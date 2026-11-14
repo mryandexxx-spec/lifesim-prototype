@@ -1,0 +1,1 @@
+{"name":"lifesim-prototype","private":true,"version":"0.1.0","type":"module","description":"Zero-build PlayCanvas prototype. Run a local static HTTP server to preview.","scripts":{"test":"node --test tests/*.test.js"}}
