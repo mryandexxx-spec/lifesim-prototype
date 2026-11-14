@@ -161,3 +161,27 @@ export function solveTwoBoneTargets({hip,knee,ankle,target,pole=null,
   return {knee:middle,ankle:reached,reachable:requested<=high&&requested>=low,
     lengthUpper:lenUpper,lengthLower:lenLower};
 }
+
+
+/**
+ * Guarded vertical-only seat correction.
+ * The game's approach/sofa timeline remains the ONLY X/Z authority. Imported
+ * glTF hip translation is neutralized by the avatar animation adapter before
+ * this call. The skinned pelvis probe controls Y only. This prevents a
+ * world-space seat root solve from relocating the body behind the furniture.
+ */
+export function solveSeatHeightCorrection({
+  seat,contactWorldY,weight=0,clearance=.02,maxCorrection=.28
+}={}) {
+  if(!seat?.contact)throw new TypeError('Seat contact required');
+  finite(seat.contact.y,'seat.contact.y');
+  finite(contactWorldY,'contactWorldY');
+  finite(clearance,'clearance');positive(maxCorrection,'maxCorrection');
+  if(clearance<0)throw new RangeError('Negative seat clearance');
+  const delta=seat.contact.y+clearance-contactWorldY;
+  // A wildly mismatched contact indicates a wrong pose, clip or transform;
+  // never move a visible character by arbitrary amounts to hide the error.
+  if(Math.abs(delta)>maxCorrection)
+    throw new RangeError('Unreliable pelvis contact: excessive height correction');
+  return delta*smoothContactWeight(weight);
+}
