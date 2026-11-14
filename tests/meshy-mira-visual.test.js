@@ -123,5 +123,5 @@ test('game supplies both independent visual adapters and includes the female mod
   assert.match(workflow,/node --check src\/meshy-mira-visual\.js/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/Блин<span>’С<\/span>/);
-  assert.match(html,/сборка \/ 0\.7e/);
+  assert.match(html,/сборка \/ 0\.7f/);
 });

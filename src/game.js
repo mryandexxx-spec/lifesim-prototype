@@ -925,9 +925,9 @@ function boot() {
       showerBusy:showerStates.mira.active,
       fridgeBusy:fridgeLeaving.mira
     });
-    // Alex uses Meshy for free locomotion and social states, but the original
-    // established rig remains active for furniture, fridge, bed and shower
-    // exit/privateness. Its simulation and save format never change.
+    // Alex stays on the same 3D rig for bed and fridge when their verified
+    // skeleton controllers exist. The original simulation/root still owns
+    // mattress placement, two bed slots, root pitch and shower privacy.
     const meshyShown=meshyAlex.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:walking&&!seating&&!bedding&&!alexShower,
@@ -940,6 +940,7 @@ function boot() {
       seat:seatContactEnabled?livingSofaSeat:null,
       seatMode,
       bedBusy:bedStates.alex.progress>0,
+      bedFrame:bedPose,
       showerBusy:showerStates.alex.active,
       fridgeBusy:fridgeLeaving.alex,
       fridgeFrame:alexFridge

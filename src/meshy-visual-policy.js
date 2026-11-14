@@ -96,16 +96,18 @@ export function alexGreetingClipTime({social=null,initiator=false,elapsed=null,d
   return duration*elapsed/ALEX_GREETING_WINDOW_MINUTES;
 }
 
-/** Sofa uses its audited Meshy sit clip; unretargeted bed/fridge/shower must retain legacy. */
+/** Skinned bed is guarded behind a real verified eight-bone post-Anim overlay.
+ * There is no sleep clip in the imported GLB. Shower remains procedural.
+ */
 export function canShowMeshy({
   preferred = false, ready = false, actionId = null,
   sofaBusy = false, bedBusy = false, showerBusy = false,
-  fridgeBusy = false, fridgeReady = false
+  fridgeBusy = false, fridgeReady = false, bedReady = false
 } = {}) {
   const eligible=actionId===null||actionId==='sofa'||
-    (actionId==='fridge'&&fridgeReady);
+    (actionId==='fridge'&&fridgeReady)||(actionId==='bed'&&bedReady);
   return Boolean(preferred&&ready&&eligible&&
-    !bedBusy&&!showerBusy&&(!fridgeBusy||fridgeReady));
+    (!bedBusy||bedReady)&&!showerBusy&&(!fridgeBusy||fridgeReady));
 }
 
 export function availableMeshClips(names) {
