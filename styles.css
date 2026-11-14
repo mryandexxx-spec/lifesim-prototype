@@ -14,7 +14,11 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .time-card span{font-weight:600; font-size:10px; color:#90968b;display:block}.time-card strong{font-size:23px;letter-spacing:-.7px;line-height:26px;}
 .control-tray {position:absolute;z-index:8;right:max(16px,env(safe-area-inset-right));top:calc(env(safe-area-inset-top) + 100px);display:flex;flex-direction:column;gap:9px;}
 .control-tray button{border:1px solid #fff;background:#ffffffe0;color:#43594d;box-shadow:0 6px 18px #566f5a20;backdrop-filter:blur(15px);height:46px;min-width:46px;border-radius:15px;font-weight:800;font-size:20px;}
-.control-tray .speed-control{font-size:15px;}.control-tray button:active{transform:scale(.95)}
+.control-tray .speed-control{font-size:15px;}
+.control-tray .rotate-control{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;line-height:1;font-size:23px;}
+.control-tray .rotate-control small{font-size:7px;letter-spacing:.55px;margin-top:2px;font-weight:800;}
+.control-tray #rotate-camera-btn[aria-pressed="true"]{background:#397c66;color:#fff;border-color:#397c66;}
+.control-tray button:active{transform:scale(.95)}
 .hotspots {position:absolute;inset:0;pointer-events:none;z-index:4;}
 .hotspot{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:7px;border:1px solid #ffffffc7;border-radius:22px;background:#fffffff0;box-shadow:0 7px 20px #2f483220;padding:7px 10px 7px 7px;pointer-events:auto;color:#3b5649;font-size:12px;font-weight:800;white-space:nowrap;transition:background .14s,scale .14s;}
 .hotspot .item-symbol {width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:#ddefe1;font-size:16px;}
