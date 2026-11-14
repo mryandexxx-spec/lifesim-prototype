@@ -84,7 +84,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,onStatus=()=>{}}) {
     get status(){return state.status;},
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
-      sofaBusy=false,sofaWeight=0,seat=null,dt=0,
+      sofaBusy=false,sofaWeight=0,seat=null,seatMode='vertical',dt=0,
       bedBusy=false,showerBusy=false,fridgeBusy=false}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
@@ -108,9 +108,16 @@ export function createMeshyVisual({pc,app,rig,footIK=true,onStatus=()=>{}}) {
         }
         if(seat && state.seatRuntime){
           try{
-            const placed=state.seatRuntime.place({
-              seat,weight:sofaWeight,scale:state.scale,base:state.base
-            });
+            const horizontalOffset=meshySofaOffset(sofaWeight,state.scale);
+            const placed=seatMode==='full'
+              ? state.seatRuntime.place({
+                seat,weight:sofaWeight,scale:state.scale,base:state.base,
+                ik:true
+              })
+              : state.seatRuntime.placeVertical({
+                seat,weight:sofaWeight,scale:state.scale,base:state.base,
+                horizontalOffset
+              });
             state.sofaOffset=placed.offset;
           }catch(error){
             // Keep the accepted 0.7b model rather than crashing gameplay if
