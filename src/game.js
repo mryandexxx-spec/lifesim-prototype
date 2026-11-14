@@ -5,7 +5,7 @@ import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
-import { createCharacterRig } from './characters.js';
+import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
@@ -13,6 +13,7 @@ import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './s
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
 import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
+import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,bedDestinationFor } from './household.js';
@@ -188,7 +189,8 @@ function boot() {
     mint: mat('#a7cab6'), green: mat('#477e62'), darkGreen: mat('#315d50'), leaf: mat('#4f986b'), leaf2: mat('#7cb785'),
     pink: mat('#e8b6aa'), peach: mat('#efcfb6'), rust: mat('#bb856f'), slate: mat('#6f8b89'), glass: mat('#badeda', {opacity:0.38}),
     white: mat('#fffdf7'), black: mat('#303c3a'), tan: mat('#be9d86'), blue: mat('#c5dbdd'), yellow: mat('#f7d68d'),
-    skin: mat('#c88d6e'), hair: mat('#47382f'), shirt: mat('#4b967d'), trousers: mat('#566675'), rug: mat('#d6b8a5')
+    skin: mat('#c88d6e'), hair: mat('#47382f'), shirt: mat('#4b967d'), trousers: mat('#566675'), rug: mat('#d6b8a5'),
+    privacy: mat('#86bac2') // Opaque: no blending or depth-write bypass.
   };
   const primitive = (type,name,x,y,z,sx,sy,sz,material,parent=app.root) => {
     const entity = new pc.Entity(name);
@@ -302,6 +304,21 @@ function boot() {
   cylinder('shower head',-4.41,2.27,2.19,.46,.09,.46,M.slate);
   cylinder('shower pipe',-4.41,1.85,2.19,.065,.80,.065,M.slate);
   box('shower towel',-2.55,.89,3.69,.45,.7,.08,M.mint);
+  // Solid, original privacy enclosure covering all angles including overhead.
+  // Both the resident and their street outfit are hidden before any outfit swap.
+  const showerPrivacy=new pc.Entity('Opaque shower privacy enclosure');
+  app.root.addChild(showerPrivacy);
+  showerPrivacy.setPosition(SHOWER_LAYOUT.interior.x,0,SHOWER_LAYOUT.interior.z);
+  box('solid shower privacy',0,SHOWER_LAYOUT.privacyHeight/2,0,
+    SHOWER_LAYOUT.privacyWidth,SHOWER_LAYOUT.privacyHeight,SHOWER_LAYOUT.privacyDepth,
+    M.privacy,showerPrivacy);
+  for(const y of [.39,1.06,1.73]){
+    box('shower ripple front '+y,0,y,SHOWER_LAYOUT.privacyDepth/2+.012,
+      SHOWER_LAYOUT.privacyWidth*.8,.035,.018,M.cream,showerPrivacy);
+    box('shower ripple right '+y,SHOWER_LAYOUT.privacyWidth/2+.012,y,0,
+      .018,.035,SHOWER_LAYOUT.privacyDepth*.75,M.cream,showerPrivacy);
+  }
+  showerPrivacy.enabled=false;
 
   // Potted plant, decorations and an oversized welcoming mat.
   cylinder('plant pot',4.19,.30,3.22,.58,.63,.58,M.rust);
@@ -318,6 +335,7 @@ function boot() {
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
   const bedStates={alex:createBedTransition(),mira:createBedTransition()};
+  const showerStates={alex:createShowerTransition(),mira:createShowerTransition()};
   const {avatar,torso,leftEye,rightEye,legPivot,armPivot,snack,book,selected:alexSelected}=alexRig;
   const {avatar:miraAvatar,torso:miraTorso,leftEye:miraLeftEye,rightEye:miraRightEye,
     legPivot:miraLegPivot,armPivot:miraArmPivot,snack:miraSnack,book:miraBook,
@@ -328,7 +346,6 @@ function boot() {
   });
   const ACTOR_POSES = {
     sofa:   SOFA_POSE,
-    shower: {x:-3.68,y:.18,z:2.44,pitch:0,yaw:0},
     fridge: {x:FRIDGE_LAYOUT.approach.x,y:0,z:FRIDGE_LAYOUT.approach.z,pitch:0,yaw:FRIDGE_FACING_YAW}
   };
   if(game.action?.phase==='using') {
@@ -418,12 +435,16 @@ function boot() {
     for(const id of HOUSEHOLD_IDS){
       sofaStates[id]=createSofaTransition();
       bedStates[id]=createBedTransition();
+      showerStates[id]=createShowerTransition();
       animationStates[id]=createAnimationState();
+      applyShowerAppearance(id==='alex'?alexRig:miraRig,false,false);
     }
     game.position=nearestWalkable(game.position);
     game.otherSim.position=nearestWalkable(game.otherSim.position);
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
+    showerPrivacy.enabled=false;
+    for(const drop of showerDrops)drop.enabled=false;
   };
   avatar.setPosition(display.x,display.y,display.z);
   miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
@@ -563,7 +584,7 @@ function boot() {
         const resident=getActor(game,residentId);
         // If another command arrives during a sit, stand up completely first.
         if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0||
-          fridgeLeaving[residentId])continue;
+          showerStates[residentId].active||fridgeLeaving[residentId])continue;
         const socialWalking=game.socialAction?.phase==='walking' &&
           game.socialAction.initiator===residentId;
         const jobId=socialWalking?'social:'+game.socialAction.kind:
