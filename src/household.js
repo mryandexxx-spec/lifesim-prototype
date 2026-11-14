@@ -80,6 +80,8 @@ export function setHouseholdAutonomy(root,enabled) {
 
 /** A single time step, applied to both actors without doubling the household clock. */
 export function tickHousehold(root,minutes) {
+  // A paused or invalid tick must be completely side-effect free, including Mira's fields.
+  if (root.paused || !Number.isFinite(minutes) || minutes<=0) return;
   const other=root.otherSim;
   if (!other) return tick(root,minutes);
   other.minutes=root.minutes;
