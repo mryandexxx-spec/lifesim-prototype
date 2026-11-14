@@ -12,7 +12,7 @@ const safe=(n,fallback)=>Number.isFinite(n)?n:fallback;
 
 export function createAnimationState() {
   return {legs:[0,0],knees:[0,0],feet:[0,0],arms:[0,0],elbows:[0,0],
-    torso:0,pelvisRoll:0,walkWeight:0,walkBob:0,
+    torso:0,pelvisRoll:0,walkWeight:0,walkBob:0,walkPhase:0,
     spineLean:0,spineTwist:0,spineRoll:0,hipShift:0,bodyLift:0,
     bedHipYaw:[0,0],bedHipRoll:[0,0],
     mouthWidth:.095,mouthHeight:.017,brow:-0.5,eyeOpen:1,time:0};
@@ -28,7 +28,11 @@ export function stepAnimation(previous,signals,dt) {
   const moving=Boolean(signals?.walking);
   const action=signals?.using||null;
   const social=signals?.social==='talk'?'talk':signals?.social==='argue'?'argue':null;
-  const gait=safe(signals?.gait,0);
+  // A stop command may send gait=0 even though the last planted foot is
+  // still mid-stride. Freeze that stance phase during deceleration to avoid
+  // an abrupt leg flip before the walk weight reaches zero.
+  const requestedGait=safe(signals?.gait,0);
+  const gait=moving?requestedGait:safe(previous.walkPhase,requestedGait);
   const side=signals?.id==='mira'?-1:1;
   const energy=clamp(safe(signals?.energy,70),0,100);
   // Acceleration and deceleration are in active real time. Phase comes from
@@ -181,7 +185,7 @@ export function stepAnimation(previous,signals,dt) {
     bedFootYaw:contact?signals.bedFootYaw:null,
     bedHipQuaternion:contact?contact.map(c=>c.quaternion):null,
     legs,knees,feet,arms,elbows,torso:contact?0:torso,pelvisRoll:contact?0:pelvisRoll,
-    walkWeight,walkBob:contact?0:walkBob,
+    walkWeight,walkBob:contact?0:walkBob,walkPhase:gait,
     spineLean:contact?0:spineLean,spineTwist:contact?0:spineTwist,
     spineRoll:contact?0:spineRoll,hipShift:contact?0:hipShift,bodyLift:contact?0:bodyLift,
     bedHipYaw,bedHipRoll,time:t,
