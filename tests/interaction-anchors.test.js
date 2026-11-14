@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createSeatSurface,seatSlot,solveSeatRoot,rotateSeatVector,blendSeatRoot,
-  seatFootTargets,smoothContactWeight,solveTwoBoneTargets
+  seatFootTargets,smoothContactWeight,solveTwoBoneTargets,seatGroundedAnkleTargets
 } from '../src/interaction-anchors.js';
 import {SOFA_LAYOUT} from '../src/pose-config.js';
 
@@ -126,4 +126,73 @@ test('Mixamo foot-side mapping respects anatomical left +X and right -X',()=>{
   assert.ok(left.x>right.x,'Left bone uses positive local X in Mixamo');
   near(left.x,.18);near(right.x,-.18);
   assert.throws(()=>seatFootTargets({seat:slot,sideSigns:[1,1]}),RangeError);
+});
+
+test('sofa shoe targets are on floor just beyond seat FRONT EDGE, not under cushion',()=>{
+  for(const depth of [.70,1.05,1.35]){
+    const couch=createSeatSurface({
+      id:'depth-'+depth,origin:{x:1.35,y:0,z:1.54},yaw:180,
+      width:2.53,depth,seatHeight:.35,slots:1
+    });
+    const slot=seatSlot(couch,0);
+    const feet=seatGroundedAnkleTargets({
+      seat:slot,scale:2.05/1.7,halfStance:.16,
+      soleDrops:[.15041,.14668],frontClearance:.09,
+      sideSigns:[1,-1]
+    });
+    for(const foot of feet){
+      assert.ok(foot.z<slot.front.z-.08,'shoe is ahead of cushion front');
+      assert.ok(foot.y>.18&&foot.y<.21,'shoe sole height is grounded');
+    }
+    assert.ok(feet[0].x<feet[1].x,'Mixamo left and right feet do not cross');
+    near(feet[1].x-feet[0].x,.32);
+    assert.ok(slot.approach.z<feet[0].z,'walk approach remains in front of planted feet');
+  }
+});
+
+test('optimized GLB seated bones can reach grounded shoe targets without moving game root',()=>{
+  const sofa=createSeatSurface({
+    id:'source-sofa',origin:{x:1.35,y:0,z:1.54},yaw:180,
+    width:2.53,depth:1.05,seatHeight:.35
+  });
+  const seat=seatSlot(sofa,0);
+  const scale=2.05/1.7;
+  // Exact skinned bone origins at t=0 from meshy-casual-v1.glb; both shoes
+  // originally sink ~15cm when the old game sofa root lowers by .225m.
+  const data=[
+    {h:[.08183475,.53698005,-.71941992],k:[.24037714,.50382335,-.39384406],
+      a:[.14496716,.14261694,-.45998932]},
+    {h:[-.11809682,.54384804,-.70488976],k:[-.25909585,.52770487,-.36689592],
+      a:[-.19542703,.15453119,-.34033732]}
+  ];
+  const offset={x:(.001-(-.016573))*scale,z:(-.027-(-.738054))*scale};
+  const baseY=-.225+(.02791073)*scale;
+  const markerY=baseY+(.63078082-.20)*scale;
+  const contactY=.35+.020;
+  const rootY=baseY+(contactY-markerY);
+  const bone=(v)=>{
+    const r=rotateSeatVector({x:v[0]*scale+offset.x,y:v[1]*scale,z:v[2]*scale+offset.z},180);
+    return {x:1.35+r.x,y:rootY+r.y,z:1.44+r.z};
+  };
+  const feet=seatGroundedAnkleTargets({seat,scale,soleDrops:[.15041,.14668],
+    halfStance:.16,frontClearance:.09,sideSigns:[1,-1]});
+  for(let i=0;i<2;i++){
+    const hip=bone(data[i].h),knee=bone(data[i].k),ankle=bone(data[i].a);
+    assert.ok(ankle.y<feet[i].y-.12,'original imported shoe is too far below floor');
+    const forward=rotateSeatVector({x:0,y:0,z:.60},seat.yaw);
+    const pole={x:hip.x+forward.x,y:hip.y-.30,z:hip.z+forward.z};
+    const result=solveTwoBoneTargets({hip,knee,ankle,target:feet[i],pole,maxStretch:.995});
+    assert.equal(result.reachable,true,'shoe target physically reachable for GLB leg');
+    assert.ok(result.knee.y<hip.y+.06,'knee is not lifted unnaturally above hip');
+    assert.ok(result.ankle.y>.18 && result.ankle.y<.21);
+  }
+});
+
+test('an invalid sole marker or inverted feet pair cannot silently corrupt IK',()=>{
+  const s=createSeatSurface({id:'chair',origin:{x:0,y:0,z:0},
+    yaw:0,width:.8,depth:.7,seatHeight:.46});
+  const seat=seatSlot(s,0);
+  assert.throws(()=>seatGroundedAnkleTargets({seat,scale:1,soleDrops:[.15]}),RangeError);
+  assert.throws(()=>seatGroundedAnkleTargets({seat,scale:1,sideSigns:[1,1]}),RangeError);
+  assert.throws(()=>seatGroundedAnkleTargets({seat,scale:-2}),RangeError);
 });
