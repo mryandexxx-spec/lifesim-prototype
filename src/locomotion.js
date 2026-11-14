@@ -1,51 +1,105 @@
 /**
- * LifeSim 0.6b.1 — readable two-bone stride, waist and elbow articulation.
- * Targets are functions of DISTANCE phase and gait intensity; graphics
- * remain procedural, state is transient and no renderer imports are used.
+ * LifeSim 0.6f.1 — grounded, distance-driven procedural walking.
+ *
+ * Each half-cycle plants one sole while the root travels exactly one
+ * half-stride. The other sole swings forward on a smooth arc. A constrained
+ * two-segment planar IK places ankles above the floor without foot skating
+ * or the exaggerated flapping from 0.6b.1. No PlayCanvas or save dependency.
  */
 import {LEG_GEOMETRY} from './pose-config.js';
+
 export const WALK_PHASE_PER_METER=7.2;
+const TAU=Math.PI*2;
+const THIGH=-LEG_GEOMETRY.kneeOffsetY;
+const SHIN=-LEG_GEOMETRY.shoeCenterY;
+// One foot stays planted while the root covers pi / phasePerMeter metres.
+const HALF_STRIDE=Math.PI/WALK_PHASE_PER_METER;
+const REACH=HALF_STRIDE/2;
+const FOOT_Y=LEG_GEOMETRY.shoeHeight/2;
+const ROOT_DIP=.045;
+const SWING_LIFT=.085;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const finite=(v,f)=>Number.isFinite(v)?v:f;
 const rad=deg=>deg*Math.PI/180;
+const deg=v=>v*180/Math.PI;
+const smooth01=t=>{const x=clamp(t,0,1);return x*x*(3-2*x);};
+const wrap=t=>((t%TAU)+TAU)%TAU;
 
-export function gaitTargets(phase,weight=1,energy=70) {
-  const t=finite(phase,0);
-  const w=clamp(finite(weight,0),0,1);
-  if(w===0)return {
-    hips:[0,0],knees:[0,0],feet:[0,0],arms:[0,0],
-    elbows:[0,0],pelvisRoll:0,torsoRoll:0,
-    spineLean:0,spineTwist:0,spineRoll:0,hipShift:0,bodyLift:0
-  };
-  const vigor=.92+.08*clamp(finite(energy,70),0,100)/100;
-  const wave=Math.sin(t);
-  const cycle=[wave,-wave];
-  const hips=[],knees=[],feet=[],elbows=[];
-  for(let i=0;i<2;i++){
-    const side=cycle[i];
-    const swing=Math.max(0,-side),stance=Math.max(0,side);
-    // Far more leg clearance than 0.6b: the advancing foot flexes at knee.
-    hips.push(39*side*w*vigor);
-    knees.push((3+53*Math.pow(swing,1.25))*w);
-    feet.push((-19*swing+6*stance)*w);
-    elbows.push((17+27*Math.max(0,side))*w);
-  }
+export function gaitRootOffset(phase){
+  const c=Math.cos(finite(phase,0));
+  return -ROOT_DIP*c*c;
+}
+
+/**
+ * 0=left, 1=right. Stance lasts half a cycle, during which the foot
+ * stays fixed in world Z because local Z moves at -1/PHASE_PER_METER.
+ * The smooth lifted swing then returns the sole to the next touchdown.
+ */
+export function gaitFootTrajectory(phase,leg=0){
+  const p=finite(phase,0);
+  const t=wrap(p+(leg===0?Math.PI:0));
+  const stance=t<Math.PI;
+  const u=stance?t/Math.PI:(t-Math.PI)/Math.PI;
   return {
-    hips,knees,feet,
-    arms:[-wave*31*w,wave*31*w],
-    elbows,
-    pelvisRoll:wave*4*w,
-    torsoRoll:-wave*4*w,
-    // Spine twists and leans as one connected structure (head/arms follow).
-    spineLean:5*w,
-    spineTwist:wave*8*w,
-    spineRoll:-wave*6*w,
-    hipShift:wave*.065*w,
-    bodyLift:(1-Math.cos(2*t))*.009*w
+    stance,
+    progress:u,
+    z:stance?REACH-HALF_STRIDE*u:
+      -REACH+HALF_STRIDE*smooth01(u),
+    lift:stance?0:SWING_LIFT*Math.sin(Math.PI*u)**2
   };
 }
 
-/** Small stance-foot adjustment; not IK. Never creates position drift. */
+/** Analytic planar 2-bone leg solve; the foot is flat on the floor in stance. */
+function solveLeg(foot,rootY){
+  const down=LEG_GEOMETRY.hipHeight+rootY-(FOOT_Y+foot.lift);
+  const reach=Math.hypot(down,foot.z);
+  const cosine=clamp((reach*reach-THIGH*THIGH-SHIN*SHIN)/(2*THIGH*SHIN),-1,1);
+  const knee=Math.acos(cosine);
+  const hip=Math.atan2(-foot.z,down)-
+    Math.atan2(SHIN*Math.sin(knee),THIGH+SHIN*Math.cos(knee));
+  // Cancel combined hip and knee pitch so the shoe stays horizontal.
+  // Only the lifted swing foot rolls its toes by a tiny amount.
+  const toe=foot.stance?0:4*Math.sin(Math.PI*foot.progress);
+  return {hip:deg(hip),knee:deg(knee),foot:deg(-hip-knee)+toe};
+}
+
+/**
+ * Deterministic targets are based on travelled metres, not render frames.
+ * The weight handles easing in/out; support geometry stays coherent at 1×/3×.
+ */
+export function gaitTargets(phase,weight=1,energy=70){
+  const t=finite(phase,0);
+  const w=clamp(finite(weight,0),0,1);
+  const zero={hips:[0,0],knees:[0,0],feet:[0,0],arms:[0,0],
+    elbows:[0,0],pelvisRoll:0,torsoRoll:0,
+    spineLean:0,spineTwist:0,spineRoll:0,hipShift:0,bodyLift:0,
+    rootOffset:0};
+  if(w===0)return zero;
+  const rootOffset=gaitRootOffset(t);
+  const solved=[0,1].map(i=>solveLeg(gaitFootTrajectory(t,i),rootOffset));
+  const wave=Math.sin(t);
+  const vigor=.9+.1*clamp(finite(energy,70),0,100)/100;
+  const arms=[-wave*19*w*vigor,wave*19*w*vigor];
+  return {
+    hips:solved.map(s=>s.hip*w),
+    knees:solved.map(s=>s.knee*w),
+    feet:solved.map(s=>s.foot*w),
+    arms,
+    elbows:[(13+10*Math.max(0,wave))*w,(13+10*Math.max(0,-wave))*w],
+    pelvisRoll:wave*1.8*w,
+    torsoRoll:-wave*1.8*w,
+    spineLean:2.2*w,
+    spineTwist:wave*3*w,
+    spineRoll:-wave*2.4*w,
+    hipShift:wave*.024*w,
+    bodyLift:0,
+    rootOffset:rootOffset*w
+  };
+}
+
+/** Legacy support estimator for older callers and compatibility tests.
+ * Contact gait now uses gaitRootOffset so ankle targets stay synchronized.
+ */
 export function gaitGroundOffset(hips,knees){
   if(!Array.isArray(hips)||!Array.isArray(knees)||hips.length<2||knees.length<2)
     return 0;
