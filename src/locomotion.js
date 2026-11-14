@@ -9,6 +9,31 @@
 import {LEG_GEOMETRY} from './pose-config.js';
 
 export const WALK_PHASE_PER_METER=7.2;
+
+/**
+ * LifeSim 0.6f.2 — advance a stride from the DISPLAYED root displacement,
+ * not the simulation's unsmoothed route follower. This keeps a planted sole
+ * planted even when the rendered avatar trails the A* path at 1× / 3×.
+ *
+ * Return null heading if stationary, paused, finishing another interaction
+ * or after a renderer reset/teleport. This is transient; nothing is saved.
+ */
+export function advanceVisualGait(phase,from,to,walking=true){
+  const previous=Number.isFinite(phase)?phase:0;
+  const frozen={phase:previous,heading:null,distance:0};
+  if(!walking||!from||!to)return frozen;
+  const dx=to.x-from.x,dz=to.z-from.z;
+  if(!Number.isFinite(dx)||!Number.isFinite(dz))return frozen;
+  const distance=Math.hypot(dx,dz);
+  // A normal rendered update is << 0.4 m. Do not play many steps when
+  // loading a save, resetting the scene, or teleporting across furniture.
+  if(distance<1e-6||distance>.4)return frozen;
+  return {
+    phase:previous+distance*WALK_PHASE_PER_METER,
+    heading:Math.atan2(dx,dz)*180/Math.PI,
+    distance
+  };
+}
 const TAU=Math.PI*2;
 const THIGH=-LEG_GEOMETRY.kneeOffsetY;
 const SHIN=-LEG_GEOMETRY.shoeCenterY;
