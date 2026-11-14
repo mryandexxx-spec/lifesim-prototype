@@ -107,19 +107,25 @@ test('pause freezes active stage and exit transitions independent of playback sp
   assert.deepEqual(at(.51),showerSequence(.51*32,32));
 });
 test('full-body rig hidden during private bathing, always returns fully clothed',()=>{
-  const root=new pc.Entity('root'),made=[];
-  root.enabled=true;
+  // Use a renderer-independent entity fixture: PlayCanvas detached roots are
+  // not activated until attached to the real scene graph.
+  class FixtureEntity{
+    constructor(name){this.name=name;this.enabled=true;this.children=[];}
+    addChild(item){this.children.push(item);}
+    setLocalPosition(x,y,z){this.position={x,y,z};}
+    setLocalScale(x,y,z){this.scale={x,y,z};}
+  }
+  const root=new FixtureEntity('root'),made=[];
   const shape=(name,x,y,z,sx,sy,sz,material,parent=root)=>{
-    const item=new pc.Entity(name);
+    const item=new FixtureEntity(name);
     item.setLocalPosition(x,y,z);item.setLocalScale(sx,sy,sz);
     parent.addChild(item);made.push(item);return item;
   };
   const materials={black:'black',cream:'cream',yellow:'yellow',green:'green',mint:'mint'};
-  const ctx={pc,root,ball:shape,box:shape,cylinder:shape,
+  const ctx={pc:{Entity:FixtureEntity},root,ball:shape,box:shape,cylinder:shape,
     mat:s=>s,materials};
   for(const id of ['alex','mira']){
     const rig=createCharacterRig(ctx,id);
-    rig.avatar.enabled=true; // Detached headless fixture starts disabled.
     assert.ok(rig.outfitMeshes.length>=10);
     assert.equal(rig.avatar.enabled,true);
     assert.equal(rig.showerWrap.enabled,false);
