@@ -11,7 +11,7 @@ import {createSkinnedSeatController} from './meshy-seat-runtime.js';
  * progress with X/Z hip root-motion compensation. Bed/fridge/shower still use
  * the tested procedural rig until their poses have been retargeted.
  */
-export function createMeshyVisual({pc,app,rig,onStatus=()=>{}}) {
+export function createMeshyVisual({pc,app,rig,footIK=true,onStatus=()=>{}}) {
   const hiddenFromReplacement=new Set([rig.selected,rig.snack,rig.book,rig.showerWrap]);
   const legacyRenderers=rig.avatar.findComponents('render')
     .filter(component=>!hiddenFromReplacement.has(component.entity));
@@ -55,7 +55,7 @@ export function createMeshyVisual({pc,app,rig,onStatus=()=>{}}) {
       // compatible bone hierarchy (this does not block other game actions).
       if(typeof model.findByName==='function')try{
         state.seatRuntime=createSkinnedSeatController({
-          pc,model,avatar:rig.avatar,profile:MESHY_SEAT_RIG_PROFILE
+          pc,model,avatar:rig.avatar,profile:MESHY_SEAT_RIG_PROFILE,footIK
         });
       }catch(error){console.warn('Meshy seat contact unavailable',error);}
       root.enabled=false;
