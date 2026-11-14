@@ -13,8 +13,10 @@ export function meshyBedPose(frame){
     !Number.isFinite(frame.bedSitWeight)||
     !Number.isFinite(frame.bedReclineWeight))return null;
   const sit=clamp(frame.bedSitWeight);
-  const step=clamp(frame.bedStepWeight);
-  const swing=clamp(frame.bedSwingWeight);
+  // The source transition uses sin(PI * phase), whose endpoint can be a
+  // tiny nonzero floating-point residue. Snap those to exact rest values.
+  const step=clamp(frame.bedStepWeight)<1e-7?0:clamp(frame.bedStepWeight);
+  const swing=clamp(frame.bedSwingWeight)<1e-7?0:clamp(frame.bedSwingWeight);
   const recline=clamp(frame.bedReclineWeight);
   const side=frame.bedSide==='left'?1:-1;
   // Keep hips in the source standing pose while prone. The game rotates
