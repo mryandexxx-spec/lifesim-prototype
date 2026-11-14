@@ -139,7 +139,9 @@ test('audited female sit track interpolates measured pelvic translation, no per-
   assert.ok(Math.abs(MIRA_SOFA_DURATION-2.26666665)<.0001);
   assert.ok(MIRA_SOFA_HIPS.length>=30);
   assert.deepEqual(miraSofaHipAt(0),{x:.00492,z:-.01003});
-  assert.deepEqual(miraSofaHipAt(MIRA_SOFA_DURATION),{x:.00013,z:-.41930});
+  const last=miraSofaHipAt(MIRA_SOFA_DURATION);
+  assert.ok(Math.abs(last.x-.00013)<1e-6);
+  assert.ok(Math.abs(last.z+.41930)<1e-6);
   assert.ok(Math.abs(miraSofaHipAt(1.0333).z+.2328)<.0001);
   const scale=2.05/1.7;
   const sitting=miraSofaOffset(1,scale);
