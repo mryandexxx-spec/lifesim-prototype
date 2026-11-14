@@ -32,11 +32,14 @@ catch { game = newHousehold(); }
 const selectedActor = () => getActor(game,game.selectedSim);
 const selectedName = () => getActorName(game.selectedSim);
 const visualQuery = new URLSearchParams(window.location.search).get('model') || '';
-// Emergency QA switches: keep Meshy appearance while reverting only seat
-// contact solving (?seat=legacy) or disabling foot IK (?ik=off).
+// The photographed 0.7c contact solver moved Alex outside the couch by
+// treating a game-owned animated X/Z root as an independent world root.
+// Default is guarded vertical-only contact. Full XYZ+IK is explicitly opt-in,
+// not shipped as a user-facing default until it passes real-device QA.
 const seatQuery = new URLSearchParams(window.location.search);
-const seatContactEnabled = seatQuery.get('seat') !== 'legacy';
-const seatIKEnabled = seatQuery.get('ik') !== 'off';
+const seatMode=seatQuery.get('seat')==='full'?'full':'vertical';
+const seatContactEnabled=seatQuery.get('seat')!=='legacy';
+const seatIKEnabled=seatQuery.get('ik')==='on';
 let meshyPreferred = meshVisualPreference(null,visualQuery);
 try { meshyPreferred=meshVisualPreference(localStorage.getItem(MESHY_VISUAL_KEY),visualQuery); }
 catch { /* Safari private mode may reject storage; use the in-memory choice. */ }
@@ -922,6 +925,7 @@ function boot() {
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
       seat:seatContactEnabled?livingSofaSeat:null,
+      seatMode,
       bedBusy:bedStates.alex.progress>0,
       showerBusy:showerStates.alex.active,
       fridgeBusy:fridgeLeaving.alex
