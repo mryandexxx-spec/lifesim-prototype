@@ -23,6 +23,7 @@ jobs:
           node-version: '22'
       - name: Check game rules and browser source syntax
         run: |
+          npm ci
           npm test
           node --check src/game.js
           node --check src/simulation.js

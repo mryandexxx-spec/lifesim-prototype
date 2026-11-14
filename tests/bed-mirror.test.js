@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {BED_SLOTS,BED_SLOT_IDS} from '../src/bed-layout.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,
-  blendBedDisplay,BED_ENTER_SECONDS,BED_EXIT_SECONDS} from '../src/bed-transition.js';
+  BED_ENTER_SECONDS,BED_EXIT_SECONDS} from '../src/bed-transition.js';
 import {createAnimationState,stepAnimation} from '../src/animations.js';
 
 const close=(a,b,t=.001)=>Math.abs(a-b)<=t;
@@ -24,17 +24,17 @@ test('left and right approaches use opposite rotations and matched mirrored traj
 test('both side-sitters face OUTWARD until seated, and rotate toward pillows only afterward',()=>{
   for(const slot of BED_SLOT_IDS){
     const approach=pose(slot,.03),turning=pose(slot,.3),perch=pose(slot,.49),
-      swinging=pose(slot,.75),lying=pose(slot,1);
+      swinging=pose(slot,.61),lying=pose(slot,1);
     assert.equal(approach.pitch,0);
     assert.ok(close(Math.abs(turning.yaw),90), 'turn is not toward foot before sitting');
     assert.ok(close(Math.abs(perch.yaw),90), 'both legs dangle OUTSIDE long edge');
     assert.ok(perch.z<-1.2,'sit beside mattress, not at bed foot');
     assert.equal(perch.pitch,0);
     assert.ok(perch.bedSitWeight>.8 && perch.bedReclineWeight===0);
-    assert.ok(swinging.bedReclineWeight>.2&&swinging.bedSwingWeight>.8);
+    assert.ok(swinging.bedReclineWeight===0&&swinging.bedSwingWeight>.8);
     assert.ok(Math.abs(swinging.yaw)<90,'turn follows seated leg swing');
-    assert.ok(Math.abs(swinging.roll)>7);
-    assert.ok(close(lying.pitch,-85));
+    assert.ok(Math.abs(swinging.roll)===0);
+    assert.ok(close(lying.pitch,-78));
     assert.ok(close(lying.roll,0));
     assert.ok(close(lying.x,BED_SLOTS[slot].pose.x,.02));
   }
@@ -44,8 +44,8 @@ test('world pelvis remains supported throughout the sit and reclining arc',()=>{
     for(let i=0;i<=500;i++){
       const p=i/500,body=pose(slot,p);
       assert.ok(Number.isFinite(body.x)&&Number.isFinite(body.y));
-      assert.ok(hipY(body)>=.72-.001&&hipY(body)<=.8141);
-      if(p>.54)assert.ok(close(hipY(body),.814,.002));
+      assert.ok(hipY(body)>=.65-.001&&hipY(body)<=.7201);
+      if(p>.54)assert.ok(close(hipY(body),.65,.002));
     }
   }
 });
@@ -63,22 +63,17 @@ test('sampled left and right movement is continuous at actual frame cadence',()=
     }
   }
 });
-test('all render channels interpolate using a shared spring, and pause freezes them',()=>{
-  const initial={x:-4.3,y:0,z:-.4,pitch:0,yaw:90,roll:0};
-  const target=pose('left',.7);
-  const one=blendBedDisplay(initial,target,1/60);
-  const ratios=['x','y','z','pitch','yaw','roll'].map(k=>
-    (one[k]-initial[k])/(target[k]-initial[k]));
-  for(const v of ratios)assert.ok(close(v,ratios[0],.00001));
-  assert.deepEqual(blendBedDisplay(one,target,0),one);
-  assert.deepEqual(blendBedDisplay(one,target,NaN),one);
-  assert.ok(Math.hypot(one.x-initial.x,one.z-initial.z)<.8);
+test('pause freezes the same sampled contact pose without a second render filter',()=>{
+  const state={slot:'left',progress:.80};
+  const held=advanceBedTransition(state,true,'left',0);
+  assert.equal(held,state);
+  assert.deepEqual(bedTransitionPose(held),bedTransitionPose(state));
 });
 test('left and right legs, body twist, and brace arm animate in opposite directions',()=>{
   const result={};
   for(const side of BED_SLOT_IDS){
     let s=createAnimationState();
-    const p=pose(side,.76);
+    const p=pose(side,.61);
     for(let i=0;i<65;i++){
       s=stepAnimation(s,{using:'bed',bedSide:side,
         bedSitWeight:p.bedSitWeight,bedReclineWeight:p.bedReclineWeight,

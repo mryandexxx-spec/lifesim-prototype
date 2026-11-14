@@ -1,10 +1,13 @@
 {
   "name": "lifesim-prototype",
   "private": true,
-  "version": "0.6.0-beta.6",
+  "version": "0.6.0-beta.7",
   "type": "module",
   "description": "Code-first PlayCanvas life simulation prototype. Run a local static HTTP server to preview.",
   "scripts": {
     "test": "node --test tests/*.test.js"
+  },
+  "devDependencies": {
+    "playcanvas": "2.24.1"
   }
 }

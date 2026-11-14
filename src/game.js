@@ -10,8 +10,8 @@ import { createAnimationState,stepAnimation,applyCharacterAnimation } from './an
 import {WALK_PHASE_PER_METER} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
-import {BED_SLOTS} from './bed-layout.js';
-import {createBedTransition,advanceBedTransition,bedTransitionPose,blendBedDisplay} from './bed-transition.js';
+import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
+import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,bedDestinationFor } from './household.js';
@@ -223,21 +223,26 @@ function boot() {
   for (let i=0;i<3;i++) box('books',-4.69,1.91,-.25+i*.22,.21,.32,.13,[M.pink,M.cream,M.green][i]);
 
   // Bed, blanket, headboard and pillows.
-  box('bed frame',-2.62,.28,-1.42,2.42,.38,2.52,M.wood);
-  box('mattress',-2.62,.52,-1.42,2.23,.22,2.36,M.white);
+  box('bed frame',BED_LAYOUT.centerX,BED_LAYOUT.frameY,BED_LAYOUT.centerZ,
+    2.42,BED_LAYOUT.frameHeight,2.52,M.wood);
+  box('mattress',BED_LAYOUT.centerX,BED_LAYOUT.mattressY,BED_LAYOUT.centerZ,
+    BED_LAYOUT.width,BED_LAYOUT.mattressHeight,BED_LAYOUT.depth,M.white);
   // Two separate quilts cover the two independent sleepers.
+  const quilts={};
   for(const [slot,color] of [['left',M.mint],['right',M.peach]]){
     const bx=BED_SLOTS[slot].x;
-    box('duvet '+slot,bx,.80,-.95,1.02,.15,1.45,color);
-    box('duvet trim '+slot,bx,.89,-1.58,.98,.025,.045,M.cream);
+    quilts[slot]={
+      body:box('duvet '+slot,bx,.53,-.49,1.02,.15,.45,color),
+      trim:box('duvet trim '+slot,bx,.62,-.69,.98,.025,.045,M.cream)
+    };
   }
   box('bed headboard',-2.62,.82,-2.69,2.47,.95,.17,M.paleWood);
-  box('pillow left',-3.15,.69,-2.18,.87,.19,.50,M.cream);
-  box('pillow right',-2.10,.69,-2.18,.87,.19,.50,M.peach);
-  box('side table',-4.23,.38,-1.45,.65,.64,.68,M.paleWood);
-  cylinder('lamp base',-4.23,.76,-1.45,.22,.10,.22,M.white);
-  cylinder('lamp stem',-4.23,.94,-1.45,.055,.32,.055,M.slate);
-  cylinder('lamp shade',-4.23,1.17,-1.45,.45,.32,.45,M.yellow);
+  box('pillow left',-3.15,.54,-2.18,.87,.19,.50,M.cream);
+  box('pillow right',-2.10,.54,-2.18,.87,.19,.50,M.peach);
+  box('side table',-4.23,.38,-3.35,.65,.64,.68,M.paleWood);
+  cylinder('lamp base',-4.23,.76,-3.35,.22,.10,.22,M.white);
+  cylinder('lamp stem',-4.23,.94,-3.35,.055,.32,.055,M.slate);
+  cylinder('lamp shade',-4.23,1.17,-3.35,.45,.32,.45,M.yellow);
 
   // Kitchen zone with tall fridge, little counter and upper cupboards.
   box('fridge',3.43,.99,-2.85,1.12,1.98,1.14,M.cream);
@@ -610,7 +615,7 @@ function boot() {
     const seating=useId==='sofa'||sofaStates.alex.progress>0;
     bedStates.alex=advanceBedTransition(bedStates.alex,
       useId==='bed'&&sofaStates.alex.progress===0,
-      game.action?.bedSlot,animDt);
+      game.action?.bedSlot,animDt,{...display});
     const bedPose=bedTransitionPose(bedStates.alex);
     const bedding=Boolean(bedPose);
     const pose=useId&&useId!=='sofa'&&useId!=='bed'?ACTOR_POSES[useId]:null;
@@ -624,7 +629,7 @@ function boot() {
           game.otherSim.position.z-game.position.z)*180/Math.PI:facing
     };
     if(bedding){
-      Object.assign(display,blendBedDisplay(display,bedPose,animDt));
+      Object.assign(display,bedPose);facing=bedPose.yaw;
     }else{
       display.x=approach(display.x,desired.x,seating||pose?10:11,animDt);
       display.y=approach(display.y,desired.y,seating||pose?10:10,animDt);
@@ -643,7 +648,7 @@ function boot() {
       bedSitWeight:bedPose?.bedSitWeight||0,
       bedReclineWeight:bedPose?.bedReclineWeight||0,
       bedSwingWeight:bedPose?.bedSwingWeight||0,
-      bedSide:bedPose?.bedSide||null,
+      bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
       social:socialUsing?game.socialAction.kind:null,
       gait,mood:game.mind?.mood?.value,energy:game.needs.energy
     },animDt);
@@ -660,7 +665,7 @@ function boot() {
     const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
     bedStates.mira=advanceBedTransition(bedStates.mira,
       miraUseId==='bed'&&sofaStates.mira.progress===0,
-      game.otherSim.action?.bedSlot,animDt);
+      game.otherSim.action?.bedSlot,animDt,{...miraDisplay});
     const miraBedPose=bedTransitionPose(bedStates.mira);
     const miraBedding=Boolean(miraBedPose);
     const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'?ACTOR_POSES[miraUseId]:null;
@@ -674,7 +679,7 @@ function boot() {
           game.position.z-game.otherSim.position.z)*180/Math.PI:miraFacing
     };
     if(miraBedding){
-      Object.assign(miraDisplay,blendBedDisplay(miraDisplay,miraBedPose,animDt));
+      Object.assign(miraDisplay,miraBedPose);miraFacing=miraBedPose.yaw;
     }else{
       miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraSeating||miraPose?10:11,animDt);
       miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraSeating||miraPose?10:10,animDt);
@@ -692,7 +697,7 @@ function boot() {
       bedSitWeight:miraBedPose?.bedSitWeight||0,
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
-      bedSide:miraBedPose?.bedSide||null,
+      bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
       social:socialUsing?game.socialAction.kind:null,gait:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
     },animDt);
@@ -701,6 +706,13 @@ function boot() {
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
+    for(const slot of ['left','right']){
+      const progress=Math.max(...Object.values(bedStates).map(s=>s.slot===slot?s.progress:0));
+      const quilt=bedBeddingPose(progress),bx=BED_SLOTS[slot].x;
+      quilts[slot].body.setPosition(bx,quilt.y,quilt.z);
+      quilts[slot].body.setLocalScale(1.02,.15,quilt.depth);
+      quilts[slot].trim.setPosition(bx,quilt.y+.09,quilt.trimZ);
+    }
     fridgeOpen=approach(fridgeOpen,(useId==='fridge'||miraUseId==='fridge')?1:0,4,animDt);
     fridgeHinge.setEulerAngles(0,-64*fridgeOpen,0);
     for(let i=0;i<showerDrops.length;i++){

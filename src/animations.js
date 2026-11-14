@@ -143,9 +143,21 @@ export function stepAnimation(previous,signals,dt) {
   const sleeping=bedReclineWeight>.65; // eyes stay closed while beginning to rise
   const blink=t%4.1<.11;
   const eyeTarget=sleeping?.04:blink?.16:1;
+  const contact=signals?.bedJoints;
+  if(contact){
+    for(let i=0;i<2;i++){
+      legs[i]=contact[i].pitch;knees[i]=contact[i].knee;
+      bedHipYaw[i]=contact[i].yaw;bedHipRoll[i]=0;feet[i]=0;
+    }
+  }
   return {
-    legs,knees,feet,arms,elbows,torso,pelvisRoll,walkWeight,walkBob,
-    spineLean,spineTwist,spineRoll,hipShift,bodyLift,bedHipYaw,bedHipRoll,time:t,
+    bedFootYaw:contact?signals.bedFootYaw:null,
+    bedHipQuaternion:contact?contact.map(c=>c.quaternion):null,
+    legs,knees,feet,arms,elbows,torso:contact?0:torso,pelvisRoll:contact?0:pelvisRoll,
+    walkWeight,walkBob:contact?0:walkBob,
+    spineLean:contact?0:spineLean,spineTwist:contact?0:spineTwist,
+    spineRoll:contact?0:spineRoll,hipShift:contact?0:hipShift,bodyLift:contact?0:bodyLift,
+    bedHipYaw,bedHipRoll,time:t,
     mouthWidth:blend(previous.mouthWidth,mouthWidthTarget,5,step),
     mouthHeight:blend(previous.mouthHeight,mouthHeightTarget,5,step),
     brow:blend(previous.brow,browTarget,5,step),
@@ -156,16 +168,22 @@ export function stepAnimation(previous,signals,dt) {
 /** Writes only lightweight transforms into an already built PlayCanvas rig. */
 export function applyCharacterAnimation(rig,state) {
   for(let i=0;i<2;i++){
-    rig.legPivot[i].setLocalEulerAngles(state.legs[i],
+    if(state.bedHipQuaternion)rig.legPivot[i].setLocalRotation(...state.bedHipQuaternion[i]);
+    else rig.legPivot[i].setLocalEulerAngles(state.legs[i],
       state.bedHipYaw?.[i]||0,state.bedHipRoll?.[i]||0);
     rig.kneePivot[i].setLocalEulerAngles(state.knees[i],0,0);
+    if(rig.anklePivot){
+      if(state.bedFootYaw!=null)rig.anklePivot[i].setEulerAngles(0,state.bedFootYaw,0);
+      else rig.anklePivot[i].setLocalEulerAngles(0,0,0);
+    }
     rig.shoes[i].setLocalEulerAngles(state.feet[i],0,0);
     rig.armPivot[i].setLocalEulerAngles(state.arms[i],0,0);
     rig.elbowPivot[i].setLocalEulerAngles(state.elbows[i],0,0);
   }
   rig.torso.setLocalEulerAngles(0,0,state.torso);
   rig.pelvis.setLocalEulerAngles(0,0,state.pelvisRoll);
-  rig.upperBody.setLocalEulerAngles(state.spineLean,state.spineTwist,state.spineRoll);
+  rig.upperBody.setLocalEulerAngles(state.bedFootYaw!=null?0:state.spineLean,
+    state.bedFootYaw!=null?0:state.spineTwist,state.bedFootYaw!=null?0:state.spineRoll);
   rig.upperBody.setLocalPosition(state.hipShift,.73+state.bodyLift,0);
   rig.leftEye.setLocalScale(1,state.eyeOpen,1);
   rig.rightEye.setLocalScale(1,state.eyeOpen,1);

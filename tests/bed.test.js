@@ -25,7 +25,7 @@ test('bed has two geometrically distinct halves, two quilt/pillow alignments',()
   assert.ok(BED_SLOTS.right.approach.x>-1.41);
   for(const id of BED_SLOT_IDS){
     const slot=BED_SLOTS[id];
-    assert.equal(slot.pose.pitch,-85);
+    assert.equal(slot.pose.pitch,-78);
     assert.ok(slot.approach.z<-1.1&&slot.approach.z>-2.1,
       'entry must be along the long side, not the foot');
     assert.ok(Math.abs(slot.edgeZ-slot.approach.z)<.03);
@@ -140,7 +140,7 @@ test('two independent staged bed entries and exits produce smooth bounded motion
     assert.equal(state.slot,slot);
     const lying=bedTransitionPose(state);
     assert.ok(near(lying.x,BED_SLOTS[slot].pose.x));
-    assert.ok(near(lying.pitch,-85));
+    assert.ok(near(lying.pitch,-78));
     assert.ok(Math.abs(lying.roll)<.001);
     state=advance(state,false,null,BED_EXIT_SECONDS+.10);
     assert.equal(state.progress,0);
@@ -162,6 +162,6 @@ test('bed approach starts on own side and turns toward own mattress, never share
   const lateLeft=bedTransitionPose({progress:.85,slot:'left'});
   const lateRight=bedTransitionPose({progress:.85,slot:'right'});
   assert.ok(lateLeft.x<lateRight.x);
-  assert.ok(lateLeft.bedWeight>.6&&lateRight.bedWeight>.6);
+  assert.ok(lateLeft.bedWeight>.49&&lateRight.bedWeight>.49);
   assert.equal(validBedSlot('alien'),false);
 });

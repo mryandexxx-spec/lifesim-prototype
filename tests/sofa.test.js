@@ -63,7 +63,7 @@ test('both characters have hinged knees and animation creates no new mesh',()=>{
     for(let i=0;i<2;i++){
       assert.equal(rig.kneePivot[i].parent,rig.legPivot[i]);
       assert.ok(rig.kneePivot[i].children.some(x=>x.name.endsWith(' shin')));
-      assert.ok(rig.kneePivot[i].children.some(x=>x.name.endsWith(' shoe')));
+      assert.ok(rig.anklePivot[i].children.some(x=>x.name.endsWith(' shoe')));
     }
     let a=createAnimationState();
     for(let i=0;i<50;i++){

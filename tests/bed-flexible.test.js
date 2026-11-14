@@ -67,16 +67,16 @@ test('the character first sits with knees bent BEFORE beginning to lie down',()=
   for(const slot of BED_SLOT_IDS){
     const start=bedTransitionPose({slot,progress:.001});
     const perch=bedTransitionPose({slot,progress:.45});
-    const midway=bedTransitionPose({slot,progress:.74});
+    const midway=bedTransitionPose({slot,progress:.85});
     const lie=bedTransitionPose({slot,progress:1});
     assert.ok(close(start.x,BED_SLOTS[slot].approach.x,.01));
     assert.ok(close(start.y,0,.01));
     assert.ok(perch.bedSitWeight>.55);
     assert.ok(perch.bedReclineWeight<.01);
     assert.ok(close(perch.pitch,0,.01),'sit before reclining');
-    assert.ok(midway.pitch< -20&&midway.pitch> -85);
-    assert.ok(midway.roll!==0,'noticeable rolling onto the mattress');
-    assert.ok(close(lie.pitch,-85));
+    assert.ok(midway.pitch< -20&&midway.pitch> -78);
+    assert.ok(midway.roll===0,'reclines in a stable sagittal plane');
+    assert.ok(close(lie.pitch,-78));
     assert.ok(close(lie.x,BED_SLOTS[slot].pose.x));
     assert.ok(close(lie.bedSitWeight,0));
     assert.ok(close(lie.bedReclineWeight,1));
@@ -90,7 +90,7 @@ test('hip stays supported while avatar reclines, preventing sinking/teleport',()
       const p=bedTransitionPose({slot,progress});
       const hipHeight=p.y+.72*Math.cos(p.pitch*Math.PI/180)*
         Math.cos(p.roll*Math.PI/180);
-      assert.ok(Math.abs(hipHeight-.814)<.008,'hip tracks mattress plane with mirrored roll');
+      assert.ok(Math.abs(hipHeight-.65)<.008,'hip tracks mattress plane with mirrored roll');
       if(before)assert.ok(Math.hypot(p.x-before.x,p.y-before.y,p.z-before.z)<.035);
       before=p;
     }

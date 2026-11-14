@@ -102,7 +102,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
     faceSurfaceDepth(0,-.132)+.003,.095,.017,.018,mouth);
 
   // Exactly the same hip/shoulder pivot positions as the accepted 0.4b rigs.
-  const legPivot=[],kneePivot=[],armPivot=[],elbowPivot=[],shoeMeshes=[];
+  const anklePivot=[],legPivot=[],kneePivot=[],armPivot=[],elbowPivot=[],shoeMeshes=[];
   for(const [side,x] of [['left',-.15],['right',.15]]){
     const hip=new pc.Entity(name+' '+side+' hip');
     avatar.addChild(hip);
@@ -114,8 +114,11 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
     knee.setLocalPosition(0,LEG_GEOMETRY.kneeOffsetY,0);
     ball(name+' '+side+' shin',0,LEG_GEOMETRY.shinCenterY,0,
       .163,LEG_GEOMETRY.shinHeight,.185,trousers,knee);
-    const shoe=ball(name+' '+side+' shoe',0,LEG_GEOMETRY.shoeCenterY,.077,
-      .22,LEG_GEOMETRY.shoeHeight,.31,shoes,knee);
+    const ankle=new pc.Entity(name+' '+side+' ankle');
+    knee.addChild(ankle);ankle.setLocalPosition(0,LEG_GEOMETRY.shoeCenterY,0);
+    anklePivot.push(ankle);
+    const shoe=ball(name+' '+side+' shoe',0,0,.077,
+      .22,LEG_GEOMETRY.shoeHeight,.31,shoes,ankle);
     // Rotate the existing shoe for subtle toe lift, without allocating an ankle mesh.
     shoeMeshes.push(shoe);legPivot.push(hip);kneePivot.push(knee);
   }
@@ -142,7 +145,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   const selected=cylinder(name+' selected',0,.018,0,.79,.025,.79,
     mat(p.select,{opacity:.30}),avatar);
   return {
-    avatar,torso,upperBody,pelvis,shoes:shoeMeshes,elbowPivot,
+    avatar,torso,upperBody,pelvis,anklePivot,shoes:shoeMeshes,elbowPivot,
     leftEye:eyes[0],rightEye:eyes[1],brows,mouth:smile,
     legPivot,kneePivot,armPivot,snack,book,selected
   };

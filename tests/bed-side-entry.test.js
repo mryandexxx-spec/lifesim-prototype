@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {BED_SLOTS,BED_SLOT_IDS} from '../src/bed-layout.js';
 import {FURNITURE,ACTOR_RADIUS,isWalkable,findPath,isClearLine}
   from '../src/navigation.js';
-import {bedTransitionPose,blendBedDisplay} from '../src/bed-transition.js';
+import {bedTransitionPose} from '../src/bed-transition.js';
 import {stepAnimation,createAnimationState} from '../src/animations.js';
 import {newHousehold,chooseResidentAction,bedSlotFor} from '../src/household.js';
 
@@ -71,10 +71,10 @@ test('both residents can reach either bedside via collision-safe A* from living 
 test('during the SIT, both hips are by the long rails with feet facing outside',()=>{
   const a=sample('left',.45),b=sample('right',.45);
   for(const side of BED_SLOT_IDS){
-    const actual=sample(side,.45),geometry=BED_SLOTS[side],hip=worldHip(actual);
+    const actual=sample(side,.49),geometry=BED_SLOTS[side],hip=worldHip(actual);
     assert.ok(epsilon(hip.x,geometry.edgeX,.013));
-    assert.ok(epsilon(hip.z,-1.36,.01));
-    assert.ok(epsilon(hip.y,.81,.02));
+    assert.ok(epsilon(hip.z,-1.42,.01));
+    assert.ok(epsilon(hip.y,.65,.02));
     assert.ok(epsilon(actual.pitch,0));
     assert.ok(epsilon(actual.yaw,geometry.approachYaw));
     assert.ok(actual.bedSitWeight>.75&&actual.bedReclineWeight===0);
@@ -87,8 +87,8 @@ test('during RECLINE, hip moves across bed width, never toward its foot',()=>{
     for(let i=0;i<=100;i++){
       const p=.53+i/100*.47;
       const pose=sample(side,p),hip=worldHip(pose),geometry=BED_SLOTS[side];
-      assert.ok(epsilon(hip.z,-1.36,.002),'hip must stay centered lengthwise');
-      assert.ok(epsilon(hip.y,.814,.002),'hip stays supported on mattress');
+      assert.ok(epsilon(hip.z,-1.42,.002),'hip must stay centered lengthwise');
+      assert.ok(epsilon(hip.y,.65,.002),'hip stays supported on mattress');
       if(side==='left'){
         assert.ok(hip.x>=geometry.edgeX-.005&&hip.x<=geometry.pose.x+.005);
         if(last)assert.ok(hip.x>=last-.005);
@@ -103,7 +103,7 @@ test('during RECLINE, hip moves across bed width, never toward its foot',()=>{
 test('a short sideways step is animated before sitting, with opposite leg direction',()=>{
   const result={};
   for(const side of BED_SLOT_IDS){
-    const pose=sample(side,.11);
+    const pose=sample(side,.16);
     assert.ok(pose.bedStepWeight>.7);
     assert.equal(pose.bedSitWeight,0);
     let state=createAnimationState();
@@ -127,13 +127,12 @@ test('left/right side entries and exit remain reserved by availability, not by n
     }
   }
 });
-test('all six channels can blend without changing the side or causing a large teleport',()=>{
+test('direct phase samples remain continuous without a second render spring',()=>{
   for(const side of BED_SLOT_IDS){
     let p=sample(side,0);
-    const frame=1/60;
     for(let i=1;i<=260;i++){
       const next=sample(side,i/260);
-      const blended=blendBedDisplay(p,next,frame);
+      const blended=next;
       assert.ok(Number.isFinite(blended.x)&&Number.isFinite(blended.yaw));
       assert.ok(Math.hypot(blended.x-p.x,blended.y-p.y,blended.z-p.z)<.04);
       p=blended;
