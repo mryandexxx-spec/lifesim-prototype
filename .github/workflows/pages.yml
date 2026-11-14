@@ -44,6 +44,9 @@ jobs:
           node --check src/privacy-mosaic.js
           node --check src/character-lab.js
           node --check src/character-lab-config.js
+      - name: Verify optimized Meshy GLB SHA-256
+        run: |
+          echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -
       - name: Assemble static website
         run: |
           mkdir -p site/src

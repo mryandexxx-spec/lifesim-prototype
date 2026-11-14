@@ -20,6 +20,9 @@
     .file-button{display:inline-flex;background:#35795a;color:white;border-color:#35795a;font-weight:650}
     input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
     .status{font-size:12px;padding-top:11px;line-height:1.35;color:#394b43;overflow-wrap:anywhere}
+    .metrics{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;font-size:12px}
+    .metrics span{background:#e8f1ea;padding:6px 9px;border-radius:9px}
+    #lab-report-text{display:block;width:100%;min-height:180px;margin-top:8px;border:1px solid #b4c8ba;border-radius:9px;padding:9px;font:12px/1.5 ui-monospace,monospace}
     .help{position:absolute;bottom:max(18px,env(safe-area-inset-bottom));left:12px;right:12px;text-align:center;font-size:12px;color:#3b5048;pointer-events:none;text-shadow:0 1px 2px #fff}
     @media(min-width:730px){.panel{right:auto;width:480px}}
   </style>
@@ -43,6 +46,8 @@
       </div>
     </div>
     <div class="status" id="lab-status" role="status" aria-live="polite">Инициализация 3D…</div>
+    <div class="metrics"><span id="lab-fps">FPS: замер…</span><span id="lab-asset-info">GLB ещё не загружен</span><button id="show-lab-report" type="button">Отчёт</button></div>
+    <div id="lab-report" hidden><textarea id="lab-report-text" readonly aria-label="Диагностический отчёт для разработчика"></textarea></div>
   </section>
   <div class="help">Одним пальцем — вращение · двумя — масштаб · все тесты модели отдельно от основной игры</div>
   <script type="module" src="./src/character-lab.js"></script>

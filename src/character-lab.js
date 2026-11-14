@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import {
-  chooseIdleClip, isOneShotClip, parseGlbHeader, characterFit, summarizeClips
+  chooseIdleClip, isOneShotClip, characterFit, summarizeClips, inspectGltf, formatAssetBytes
 } from './character-lab-config.js';
 
 const $ = id => document.getElementById(id);
@@ -68,6 +68,48 @@ let current=null,currentAsset=null,currentUrl=null;
 const clipSelect=$('clip-select');
 const pauseButton=$('pause-animation');
 const preferredAutoUrl='./assets/characters/meshy-casual-v1.glb';
+let modelInfo=null,fps=null,fpsFrames=0,fpsSeconds=0;
+function updateMetrics(){
+  $('lab-fps').textContent=fps===null?'FPS: замер…':`FPS: ${fps}`;
+  $('lab-asset-info').textContent=modelInfo
+    ?`${formatAssetBytes(modelInfo.bytes)} · ${modelInfo.triangles??'?'} треуг. · ${modelInfo.joints??'?'} костей · ${modelInfo.clips??'?'} анимаций`
+    :'GLB ещё не загружен';
+}
+app.on('update',dt=>{
+  if(!Number.isFinite(dt)||dt<=0||dt>1)return;
+  fpsFrames++;fpsSeconds+=dt;
+  if(fpsSeconds>=1){fps=Math.round(fpsFrames/fpsSeconds);fpsFrames=0;fpsSeconds=0;updateMetrics();}
+});
+updateMetrics();
+$('show-lab-report').addEventListener('click',()=>{
+  const box=$('lab-report');box.hidden=!box.hidden;
+  if(box.hidden)return;
+  $('lab-report-text').value=[
+    'LifeSim Meshy Character Lab — диагностический отчёт',
+    `Модель: ${modelInfo?.title||'не загружена'}`,
+    `Размер: ${formatAssetBytes(modelInfo?.bytes||0)}`,
+    `Треугольников: ${modelInfo?.triangles??'—'}`,
+    `Костей: ${modelInfo?.joints??'—'}`,
+    `Анимаций: ${modelInfo?.clips??'—'}`,
+    `Morph targets: ${modelInfo?.morphTargets??'—'}`,
+    `Активная анимация: ${clipSelect.value||'—'}`,
+    `FPS (приблизительно): ${fps??'—'}`,
+    'Визуальная приёмка: ожидается проверка владельцем на iPhone'
+  ].join('\n');
+});
+
+async function inspectLocalFile(file){
+  const header=await file.slice(0,20).arrayBuffer();
+  if(header.byteLength!==20)throw new Error('Слишком короткий GLB.');
+  const dv=new DataView(header);
+  if(dv.getUint32(0,true)!==0x46546c67||dv.getUint32(4,true)!==2||dv.getUint32(8,true)!==file.size)
+    throw new Error('Файл не является корректным GLB 2.0.');
+  const jsonLength=dv.getUint32(12,true);
+  if(dv.getUint32(16,true)!==0x4e4f534a || jsonLength<4 || jsonLength>file.size-20)
+    throw new Error('Некорректная JSON-секция GLB.');
+  const buffer=await file.slice(20,20+jsonLength).arrayBuffer();
+  return inspectGltf(JSON.parse(new TextDecoder().decode(buffer)));
+}
 
 function entityBounds(entity){
   let min=null,max=null;
@@ -83,7 +125,7 @@ function entityBounds(entity){
   return min?{min,max}:null;
 }
 
-async function loadAsset(url, title){
+async function loadAsset(url, title, metadata={}){
   status(`Загрузка ${title}…`);
   const asset=new pc.Asset(title,'container',{url});
   app.assets.add(asset);
@@ -106,13 +148,16 @@ async function loadAsset(url, title){
       const clips=asset.resource.animations.map(entry=>entry.resource);
       for(const clip of clips)avatar.anim.assignAnimation(clip.name,clip,undefined,1,!isOneShotClip(clip.name));
       current=avatar;currentAsset=asset;
+      modelInfo={title,bytes:metadata.bytes||0,triangles:metadata.triangles??null,
+        joints:metadata.joints??null,clips:clips.length,morphTargets:metadata.morphTargets??null};
+      updateMetrics();
       if(previous){previous.destroy();app.assets.remove(previousAsset);previousAsset.unload();}
       clipSelect.replaceChildren();
       const available=summarizeClips(clips.map(c=>c.name));
       for(const clip of available){const option=document.createElement('option');option.value=clip.name;option.textContent=clip.name+(clip.loop?'':' · однократно');clipSelect.append(option);}
       clipSelect.disabled=!clips.length;pauseButton.disabled=!clips.length;pauseButton.textContent='Пауза';
       if(clips.length){const initial=chooseIdleClip(clips.map(c=>c.name));clipSelect.value=initial;avatar.anim.baseLayer.play(initial);}
-      status(`Загружено: ${title}. Высота ${info.height.toFixed(2)} м, скелет и ${clips.length} анимаций. Меняйте клипы в списке.`);
+      status(`Загружено: ${title}. Высота ${info.height.toFixed(2)} м, ${clips.length} анимаций. Проверьте все ракурсы и FPS.`);
     }catch(error){avatar.destroy();throw error;}
   }catch(error){
     if(currentAsset!==asset){app.assets.remove(asset);asset.unload();}
@@ -132,12 +177,10 @@ pauseButton.addEventListener('click',()=>{
 });
 $('glb-input').addEventListener('change',async event=>{
   const file=event.target.files?.[0];if(!file)return;
-  const header=await file.slice(0,12).arrayBuffer();
   try{
-    const view=new DataView(header);
-    if(view.getUint32(0,true)!==0x46546c67||view.getUint32(4,true)!==2||view.getUint32(8,true)!==file.size){throw new Error('Файл не является корректным GLB 2.0.');}
+    const metadata=await inspectLocalFile(file);
     const nextUrl=URL.createObjectURL(file);
-    try{await loadAsset(nextUrl,file.name);if(currentUrl)URL.revokeObjectURL(currentUrl);currentUrl=nextUrl;}
+    try{await loadAsset(nextUrl,file.name,{...metadata,bytes:file.size});if(currentUrl)URL.revokeObjectURL(currentUrl);currentUrl=nextUrl;}
     catch(error){URL.revokeObjectURL(nextUrl);throw error;}
   }catch(error){status(`Ошибка файла: ${error?.message||String(error)}`);console.error(error);}
 });
@@ -148,5 +191,5 @@ app.start();
 // No temporary signed Meshy URLs or user tokens belong in the public repository.
 fetch(preferredAutoUrl,{method:'HEAD'}).then(response=>{
   if(!response.ok)throw new Error('not bundled');
-  return loadAsset(preferredAutoUrl,'meshy-casual-v1.glb');
+  return loadAsset(preferredAutoUrl,'meshy-casual-v1.glb',{bytes:Number(response.headers.get('content-length'))||2278456,triangles:25847,joints:66,morphTargets:0});
 }).catch(()=>status('3D-сцена готова. Модель ещё не добавлена в опубликованные ассеты — выберите GLB через кнопку.'));

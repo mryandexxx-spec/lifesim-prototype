@@ -64,3 +64,30 @@ export function summarizeClips(names) {
   }
   return list;
 }
+
+/** Static metadata only: does not decode meshes or execute animations. */
+export function inspectGltf(json) {
+  if (!json || typeof json !== 'object' || !Array.isArray(json.meshes)) {
+    throw new Error('Некорректная структура glTF.');
+  }
+  let triangles=0, morphTargets=0;
+  for (const mesh of json.meshes) for (const primitive of mesh.primitives||[]) {
+    if ((primitive.mode??4)===4) {
+      const accessorIndex=primitive.indices??primitive.attributes?.POSITION;
+      const count=json.accessors?.[accessorIndex]?.count;
+      if (Number.isInteger(count) && count>=0) triangles+=Math.floor(count/3);
+    }
+    morphTargets+=primitive.targets?.length||0;
+  }
+  return {
+    triangles,
+    joints:Math.max(0,...(json.skins||[]).map(s=>s.joints?.length||0)),
+    clips:json.animations?.length||0,
+    materials:json.materials?.length||0,
+    morphTargets
+  };
+}
+
+export function formatAssetBytes(bytes) {
+  return Number.isFinite(bytes)&&bytes>0 ? `${(bytes/1_000_000).toFixed(2)} МБ` : '—';
+}

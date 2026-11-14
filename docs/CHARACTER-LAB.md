@@ -5,8 +5,8 @@ Standalone route `character-lab.html` in the same code-first PlayCanvas 2.24.1 r
 - Scene, light, floor, camera, mobile touch orbit/pinch and GLB loader are created in `src/character-lab.js`, not in PlayCanvas Editor.
 - The loader uses the GLB's own animation clips and Mixamo skin. It displays named clips and lets you switch, pause and rotate the model.
 - If `assets/characters/meshy-casual-v1.glb` is deployed alongside the route, it loads automatically. Otherwise the route lets the user select a GLB in the browser as a **temporary diagnostic fallback**, not a replacement for shipping the model.
-- Do not store expiring signed Meshy URLs in the repository. The binary GLB is still required for a fully automatic published preview.
-- Basic source/test checks cover the GLB header and character fit math. Browser/Safari animation playback is NOT verified until the actual file is served and the owner tests the page.
+- Do not store expiring signed Meshy URLs in the repository. The audited mobile GLB is now bundled as a versioned asset.
+- Source/test checks now cover GLB metadata, headers and fitting. Actions validates the bundled binary SHA-256. Real Safari playback and performance require owner testing.
 
 ## Audited source model (2026-11-14)
 
@@ -22,3 +22,15 @@ Uploaded: `Meshy_AI_Casual_Animated_Young_Man_20261114_animated_mixamo_All_anima
 - `Sit_to_Stand_Transition_M` includes substantial hip translation; do not drop into sofa/bed interaction without retargeting and animation-anchor validation.
 
 This lab is a sandbox. No production integration is approved until animations, gameplay pose compatibility, download size and iPhone performance are assessed.
+
+## 2026-11-14 — mobile asset packaged for GitHub Pages
+
+- Bundled path: `assets/characters/meshy-casual-v1.glb`.
+- Mobile GLB: **2,278,456 bytes** (2.28 MB, 81.34% below original), JPEG 1024×1024.
+- SHA-256: `7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4`.
+- SHA is verified in GitHub Actions before the Pages artifact is assembled.
+- Original topology unchanged: 25,847 triangles, 66 Mixamo-style bones, 10 animation clips, no facial morphs.
+- Camera/lighting and imports remain code-first PlayCanvas. The lab displays approximate FPS and GLB metadata and provides a copyable visual QA report in the page.
+- Optimization source: `tools/optimize_meshy_glb.py` (Python with NumPy and Pillow; not a build-time dependency).
+- **This is a standalone test route, not an in-game resident replacement.** No game simulation, production animations, saved characters or v1 localStorage were modified.
+- Status: asset uploaded to GitHub; Safari/iPhone graphical and FPS validation still pending owner review.

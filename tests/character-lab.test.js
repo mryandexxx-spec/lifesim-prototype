@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {chooseIdleClip,isOneShotClip,characterFit,parseGlbHeader,summarizeClips,KNOWN_CLIPS} from '../src/character-lab-config.js';
+import {chooseIdleClip,isOneShotClip,characterFit,parseGlbHeader,summarizeClips,KNOWN_CLIPS,inspectGltf,formatAssetBytes} from '../src/character-lab-config.js';
 
 test('meshys actual ten animation clip names are in the preview contract',()=>{
   assert.equal(KNOWN_CLIPS.length,10);
@@ -30,4 +30,21 @@ test('clip summary is deduplicated and preserves authoring order',()=>{
   assert.deepEqual(summarizeClips(['Idle_3','Idle_3','Sit_to_Stand_Transition_M']),[
     {name:'Idle_3',loop:true},{name:'Sit_to_Stand_Transition_M',loop:false}
   ]);
+});
+
+
+test('GLB metadata counts triangles for indexed and unindexed primitives',()=>{
+  const meta=inspectGltf({
+    accessors:[{count:6},{count:9},{count:120}],
+    meshes:[{primitives:[{indices:0},{mode:4,attributes:{POSITION:1}},{mode:1,indices:2,targets:[{}]}]}],
+    skins:[{joints:[1,2,3]}],animations:[{},{}],materials:[{}]
+  });
+  assert.deepEqual(meta,{triangles:5,joints:3,clips:2,materials:1,morphTargets:1});
+});
+
+test('metadata parsing rejects malformed shapes, sizes have neutral fallback',()=>{
+  assert.throws(()=>inspectGltf(null));
+  assert.throws(()=>inspectGltf({meshes:null}));
+  assert.equal(formatAssetBytes(2278456),'2.28 МБ');
+  assert.equal(formatAssetBytes(0),'—');
 });
