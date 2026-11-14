@@ -50,13 +50,12 @@ test('score clamps 0–100 and memories are bounded to 12',()=>{
   assert.equal(relationshipLabel(50),'Нейтрально');
   assert.equal(relationshipLabel(80),'Дружески');
 });
-test('a busy partner blocks a second conversation',()=>{
+test('player may invite a busy partner, while overlapping social actions remain blocked',()=>{
   const s=newHousehold();
   assert.equal(chooseResidentAction(s,'sofa',false,'mira'),true);
-  assert.equal(canStartSocial(s,'talk','alex'),false);
-  assert.equal(startSocial(s,'talk','alex',place),false);
-  s.otherSim.action=null;
+  assert.equal(canStartSocial(s,'talk','alex'),true);
   assert.equal(startSocial(s,'talk','alex',place),true);
+  assert.equal(s.otherSim.action,null,'manual interaction interrupts busy partner');
   assert.equal(startSocial(s,'argue','mira',place),false);
   assert.equal(cancelSocial(s),true);
   assert.equal(s.mind.memories.length,0);
