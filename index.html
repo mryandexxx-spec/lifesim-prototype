@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>life<span>sim</span></b><small>prototype / 0.3.1</small></div>
+        <div><b>life<span>sim</span></b><small>prototype / 0.4a</small></div>
       </div>
       <div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div>
     </header>
@@ -46,15 +46,21 @@
     </section>
 
     <section class="mind-panel" id="mind-panel" hidden aria-label="Внутренний мир Алекса">
-      <div class="mind-panel-head"><div><span class="eyebrow">ПЕРСОНАЖ / 01</span><h2>Внутренний мир</h2></div><button id="mind-close" aria-label="Закрыть панель" type="button">×</button></div>
+      <div class="mind-panel-head"><div><span class="eyebrow" id="mind-person">АЛЕКС / ВНУТРЕННИЙ МИР</span><h2>Внутренний мир</h2></div><button id="mind-close" aria-label="Закрыть панель" type="button">×</button></div>
       <div class="mind-mood"><span>Настроение</span><strong id="mind-mood-label">Спокоен</strong><div class="mind-meter"><i id="mind-mood-bar"></i></div></div>
       <div class="mind-wish"><span class="eyebrow">СЕЙЧАС ХОЧЕТ</span><strong id="mind-wish-label">Устроить уютный отдых</strong><button id="wish-do-btn" type="button">Помочь исполнить ↗</button></div>
-      <div class="mind-traits"><span class="eyebrow">ЧЕРТЫ ХАРАКТЕРА</span><div class="mind-tags"><span>✧ Аккуратный</span><span>☾ Ценит уют</span><span>♫ Любознательный</span></div></div>
+      <div class="mind-traits"><span class="eyebrow">ЧЕРТЫ ХАРАКТЕРА</span><div class="mind-tags"><span id="mind-traits-label">✧ Аккуратный · ☾ Ценит уют · ♫ Любознательный</span></div></div>
       <div class="mind-history"><span class="eyebrow">ПОСЛЕДНИЕ ВОСПОМИНАНИЯ</span><ul id="mind-memories"><li>Пока всё впереди</li></ul></div>
     </section>
 
     <footer class="dashboard">
-      <button id="mind-toggle" class="character-tag" type="button" aria-controls="mind-panel" aria-expanded="false"><span class="avatar-icon">☺</span><div><strong>Алекс <span class="mind-indicator">⌄</span></strong><small id="mood-label">Спокоен</small><small id="wish-label">♫ Хочет отдохнуть</small></div></button>
+      <div class="resident-column">
+        <div class="resident-switch" role="group" aria-label="Кем управлять">
+          <button id="pick-alex" type="button" aria-pressed="true">Алекс</button>
+          <button id="pick-mira" type="button" aria-pressed="false">Мира</button>
+        </div>
+        <button id="mind-toggle" class="character-tag" type="button" aria-controls="mind-panel" aria-expanded="false"><span id="avatar-symbol" class="avatar-icon">☺</span><div><strong id="resident-name">Алекс</strong><small id="mood-label">Спокоен</small><small id="wish-label">♫ Хочет отдохнуть</small></div><span class="mind-indicator" aria-hidden="true">⌄</span></button>
+      </div>
       <div class="needs" aria-label="Потребности персонажа">
         <div class="need" data-need="hunger"><span class="need-icon">◕</span><div class="need-copy"><span>Голод</span><div class="meter"><i id="bar-hunger"></i></div></div><output id="value-hunger">78</output></div>
         <div class="need" data-need="energy"><span class="need-icon">☾</span><div class="need-copy"><span>Энергия</span><div class="meter"><i id="bar-energy"></i></div></div><output id="value-energy">67</output></div>
@@ -65,7 +71,7 @@
     </footer>
 
     <div class="toast" role="status" id="toast" aria-live="polite"></div>
-    <div class="loading" id="loading"><div class="loading-mark">✦</div><strong>Готовим комнату...</strong><span>LifeSim / прототип 0.3.1</span></div>
+    <div class="loading" id="loading"><div class="loading-mark">✦</div><strong>Готовим комнату...</strong><span>LifeSim / прототип 0.4a</span></div>
   </div>
   <script type="module" src="./src/game.js"></script>
   <script>

@@ -74,3 +74,30 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .control-tray .auto-control { width:55px;min-width:55px;padding:4px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1.2;font-size:11px;border-color:#b0d8bf;background:#e5f5e8;color:#357f60; }
 .control-tray .auto-control small { font-size:9px;font-weight:800;letter-spacing:.5px; }
 .control-tray .auto-control[aria-pressed="false"] { background:#f3f1ee;color:#777c77;border-color:#dfdfdc; }
+
+/* 0.4a — resident selection fits inside the existing mobile dashboard. */
+.dashboard {grid-template-columns:142px 1fr auto;}
+.resident-column{display:flex;flex-direction:column;gap:7px;min-width:0;padding-right:8px;border-right:1px solid #e7ece6;}
+.resident-switch{display:flex;gap:4px;}
+.resident-switch button{flex:1;min-width:0;border:1px solid #dce9dd;border-radius:9px;padding:5px 7px;background:#edf3ee;color:#6a8474;font-weight:800;font-size:10px;}
+.resident-switch button[aria-pressed="true"]{background:#4e9779;color:#fff;border-color:#4e9779;}
+.character-tag{border:0;padding:0;display:flex;align-items:center;width:100%;}
+.character-tag .avatar-icon{width:33px;height:33px;min-width:33px;font-size:20px;border-radius:10px;}
+.character-tag #resident-name{font-size:13px;}
+.character-tag #wish-label{max-width:104px;font-size:8px;}
+.character-tag .mind-indicator{margin-left:auto;}
+@media(max-width:700px){
+  .dashboard{grid-template-columns:1fr;gap:9px;}
+  .resident-column{width:min(190px,60%);border:0;padding:0;}
+  .resident-switch{gap:5px;}
+  .resident-switch button{padding:5px 8px;font-size:11px;}
+  .mind-panel{bottom:calc(env(safe-area-inset-bottom) + 190px);}
+  .hint{bottom:calc(env(safe-area-inset-bottom) + 178px);}
+  .action-sheet{bottom:calc(env(safe-area-inset-bottom) + 178px);}
+}
+@media(max-height:560px){
+  .dashboard{grid-template-columns:142px 1fr auto;}
+  .resident-column{width:auto;border-right:1px solid #e7ece6;}
+  .mind-panel{bottom:calc(env(safe-area-inset-bottom) + 125px);}
+  .hint,.action-sheet{bottom:calc(env(safe-area-inset-bottom) + 127px);}
+}

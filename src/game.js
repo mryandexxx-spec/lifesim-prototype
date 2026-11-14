@@ -2,13 +2,18 @@ import * as pc from 'playcanvas';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
+import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
+  selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
+  residentAutonomousChoice } from './household.js';
 
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
 const canvas = $('game-canvas');
 let game;
-try { game = loadGame(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
-catch { game = newGame(); }
+try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
+catch { game = newHousehold(); }
+const selectedActor = () => getActor(game,game.selectedSim);
+const selectedName = () => getActorName(game.selectedSim);
 
 const META = {
   bed: { title: 'Уютная кровать', category: 'Спальня', description: 'Сон восстанавливает энергию', icon: '☾', anchor: [-2.5, 1.22, -1.48] },
@@ -42,10 +47,10 @@ $('mind-toggle').addEventListener('click', () => {
 });
 $('mind-close').addEventListener('click', closeMindPanel);
 $('wish-do-btn').addEventListener('click', () => {
-  const id = game.mind?.wish?.id;
+  const id = selectedActor().mind?.wish?.id;
   if (id && beginAction(id)) {
     closeMindPanel();
-    toast('Алекс исполняет желание: ' + WISHES[id].label.toLowerCase());
+    toast(selectedName()+' исполняет желание: ' + WISHES[id].label.toLowerCase());
   }
 });
 function select(id) {
@@ -72,7 +77,7 @@ $('close-action').addEventListener('click', () => select(null));
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
   if (beginAction(selected)) {
-    toast(`Алекс: ${ACTIONS[selected].label.toLowerCase()}`);
+    toast(`${selectedName()}: ${ACTIONS[selected].label.toLowerCase()}`);
     select(null);
   }
 });
@@ -96,7 +101,7 @@ function updateAutoButton() {
   $('auto-state').textContent = enabled ? 'ВКЛ' : 'ВЫКЛ';
 }
 $('auto-btn').addEventListener('click', () => {
-  const enabled = setAutonomyEnabled(game, !game.autonomy.enabled);
+  const enabled = setHouseholdAutonomy(game, !game.autonomy.enabled);
   restartAutonomyWait();
   if (enabled) game.event = 'Свободное время';
   updateAutoButton();
@@ -105,13 +110,33 @@ $('auto-btn').addEventListener('click', () => {
     : 'Автономность выключена. Алекс ждёт твоих команд.');
 });
 updateAutoButton();
+function updateResidentPicker() {
+  for (const id of HOUSEHOLD_IDS) {
+    $('pick-'+id).setAttribute('aria-pressed',String(game.selectedSim===id));
+  }
+  $('resident-name').textContent=selectedName();
+  $('avatar-symbol').textContent=game.selectedSim==='alex' ? '☺' : '✿';
+  $('mind-panel').setAttribute('aria-label','Внутренний мир: '+selectedName());
+  $('mind-person').textContent=selectedName().toUpperCase()+' / ВНУТРЕННИЙ МИР';
+  $('mind-traits-label').textContent=game.selectedSim==='alex'
+    ? '✧ Аккуратный · ☾ Ценит уют · ♫ Любознательный'
+    : '✧ Внимательная · ☾ Любит уют · ♫ Любознательная';
+}
+for (const id of HOUSEHOLD_IDS) {
+  $('pick-'+id).addEventListener('click',()=>{
+    selectResident(game,id);
+    select(null); closeMindPanel(); updateResidentPicker(); save(true);
+    toast('Теперь управляешь: '+selectedName());
+  });
+}
+updateResidentPicker();
 $('save-btn').addEventListener('click', () => save());
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
   const enabled = game.autonomy.enabled;
-  game = newGame();
-  setAutonomyEnabled(game, enabled); // Respect the player's choice across New Game.
-  resetRuntime(); restartAutonomyWait(); updateAutoButton();
+  game = newHousehold();
+  setHouseholdAutonomy(game, enabled); // Keep the player's chosen play style.
+  resetRuntime(); restartAutonomyWait(); updateAutoButton(); updateResidentPicker();
   save(true); select(null); closeMindPanel(); toast('Новая игра началась');
 });
 window.addEventListener('pagehide', () => save(true));
@@ -267,6 +292,33 @@ function boot() {
   const snack = ball('apple',0,-.51,.12,.20,.17,.20,M.yellow,armPivot[1]);
   const book = box('book',0,-.51,.12,.28,.065,.29,M.green,armPivot[1]);
   snack.enabled=false;book.enabled=false;
+  const alexSelected = cylinder('Alex selected',0,.018,0,.79,.025,.79,mat('#69ba8a',{opacity:.3}),avatar);
+  // Mira: independently animated original procedural avatar, distinct clothes and hairstyle.
+  const miraAvatar=new pc.Entity('Mira');app.root.addChild(miraAvatar);
+  const miraSkin=mat('#d49a81'),miraHair=mat('#745044');
+  const miraTop=mat('#c67887'),miraPants=mat('#57727a');
+  const miraTorso=box('Mira torso',0,.91,0,.46,.60,.32,miraTop,miraAvatar);
+  ball('Mira head',0,1.48,0,.46,.48,.42,miraSkin,miraAvatar);
+  ball('Mira hair',0,1.68,-.07,.49,.27,.46,miraHair,miraAvatar);
+  ball('Mira bun',0,1.81,-.23,.30,.32,.33,miraHair,miraAvatar);
+  const miraLeftEye=ball('Mira left eye',-.115,1.50,.20,.05,.055,.04,M.black,miraAvatar);
+  const miraRightEye=ball('Mira right eye',.115,1.50,.20,.05,.055,.04,M.black,miraAvatar);
+  const miraLegPivot=[],miraArmPivot=[];
+  for (const [side,x] of [['left',-.15],['right',.15]]) {
+    const pivot=new pc.Entity('Mira '+side+' hip');miraAvatar.addChild(pivot);pivot.setLocalPosition(x,.72,0);
+    box('Mira '+side+' leg',0,-.29,0,.16,.5,.19,miraPants,pivot);
+    box('Mira '+side+' shoe',0,-.605,.08,.19,.15,.33,M.cream,pivot);
+    miraLegPivot.push(pivot);
+  }
+  for (const [side,x] of [['left',-.33],['right',.33]]) {
+    const pivot=new pc.Entity('Mira '+side+' shoulder');miraAvatar.addChild(pivot);pivot.setLocalPosition(x,1.17,0);
+    box('Mira '+side+' arm',0,-.25,0,.15,.50,.18,miraSkin,pivot);
+    miraArmPivot.push(pivot);
+  }
+  const miraSnack=ball('Mira snack',0,-.51,.12,.20,.17,.20,M.yellow,miraArmPivot[1]);
+  const miraBook=box('Mira book',0,-.51,.12,.28,.065,.29,M.green,miraArmPivot[1]);
+  miraSnack.enabled=false;miraBook.enabled=false;
+  const miraSelected=cylinder('Mira selected',0,.018,0,.79,.025,.79,mat('#db8394',{opacity:.31}),miraAvatar);
   const showerDrops = Array.from({length:9},(_,i)=>{
     const drop=ball('water drop '+i,-4.47+i*.14,2.02,2.20+(i%3)*.12,.058,.10,.06,M.blue);
     drop.enabled=false;return drop;
@@ -282,34 +334,57 @@ function boot() {
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
   game.position=nearestWalkable(game.position);
+  if(game.otherSim.action?.phase==='using') {
+    const [x,z]=ACTIONS[game.otherSim.action.id].location;
+    game.otherSim.position={x,z};
+  }
+  game.otherSim.position=nearestWalkable(game.otherSim.position);
   const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0};
-  let facing=0, gait=0, effectTime=0, fridgeOpen=0;
-  let route=null, routeIndex=0, routeId=null;
-  let autonomyWaitSeconds = 0;
-  restartAutonomyWait = () => { autonomyWaitSeconds = 0; };
+  const miraDisplay={x:game.otherSim.position.x,y:0,z:game.otherSim.position.z,yaw:0,pitch:0};
+  let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
+  const paths={
+    alex:{points:null,index:0,id:null},
+    mira:{points:null,index:0,id:null}
+  };
+  const autonomyWaitSeconds={alex:0,mira:0};
+  restartAutonomyWait=(id=null)=>{
+    if (id) autonomyWaitSeconds[id]=0;
+    else for(const key of HOUSEHOLD_IDS) autonomyWaitSeconds[key]=0;
+  };
   const destination=id=>({x:ACTIONS[id].location[0],z:ACTIONS[id].location[1]});
-  function buildRoute(id) {
-    const points=findPath(game.position,destination(id));
+  function buildRoute(id,actorId='alex') {
+    const actor=getActor(game,actorId);
+    const points=findPath(actor.position,destination(id));
     if(!points) return false;
-    route=points;routeId=id;routeIndex=0;
+    paths[actorId]={points,index:0,id};
     return true;
   }
-  beginAction=(id,automatic=false)=>{
+  beginAction=(id,automatic=false,actorId=game.selectedSim)=>{
+    const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
-    if(!buildRoute(id)){
-      if(!automatic) toast('Алекс не может добраться до предмета');
-      else game.autonomy.nextAt=game.minutes+15;
+    if(!furnitureAvailable(game,id,actorId)){
+      if(!automatic)toast('Предмет сейчас занят другим жителем');
       return false;
     }
-    const started=chooseAction(game,id,automatic);
-    if (started) restartAutonomyWait();
+    if(!buildRoute(id,actorId)){
+      if(!automatic) toast(getActorName(actorId)+' не может добраться до предмета');
+      else actor.autonomy.nextAt=game.minutes+15;
+      return false;
+    }
+    const started=chooseResidentAction(game,id,automatic,actorId);
+    if(started)restartAutonomyWait(actorId);
     return started;
   };
   resetRuntime=()=>{
-    route=null;routeId=null;routeIndex=0;facing=0;gait=0;fridgeOpen=0;
-    display.x=game.position.x;display.z=game.position.z;display.y=0;display.yaw=0;display.pitch=0;
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
+    game.position=nearestWalkable(game.position);
+    game.otherSim.position=nearestWalkable(game.otherSim.position);
+    Object.assign(display,{...game.position,y:0,yaw:0,pitch:0});
+    Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0});
   };
   avatar.setPosition(display.x,display.y,display.z);
+  miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
 
   // Lighting and orbital camera.
   const sun = new pc.Entity('Sun'); sun.addComponent('light',{
@@ -389,40 +464,56 @@ function boot() {
       accumulator+=dt;
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
-        const previous=game.action?.id;
-        tick(game,.30 * game.speed); // 1 real second = 3 game minutes at 1x.
-        if(previous && !game.action) toast('Алекс закончил: '+ACTIONS[previous].label.toLowerCase());
+        const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
+        tickHousehold(game,.30 * game.speed); // Both share the clock; no double advancement.
+        if(prevAlex && !game.action) toast('Алекс закончил: '+ACTIONS[prevAlex].label.toLowerCase());
+        if(prevMira && !game.otherSim.action) toast('Мира закончила: '+ACTIONS[prevMira].label.toLowerCase());
         accumulator-=.10;
       }
-      if(game.action?.phase==='walking'){
-        if(routeId!==game.action.id || !route) {
-          if(!buildRoute(game.action.id)) {game.action=null;game.event='Путь недоступен';}
-        }
-        if(route && game.action?.phase==='walking') {
-          let remaining=dt*1.65*game.speed, hops=0;
-          while(remaining>0 && routeIndex<route.length && hops++<12) {
-            const next=route[routeIndex];
-            const dx=next.x-game.position.x,dz=next.z-game.position.z;
-            const dist=Math.hypot(dx,dz);
-            if(dist<.0001){routeIndex++;continue;}
-            facing=Math.atan2(dx,dz)*180/Math.PI;
-            const step=Math.min(dist,remaining);
-            game.position.x+=dx/dist*step;game.position.z+=dz/dist*step;
-            remaining-=step;
-            gait+=step*7.2;
-            if(dist-step<.0001){game.position.x=next.x;game.position.z=next.z;routeIndex++;}
+      // Run two independent route followers with one shared room and item reservation.
+      for(const residentId of HOUSEHOLD_IDS){
+        const resident=getActor(game,residentId);
+        if(resident.action?.phase==='walking'){
+          let p=paths[residentId];
+          if(p.id!==resident.action.id || !p.points){
+            if(!buildRoute(resident.action.id,residentId)){
+              resident.action=null;resident.event='Путь недоступен';
+            }
+            p=paths[residentId];
           }
-          if(routeIndex>=route.length){
-            const goal=destination(game.action.id);
-            game.position={x:goal.x,z:goal.z};
-            arrive(game);route=null;routeId=null;routeIndex=0;
+          if(p.points && resident.action?.phase==='walking'){
+            let remaining=dt*1.65*game.speed, hops=0;
+            while(remaining>0 && p.index<p.points.length && hops++<12){
+              const next=p.points[p.index];
+              const dx=next.x-resident.position.x,dz=next.z-resident.position.z;
+              const dist=Math.hypot(dx,dz);
+              if(dist<.0001){p.index++;continue;}
+              if(residentId==='alex')facing=Math.atan2(dx,dz)*180/Math.PI;
+              else miraFacing=Math.atan2(dx,dz)*180/Math.PI;
+              const step=Math.min(dist,remaining);
+              resident.position.x+=dx/dist*step;resident.position.z+=dz/dist*step;
+              remaining-=step;
+              if(residentId==='alex')gait+=step*7.2;
+              else miraGait+=step*7.2;
+              if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
+            }
+            if(p.index>=p.points.length){
+              resident.position=destination(resident.action.id);
+              arrive(resident);
+              paths[residentId]={points:null,index:0,id:null};
+            }
           }
         }
       }
-      autonomyWaitSeconds = advanceAutonomyWait(autonomyWaitSeconds, dt, game);
-      if (!game.action && autonomyWaitSeconds >= AUTONOMY_WAIT_SECONDS) {
-        const idea=autonomousChoice(game);
-        if(idea && beginAction(idea,true))toast('Алекс сам решил: '+ACTIONS[idea].label.toLowerCase());
+      // Real active-time wait is independent for each sim and unaffected by game speed.
+      for(const residentId of HOUSEHOLD_IDS){
+        const resident=getActor(game,residentId);
+        autonomyWaitSeconds[residentId]=advanceAutonomyWait(autonomyWaitSeconds[residentId],dt,resident);
+        if(!resident.action && autonomyWaitSeconds[residentId]>=AUTONOMY_WAIT_SECONDS){
+          const idea=residentAutonomousChoice(game,residentId);
+          if(idea && beginAction(idea,true,residentId))
+            toast(getActorName(residentId)+' самостоятельно решил(а): '+ACTIONS[idea].label.toLowerCase());
+        }
       }
     }
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
@@ -452,11 +543,42 @@ function boot() {
     const sleepy=using && useId==='bed';
     leftEye.enabled=!sleepy;rightEye.enabled=!sleepy;
     snack.enabled=using && useId==='fridge';book.enabled=using && useId==='sofa';
-    fridgeOpen=approach(fridgeOpen,using && useId==='fridge'?1:0,4,animDt);
+    // Mira uses the same pose definitions, but maintains her own position and gait.
+    const miraUsing=game.otherSim.action?.phase==='using';
+    const miraUseId=miraUsing?game.otherSim.action.id:null;
+    const miraWalking=active && game.otherSim.action?.phase==='walking';
+    const miraPose=miraUseId?ACTOR_POSES[miraUseId]:null;
+    const miraDesired={
+      x:miraPose?miraPose.x:game.otherSim.position.x,
+      y:miraPose?miraPose.y:(miraWalking?Math.abs(Math.sin(miraGait))*.045:0),
+      z:miraPose?miraPose.z:game.otherSim.position.z,
+      pitch:miraPose?miraPose.pitch:0,
+      yaw:miraPose?miraPose.yaw:miraFacing
+    };
+    miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraPose?3.4:11,animDt);
+    miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraPose?3.4:10,animDt);
+    miraDisplay.z=approach(miraDisplay.z,miraDesired.z,miraPose?3.4:11,animDt);
+    miraDisplay.pitch=approach(miraDisplay.pitch,miraDesired.pitch,3.8,animDt);
+    miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,animDt);
+    miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
+    miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,0);
+    const miraWave=active?Math.sin(miraGait):0;
+    miraLegPivot[0].setLocalEulerAngles(miraUsing&&miraUseId==='sofa'?67:miraWalking?miraWave*25:0,0,0);
+    miraLegPivot[1].setLocalEulerAngles(miraUsing&&miraUseId==='sofa'?67:miraWalking?-miraWave*25:0,0,0);
+    miraArmPivot[0].setLocalEulerAngles(miraUsing&&miraUseId==='shower'?38:miraUsing&&miraUseId==='sofa'?26:miraWalking?-miraWave*18:0,0,0);
+    miraArmPivot[1].setLocalEulerAngles(miraUsing&&miraUseId==='fridge'?-54:miraUsing&&miraUseId==='shower'?38:miraUsing&&miraUseId==='sofa'?35:miraWalking?miraWave*18:0,0,0);
+    miraTorso.setLocalEulerAngles(0,0,miraUsing&&miraUseId!=='bed'?Math.sin(effectTime*2.1)*1.4:0);
+    miraLeftEye.enabled=!(miraUsing&&miraUseId==='bed');
+    miraRightEye.enabled=!(miraUsing&&miraUseId==='bed');
+    miraSnack.enabled=miraUsing&&miraUseId==='fridge';
+    miraBook.enabled=miraUsing&&miraUseId==='sofa';
+    alexSelected.enabled=game.selectedSim==='alex' && !using;
+    miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
+    fridgeOpen=approach(fridgeOpen,(useId==='fridge'||miraUseId==='fridge')?1:0,4,animDt);
     fridgeHinge.setEulerAngles(0,-64*fridgeOpen,0);
     for(let i=0;i<showerDrops.length;i++){
       const drop=showerDrops[i];
-      drop.enabled=using && useId==='shower';
+      drop.enabled=(useId==='shower'||miraUseId==='shower');
       if(drop.enabled){
         const t=(effectTime*.8+i*.17)%1;
         drop.setLocalPosition(-4.42+(i%5)*.15,2.25-t*1.9,2.17+Math.floor(i/5)*.15);
@@ -466,23 +588,25 @@ function boot() {
     if(uiTimer>.14){
       uiTimer=0;
       const t=readableTime(game.minutes);$('day-label').textContent=t.day;$('time-label').textContent=t.time;
+      const current=selectedActor();
+      $('resident-name').textContent=selectedName();
       for(const need of NEEDS){
-        const val=Math.round(game.needs[need]);
+        const val=Math.round(current.needs[need]);
         $('bar-'+need).style.width=val+'%';
         $('bar-'+need).style.background=val<30?'#e2a074':val<55?'#e1c27d':'#80bda1';
         $('value-'+need).textContent=val;
       }
-      $('mood-label').textContent=game.mind.mood.label;
-      const wish=game.mind.wish && WISHES[game.mind.wish.id];
+      $('mood-label').textContent=current.mind.mood.label;
+      const wish=current.mind.wish && WISHES[current.mind.wish.id];
       $('wish-label').textContent=wish ? wish.symbol+' Хочет: '+wish.label : 'Думает о будущем';
-      $('mind-mood-label').textContent=game.mind.mood.label+' · '+game.mind.mood.value+'/100';
-      $('mind-mood-bar').style.width=game.mind.mood.value+'%';
+      $('mind-mood-label').textContent=current.mind.mood.label+' · '+current.mind.mood.value+'/100';
+      $('mind-mood-bar').style.width=current.mind.mood.value+'%';
       $('mind-wish-label').textContent=wish?.label || 'Присматривается к миру';
       $('wish-do-btn').disabled=!wish;
       if (!$('mind-panel').hidden) {
         const list=$('mind-memories');
         list.replaceChildren();
-        const memories=game.mind.memories.slice(-4).reverse();
+        const memories=current.mind.memories.slice(-4).reverse();
         for (const entry of memories) {
           const li=document.createElement('li');
           li.textContent=(entry.fulfilled?'★ ':'• ')+MEMORY_TEXT[entry.id]+' · '+readableTime(entry.at).day;
@@ -494,7 +618,7 @@ function boot() {
       }
       $('pause-icon').textContent=game.paused?'▶':'Ⅱ';
       $('speed-btn').textContent=game.speed+'×';
-      const status=game.paused?'Пауза':!game.autonomy.enabled && !game.action?'Алекс ждёт указаний':game.action?.phase==='walking'?'Идёт: '+ACTIONS[game.action.id].label.toLowerCase():game.action?.phase==='using'?ACTIONS[game.action.id].label+' · '+Math.min(100,Math.round(100*game.action.elapsed/ACTIONS[game.action.id].duration))+'%':game.event;
+      const status=game.paused?'Пауза':!game.autonomy.enabled&&!current.action?selectedName()+' ждёт указаний':current.action?.phase==='walking'?'Идёт: '+ACTIONS[current.action.id].label.toLowerCase():current.action?.phase==='using'?ACTIONS[current.action.id].label+' · '+Math.min(100,Math.round(100*current.action.elapsed/ACTIONS[current.action.id].duration))+'%':current.event;
       if(status!==lastStatus){$('status-text').textContent=status;lastStatus=status;}
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.
       for(const [id,meta] of Object.entries(META)){
