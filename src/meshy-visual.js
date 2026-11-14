@@ -107,6 +107,12 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
           state.clip=MESHY_SOFA_CLIP;
           state.sofaRelease=null;
         }
+        // Set the source clip's time BEFORE reading animated joint matrices.
+        // The old order solved contact against a previous-frame pose, then
+        // advanced the animation, which could kick knees and soles on motion.
+        anim.speed=0;
+        anim.playing=true;
+        anim.baseLayer.activeStateCurrentTime=meshySitClipTime(sofaWeight);
         if(seat && state.seatRuntime){
           try{
             const horizontalOffset=meshySofaOffset(sofaWeight,state.scale);
@@ -139,11 +145,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
           state.model.setLocalPosition(state.base.x+correction.x,
             state.base.y+lift,state.base.z+correction.z);
         }
-        // PlayCanvas 2.24 evaluates a manually scrubbed layer with speed=0.
-        // The game's timeline, not the GLB root translation, owns the seat.
-        anim.speed=0;
-        anim.playing=true;
-        anim.baseLayer.activeStateCurrentTime=meshySitClipTime(sofaWeight);
+        // The game's timeline, not independent GLB time/root motion, owns
+        // the seat. The scrub was applied before the contact/foot pass.
         return true;
       }
       const target=meshClipFor({walking,social});
