@@ -44,7 +44,7 @@ export const MESHY_SEAT_RIG_PROFILE=Object.freeze({
   frontClearance:.09, // shoe anchor just beyond front edge of seat, not under cushion
   groundClearance:.010,
   kneePoleForward:.60,
-  kneePoleDown:.30,
+  kneePoleDown:Object.freeze([.33,.355]), // calibrated left/right knee bend from Mixamo bone lengths
   legs:Object.freeze([
     Object.freeze({thigh:'mixamorig:LeftUpLeg',shin:'mixamorig:LeftLeg',
       ankle:'mixamorig:LeftFoot'}),
