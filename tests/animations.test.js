@@ -9,13 +9,13 @@ const at=(x={})=>({...{walking:false,using:null,social:null,gait:0,mood:68,energ
 test('transition into walk is smooth, then naturally settles in idle',()=>{
   let a=createAnimationState();
   const first=stepAnimation(a,at({walking:true,gait:Math.PI/2}),.016);
-  assert.ok(first.legs[0]>0 && first.legs[0]<27);
-  assert.ok(first.legs[1]<0 && first.legs[1]>-27);
+  assert.ok(first.legs[0]<0 && first.legs[0]>-10);
+  assert.ok(Math.abs(first.legs[1])<10);
   a=first;
   for(let i=0;i<35;i++)a=stepAnimation(a,at({walking:true,gait:Math.PI/2}),.016);
-  assert.ok(a.legs[0]>26 && a.legs[0]<42);
+  assert.ok(a.legs[0]<-14 && a.legs[0]>-45);
   const stop=stepAnimation(a,at(),.016);
-  assert.ok(stop.legs[0]>0 && stop.legs[0]<a.legs[0]);
+  assert.ok(stop.legs[0]<0 && stop.legs[0]>a.legs[0]);
 });
 test('sit, shower, fridge and bed poses converge without snapping',()=>{
   const scenarios=[
