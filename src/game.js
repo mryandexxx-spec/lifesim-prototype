@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
 import { ACTIONS, NEEDS, SAVE_KEY, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
+import { WISHES, MEMORY_TEXT } from './psychology.js';
 
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
@@ -28,7 +29,26 @@ function save(silent = false) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); if (!silent) toast('Игра сохранена на этом устройстве'); }
   catch { if (!silent) toast('Не удалось сохранить: браузер запретил хранилище'); }
 }
+function closeMindPanel() {
+  $('mind-panel').hidden = true;
+  $('mind-toggle').setAttribute('aria-expanded', 'false');
+}
+$('mind-toggle').addEventListener('click', () => {
+  const open = $('mind-panel').hidden;
+  $('mind-panel').hidden = !open;
+  $('mind-toggle').setAttribute('aria-expanded', String(open));
+  if (open) select(null);
+});
+$('mind-close').addEventListener('click', closeMindPanel);
+$('wish-do-btn').addEventListener('click', () => {
+  const id = game.mind?.wish?.id;
+  if (id && beginAction(id)) {
+    closeMindPanel();
+    toast('Алекс исполняет желание: ' + WISHES[id].label.toLowerCase());
+  }
+});
 function select(id) {
+  if (id) closeMindPanel();
   selected = id;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -69,7 +89,7 @@ $('speed-btn').addEventListener('click', () => {
 $('save-btn').addEventListener('click', () => save());
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
-  game = newGame(); resetRuntime(); save(true); select(null); toast('Новая игра началась');
+  game = newGame(); resetRuntime(); save(true); select(null); closeMindPanel(); toast('Новая игра началась');
 });
 window.addEventListener('pagehide', () => save(true));
 window.addEventListener('visibilitychange', () => { if (document.hidden) save(true); });
@@ -424,7 +444,26 @@ function boot() {
         $('bar-'+need).style.background=val<30?'#e2a074':val<55?'#e1c27d':'#80bda1';
         $('value-'+need).textContent=val;
       }
-      $('mood-label').textContent=Math.min(...NEEDS.map(x=>game.needs[x]))<30?'Нуждается в заботе':'Всё хорошо';
+      $('mood-label').textContent=game.mind.mood.label;
+      const wish=game.mind.wish && WISHES[game.mind.wish.id];
+      $('wish-label').textContent=wish ? wish.symbol+' Хочет: '+wish.label : 'Думает о будущем';
+      $('mind-mood-label').textContent=game.mind.mood.label+' · '+game.mind.mood.value+'/100';
+      $('mind-mood-bar').style.width=game.mind.mood.value+'%';
+      $('mind-wish-label').textContent=wish?.label || 'Присматривается к миру';
+      $('wish-do-btn').disabled=!wish;
+      if (!$('mind-panel').hidden) {
+        const list=$('mind-memories');
+        list.replaceChildren();
+        const memories=game.mind.memories.slice(-4).reverse();
+        for (const entry of memories) {
+          const li=document.createElement('li');
+          li.textContent=(entry.fulfilled?'★ ':'• ')+MEMORY_TEXT[entry.id]+' · '+readableTime(entry.at).day;
+          list.appendChild(li);
+        }
+        if (!memories.length) {
+          const li=document.createElement('li');li.textContent='Пока всё впереди';list.appendChild(li);
+        }
+      }
       $('pause-icon').textContent=game.paused?'▶':'Ⅱ';
       $('speed-btn').textContent=game.speed+'×';
       const status=game.paused?'Пауза':game.action?.phase==='walking'?'Идёт: '+ACTIONS[game.action.id].label.toLowerCase():game.action?.phase==='using'?ACTIONS[game.action.id].label+' · '+Math.min(100,Math.round(100*game.action.elapsed/ACTIONS[game.action.id].duration))+'%':game.event;

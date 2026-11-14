@@ -39,3 +39,32 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 @media(max-width:700px){.dashboard{grid-template-columns:1fr;gap:9px;padding:11px 14px 12px;}.character-tag{border:0;padding:0;}.needs{gap:8px;}.need-icon{font-size:15px}.need{gap:4px;}.need output{display:none}.need-copy>span{font-size:10px;}.footer-actions{position:absolute;right:14px;top:10px}.footer-actions button{font-size:9px;padding:8px}.hint{bottom:calc(env(safe-area-inset-bottom) + 148px);font-size:10px;}.action-sheet{bottom:calc(env(safe-area-inset-bottom) + 146px);}.brand{padding:8px 10px}.brand-mark{height:31px;width:31px}.brand b{font-size:20px}.time-card{padding:8px 12px;}.scene-badge{top:calc(env(safe-area-inset-top) + 91px);}.control-tray{top:calc(env(safe-area-inset-top) + 91px)}}
 @media(max-width:370px){.hotspot{font-size:10px;padding:5px;}.hotspot .item-symbol{height:21px;width:21px}.needs{gap:5px}.hint{font-size:9px;padding:8px;}}
 @media(max-height:560px){.dashboard{grid-template-columns:100px 1fr auto}.character-tag{border-right:1px solid #e7ece6}.footer-actions{position:static}.hint{bottom:calc(env(safe-area-inset-bottom) + 102px)}.action-sheet{bottom:calc(env(safe-area-inset-bottom) + 102px);}.control-tray{top:calc(env(safe-area-inset-top) + 74px)}}
+
+
+/* LifeSim 0.3: compact psychology affordances, no additional viewport chrome. */
+.character-tag{background:transparent;border:0;font:inherit;text-align:left;cursor:pointer;min-width:0;color:inherit;}
+.character-tag>div{min-width:0;}
+.character-tag small{overflow:hidden;max-width:165px;text-overflow:ellipsis;}
+.mind-indicator{font-size:11px;color:#4c8d74;}
+#wish-label{color:#608b73;margin-top:3px;font-size:9px;line-height:1.2;white-space:nowrap;}
+.mind-panel{position:absolute;z-index:12;bottom:calc(env(safe-area-inset-bottom) + 172px);left:max(13px,env(safe-area-inset-left));width:min(370px,calc(100vw - 26px));max-height:min(60dvh,400px);overflow-y:auto;overscroll-behavior:contain;background:#fffffffa;border:1px solid #ffffffe8;border-radius:24px;padding:16px 17px;box-shadow:0 14px 52px #304c3c4a;backdrop-filter:blur(18px);}
+.mind-panel[hidden]{display:none;}
+.mind-panel-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:13px;}
+.mind-panel h2{font-size:21px;margin:3px 0 0;color:#334f41;line-height:1.2;}
+.eyebrow{display:block;letter-spacing:1px;font-size:9px;font-weight:800;color:#8fa697;}
+.mind-panel-head button{height:32px;width:32px;border:0;border-radius:12px;font-size:23px;background:#eaf3ec;color:#40614e;}
+.mind-mood{font-size:12px;color:#647a6a;margin-bottom:12px;}
+.mind-mood strong{display:block;font-size:18px;color:#385d4a;margin:3px 0 7px;}
+.mind-meter{height:8px;background:#e9f0e7;border-radius:12px;overflow:hidden;}
+.mind-meter i{height:100%;display:block;width:70%;background:#81baa0;transition:width .3s;}
+.mind-wish{padding:12px;border-radius:16px;background:#eaf5ed;margin-bottom:12px;}
+.mind-wish strong{display:block;color:#385d4a;font-size:14px;margin:5px 0 10px;}
+.mind-wish button{background:#3f9276;color:white;font-weight:800;border:0;border-radius:11px;padding:9px 12px;font-size:12px;width:100%;}
+.mind-wish button:disabled{opacity:.55;}
+.mind-traits,.mind-history{margin-top:12px;}
+.mind-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
+.mind-tags span{background:#f0f4ee;color:#567864;border:1px solid #e2ebe2;border-radius:12px;padding:6px 9px;font-size:11px;font-weight:700;}
+.mind-history ul{list-style:none;padding:0;margin:7px 0 0;}
+.mind-history li{font-size:11px;color:#667d6c;padding:7px 0;border-bottom:1px solid #edf0ec;}
+@media (max-width:700px){.mind-panel{bottom:calc(env(safe-area-inset-bottom) + 162px);} .character-tag small{max-width:154px;}}
+@media (max-height:560px){.mind-panel{bottom:calc(env(safe-area-inset-bottom) + 109px);max-height:55dvh;}}

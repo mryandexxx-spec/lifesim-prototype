@@ -1,0 +1,137 @@
+/** Headless LifeSim personality, emotions, wishes and event memory. No DOM, engine or I/O. */
+export const TRAITS = Object.freeze({
+  neat: { label: 'Аккуратный', description: 'Любит чистоту и порядок', value: 0.82 },
+  cozy: { label: 'Ценит уют', description: 'Любит спокойные вечера и комфорт', value: 0.73 },
+  curious: { label: 'Любознательный', description: 'Предпочитает развлечения и новые впечатления', value: 0.78 }
+});
+export const WISHES = Object.freeze({
+  bed: { label: 'Хорошенько выспаться', symbol: '☾' },
+  fridge: { label: 'Вкусно перекусить', symbol: '◕' },
+  shower: { label: 'Освежиться в душе', symbol: '✧' },
+  sofa: { label: 'Устроить уютный отдых', symbol: '♫' }
+});
+export const MEMORY_TEXT = Object.freeze({
+  bed: 'Выспался и набрался сил',
+  fridge: 'Вкусно перекусил',
+  shower: 'Порадовался свежести после душа',
+  sofa: 'Приятно отдохнул на диване'
+});
+const IDS = Object.keys(WISHES);
+const LIMIT = 12;
+const finite = n => Number.isFinite(n);
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+const trait = id => TRAITS[id].value;
+
+/** Only known item IDs and timestamps enter saved memories. */
+export function createMind(minutes = 480) {
+  return {
+    memories: [],
+    wish: { id: 'sofa', since: minutes, until: minutes + 480 },
+    mood: { value: 70, label: 'Спокоен' }
+  };
+}
+
+export function recentMemoryEffect(mind, minutes) {
+  return (mind.memories || []).reduce((sum, memory) => {
+    const elapsed = clamp(minutes - memory.at, 0, 10000000);
+    const strength = Math.max(0, 1 - elapsed / 360);
+    return sum + (memory.fulfilled ? 12 : 5) * strength;
+  }, 0);
+}
+
+/** Mood is a derived snapshot, never trusted from localStorage. */
+export function calculateMood(needs, mind, minutes) {
+  const values = [needs.hunger, needs.energy, needs.hygiene, needs.fun].map(x => clamp(finite(x) ? x : 50, 0, 100));
+  const average = values.reduce((a, b) => a + b, 0) / values.length;
+  const worst = Math.min(...values);
+  const comfort = (needs.fun * trait('curious') + needs.hygiene * trait('neat') + needs.energy * trait('cozy')) / (trait('curious') + trait('neat') + trait('cozy'));
+  const score = clamp(Math.round(20 + average * .48 + comfort * .27 + Math.min(17, recentMemoryEffect(mind, minutes)) - (worst < 25 ? (25 - worst) * .8 : 0)), 0, 100);
+  let label = 'Спокоен';
+  if (worst < 20) {
+    const lowest = values.indexOf(worst);
+    label = ['Очень голоден', 'Измотан', 'Не в духе', 'Скучает'][lowest];
+  } else if (score >= 83) label = 'Вдохновлён';
+  else if (score >= 68) label = 'Доволен';
+  else if (score < 40) label = 'Подавлен';
+  else if (score < 56) label = 'Не в настроении';
+  return { value: score, label };
+}
+
+/** Deterministic wish generation, allowing identical saves to produce identical behavior. */
+export function selectWish(state, except = null) {
+  const n = state.needs;
+  const hour = Math.floor((state.minutes % 1440) / 60);
+  const night = hour >= 22 || hour < 6;
+  const weights = {
+    bed: 22 * trait('cozy') + (100 - n.energy) * .16 + (night ? 13 : 0),
+    fridge: 15 + (100 - n.hunger) * .20,
+    shower: 26 * trait('neat') + (100 - n.hygiene) * .16,
+    sofa: 30 * trait('curious') + (100 - n.fun) * .17
+  };
+  for (const memory of (state.mind?.memories || []).slice(-4)) {
+    if (state.minutes - memory.at < 180) weights[memory.id] -= 8;
+  }
+  if (except && weights[except] !== undefined) weights[except] -= 22;
+  return IDS.slice().sort((a, b) => weights[b] - weights[a] || IDS.indexOf(a) - IDS.indexOf(b))[0];
+}
+
+export function refreshMind(state) {
+  if (!state.mind || typeof state.mind !== 'object') state.mind = createMind(state.minutes);
+  if (!state.mind.wish || state.minutes >= state.mind.wish.until) {
+    const id = selectWish(state);
+    state.mind.wish = { id, since: state.minutes, until: state.minutes + 480 };
+  }
+  state.mind.mood = calculateMood(state.needs, state.mind, state.minutes);
+}
+
+export function rememberAction(state, id) {
+  if (!WISHES[id]) return;
+  const mind = state.mind;
+  const fulfilled = mind.wish?.id === id;
+  mind.memories.push({ id, at: state.minutes, fulfilled });
+  mind.memories = mind.memories.slice(-LIMIT);
+  if (fulfilled) {
+    const next = selectWish(state, id);
+    mind.wish = { id: next, since: state.minutes, until: state.minutes + 480 };
+  }
+  refreshMind(state);
+}
+
+/** Saving invalid or foreign mind data may never crash the game or inject UI strings. */
+export function restoreMind(raw, state) {
+  const mind = createMind(state.minutes);
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    if (Array.isArray(raw.memories)) {
+      mind.memories = raw.memories.filter(m => m && typeof m === 'object' &&
+        IDS.includes(m.id) && finite(m.at) && m.at >= 0 && m.at <= state.minutes
+      ).slice(-LIMIT).map(m => ({ id: m.id, at: m.at, fulfilled: m.fulfilled === true }));
+    }
+    if (raw.wish && typeof raw.wish === 'object' && IDS.includes(raw.wish.id) &&
+      finite(raw.wish.since) && finite(raw.wish.until) && raw.wish.since >= 0 &&
+      raw.wish.since <= state.minutes && raw.wish.until > state.minutes &&
+      raw.wish.until <= state.minutes + 480) {
+      mind.wish = { id: raw.wish.id, since: raw.wish.since, until: raw.wish.until };
+    } else if (mind.memories.length) {
+      mind.wish = null; // regenerate against recent history
+    }
+  }
+  state.mind = mind;
+  refreshMind(state);
+  return mind;
+}
+
+/** Utility modifier used only when there is a legitimate base need or mature wish. */
+export function psychologyScore(state, id, wishReady = true) {
+  if (!WISHES[id]) return 0;
+  const n = state.needs;
+  const critical = Math.min(n.energy, n.hunger, n.hygiene, n.fun) < 24;
+  let score = 0;
+  if (id === 'shower') score += (trait('neat') - .5) * 5;
+  if (id === 'bed') score += (trait('cozy') - .5) * 6;
+  if (id === 'sofa') score += (trait('curious') - .5) * 5;
+  if (!critical && wishReady && state.mind?.wish?.id === id) score += 11;
+  if (id === 'sofa' && !critical && state.mind?.mood?.value < 48) score += 3;
+  const last = state.mind?.memories?.at(-1);
+  if (last && last.id === id && state.minutes - last.at < 90) score -= 4;
+  return score;
+}

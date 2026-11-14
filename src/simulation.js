@@ -1,4 +1,5 @@
 /** Pure game rules: no PlayCanvas or browser imports. */
+import { createMind, restoreMind, refreshMind, rememberAction, psychologyScore } from './psychology.js';
 export const NEEDS = ['hunger', 'energy', 'hygiene', 'fun'];
 export const ACTIONS = Object.freeze({
   bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [-0.82, -1.05] },
@@ -11,12 +12,15 @@ export const SAVE_KEY = 'lifesim.room01.v1';
 const clamp = value => Math.max(0, Math.min(100, value));
 
 export function newGame() {
-  return {
+  const state = {
     version: 1, minutes: 8 * 60, speed: 1, paused: false,
     needs: { hunger: 78, energy: 67, hygiene: 82, fun: 58 },
     position: { x: -0.25, z: 0.35 }, action: null, event: 'Свободное время',
-    autonomy: { nextAt: 480 }
+    autonomy: { nextAt: 480 },
+    mind: createMind(480)
   };
+  refreshMind(state);
+  return state;
 }
 
 export function loadGame(data) {
@@ -29,6 +33,7 @@ export function loadGame(data) {
     next.position.z = Math.max(-3.7, Math.min(3.7, data.position.z));
   }
   if (Number.isFinite(data.autonomy?.nextAt)) next.autonomy.nextAt = Math.max(0, Math.min(data.autonomy.nextAt, 10000000));
+  restoreMind(data.mind, next);
   if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase)) {
     next.action = { id: data.action.id, phase: data.action.phase, elapsed: Math.max(0, Math.min(1000, Number(data.action.elapsed) || 0)), automatic: Boolean(data.action.automatic) };
   }
@@ -52,6 +57,7 @@ export function tick(state, minutes) {
   if (state.paused || !Number.isFinite(minutes) || minutes <= 0) return;
   state.minutes += minutes;
   for (const need of NEEDS) state.needs[need] = clamp(state.needs[need] - DECAY[need] * minutes);
+  refreshMind(state);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
     const amount = Math.min(minutes, Math.max(0, definition.duration - state.action.elapsed));
@@ -59,6 +65,7 @@ export function tick(state, minutes) {
     state.action.elapsed += amount;
     if (state.action.elapsed >= definition.duration || state.needs[definition.need] >= 99.9) {
       state.event = definition.label + ' — готово';
+      rememberAction(state, state.action.id);
       state.autonomy.nextAt = state.minutes + 7; // short break between autonomous tasks
       state.action = null;
     }
@@ -69,19 +76,24 @@ export function autonomousChoice(state) {
   if (state.paused || state.action || state.minutes < state.autonomy.nextAt) return null;
   const hour = Math.floor(state.minutes % 1440 / 60);
   const night = hour >= 22 || hour < 6;
+  const critical = Math.min(...NEEDS.map(id => state.needs[id])) < 24;
+  const wishReady = !critical && state.minutes >= 540;
   const options = [
     { id: 'fridge', need: 'hunger', threshold: 43, weight: 1.25 },
     { id: 'bed', need: 'energy', threshold: 42, weight: 1.12 },
     { id: 'shower', need: 'hygiene', threshold: 40, weight: 0.95 },
     { id: 'sofa', need: 'fun', threshold: 37, weight: 0.90 }
   ];
-  const scored=options.map(option=>{
-    const value=state.needs[option.need];
-    const urgency=Math.max(0, option.threshold-value)*option.weight;
-    // During late evening, Alex is more likely to go to bed before exhaustion.
-    const bedtime=night && option.id==='bed' && value < 67 ? (67-value)*0.48 : 0;
-    return { id:option.id, score:urgency+bedtime };
-  }).sort((a,b)=>b.score-a.score);
+  const scored = options.map(option => {
+    const value = state.needs[option.need];
+    const urgency = Math.max(0, option.threshold - value) * option.weight;
+    const bedtime = night && option.id === 'bed' && value < 67 ? (67-value) * 1.40 : 0;
+    const base = urgency + bedtime;
+    // No voluntary action at game start: let the player explore for the first hour.
+    const eligible = base > 0 || (wishReady && state.mind?.wish?.id === option.id);
+    const score = eligible ? base + psychologyScore(state, option.id, wishReady) : 0;
+    return { id: option.id, score };
+  }).sort((a, b) => b.score - a.score);
   return scored[0].score > 0 ? scored[0].id : null;
 }
 
