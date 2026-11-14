@@ -32,6 +32,11 @@ catch { game = newHousehold(); }
 const selectedActor = () => getActor(game,game.selectedSim);
 const selectedName = () => getActorName(game.selectedSim);
 const visualQuery = new URLSearchParams(window.location.search).get('model') || '';
+// Emergency QA switches: keep Meshy appearance while reverting only seat
+// contact solving (?seat=legacy) or disabling foot IK (?ik=off).
+const seatQuery = new URLSearchParams(window.location.search);
+const seatContactEnabled = seatQuery.get('seat') !== 'legacy';
+const seatIKEnabled = seatQuery.get('ik') !== 'off';
 let meshyPreferred = meshVisualPreference(null,visualQuery);
 try { meshyPreferred=meshVisualPreference(localStorage.getItem(MESHY_VISUAL_KEY),visualQuery); }
 catch { /* Safari private mode may reject storage; use the in-memory choice. */ }
@@ -370,7 +375,7 @@ function boot() {
   const miraRig=createCharacterRig(rigContext,'mira');
   // Visual-only experimental Alex skin. The procedural rig and every action
   // controller remain authoritative; any GLB error falls back immediately.
-  const meshyAlex=createMeshyVisual({pc,app,rig:alexRig,onStatus:(status,error)=>{
+  const meshyAlex=createMeshyVisual({pc,app,rig:alexRig,footIK:seatIKEnabled,onStatus:(status,error)=>{
     if(status==='ready'&&meshyPreferred)toast('3D-облик Meshy загружен для Алекса');
     if(status==='error')toast('Meshy недоступен: сохранён обычный облик Алекса');
     if(error)console.warn('Meshy visual unavailable',error);
@@ -916,7 +921,7 @@ function boot() {
       actionId:useId,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
-      seat:livingSofaSeat,
+      seat:seatContactEnabled?livingSofaSeat:null,
       bedBusy:bedStates.alex.progress>0,
       showerBusy:showerStates.alex.active,
       fridgeBusy:fridgeLeaving.alex
