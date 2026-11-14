@@ -16,14 +16,16 @@ test('Meshy is an opt-out visual mode; legacy and URL overrides are supported',(
   assert.equal(MESHY_VISUAL_KEY,'lifesim.meshyVisual.v1');
 });
 
-test('only safe free locomotion and social states show the experimental mesh',()=>{
+test('Meshy sofa stays visible while bed/fridge/shower retain procedural fallback',()=>{
   const standard={preferred:true,ready:true};
   assert.equal(canShowMeshy(standard),true);
   assert.equal(canShowMeshy({...standard,ready:false}),false);
   assert.equal(canShowMeshy({...standard,preferred:false}),false);
-  for(const actionId of ['bed','sofa','fridge','shower'])
+  assert.equal(canShowMeshy({...standard,actionId:'sofa'}),true);
+  for(const actionId of ['bed','fridge','shower'])
     assert.equal(canShowMeshy({...standard,actionId}),false,actionId);
-  for(const gate of ['sofaBusy','bedBusy','showerBusy','fridgeBusy'])
+  assert.equal(canShowMeshy({...standard,sofaBusy:true}),true);
+  for(const gate of ['bedBusy','showerBusy','fridgeBusy'])
     assert.equal(canShowMeshy({...standard,[gate]:true}),false,gate);
   assert.equal(canShowMeshy({...standard,actionId:null}),true);
 });
@@ -36,6 +38,7 @@ test('Meshy clip mapping matches actual semantic states, not fabricated clip nam
   assert.equal(meshClipFor({walking:true,social:'talk'}),'Walking');
   assert.equal(availableMeshClips(REQUIRED_MESHY_CLIPS),true);
   assert.equal(availableMeshClips(['Idle_3','Walking']),false);
+  assert.ok(REQUIRED_MESHY_CLIPS.includes('Sit_to_Stand_Transition_M'));
 });
 
 test('production asset path, height and file contract match validated Meshy GLB',()=>{
