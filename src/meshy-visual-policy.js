@@ -46,6 +46,15 @@ export const MESHY_SEAT_RIG_PROFILE=Object.freeze({
   ])
 });
 
+/** 0.7c Safari regression guard. Unsafe XYZ/IK remains explicit QA opt-in. */
+export function meshSeatRuntimeSettings(seatParam=null,ikParam=null){
+  if(seatParam==='legacy')return {enabled:false,mode:'vertical',footIK:false};
+  if(seatParam==='full')return {
+    enabled:true,mode:'full',footIK:ikParam==='on'
+  };
+  return {enabled:true,mode:'vertical',footIK:false};
+}
+
 export const MESHY_VISUAL_KEY = 'lifesim.meshyVisual.v1';
 export const REQUIRED_MESHY_CLIPS = Object.freeze([
   'Idle_3','Walking','Listening_Gesture','Stand_Talking_Angry',MESHY_SOFA_CLIP
