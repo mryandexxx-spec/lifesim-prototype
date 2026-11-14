@@ -391,6 +391,12 @@ function boot() {
   beginAction=(id,automatic=false,actorId=game.selectedSim)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
+    // Releasing the headless shower action does not immediately clear the
+    // physical cubicle: the prior user must finish dressing and exiting first.
+    if(id==='shower'&&HOUSEHOLD_IDS.some(other=>other!==actorId&&showerStates[other].active)){
+      if(!automatic)toast('Душевая пока занята: житель выходит');
+      return false;
+    }
     if(!furnitureAvailable(game,id,actorId)){
       if(!automatic)toast('Предмет сейчас занят другим жителем');
       return false;
