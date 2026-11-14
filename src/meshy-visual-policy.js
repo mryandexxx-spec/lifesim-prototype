@@ -25,6 +25,26 @@ export function meshPlacement(targetHeight=MESHY_DISPLAY_HEIGHT){
     z:-(min.z+max.z)*scale/2
   };
 }
+
+/** One contact profile per RIG, not per sofa. All positions in imported GLB units.
+ * The pelvis point is below mixamorig:Hips and represents the lower rear cloth
+ * surface in the seated pose; a small cushion clearance avoids mesh overlap.
+ */
+export const MESHY_SEAT_RIG_PROFILE=Object.freeze({
+  pelvisBone:'mixamorig:Hips',
+  contact:Object.freeze({x:0,y:-.18,z:0}),
+  clearance:.025,
+  halfStance:.16,
+  footForward:.46,
+  ankleHeight:.073,
+  legs:Object.freeze([
+    Object.freeze({thigh:'mixamorig:LeftUpLeg',shin:'mixamorig:LeftLeg',
+      ankle:'mixamorig:LeftFoot'}),
+    Object.freeze({thigh:'mixamorig:RightUpLeg',shin:'mixamorig:RightLeg',
+      ankle:'mixamorig:RightFoot'})
+  ])
+});
+
 export const MESHY_VISUAL_KEY = 'lifesim.meshyVisual.v1';
 export const REQUIRED_MESHY_CLIPS = Object.freeze([
   'Idle_3','Walking','Listening_Gesture','Stand_Talking_Angry',MESHY_SOFA_CLIP
