@@ -7,6 +7,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js';
+import {createSeatSurface,seatSlot} from './interaction-anchors.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js';
 import {meshVisualPreference,MESHY_VISUAL_KEY} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
@@ -355,6 +356,16 @@ function boot() {
 
   // Original reusable 0.5a rigs. Keep all existing motion/interaction pivot references.
   const rigContext={pc,root:app.root,ball,box,cylinder,mat,materials:M};
+  // Furniture publishes its own physical seat dimensions/placement.
+  // Future armchairs and couch variants register the same metadata and
+  // reuse this controller: no per-sofa adjustments of the avatar's Y.
+  const livingSofaSurface=createSeatSurface({
+    id:'living-sofa',origin:{x:SOFA_LAYOUT.x,y:0,z:SOFA_LAYOUT.z},
+    yaw:SOFA_POSE.yaw,width:SOFA_LAYOUT.seatWidth,depth:SOFA_LAYOUT.seatDepth,
+    seatHeight:SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2,
+    floorY:0,slots:1,sideMargin:.35,backClearance:.10,approachGap:.50
+  });
+  const livingSofaSeat=seatSlot(livingSofaSurface,0);
   const alexRig=createCharacterRig(rigContext,'alex');
   const miraRig=createCharacterRig(rigContext,'mira');
   // Visual-only experimental Alex skin. The procedural rig and every action
@@ -905,6 +916,7 @@ function boot() {
       actionId:useId,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
+      seat:livingSofaSeat,
       bedBusy:bedStates.alex.progress>0,
       showerBusy:showerStates.alex.active,
       fridgeBusy:fridgeLeaving.alex
