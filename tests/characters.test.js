@@ -44,12 +44,17 @@ test('constructor builds both rig contracts once with correct animated pivot geo
   for(const r of [alex,mira]) {
     assert.equal(r.legPivot.length,2);
     assert.equal(r.armPivot.length,2);
-    assert.equal(r.leftEye.parent,r.avatar);
-    assert.equal(r.rightEye.parent,r.avatar);
+    assert.equal(r.elbowPivot.length,2);
+    assert.equal(r.upperBody.parent,r.avatar);
+    assert.equal(r.leftEye.parent,r.upperBody);
+    assert.equal(r.rightEye.parent,r.upperBody);
     assert.equal(r.legPivot[0].position.y,.72);
-    assert.equal(r.armPivot[1].position.y,1.17);
-    assert.equal(r.snack.parent,r.armPivot[1]);
-    assert.equal(r.book.parent,r.armPivot[1]);
+    assert.equal(r.upperBody.position.y,.73);
+    assert.equal(r.upperBody.position.y+r.armPivot[1].position.y,1.17);
+    assert.equal(r.armPivot[1].parent,r.upperBody);
+    assert.equal(r.elbowPivot[1].parent,r.armPivot[1]);
+    assert.equal(r.snack.parent,r.elbowPivot[1]);
+    assert.equal(r.book.parent,r.elbowPivot[1]);
     assert.equal(r.snack.enabled,false);
     assert.equal(r.book.enabled,false);
     assert.equal(r.selected.parent,r.avatar);
@@ -152,7 +157,8 @@ test('sleeves connect inside the torso instead of bulging into detached shoulder
       // Sample at the pivot shoulder height: the torso must overlap the sleeve.
       assert.ok(torsoEdge-sleeveEdge>.02,
         'Shirt and sleeve should intersect sufficiently to hide the visible joint');
-      assert.ok(arm.position.y+arm.scale.y/2 > sleeve.position.y-sleeve.scale.y/2,
+      assert.ok(rig.elbowPivot[i].position.y+arm.position.y+arm.scale.y/2 >
+        sleeve.position.y-sleeve.scale.y/2,
         'Skin forearm must begin inside the bottom of the sleeve');
       assert.ok(hand.position.y+hand.scale.y/2 > arm.position.y-arm.scale.y/2,
         'Hand must meet the forearm rather than hang detached');

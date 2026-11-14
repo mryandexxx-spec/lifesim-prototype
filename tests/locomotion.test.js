@@ -20,7 +20,10 @@ test('opposite legs and arms swing; forward knee bends, toes lift',()=>{
   assert.ok(p.hips[0]>20&&p.hips[1]<-20);
   assert.ok(p.knees[1]>p.knees[0]+25);
   assert.ok(p.feet[1]<-8&&p.feet[0]>0);
-  assert.ok(p.arms[0]<0&&p.arms[1]>0);
+  assert.ok(p.arms[0]<-25&&p.arms[1]>25);
+  assert.ok(p.elbows[0]>p.elbows[1]+20);
+  assert.ok(p.spineLean>3&&Math.abs(p.spineTwist)>6);
+  assert.ok(p.hipShift>.04);
   assert.ok(p.torsoRoll*p.pelvisRoll<0);
 });
 
@@ -118,6 +121,11 @@ test('animator applies foot/weight transforms to existing meshes, not new meshes
     }
     assert.ok(Math.abs(rig.shoes[0].rot[0])>0);
     assert.equal(rig.pelvis.rot[2],state.pelvisRoll);
+    assert.equal(rig.upperBody.rot[0],state.spineLean);
+    assert.equal(rig.upperBody.rot[1],state.spineTwist);
+    assert.equal(rig.upperBody.rot[2],state.spineRoll);
+    assert.equal(rig.elbowPivot[0].rot[0],state.elbows[0]);
+    assert.ok(Math.abs(rig.upperBody.position.x)>.004);
     assert.equal(all.length,count);
   }
 });

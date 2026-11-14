@@ -13,7 +13,7 @@ test('transition into walk is smooth, then naturally settles in idle',()=>{
   assert.ok(first.legs[1]<0 && first.legs[1]>-27);
   a=first;
   for(let i=0;i<35;i++)a=stepAnimation(a,at({walking:true,gait:Math.PI/2}),.016);
-  assert.ok(a.legs[0]>20 && a.legs[0]<28);
+  assert.ok(a.legs[0]>26 && a.legs[0]<42);
   const stop=stepAnimation(a,at(),.016);
   assert.ok(stop.legs[0]>0 && stop.legs[0]<a.legs[0]);
 });

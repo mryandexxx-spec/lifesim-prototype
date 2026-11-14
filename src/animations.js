@@ -1,5 +1,5 @@
 /**
- * LifeSim 0.6b — transient procedural pose, ground-contact gait and face animation.
+ * LifeSim 0.6b.1 — visible upper-body, elbow and two-segment gait animation.
  * No engine import, simulation state mutation, saved fields or browser APIs.
  * Every angle eases toward a target instead of snapping on state transitions.
  */
@@ -11,8 +11,9 @@ const blend=(a,b,rate,dt)=>a+(b-a)*(1-Math.exp(-rate*dt));
 const safe=(n,fallback)=>Number.isFinite(n)?n:fallback;
 
 export function createAnimationState() {
-  return {legs:[0,0],knees:[0,0],feet:[0,0],arms:[0,0],
+  return {legs:[0,0],knees:[0,0],feet:[0,0],arms:[0,0],elbows:[0,0],
     torso:0,pelvisRoll:0,walkWeight:0,walkBob:0,
+    spineLean:0,spineTwist:0,spineRoll:0,hipShift:0,bodyLift:0,
     mouthWidth:.095,mouthHeight:.017,brow:-0.5,eyeOpen:1,time:0};
 }
 
@@ -32,12 +33,13 @@ export function stepAnimation(previous,signals,dt) {
   // Acceleration and deceleration are in active real time. Phase comes from
   // ACTUAL travelled metres in game.js, so 1×/3× keep stride in sync.
   const walkWeight=blend(safe(previous.walkWeight,0),
-    moving?1:0,moving?8:10,step);
+    moving?1:0,moving?9:12,step);
   const walkPose=gaitTargets(gait,walkWeight,energy);
   // Progress lets the figure bend AFTER approaching and turning; the headless
   // animator remains backward compatible when no progress signal is supplied.
   const sofaWeight=clamp(safe(signals?.sofaWeight,action==='sofa'?1:0),0,1);
-  let legTarget=[0,0],kneeTarget=[0,0],footTarget=[0,0],armTarget=[0,0];
+  let legTarget=[0,0],kneeTarget=[0,0],footTarget=[0,0],armTarget=[0,0],
+    elbowTarget=[0,0];
   if(sofaWeight>0){
     legTarget=[SOFA_HIP_PITCH*sofaWeight,SOFA_HIP_PITCH*sofaWeight];
     kneeTarget=[SOFA_KNEE_PITCH*sofaWeight,SOFA_KNEE_PITCH*sofaWeight];
@@ -56,14 +58,18 @@ export function stepAnimation(previous,signals,dt) {
     kneeTarget=walkPose.knees;
     footTarget=walkPose.feet;
     armTarget=walkPose.arms;
+    elbowTarget=walkPose.elbows;
   }else if(action!=='bed'){
     armTarget=[Math.sin(t*1.5)*1.4,Math.sin(t*1.5+1.1)*1.4];
   }
-  const speed=social?7:action?5.5:moving?9:5;
+  // The previous slow smoothing filtered nearly half the 0.6b stride amplitude
+  // at 1.65 m/s, making changes almost invisible on a phone-sized figure.
+  const speed=social?7:action?5.5:moving?18:8;
   const legs=previous.legs.map((v,i)=>blend(v,legTarget[i],speed,step));
   const knees=(previous.knees||[0,0]).map((v,i)=>blend(v,kneeTarget[i],speed,step));
   const feet=(previous.feet||[0,0]).map((v,i)=>blend(v,footTarget[i],speed,step));
   const arms=previous.arms.map((v,i)=>blend(v,armTarget[i],speed,step));
+  const elbows=(previous.elbows||[0,0]).map((v,i)=>blend(v,elbowTarget[i],speed,step));
   // Light breathing and conversational emphasis, independent of gameplay logic.
   const inGait=(moving||walkWeight>.003)&&!sofaWeight;
   const torsoTarget=action==='bed'?0:social
@@ -73,7 +79,19 @@ export function stepAnimation(previous,signals,dt) {
   // Opposite weight transfer through pelvis + chest; sole remains close to
   // floor at stance without moving any collision or gameplay position.
   const pelvisRoll=blend(safe(previous.pelvisRoll,0),
-    inGait?walkPose.pelvisRoll:0,7,step);
+    inGait?walkPose.pelvisRoll:0,9,step);
+  // Waist pivot brings head, shoulders, eyes and arms along as a coherent
+  // upper-body volume. Head-to-hips lean is now visible from the isometric view.
+  const spineLean=blend(safe(previous.spineLean,0),
+    inGait?walkPose.spineLean:0,12,step);
+  const spineTwist=blend(safe(previous.spineTwist,0),
+    inGait?walkPose.spineTwist:0,14,step);
+  const spineRoll=blend(safe(previous.spineRoll,0),
+    inGait?walkPose.spineRoll:0,14,step);
+  const hipShift=blend(safe(previous.hipShift,0),
+    inGait?walkPose.hipShift:0,14,step);
+  const bodyLift=blend(safe(previous.bodyLift,0),
+    inGait?walkPose.bodyLift:0,14,step);
   const ground=inGait?gaitGroundOffset(legs,knees):0;
   const walkBob=blend(safe(previous.walkBob,0),ground,13,step);
 
@@ -87,7 +105,8 @@ export function stepAnimation(previous,signals,dt) {
   const blink=t%4.1<.11;
   const eyeTarget=sleeping?.04:blink?.16:1;
   return {
-    legs,knees,feet,arms,torso,pelvisRoll,walkWeight,walkBob,time:t,
+    legs,knees,feet,arms,elbows,torso,pelvisRoll,walkWeight,walkBob,
+    spineLean,spineTwist,spineRoll,hipShift,bodyLift,time:t,
     mouthWidth:blend(previous.mouthWidth,mouthWidthTarget,5,step),
     mouthHeight:blend(previous.mouthHeight,mouthHeightTarget,5,step),
     brow:blend(previous.brow,browTarget,5,step),
@@ -102,9 +121,12 @@ export function applyCharacterAnimation(rig,state) {
     rig.kneePivot[i].setLocalEulerAngles(state.knees[i],0,0);
     rig.shoes[i].setLocalEulerAngles(state.feet[i],0,0);
     rig.armPivot[i].setLocalEulerAngles(state.arms[i],0,0);
+    rig.elbowPivot[i].setLocalEulerAngles(state.elbows[i],0,0);
   }
   rig.torso.setLocalEulerAngles(0,0,state.torso);
   rig.pelvis.setLocalEulerAngles(0,0,state.pelvisRoll);
+  rig.upperBody.setLocalEulerAngles(state.spineLean,state.spineTwist,state.spineRoll);
+  rig.upperBody.setLocalPosition(state.hipShift,.73+state.bodyLift,0);
   rig.leftEye.setLocalScale(1,state.eyeOpen,1);
   rig.rightEye.setLocalScale(1,state.eyeOpen,1);
   // Dynamic width/height never push facial details away from the head.
