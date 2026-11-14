@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createMeshyVisual} from '../src/meshy-visual.js';
-import {REQUIRED_MESHY_CLIPS} from '../src/meshy-visual-policy.js';
+import {REQUIRED_MESHY_CLIPS,meshPlacement} from '../src/meshy-visual-policy.js';
 
 function fixture({loadError=false,missClip=false}={}){
   const events=[];
@@ -70,7 +70,8 @@ test('Meshy adapter hides only legacy body renderer; selection, items and privac
   const visual=createMeshyVisual({pc:f.pc,app:f.app,rig:f.rig,onStatus:status=>statuses.push(status)});
   assert.equal(visual.ready,true);
   assert.deepEqual(statuses,['ready']);
-  assert.equal(f.model.scale[0],1.78);
+  assert.equal(f.model.scale[0],meshPlacement().scale);
+  assert.equal(f.model.position[1],meshPlacement().y);
   visual.update({preferred:true,walking:true});
   assert.equal(f.renderers[0].enabled,false);
   assert.ok(f.renderers.slice(1).every(r=>r.enabled));
@@ -127,7 +128,25 @@ test('Meshy sofa plays backwards from exact progress without swapping body, even
   const releasingZ=f.model.position[2];
   visual.update({preferred:true,dt:.10});
   assert.notEqual(f.model.position[2],releasingZ);
-  assert.equal(f.model.position[2],0,'root offset fully released');
+  assert.equal(f.model.position[2],meshPlacement().z,'root offset fully released');
   visual.update({preferred:true,actionId:'fridge'});
   assert.equal(f.renderers[0].enabled,true,'fridge deliberately uses legacy');
+});
+
+test('new Meshy sofa seat correction stays off when standing and clears the cushion at rest',()=>{
+  const f=fixture();
+  const visual=createMeshyVisual({pc:f.pc,app:f.app,rig:f.rig});
+  const base=meshPlacement();
+  visual.update({preferred:true,actionId:'sofa',sofaBusy:true,sofaWeight:0,dt:.016});
+  assert.ok(Math.abs(f.model.position[1]-base.y)<1e-10);
+  visual.update({preferred:true,actionId:'sofa',sofaBusy:true,sofaWeight:1,dt:.016});
+  const seatedY=f.model.position[1];
+  assert.ok(seatedY>base.y,'seat height correction must lift mesh, not lower it');
+  assert.ok(seatedY-base.y<.07,'no visible jump or feet flying above couch');
+  visual.update({preferred:true,sofaBusy:true,sofaWeight:.5,paused:true,dt:0});
+  const hold=f.model.position[1];
+  visual.update({preferred:true,sofaBusy:true,sofaWeight:.5,paused:true,dt:0});
+  assert.equal(f.model.position[1],hold,'pause holds corrected seat height');
+  visual.update({preferred:true,dt:.20});
+  assert.ok(Math.abs(f.model.position[1]-base.y)<1e-8,'standing restores ground reference');
 });
