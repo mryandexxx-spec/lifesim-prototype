@@ -88,7 +88,9 @@ export function stepAnimation(previous,signals,dt) {
       footTarget=walkPose.feet.map(v=>v*step);
       armTarget=walkPose.arms.map(v=>v*step);
       elbowTarget=walkPose.elbows.map(v=>v*step);
-    }else if(signals?.showerWater){
+    }else if(signals?.showerWater??action==='shower'){
+      // Older animation callers supplied only using:'shower'. Keep that
+      // legacy washing pose, but explicit false from 0.6e means dry/exit.
       armTarget=[36+Math.sin(t*5)*12,34-Math.sin(t*4.5)*12];
     }else{
       armTarget=[5,8];

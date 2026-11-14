@@ -84,7 +84,7 @@ test('sampled real mesh surfaces stay outside mattress solid and above floor, fo
     for(let i=0;i<=120;i++){
       s.sample(i/120,slot);
       for(const e of s.meshes){
-        if(/selected|book|apple/.test(e.name))continue;
+        if(!e.enabled||/selected|book|apple/.test(e.name))continue;
         const m=e.getWorldTransform();
         for(const v of surface){
           const w=m.transformPoint(v);

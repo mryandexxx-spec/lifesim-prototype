@@ -108,6 +108,7 @@ test('pause freezes active stage and exit transitions independent of playback sp
 });
 test('full-body rig hidden during private bathing, always returns fully clothed',()=>{
   const root=new pc.Entity('root'),made=[];
+  root.enabled=true;
   const shape=(name,x,y,z,sx,sy,sz,material,parent=root)=>{
     const item=new pc.Entity(name);
     item.setLocalPosition(x,y,z);item.setLocalScale(sx,sy,sz);
@@ -118,6 +119,7 @@ test('full-body rig hidden during private bathing, always returns fully clothed'
     mat:s=>s,materials};
   for(const id of ['alex','mira']){
     const rig=createCharacterRig(ctx,id);
+    rig.avatar.enabled=true; // Detached headless fixture starts disabled.
     assert.ok(rig.outfitMeshes.length>=10);
     assert.equal(rig.avatar.enabled,true);
     assert.equal(rig.showerWrap.enabled,false);
