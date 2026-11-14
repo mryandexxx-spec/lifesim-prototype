@@ -49,52 +49,10 @@ test('audit female GLB clip timelines and animated pelvis translation',()=>{
   const needed=['Look_Back_and_Sit','Sit_to_Stand_Transition_F','Step_to_Sit_Transition','Lie_Down_Hands_Spread'];
   assert.ok(needed.every(name=>root.animations.some(x=>x.name===name)));
   assert.ok(pelvis.length>=1);
-  // Diagnostic audit for native sleeping clips. Remove these console logs
-  // once anchored animation design is recorded and tested.
-  const sampleTrack=(clipName,boneName,trackPath)=>{
-    const clip=root.animations.find(x=>x.name===clipName);
-    const node=root.nodes.findIndex(x=>x.name===boneName);
-    const channel=clip?.channels.find(x=>x.target.node===node&&x.target.path===trackPath);
-    if(!channel)return null;
-    const sm=clip.samplers[channel.sampler],timeA=root.accessors[sm.input],
-      outputA=root.accessors[sm.output];
-    const read=(accessor,i)=>{
-      const v=root.bufferViews[accessor.bufferView],
-        n={SCALAR:1,VEC3:3,VEC4:4}[accessor.type],
-        start=binOffset+v.byteOffset+(accessor.byteOffset||0)+i*(v.byteStride||n*4);
-      return Array.from({length:n},(_,k)=>Number(glb.readFloatLE(start+k*4).toFixed(5)));
-    };
-    const indices=[0,Math.round((outputA.count-1)*.25),
-      Math.round((outputA.count-1)*.5),Math.round((outputA.count-1)*.75),outputA.count-1];
-    return indices.map(i=>[...read(timeA,i),...read(outputA,i)]);
-  };
-  const details={};
-  for(const name of ['Idle_7','Look_Back_and_Sit','Lie_Down_Hands_Spread','sleep']){
-    const record={};
-    for(const b of ['mixamorig:Hips','mixamorig:Spine','mixamorig:Spine1',
-      'mixamorig:Spine2','mixamorig:Head','mixamorig:LeftUpLeg']){
-      record[b.replace('mixamorig:','')]={
-        r:sampleTrack(name,b,'rotation'),
-        t:b==='mixamorig:Hips'?sampleTrack(name,b,'translation'):null
-      };
-    }
-    details[name]=record;
-  }
-  console.log('MIRA_BED_ROT_AUDIT',JSON.stringify(details));
-  const getSamplerRows=(name,kind)=>{
-    const track=root.animations.find(a=>a.name==='sleep');
-    const ch=track.channels.find(x=>x.target.node===pelvis[0].id&&x.target.path===kind);
-    const sm=track.samplers[ch.sampler],ts=root.accessors[sm.input],outputs=root.accessors[sm.output];
-    const get=(a,i)=>{
-      const view=root.bufferViews[a.bufferView],n={SCALAR:1,VEC3:3,VEC4:4}[a.type];
-      const start=binOffset+view.byteOffset+(a.byteOffset||0)+i*(view.byteStride||n*4);
-      return Array.from({length:n},(_,j)=>Number(glb.readFloatLE(start+j*4).toFixed(6)));
-    };
-    return Array.from({length:outputs.count},(_,i)=>[get(ts,i)[0],...get(outputs,i)]);
-  };
-  console.log('MIRA_SLEEP_HIPS_POSITION',JSON.stringify(getSamplerRows('sleep','translation')));
-  console.log('MIRA_SLEEP_HIPS_ROTATION',JSON.stringify(getSamplerRows('sleep','rotation')));
-  console.log('MIRA_BONE_PARENT_AUDIT',JSON.stringify(pelvis.map(x=>({
-    node:root.nodes[x.id],parent:root.nodes.findIndex(n=>(n.children||[]).includes(x.id))
-  }))));
+  const sleep=root.animations.find(a=>a.name==='sleep');
+  const hipID=pelvis[0].id;
+  const tr=sleep.channels.find(c=>c.target.node===hipID&&c.target.path==='translation');
+  const ro=sleep.channels.find(c=>c.target.node===hipID&&c.target.path==='rotation');
+  assert.equal(root.accessors[sleep.samplers[tr.sampler].output].count,62);
+  assert.equal(root.accessors[sleep.samplers[ro.sampler].output].count,59);
 });

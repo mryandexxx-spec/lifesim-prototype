@@ -2,6 +2,8 @@ import {MIRA_MESHY_URL,miraHasClips,miraClipFor,
   miraMeshPlacement,canShowMiraMeshy} from './meshy-mira-policy.js';
 import {MIRA_SOFA_CLIP,MIRA_SOFA_DURATION,miraSofaClipTime,miraSofaOffset}
   from './meshy-mira-sofa.js';
+import {MIRA_SLEEP_CLIP,MIRA_SLEEP_DURATION,miraBedPose,createMiraBedController}
+  from './meshy-mira-bed.js';
 
 /** Read undeformed geometry AABBs, never pose-dependent meshInstance.aabb.
  * The validated female GLB has one original skinned mesh.
@@ -34,7 +36,8 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
     .filter(component=>!preserved.has(component.entity));
   const state={ready:false,status:'loading',error:null,
     root:null,model:null,clip:null,visible:false,base:null,
-    sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null};
+    sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null,
+    bedReady:false,bedRuntime:null};
   function attach(asset){
     const model=asset.resource.instantiateRenderEntity();
     const root=new pc.Entity('Meshy Mira visual');
@@ -53,15 +56,39 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       // Future model replacements retain legacy sofa until re-audited.
       state.sofaReady=Number.isFinite(sourceSeat?.duration)&&
         Math.abs(sourceSeat.duration-MIRA_SOFA_DURATION)<.04;
+      const sleep=clips.find(clip=>clip.name===MIRA_SLEEP_CLIP);
+      const bedClipsReady=state.sofaReady&&Number.isFinite(sleep?.duration)&&
+        Math.abs(sleep.duration-MIRA_SLEEP_DURATION)<.04;
       for(const clip of clips)model.anim.assignAnimation(
         clip.name,clip,undefined,1,
         !['Hand_on_Hip_Gesture','Lie_Down_Hands_Spread',
           'Look_Back_and_Sit','Sit_to_Stand_Transition_F',
-          'Step_to_Sit_Transition','Wave_for_Help_1'].includes(clip.name)
+          'Step_to_Sit_Transition','Wave_for_Help_1',MIRA_SLEEP_CLIP].includes(clip.name)
       );
       model.anim.baseLayer.play('Idle_7');
       model.anim.playing=false;
       rig.avatar.addChild(root);
+      // Female bed inherits the same mattress slot/path as the procedural
+      // controller; source 'sleep' is an original authored lying animation.
+      // Guard the post-Anim absolute hip quaternion to avoid double reclining.
+      if(bedClipsReady&&pc.Script&&model.findByName){
+        try{
+          const bed=createMiraBedController({pc,model});
+          if(bed.ready){
+            if(!model.script)model.addComponent('script');
+            class MiraBedPostUpdate extends pc.Script{
+              static scriptName='blinsMiraBedPostUpdate';
+              postUpdate(){bed.apply();}
+            }
+            model.script.create(MiraBedPostUpdate);
+            state.bedRuntime=bed;
+            state.bedReady=true;
+          }
+        }catch(error){
+          state.bedReady=false;state.bedRuntime=null;
+          console.warn('Mira bed skin unavailable',error);
+        }
+      }
       root.enabled=false;
       Object.assign(state,{ready:true,status:'ready',root,model,clip:'Idle_7',base});
       onStatus('ready');
@@ -88,20 +115,26 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,dt=0,
-      bedBusy=false,showerBusy=false,fridgeBusy=false}={}){
+      bedBusy=false,bedFrame=null,bedProgress=0,
+      showerBusy=false,fridgeBusy=false}={}){
       const show=canShowMiraMeshy({
         preferred,ready:state.ready,actionId,
-        sofaBusy,sofaReady:state.sofaReady,bedBusy,showerBusy,fridgeBusy
+        sofaBusy,sofaReady:state.sofaReady,
+        bedBusy,bedReady:state.bedReady,showerBusy,fridgeBusy
       });
       if(state.visible!==show){
         for(const renderer of legacyRenderers)renderer.enabled=!show;
         if(state.root)state.root.enabled=show;
         state.visible=show;
       }
-      if(!show||!state.model)return show;
+      if(!show||!state.model){
+        state.bedRuntime?.setFrame(null);
+        return show;
+      }
       const sofa=actionId==='sofa'||sofaBusy;
       const anim=state.model.anim;
       if(sofa){
+        state.bedRuntime?.setFrame(null);
         if(state.clip!==MIRA_SOFA_CLIP){
           anim.baseLayer.play(MIRA_SOFA_CLIP);
           state.clip=MIRA_SOFA_CLIP;
@@ -120,6 +153,32 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
         anim.baseLayer.activeStateCurrentTime=t;
         return true;
       }
+      const bedding=actionId==='bed'||bedBusy;
+      if(bedding){
+        const pose=miraBedPose(bedFrame,bedProgress,state.base.scale);
+        state.bedRuntime?.setFrame(pose);
+        if(!pose)return true;
+        if(state.clip!==pose.clip){
+          // Skinned bed: use authored sit and native sleep in both directions.
+          // The script postUpdate cancels the duplicated procedural root pitch.
+          if(state.clip===MIRA_SOFA_CLIP&&pose.clip===MIRA_SLEEP_CLIP)
+            anim.baseLayer.transition(pose.clip,.18);
+          else anim.baseLayer.play(pose.clip);
+          state.clip=pose.clip;
+        }
+        state.sofaRelease=null;
+        state.model.setLocalPosition(state.base.x+pose.offset.x,
+          state.base.y+pose.offset.y,state.base.z+pose.offset.z);
+        if(pose.time!==null){
+          anim.speed=0;
+          anim.playing=true;
+          anim.baseLayer.activeStateCurrentTime=pose.time;
+        }else{
+          anim.speed=1;anim.playing=!paused;
+        }
+        return true;
+      }
+      state.bedRuntime?.setFrame(null);
       const clip=miraClipFor({walking,social});
       if(state.clip===MIRA_SOFA_CLIP){
         state.sofaRelease={remaining:.2,offset:{...state.sofaOffset}};
@@ -150,6 +209,7 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       state.clip='Idle_7';
       state.sofaOffset={x:0,z:0};
       state.sofaRelease=null;
+      state.bedRuntime?.setFrame(null);
       state.model.anim.speed=1;
       const {base}=state;
       state.model.setLocalPosition(base.x,base.y,base.z);

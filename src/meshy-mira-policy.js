@@ -34,13 +34,14 @@ export function miraMeshPlacement(bounds,targetHeight=MIRA_DISPLAY_HEIGHT){
     y:-min.y*scale+MIRA_IDLE_GROUND_OFFSET,
     z:-(min.z+max.z)*.5*scale};
 }
-/** The authored female sofa clip is retargeted with original GLB pelvis data.
- * All other furniture continues to use the procedural fallback.
+/** Authored female sofa and bed clips are separately gated. Food and shower
+ * remain on the original fallback until their skinned actions are verified.
  */
 export function canShowMiraMeshy({preferred=false,ready=false,actionId=null,
   sofaBusy=false,sofaReady=false,
-  bedBusy=false,showerBusy=false,fridgeBusy=false}={}){
-  const eligible=actionId===null||(actionId==='sofa'&&sofaReady);
+  bedBusy=false,bedReady=false,showerBusy=false,fridgeBusy=false}={}){
+  const eligible=actionId===null||(actionId==='sofa'&&sofaReady)||
+    (actionId==='bed'&&bedReady);
   return Boolean(preferred&&ready&&eligible&&(!sofaBusy||sofaReady)&&
-    !bedBusy&&!showerBusy&&!fridgeBusy);
+    (!bedBusy||bedReady)&&!showerBusy&&!fridgeBusy);
 }

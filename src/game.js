@@ -913,8 +913,9 @@ function boot() {
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
-    // The new female GLB is cosmetic. Unretargeted furniture/shower actions
-    // remain procedural; the existing simulation/save schema is untouched.
+    // Mira now retains her authored 3D skin for sofa and both bed sides.
+    // Fridge/shower still use privacy-safe or action-safe procedural fallback;
+    // all shared game navigation, occupancy and save state stay unchanged.
     const miraMeshShown=meshyMira.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:(game.otherSim.action?.phase==='walking'||
@@ -925,6 +926,8 @@ function boot() {
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
+      bedFrame:miraBedPose,
+      bedProgress:bedStates.mira.progress,
       showerBusy:showerStates.mira.active,
       fridgeBusy:fridgeLeaving.mira
     });
