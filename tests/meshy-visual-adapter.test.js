@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {createMeshyVisual} from '../src/meshy-visual.js';
 import {REQUIRED_MESHY_CLIPS,meshPlacement} from '../src/meshy-visual-policy.js';
 
@@ -202,7 +203,7 @@ test('optional idle is a safe fallback if older animation asset lacks Idle_4',()
   assert.ok(!f.events.some(([_,name])=>name==='Idle_4'));
 });
 test('game supplies saved simulation clock and preserves walk during pause',()=>{
-  const source=(await import('node:fs')).readFileSync(
+  const source=readFileSync(
     new URL('../src/game.js',import.meta.url),'utf8');
   assert.match(source,/worldMinutes:game\.minutes/);
   assert.match(source,/mood:game\.mind\?\.mood\?\.value/);
