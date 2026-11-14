@@ -124,7 +124,7 @@ test('two independent staged bed entries and exits produce smooth bounded motion
     assert.equal(advanceBedTransition(state,true,slot,0),state);
     assert.equal(advanceBedTransition(state,true,slot,NaN),state);
     let prior=null;
-    for(let i=0;i<240;i++){
+    for(let i=0;i<320;i++){
       state=advanceBedTransition(state,true,slot,1/60);
       const p=bedTransitionPose(state);
       assert.ok(p);

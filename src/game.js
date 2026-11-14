@@ -11,7 +11,7 @@ import {WALK_PHASE_PER_METER} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
 import {BED_SLOTS} from './bed-layout.js';
-import {createBedTransition,advanceBedTransition,bedTransitionPose} from './bed-transition.js';
+import {createBedTransition,advanceBedTransition,bedTransitionPose,blendBedDisplay} from './bed-transition.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,bedDestinationFor } from './household.js';
@@ -604,10 +604,12 @@ function boot() {
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
     const walking=active&&(game.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'));
-    sofaStates.alex=advanceSofaTransition(sofaStates.alex,useId==='sofa',animDt);
+    sofaStates.alex=advanceSofaTransition(sofaStates.alex,
+      useId==='sofa'&&bedStates.alex.progress===0,animDt);
     const seatPose=sofaTransitionPose(sofaStates.alex);
     const seating=useId==='sofa'||sofaStates.alex.progress>0;
-    bedStates.alex=advanceBedTransition(bedStates.alex,useId==='bed',
+    bedStates.alex=advanceBedTransition(bedStates.alex,
+      useId==='bed'&&sofaStates.alex.progress===0,
       game.action?.bedSlot,animDt);
     const bedPose=bedTransitionPose(bedStates.alex);
     const bedding=Boolean(bedPose);
@@ -621,12 +623,16 @@ function boot() {
         ? Math.atan2(game.otherSim.position.x-game.position.x,
           game.otherSim.position.z-game.position.z)*180/Math.PI:facing
     };
-    display.x=approach(display.x,desired.x,bedding||seating||pose?10:11,animDt);
-    display.y=approach(display.y,desired.y,bedding||seating||pose?10:10,animDt);
-    display.z=approach(display.z,desired.z,bedding||seating||pose?10:11,animDt);
-    display.pitch=approach(display.pitch,desired.pitch,bedding?10:3.8,animDt);
-    display.yaw=approachAngle(display.yaw,desired.yaw,10,animDt);
-    display.roll=approach(display.roll,bedPose?.roll||0,12,animDt);
+    if(bedding){
+      Object.assign(display,blendBedDisplay(display,bedPose,animDt));
+    }else{
+      display.x=approach(display.x,desired.x,seating||pose?10:11,animDt);
+      display.y=approach(display.y,desired.y,seating||pose?10:10,animDt);
+      display.z=approach(display.z,desired.z,seating||pose?10:11,animDt);
+      display.pitch=approach(display.pitch,desired.pitch,3.8,animDt);
+      display.yaw=approachAngle(display.yaw,desired.yaw,10,animDt);
+      display.roll=approach(display.roll,0,12,animDt);
+    }
     avatar.setPosition(display.x,display.y,display.z);
     avatar.setEulerAngles(display.pitch,display.yaw,display.roll);
     if(active)effectTime+=dt*game.speed;
@@ -635,6 +641,8 @@ function boot() {
       sofaWeight:seatPose.sofaWeight,
       bedSitWeight:bedPose?.bedSitWeight||0,
       bedReclineWeight:bedPose?.bedReclineWeight||0,
+      bedSwingWeight:bedPose?.bedSwingWeight||0,
+      bedSide:bedPose?.bedSide||null,
       social:socialUsing?game.socialAction.kind:null,
       gait,mood:game.mind?.mood?.value,energy:game.needs.energy
     },animDt);
@@ -645,10 +653,12 @@ function boot() {
     const miraUseId=miraUsing?game.otherSim.action.id:null;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'));
-    sofaStates.mira=advanceSofaTransition(sofaStates.mira,miraUseId==='sofa',animDt);
+    sofaStates.mira=advanceSofaTransition(sofaStates.mira,
+      miraUseId==='sofa'&&bedStates.mira.progress===0,animDt);
     const miraSeatPose=sofaTransitionPose(sofaStates.mira);
     const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
-    bedStates.mira=advanceBedTransition(bedStates.mira,miraUseId==='bed',
+    bedStates.mira=advanceBedTransition(bedStates.mira,
+      miraUseId==='bed'&&sofaStates.mira.progress===0,
       game.otherSim.action?.bedSlot,animDt);
     const miraBedPose=bedTransitionPose(bedStates.mira);
     const miraBedding=Boolean(miraBedPose);
@@ -662,12 +672,16 @@ function boot() {
         ? Math.atan2(game.position.x-game.otherSim.position.x,
           game.position.z-game.otherSim.position.z)*180/Math.PI:miraFacing
     };
-    miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraBedding||miraSeating||miraPose?10:11,animDt);
-    miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraBedding||miraSeating||miraPose?10:10,animDt);
-    miraDisplay.z=approach(miraDisplay.z,miraDesired.z,miraBedding||miraSeating||miraPose?10:11,animDt);
-    miraDisplay.pitch=approach(miraDisplay.pitch,miraDesired.pitch,miraBedding?10:3.8,animDt);
-    miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,animDt);
-    miraDisplay.roll=approach(miraDisplay.roll,miraBedPose?.roll||0,12,animDt);
+    if(miraBedding){
+      Object.assign(miraDisplay,blendBedDisplay(miraDisplay,miraBedPose,animDt));
+    }else{
+      miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraSeating||miraPose?10:11,animDt);
+      miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraSeating||miraPose?10:10,animDt);
+      miraDisplay.z=approach(miraDisplay.z,miraDesired.z,miraSeating||miraPose?10:11,animDt);
+      miraDisplay.pitch=approach(miraDisplay.pitch,miraDesired.pitch,3.8,animDt);
+      miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,animDt);
+      miraDisplay.roll=approach(miraDisplay.roll,0,12,animDt);
+    }
     miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
     miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,miraDisplay.roll);
     animationStates.mira=stepAnimation(animationStates.mira,{
@@ -675,6 +689,8 @@ function boot() {
       sofaWeight:miraSeatPose.sofaWeight,
       bedSitWeight:miraBedPose?.bedSitWeight||0,
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
+      bedSwingWeight:miraBedPose?.bedSwingWeight||0,
+      bedSide:miraBedPose?.bedSide||null,
       social:socialUsing?game.socialAction.kind:null,gait:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
     },animDt);

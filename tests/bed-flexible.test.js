@@ -88,8 +88,9 @@ test('hip stays supported while avatar reclines, preventing sinking/teleport',()
     for(let i=0;i<=180;i++){
       const progress=.53+i/180*.47;
       const p=bedTransitionPose({slot,progress});
-      const hipHeight=p.y+.72*Math.cos(p.pitch*Math.PI/180);
-      assert.ok(Math.abs(hipHeight-.814)<.008,'hip tracks mattress plane');
+      const hipHeight=p.y+.72*Math.cos(p.pitch*Math.PI/180)*
+        Math.cos(p.roll*Math.PI/180);
+      assert.ok(Math.abs(hipHeight-.814)<.008,'hip tracks mattress plane with mirrored roll');
       if(before)assert.ok(Math.hypot(p.x-before.x,p.y-before.y,p.z-before.z)<.035);
       before=p;
     }
@@ -111,7 +112,7 @@ test('knee, elbow and torso animate on entering bed and reverse on standing',()=
   assert.ok(state.legs[0]>-12 && state.knees[0]<18);
   assert.ok(state.eyeOpen<.2);
   let trans={progress:1,slot:'left'};
-  for(let i=0;i<220;i++){
+  for(let i=0;i<320;i++){
     trans=advanceBedTransition(trans,false,null,.016);
     const pose=bedTransitionPose(trans);
     state=stepAnimation(state,{using:null,bedSitWeight:pose?.bedSitWeight||0,

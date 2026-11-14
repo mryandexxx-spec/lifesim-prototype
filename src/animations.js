@@ -14,6 +14,7 @@ export function createAnimationState() {
   return {legs:[0,0],knees:[0,0],feet:[0,0],arms:[0,0],elbows:[0,0],
     torso:0,pelvisRoll:0,walkWeight:0,walkBob:0,
     spineLean:0,spineTwist:0,spineRoll:0,hipShift:0,bodyLift:0,
+    bedHipYaw:[0,0],bedHipRoll:[0,0],
     mouthWidth:.095,mouthHeight:.017,brow:-0.5,eyeOpen:1,time:0};
 }
 
@@ -40,8 +41,10 @@ export function stepAnimation(previous,signals,dt) {
   const sofaWeight=clamp(safe(signals?.sofaWeight,action==='sofa'?1:0),0,1);
   const bedSitWeight=clamp(safe(signals?.bedSitWeight,0),0,1);
   const bedReclineWeight=clamp(safe(signals?.bedReclineWeight,action==='bed'?1:0),0,1);
+  const bedSwing=clamp(safe(signals?.bedSwingWeight,0),0,1);
+  const bedSign=signals?.bedSide==='left'?1:signals?.bedSide==='right'?-1:0;
   let legTarget=[0,0],kneeTarget=[0,0],footTarget=[0,0],armTarget=[0,0],
-    elbowTarget=[0,0];
+    elbowTarget=[0,0],bedYawTarget=[0,0],bedRollTarget=[0,0];
   if(sofaWeight>0){
     legTarget=[SOFA_HIP_PITCH*sofaWeight,SOFA_HIP_PITCH*sofaWeight];
     kneeTarget=[SOFA_KNEE_PITCH*sofaWeight,SOFA_KNEE_PITCH*sofaWeight];
@@ -52,10 +55,21 @@ export function stepAnimation(previous,signals,dt) {
     const hip=-73*bedSitWeight-3*bedReclineWeight;
     const knee=79*bedSitWeight+10*bedReclineWeight;
     legTarget=[hip,hip];kneeTarget=[knee,knee];
-    armTarget=[24*bedSitWeight+9*bedReclineWeight,
-      28*bedSitWeight+11*bedReclineWeight];
-    elbowTarget=[28*bedSitWeight+14*bedReclineWeight,
-      30*bedSitWeight+14*bedReclineWeight];
+    // Rotate both thighs INWARD across the occupied mattress half.
+    // The brace arm is the one nearest the OUTER edge; swap for right entry.
+    bedYawTarget=[bedSign*28*bedSwing,bedSign*24*bedSwing];
+    bedRollTarget=[-bedSign*8*bedSwing,bedSign*8*bedSwing];
+    const outerLeft=bedSign>=0;
+    armTarget=outerLeft
+      ?[35*bedSitWeight+17*bedSwing+9*bedReclineWeight,
+        19*bedSitWeight+11*bedReclineWeight]
+      :[19*bedSitWeight+11*bedReclineWeight,
+        35*bedSitWeight+17*bedSwing+9*bedReclineWeight];
+    elbowTarget=outerLeft
+      ?[41*bedSitWeight+18*bedSwing+14*bedReclineWeight,
+        19*bedSitWeight+14*bedReclineWeight]
+      :[19*bedSitWeight+14*bedReclineWeight,
+        41*bedSitWeight+18*bedSwing+14*bedReclineWeight];
   }else if(action==='shower'){
     armTarget=[36+Math.sin(t*5)*12,34-Math.sin(t*4.5)*12];
   }else if(action==='fridge'){
@@ -82,6 +96,8 @@ export function stepAnimation(previous,signals,dt) {
   const feet=(previous.feet||[0,0]).map((v,i)=>blend(v,footTarget[i],speed,step));
   const arms=previous.arms.map((v,i)=>blend(v,armTarget[i],speed,step));
   const elbows=(previous.elbows||[0,0]).map((v,i)=>blend(v,elbowTarget[i],speed,step));
+  const bedHipYaw=(previous.bedHipYaw||[0,0]).map((v,i)=>blend(v,bedYawTarget[i],12,step));
+  const bedHipRoll=(previous.bedHipRoll||[0,0]).map((v,i)=>blend(v,bedRollTarget[i],12,step));
   // Light breathing and conversational emphasis, independent of gameplay logic.
   const inGait=(moving||walkWeight>.003)&&!sofaWeight&&!bedSitWeight&&!bedReclineWeight;
   const torsoTarget=action==='bed'?0:social
@@ -97,9 +113,9 @@ export function stepAnimation(previous,signals,dt) {
   const spineLean=blend(safe(previous.spineLean,0),
     bedSitWeight>0?-11*bedSitWeight:inGait?walkPose.spineLean:0,12,step);
   const spineTwist=blend(safe(previous.spineTwist,0),
-    inGait?walkPose.spineTwist:0,14,step);
+    bedSign*16*bedSwing+(inGait?walkPose.spineTwist:0),14,step);
   const spineRoll=blend(safe(previous.spineRoll,0),
-    inGait?walkPose.spineRoll:0,14,step);
+    bedSign*8*bedSwing+(inGait?walkPose.spineRoll:0),14,step);
   const hipShift=blend(safe(previous.hipShift,0),
     inGait?walkPose.hipShift:0,14,step);
   const bodyLift=blend(safe(previous.bodyLift,0),
@@ -113,12 +129,12 @@ export function stepAnimation(previous,signals,dt) {
   const mouthWidthTarget=upset?.061:happy?.109:.088;
   const mouthHeightTarget=upset?.022:happy?.025:.014;
   const browTarget=upset?13:happy?-5:0;
-  const sleeping=action==='bed'&&bedReclineWeight>.65;
+  const sleeping=bedReclineWeight>.65; // eyes stay closed while beginning to rise
   const blink=t%4.1<.11;
   const eyeTarget=sleeping?.04:blink?.16:1;
   return {
     legs,knees,feet,arms,elbows,torso,pelvisRoll,walkWeight,walkBob,
-    spineLean,spineTwist,spineRoll,hipShift,bodyLift,time:t,
+    spineLean,spineTwist,spineRoll,hipShift,bodyLift,bedHipYaw,bedHipRoll,time:t,
     mouthWidth:blend(previous.mouthWidth,mouthWidthTarget,5,step),
     mouthHeight:blend(previous.mouthHeight,mouthHeightTarget,5,step),
     brow:blend(previous.brow,browTarget,5,step),
@@ -129,7 +145,8 @@ export function stepAnimation(previous,signals,dt) {
 /** Writes only lightweight transforms into an already built PlayCanvas rig. */
 export function applyCharacterAnimation(rig,state) {
   for(let i=0;i<2;i++){
-    rig.legPivot[i].setLocalEulerAngles(state.legs[i],0,0);
+    rig.legPivot[i].setLocalEulerAngles(state.legs[i],
+      state.bedHipYaw?.[i]||0,state.bedHipRoll?.[i]||0);
     rig.kneePivot[i].setLocalEulerAngles(state.knees[i],0,0);
     rig.shoes[i].setLocalEulerAngles(state.feet[i],0,0);
     rig.armPivot[i].setLocalEulerAngles(state.arms[i],0,0);
