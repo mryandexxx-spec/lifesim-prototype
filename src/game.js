@@ -5,6 +5,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import { createCharacterRig } from './characters.js';
+import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice } from './household.js';
@@ -285,6 +286,7 @@ function boot() {
   const rigContext={pc,root:app.root,ball,box,cylinder,mat,materials:M};
   const alexRig=createCharacterRig(rigContext,'alex');
   const miraRig=createCharacterRig(rigContext,'mira');
+  const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const {avatar,torso,leftEye,rightEye,legPivot,armPivot,snack,book,selected:alexSelected}=alexRig;
   const {avatar:miraAvatar,torso:miraTorso,leftEye:miraLeftEye,rightEye:miraRightEye,
     legPivot:miraLegPivot,armPivot:miraArmPivot,snack:miraSnack,book:miraBook,
@@ -532,7 +534,8 @@ function boot() {
     }
     const socialUsing=game.socialAction?.phase==='using';
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
-    const walking=active && game.action?.phase==='walking';
+    const walking=active&&(game.action?.phase==='walking'||
+      (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'));
     const pose=useId?ACTOR_POSES[useId]:null;
     const desired={
       x:pose?pose.x:game.position.x,
@@ -550,20 +553,18 @@ function boot() {
     display.yaw=approachAngle(display.yaw,desired.yaw,10,animDt);
     avatar.setPosition(display.x,display.y,display.z);
     avatar.setEulerAngles(display.pitch,display.yaw,0);
-    const wave=active?Math.sin(gait):0;
-    legPivot[0].setLocalEulerAngles(using && useId==='sofa'?67:walking?wave*25:0,0,0);
-    legPivot[1].setLocalEulerAngles(using && useId==='sofa'?67:walking?-wave*25:0,0,0);
-    armPivot[0].setLocalEulerAngles(socialUsing?25+Math.sin(effectTime*5)*18:using&&useId==='shower'?35+Math.sin(effectTime*5)*16:using&&useId==='sofa'?26:walking?-wave*18:0,0,0);
-    armPivot[1].setLocalEulerAngles(socialUsing?24-Math.sin(effectTime*4)*20:using&&useId==='fridge'?-54+Math.sin(effectTime*4)*11:using&&useId==='shower'?35-Math.sin(effectTime*5)*15:using&&useId==='sofa'?35:walking?wave*18:0,0,0);
-    if(active) effectTime+=dt*game.speed;
-    torso.setLocalEulerAngles(0,0,using && useId!=='bed'?Math.sin(effectTime*2)*1.4:0);
-    const sleepy=using && useId==='bed';
-    leftEye.enabled=!sleepy;rightEye.enabled=!sleepy;
-    snack.enabled=using && useId==='fridge';book.enabled=using && useId==='sofa';
+    if(active)effectTime+=dt*game.speed;
+    animationStates.alex=stepAnimation(animationStates.alex,{
+      id:'alex',walking,using:useId,social:socialUsing?game.socialAction.kind:null,
+      gait,mood:game.mind?.mood?.value,energy:game.needs.energy
+    },animDt);
+    applyCharacterAnimation(alexRig,animationStates.alex);
+    snack.enabled=using&&useId==='fridge';book.enabled=using&&useId==='sofa';
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
     const miraUseId=miraUsing?game.otherSim.action.id:null;
-    const miraWalking=active && game.otherSim.action?.phase==='walking';
+    const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
+      (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'));
     const miraPose=miraUseId?ACTOR_POSES[miraUseId]:null;
     const miraDesired={
       x:miraPose?miraPose.x:game.otherSim.position.x,
@@ -581,14 +582,12 @@ function boot() {
     miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,animDt);
     miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
     miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,0);
-    const miraWave=active?Math.sin(miraGait):0;
-    miraLegPivot[0].setLocalEulerAngles(miraUsing&&miraUseId==='sofa'?67:miraWalking?miraWave*25:0,0,0);
-    miraLegPivot[1].setLocalEulerAngles(miraUsing&&miraUseId==='sofa'?67:miraWalking?-miraWave*25:0,0,0);
-    miraArmPivot[0].setLocalEulerAngles(socialUsing?25-Math.sin(effectTime*4.7)*18:miraUsing&&miraUseId==='shower'?38:miraUsing&&miraUseId==='sofa'?26:miraWalking?-miraWave*18:0,0,0);
-    miraArmPivot[1].setLocalEulerAngles(socialUsing?26+Math.sin(effectTime*4.3)*17:miraUsing&&miraUseId==='fridge'?-54:miraUsing&&miraUseId==='shower'?38:miraUsing&&miraUseId==='sofa'?35:miraWalking?miraWave*18:0,0,0);
-    miraTorso.setLocalEulerAngles(0,0,miraUsing&&miraUseId!=='bed'?Math.sin(effectTime*2.1)*1.4:0);
-    miraLeftEye.enabled=!(miraUsing&&miraUseId==='bed');
-    miraRightEye.enabled=!(miraUsing&&miraUseId==='bed');
+    animationStates.mira=stepAnimation(animationStates.mira,{
+      id:'mira',walking:miraWalking,using:miraUseId,
+      social:socialUsing?game.socialAction.kind:null,gait:miraGait,
+      mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
+    },animDt);
+    applyCharacterAnimation(miraRig,animationStates.mira);
     miraSnack.enabled=miraUsing&&miraUseId==='fridge';
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
     alexSelected.enabled=game.selectedSim==='alex' && !using;

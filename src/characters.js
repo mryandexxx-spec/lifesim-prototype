@@ -72,7 +72,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
 
   // Small, near-flush eyes. Eye pivots preserve the old sleep-blink contract.
   // Avoid separate big white/iris/glint spheres that look like googly eyes.
-  const eyes=[];
+  const eyes=[],brows=[];
   for(const [side,x] of [['left',-.10],['right',.10]]){
     const group=new pc.Entity(name+' '+side+' eye');
     avatar.addChild(group);
@@ -80,13 +80,14 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
     group.setLocalPosition(x,y,faceSurfaceDepth(x,y-headY)+.003);
     ball(name+' '+side+' pupil',0,0,.004,.052,.060,.021,materials.black,group);
     ball(name+' '+side+' catchlight',-.012,.015,.017,.013,.014,.008,materials.cream,group);
-    ball(name+' '+side+' eyebrow',x,headY+.135,
+    const brow=ball(name+' '+side+' eyebrow',x,headY+.135,
       faceSurfaceDepth(x,.135)+.002,.083,.017,.015,hair,avatar);
+    brows.push(brow);
     eyes.push(group);
   }
   ball(name+' subtle nose',0,headY-.048,
     faceSurfaceDepth(0,-.048)+.002,.030,.041,.024,skin,avatar);
-  ball(name+' little smile',0,headY-.132,
+  const smile=ball(name+' little smile',0,headY-.132,
     faceSurfaceDepth(0,-.132)+.003,.095,.017,.018,mouth,avatar);
 
   // Exactly the same hip/shoulder pivot positions as the accepted 0.4b rigs.
@@ -120,7 +121,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   const selected=cylinder(name+' selected',0,.018,0,.79,.025,.79,
     mat(p.select,{opacity:.30}),avatar);
   return {
-    avatar,torso,leftEye:eyes[0],rightEye:eyes[1],
+    avatar,torso,leftEye:eyes[0],rightEye:eyes[1],brows,mouth:smile,
     legPivot,armPivot,snack,book,selected
   };
 }
