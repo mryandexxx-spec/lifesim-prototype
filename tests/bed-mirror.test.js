@@ -21,16 +21,18 @@ test('left and right approaches use opposite rotations and matched mirrored traj
     assert.ok(close(l.pitch,r.pitch,.002));
   }
 });
-test('turn toward the foot of bed is complete before sitting; lie begins only after perch',()=>{
+test('both side-sitters face OUTWARD until seated, and rotate toward pillows only afterward',()=>{
   for(const slot of BED_SLOT_IDS){
     const approach=pose(slot,.03),turning=pose(slot,.3),perch=pose(slot,.49),
       swinging=pose(slot,.75),lying=pose(slot,1);
     assert.equal(approach.pitch,0);
-    assert.ok(Math.abs(turning.yaw)>10 && Math.abs(turning.yaw)<90);
-    assert.ok(Math.abs(perch.yaw)<.01);
+    assert.ok(close(Math.abs(turning.yaw),90), 'turn is not toward foot before sitting');
+    assert.ok(close(Math.abs(perch.yaw),90), 'both legs dangle OUTSIDE long edge');
+    assert.ok(perch.z<-1.2,'sit beside mattress, not at bed foot');
     assert.equal(perch.pitch,0);
     assert.ok(perch.bedSitWeight>.8 && perch.bedReclineWeight===0);
     assert.ok(swinging.bedReclineWeight>.2&&swinging.bedSwingWeight>.8);
+    assert.ok(Math.abs(swinging.yaw)<90,'turn follows seated leg swing');
     assert.ok(Math.abs(swinging.roll)>7);
     assert.ok(close(lying.pitch,-85));
     assert.ok(close(lying.roll,0));

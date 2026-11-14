@@ -26,7 +26,9 @@ test('bed has two geometrically distinct halves, two quilt/pillow alignments',()
   for(const id of BED_SLOT_IDS){
     const slot=BED_SLOTS[id];
     assert.equal(slot.pose.pitch,-85);
-    assert.ok(slot.pose.z<slot.approach.z);
+    assert.ok(slot.approach.z<-1.1&&slot.approach.z>-2.1,
+      'entry must be along the long side, not the foot');
+    assert.ok(Math.abs(slot.edgeZ-slot.approach.z)<.03);
   }
 });
 test('each side has a real collision-free A* route from the living room',()=>{
@@ -146,11 +148,17 @@ test('two independent staged bed entries and exits produce smooth bounded motion
   }
 });
 test('bed approach starts on own side and turns toward own mattress, never shares a pose',()=>{
-  const left=bedTransitionPose({progress:.2,slot:'left'});
-  const right=bedTransitionPose({progress:.2,slot:'right'});
+  const left=bedTransitionPose({progress:.001,slot:'left'});
+  const right=bedTransitionPose({progress:.001,slot:'right'});
   assert.ok(left.x<-3.85&&right.x>-1.38);
   assert.equal(left.y,0);assert.equal(right.y,0);
-  assert.ok(left.yaw>0&&right.yaw<0);
+  assert.ok(left.yaw<0&&right.yaw>0,
+    'sit facing out of the LONG side, not toward the bed foot');
+  const seatedLeft=bedTransitionPose({progress:.45,slot:'left'});
+  const seatedRight=bedTransitionPose({progress:.45,slot:'right'});
+  assert.ok(Math.abs(seatedLeft.x-BED_SLOTS.left.edgeX)<.03);
+  assert.ok(Math.abs(seatedRight.x-BED_SLOTS.right.edgeX)<.03);
+  assert.ok(seatedLeft.z<-1.2&&seatedRight.z<-1.2);
   const lateLeft=bedTransitionPose({progress:.85,slot:'left'});
   const lateRight=bedTransitionPose({progress:.85,slot:'right'});
   assert.ok(lateLeft.x<lateRight.x);

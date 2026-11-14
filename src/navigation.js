@@ -3,7 +3,7 @@ export const ROOM = Object.freeze({ minX: -4.62, maxX: 4.62, minZ: -3.96, maxZ: 
 export const ACTOR_RADIUS = 0.26;
 export const FURNITURE = Object.freeze([
   { id: 'bed', minX: -3.83, maxX: -1.41, minZ: -2.69, maxZ: -0.16 },
-  { id: 'nightstand', minX: -4.56, maxX: -3.90, minZ: -1.79, maxZ: -1.11 },
+  { id: 'nightstand', minX: -4.56, maxX: -3.90, minZ: -3.69, maxZ: -3.01 },
   { id: 'counter', minX: 0.52, maxX: 2.87, minZ: -3.84, maxZ: -2.79 },
   { id: 'fridge', minX: 2.86, maxX: 4.04, minZ: -3.49, maxZ: -2.26 },
   { id: 'sofa', minX: -0.07, maxX: 2.78, minZ: 0.89, maxZ: 2.29 },

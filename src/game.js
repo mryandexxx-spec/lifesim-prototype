@@ -639,6 +639,7 @@ function boot() {
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:walking&&!seating&&!bedding,using:useId,
       sofaWeight:seatPose.sofaWeight,
+      bedStepWeight:bedPose?.bedStepWeight||0,
       bedSitWeight:bedPose?.bedSitWeight||0,
       bedReclineWeight:bedPose?.bedReclineWeight||0,
       bedSwingWeight:bedPose?.bedSwingWeight||0,
@@ -687,6 +688,7 @@ function boot() {
     animationStates.mira=stepAnimation(animationStates.mira,{
       id:'mira',walking:miraWalking&&!miraSeating&&!miraBedding,using:miraUseId,
       sofaWeight:miraSeatPose.sofaWeight,
+      bedStepWeight:miraBedPose?.bedStepWeight||0,
       bedSitWeight:miraBedPose?.bedSitWeight||0,
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,

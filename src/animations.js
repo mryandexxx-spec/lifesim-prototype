@@ -39,6 +39,7 @@ export function stepAnimation(previous,signals,dt) {
   // Progress lets the figure bend AFTER approaching and turning; the headless
   // animator remains backward compatible when no progress signal is supplied.
   const sofaWeight=clamp(safe(signals?.sofaWeight,action==='sofa'?1:0),0,1);
+  const bedStepWeight=clamp(safe(signals?.bedStepWeight,0),0,1);
   const bedSitWeight=clamp(safe(signals?.bedSitWeight,0),0,1);
   const bedReclineWeight=clamp(safe(signals?.bedReclineWeight,action==='bed'?1:0),0,1);
   const bedSwing=clamp(safe(signals?.bedSwingWeight,0),0,1);
@@ -49,6 +50,15 @@ export function stepAnimation(previous,signals,dt) {
     legTarget=[SOFA_HIP_PITCH*sofaWeight,SOFA_HIP_PITCH*sofaWeight];
     kneeTarget=[SOFA_KNEE_PITCH*sofaWeight,SOFA_KNEE_PITCH*sofaWeight];
     armTarget=[26*sofaWeight,35*sofaWeight];
+  }else if(bedStepWeight>0){
+    // A short, mirrored step over the long rail. Previously the entire avatar
+    // slid ~0.6 m without taking a visible step on entering the bed.
+    const sideStep=bedSign*bedStepWeight;
+    legTarget=[-17*sideStep,17*sideStep];
+    kneeTarget=[21*bedStepWeight,6*bedStepWeight];
+    armTarget=[-13*sideStep,13*sideStep];
+    elbowTarget=[14*bedStepWeight,9*bedStepWeight];
+    bedYawTarget=[9*sideStep,7*sideStep];
   }else if(bedSitWeight>0||bedReclineWeight>0){
     // Sitting on the side is a real knee/hip bend; straighten the shins as
     // the entire body reclines around the anchored pelvis.
@@ -90,7 +100,8 @@ export function stepAnimation(previous,signals,dt) {
   }
   // The previous slow smoothing filtered nearly half the 0.6b stride amplitude
   // at 1.65 m/s, making changes almost invisible on a phone-sized figure.
-  const speed=social?7:bedSitWeight>0||bedReclineWeight>0?14:action?5.5:moving?18:8;
+  const speed=social?7:bedStepWeight>0||bedSitWeight>0||bedReclineWeight>0
+    ?14:action?5.5:moving?18:8;
   const legs=previous.legs.map((v,i)=>blend(v,legTarget[i],speed,step));
   const knees=(previous.knees||[0,0]).map((v,i)=>blend(v,kneeTarget[i],speed,step));
   const feet=(previous.feet||[0,0]).map((v,i)=>blend(v,footTarget[i],speed,step));
@@ -99,7 +110,7 @@ export function stepAnimation(previous,signals,dt) {
   const bedHipYaw=(previous.bedHipYaw||[0,0]).map((v,i)=>blend(v,bedYawTarget[i],12,step));
   const bedHipRoll=(previous.bedHipRoll||[0,0]).map((v,i)=>blend(v,bedRollTarget[i],12,step));
   // Light breathing and conversational emphasis, independent of gameplay logic.
-  const inGait=(moving||walkWeight>.003)&&!sofaWeight&&!bedSitWeight&&!bedReclineWeight;
+  const inGait=(moving||walkWeight>.003)&&!sofaWeight&&!bedStepWeight&&!bedSitWeight&&!bedReclineWeight;
   const torsoTarget=action==='bed'?0:social
     ?Math.sin(t*(social==='argue'?4:2.5))*2.1
     :inGait?walkPose.torsoRoll:Math.sin(t*1.4)*.9;

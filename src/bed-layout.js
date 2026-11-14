@@ -1,13 +1,13 @@
 /** Double-bed geometry shared between renderer, AI and storage. */
 export const BED_SLOTS=Object.freeze({
   left:Object.freeze({
-    id:'left',x:-3.18,approach:Object.freeze({x:-4.30,z:-.40}),
-    edgeX:-3.97,edgeZ:-.47,approachYaw:90,
+    id:'left',x:-3.18,approach:Object.freeze({x:-4.35,z:-1.42}),
+    edgeX:-3.72,edgeZ:-1.42,approachYaw:-90,
     pose:Object.freeze({x:-3.18,y:.751,z:-.64,pitch:-85,yaw:0})
   }),
   right:Object.freeze({
-    id:'right',x:-2.06,approach:Object.freeze({x:-.93,z:-.40}),
-    edgeX:-1.28,edgeZ:-.47,approachYaw:-90,
+    id:'right',x:-2.06,approach:Object.freeze({x:-.89,z:-1.42}),
+    edgeX:-1.52,edgeZ:-1.42,approachYaw:90,
     pose:Object.freeze({x:-2.06,y:.751,z:-.64,pitch:-85,yaw:0})
   })
 });
