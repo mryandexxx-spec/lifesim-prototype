@@ -37,7 +37,14 @@ export const MESHY_SEAT_RIG_PROFILE=Object.freeze({
   halfStance:.16,
   footForward:.46,
   footSideSigns:Object.freeze([1,-1]), // Mixamo Left has local +X, Right has -X
-  ankleHeight:.073,
+  ankleHeight:.073, // retained for explicit experimental full-XYZ mode
+  // Audited from skinned t=0 Sit_to_Stand_Transition_M GLB: sole minima lie
+  // 0.1504/0.1467 model units below respective animated ankle origins.
+  soleDrops:Object.freeze([.15041,.14668]),
+  frontClearance:.09, // shoe anchor just beyond front edge of seat, not under cushion
+  groundClearance:.010,
+  kneePoleForward:.60,
+  kneePoleDown:.30,
   legs:Object.freeze([
     Object.freeze({thigh:'mixamorig:LeftUpLeg',shin:'mixamorig:LeftLeg',
       ankle:'mixamorig:LeftFoot'}),
