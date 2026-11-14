@@ -80,8 +80,19 @@ export function stepAnimation(previous,signals,dt) {
         19*bedSitWeight+14*bedReclineWeight]
       :[19*bedSitWeight+14*bedReclineWeight,
         41*bedSitWeight+18*bedSwing+14*bedReclineWeight];
-  }else if(action==='shower'){
-    armTarget=[36+Math.sin(t*5)*12,34-Math.sin(t*4.5)*12];
+  }else if(action==='shower' || signals?.showerExiting){
+    const step=clamp(safe(signals?.showerStep,0),0,1);
+    if(step>.015){
+      legTarget=walkPose.hips.map(v=>v*step);
+      kneeTarget=walkPose.knees.map(v=>v*step);
+      footTarget=walkPose.feet.map(v=>v*step);
+      armTarget=walkPose.arms.map(v=>v*step);
+      elbowTarget=walkPose.elbows.map(v=>v*step);
+    }else if(signals?.showerWater){
+      armTarget=[36+Math.sin(t*5)*12,34-Math.sin(t*4.5)*12];
+    }else{
+      armTarget=[5,8];
+    }
   }else if(action==='fridge'){
     const reach=clamp(safe(signals?.fridgeReach,1),0,1);
     const eat=clamp(safe(signals?.fridgeEat,0),0,1);
