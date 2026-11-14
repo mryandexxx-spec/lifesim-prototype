@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import {CAMERA_INITIAL,panCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
@@ -408,61 +409,97 @@ function boot() {
   const camera = new pc.Entity('Camera');
   camera.addComponent('camera',{ clearColor:new pc.Color(0.85,0.91,0.86), fov:41, nearClip:.1, farClip:120 });
   app.root.addChild(camera);
-  const view = { yaw: 42, pitch: 47, distance: 16.9, center: new pc.Vec3(0,0.62,0) };
-  function cameraUpdate() {
-    const y = view.yaw * Math.PI/180, p = view.pitch * Math.PI/180;
-    camera.setPosition(view.center.x + Math.sin(y)*Math.cos(p)*view.distance,
-      view.center.y + Math.sin(p)*view.distance,
-      view.center.z + Math.cos(y)*Math.cos(p)*view.distance);
-    camera.lookAt(view.center);
+  const view={...CAMERA_INITIAL};
+  const cameraTarget=new pc.Vec3(view.centerX,view.centerY,view.centerZ);
+  function cameraUpdate(){
+    const y=view.yaw*Math.PI/180,p=view.pitch*Math.PI/180;
+    cameraTarget.set(view.centerX,view.centerY,view.centerZ);
+    camera.setPosition(view.centerX+Math.sin(y)*Math.cos(p)*view.distance,
+      view.centerY+Math.sin(p)*view.distance,
+      view.centerZ+Math.cos(y)*Math.cos(p)*view.distance);
+    camera.lookAt(cameraTarget);
   }
+  function setView(next){Object.assign(view,next);cameraUpdate();}
   cameraUpdate();
-  $('reset-camera-btn').addEventListener('click',()=>{view.yaw=42;view.pitch=47;view.distance=16.9;cameraUpdate();toast('Камера возвращена');});
+  $('reset-camera-btn').addEventListener('click',()=>{
+    setView(CAMERA_INITIAL);
+    toast('Камера сброшена · свайп — перемещение · два пальца — поворот/масштаб');
+  });
 
-  // Direct pointer gestures work in Safari and desktop browsers.
-  const fingers = new Map();
-  let startPoint = null, lastPinch = null;
-  const pinchDistance = () => {
-    const a=[...fingers.values()];return a.length<2?0:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+  // 1 finger grabs/pans the room; 2 fingers orbit and pinch in mobile Safari.
+  // A multi-touch gesture never accidentally becomes a tap on furniture.
+  const fingers=new Map();
+  let tapCandidate=null,lastPinch=null,lastMidpoint=null;
+  const twoFingerMetrics=()=>{
+    const points=[...fingers.values()];
+    if(points.length!==2)return null;
+    return {
+      distance:Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y),
+      x:(points[0].x+points[1].x)/2,
+      y:(points[0].y+points[1].y)/2
+    };
   };
   canvas.addEventListener('pointerdown',event=>{
-    canvas.setPointerCapture?.(event.pointerId);
+    if(event.pointerType==='mouse'&&event.button!==0)return;
+    try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
     fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-    if(fingers.size===1) startPoint={x:event.clientX,y:event.clientY,t:performance.now(),travel:0};
-    else {startPoint=null;lastPinch=pinchDistance();}
+    if(fingers.size===1){
+      tapCandidate={id:event.pointerId,t:performance.now(),travel:0};
+      lastPinch=null;lastMidpoint=null;
+    }else{
+      tapCandidate=null;
+      const metrics=twoFingerMetrics();
+      lastPinch=metrics?.distance??null;lastMidpoint=metrics;
+    }
   });
   canvas.addEventListener('pointermove',event=>{
-    if(!fingers.has(event.pointerId)) return;
+    if(!fingers.has(event.pointerId))return;
     const prev=fingers.get(event.pointerId);
     fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(fingers.size===1){
       const dx=event.clientX-prev.x,dy=event.clientY-prev.y;
-      view.yaw-=dx*.26;view.pitch=Math.max(24,Math.min(68,view.pitch+dy*.19));
-      if(startPoint)startPoint.travel+=Math.hypot(dx,dy);
-      cameraUpdate();
-    } else if(fingers.size===2){
-      const d=pinchDistance(); if(lastPinch)view.distance=Math.max(11.0,Math.min(24.0,view.distance*lastPinch/d));
-      lastPinch=d;cameraUpdate();
+      if(tapCandidate)tapCandidate.travel+=Math.hypot(dx,dy);
+      if(dx||dy)setView(panCamera(view,dx,dy,canvas.clientHeight));
+    }else if(fingers.size===2){
+      const metrics=twoFingerMetrics();
+      if(metrics&&lastMidpoint){
+        const dx=metrics.x-lastMidpoint.x,dy=metrics.y-lastMidpoint.y;
+        let next=orbitCamera(view,dx,dy);
+        if(lastPinch)next=pinchCamera(next,lastPinch,metrics.distance);
+        setView(next);
+      }
+      lastPinch=metrics?.distance??null;lastMidpoint=metrics;
     }
   });
   const endPointer=event=>{
-    const click=startPoint && fingers.size===1 && startPoint.travel<10 && performance.now()-startPoint.t<360;
-    const pos={x:event.clientX,y:event.clientY};fingers.delete(event.pointerId);
-    if(fingers.size===0){lastPinch=null;startPoint=null;}
-    if(click){
+    if(!fingers.has(event.pointerId))return;
+    const tap=tapCandidate&&tapCandidate.id===event.pointerId&&
+      fingers.size===1&&tapCandidate.travel<10&&
+      performance.now()-tapCandidate.t<360;
+    const pos={x:event.clientX,y:event.clientY};
+    fingers.delete(event.pointerId);
+    tapCandidate=null;lastPinch=null;lastMidpoint=null;
+    if(tap){
       let best=null,bestDist=65;
       for(const [id,btn] of Object.entries(markers)){
         if(btn.hidden)continue;
         const rect=btn.getBoundingClientRect();
         const dx=rect.left+rect.width/2-pos.x,dy=rect.top+rect.height/2-pos.y;
-        const dist=Math.hypot(dx,dy);if(dist<bestDist){bestDist=dist;best=id;}
+        const dist=Math.hypot(dx,dy);
+        if(dist<bestDist){bestDist=dist;best=id;}
       }
       if(best)select(best);else select(null);
     }
   };
   canvas.addEventListener('pointerup',endPointer);
-  canvas.addEventListener('pointercancel',event=>{fingers.delete(event.pointerId);startPoint=null;lastPinch=null;});
-  canvas.addEventListener('wheel',event=>{event.preventDefault();view.distance=Math.max(11,Math.min(24,view.distance+event.deltaY*.012));cameraUpdate();},{passive:false});
+  canvas.addEventListener('pointercancel',event=>{
+    fingers.delete(event.pointerId);
+    tapCandidate=null;lastPinch=null;lastMidpoint=null;
+  });
+  canvas.addEventListener('wheel',event=>{
+    event.preventDefault();
+    setView(wheelCamera(view,event.deltaY));
+  },{passive:false});
   canvas.addEventListener('contextmenu',event=>event.preventDefault());
 
   let accumulator=0, uiTimer=0, autosaveTime=0, lastStatus='';
@@ -697,7 +734,7 @@ function boot() {
   });
   app.start();
   $('loading').hidden=true;
-  if(!localStorage.getItem(SAVE_KEY))toast('Выбери любой предмет в комнате ✨');
+  toast('Свайп — двигай комнату · два пальца — поворот и масштаб');
 }
 
 try { boot(); }
