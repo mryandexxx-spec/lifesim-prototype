@@ -27,8 +27,12 @@ export function relationshipLabel(value) {
 export function canStartSocial(root,kind,initiator,automatic=false) {
   if(!Object.hasOwn(SOCIAL_ACTIONS,kind)||!validId(initiator)||!root.otherSim||root.socialAction)return false;
   const self=get(root,initiator),partner=get(root,otherId(initiator));
-  if(!self||!partner||partner.action)return false;
-  if(automatic&&(!root.autonomy?.enabled||root.paused||self.action||root.minutes<root.relationship.nextSocialAt))return false;
+  if(!self||!partner)return false;
+  // Manual talk/argue is always available at affinity 0 or 100 and may
+  // override a partner's scheduled task. Autonomous social still waits for
+  // both residents to become free and respects its cooldown.
+  if(automatic&&(partner.action||!root.autonomy?.enabled||root.paused||
+    self.action||root.minutes<root.relationship.nextSocialAt))return false;
   return true;
 }
 export function startSocial(root,kind,initiator,target,automatic=false) {
@@ -36,7 +40,11 @@ export function startSocial(root,kind,initiator,target,automatic=false) {
     !Number.isFinite(target.x)||!Number.isFinite(target.z)||
     Math.abs(target.x)>4.65||Math.abs(target.z)>4.01)return false;
   const self=get(root,initiator),partner=get(root,otherId(initiator));
-  self.action=null; // A manual conversation can interrupt only its initiator.
+  self.action=null;
+  // Explicit player intent takes priority over the other resident's job.
+  // Render transitions (bed/sofa/shower/fridge) still finish safely before
+  // the talking pose starts; no need to remove or overwrite saved fields.
+  if(!automatic)partner.action=null;
   root.socialAction={kind,initiator,partner:otherId(initiator),
     target:{x:target.x,z:target.z},phase:'walking',elapsed:0,automatic:Boolean(automatic)};
   self.event=SOCIAL_ACTIONS[kind].label;
