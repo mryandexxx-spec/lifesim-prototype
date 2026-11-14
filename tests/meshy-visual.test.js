@@ -76,20 +76,23 @@ test('GLB geometry-fit is stable independent of current animated skinned AABB',(
   assert.throws(()=>meshPlacement(NaN),RangeError);
 });
 
-test('0.7c regression: off-couch full XYZ/IK is not enabled by default',()=>{
+test('0.7c regression: full XYZ remains disabled; guarded shoe planting has rollback',()=>{
   assert.deepEqual(meshSeatRuntimeSettings(null,null),{
-    enabled:true,mode:'vertical',footIK:false
+    enabled:true,mode:'vertical',footIK:false,footPlant:true
   });
   assert.deepEqual(meshSeatRuntimeSettings('legacy','on'),{
-    enabled:false,mode:'vertical',footIK:false
+    enabled:false,mode:'vertical',footIK:false,footPlant:false
   });
   assert.deepEqual(meshSeatRuntimeSettings('full','on'),{
-    enabled:true,mode:'full',footIK:true
+    enabled:true,mode:'full',footIK:true,footPlant:false
   });
   assert.deepEqual(meshSeatRuntimeSettings('full',null),{
-    enabled:true,mode:'full',footIK:false
+    enabled:true,mode:'full',footIK:false,footPlant:false
   });
   assert.deepEqual(meshSeatRuntimeSettings('unknown','on'),{
-    enabled:true,mode:'vertical',footIK:false
+    enabled:true,mode:'vertical',footIK:false,footPlant:true
+  });
+  assert.deepEqual(meshSeatRuntimeSettings(null,null,'off'),{
+    enabled:true,mode:'vertical',footIK:false,footPlant:false
   });
 });
