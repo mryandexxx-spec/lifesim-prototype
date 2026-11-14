@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createSkinnedSeatController} from '../src/meshy-seat-runtime.js';
 import {meshPlacement,MESHY_SEAT_RIG_PROFILE} from '../src/meshy-visual-policy.js';
+import {meshySofaOffset} from '../src/meshy-sofa-pose.js';
 import {createSeatSurface,seatSlot,rotateSeatVector} from '../src/interaction-anchors.js';
 
 const close=(a,b,tol=1e-6)=>assert.ok(Math.abs(a-b)<tol,`${a} differs from ${b}`);
@@ -116,4 +117,77 @@ test('invalid seat marker stays a detectable error, not NaN pose',()=>{
   const con=createSkinnedSeatController({pc:env.pc,model:env.model,
     avatar:env.avatar,profile:MESHY_SEAT_RIG_PROFILE,footIK:false});
   assert.throws(()=>con.place({seat:null,weight:1,scale:env.base.scale,base:env.base}),TypeError);
+});
+
+test('REGRESSION 0.7c: guarded pelvis placement never ejects Alex behind the couch',()=>{
+  const env=environment({yaw:180});
+  const controller=createSkinnedSeatController({
+    pc:env.pc,model:env.model,avatar:env.avatar,
+    profile:MESHY_SEAT_RIG_PROFILE,footIK:false
+  });
+  const moved=controller.placeVertical({
+    seat:env.seat,weight:1,base:env.base,scale:env.base.scale,
+    horizontalOffset:meshySofaOffset(1,env.base.scale)
+  });
+  const seatPoint=env.model.getWorldTransform().transformPoint({
+    x:env.hipLocal.x+MESHY_SEAT_RIG_PROFILE.contact.x,
+    y:env.hipLocal.y+MESHY_SEAT_RIG_PROFILE.contact.y,
+    z:env.hipLocal.z+MESHY_SEAT_RIG_PROFILE.contact.z
+  });
+  close(seatPoint.y,env.seat.contact.y+MESHY_SEAT_RIG_PROFILE.clearance);
+  // The X/Z of the *visible skinned body contact*, not the model origin,
+  // must remain inside the actual seat rectangle during the entire pose.
+  assert.ok(Math.abs(seatPoint.x-1.35)<1.0,'person left the sofa along X');
+  assert.ok(seatPoint.z>1.015&&seatPoint.z<2.065,
+    'person moved in front of or behind sofa: '+seatPoint.z);
+  const oldOffset=meshySofaOffset(1,env.base.scale);
+  close(moved.offset.x,oldOffset.x);
+  close(moved.offset.z,oldOffset.z);
+  assert.equal(moved.footChains,0,'untested foot IK must stay off');
+});
+test('guarded solver aligns two cushion heights but never adjusts horizontal placement',()=>{
+  for(const height of [.29,.35,.52]){
+    const env=environment({yaw:180});
+    const contactSeat=seatSlot(createSeatSurface({
+      id:'test-seat-'+height,origin:{x:1.35,y:0,z:1.54},
+      yaw:180,width:2.53,depth:1.05,seatHeight:height
+    }),0);
+    const controller=createSkinnedSeatController({
+      pc:env.pc,model:env.model,avatar:env.avatar,
+      profile:MESHY_SEAT_RIG_PROFILE,footIK:false
+    });
+    const offset=meshySofaOffset(1,env.base.scale);
+    const result=controller.placeVertical({
+      seat:contactSeat,weight:1,scale:env.base.scale,
+      base:env.base,horizontalOffset:offset
+    });
+    close(result.offset.x,offset.x);
+    close(result.offset.z,offset.z);
+    const contact=env.model.getWorldTransform().transformPoint({
+      x:env.hipLocal.x+MESHY_SEAT_RIG_PROFILE.contact.x,
+      y:env.hipLocal.y+MESHY_SEAT_RIG_PROFILE.contact.y,
+      z:env.hipLocal.z+MESHY_SEAT_RIG_PROFILE.contact.z
+    });
+    close(contact.y,height+MESHY_SEAT_RIG_PROFILE.clearance);
+  }
+});
+test('outlier pelvic transforms fail safely rather than moving the person metres away',()=>{
+  const env=environment();
+  const controller=createSkinnedSeatController({
+    pc:env.pc,model:env.model,avatar:env.avatar,
+    profile:MESHY_SEAT_RIG_PROFILE,footIK:false
+  });
+  const impossiblyHighSeat=seatSlot(createSeatSurface({
+    id:'stool',origin:{x:1.35,y:0,z:1.54},yaw:180,
+    width:2.53,depth:1.05,seatHeight:1.6
+  }),0);
+  assert.throws(()=>controller.placeVertical({
+    seat:impossiblyHighSeat,weight:1,scale:env.base.scale,base:env.base,
+    horizontalOffset:{x:0,z:0}
+  }),RangeError);
+  const idle=controller.placeVertical({
+    seat:env.seat,weight:0,scale:env.base.scale,base:env.base,
+    horizontalOffset:{x:0,z:0}
+  });
+  close(idle.offset.y,0);
 });
