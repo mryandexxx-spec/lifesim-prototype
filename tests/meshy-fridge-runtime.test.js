@@ -59,6 +59,7 @@ test('real bone targets rotate only shoulder and forearm, never game root',()=>{
       getPosition:()=>new Vec3(...xyz),
       getRotation:()=>new Quat(),
       setRotation:()=>{changes.push(name);}
+      addChild(child){child.parent=this;}
     };
   }
   const bones={
