@@ -9,7 +9,7 @@ import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js';
-import {meshVisualPreference,MESHY_VISUAL_KEY} from './meshy-visual-policy.js';
+import {meshVisualPreference,MESHY_VISUAL_KEY,meshSeatRuntimeSettings} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
@@ -37,9 +37,10 @@ const visualQuery = new URLSearchParams(window.location.search).get('model') || 
 // Default is guarded vertical-only contact. Full XYZ+IK is explicitly opt-in,
 // not shipped as a user-facing default until it passes real-device QA.
 const seatQuery = new URLSearchParams(window.location.search);
-const seatMode=seatQuery.get('seat')==='full'?'full':'vertical';
-const seatContactEnabled=seatQuery.get('seat')!=='legacy';
-const seatIKEnabled=seatQuery.get('ik')==='on';
+const seatSettings=meshSeatRuntimeSettings(seatQuery.get('seat'),seatQuery.get('ik'));
+const seatMode=seatSettings.mode;
+const seatContactEnabled=seatSettings.enabled;
+const seatIKEnabled=seatSettings.footIK;
 let meshyPreferred = meshVisualPreference(null,visualQuery);
 try { meshyPreferred=meshVisualPreference(localStorage.getItem(MESHY_VISUAL_KEY),visualQuery); }
 catch { /* Safari private mode may reject storage; use the in-memory choice. */ }
