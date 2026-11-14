@@ -7,7 +7,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
-import {WALK_PHASE_PER_METER} from './locomotion.js';
+import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
@@ -624,8 +624,6 @@ function boot() {
               const step=Math.min(dist,remaining);
               resident.position.x+=dx/dist*step;resident.position.z+=dz/dist*step;
               remaining-=step;
-              if(residentId==='alex')gait+=step*WALK_PHASE_PER_METER;
-              else miraGait+=step*WALK_PHASE_PER_METER;
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
             }
             if(p.index>=p.points.length){
@@ -672,6 +670,7 @@ function boot() {
     const bedPose=bedTransitionPose(bedStates.alex);
     const bedding=Boolean(bedPose);
     const pose=useId&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'?ACTOR_POSES[useId]:null;
+    const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:game.position.x,
       y:pose?pose.y:animationStates.alex.walkBob,
@@ -693,6 +692,14 @@ function boot() {
       display.yaw=approachAngle(display.yaw,desired.yaw,10,animDt);
       display.roll=approach(display.roll,0,12,animDt);
     }
+    // Drive the stride from the ACTUAL onscreen movement, after x/z easing.
+    // At tight A* bends the visible motion direction leads the character;
+    // neither turning the camera nor a pause advances the gait clock.
+    const alexMotion=advanceVisualGait(gait,previousAlexXZ,display,
+      walking&&!seating&&!bedding&&!pose&&!alexShower);
+    gait=alexMotion.phase;
+    if(alexMotion.heading!==null)
+      display.yaw=approachAngle(display.yaw,alexMotion.heading,13,animDt);
     avatar.setPosition(display.x,display.y,display.z);
     avatar.setEulerAngles(display.pitch,display.yaw,display.roll);
     if(active)effectTime+=dt*game.speed;
@@ -744,6 +751,7 @@ function boot() {
     const miraBedPose=bedTransitionPose(bedStates.mira);
     const miraBedding=Boolean(miraBedPose);
     const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'?ACTOR_POSES[miraUseId]:null;
+    const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:game.otherSim.position.x,
       y:miraPose?miraPose.y:animationStates.mira.walkBob,
@@ -765,6 +773,11 @@ function boot() {
       miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,animDt);
       miraDisplay.roll=approach(miraDisplay.roll,0,12,animDt);
     }
+    const miraMotion=advanceVisualGait(miraGait,previousMiraXZ,miraDisplay,
+      miraWalking&&!miraSeating&&!miraBedding&&!miraPose&&!miraShower);
+    miraGait=miraMotion.phase;
+    if(miraMotion.heading!==null)
+      miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraMotion.heading,13,animDt);
     miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
     miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,miraDisplay.roll);
     animationStates.mira=stepAnimation(animationStates.mira,{
