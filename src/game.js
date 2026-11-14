@@ -6,6 +6,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import { createCharacterRig } from './characters.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
+import {SOFA_LAYOUT,SOFA_POSE} from './pose-config.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice } from './household.js';
@@ -251,12 +252,19 @@ function boot() {
   // Lounge with sofa, rug, coffee table and TV.
   box('living rug',1.24,.034,1.19,4.15,.015,3.1,M.cream);
   box('rug center',1.24,.045,1.19,3.84,.012,2.78,M.rug);
-  box('sofa seat',1.35,.42,1.54,2.53,.54,1.05,M.peach);
-  box('sofa back',1.35,.73,2.10,2.52,.95,.29,M.rust);
-  box('sofa arm left',.11,.63,1.54,.30,.86,1.21,M.rust);
-  box('sofa arm right',2.58,.63,1.54,.30,.86,1.21,M.rust);
-  box('sofa pillow left',.72,.75,1.80,.63,.47,.23,M.cream);
-  box('sofa pillow right',1.99,.75,1.80,.63,.47,.23,M.mint);
+  // Seat height and actor pose share the same dimensions.
+  box('sofa seat',SOFA_LAYOUT.x,SOFA_LAYOUT.seatCenterY,SOFA_LAYOUT.z,
+    SOFA_LAYOUT.seatWidth,SOFA_LAYOUT.seatHeight,SOFA_LAYOUT.seatDepth,M.peach);
+  box('sofa back',SOFA_LAYOUT.x,SOFA_LAYOUT.backCenterY,SOFA_LAYOUT.backZ,
+    2.52,SOFA_LAYOUT.backHeight,.29,M.rust);
+  box('sofa arm left',.11,SOFA_LAYOUT.armCenterY,SOFA_LAYOUT.z,
+    .30,SOFA_LAYOUT.armHeight,1.21,M.rust);
+  box('sofa arm right',2.58,SOFA_LAYOUT.armCenterY,SOFA_LAYOUT.z,
+    .30,SOFA_LAYOUT.armHeight,1.21,M.rust);
+  box('sofa pillow left',.72,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
+    .63,SOFA_LAYOUT.pillowHeight,.23,M.cream);
+  box('sofa pillow right',1.99,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
+    .63,SOFA_LAYOUT.pillowHeight,.23,M.mint);
   box('coffee table top',1.34,.40,.15,1.47,.12,.73,M.paleWood);
   for(let x of [.74,1.94]) for(let z of [-.12,.42]) cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
   box('tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
@@ -297,7 +305,7 @@ function boot() {
   });
   const ACTOR_POSES = {
     bed:    {x:-2.62,y:.81,z:-.64,pitch:-85,yaw:0},
-    sofa:   {x:1.35,y:.59,z:1.55,pitch:0,yaw:180},
+    sofa:   SOFA_POSE,
     shower: {x:-3.68,y:.18,z:2.44,pitch:0,yaw:0},
     fridge: {x:3.48,y:0,z:-1.76,pitch:0,yaw:180}
   };

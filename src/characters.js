@@ -9,6 +9,8 @@
  * Sleeve and leg ellipsoids overlap torso/pelvis at the pose pivots, rather
  * than looking like loose balls attached to the character.
  */
+import {LEG_GEOMETRY} from './pose-config.js';
+
 const APPEARANCE={
   alex:{
     name:'Алекс',silhouette:'side-part',bodyWidth:.59,
@@ -91,16 +93,21 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
     faceSurfaceDepth(0,-.132)+.003,.095,.017,.018,mouth,avatar);
 
   // Exactly the same hip/shoulder pivot positions as the accepted 0.4b rigs.
-  const legPivot=[],armPivot=[];
+  const legPivot=[],kneePivot=[],armPivot=[];
   for(const [side,x] of [['left',-.15],['right',.15]]){
-    const pivot=new pc.Entity(name+' '+side+' hip');
-    avatar.addChild(pivot);
-    pivot.setLocalPosition(x,.72,0);
-    // A taller, narrow leg passes inside the pelvis instead of meeting it
-    // at a single tangent point. Shoe meets the ankle under the trouser.
-    ball(name+' '+side+' trouser leg',0,-.264,0,.18,.57,.19,trousers,pivot);
-    ball(name+' '+side+' shoe',0,-.575,.077,.22,.15,.31,shoes,pivot);
-    legPivot.push(pivot);
+    const hip=new pc.Entity(name+' '+side+' hip');
+    avatar.addChild(hip);
+    hip.setLocalPosition(x,LEG_GEOMETRY.hipHeight,0);
+    ball(name+' '+side+' trouser leg',0,LEG_GEOMETRY.thighCenterY,0,
+      .18,LEG_GEOMETRY.thighHeight,.19,trousers,hip);
+    const knee=new pc.Entity(name+' '+side+' knee');
+    hip.addChild(knee);
+    knee.setLocalPosition(0,LEG_GEOMETRY.kneeOffsetY,0);
+    ball(name+' '+side+' shin',0,LEG_GEOMETRY.shinCenterY,0,
+      .163,LEG_GEOMETRY.shinHeight,.185,trousers,knee);
+    ball(name+' '+side+' shoe',0,LEG_GEOMETRY.shoeCenterY,.077,
+      .22,LEG_GEOMETRY.shoeHeight,.31,shoes,knee);
+    legPivot.push(hip);kneePivot.push(knee);
   }
   for(const [side,x] of [['left',-.33],['right',.33]]){
     const pivot=new pc.Entity(name+' '+side+' shoulder');
@@ -122,6 +129,6 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
     mat(p.select,{opacity:.30}),avatar);
   return {
     avatar,torso,leftEye:eyes[0],rightEye:eyes[1],brows,mouth:smile,
-    legPivot,armPivot,snack,book,selected
+    legPivot,kneePivot,armPivot,snack,book,selected
   };
 }

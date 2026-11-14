@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAnimationState,stepAnimation,applyCharacterAnimation} from '../src/animations.js';
 import {createCharacterRig} from '../src/characters.js';
+import {SOFA_HIP_PITCH} from '../src/pose-config.js';
 import {newHousehold,loadHousehold} from '../src/household.js';
 
 const at=(x={})=>({...{walking:false,using:null,social:null,gait:0,mood:68,energy:70,id:'alex'},...x});
@@ -18,7 +19,7 @@ test('transition into walk is smooth, then naturally settles in idle',()=>{
 });
 test('sit, shower, fridge and bed poses converge without snapping',()=>{
   const scenarios=[
-    ['sofa',p=>p.legs[0]>45&&p.legs[1]>45],
+    ['sofa',p=>p.legs[0]<-60&&p.legs[1]<-60&&p.knees[0]>60&&p.knees[1]>60],
     ['fridge',p=>p.arms[1]<-30],
     ['shower',p=>p.arms[0]>19],
     ['bed',p=>p.eyeOpen<.2]
@@ -58,7 +59,7 @@ test('pause freezes animator and invalid or extreme dt cannot cause jumps',()=>{
   assert.equal(stepAnimation(a,at({walking:true}),0),a);
   assert.equal(stepAnimation(a,at({walking:true}),Number.NaN),a);
   const b=stepAnimation(a,at({using:'sofa'}),5);
-  assert.ok(b.legs[0]>0 && b.legs[0]<67);
+  assert.ok(b.legs[0]<0 && b.legs[0]>SOFA_HIP_PITCH);
   assert.ok(b.time<=.06);
 });
 test('every returned pose remains finite even with malformed mood inputs',()=>{
@@ -89,6 +90,7 @@ test('rig transforms apply to existing pivots, eye groups and face without new m
     const pose=stepAnimation(createAnimationState(),at({mood:20,social:'argue'}),.06);
     applyCharacterAnimation(rig,pose);
     assert.equal(rig.legPivot[0].rotation[0],pose.legs[0]);
+    assert.equal(rig.kneePivot[0].rotation[0],pose.knees[0]);
     assert.equal(rig.armPivot[1].rotation[0],pose.arms[1]);
     assert.equal(rig.mouth.scale[0],pose.mouthWidth);
     assert.equal(rig.brows.length,2);
