@@ -50,17 +50,16 @@ jobs:
       - name: Verify optimized Meshy GLB SHA-256
         run: |
           echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -
+          echo "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a  assets/characters/meshy-mira-mobile-v1.glb" | sha256sum -c -
       - name: Assemble static website
         run: |
           mkdir -p site/src
-          cp index.html character-lab.html styles.css favicon.svg manifest.webmanifest .nojekyll site/
+          cp index.html character-lab.html character-lab-mira.html styles.css favicon.svg manifest.webmanifest .nojekyll site/
           cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/household.js src/relationships.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js site/src/
       - name: Include optional Meshy character GLB when present
         run: |
-          if [ -f assets/characters/meshy-casual-v1.glb ]; then
-            mkdir -p site/assets/characters
-            cp assets/characters/meshy-casual-v1.glb site/assets/characters/
-          fi
+          mkdir -p site/assets/characters
+          cp assets/characters/meshy-casual-v1.glb assets/characters/meshy-mira-mobile-v1.glb site/assets/characters/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

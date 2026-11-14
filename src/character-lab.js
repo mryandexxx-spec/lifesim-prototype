@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import {
-  chooseIdleClip, isOneShotClip, characterFit, summarizeClips, inspectGltf, formatAssetBytes
+  chooseIdleClip, isOneShotClip, characterFit, summarizeClips, inspectGltf, formatAssetBytes, characterLabModel
 } from './character-lab-config.js';
 
 const $ = id => document.getElementById(id);
@@ -67,7 +67,8 @@ canvas.addEventListener('wheel',event=>{event.preventDefault();view.distance=Mat
 let current=null,currentAsset=null,currentUrl=null;
 const clipSelect=$('clip-select');
 const pauseButton=$('pause-animation');
-const preferredAutoUrl='./assets/characters/meshy-casual-v1.glb';
+const labModel=characterLabModel(document.body.dataset.character);
+const preferredAutoUrl=labModel.assetUrl;
 let modelInfo=null,fps=null,fpsFrames=0,fpsSeconds=0;
 function updateMetrics(){
   $('lab-fps').textContent=fps===null?'FPS: замер…':`FPS: ${fps}`;
@@ -141,7 +142,7 @@ async function loadAsset(url, title, metadata={}){
     let info;
     try{
       const bounds=entityBounds(avatar);
-      info=characterFit(bounds);
+      info=characterFit(bounds,labModel.targetHeight);
       avatar.setLocalScale(info.scale,info.scale,info.scale);
       avatar.setLocalPosition(info.x,info.y,info.z);
       avatar.addComponent('anim',{activate:true});
@@ -191,5 +192,9 @@ app.start();
 // No temporary signed Meshy URLs or user tokens belong in the public repository.
 fetch(preferredAutoUrl,{method:'HEAD'}).then(response=>{
   if(!response.ok)throw new Error('not bundled');
-  return loadAsset(preferredAutoUrl,'meshy-casual-v1.glb',{bytes:Number(response.headers.get('content-length'))||2278456,triangles:25847,joints:66,morphTargets:0});
-}).catch(()=>status('3D-сцена готова. Модель ещё не добавлена в опубликованные ассеты — выберите GLB через кнопку.'));
+  return loadAsset(preferredAutoUrl,labModel.fileName,{
+    bytes:Number(response.headers.get('content-length'))||labModel.bytes,
+    triangles:labModel.triangles,joints:labModel.joints,morphTargets:labModel.morphTargets
+  });
+}).catch(error=>status('Не удалось автоматически загрузить '+labModel.label+
+  ': '+String(error?.message||error)+'. Можно выбрать GLB вручную для диагностики.'));

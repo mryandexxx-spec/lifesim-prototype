@@ -6,8 +6,32 @@ export const KNOWN_CLIPS = Object.freeze([
   'Stand_Talking_Angry', 'Wave_One_Hand'
 ]);
 export const ONE_SHOT_CLIPS = Object.freeze(new Set([
-  'Sit_to_Stand_Transition_M', 'Wave_One_Hand', 'Call_Gesture'
+  'Sit_to_Stand_Transition_M', 'Wave_One_Hand', 'Call_Gesture',
+  'Sit_to_Stand_Transition_F', 'Step_to_Sit_Transition', 'Look_Back_and_Sit',
+  'Lie_Down_Hands_Spread', 'Hand_on_Hip_Gesture', 'Wave_for_Help_1'
 ]));
+// The female preview is separate from the production Mira renderer and Alex configuration.
+export const MIRA_KNOWN_CLIPS = Object.freeze([
+  'Running', 'Walking', 'Hand_on_Hip_Gesture', 'Idle_7',
+  'Lie_Down_Hands_Spread', 'Listening_Gesture', 'Look_Back_and_Sit',
+  'Sit_Cross_Legged', 'Sit_to_Stand_Transition_F', 'Step_to_Sit_Transition',
+  'Walking_Woman', 'Wave_for_Help_1', 'sleep'
+]);
+export const CHARACTER_LAB_MODELS = Object.freeze({
+  alex:Object.freeze({
+    key:'alex',label:'Алекс',assetUrl:'./assets/characters/meshy-casual-v1.glb',
+    fileName:'meshy-casual-v1.glb',bytes:2278456,triangles:25847,joints:66,
+    morphTargets:0,targetHeight:1.78
+  }),
+  mira:Object.freeze({
+    key:'mira',label:'Мира',assetUrl:'./assets/characters/meshy-mira-mobile-v1.glb',
+    fileName:'meshy-mira-mobile-v1.glb',bytes:2235708,triangles:23245,joints:66,
+    morphTargets:0,targetHeight:1.78
+  })
+});
+export function characterLabModel(character='alex') {
+  return CHARACTER_LAB_MODELS[character] ?? CHARACTER_LAB_MODELS.alex;
+}
 export const TARGET_HEIGHT_M = 1.78;
 export const MIN_GLB_SIZE = 20;
 export const GLB_MAGIC = 0x46546c67;
