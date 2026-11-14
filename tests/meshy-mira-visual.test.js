@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {bedTransitionPose} from '../src/bed-transition.js';
 import {MIRA_MESHY_URL,MIRA_REQUIRED_CLIPS,MIRA_DISPLAY_HEIGHT,
   MIRA_IDLE_GROUND_OFFSET,miraHasClips,miraClipFor,
   miraMeshPlacement,canShowMiraMeshy} from '../src/meshy-mira-policy.js';
@@ -227,7 +228,7 @@ test('game feeds female sofa bend and conceals old elbow book',()=>{
   assert.match(source,/sofaWeight:miraSeatPose\.sofaWeight/);
   assert.match(source,/if\(miraMeshShown&&miraUseId==='sofa'\)miraBook\.enabled=false/);
   assert.ok(workflow.includes('node --check src/meshy-mira-sofa.js'));
-  assert.ok(workflow.includes('src/meshy-mira-sofa.js src/meshy-mira-policy.js'));
+  assert.ok(workflow.includes('src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js'));
 });
  
 test('Mira bed uses original female sit-to-sleep clips without swapping skin',()=>{
