@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {
   MESHY_ASSET_URL, MESHY_DISPLAY_HEIGHT, MESHY_VISUAL_KEY, meshPlacement,
   MESHY_SOURCE_BOUNDS, MESHY_IDLE_FOOT_LOCAL_Y,
-  REQUIRED_MESHY_CLIPS,meshVisualPreference,meshClipFor,canShowMeshy,
+  REQUIRED_MESHY_CLIPS,meshVisualPreference,meshSeatRuntimeSettings,meshClipFor,canShowMeshy,
   availableMeshClips
 } from '../src/meshy-visual-policy.js';
 
@@ -74,4 +74,22 @@ test('GLB geometry-fit is stable independent of current animated skinned AABB',(
   assert.ok(Math.abs((MESHY_SOURCE_BOUNDS.max.y-MESHY_SOURCE_BOUNDS.min.y)*a.scale-2.05)<1e-9);
   assert.throws(()=>meshPlacement(0),RangeError);
   assert.throws(()=>meshPlacement(NaN),RangeError);
+});
+
+test('0.7c regression: off-couch full XYZ/IK is not enabled by default',()=>{
+  assert.deepEqual(meshSeatRuntimeSettings(null,null),{
+    enabled:true,mode:'vertical',footIK:false
+  });
+  assert.deepEqual(meshSeatRuntimeSettings('legacy','on'),{
+    enabled:false,mode:'vertical',footIK:false
+  });
+  assert.deepEqual(meshSeatRuntimeSettings('full','on'),{
+    enabled:true,mode:'full',footIK:true
+  });
+  assert.deepEqual(meshSeatRuntimeSettings('full',null),{
+    enabled:true,mode:'full',footIK:false
+  });
+  assert.deepEqual(meshSeatRuntimeSettings('unknown','on'),{
+    enabled:true,mode:'vertical',footIK:false
+  });
 });
