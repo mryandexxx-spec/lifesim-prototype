@@ -17,6 +17,11 @@ const rad=deg=>deg*Math.PI/180;
 export function gaitTargets(phase,weight=1,energy=70){
   const t=finite(phase,0);
   const w=clamp(finite(weight,0),0,1);
+  // Canonical neutral pose avoids -0 outputs and unnecessary oscillation.
+  if(w===0)return {
+    hips:[0,0],knees:[0,0],feet:[0,0],arms:[0,0],
+    pelvisRoll:0,torsoRoll:0
+  };
   const vigor=.9+.1*clamp(finite(energy,70),0,100)/100;
   const cycle=[Math.sin(t),-Math.sin(t)];
   const hips=[],knees=[],feet=[];
