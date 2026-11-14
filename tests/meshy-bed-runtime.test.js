@@ -78,5 +78,6 @@ test('game feeds the real bed pose and Pages contains post-update module',()=>{
   assert.match(visual,/postUpdate\(\)\{bed\.apply\(\);\}/);
   assert.match(visual,/bedReady:Boolean\(state\.bedRuntime\?\.ready\)/);
   assert.match(pages,/node --check src\/meshy-bed-runtime\.js/);
-  assert.match(pages,/src\/meshy-bed-runtime\.js src\/loading-progress\.js/);
+  assert.match(pages,/src\\/meshy-bed-runtime\\.js src\\/meshy-shower-runtime\\.js/);
+  assert.match(pages,/src\\/meshy-shower-runtime\\.js src\\/loading-progress\\.js/);
 });
