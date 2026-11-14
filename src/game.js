@@ -927,7 +927,7 @@ function boot() {
     });
     // Alex stays on the same 3D rig for bed and fridge when their verified
     // skeleton controllers exist. The original simulation/root still owns
-    // mattress placement, two bed slots, root pitch and shower privacy.
+    // mattress placement, both bed slots, shower movement and opaque privacy.
     const meshyShown=meshyAlex.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:walking&&!seating&&!bedding&&!alexShower,
@@ -942,6 +942,7 @@ function boot() {
       bedBusy:bedStates.alex.progress>0,
       bedFrame:bedPose,
       showerBusy:showerStates.alex.active,
+      showerFrame:alexShower,
       fridgeBusy:fridgeLeaving.alex,
       fridgeFrame:alexFridge
     });

@@ -5,6 +5,8 @@ import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} 
 import {createSkinnedSeatController} from './meshy-seat-runtime.js';
 import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
 import {createMeshyBedController} from './meshy-bed-runtime.js';
+import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
+  from './meshy-shower-runtime.js';
 
 /**
  * Meshy visual adapter for the EXISTING LifeSim procedural character root.
@@ -12,8 +14,9 @@ import {createMeshyBedController} from './meshy-bed-runtime.js';
  * Its existing avatar remains authoritative for motion, selection and props.
  * The sofa uses the audited Sit-to-Stand clip, scrubbed from real transition
  * progress with X/Z hip root-motion compensation. Bed uses the existing
- * side-entry game root with a guarded post-Anim skeletal pose; shower
- * retains the previous procedural fallback.
+ * side-entry game root with a guarded post-Anim skeletal pose. Shower uses
+ * the same skin for dressed entry/exit, but the entire avatar is hidden
+ * behind the existing opaque privacy enclosure for washing.
  */
 export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStatus=()=>{}}) {
   const hiddenFromReplacement=new Set([rig.selected,rig.snack,rig.book,rig.showerWrap]);
@@ -22,7 +25,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
   const state={status:'loading',ready:false,root:null,model:null,clip:null,visible:false,error:null,
     scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null,
     seatRuntime:null,seatWarning:false,greetingDuration:0,fridgeRuntime:null,
-    bedRuntime:null};
+    bedRuntime:null,showerRuntime:null,walkDuration:0};
   let requested=false;
 
   function attach(container){
@@ -47,6 +50,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
       if(!availableMeshClips(clips.map(clip=>clip.name)))
         throw Error('Missing required Meshy animation clips');
       state.greetingDuration=clips.find(clip=>clip.name===ALEX_GREETING_CLIP)?.duration||0;
+      state.walkDuration=clips.find(clip=>clip.name==='Walking')?.duration||0;
       for(const clip of clips)model.anim.assignAnimation(
         clip.name,clip,undefined,1,
         !['Sit_to_Stand_Transition_M','Wave_One_Hand','Call_Gesture'].includes(clip.name)
@@ -99,6 +103,23 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
         console.warn('Meshy bed rig unavailable',error);
         state.bedRuntime=null;
       }
+      // Safe shower: only fully clothed entry/exit is visible. The game's
+      // applyShowerAppearance() hides the entire avatar while private.
+      try{
+        const shower=createMeshyShowerController({pc,model});
+        if(shower.ready&&pc.Script){
+          if(!model.script)model.addComponent('script');
+          class ShowerPostUpdate extends pc.Script{
+            static scriptName='blinsAlexShowerPostUpdate';
+            postUpdate(){shower.apply();}
+          }
+          model.script.create(ShowerPostUpdate);
+          state.showerRuntime=shower;
+        }
+      }catch(error){
+        console.warn('Meshy shower arm unavailable',error);
+        state.showerRuntime=null;
+      }
       root.enabled=false;
       state.root=root;state.model=model;state.clip='Idle_3';
       state.ready=true;state.status='ready';
@@ -126,13 +147,14 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,seat=null,seatMode='vertical',dt=0,
-      bedBusy=false,bedFrame=null,showerBusy=false,fridgeBusy=false,
+      bedBusy=false,bedFrame=null,showerBusy=false,showerFrame=null,fridgeBusy=false,
       socialInitiator=false,socialElapsed=null,fridgeFrame=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
         preferred:requested,ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
         fridgeBusy,fridgeReady:Boolean(state.fridgeRuntime?.ready),
-        bedReady:Boolean(state.bedRuntime?.ready)
+        bedReady:Boolean(state.bedRuntime?.ready),
+        showerReady:Boolean(state.showerRuntime?.ready)
       });
       if(state.visible!==useMeshy){
         for(const comp of legacyRenderers)comp.enabled=!useMeshy;
@@ -142,6 +164,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
       if(!useMeshy||!state.model){
         state.fridgeRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
+        state.showerRuntime?.setFrame(null);
         return useMeshy;
       }
       // Game updates the pose; postUpdate applies joint rotations after Anim.
@@ -149,6 +172,33 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
       state.fridgeRuntime?.setFrame(fridge&&actionId==='fridge'?fridgeFrame:null);
       const bed=actionId==='bed'||bedBusy;
       state.bedRuntime?.setFrame(bed?bedFrame:null,paused);
+      const shower=actionId==='shower'||showerBusy;
+      state.showerRuntime?.setFrame(shower?showerFrame:null,paused);
+      if(shower){
+        // The game exclusively owns the walk-in/out x/z, curtain, privacy,
+        // costume and water. This adapter controls only the imported skin.
+        const anim=state.model.anim;
+        const phase=meshyShowerPose(showerFrame);
+        const gait=phase?.walking===true;
+        const target=gait?'Walking':'Idle_3';
+        if(state.clip!==target){
+          anim.baseLayer.transition(target,.16);
+          state.clip=target;
+        }
+        state.sofaRelease=null;
+        state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
+        const walkingTime=gait
+          ?showerWalkClipTime(phase.gaitMeters,state.walkDuration):null;
+        if(walkingTime!==null){
+          anim.speed=0;
+          anim.playing=true;
+          anim.baseLayer.activeStateCurrentTime=walkingTime;
+        }else{
+          anim.speed=1;
+          anim.playing=!paused;
+        }
+        return true;
+      }
       if(bed){
         // Bed root x/y/z, yaw and 78-degree recline are already calculated
         // by the game's mirrored side-entry bedTransitionPose. Never adjust
@@ -278,6 +328,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
         state.sofaRelease=null;
         state.fridgeRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
+        state.showerRuntime?.setFrame(null);
         state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
       }
     }

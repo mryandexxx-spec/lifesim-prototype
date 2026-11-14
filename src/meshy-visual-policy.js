@@ -96,18 +96,21 @@ export function alexGreetingClipTime({social=null,initiator=false,elapsed=null,d
   return duration*elapsed/ALEX_GREETING_WINDOW_MINUTES;
 }
 
-/** Skinned bed is guarded behind a real verified eight-bone post-Anim overlay.
- * There is no sleep clip in the imported GLB. Shower remains procedural.
+/** Cosmetic appearance gate: the gameplay avatar and opaque shower privacy
+ * remain authoritative even when the skinned rig is selected.
  */
 export function canShowMeshy({
   preferred = false, ready = false, actionId = null,
   sofaBusy = false, bedBusy = false, showerBusy = false,
-  fridgeBusy = false, fridgeReady = false, bedReady = false
+  fridgeBusy = false, fridgeReady = false, bedReady = false,
+  showerReady = false
 } = {}) {
   const eligible=actionId===null||actionId==='sofa'||
-    (actionId==='fridge'&&fridgeReady)||(actionId==='bed'&&bedReady);
+    (actionId==='fridge'&&fridgeReady)||(actionId==='bed'&&bedReady)||
+    (actionId==='shower'&&showerReady);
   return Boolean(preferred&&ready&&eligible&&
-    (!bedBusy||bedReady)&&!showerBusy&&(!fridgeBusy||fridgeReady));
+    (!bedBusy||bedReady)&&(!showerBusy||showerReady)&&
+    (!fridgeBusy||fridgeReady));
 }
 
 export function availableMeshClips(names) {
