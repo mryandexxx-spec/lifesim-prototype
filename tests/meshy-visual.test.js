@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
-  MESHY_ASSET_URL, MESHY_DISPLAY_HEIGHT, MESHY_VISUAL_KEY,
+  MESHY_ASSET_URL, MESHY_DISPLAY_HEIGHT, MESHY_VISUAL_KEY, meshPlacement,
+  MESHY_SOURCE_BOUNDS, MESHY_IDLE_FOOT_LOCAL_Y,
   REQUIRED_MESHY_CLIPS,meshVisualPreference,meshClipFor,canShowMeshy,
   availableMeshClips
 } from '../src/meshy-visual-policy.js';
@@ -43,7 +44,7 @@ test('Meshy clip mapping matches actual semantic states, not fabricated clip nam
 
 test('production asset path, height and file contract match validated Meshy GLB',()=>{
   assert.equal(MESHY_ASSET_URL,'./assets/characters/meshy-casual-v1.glb');
-  assert.equal(MESHY_DISPLAY_HEIGHT,1.78);
+  assert.equal(MESHY_DISPLAY_HEIGHT,2.05);
   const glb=readFileSync(new URL('../assets/characters/meshy-casual-v1.glb',import.meta.url));
   assert.equal(glb.readUInt32LE(0),0x46546c67);
   assert.equal(glb.readUInt32LE(4),2);
@@ -56,4 +57,21 @@ test('production asset path, height and file contract match validated Meshy GLB'
   assert.equal(model.meshes.length,1);
   assert.ok(REQUIRED_MESHY_CLIPS.every(name=>model.animations.some(a=>a.name===name)));
   assert.equal(model.images[0].mimeType,'image/jpeg');
+  const position=model.accessors[model.meshes[0].primitives[0].attributes.POSITION];
+  for(const [i,k] of ['x','y','z'].entries()){
+    assert.ok(Math.abs(position.min[i]-MESHY_SOURCE_BOUNDS.min[k])<.00001);
+    assert.ok(Math.abs(position.max[i]-MESHY_SOURCE_BOUNDS.max[k])<.00001);
+  }
+  const fit=meshPlacement();
+  assert.ok(fit.scale>1.2 && fit.scale<1.22);
+  assert.ok(fit.y>.03 && fit.y<.04,'idle shoe is raised to floor contact');
+});
+
+test('GLB geometry-fit is stable independent of current animated skinned AABB',()=>{
+  const a=meshPlacement(),b=meshPlacement();
+  assert.deepEqual(a,b);
+  assert.ok(Math.abs(MESHY_IDLE_FOOT_LOCAL_Y*a.scale+a.y)<1e-10);
+  assert.ok(Math.abs((MESHY_SOURCE_BOUNDS.max.y-MESHY_SOURCE_BOUNDS.min.y)*a.scale-2.05)<1e-9);
+  assert.throws(()=>meshPlacement(0),RangeError);
+  assert.throws(()=>meshPlacement(NaN),RangeError);
 });
