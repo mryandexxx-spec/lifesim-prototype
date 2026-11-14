@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import {CAMERA_INITIAL,panCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
+import {CAMERA_INITIAL,dragCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
@@ -432,6 +432,12 @@ function boot() {
     }
     if(!best){if(!automatic)toast('Сейчас не получается подойти к собеседнику');return false;}
     if(!startSocial(game,kind,actorId,best.goal,automatic))return false;
+    // A manual invitation interrupts the partner's task but never bypasses
+    // its renderer exit transition (bed/sofa/shower/fridge). Drop obsolete A*.
+    if(!automatic){
+      const partnerId=actorId==='alex'?'mira':'alex';
+      paths[partnerId]={points:null,index:0,id:null};
+    }
     paths[actorId]={points:best.points,index:0,id:'social:'+kind};
     restartAutonomyWait();
     return true;
@@ -481,7 +487,24 @@ function boot() {
   cameraUpdate();
   $('reset-camera-btn').addEventListener('click',()=>{
     setView(CAMERA_INITIAL);
-    toast('Камера сброшена · свайп — перемещение · два пальца — поворот/масштаб');
+    toast('Камера сброшена');
+  });
+  // Default one-finger pan is preserved. Tapping the visible rotate control
+  // changes only the drag interpretation; it never changes the saved game.
+  let dragMode='pan';
+  const rotateButton=$('rotate-camera-btn');
+  rotateButton.addEventListener('click',()=>{
+    dragMode=dragMode==='pan'?'orbit':'pan';
+    const rotating=dragMode==='orbit';
+    rotateButton.setAttribute('aria-pressed',String(rotating));
+    rotateButton.setAttribute('aria-label',rotating
+      ?'Режим вращения включён. Нажмите для перемещения камеры'
+      :'Включить вращение камеры одним пальцем');
+    rotateButton.title=rotating?'Перемещать камеру':'Вращать камеру';
+    $('hint').textContent=rotating?'Один палец — вращение · два — поворот/масштаб'
+      :'Один палец — перемещение · два — поворот/масштаб';
+    toast(rotating?'Вращение камеры: проведи одним пальцем'
+      :'Перемещение камеры: проведи одним пальцем');
   });
 
   // 1 finger grabs/pans the room; 2 fingers orbit and pinch in mobile Safari.
@@ -499,6 +522,7 @@ function boot() {
   };
   canvas.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse'&&event.button!==0)return;
+    if(event.cancelable)event.preventDefault();
     try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
     fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(fingers.size===1){
@@ -510,19 +534,22 @@ function boot() {
       lastPinch=metrics?.distance??null;lastMidpoint=metrics;
     }
   });
-  canvas.addEventListener('pointermove',event=>{
+  // Window-level listeners continue a swipe even when iOS pointer capture
+  // fails or a finger crosses a hotspot / the edge of the canvas.
+  window.addEventListener('pointermove',event=>{
     if(!fingers.has(event.pointerId))return;
+    if(event.cancelable)event.preventDefault();
     const prev=fingers.get(event.pointerId);
     fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(fingers.size===1){
       const dx=event.clientX-prev.x,dy=event.clientY-prev.y;
       if(tapCandidate)tapCandidate.travel+=Math.hypot(dx,dy);
-      if(dx||dy)setView(panCamera(view,dx,dy,canvas.clientHeight));
+      if(dx||dy)setView(dragCamera(view,dragMode,dx,dy,canvas.clientHeight));
     }else if(fingers.size===2){
       const metrics=twoFingerMetrics();
       if(metrics&&lastMidpoint){
         const dx=metrics.x-lastMidpoint.x,dy=metrics.y-lastMidpoint.y;
-        let next=orbitCamera(view,dx,dy);
+        let next=orbitCamera(view,dx,dy,2.0);
         if(lastPinch)next=pinchCamera(next,lastPinch,metrics.distance);
         setView(next);
       }
@@ -549,8 +576,8 @@ function boot() {
       if(best)select(best);else select(null);
     }
   };
-  canvas.addEventListener('pointerup',endPointer);
-  canvas.addEventListener('pointercancel',event=>{
+  window.addEventListener('pointerup',endPointer);
+  window.addEventListener('pointercancel',event=>{
     fingers.delete(event.pointerId);
     tapCandidate=null;lastPinch=null;lastMidpoint=null;
   });
@@ -628,8 +655,21 @@ function boot() {
             }
             if(p.index>=p.points.length){
               resident.position=socialWalking?{...game.socialAction.target}:destination(jobId,residentId);
-              if(socialWalking)arriveSocial(game);
-              else arrive(resident);
+              if(socialWalking){
+                const partnerId=residentId==='alex'?'mira':'alex';
+                const partnerExiting=sofaStates[partnerId].progress>0||
+                  bedStates[partnerId].progress>0||
+                  showerStates[partnerId].active||
+                  fridgeLeaving[partnerId];
+                if(partnerExiting){
+                  // Do not start conversation while partner is still
+                  // physically standing up / exiting shower / closing door.
+                  paths[residentId]={points:[{...game.socialAction.target}],
+                    index:0,id:jobId};
+                  continue;
+                }
+                arriveSocial(game);
+              }else arrive(resident);
               paths[residentId]={points:null,index:0,id:null};
             }
           }
@@ -844,7 +884,9 @@ function boot() {
       $('relationship-label').textContent=relationshipLabel(relation.affinity);
       $('relationship-bar').style.width=relation.affinity+'%';
       $('social-partner').textContent=game.selectedSim==='alex'?'Мирой':'Алексом';
-      const busy=Boolean(game.socialAction) || Boolean(getActor(game,game.selectedSim==='alex'?'mira':'alex').action);
+      // Affinity reaching 0 or 100 is only a meter clamp. Player-requested
+      // talk/argue stays available; the partner's current task is interruptible.
+      const busy=Boolean(game.socialAction);
       for(const kind of Object.keys(SOCIAL_ACTIONS))$(kind+'-btn').disabled=busy;
       const socialFx=$('social-effect');
       socialFx.hidden=!socialUsing;
