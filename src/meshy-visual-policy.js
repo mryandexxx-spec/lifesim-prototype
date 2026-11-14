@@ -32,8 +32,8 @@ export function meshPlacement(targetHeight=MESHY_DISPLAY_HEIGHT){
  */
 export const MESHY_SEAT_RIG_PROFILE=Object.freeze({
   pelvisBone:'mixamorig:Hips',
-  contact:Object.freeze({x:0,y:-.18,z:0}),
-  clearance:.025,
+  contact:Object.freeze({x:0,y:-.20,z:0}),
+  clearance:.020,
   halfStance:.16,
   footForward:.46,
   ankleHeight:.073,
