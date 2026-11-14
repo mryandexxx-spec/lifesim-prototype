@@ -27,10 +27,18 @@ export function panCamera(view,dx,dy,height,fov=41){
   return {...view,centerX:clamp(x,CAMERA_BOUNDS.minX,CAMERA_BOUNDS.maxX),
     centerZ:clamp(z,CAMERA_BOUNDS.minZ,CAMERA_BOUNDS.maxZ)};
 }
-export function orbitCamera(view,dx,dy){
-  if(!valid(dx)||!valid(dy))return {...view};
-  return {...view,yaw:((view.yaw-dx*.26)%360+360)%360,
-    pitch:clamp(view.pitch+dy*.19,CAMERA_BOUNDS.minPitch,CAMERA_BOUNDS.maxPitch)};
+export function orbitCamera(view,dx,dy,gain=1){
+  if(!valid(dx)||!valid(dy)||!valid(gain)||gain<=0)return {...view};
+  const s=clamp(gain,.25,3);
+  return {...view,yaw:((view.yaw-dx*.26*s)%360+360)%360,
+    pitch:clamp(view.pitch+dy*.19*s,CAMERA_BOUNDS.minPitch,CAMERA_BOUNDS.maxPitch)};
+}
+
+/** One-finger camera mode: default pan preserved, explicit rotate is easier
+ * to control on a phone than dragging two fingertips across the whole screen.
+ */
+export function dragCamera(view,mode,dx,dy,height){
+  return mode==='orbit'?orbitCamera(view,dx,dy,2.0):panCamera(view,dx,dy,height);
 }
 export function pinchCamera(view,previousDistance,nextDistance){
   if(!valid(previousDistance)||!valid(nextDistance)||
