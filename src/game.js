@@ -1,6 +1,8 @@
 import * as pc from 'playcanvas';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
+import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
+  arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
@@ -24,6 +26,7 @@ const META = {
 
 let selected = null;
 let beginAction = () => false;
+let beginSocial = () => false;
 let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let toastTimeout;
@@ -81,6 +84,14 @@ $('action-button').addEventListener('click', () => {
     select(null);
   }
 });
+for(const kind of Object.keys(SOCIAL_ACTIONS)){
+  $(kind+'-btn').addEventListener('click',()=>{
+    if(beginSocial(kind)) {
+      select(null);closeMindPanel();
+      toast(selectedName()+' хочет '+(kind==='talk'?'поговорить':'поспорить')+' с '+getActorName(game.selectedSim==='alex'?'mira':'alex'));
+    }
+  });
+}
 $('pause-btn').addEventListener('click', () => {
   game.paused = !game.paused;
   $('pause-icon').textContent = game.paused ? '▶' : 'Ⅱ';
@@ -106,8 +117,8 @@ $('auto-btn').addEventListener('click', () => {
   if (enabled) game.event = 'Свободное время';
   updateAutoButton();
   save(true);
-  toast(enabled ? 'Автономность включена. Алекс подумает перед действием.'
-    : 'Автономность выключена. Алекс ждёт твоих команд.');
+  toast(enabled ? 'Автономность включена. Жители скоро решат, чем заняться.'
+    : 'Автономность выключена. Оба жителя ждут твоих команд.');
 });
 updateAutoButton();
 function updateResidentPicker() {
@@ -375,6 +386,30 @@ function boot() {
     if(started)restartAutonomyWait(actorId);
     return started;
   };
+
+  // Meet beside the other resident at a walkable, reachable point.
+  beginSocial=(kind,automatic=false,actorId=game.selectedSim)=>{
+    if(!canStartSocial(game,kind,actorId,automatic)){
+      if(!automatic)toast('Собеседник занят или разговор уже идёт');
+      return false;
+    }
+    const self=getActor(game,actorId), partner=getActor(game,actorId==='alex'?'mira':'alex');
+    const offsets=[[.84,0],[-.84,0],[0,.84],[0,-.84],[.62,.62],[-.62,.62],[.62,-.62],[-.62,-.62]];
+    let best=null,bestLength=Infinity;
+    for(const [dx,dz] of offsets){
+      const goal={x:partner.position.x+dx,z:partner.position.z+dz};
+      const points=findPath(self.position,goal);
+      if(!points)continue;
+      let previous=self.position,len=0;
+      for(const point of points){len+=Math.hypot(point.x-previous.x,point.z-previous.z);previous=point;}
+      if(len<bestLength){best={goal,points};bestLength=len;}
+    }
+    if(!best){if(!automatic)toast('Сейчас не получается подойти к собеседнику');return false;}
+    if(!startSocial(game,kind,actorId,best.goal,automatic))return false;
+    paths[actorId]={points:best.points,index:0,id:'social:'+kind};
+    restartAutonomyWait();
+    return true;
+  };
   resetRuntime=()=>{
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
@@ -465,24 +500,37 @@ function boot() {
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
+        const socialBefore=game.socialAction?.kind;
         tickHousehold(game,.30 * game.speed); // Both share the clock; no double advancement.
         if(prevAlex && !game.action) toast('Алекс закончил: '+ACTIONS[prevAlex].label.toLowerCase());
         if(prevMira && !game.otherSim.action) toast('Мира закончила: '+ACTIONS[prevMira].label.toLowerCase());
+        if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
         accumulator-=.10;
       }
       // Run two independent route followers with one shared room and item reservation.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
-        if(resident.action?.phase==='walking'){
+        const socialWalking=game.socialAction?.phase==='walking' &&
+          game.socialAction.initiator===residentId;
+        const jobId=socialWalking?'social:'+game.socialAction.kind:
+          resident.action?.phase==='walking'?resident.action.id:null;
+        if(jobId){
           let p=paths[residentId];
-          if(p.id!==resident.action.id || !p.points){
-            if(!buildRoute(resident.action.id,residentId)){
-              resident.action=null;resident.event='Путь недоступен';
+          if(p.id!==jobId || !p.points){
+            const available=socialWalking
+              ? findPath(resident.position,game.socialAction.target)
+              : (buildRoute(jobId,residentId)?paths[residentId].points:null);
+            if(!available){
+              if(socialWalking)cancelSocial(game);
+              else {resident.action=null;resident.event='Путь недоступен';}
+              paths[residentId]={points:null,index:0,id:null};
+            } else if(socialWalking){
+              paths[residentId]={points:available,index:0,id:jobId};
             }
             p=paths[residentId];
           }
-          if(p.points && resident.action?.phase==='walking'){
-            let remaining=dt*1.65*game.speed, hops=0;
+          if(p.points && (socialWalking?game.socialAction?.phase==='walking':resident.action?.phase==='walking')){
+            let remaining=dt*1.65*game.speed,hops=0;
             while(remaining>0 && p.index<p.points.length && hops++<12){
               const next=p.points[p.index];
               const dx=next.x-resident.position.x,dz=next.z-resident.position.z;
@@ -498,8 +546,9 @@ function boot() {
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
             }
             if(p.index>=p.points.length){
-              resident.position=destination(resident.action.id);
-              arrive(resident);
+              resident.position=socialWalking?{...game.socialAction.target}:destination(jobId);
+              if(socialWalking)arriveSocial(game);
+              else arrive(resident);
               paths[residentId]={points:null,index:0,id:null};
             }
           }
@@ -508,14 +557,21 @@ function boot() {
       // Real active-time wait is independent for each sim and unaffected by game speed.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
+        if(game.socialAction){autonomyWaitSeconds[residentId]=0;continue;}
         autonomyWaitSeconds[residentId]=advanceAutonomyWait(autonomyWaitSeconds[residentId],dt,resident);
         if(!resident.action && autonomyWaitSeconds[residentId]>=AUTONOMY_WAIT_SECONDS){
+          const socialIdea=autonomousSocialChoice(game,residentId);
+          if(socialIdea && beginSocial(socialIdea,true,residentId)){
+            toast(getActorName(residentId)+' захотел(а) поговорить');
+            continue;
+          }
           const idea=residentAutonomousChoice(game,residentId);
           if(idea && beginAction(idea,true,residentId))
             toast(getActorName(residentId)+' самостоятельно решил(а): '+ACTIONS[idea].label.toLowerCase());
         }
       }
     }
+    const socialUsing=game.socialAction?.phase==='using';
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
     const walking=active && game.action?.phase==='walking';
     const pose=useId?ACTOR_POSES[useId]:null;
@@ -524,7 +580,9 @@ function boot() {
       y:pose?pose.y:(walking?Math.abs(Math.sin(gait))*.045:0),
       z:pose?pose.z:game.position.z,
       pitch:pose?pose.pitch:0,
-      yaw:pose?pose.yaw:facing
+      yaw:pose?pose.yaw:socialUsing
+        ? Math.atan2(game.otherSim.position.x-game.position.x,
+          game.otherSim.position.z-game.position.z)*180/Math.PI:facing
     };
     display.x=approach(display.x,desired.x,pose?3.4:11,animDt);
     display.y=approach(display.y,desired.y,pose?3.4:10,animDt);
@@ -536,8 +594,8 @@ function boot() {
     const wave=active?Math.sin(gait):0;
     legPivot[0].setLocalEulerAngles(using && useId==='sofa'?67:walking?wave*25:0,0,0);
     legPivot[1].setLocalEulerAngles(using && useId==='sofa'?67:walking?-wave*25:0,0,0);
-    armPivot[0].setLocalEulerAngles(using && useId==='shower'?35+Math.sin(effectTime*5)*16:using && useId==='sofa'?26:walking?-wave*18:0,0,0);
-    armPivot[1].setLocalEulerAngles(using && useId==='fridge'?-54+Math.sin(effectTime*4)*11:using && useId==='shower'?35-Math.sin(effectTime*5)*15:using && useId==='sofa'?35:walking?wave*18:0,0,0);
+    armPivot[0].setLocalEulerAngles(socialUsing?25+Math.sin(effectTime*5)*18:using&&useId==='shower'?35+Math.sin(effectTime*5)*16:using&&useId==='sofa'?26:walking?-wave*18:0,0,0);
+    armPivot[1].setLocalEulerAngles(socialUsing?24-Math.sin(effectTime*4)*20:using&&useId==='fridge'?-54+Math.sin(effectTime*4)*11:using&&useId==='shower'?35-Math.sin(effectTime*5)*15:using&&useId==='sofa'?35:walking?wave*18:0,0,0);
     if(active) effectTime+=dt*game.speed;
     torso.setLocalEulerAngles(0,0,using && useId!=='bed'?Math.sin(effectTime*2)*1.4:0);
     const sleepy=using && useId==='bed';
@@ -553,7 +611,9 @@ function boot() {
       y:miraPose?miraPose.y:(miraWalking?Math.abs(Math.sin(miraGait))*.045:0),
       z:miraPose?miraPose.z:game.otherSim.position.z,
       pitch:miraPose?miraPose.pitch:0,
-      yaw:miraPose?miraPose.yaw:miraFacing
+      yaw:miraPose?miraPose.yaw:socialUsing
+        ? Math.atan2(game.position.x-game.otherSim.position.x,
+          game.position.z-game.otherSim.position.z)*180/Math.PI:miraFacing
     };
     miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraPose?3.4:11,animDt);
     miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraPose?3.4:10,animDt);
@@ -565,8 +625,8 @@ function boot() {
     const miraWave=active?Math.sin(miraGait):0;
     miraLegPivot[0].setLocalEulerAngles(miraUsing&&miraUseId==='sofa'?67:miraWalking?miraWave*25:0,0,0);
     miraLegPivot[1].setLocalEulerAngles(miraUsing&&miraUseId==='sofa'?67:miraWalking?-miraWave*25:0,0,0);
-    miraArmPivot[0].setLocalEulerAngles(miraUsing&&miraUseId==='shower'?38:miraUsing&&miraUseId==='sofa'?26:miraWalking?-miraWave*18:0,0,0);
-    miraArmPivot[1].setLocalEulerAngles(miraUsing&&miraUseId==='fridge'?-54:miraUsing&&miraUseId==='shower'?38:miraUsing&&miraUseId==='sofa'?35:miraWalking?miraWave*18:0,0,0);
+    miraArmPivot[0].setLocalEulerAngles(socialUsing?25-Math.sin(effectTime*4.7)*18:miraUsing&&miraUseId==='shower'?38:miraUsing&&miraUseId==='sofa'?26:miraWalking?-miraWave*18:0,0,0);
+    miraArmPivot[1].setLocalEulerAngles(socialUsing?26+Math.sin(effectTime*4.3)*17:miraUsing&&miraUseId==='fridge'?-54:miraUsing&&miraUseId==='shower'?38:miraUsing&&miraUseId==='sofa'?35:miraWalking?miraWave*18:0,0,0);
     miraTorso.setLocalEulerAngles(0,0,miraUsing&&miraUseId!=='bed'?Math.sin(effectTime*2.1)*1.4:0);
     miraLeftEye.enabled=!(miraUsing&&miraUseId==='bed');
     miraRightEye.enabled=!(miraUsing&&miraUseId==='bed');
@@ -590,6 +650,22 @@ function boot() {
       const t=readableTime(game.minutes);$('day-label').textContent=t.day;$('time-label').textContent=t.time;
       const current=selectedActor();
       $('resident-name').textContent=selectedName();
+      const relation=game.relationship;
+      $('relationship-value').textContent=Math.round(relation.affinity)+'/100';
+      $('relationship-label').textContent=relationshipLabel(relation.affinity);
+      $('relationship-bar').style.width=relation.affinity+'%';
+      $('social-partner').textContent=game.selectedSim==='alex'?'Мирой':'Алексом';
+      const busy=Boolean(game.socialAction) || Boolean(getActor(game,game.selectedSim==='alex'?'mira':'alex').action);
+      for(const kind of Object.keys(SOCIAL_ACTIONS))$(kind+'-btn').disabled=busy;
+      const socialFx=$('social-effect');
+      socialFx.hidden=!socialUsing;
+      if(socialUsing){
+        socialFx.textContent=game.socialAction.kind==='talk'?'♡ ✦':'⚡';
+        const p=camera.camera.worldToScreen(new pc.Vec3(
+          (game.position.x+game.otherSim.position.x)/2,2.2,
+          (game.position.z+game.otherSim.position.z)/2));
+        socialFx.style.left=p.x+'px';socialFx.style.top=p.y+'px';
+      }
       for(const need of NEEDS){
         const val=Math.round(current.needs[need]);
         $('bar-'+need).style.width=val+'%';
@@ -618,7 +694,9 @@ function boot() {
       }
       $('pause-icon').textContent=game.paused?'▶':'Ⅱ';
       $('speed-btn').textContent=game.speed+'×';
-      const status=game.paused?'Пауза':!game.autonomy.enabled&&!current.action?selectedName()+' ждёт указаний':current.action?.phase==='walking'?'Идёт: '+ACTIONS[current.action.id].label.toLowerCase():current.action?.phase==='using'?ACTIONS[current.action.id].label+' · '+Math.min(100,Math.round(100*current.action.elapsed/ACTIONS[current.action.id].duration))+'%':current.event;
+      const status=game.paused?'Пауза':game.socialAction
+        ? (game.socialAction.phase==='walking'?'Идёт на встречу: ':'Общаются: ')+SOCIAL_ACTIONS[game.socialAction.kind].label.toLowerCase()
+        :!game.autonomy.enabled&&!current.action?selectedName()+' ждёт указаний':current.action?.phase==='walking'?'Идёт: '+ACTIONS[current.action.id].label.toLowerCase():current.action?.phase==='using'?ACTIONS[current.action.id].label+' · '+Math.min(100,Math.round(100*current.action.elapsed/ACTIONS[current.action.id].duration))+'%':current.event;
       if(status!==lastStatus){$('status-text').textContent=status;lastStatus=status;}
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.
       for(const [id,meta] of Object.entries(META)){

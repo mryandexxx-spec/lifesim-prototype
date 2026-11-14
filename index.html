@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>life<span>sim</span></b><small>prototype / 0.4a</small></div>
+        <div><b>life<span>sim</span></b><small>prototype / 0.4b</small></div>
       </div>
       <div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div>
     </header>
@@ -53,6 +53,12 @@
       <div class="mind-history"><span class="eyebrow">ПОСЛЕДНИЕ ВОСПОМИНАНИЯ</span><ul id="mind-memories"><li>Пока всё впереди</li></ul></div>
     </section>
 
+    <section class="social-bar" aria-label="Отношения между жителями">
+      <div class="social-summary"><span class="social-icon" aria-hidden="true">♡</span><div><span class="social-title">ОТНОШЕНИЯ <span id="relationship-value">50/100</span></span><strong id="relationship-label">Нейтрально</strong><div class="social-meter"><i id="relationship-bar"></i></div></div></div>
+      <div class="social-controls"><span>Общение с <b id="social-partner">Мирой</b></span><div><button id="talk-btn" type="button">Поговорить</button><button id="argue-btn" type="button">Поспорить</button></div></div>
+    </section>
+    <div id="social-effect" class="social-effect" aria-hidden="true" hidden>♡</div>
+
     <footer class="dashboard">
       <div class="resident-column">
         <div class="resident-switch" role="group" aria-label="Кем управлять">
@@ -71,7 +77,7 @@
     </footer>
 
     <div class="toast" role="status" id="toast" aria-live="polite"></div>
-    <div class="loading" id="loading"><div class="loading-mark">✦</div><strong>Готовим комнату...</strong><span>LifeSim / прототип 0.4a</span></div>
+    <div class="loading" id="loading"><div class="loading-mark">✦</div><strong>Готовим комнату...</strong><span>LifeSim / прототип 0.4b</span></div>
   </div>
   <script type="module" src="./src/game.js"></script>
   <script>
