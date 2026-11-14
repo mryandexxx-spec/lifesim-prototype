@@ -10,7 +10,10 @@ export const SOFA_LAYOUT=Object.freeze({
   armCenterY:.44,armHeight:.67,
   pillowCenterY:.47,pillowHeight:.23,pillowZ:1.80
 });
-export const SOFA_POSE=Object.freeze({x:1.35,y:-.26,z:1.44,pitch:0,yaw:180});
+export const SOFA_POSE=Object.freeze({x:1.35,y:-.22,z:1.44,pitch:0,yaw:180});
+/** Walkable approach point directly in front of the sofa. */
+export const SOFA_APPROACH=Object.freeze({x:1.35,z:.52});
+export const SOFA_FRONT_EDGE=SOFA_LAYOUT.z-SOFA_LAYOUT.seatDepth/2;
 /* Negative X pitch moves thighs to the avatar's front (+Z).
    The opposite knee pitch keeps the shin pointing downward. */
 export const SOFA_HIP_PITCH=-79;

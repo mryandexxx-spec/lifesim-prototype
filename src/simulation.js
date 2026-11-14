@@ -5,7 +5,7 @@ export const ACTIONS = Object.freeze({
   bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [-0.82, -1.05] },
   fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [3.48, -1.76] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [-2.18, 2.10] },
-  sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 0.96, location: [-0.48, 1.46] }
+  sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 0.96, location: [1.35, 0.52] }
 });
 const DECAY = { hunger: 0.12, energy: 0.085, hygiene: 0.068, fun: 0.094 };
 export const SAVE_KEY = 'lifesim.room01.v1';

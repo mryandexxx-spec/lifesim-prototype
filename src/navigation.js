@@ -7,7 +7,7 @@ export const FURNITURE = Object.freeze([
   { id: 'counter', minX: 0.52, maxX: 2.87, minZ: -3.84, maxZ: -2.79 },
   { id: 'fridge', minX: 2.86, maxX: 4.04, minZ: -3.49, maxZ: -2.26 },
   { id: 'sofa', minX: -0.07, maxX: 2.78, minZ: 0.89, maxZ: 2.29 },
-  { id: 'table', minX: 0.59, maxX: 2.09, minZ: -0.24, maxZ: 0.54 },
+  { id: 'table', minX: 0.59, maxX: 2.09, minZ: -0.65, maxZ: 0.13 },
   { id: 'tv', minX: 3.43, maxX: 4.30, minZ: -0.49, maxZ: 1.18 },
   { id: 'shower', minX: -4.65, maxX: -2.74, minZ: 1.54, maxZ: 3.49 },
   { id: 'plant', minX: 3.83, maxX: 4.52, minZ: 2.78, maxZ: 3.66 }

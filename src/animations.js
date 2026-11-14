@@ -28,12 +28,14 @@ export function stepAnimation(previous,signals,dt) {
   const wave=Math.sin(gait);
   const side=signals?.id==='mira'?-1:1;
   const energy=clamp(safe(signals?.energy,70),0,100);
+  // Progress lets the figure bend AFTER approaching and turning; the headless
+  // animator remains backward compatible when no progress signal is supplied.
+  const sofaWeight=clamp(safe(signals?.sofaWeight,action==='sofa'?1:0),0,1);
   let legTarget=[0,0],kneeTarget=[0,0],armTarget=[0,0];
-  if(action==='sofa'){
-    // Legs project FORWARD into the room; shins bend DOWN at the knees.
-    legTarget=[SOFA_HIP_PITCH,SOFA_HIP_PITCH];
-    kneeTarget=[SOFA_KNEE_PITCH,SOFA_KNEE_PITCH];
-    armTarget=[26,35];
+  if(sofaWeight>0){
+    legTarget=[SOFA_HIP_PITCH*sofaWeight,SOFA_HIP_PITCH*sofaWeight];
+    kneeTarget=[SOFA_KNEE_PITCH*sofaWeight,SOFA_KNEE_PITCH*sofaWeight];
+    armTarget=[26*sofaWeight,35*sofaWeight];
   }else if(action==='shower'){
     armTarget=[36+Math.sin(t*5)*12,34-Math.sin(t*4.5)*12];
   }else if(action==='fridge'){
