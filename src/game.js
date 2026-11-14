@@ -7,6 +7,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js';
+import {createMiraMeshyVisual} from './meshy-mira-visual.js';
 import {meshVisualPreference,MESHY_VISUAL_KEY} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
@@ -37,8 +38,8 @@ function updateMeshModelButton(){
   const button=$('mesh-model-btn');
   button.setAttribute('aria-pressed',String(meshyPreferred));
   button.setAttribute('aria-label',meshyPreferred
-    ? 'Алекс: модель Meshy. Нажмите, чтобы вернуть обычную модель.'
-    : 'Алекс: обычная модель. Нажмите, чтобы включить Meshy.');
+    ? 'Алекс и Мира: 3D-модели Meshy. Нажмите, чтобы вернуть старые модели.'
+    : 'Алекс и Мира: старые модели. Нажмите, чтобы включить 3D-модели Meshy.');
   $('mesh-model-state').textContent=meshyPreferred?'MESHY':'СТАРЫЙ';
 }
 $('mesh-model-btn').addEventListener('click',()=>{
@@ -46,7 +47,7 @@ $('mesh-model-btn').addEventListener('click',()=>{
   try{localStorage.setItem(MESHY_VISUAL_KEY,meshyPreferred?'meshy':'legacy');}
   catch{/* This is only a visual preference and never blocks gameplay. */}
   updateMeshModelButton();
-  toast(meshyPreferred?'Алекс: включён облик Meshy':'Алекс: возвращён прежний облик');
+  toast(meshyPreferred?'3D-облики Алекса и Миры включены':'Оба жителя: прежние облики');
 });
 updateMeshModelButton();
 
@@ -363,6 +364,11 @@ function boot() {
     if(status==='error')toast('Meshy недоступен: сохранён обычный облик Алекса');
     if(error)console.warn('Meshy visual unavailable',error);
   }});
+  const meshyMira=createMiraMeshyVisual({pc,app,rig:miraRig,onStatus:(status,error)=>{
+    if(status==='ready'&&meshyPreferred)toast('3D-облик Миры загружен');
+    if(status==='error')toast('Модель Миры недоступна: используется прежний облик');
+    if(error)console.warn('Meshy Mira visual unavailable',error);
+  }});
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
   const bedStates={alex:createBedTransition(),mira:createBedTransition()};
@@ -483,6 +489,7 @@ function boot() {
       applyShowerAppearance(id==='alex'?alexRig:miraRig,false,false);
     }
     meshyAlex.reset();
+    meshyMira.reset();
     game.position=nearestWalkable(game.position);
     game.otherSim.position=nearestWalkable(game.otherSim.position);
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
@@ -876,6 +883,18 @@ function boot() {
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
+    // The new female GLB is cosmetic. Unretargeted furniture/shower actions
+    // remain procedural; the existing simulation/save schema is untouched.
+    meshyMira.update({
+      preferred:meshyPreferred,paused:!active,
+      walking:miraWalking&&!miraSeating&&!miraBedding&&!miraShower,
+      social:socialUsing?game.socialAction.kind:null,
+      actionId:miraUseId,
+      sofaBusy:sofaStates.mira.progress>0,
+      bedBusy:bedStates.mira.progress>0,
+      showerBusy:showerStates.mira.active,
+      fridgeBusy:fridgeLeaving.mira
+    });
     // Alex uses Meshy for free locomotion and social states, but the original
     // established rig remains active for furniture, fridge, bed and shower
     // exit/privateness. Its simulation and save format never change.
