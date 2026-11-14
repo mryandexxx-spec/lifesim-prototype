@@ -714,19 +714,22 @@ function boot() {
     const miraUsing=game.otherSim.action?.phase==='using';
     const miraUseId=miraUsing?game.otherSim.action.id:null;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,ACTIONS.fridge.duration):null;
+    showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
+      game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,miraDisplay.yaw);
+    const miraShower=showerStates.mira.frame;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'));
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
-      miraUseId==='sofa'&&bedStates.mira.progress===0,animDt);
+      miraUseId==='sofa'&&bedStates.mira.progress===0&&!showerStates.mira.active,animDt);
     const miraSeatPose=sofaTransitionPose(sofaStates.mira);
     const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
     bedStates.mira=advanceBedTransition(bedStates.mira,
-      miraUseId==='bed'&&sofaStates.mira.progress===0,
+      miraUseId==='bed'&&sofaStates.mira.progress===0&&!showerStates.mira.active,
       game.otherSim.action?.bedSlot,animDt,{...miraDisplay});
     const miraBedPose=bedTransitionPose(bedStates.mira);
     const miraBedding=Boolean(miraBedPose);
-    const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'?ACTOR_POSES[miraUseId]:null;
-    const miraDesired=miraBedding?miraBedPose:miraSeating?miraSeatPose:{
+    const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'?ACTOR_POSES[miraUseId]:null;
+    const miraDesired=miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:game.otherSim.position.x,
       y:miraPose?miraPose.y:animationStates.mira.walkBob,
       z:miraPose?miraPose.z:game.otherSim.position.z,
@@ -735,7 +738,9 @@ function boot() {
         ? Math.atan2(game.position.x-game.otherSim.position.x,
           game.position.z-game.otherSim.position.z)*180/Math.PI:miraFacing
     };
-    if(miraBedding){
+    if(miraShower){
+      Object.assign(miraDisplay,miraShower.pose);miraFacing=miraShower.pose.yaw;
+    }else if(miraBedding){
       Object.assign(miraDisplay,miraBedPose);miraFacing=miraBedPose.yaw;
     }else{
       miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraSeating||miraPose?10:11,animDt);
@@ -748,7 +753,10 @@ function boot() {
     miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
     miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,miraDisplay.roll);
     animationStates.mira=stepAnimation(animationStates.mira,{
-      id:'mira',walking:miraWalking&&!miraSeating&&!miraBedding,using:miraUseId,
+      id:'mira',walking:(miraWalking||Boolean(miraShower?.stepWeight>.015))&&!miraSeating&&!miraBedding,
+      using:miraShower?'shower':miraUseId,
+      showerStep:miraShower?.stepWeight||0,showerWater:Boolean(miraShower?.water),
+      showerExiting:Boolean(miraShower&&miraUseId!=='shower'),
       sofaWeight:miraSeatPose.sofaWeight,
       bedStepWeight:miraBedPose?.bedStepWeight||0,
       bedSitWeight:miraBedPose?.bedSitWeight||0,
@@ -757,10 +765,12 @@ function boot() {
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
       social:socialUsing?game.socialAction.kind:null,
       fridgeReach:miraFridge?.reach||0,fridgeEat:miraFridge?.eat||0,
-      fridgeChew:miraFridge?.chew||0,gait:miraGait,
+      fridgeChew:miraFridge?.chew||0,
+      gait:miraShower?miraShower.gaitMeters*WALK_PHASE_PER_METER:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
     },animDt);
     applyCharacterAnimation(miraRig,animationStates.mira);
+    applyShowerAppearance(miraRig,Boolean(miraShower?.privacy),Boolean(miraShower?.bathing));
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
@@ -779,12 +789,16 @@ function boot() {
     const shelfFood=activeFridge?.shelfFood||0;
     fridgeFood.enabled=shelfFood>.012;
     if(fridgeFood.enabled)fridgeFood.setLocalScale(.20*shelfFood,.18*shelfFood,.20*shelfFood);
+    // The private resident is never rendered: the screen is opaque from ALL
+    // viewpoints, even when camera is rotating during the shower.
+    showerPrivacy.enabled=Boolean(alexShower?.privacy||miraShower?.privacy);
+    const waterOn=Boolean(alexShower?.water||miraShower?.water);
     for(let i=0;i<showerDrops.length;i++){
       const drop=showerDrops[i];
-      drop.enabled=(useId==='shower'||miraUseId==='shower');
+      drop.enabled=waterOn;
       if(drop.enabled){
         const t=(effectTime*.8+i*.17)%1;
-        drop.setLocalPosition(-4.42+(i%5)*.15,2.25-t*1.9,2.17+Math.floor(i/5)*.15);
+        drop.setLocalPosition(-4.28+(i%5)*.22,2.13-t*1.8,3.25+(i%2)*.035);
       }
     }
     uiTimer+=dt;autosaveTime+=dt;
