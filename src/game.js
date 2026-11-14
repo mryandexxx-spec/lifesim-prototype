@@ -14,6 +14,7 @@ import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
 import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
+import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,bedDestinationFor } from './household.js';
@@ -189,8 +190,7 @@ function boot() {
     mint: mat('#a7cab6'), green: mat('#477e62'), darkGreen: mat('#315d50'), leaf: mat('#4f986b'), leaf2: mat('#7cb785'),
     pink: mat('#e8b6aa'), peach: mat('#efcfb6'), rust: mat('#bb856f'), slate: mat('#6f8b89'), glass: mat('#badeda', {opacity:0.38}),
     white: mat('#fffdf7'), black: mat('#303c3a'), tan: mat('#be9d86'), blue: mat('#c5dbdd'), yellow: mat('#f7d68d'),
-    skin: mat('#c88d6e'), hair: mat('#47382f'), shirt: mat('#4b967d'), trousers: mat('#566675'), rug: mat('#d6b8a5'),
-    privacy: mat('#86bac2') // Opaque: no blending or depth-write bypass.
+    skin: mat('#c88d6e'), hair: mat('#47382f'), shirt: mat('#4b967d'), trousers: mat('#566675'), rug: mat('#d6b8a5')
   };
   const primitive = (type,name,x,y,z,sx,sy,sz,material,parent=app.root) => {
     const entity = new pc.Entity(name);
@@ -304,20 +304,22 @@ function boot() {
   cylinder('shower head',-4.41,2.27,2.19,.46,.09,.46,M.slate);
   cylinder('shower pipe',-4.41,1.85,2.19,.065,.80,.065,M.slate);
   box('shower towel',-2.55,.89,3.69,.45,.7,.08,M.mint);
-  // Solid, original privacy enclosure covering all angles including overhead.
-  // Both the resident and their street outfit are hidden before any outfit swap.
-  const showerPrivacy=new pc.Entity('Opaque shower privacy enclosure');
+  // 0.6e.1: a lightweight original floating pixel mosaic, NOT a solid box.
+  // One opaque texture is shared by 3 curved shell primitives (3 draw calls).
+  // The full character rig is still hidden while privacy is active; this is
+  // visual decoration, never a translucent renderer or a simulated censor.
+  const showerPrivacy=new pc.Entity('Floating mosaic shower privacy');
   app.root.addChild(showerPrivacy);
   showerPrivacy.setPosition(SHOWER_LAYOUT.interior.x,0,SHOWER_LAYOUT.interior.z);
-  box('solid shower privacy',0,SHOWER_LAYOUT.privacyHeight/2,0,
-    SHOWER_LAYOUT.privacyWidth,SHOWER_LAYOUT.privacyHeight,SHOWER_LAYOUT.privacyDepth,
-    M.privacy,showerPrivacy);
-  for(const y of [.39,1.06,1.73]){
-    box('shower ripple front '+y,0,y,SHOWER_LAYOUT.privacyDepth/2+.012,
-      SHOWER_LAYOUT.privacyWidth*.8,.035,.018,M.cream,showerPrivacy);
-    box('shower ripple right '+y,SHOWER_LAYOUT.privacyWidth/2+.012,y,0,
-      .018,.035,SHOWER_LAYOUT.privacyDepth*.75,M.cream,showerPrivacy);
-  }
+  const mosaicMaterial=createPrivacyMosaicMaterial(pc,app.graphicsDevice);
+  const veilWidth=SHOWER_LAYOUT.privacyWidth*.89;
+  const veilDepth=SHOWER_LAYOUT.privacyDepth*.89;
+  cylinder('shower mosaic cloud',0,1.25,0,veilWidth,1.95,veilDepth,
+    mosaicMaterial,showerPrivacy);
+  ball('shower mosaic top',0,2.23,0,veilWidth,.32,veilDepth,
+    mosaicMaterial,showerPrivacy);
+  ball('shower mosaic base',0,.27,0,veilWidth,.30,veilDepth,
+    mosaicMaterial,showerPrivacy);
   showerPrivacy.enabled=false;
 
   // Potted plant, decorations and an oversized welcoming mat.
