@@ -15,7 +15,7 @@ const ankle=(p,leg,pose=gaitTargets(p,1))=>{
   const a=LEG_GEOMETRY.kneeOffsetY,b=LEG_GEOMETRY.shoeCenterY;
   return {
     y:LEG_GEOMETRY.hipHeight+pose.rootOffset+a*Math.cos(h)+b*Math.cos(h+k),
-    z:travelZ(p)-a*Math.sin(h)-b*Math.sin(h+k)
+    z:travelZ(p)+a*Math.sin(h)+b*Math.sin(h+k)
   };
 };
 
