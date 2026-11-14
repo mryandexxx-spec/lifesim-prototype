@@ -100,10 +100,12 @@ export function alexGreetingClipTime({social=null,initiator=false,elapsed=null,d
 export function canShowMeshy({
   preferred = false, ready = false, actionId = null,
   sofaBusy = false, bedBusy = false, showerBusy = false,
-  fridgeBusy = false
+  fridgeBusy = false, fridgeReady = false
 } = {}) {
-  return Boolean(preferred && ready && (actionId===null||actionId==='sofa') &&
-    !bedBusy && !showerBusy && !fridgeBusy);
+  const eligible=actionId===null||actionId==='sofa'||
+    (actionId==='fridge'&&fridgeReady);
+  return Boolean(preferred&&ready&&eligible&&
+    !bedBusy&&!showerBusy&&(!fridgeBusy||fridgeReady));
 }
 
 export function availableMeshClips(names) {

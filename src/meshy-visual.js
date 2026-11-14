@@ -3,6 +3,7 @@ import {canShowMeshy, meshClipFor, availableMeshClips,
   ALEX_GREETING_CLIP,alexGreetingClipTime} from './meshy-visual-policy.js';
 import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} from './meshy-sofa-pose.js';
 import {createSkinnedSeatController} from './meshy-seat-runtime.js';
+import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
 
 /**
  * Meshy visual adapter for the EXISTING LifeSim procedural character root.
@@ -18,7 +19,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
     .filter(component=>!hiddenFromReplacement.has(component.entity));
   const state={status:'loading',ready:false,root:null,model:null,clip:null,visible:false,error:null,
     scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null,
-    seatRuntime:null,seatWarning:false,greetingDuration:0};
+    seatRuntime:null,seatWarning:false,greetingDuration:0,fridgeRuntime:null};
   let requested=false;
 
   function attach(container){
@@ -61,6 +62,23 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
           footIK,footPlant
         });
       }catch(error){console.warn('Meshy seat contact unavailable',error);}
+      // A stable post-Anim script for the right arm and hand-attached snack.
+      // If the rig lacks bones or Script support, retain procedural fridge.
+      try{
+        const fridge=createMeshyFridgeController({pc,model,avatar:rig.avatar});
+        if(fridge.ready&&pc.Script&&typeof model.addComponent==='function'){
+          class FridgePostUpdate extends pc.Script{
+            static scriptName='blinsAlexFridgePostUpdate';
+            postUpdate(){fridge.apply();}
+          }
+          model.addComponent('script');
+          model.script.create(FridgePostUpdate);
+          state.fridgeRuntime=fridge;
+        }
+      }catch(error){
+        console.warn('Meshy fridge arm unavailable',error);
+        state.fridgeRuntime=null;
+      }
       root.enabled=false;
       state.root=root;state.model=model;state.clip='Idle_3';
       state.ready=true;state.status='ready';
@@ -89,17 +107,35 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,seat=null,seatMode='vertical',dt=0,
       bedBusy=false,showerBusy=false,fridgeBusy=false,
-      socialInitiator=false,socialElapsed=null}={}){
+      socialInitiator=false,socialElapsed=null,fridgeFrame=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
-        preferred:requested,ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,fridgeBusy
+        preferred:requested,ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
+        fridgeBusy,fridgeReady:Boolean(state.fridgeRuntime?.ready)
       });
       if(state.visible!==useMeshy){
         for(const comp of legacyRenderers)comp.enabled=!useMeshy;
         if(state.root)state.root.enabled=useMeshy;
         state.visible=useMeshy;
       }
-      if(!useMeshy||!state.model)return useMeshy;
+      if(!useMeshy||!state.model){
+        state.fridgeRuntime?.setFrame(null);
+        return useMeshy;
+      }
+      // Game updates the pose; postUpdate applies joint rotations after Anim.
+      const fridge=actionId==='fridge'||fridgeBusy;
+      state.fridgeRuntime?.setFrame(fridge&&actionId==='fridge'?fridgeFrame:null);
+      if(fridge){
+        const anim=state.model.anim;
+        if(state.clip!=='Idle_3'){
+          anim.baseLayer.transition('Idle_3',.20);
+          state.clip='Idle_3';
+        }
+        state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
+        anim.speed=1;
+        anim.playing=!paused;
+        return true;
+      }
       const sofa=actionId==='sofa'||sofaBusy;
       const anim=state.model.anim;
       if(sofa){
@@ -201,6 +237,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
         state.clip='Idle_3';
         state.sofaOffset={x:0,y:0,z:0};
         state.sofaRelease=null;
+        state.fridgeRuntime?.setFrame(null);
         state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
       }
     }

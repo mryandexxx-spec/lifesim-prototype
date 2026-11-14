@@ -941,8 +941,12 @@ function boot() {
       seatMode,
       bedBusy:bedStates.alex.progress>0,
       showerBusy:showerStates.alex.active,
-      fridgeBusy:fridgeLeaving.alex
+      fridgeBusy:fridgeLeaving.alex,
+      fridgeFrame:alexFridge
     });
+    // The old snack is attached to the hidden procedural elbow; use the
+    // new Meshy hand-bone prop instead, never show both at once.
+    if(meshyShown&&useId==='fridge')snack.enabled=false;
     // The existing procedural book is attached to the old right elbow.
     // Never let it float beside the Meshy hand until a real socket exists.
     if(meshyShown&&useId==='sofa')book.enabled=false;

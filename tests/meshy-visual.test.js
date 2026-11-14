@@ -18,7 +18,7 @@ test('Meshy is an opt-out visual mode; legacy and URL overrides are supported',(
   assert.equal(MESHY_VISUAL_KEY,'lifesim.meshyVisual.v1');
 });
 
-test('Meshy sofa stays visible while bed/fridge/shower retain procedural fallback',()=>{
+test('Meshy sofa and guarded fridge visual gates preserve fallback',()=>{
   const standard={preferred:true,ready:true};
   assert.equal(canShowMeshy(standard),true);
   assert.equal(canShowMeshy({...standard,ready:false}),false);
@@ -26,6 +26,10 @@ test('Meshy sofa stays visible while bed/fridge/shower retain procedural fallbac
   assert.equal(canShowMeshy({...standard,actionId:'sofa'}),true);
   for(const actionId of ['bed','fridge','shower'])
     assert.equal(canShowMeshy({...standard,actionId}),false,actionId);
+  assert.equal(canShowMeshy({...standard,actionId:'fridge',fridgeReady:true}),true);
+  assert.equal(canShowMeshy({...standard,actionId:'fridge',fridgeReady:false}),false);
+  assert.equal(canShowMeshy({...standard,fridgeReady:true,fridgeBusy:true}),true);
+  assert.equal(canShowMeshy({...standard,fridgeReady:false,fridgeBusy:true}),false);
   assert.equal(canShowMeshy({...standard,sofaBusy:true}),true);
   for(const gate of ['bedBusy','showerBusy','fridgeBusy'])
     assert.equal(canShowMeshy({...standard,[gate]:true}),false,gate);

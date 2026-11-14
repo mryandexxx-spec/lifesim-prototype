@@ -132,7 +132,7 @@ test('Meshy sofa plays backwards from exact progress without swapping body, even
   assert.notEqual(f.model.position[2],releasingZ);
   assert.equal(f.model.position[2],meshPlacement().z,'root offset fully released');
   visual.update({preferred:true,actionId:'fridge'});
-  assert.equal(f.renderers[0].enabled,true,'fridge deliberately uses legacy');
+  assert.equal(f.renderers[0].enabled,true,'missing Mixamo arm rig uses safe legacy fridge');
 });
 
 test('new Meshy sofa seat correction stays off when standing and clears the cushion at rest',()=>{

@@ -12,6 +12,9 @@ const ease=(a,b,p)=>{
 export const FRIDGE_LAYOUT=Object.freeze({
   approach:Object.freeze({x:2.54,z:-1.74}),
   handle:Object.freeze({x:3.04,z:-2.145}),
+  handleY:1.51,
+  // Physical prefab contact markers, never per-avatar pixel offsets.
+  shelfTarget:Object.freeze({x:3.24,y:1.38,z:-2.22}),
   hinge:Object.freeze({x:3.98,y:1.44,z:-2.205}),
   doorWidth:1.08,doorAngle:68,
   sweep:Object.freeze({minX:2.89,maxX:4.04,minZ:-2.26,maxZ:-1.20})
