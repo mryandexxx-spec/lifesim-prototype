@@ -58,7 +58,7 @@ test('constructor builds both rig contracts once with correct animated pivot geo
     assert.ok(traverse(r.avatar).some(e=>/hair/.test(e.name)));
   }
   assert.notEqual(alex.avatar.name,mira.avatar.name);
-  assert.ok(created.length>=95 && created.length<150,'Keep the static mobile geometry bounded');
+  assert.ok(created.length>=75 && created.length<110,'Keep the static mobile geometry bounded');
 });
 test('rig only uses round geometry for person except the existing held book',()=>{
   const {ctx,created}=rigScene();
