@@ -1,6 +1,7 @@
 import {
   solveSeatRoot,blendSeatRoot,seatFootTargets,solveTwoBoneTargets,
-  smoothContactWeight,solveSeatHeightCorrection
+  smoothContactWeight,solveSeatHeightCorrection,
+  seatGroundedAnkleTargets,rotateSeatVector
 } from './interaction-anchors.js';
 
 /**
@@ -12,7 +13,7 @@ import {
  * systems have evaluated the imported skin pose (PlayCanvas 2.24).
  */
 export function createSkinnedSeatController({
-  pc,model,avatar,profile,footIK=true
+  pc,model,avatar,profile,footIK=true,footPlant=false
 }) {
   if(!model?.findByName || !avatar || !profile)throw new TypeError('Seat rig required');
   const pelvis=model.findByName(profile.pelvisBone);
@@ -24,14 +25,14 @@ export function createSkinnedSeatController({
   const contactModel=new pc.Vec3();
   const inverseModel=new pc.Mat4();
   const feet=[];
-  if(footIK)for(const leg of profile.legs||[]){
+  if(footIK||footPlant)for(const leg of profile.legs||[]){
     const thigh=model.findByName(leg.thigh),shin=model.findByName(leg.shin),
       ankle=model.findByName(leg.ankle);
     if(thigh&&shin&&ankle)feet.push({thigh,shin,ankle});
   }
   const from=new pc.Vec3(),to=new pc.Vec3(),swing=new pc.Quat(),goal=new pc.Quat(),
     blended=new pc.Quat();
-  function rotateTowards(node,at,desired,weight){
+  function rotateTowards(node,at,desired,weight,maxAngleDegrees=55){
     const pivot=node.getPosition();
     from.set(at.x-pivot.x,at.y-pivot.y,at.z-pivot.z);
     to.set(desired.x-pivot.x,desired.y-pivot.y,desired.z-pivot.z);
@@ -41,12 +42,67 @@ export function createSkinnedSeatController({
     if(cosine>.99999)return;
     // Prevent a malformed clip / furniture surface from twisting a leg
     // through an arbitrarily large angle in a single render frame.
-    const capped=Math.min(1,(55*Math.PI/180)/Math.acos(cosine));
+    const capped=Math.min(1,(maxAngleDegrees*Math.PI/180)/Math.acos(cosine));
     swing.setFromDirections(from,to);
     const current=node.getRotation();
     goal.mul2(swing,current);
     blended.slerp(current,goal,Math.min(1,weight*capped));
     node.setRotation(blended);
+  }
+
+  /**
+   * Sofa-specific *phase*, furniture-agnostic shoe planting. The place and
+   * yaw of the Meshy root stay entirely owned by the original game action.
+   * A shoe sole's height is a CHARACTER RIG measurement from the GLB, while
+   * the shoe goal in X/Z is calculated from the FURNITURE FRONT EDGE.
+   * Neither datum needs tuning per character x sofa pair.
+   */
+  function plantGroundedFeet({seat,weight,scale}){
+    if(!footPlant||feet.length!==2||weight<=.62)return 0;
+    const strength=smoothContactWeight((weight-.62)/.38);
+    if(strength<=0)return 0;
+    const targets=seatGroundedAnkleTargets({
+      seat,scale,halfStance:profile.halfStance,
+      soleDrops:profile.soleDrops,
+      frontClearance:profile.frontClearance,
+      groundClearance:profile.groundClearance,
+      sideSigns:profile.footSideSigns
+    });
+    const forward=rotateSeatVector({
+      x:0,y:0,z:profile.kneePoleForward
+    },seat.yaw);
+    let planted=0;
+    for(let i=0;i<feet.length;i++){
+      const leg=feet[i];
+      const hip=leg.thigh.getPosition();
+      const knee=leg.shin.getPosition();
+      const ankle=leg.ankle.getPosition();
+      const target=targets[i];
+      // Reject a mismatched animation/seat/rig: never contort or translate the
+      // full actor trying to reach an anatomically impossible floor marker.
+      if(Math.hypot(target.x-ankle.x,target.z-ankle.z)>.38 ||
+        Math.abs(target.y-ankle.y)>.34)continue;
+      const kneePole={
+        x:hip.x+forward.x,
+        y:hip.y-profile.kneePoleDown,
+        z:hip.z+forward.z
+      };
+      let solution;
+      try{
+        solution=solveTwoBoneTargets({
+          hip,knee,ankle,target,pole:kneePole,maxStretch:.995
+        });
+      }catch(error){continue;}
+      if(!solution.reachable)continue;
+      // Smooth only in the final seating phase. The authored clip continues to
+      // drive the walk, approach, sit, and rise until its feet can be planted.
+      const blend=strength*.95;
+      rotateTowards(leg.thigh,knee,solution.knee,blend,65);
+      const adjustedAnkle=leg.ankle.getPosition();
+      rotateTowards(leg.shin,adjustedAnkle,solution.ankle,blend,55);
+      planted++;
+    }
+    return planted;
   }
 
   /**
@@ -78,8 +134,9 @@ export function createSkinnedSeatController({
     // The rig is parented to the game avatar, whose Y axis stays upright
     // during sitting. Keep the local X/Z fixed and adjust the visual Y.
     model.setLocalPosition(x,base.y+correction,z);
+    const planted=plantGroundedFeet({seat,weight,scale});
     return {offset:{x:horizontalOffset.x,y:correction,z:horizontalOffset.z},
-      footChains:0};
+      footChains:planted};
   }
 
   function place({seat,weight=0,scale,base,ik=true}){
