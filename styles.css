@@ -19,6 +19,9 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .control-tray .rotate-control small{font-size:7px;letter-spacing:.55px;margin-top:2px;font-weight:800;}
 .control-tray #rotate-camera-btn[aria-pressed="true"]{background:#397c66;color:#fff;border-color:#397c66;}
 .control-tray button:active{transform:scale(.95)}
+.control-tray .mesh-model-control{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1;font-size:18px;background:#367d61;color:#fff;border-color:#367d61;}
+.control-tray .mesh-model-control small{font-size:8px;letter-spacing:.35px;font-weight:800;}
+.control-tray .mesh-model-control[aria-pressed="false"]{background:#ffffffed;color:#52675a;border-color:#fff;}
 .hotspots {position:absolute;inset:0;pointer-events:none;z-index:4;}
 .hotspot{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:7px;border:1px solid #ffffffc7;border-radius:22px;background:#fffffff0;box-shadow:0 7px 20px #2f483220;padding:7px 10px 7px 7px;pointer-events:auto;color:#3b5649;font-size:12px;font-weight:800;white-space:nowrap;transition:background .14s,scale .14s;}
 .hotspot .item-symbol {width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:#ddefe1;font-size:16px;}
