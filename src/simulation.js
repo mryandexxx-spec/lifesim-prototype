@@ -1,10 +1,11 @@
 /** Pure game rules: no PlayCanvas or browser imports. */
 import { createMind, restoreMind, refreshMind, rememberAction, psychologyScore } from './psychology.js';
 import {validBedSlot,BED_SLOTS} from './bed-layout.js';
+import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
 export const NEEDS = ['hunger', 'energy', 'hygiene', 'fun'];
 export const ACTIONS = Object.freeze({
   bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
-  fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [3.48, -1.76] },
+  fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [-2.18, 2.10] },
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 0.96, location: [1.35, 0.52] }
 });
@@ -91,9 +92,19 @@ export function tick(state, minutes) {
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
     const amount = Math.min(minutes, Math.max(0, definition.duration - state.action.elapsed));
-    state.needs[definition.need] = clamp(state.needs[definition.need] + definition.benefitPerMinute * amount);
+    // Hunger rises only when eating, not before taking food from the shelf.
+    // Preserve the previous total benefit by concentrating it in the bite phase.
+    let gained=definition.benefitPerMinute*amount;
+    if(state.action.id==='fridge'){
+      const eatFrom=definition.duration*FRIDGE_EAT_START;
+      const before=Math.max(0,state.action.elapsed-eatFrom);
+      const after=Math.max(0,state.action.elapsed+amount-eatFrom);
+      gained=definition.benefitPerMinute*(after-before)/(1-FRIDGE_EAT_START);
+    }
+    state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
     state.action.elapsed += amount;
-    if (state.action.elapsed >= definition.duration || state.needs[definition.need] >= 99.9) {
+    if (state.action.elapsed >= definition.duration ||
+        (state.action.id!=='fridge' && state.needs[definition.need] >= 99.9)) {
       state.event = definition.label + ' — готово';
       rememberAction(state, state.action.id);
       state.autonomy.nextAt = state.minutes + 7; // short break between autonomous tasks
