@@ -35,7 +35,7 @@ test('shower choreography enters through east side and returns a finite rooted p
   assert.equal(start.privacy,false);
   assert.ok(entry.pose.x<start.pose.x-1.3);
   assert.ok(Math.abs(entry.pose.x-SHOWER_LAYOUT.interior.x)<1e-8);
-  assert.equal(wet.pose.y,0);
+  assert.equal(wet.pose.y,SHOWER_LAYOUT.interior.y);
   for(let i=0;i<=1000;i++){
     const p=at(i/1000);
     assert.ok(Object.values(p.pose).every(Number.isFinite));
