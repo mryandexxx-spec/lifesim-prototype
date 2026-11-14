@@ -103,3 +103,31 @@ test('GLB failure or incompatible animation track falls back to legacy rendering
     assert.deepEqual(statuses,['error']);
   }
 });
+
+test('Meshy sofa plays backwards from exact progress without swapping body, even on exit',()=>{
+  const f=fixture();
+  const visual=createMeshyVisual({pc:f.pc,app:f.app,rig:f.rig});
+  visual.update({preferred:true,actionId:'sofa',sofaBusy:true,sofaWeight:0,dt:.016});
+  assert.equal(f.renderers[0].enabled,false,'old body remains hidden');
+  assert.ok(f.events.some(e=>e[0]==='play'&&e[1]==='Sit_to_Stand_Transition_M'));
+  assert.equal(f.model.anim.speed,0);
+  assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime-6.16667)<.002);
+  const standingZ=f.model.position[2];
+  visual.update({preferred:true,actionId:'sofa',sofaBusy:true,sofaWeight:1,dt:.016});
+  assert.equal(f.model.anim.baseLayer.activeStateCurrentTime,0);
+  assert.ok(f.model.position[2]>standingZ+.2,'X/Z translation from sit animation cancelled');
+  visual.update({preferred:true,sofaBusy:true,sofaWeight:.6,paused:true,dt:0});
+  assert.equal(f.renderers[0].enabled,false);
+  assert.equal(f.model.anim.speed,0,'game pause does not advance authored sit clip');
+  assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime-6.16667*.4)<.0001);
+  visual.update({preferred:true,dt:.10});
+  assert.equal(f.renderers[0].enabled,false,'stand-up does not switch back to old avatar');
+  assert.ok(f.events.some(e=>e[0]==='transition'&&e[1]==='Idle_3'));
+  assert.equal(f.model.anim.speed,1);
+  const releasingZ=f.model.position[2];
+  visual.update({preferred:true,dt:.10});
+  assert.notEqual(f.model.position[2],releasingZ);
+  assert.equal(f.model.position[2],0,'root offset fully released');
+  visual.update({preferred:true,actionId:'fridge'});
+  assert.equal(f.renderers[0].enabled,true,'fridge deliberately uses legacy');
+});
