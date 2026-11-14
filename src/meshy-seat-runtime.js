@@ -1,6 +1,6 @@
 import {
   solveSeatRoot,blendSeatRoot,seatFootTargets,solveTwoBoneTargets,
-  smoothContactWeight
+  smoothContactWeight,solveSeatHeightCorrection
 } from './interaction-anchors.js';
 
 /**
@@ -47,6 +47,39 @@ export function createSkinnedSeatController({
     goal.mul2(swing,current);
     blended.slerp(current,goal,Math.min(1,weight*capped));
     node.setRotation(blended);
+  }
+
+  /**
+   * Production-safe contact: the sofa action controller owns world X/Z.
+   * Source clip hip root-motion X/Z is extracted by the visual adapter, once.
+   * This computes only a bounded Y correction using the actual animated pelvis.
+   *
+   * The previous full 3D solve was mathematically valid for an independent
+   * avatar root, but relocating the GLB child of an already positioned game
+   * avatar shifted Alex off the couch (owner's 0.7c Safari screenshot).
+   */
+  function placeVertical({seat,weight=0,scale,base,horizontalOffset}={}){
+    if(!seat?.contact)throw new TypeError('Seat contact required');
+    if(!horizontalOffset||!Number.isFinite(horizontalOffset.x)||
+      !Number.isFinite(horizontalOffset.z))
+      throw new TypeError('Horizontal root-motion extraction required');
+    const x=base.x+horizontalOffset.x,z=base.z+horizontalOffset.z;
+    model.setLocalPosition(x,base.y,z);
+    if(weight<=.55){
+      return {offset:{x:horizontalOffset.x,y:0,z:horizontalOffset.z},
+        footChains:0};
+    }
+    pelvis.getWorldTransform().transformPoint(contactMarker,contactWorld);
+    const correction=solveSeatHeightCorrection({
+      seat,contactWorldY:contactWorld.y,
+      weight:(weight-.55)/.45,clearance:profile.clearance,
+      maxCorrection:.55
+    });
+    // The rig is parented to the game avatar, whose Y axis stays upright
+    // during sitting. Keep the local X/Z fixed and adjust the visual Y.
+    model.setLocalPosition(x,base.y+correction,z);
+    return {offset:{x:horizontalOffset.x,y:correction,z:horizontalOffset.z},
+      footChains:0};
   }
 
   function place({seat,weight=0,scale,base,ik=true}){
@@ -101,5 +134,5 @@ export function createSkinnedSeatController({
     };
   }
 
-  return {place,get validFootChains(){return feet.length;}};
+  return {place,placeVertical,get validFootChains(){return feet.length;}};
 }
