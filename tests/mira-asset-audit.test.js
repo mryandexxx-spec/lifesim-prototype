@@ -81,6 +81,19 @@ test('audit female GLB clip timelines and animated pelvis translation',()=>{
     details[name]=record;
   }
   console.log('MIRA_BED_ROT_AUDIT',JSON.stringify(details));
+  const getSamplerRows=(name,kind)=>{
+    const track=root.animations.find(a=>a.name==='sleep');
+    const ch=track.channels.find(x=>x.target.node===pelvis[0].id&&x.target.path===kind);
+    const sm=track.samplers[ch.sampler],ts=root.accessors[sm.input],outputs=root.accessors[sm.output];
+    const get=(a,i)=>{
+      const view=root.bufferViews[a.bufferView],n={SCALAR:1,VEC3:3,VEC4:4}[a.type];
+      const start=binOffset+view.byteOffset+(a.byteOffset||0)+i*(view.byteStride||n*4);
+      return Array.from({length:n},(_,j)=>Number(glb.readFloatLE(start+j*4).toFixed(6)));
+    };
+    return Array.from({length:outputs.count},(_,i)=>[get(ts,i)[0],...get(outputs,i)]);
+  };
+  console.log('MIRA_SLEEP_HIPS_POSITION',JSON.stringify(getSamplerRows('sleep','translation')));
+  console.log('MIRA_SLEEP_HIPS_ROTATION',JSON.stringify(getSamplerRows('sleep','rotation')));
   console.log('MIRA_BONE_PARENT_AUDIT',JSON.stringify(pelvis.map(x=>({
     node:root.nodes[x.id],parent:root.nodes.findIndex(n=>(n.children||[]).includes(x.id))
   }))));
