@@ -121,3 +121,62 @@ test('hair volumes stay adjacent to the head, not as detached side clusters',()=
     }
   }
 });
+
+/** Signed x coordinates are in avatar space; spheres use full diameters. */
+function ellipseRadiusXAtY(shape,atY) {
+  const ry=shape.scale.y/2,rx=shape.scale.x/2;
+  const offset=(atY-shape.position.y)/ry;
+  return Math.abs(offset)<=1?rx*Math.sqrt(1-offset*offset):0;
+}
+test('sleeves connect inside the torso instead of bulging into detached shoulder balls',()=>{
+  const {ctx}=rigScene();
+  for(const id of CHARACTER_IDS) {
+    const rig=createCharacterRig(ctx,id);
+    const shapes=traverse(rig.avatar);
+    const shirt=shapes.find(x=>x.name.endsWith(' torso'));
+    assert.ok(shirt.scale.x>=.55);
+    for(const [i,side] of ['left','right'].entries()){
+      const pivot=rig.armPivot[i];
+      const sleeve=traverse(pivot).find(x=>x.name.endsWith(' '+side+' shirt sleeve'));
+      const arm=traverse(pivot).find(x=>x.name.endsWith(' '+side+' forearm'));
+      const hand=traverse(pivot).find(x=>x.name.endsWith(' '+side+' hand'));
+      assert.ok(sleeve&&arm&&hand);
+      assert.ok(sleeve.scale.y>.35 && sleeve.scale.x<.17,
+        'Long tapered-look sleeve should not be a shoulder bead');
+      assert.ok(Math.abs(sleeve.position.x)>=.05,
+        'Sleeve must be tucked inward toward the torso under the shoulder');
+      const sleeveGlobalX=pivot.position.x+sleeve.position.x;
+      const torsoEdge=ellipseRadiusXAtY(shirt,pivot.position.y);
+      const sleeveEdge=Math.abs(sleeveGlobalX)-
+        ellipseRadiusXAtY(sleeve,pivot.position.y-pivot.position.y);
+      // Sample at the pivot shoulder height: the torso must overlap the sleeve.
+      assert.ok(torsoEdge-sleeveEdge>.02,
+        'Shirt and sleeve should intersect sufficiently to hide the visible joint');
+      assert.ok(arm.position.y+arm.scale.y/2 > sleeve.position.y-sleeve.scale.y/2,
+        'Skin forearm must begin inside the bottom of the sleeve');
+      assert.ok(hand.position.y+hand.scale.y/2 > arm.position.y-arm.scale.y/2,
+        'Hand must meet the forearm rather than hang detached');
+    }
+  }
+});
+test('upper legs are embedded in pelvis and animation pivot contract is unchanged',()=>{
+  const {ctx}=rigScene();
+  for(const id of CHARACTER_IDS) {
+    const rig=createCharacterRig(ctx,id);
+    const pelvis=traverse(rig.avatar).find(x=>x.name.endsWith(' pelvis'));
+    assert.ok(pelvis && pelvis.scale.x>=.45);
+    for(const [i,side] of ['left','right'].entries()){
+      const pivot=rig.legPivot[i];
+      assert.equal(pivot.position.y,.72);
+      const leg=traverse(pivot).find(x=>x.name.endsWith(' '+side+' trouser leg'));
+      const shoe=traverse(pivot).find(x=>x.name.endsWith(' '+side+' shoe'));
+      assert.ok(leg && shoe);
+      const legTop=pivot.position.y+leg.position.y+leg.scale.y/2;
+      const pelvisBottom=pelvis.position.y-pelvis.scale.y/2;
+      assert.ok(legTop-pelvisBottom>.10,
+        'Leg top should extend inside pelvis, not meet it at a single edge');
+      assert.ok(shoe.position.y+shoe.scale.y/2 > leg.position.y-leg.scale.y/2,
+        'Shoe must overlap trouser leg at the ankle');
+    }
+  }
+});

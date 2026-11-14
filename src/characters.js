@@ -1,21 +1,23 @@
 /**
- * LifeSim 0.5a.1 — restrained, lightweight character silhouettes.
+ * LifeSim 0.5b.1 — connected shoulder and limb silhouettes.
  *
  * IMPORTANT: PlayCanvas primitive scales are FULL diameters, NOT radii.
  * The first 0.5a release treated them as radii, producing floating eyes,
  * protruding mouths and excessive hair spheres visible in real iPhone QA.
  * Facial positions are now calculated against the ellipsoid surface.
  * No imported engine, DOM, game logic, save format or runtime mesh rebuilds.
+ * Sleeve and leg ellipsoids overlap torso/pelvis at the pose pivots, rather
+ * than looking like loose balls attached to the character.
  */
 const APPEARANCE={
   alex:{
-    name:'Алекс',silhouette:'side-part',bodyWidth:.53,
+    name:'Алекс',silhouette:'side-part',bodyWidth:.59,
     skin:'#c79176',hair:'#493b34',top:'#438e79',
     pants:'#52697c',shoes:'#3e4c4a',mouth:'#995f5c',
     select:'#65b98a',collar:'#c4dac7'
   },
   mira:{
-    name:'Мира',silhouette:'close-bob',bodyWidth:.49,
+    name:'Мира',silhouette:'close-bob',bodyWidth:.56,
     skin:'#d7a188',hair:'#744e55',top:'#bc7c8c',
     pants:'#687b86',shoes:'#e6e3dc',mouth:'#a06870',
     select:'#dd8d9e',collar:'#ead0d1'
@@ -47,9 +49,10 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   const name=p.name;
   const headY=id==='mira'?1.54:1.55;
 
-  // A single clear torso and narrow limbs replace "beads" and stacked globes.
-  ball(name+' hips',0,.73,0,.42,.27,.31,trousers,avatar);
-  const torso=ball(name+' torso',0,.99,0,p.bodyWidth,.67,.35,top,avatar);
+  // The pelvis overlaps both trouser legs and the lower torso. Shoulder
+  // width intersects the upper sleeves at the existing animation pivots.
+  ball(name+' pelvis',0,.73,0,.46,.30,.32,trousers,avatar);
+  const torso=ball(name+' torso',0,.99,0,p.bodyWidth,.70,.355,top,avatar);
   ball(name+' collar',0,1.245,.164,.16,.055,.032,collar,avatar);
   cylinder(name+' neck',0,1.303,0,.115,.17,.116,skin,avatar);
   ball(name+' head',0,headY,0,
@@ -92,17 +95,23 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
     const pivot=new pc.Entity(name+' '+side+' hip');
     avatar.addChild(pivot);
     pivot.setLocalPosition(x,.72,0);
-    ball(name+' '+side+' trouser leg',0,-.27,0,.173,.52,.188,trousers,pivot);
-    ball(name+' '+side+' shoe',0,-.59,.077,.23,.145,.32,shoes,pivot);
+    // A taller, narrow leg passes inside the pelvis instead of meeting it
+    // at a single tangent point. Shoe meets the ankle under the trouser.
+    ball(name+' '+side+' trouser leg',0,-.264,0,.18,.57,.19,trousers,pivot);
+    ball(name+' '+side+' shoe',0,-.575,.077,.22,.15,.31,shoes,pivot);
     legPivot.push(pivot);
   }
   for(const [side,x] of [['left',-.33],['right',.33]]){
     const pivot=new pc.Entity(name+' '+side+' shoulder');
     avatar.addChild(pivot);
     pivot.setLocalPosition(x,1.17,0);
-    ball(name+' '+side+' shirt sleeve',0,-.103,0,.177,.234,.189,top,pivot);
-    ball(name+' '+side+' forearm',0,-.31,0,.129,.341,.149,skin,pivot);
-    ball(name+' '+side+' hand',0,-.51,.012,.117,.128,.122,skin,pivot);
+    // The sleeve is a slender vertical volume, not a round shoulder ball.
+    // Its upper end moves inward under the torso to hide the shoulder seam;
+    // the skin forearm starts inside its lower end, and the hand overlaps it.
+    const towardTorso=side==='left' ? .065 : -.065;
+    ball(name+' '+side+' shirt sleeve',towardTorso,-.150,0,.160,.385,.175,top,pivot);
+    ball(name+' '+side+' forearm',0,-.338,0,.122,.385,.138,skin,pivot);
+    ball(name+' '+side+' hand',0,-.533,.012,.108,.129,.109,skin,pivot);
     armPivot.push(pivot);
   }
   const snack=ball(name+' apple',0,-.51,.12,.20,.17,.20,materials.yellow,armPivot[1]);
