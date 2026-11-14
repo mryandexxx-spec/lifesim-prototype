@@ -121,3 +121,39 @@ export function seatFootTargets({seat,halfStance=.16,forward=.42}={}){
     return add(center,add(displacement,lateral));
   });
 }
+
+
+/** Two-bone IK target geometry (hip, knee, ankle/foot).
+ * Pure and renderer-independent. The runtime rotates the upper/lower bones
+ * to these directions AFTER the authored animation pose has been evaluated.
+ * Unreachable targets are clamped to physical limb extension.
+ */
+export function solveTwoBoneTargets({hip,knee,ankle,target,pole=null,
+  maxStretch=.995}={}) {
+  const h=vec(hip,'hip'),k=vec(knee,'knee'),a=vec(ankle,'ankle');
+  const goal=vec(target,'target');
+  if(!(maxStretch>0&&maxStretch<=1))throw new RangeError('Invalid IK maxStretch');
+  const length=v=>Math.hypot(v.x,v.y,v.z);
+  const dot=(x,y)=>x.x*y.x+x.y*y.y+x.z*y.z;
+  const lenUpper=length(sub(k,h)),lenLower=length(sub(a,k));
+  if(lenUpper<.02||lenLower<.02)throw new RangeError('Degenerate leg');
+  const normalize=v=>mul(v,1/Math.max(1e-9,length(v)));
+  const direction=normalize(sub(goal,h));
+  const requested=length(sub(goal,h));
+  const low=Math.abs(lenUpper-lenLower)+.001;
+  const high=(lenUpper+lenLower)*maxStretch;
+  const dist=Math.min(high,Math.max(low,requested));
+  const reached=add(h,mul(direction,dist));
+  const along=(lenUpper*lenUpper+dist*dist-lenLower*lenLower)/(2*dist);
+  const altitude=Math.sqrt(Math.max(0,lenUpper*lenUpper-along*along));
+  const currentPole=pole?sub(vec(pole,'pole'),h):sub(k,h);
+  let perpendicular=sub(currentPole,mul(direction,dot(currentPole,direction)));
+  if(length(perpendicular)<1e-6){
+    const fallback=Math.abs(direction.y)<.95?{x:0,y:1,z:0}:{x:0,y:0,z:1};
+    perpendicular=sub(fallback,mul(direction,dot(fallback,direction)));
+  }
+  perpendicular=normalize(perpendicular);
+  const middle=add(add(h,mul(direction,along)),mul(perpendicular,altitude));
+  return {knee:middle,ankle:reached,reachable:requested<=high&&requested>=low,
+    lengthUpper:lenUpper,lengthLower:lenLower};
+}
