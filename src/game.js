@@ -4,6 +4,7 @@ import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
+import { createCharacterRig } from './characters.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice } from './household.js';
@@ -280,56 +281,14 @@ function boot() {
   ball('plant leaf',4.45,1.38,3.42,.65,.74,.51,M.green);
   box('entry mat',-.65,.042,3.45,1.45,.012,.60,M.mint);
 
-  // Character: small joint pivots allow walking, sitting and reaching without external assets.
-  const avatar = new pc.Entity('Alex'); app.root.addChild(avatar);
-  const torso = box('torso',0,.91,0,.47,.60,.32,M.shirt,avatar);
-  ball('head',0,1.48,0,.46,.48,.42,M.skin,avatar);
-  ball('hair cap',0,1.67,-.045,.47,.22,.46,M.hair,avatar);
-  ball('hair fringe',.05,1.61,.11,.43,.16,.24,M.hair,avatar);
-  const leftEye=ball('eye left',-.115,1.50,.20,.05,.055,.04,M.black,avatar);
-  const rightEye=ball('eye right',.115,1.50,.20,.05,.055,.04,M.black,avatar);
-  const legPivot = [], armPivot = [];
-  for(const [side, x] of [['left',-.15], ['right',.15]]) {
-    const pivot=new pc.Entity(side+' hip');avatar.addChild(pivot);pivot.setLocalPosition(x,.72,0);
-    box(side+' leg',0,-.29,0,.16,.50,.19,M.trousers,pivot);
-    box(side+' shoe',0,-.605,.08,.19,.15,.33,M.black,pivot);
-    legPivot.push(pivot);
-  }
-  for(const [side, x] of [['left',-.33],['right',.33]]) {
-    const pivot=new pc.Entity(side+' shoulder'); avatar.addChild(pivot);pivot.setLocalPosition(x,1.17,0);
-    box(side+' arm',0,-.25,0,.15,.50,.18,M.skin,pivot);
-    armPivot.push(pivot);
-  }
-  const snack = ball('apple',0,-.51,.12,.20,.17,.20,M.yellow,armPivot[1]);
-  const book = box('book',0,-.51,.12,.28,.065,.29,M.green,armPivot[1]);
-  snack.enabled=false;book.enabled=false;
-  const alexSelected = cylinder('Alex selected',0,.018,0,.79,.025,.79,mat('#69ba8a',{opacity:.3}),avatar);
-  // Mira: independently animated original procedural avatar, distinct clothes and hairstyle.
-  const miraAvatar=new pc.Entity('Mira');app.root.addChild(miraAvatar);
-  const miraSkin=mat('#d49a81'),miraHair=mat('#745044');
-  const miraTop=mat('#c67887'),miraPants=mat('#57727a');
-  const miraTorso=box('Mira torso',0,.91,0,.46,.60,.32,miraTop,miraAvatar);
-  ball('Mira head',0,1.48,0,.46,.48,.42,miraSkin,miraAvatar);
-  ball('Mira hair',0,1.68,-.07,.49,.27,.46,miraHair,miraAvatar);
-  ball('Mira bun',0,1.81,-.23,.30,.32,.33,miraHair,miraAvatar);
-  const miraLeftEye=ball('Mira left eye',-.115,1.50,.20,.05,.055,.04,M.black,miraAvatar);
-  const miraRightEye=ball('Mira right eye',.115,1.50,.20,.05,.055,.04,M.black,miraAvatar);
-  const miraLegPivot=[],miraArmPivot=[];
-  for (const [side,x] of [['left',-.15],['right',.15]]) {
-    const pivot=new pc.Entity('Mira '+side+' hip');miraAvatar.addChild(pivot);pivot.setLocalPosition(x,.72,0);
-    box('Mira '+side+' leg',0,-.29,0,.16,.5,.19,miraPants,pivot);
-    box('Mira '+side+' shoe',0,-.605,.08,.19,.15,.33,M.cream,pivot);
-    miraLegPivot.push(pivot);
-  }
-  for (const [side,x] of [['left',-.33],['right',.33]]) {
-    const pivot=new pc.Entity('Mira '+side+' shoulder');miraAvatar.addChild(pivot);pivot.setLocalPosition(x,1.17,0);
-    box('Mira '+side+' arm',0,-.25,0,.15,.50,.18,miraSkin,pivot);
-    miraArmPivot.push(pivot);
-  }
-  const miraSnack=ball('Mira snack',0,-.51,.12,.20,.17,.20,M.yellow,miraArmPivot[1]);
-  const miraBook=box('Mira book',0,-.51,.12,.28,.065,.29,M.green,miraArmPivot[1]);
-  miraSnack.enabled=false;miraBook.enabled=false;
-  const miraSelected=cylinder('Mira selected',0,.018,0,.79,.025,.79,mat('#db8394',{opacity:.31}),miraAvatar);
+  // Original reusable 0.5a rigs. Keep all existing motion/interaction pivot references.
+  const rigContext={pc,root:app.root,ball,box,cylinder,mat,materials:M};
+  const alexRig=createCharacterRig(rigContext,'alex');
+  const miraRig=createCharacterRig(rigContext,'mira');
+  const {avatar,torso,leftEye,rightEye,legPivot,armPivot,snack,book,selected:alexSelected}=alexRig;
+  const {avatar:miraAvatar,torso:miraTorso,leftEye:miraLeftEye,rightEye:miraRightEye,
+    legPivot:miraLegPivot,armPivot:miraArmPivot,snack:miraSnack,book:miraBook,
+    selected:miraSelected}=miraRig;
   const showerDrops = Array.from({length:9},(_,i)=>{
     const drop=ball('water drop '+i,-4.47+i*.14,2.02,2.20+(i%3)*.12,.058,.10,.06,M.blue);
     drop.enabled=false;return drop;

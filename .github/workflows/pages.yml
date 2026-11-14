@@ -30,11 +30,12 @@ jobs:
           node --check src/psychology.js
           node --check src/household.js
           node --check src/relationships.js
+          node --check src/characters.js
       - name: Assemble static website
         run: |
           mkdir -p site/src
           cp index.html styles.css favicon.svg manifest.webmanifest .nojekyll site/
-          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/household.js src/relationships.js site/src/
+          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/household.js src/relationships.js src/characters.js site/src/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
