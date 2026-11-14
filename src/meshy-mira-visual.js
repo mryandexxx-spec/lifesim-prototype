@@ -1,5 +1,7 @@
 import {MIRA_MESHY_URL,miraHasClips,miraClipFor,
   miraMeshPlacement,canShowMiraMeshy} from './meshy-mira-policy.js';
+import {MIRA_SOFA_CLIP,MIRA_SOFA_DURATION,miraSofaClipTime,miraSofaOffset}
+  from './meshy-mira-sofa.js';
 
 /** Read undeformed geometry AABBs, never pose-dependent meshInstance.aabb.
  * The validated female GLB has one original skinned mesh.
@@ -22,15 +24,17 @@ export function miraStaticSourceBounds(renderRoot){
   return {min,max};
 }
 
-/** Production Mira renderer: cosmetic only, separately fail-safe from Alex.
- * The procedural avatar controls navigation, sleep, sofa, food, shower, etc.
+/** Production Mira renderer: cosmetic only and separately fail-safe from Alex.
+ * The existing avatar controls motion and sofa seat root; the authored
+ * female sitting clip drives ONLY the skinned pose with X/Z motion removed.
  */
 export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
   const preserved=new Set([rig.selected,rig.snack,rig.book,rig.showerWrap]);
   const legacyRenderers=rig.avatar.findComponents('render')
     .filter(component=>!preserved.has(component.entity));
   const state={ready:false,status:'loading',error:null,
-    root:null,model:null,clip:null,visible:false,base:null};
+    root:null,model:null,clip:null,visible:false,base:null,
+    sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null};
   function attach(asset){
     const model=asset.resource.instantiateRenderEntity();
     const root=new pc.Entity('Meshy Mira visual');
@@ -44,6 +48,11 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       const clips=(asset.resource.animations||[]).map(item=>item.resource);
       if(!miraHasClips(clips.map(clip=>clip.name)))
         throw Error('Missing required female Meshy clips');
+      const sourceSeat=clips.find(clip=>clip.name===MIRA_SOFA_CLIP);
+      // The audited pelvis curve is tied to this exact source clip duration.
+      // Future model replacements retain legacy sofa until re-audited.
+      state.sofaReady=Number.isFinite(sourceSeat?.duration)&&
+        Math.abs(sourceSeat.duration-MIRA_SOFA_DURATION)<.04;
       for(const clip of clips)model.anim.assignAnimation(
         clip.name,clip,undefined,1,
         !['Hand_on_Hip_Gesture','Lie_Down_Hands_Spread',
@@ -78,10 +87,11 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
     get status(){return state.status;},
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
-      sofaBusy=false,bedBusy=false,showerBusy=false,fridgeBusy=false}={}){
+      sofaBusy=false,sofaWeight=0,dt=0,
+      bedBusy=false,showerBusy=false,fridgeBusy=false}={}){
       const show=canShowMiraMeshy({
         preferred,ready:state.ready,actionId,
-        sofaBusy,bedBusy,showerBusy,fridgeBusy
+        sofaBusy,sofaReady:state.sofaReady,bedBusy,showerBusy,fridgeBusy
       });
       if(state.visible!==show){
         for(const renderer of legacyRenderers)renderer.enabled=!show;
@@ -89,12 +99,48 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
         state.visible=show;
       }
       if(!show||!state.model)return show;
+      const sofa=actionId==='sofa'||sofaBusy;
+      const anim=state.model.anim;
+      if(sofa){
+        if(state.clip!==MIRA_SOFA_CLIP){
+          anim.baseLayer.play(MIRA_SOFA_CLIP);
+          state.clip=MIRA_SOFA_CLIP;
+          state.sofaRelease=null;
+        }
+        // The source GLB hips move ~40 cm backward; the game already moves
+        // the resident to the sofa and rotates her. Cancel only imported
+        // horizontal drift. Authored knee and vertical hip bend remain.
+        const t=miraSofaClipTime(sofaWeight);
+        const offset=miraSofaOffset(sofaWeight,state.base.scale);
+        state.sofaOffset=offset;
+        state.model.setLocalPosition(state.base.x+offset.x,
+          state.base.y,state.base.z+offset.z);
+        anim.speed=0;
+        anim.playing=true;
+        anim.baseLayer.activeStateCurrentTime=t;
+        return true;
+      }
       const clip=miraClipFor({walking,social});
+      if(state.clip===MIRA_SOFA_CLIP){
+        state.sofaRelease={remaining:.2,offset:{...state.sofaOffset}};
+      }
       if(state.clip!==clip){
-        state.model.anim.baseLayer.transition(clip,.20);
+        anim.baseLayer.transition(clip,.20);
         state.clip=clip;
       }
-      state.model.anim.playing=!paused;
+      if(state.sofaRelease){
+        const r=state.sofaRelease;
+        r.remaining=Math.max(0,r.remaining-
+          (Number.isFinite(dt)?Math.max(0,dt):0));
+        const w=r.remaining/.2;
+        state.model.setLocalPosition(state.base.x+r.offset.x*w,
+          state.base.y,state.base.z+r.offset.z*w);
+        if(r.remaining===0)state.sofaRelease=null;
+      }else{
+        state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
+      }
+      anim.speed=1;
+      anim.playing=!paused;
       return true;
     },
     reset(){
@@ -102,6 +148,9 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       state.model.anim.baseLayer.play('Idle_7');
       state.model.anim.playing=false;
       state.clip='Idle_7';
+      state.sofaOffset={x:0,z:0};
+      state.sofaRelease=null;
+      state.model.anim.speed=1;
       const {base}=state;
       state.model.setLocalPosition(base.x,base.y,base.z);
     }

@@ -915,16 +915,21 @@ function boot() {
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
     // The new female GLB is cosmetic. Unretargeted furniture/shower actions
     // remain procedural; the existing simulation/save schema is untouched.
-    meshyMira.update({
-      preferred:meshyPreferred,paused:!active,
-      walking:miraWalking&&!miraSeating&&!miraBedding&&!miraShower,
+    const miraMeshShown=meshyMira.update({
+      preferred:meshyPreferred,paused:!active,dt:animDt,
+      walking:(game.otherSim.action?.phase==='walking'||
+        (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'))&&
+        !miraSeating&&!miraBedding&&!miraShower,
       social:socialUsing?game.socialAction.kind:null,
       actionId:miraUseId,
       sofaBusy:sofaStates.mira.progress>0,
+      sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
       showerBusy:showerStates.mira.active,
       fridgeBusy:fridgeLeaving.mira
     });
+    // The procedural book belongs to a hidden elbow; never show it floating.
+    if(miraMeshShown&&miraUseId==='sofa')miraBook.enabled=false;
     // Alex stays on the same 3D rig for bed and fridge when their verified
     // skeleton controllers exist. The original simulation/root still owns
     // mattress placement, both bed slots, shower movement and opaque privacy.

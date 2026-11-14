@@ -5,6 +5,8 @@ import {MIRA_MESHY_URL,MIRA_REQUIRED_CLIPS,MIRA_DISPLAY_HEIGHT,
   MIRA_IDLE_GROUND_OFFSET,miraHasClips,miraClipFor,
   miraMeshPlacement,canShowMiraMeshy} from '../src/meshy-mira-policy.js';
 import {createMiraMeshyVisual,miraStaticSourceBounds} from '../src/meshy-mira-visual.js';
+import {MIRA_SOFA_CLIP,MIRA_SOFA_DURATION,MIRA_IDLE_HIP,MIRA_SOFA_HIPS,
+  miraSofaClipTime,miraSofaHipAt,miraSofaOffset} from '../src/meshy-mira-sofa.js';
 
 const validBounds={min:{x:-.3,y:0,z:-.15},max:{x:.3,y:1.7,z:.15}};
 test('female source asset has its own clips and separate 2.05 game-height placement',()=>{
@@ -22,17 +24,21 @@ test('female source asset has its own clips and separate 2.05 game-height placem
   assert.deepEqual(miraMeshPlacement(validBounds),fit);
   assert.throws(()=>miraMeshPlacement({min:{x:0,y:1,z:0},max:{x:0,y:1,z:0}}),RangeError);
 });
-test('female visuals never replace furniture, shower or post-use exit transitions',()=>{
+test('female visuals use a guarded authored sofa, but retain fallback elsewhere',()=>{
   const ready={preferred:true,ready:true};
   assert.equal(canShowMiraMeshy(ready),true);
   assert.equal(canShowMiraMeshy({...ready,ready:false}),false);
   for(const name of ['sofa','bed','fridge','shower'])
     assert.equal(canShowMiraMeshy({...ready,actionId:name}),false);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'sofa',sofaReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,sofaBusy:true,sofaReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,sofaBusy:true,sofaReady:false}),false);
   for(const busy of ['sofaBusy','bedBusy','fridgeBusy','showerBusy'])
     assert.equal(canShowMiraMeshy({...ready,[busy]:true}),false);
   assert.equal(canShowMiraMeshy({...ready,preferred:false}),false);
 });
-function fixture({loadError=false,missingClip=false,noStaticBounds=false}={}){
+function fixture({loadError=false,missingClip=false,noStaticBounds=false,
+  sofaClip=false,sofaDuration=MIRA_SOFA_DURATION}={}){
   const events=[];
   class Entity{
     constructor(name){this.name=name;this.enabled=true;this.children=[];}
@@ -63,9 +69,11 @@ function fixture({loadError=false,missingClip=false,noStaticBounds=false}={}){
   }};
   const app={root:new Entity('root'),assets:{add(){},load(asset){
     if(loadError){asset.onError(Error('network unavailable'));return;}
-    const clips=missingClip?['Idle_7','Walking_Woman']:MIRA_REQUIRED_CLIPS;
+    const clips=missingClip?['Idle_7','Walking_Woman']:
+      [...MIRA_REQUIRED_CLIPS,...(sofaClip?[MIRA_SOFA_CLIP]:[])];
     asset.resource={instantiateRenderEntity(){return model;},
-      animations:clips.map(name=>({resource:{name}}))};
+      animations:clips.map(name=>({resource:{name,
+        duration:name===MIRA_SOFA_CLIP?sofaDuration:6.2}}))};
     asset.onReady();
   }}};
   return {pc,app,rig,model,events,renderers};
@@ -119,9 +127,69 @@ test('game supplies both independent visual adapters and includes the female mod
   assert.match(game,/createMiraMeshyVisual/);
   assert.match(game,/meshyMira\.update/);
   assert.match(game,/meshyMira\.reset/);
-  assert.match(workflow,/src\/meshy-mira-visual\.js src\/meshy-mira-policy\.js site\/src\//);
+  assert.match(workflow,/src\/meshy-mira-visual\.js src\/meshy-mira-sofa\.js src\/meshy-mira-policy\.js site\/src\//);
   assert.match(workflow,/node --check src\/meshy-mira-visual\.js/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/Блин<span>’С<\/span>/);
-  assert.match(html,/сборка \/ 0\.7h/);
+  assert.match(html,/сборка \/ 0\.7i/);
+});
+
+test('audited female sit track interpolates measured pelvic translation, no per-sofa offsets',()=>{
+  assert.equal(MIRA_SOFA_CLIP,'Look_Back_and_Sit');
+  assert.ok(Math.abs(MIRA_SOFA_DURATION-2.26666665)<.0001);
+  assert.ok(MIRA_SOFA_HIPS.length>=30);
+  assert.deepEqual(miraSofaHipAt(0),{x:.00492,z:-.01003});
+  assert.deepEqual(miraSofaHipAt(MIRA_SOFA_DURATION),{x:.00013,z:-.41930});
+  assert.ok(Math.abs(miraSofaHipAt(1.0333).z+.2328)<.0001);
+  const scale=2.05/1.7;
+  const sitting=miraSofaOffset(1,scale);
+  const starting=miraSofaOffset(0,scale);
+  assert.ok(Math.abs(starting.z)<.006);
+  assert.ok(sitting.z>.48&&sitting.z<.51);
+  assert.ok(Math.abs(sitting.x)<.02);
+  assert.equal(miraSofaClipTime(0),0);
+  assert.ok(Math.abs(miraSofaClipTime(1)-MIRA_SOFA_DURATION)<1e-9);
+  assert.throws(()=>miraSofaOffset(.5,0),RangeError);
+  assert.ok(Math.abs(MIRA_IDLE_HIP.z)<.01);
+});
+test('Mira keeps her 3D skin on sofa during sit, pause, rise and clean release',()=>{
+  const f=fixture({sofaClip:true});
+  const visual=createMiraMeshyVisual(f);
+  visual.update({preferred:true,actionId:'sofa',sofaBusy:true,sofaWeight:0});
+  assert.equal(f.renderers[0].enabled,false);
+  assert.ok(f.events.some(x=>x[0]==='play'&&x[1]===MIRA_SOFA_CLIP));
+  assert.equal(f.model.anim.baseLayer.activeStateCurrentTime,0);
+  visual.update({preferred:true,actionId:'sofa',sofaBusy:true,sofaWeight:1});
+  assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime-MIRA_SOFA_DURATION)<1e-8);
+  assert.ok(f.model.position[2]>.45,'female source hip drift is compensated in model space');
+  visual.update({preferred:true,sofaBusy:true,sofaWeight:.55,paused:true,dt:0});
+  const hold=f.model.position.slice();
+  visual.update({preferred:true,sofaBusy:true,sofaWeight:.55,paused:true,dt:0});
+  assert.deepEqual(f.model.position,hold);
+  visual.update({preferred:true,sofaBusy:true,sofaWeight:.06});
+  visual.update({preferred:true,dt:.1});
+  assert.equal(f.renderers[0].enabled,false);
+  assert.equal(f.model.anim.playing,true);
+  visual.update({preferred:true,dt:.1});
+  assert.ok(Math.abs(f.model.position[2]-miraMeshPlacement(validBounds).z)<1e-7);
+  visual.reset();
+  assert.equal(f.model.position[2],miraMeshPlacement(validBounds).z);
+});
+test('female clip duration mismatch keeps procedural sofa rather than unsafe retarget',()=>{
+  const f=fixture({sofaClip:true,sofaDuration:1.1});
+  const visual=createMiraMeshyVisual(f);
+  visual.update({preferred:true,actionId:'sofa',sofaBusy:true,sofaWeight:.8});
+  assert.equal(f.renderers[0].enabled,true);
+  const old=fixture();
+  const fallback=createMiraMeshyVisual(old);
+  fallback.update({preferred:true,actionId:'sofa',sofaBusy:true,sofaWeight:.8});
+  assert.equal(old.renderers[0].enabled,true);
+});
+test('game feeds female sofa bend and conceals old elbow book',()=>{
+  const source=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
+  assert.match(source,/sofaWeight:miraSeatPose\.sofaWeight/);
+  assert.match(source,/if\(miraMeshShown&&miraUseId==='sofa'\)miraBook\.enabled=false/);
+  assert.ok(workflow.includes('node --check src/meshy-mira-sofa.js'));
+  assert.ok(workflow.includes('src/meshy-mira-sofa.js src/meshy-mira-policy.js'));
 });
