@@ -2,11 +2,12 @@
 import { createMind, restoreMind, refreshMind, rememberAction, psychologyScore } from './psychology.js';
 import {validBedSlot,BED_SLOTS} from './bed-layout.js';
 import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
+import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
 export const NEEDS = ['hunger', 'energy', 'hygiene', 'fun'];
 export const ACTIONS = Object.freeze({
   bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
   fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
-  shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [-2.18, 2.10] },
+  shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 0.96, location: [1.35, 0.52] }
 });
 const DECAY = { hunger: 0.12, energy: 0.085, hygiene: 0.068, fun: 0.094 };
@@ -100,11 +101,18 @@ export function tick(state, minutes) {
       const before=Math.max(0,state.action.elapsed-eatFrom);
       const after=Math.max(0,state.action.elapsed+amount-eatFrom);
       gained=definition.benefitPerMinute*(after-before)/(1-FRIDGE_EAT_START);
+    }else if(state.action.id==='shower'){
+      // Hygiene rises only under the closed privacy mask with the water on.
+      const from=definition.duration*SHOWER_WASH_START;
+      const to=definition.duration*SHOWER_WASH_END;
+      const overlap=Math.max(0,Math.min(state.action.elapsed+amount,to)
+        -Math.max(state.action.elapsed,from));
+      gained=definition.benefitPerMinute*overlap/(SHOWER_WASH_END-SHOWER_WASH_START);
     }
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
     state.action.elapsed += amount;
     if (state.action.elapsed >= definition.duration ||
-        (state.action.id!=='fridge' && state.needs[definition.need] >= 99.9)) {
+        (!['fridge','shower'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       state.event = definition.label + ' — готово';
       rememberAction(state, state.action.id);
       state.autonomy.nextAt = state.minutes + 7; // short break between autonomous tasks
