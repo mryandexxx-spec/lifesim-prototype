@@ -116,3 +116,14 @@ test('two-bone IK clamps impossible foot targets instead of stretching bones',()
   near(d(res.knee,res.ankle),res.lengthLower,1e-8);
   assert.throws(()=>solveTwoBoneTargets({hip,knee:hip,ankle,target}),RangeError);
 });
+
+test('Mixamo foot-side mapping respects anatomical left +X and right -X',()=>{
+  const surf=createSeatSurface({id:'rig-sofa',origin:{x:0,y:0,z:0},
+    width:2.0,depth:1.0,seatHeight:.38,yaw:0});
+  const slot=seatSlot(surf,0);
+  const [left,right]=seatFootTargets({seat:slot,halfStance:.18,
+    forward:.44,sideSigns:[1,-1]});
+  assert.ok(left.x>right.x,'Left bone uses positive local X in Mixamo');
+  near(left.x,.18);near(right.x,-.18);
+  assert.throws(()=>seatFootTargets({seat:slot,sideSigns:[1,1]}),RangeError);
+});
