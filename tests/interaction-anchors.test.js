@@ -5,6 +5,7 @@ import {
   seatFootTargets,smoothContactWeight,solveTwoBoneTargets,seatGroundedAnkleTargets
 } from '../src/interaction-anchors.js';
 import {SOFA_LAYOUT} from '../src/pose-config.js';
+import {MESHY_SEAT_RIG_PROFILE} from '../src/meshy-visual-policy.js';
 
 const near=(actual,expected,epsilon=1e-8)=>
   assert.ok(Math.abs(actual-expected)<=epsilon,actual+' differs from '+expected);
@@ -180,7 +181,9 @@ test('optimized GLB seated bones can reach grounded shoe targets without moving 
     const hip=bone(data[i].h),knee=bone(data[i].k),ankle=bone(data[i].a);
     assert.ok(ankle.y<feet[i].y-.12,'original imported shoe is too far below floor');
     const forward=rotateSeatVector({x:0,y:0,z:.60},seat.yaw);
-    const pole={x:hip.x+forward.x,y:hip.y-.30,z:hip.z+forward.z};
+    const pole={x:hip.x+forward.x,
+      y:hip.y-MESHY_SEAT_RIG_PROFILE.kneePoleDown[i],
+      z:hip.z+forward.z};
     const result=solveTwoBoneTargets({hip,knee,ankle,target:feet[i],pole,maxStretch:.995});
     assert.equal(result.reachable,true,'shoe target physically reachable for GLB leg');
     assert.ok(result.knee.y<hip.y+.06,'knee is not lifted unnaturally above hip');
