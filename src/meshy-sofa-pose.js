@@ -1,3 +1,5 @@
+import {SOFA_LAYOUT,SOFA_POSE} from './pose-config.js';
+
 /** Exact hips x/z samples of the user's 2.28 MB Mixamo GLB sit-to-stand clip.
  * Samples were audited from its glTF translation accessor, not guessed.
  * Only horizontal movement is cancelled: its *vertical* sit-down motion is
@@ -55,4 +57,25 @@ export function meshySofaOffset(sofaWeight,scale) {
   const hips=meshyHipAtTime(meshySitClipTime(sofaWeight));
   return {x:(MESHY_IDLE_HIP.x-hips.x)*scale,
     z:(MESHY_IDLE_HIP.z-hips.z)*scale};
+}
+
+/** From skinning the shipped Sit_to_Stand clip at t=0:
+ * the low butt/cushion-contact vertex band is ~0.4775 m above model origin.
+ * This is NOT the foot height, and it must not be treated as full mesh AABB.
+ */
+export const MESHY_SIT_CONTACT_LOCAL_Y = 0.4774562;
+export const MESHY_SOFA_CLEARANCE_M = 0.045;
+
+/** Preserve the existing game sofa y timeline, adding only the smallest
+ * smooth correction needed to keep the imported lower body out of the cushion.
+ * At the same time, the new mesh scale comes from original GLB geometry.
+ */
+export function meshySofaVerticalLift(weight, scale, baseY) {
+  if(!(Number.isFinite(scale)&&scale>0&&Number.isFinite(baseY)))
+    throw new RangeError('Invalid Meshy seat transform');
+  const seatTop=SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2;
+  const seatedContact=SOFA_POSE.y+baseY+MESHY_SIT_CONTACT_LOCAL_Y*scale;
+  const lift=Math.max(0,seatTop+MESHY_SOFA_CLEARANCE_M-seatedContact);
+  const t=clamp01(weight);
+  return lift*t*t*(3-2*t);
 }
