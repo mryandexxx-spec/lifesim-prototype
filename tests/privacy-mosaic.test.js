@@ -24,7 +24,7 @@ test('individual mosaic tiles visibly vary without random or time-dependent data
   for(let y=0;y<MOSAIC_ROWS;y++)for(let x=0;x<MOSAIC_COLUMNS;x++)colors.add(center(x,y));
   assert.ok(colors.size>=14, 'must look like a mosaic, not a monochrome screen');
   assert.ok(colors.size<MOSAIC_COLUMNS*MOSAIC_ROWS);
-  assert.notDeepEqual(p.slice(0,4),p.slice(12*4,13*4));
+  assert.notEqual(center(0,0),center(4,9), 'distant centers should not share the same shade');
   assert.deepEqual(privacyMosaicPixels(),p);
 });
 test('texture generation supports smaller sizes and rejects unbounded uploads',()=>{
