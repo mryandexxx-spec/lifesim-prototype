@@ -64,7 +64,8 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   // width intersects the upper sleeves at the existing animation pivots.
   const pelvis=ball(name+' pelvis',0,.73,0,.46,.30,.32,trousers,avatar);
   const torso=upperBall(name+' torso',0,.99,0,p.bodyWidth,.70,.355,top);
-  upperBall(name+' collar',0,1.245,.164,.16,.055,.032,collar);
+  const outfitMeshes=[pelvis,torso];
+  outfitMeshes.push(upperBall(name+' collar',0,1.245,.164,.16,.055,.032,collar));
   upperCylinder(name+' neck',0,1.303,0,.115,.17,.116,skin);
   upperBall(name+' head',0,headY,0,
     HEAD_DIMENSIONS.width,HEAD_DIMENSIONS.height,HEAD_DIMENSIONS.depth,skin);
@@ -107,20 +108,20 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
     const hip=new pc.Entity(name+' '+side+' hip');
     avatar.addChild(hip);
     hip.setLocalPosition(x,LEG_GEOMETRY.hipHeight,0);
-    ball(name+' '+side+' trouser leg',0,LEG_GEOMETRY.thighCenterY,0,
-      .18,LEG_GEOMETRY.thighHeight,.19,trousers,hip);
+    outfitMeshes.push(ball(name+' '+side+' trouser leg',0,LEG_GEOMETRY.thighCenterY,0,
+      .18,LEG_GEOMETRY.thighHeight,.19,trousers,hip));
     const knee=new pc.Entity(name+' '+side+' knee');
     hip.addChild(knee);
     knee.setLocalPosition(0,LEG_GEOMETRY.kneeOffsetY,0);
-    ball(name+' '+side+' shin',0,LEG_GEOMETRY.shinCenterY,0,
-      .163,LEG_GEOMETRY.shinHeight,.185,trousers,knee);
+    outfitMeshes.push(ball(name+' '+side+' shin',0,LEG_GEOMETRY.shinCenterY,0,
+      .163,LEG_GEOMETRY.shinHeight,.185,trousers,knee));
     const ankle=new pc.Entity(name+' '+side+' ankle');
     knee.addChild(ankle);ankle.setLocalPosition(0,LEG_GEOMETRY.shoeCenterY,0);
     anklePivot.push(ankle);
     const shoe=ball(name+' '+side+' shoe',0,0,.077,
       .22,LEG_GEOMETRY.shoeHeight,.31,shoes,ankle);
     // Rotate the existing shoe for subtle toe lift, without allocating an ankle mesh.
-    shoeMeshes.push(shoe);legPivot.push(hip);kneePivot.push(knee);
+    shoeMeshes.push(shoe);outfitMeshes.push(shoe);legPivot.push(hip);kneePivot.push(knee);
   }
   for(const [side,x] of [['left',-.33],['right',.33]]){
     const pivot=new pc.Entity(name+' '+side+' shoulder');
@@ -130,7 +131,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
     // Its upper end moves inward under the torso to hide the shoulder seam;
     // the skin forearm starts inside its lower end, and the hand overlaps it.
     const towardTorso=side==='left' ? .065 : -.065;
-    ball(name+' '+side+' shirt sleeve',towardTorso,-.150,0,.160,.385,.175,top,pivot);
+    outfitMeshes.push(ball(name+' '+side+' shirt sleeve',towardTorso,-.150,0,.160,.385,.175,top,pivot));
     const elbow=new pc.Entity(name+' '+side+' elbow');
     pivot.addChild(elbow);
     elbow.setLocalPosition(0,-.28,0);
@@ -142,11 +143,29 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   const snack=ball(name+' apple',0,-.23,.12,.20,.17,.20,materials.yellow,elbowPivot[1]);
   const book=box(name+' book',0,-.23,.12,.28,.065,.29,materials.green,elbowPivot[1]);
   snack.enabled=false;book.enabled=false;
+  // The privacy costume is an opaque, fully covering bath wrap, never a nude mesh.
+  // It is only activated while the resident is hidden by the privacy enclosure.
+  const showerWrap=ball(name+' modest shower wrap',0,.84,0,.70,1.48,.52,
+    materials.mint||materials.cream,avatar);
+  showerWrap.enabled=false;
   const selected=cylinder(name+' selected',0,.018,0,.79,.025,.79,
     mat(p.select,{opacity:.30}),avatar);
   return {
     avatar,torso,upperBody,pelvis,anklePivot,shoes:shoeMeshes,elbowPivot,
     leftEye:eyes[0],rightEye:eyes[1],brows,mouth:smile,
-    legPivot,kneePivot,armPivot,snack,book,selected
+    legPivot,kneePivot,armPivot,snack,book,selected,outfitMeshes,showerWrap
   };
+}
+
+/** Fail-safe: no renderer frame can show a resident with clothes removed.
+ * While the opaque screen is present we hide the avatar completely; the only
+ * replacement is a fully covered bath wrap (also behind the screen).
+ * On interruption, street clothes are restored before the avatar is revealed.
+ */
+export function applyShowerAppearance(rig,privacy,bathing){
+  const masked=privacy===true;
+  const changed=masked&&bathing===true;
+  for(const item of rig.outfitMeshes)item.enabled=!changed;
+  rig.showerWrap.enabled=changed;
+  rig.avatar.enabled=!masked;
 }
