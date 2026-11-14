@@ -46,6 +46,7 @@ jobs:
           node --check src/character-lab-config.js
           node --check src/meshy-visual.js
           node --check src/meshy-visual-policy.js
+          node --check src/meshy-sofa-pose.js
       - name: Verify optimized Meshy GLB SHA-256
         run: |
           echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -
@@ -53,7 +54,7 @@ jobs:
         run: |
           mkdir -p site/src
           cp index.html character-lab.html styles.css favicon.svg manifest.webmanifest .nojekyll site/
-          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/household.js src/relationships.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js site/src/
+          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/household.js src/relationships.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js site/src/
       - name: Include optional Meshy character GLB when present
         run: |
           if [ -f assets/characters/meshy-casual-v1.glb ]; then
