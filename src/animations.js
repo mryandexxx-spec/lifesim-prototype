@@ -83,7 +83,11 @@ export function stepAnimation(previous,signals,dt) {
   }else if(action==='shower'){
     armTarget=[36+Math.sin(t*5)*12,34-Math.sin(t*4.5)*12];
   }else if(action==='fridge'){
-    armTarget=[8,-50+Math.sin(t*4)*9];
+    const reach=clamp(safe(signals?.fridgeReach,1),0,1);
+    const eat=clamp(safe(signals?.fridgeEat,0),0,1);
+    // One hand reaches for the shelf, then the elbow brings a bite to the mouth.
+    armTarget=[8*reach+12*eat,-57*reach-104*eat];
+    elbowTarget=[5*reach,-18*reach-82*eat];
   }else if(social){
     const angry=social==='argue';
     armTarget=angry
@@ -101,7 +105,7 @@ export function stepAnimation(previous,signals,dt) {
   // The previous slow smoothing filtered nearly half the 0.6b stride amplitude
   // at 1.65 m/s, making changes almost invisible on a phone-sized figure.
   const speed=social?7:bedStepWeight>0||bedSitWeight>0||bedReclineWeight>0
-    ?14:action?5.5:moving?18:8;
+    ?14:action==='fridge'?12:action?5.5:moving?18:8;
   const legs=previous.legs.map((v,i)=>blend(v,legTarget[i],speed,step));
   const knees=(previous.knees||[0,0]).map((v,i)=>blend(v,kneeTarget[i],speed,step));
   const feet=(previous.feet||[0,0]).map((v,i)=>blend(v,footTarget[i],speed,step));
@@ -138,7 +142,8 @@ export function stepAnimation(previous,signals,dt) {
   const upset=social==='argue'||mood<42;
   const happy=social==='talk'||mood>=74;
   const mouthWidthTarget=upset?.061:happy?.109:.088;
-  const mouthHeightTarget=upset?.022:happy?.025:.014;
+  const fridgeChew=clamp(safe(signals?.fridgeChew,0),0,1);
+  const mouthHeightTarget=fridgeChew>0?.014+.035*fridgeChew:upset?.022:happy?.025:.014;
   const browTarget=upset?13:happy?-5:0;
   const sleeping=bedReclineWeight>.65; // eyes stay closed while beginning to rise
   const blink=t%4.1<.11;
