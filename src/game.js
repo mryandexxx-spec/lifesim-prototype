@@ -649,19 +649,22 @@ function boot() {
     const socialUsing=game.socialAction?.phase==='using';
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
+    showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
+      game.action?.elapsed||0,ACTIONS.shower.duration,animDt,display.yaw);
+    const alexShower=showerStates.alex.frame;
     const walking=active&&(game.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'));
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
-      useId==='sofa'&&bedStates.alex.progress===0,animDt);
+      useId==='sofa'&&bedStates.alex.progress===0&&!showerStates.alex.active,animDt);
     const seatPose=sofaTransitionPose(sofaStates.alex);
     const seating=useId==='sofa'||sofaStates.alex.progress>0;
     bedStates.alex=advanceBedTransition(bedStates.alex,
-      useId==='bed'&&sofaStates.alex.progress===0,
+      useId==='bed'&&sofaStates.alex.progress===0&&!showerStates.alex.active,
       game.action?.bedSlot,animDt,{...display});
     const bedPose=bedTransitionPose(bedStates.alex);
     const bedding=Boolean(bedPose);
-    const pose=useId&&useId!=='sofa'&&useId!=='bed'?ACTOR_POSES[useId]:null;
-    const desired=bedding?bedPose:seating?seatPose:{
+    const pose=useId&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'?ACTOR_POSES[useId]:null;
+    const desired=alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:game.position.x,
       y:pose?pose.y:animationStates.alex.walkBob,
       z:pose?pose.z:game.position.z,
@@ -670,7 +673,9 @@ function boot() {
         ? Math.atan2(game.otherSim.position.x-game.position.x,
           game.otherSim.position.z-game.position.z)*180/Math.PI:facing
     };
-    if(bedding){
+    if(alexShower){
+      Object.assign(display,alexShower.pose);facing=alexShower.pose.yaw;
+    }else if(bedding){
       Object.assign(display,bedPose);facing=bedPose.yaw;
     }else{
       display.x=approach(display.x,desired.x,seating||pose?10:11,animDt);
@@ -684,7 +689,10 @@ function boot() {
     avatar.setEulerAngles(display.pitch,display.yaw,display.roll);
     if(active)effectTime+=dt*game.speed;
     animationStates.alex=stepAnimation(animationStates.alex,{
-      id:'alex',walking:walking&&!seating&&!bedding,using:useId,
+      id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
+      using:alexShower?'shower':useId,
+      showerStep:alexShower?.stepWeight||0,showerWater:Boolean(alexShower?.water),
+      showerExiting:Boolean(alexShower&&useId!=='shower'),
       sofaWeight:seatPose.sofaWeight,
       bedStepWeight:bedPose?.bedStepWeight||0,
       bedSitWeight:bedPose?.bedSitWeight||0,
@@ -694,9 +702,11 @@ function boot() {
       social:socialUsing?game.socialAction.kind:null,
       fridgeReach:alexFridge?.reach||0,fridgeEat:alexFridge?.eat||0,
       fridgeChew:alexFridge?.chew||0,
-      gait,mood:game.mind?.mood?.value,energy:game.needs.energy
+      gait:alexShower?alexShower.gaitMeters*WALK_PHASE_PER_METER:gait,
+      mood:game.mind?.mood?.value,energy:game.needs.energy
     },animDt);
     applyCharacterAnimation(alexRig,animationStates.alex);
+    applyShowerAppearance(alexRig,Boolean(alexShower?.privacy),Boolean(alexShower?.bathing));
     snack.enabled=Boolean(alexFridge&&alexFridge.handFood>.012);
     if(snack.enabled)snack.setLocalScale(.20*alexFridge.handFood,.17*alexFridge.handFood,.20*alexFridge.handFood);
     book.enabled=using&&useId==='sofa';
