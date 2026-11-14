@@ -36,6 +36,7 @@ export const MESHY_SEAT_RIG_PROFILE=Object.freeze({
   clearance:.020,
   halfStance:.16,
   footForward:.46,
+  footSideSigns:Object.freeze([1,-1]), // Mixamo Left has local +X, Right has -X
   ankleHeight:.073,
   legs:Object.freeze([
     Object.freeze({thigh:'mixamorig:LeftUpLeg',shin:'mixamorig:LeftLeg',
