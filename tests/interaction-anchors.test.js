@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createSeatSurface,seatSlot,solveSeatRoot,rotateSeatVector,blendSeatRoot,
-  seatFootTargets,smoothContactWeight
+  seatFootTargets,smoothContactWeight,solveTwoBoneTargets
 } from '../src/interaction-anchors.js';
 import {SOFA_LAYOUT} from '../src/pose-config.js';
 
@@ -94,4 +94,25 @@ test('invalid surfaces or pose data fail fast, not silently warp a character',()
     contactLocal:{x:0,y:1,z:0},scale:0}),RangeError);
   assert.throws(()=>solveSeatRoot({seat:seatSlot(s,0),
     contactLocal:{x:NaN,y:1,z:0},scale:1}),TypeError);
+});
+
+test('two-bone IK keeps limb lengths and places ankle on reachable foot target',()=>{
+  const hip={x:0,y:.85,z:0},knee={x:0,y:.48,z:.15},ankle={x:0,y:.10,z:.20};
+  const target={x:.08,y:.08,z:.30};
+  const res=solveTwoBoneTargets({hip,knee,ankle,target});
+  assert.equal(res.reachable,true);
+  const d=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+  near(d(res.knee,hip),res.lengthUpper,1e-8);
+  near(d(res.knee,res.ankle),res.lengthLower,1e-8);
+  near(d(res.ankle,target),0,1e-8);
+});
+test('two-bone IK clamps impossible foot targets instead of stretching bones',()=>{
+  const hip={x:0,y:.80,z:0},knee={x:0,y:.40,z:.10},ankle={x:0,y:.10,z:.20};
+  const target={x:0,y:0,z:4};
+  const res=solveTwoBoneTargets({hip,knee,ankle,target});
+  assert.equal(res.reachable,false);
+  const d=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+  near(d(res.ankle,hip),.995*(res.lengthUpper+res.lengthLower));
+  near(d(res.knee,res.ankle),res.lengthLower,1e-8);
+  assert.throws(()=>solveTwoBoneTargets({hip,knee:hip,ankle,target}),RangeError);
 });
