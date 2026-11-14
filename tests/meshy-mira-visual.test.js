@@ -119,7 +119,7 @@ test('game supplies both independent visual adapters and includes the female mod
   assert.match(game,/createMiraMeshyVisual/);
   assert.match(game,/meshyMira\.update/);
   assert.match(game,/meshyMira\.reset/);
-  assert.match(workflow,/src\/meshy-mira-visual\.js site\/src\//);
+  assert.match(workflow,/src\/meshy-mira-visual\.js src\/meshy-mira-policy\.js site\/src\//);
   assert.match(workflow,/node --check src\/meshy-mira-visual\.js/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/prototype \/ 0\.7c/);

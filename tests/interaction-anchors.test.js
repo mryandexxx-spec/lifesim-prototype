@@ -98,7 +98,7 @@ test('invalid surfaces or pose data fail fast, not silently warp a character',()
 
 test('two-bone IK keeps limb lengths and places ankle on reachable foot target',()=>{
   const hip={x:0,y:.85,z:0},knee={x:0,y:.48,z:.15},ankle={x:0,y:.10,z:.20};
-  const target={x:.08,y:.08,z:.30};
+  const target={x:.08,y:.18,z:.20}; // Inside measured max extension (~0.78m).
   const res=solveTwoBoneTargets({hip,knee,ankle,target});
   assert.equal(res.reachable,true);
   const d=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
