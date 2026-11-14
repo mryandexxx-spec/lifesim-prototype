@@ -39,11 +39,14 @@ jobs:
           node --check src/locomotion.js
           node --check src/bed-layout.js
           node --check src/bed-transition.js
+          node --check src/fridge-interaction.js
+          node --check src/shower-interaction.js
+          node --check src/privacy-mosaic.js
       - name: Assemble static website
         run: |
           mkdir -p site/src
           cp index.html styles.css favicon.svg manifest.webmanifest .nojekyll site/
-          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/household.js src/relationships.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js site/src/
+          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/household.js src/relationships.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js site/src/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
