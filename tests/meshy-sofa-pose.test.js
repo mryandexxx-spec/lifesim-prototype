@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
   MESHY_SOFA_CLIP,MESHY_SOFA_SECONDS,meshyHipAtTime,meshySitClipTime,
-  meshySofaOffset
+  meshySofaOffset,meshySofaVerticalLift,MESHY_SIT_CONTACT_LOCAL_Y,MESHY_SOFA_CLEARANCE_M
 } from '../src/meshy-sofa-pose.js';
+import {meshPlacement} from '../src/meshy-visual-policy.js';
+import {SOFA_LAYOUT,SOFA_POSE} from '../src/pose-config.js';
 
 function readRawPelvisTrack(){
   const bytes=readFileSync(new URL('../assets/characters/meshy-casual-v1.glb',import.meta.url));
@@ -58,4 +60,17 @@ test('sofa scrub preserves endpoints and cancels only horizontal displacement',(
   }
   assert.throws(()=>meshySofaOffset(1,-1),RangeError);
   assert.throws(()=>meshySofaOffset(.5,NaN),RangeError);
+});
+
+test('corrected sitting underside rests above actual couch seat top',()=>{
+  const placement=meshPlacement();
+  const seatTop=SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2;
+  const underside=SOFA_POSE.y+placement.y+MESHY_SIT_CONTACT_LOCAL_Y*placement.scale;
+  const lift=meshySofaVerticalLift(1,placement.scale,placement.y);
+  assert.ok(lift>=0 && lift<.07);
+  assert.ok(underside+lift>=seatTop+MESHY_SOFA_CLEARANCE_M-1e-9);
+  assert.equal(meshySofaVerticalLift(0,placement.scale,placement.y),0);
+  assert.ok(meshySofaVerticalLift(.5,placement.scale,placement.y)<lift);
+  assert.throws(()=>meshySofaVerticalLift(1,-1,0),RangeError);
+  assert.throws(()=>meshySofaVerticalLift(1,1,NaN),RangeError);
 });
