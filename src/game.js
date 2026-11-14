@@ -550,11 +550,20 @@ function boot() {
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
         accumulator-=.10;
       }
+      // On cancellation, finish closing before the former fridge user departs.
+      for(const residentId of HOUSEHOLD_IDS){
+        const a=getActor(game,residentId);
+        const stillUsing=a.action?.id==='fridge'&&a.action.phase==='using';
+        if(fridgeWasUsing[residentId]&&!stillUsing&&fridgeOpen>.015)fridgeLeaving[residentId]=true;
+        if(fridgeLeaving[residentId]&&fridgeOpen<=.015)fridgeLeaving[residentId]=false;
+        fridgeWasUsing[residentId]=Boolean(stillUsing);
+      }
       // Run two independent route followers with one shared room and item reservation.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
         // If another command arrives during a sit, stand up completely first.
-        if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0)continue;
+        if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0||
+          fridgeLeaving[residentId])continue;
         const socialWalking=game.socialAction?.phase==='walking' &&
           game.socialAction.initiator===residentId;
         const jobId=socialWalking?'social:'+game.socialAction.kind:
@@ -618,6 +627,7 @@ function boot() {
     }
     const socialUsing=game.socialAction?.phase==='using';
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
+    const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
     const walking=active&&(game.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'));
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
@@ -661,13 +671,18 @@ function boot() {
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
       social:socialUsing?game.socialAction.kind:null,
+      fridgeReach:alexFridge?.reach||0,fridgeEat:alexFridge?.eat||0,
+      fridgeChew:alexFridge?.chew||0,
       gait,mood:game.mind?.mood?.value,energy:game.needs.energy
     },animDt);
     applyCharacterAnimation(alexRig,animationStates.alex);
-    snack.enabled=using&&useId==='fridge';book.enabled=using&&useId==='sofa';
+    snack.enabled=Boolean(alexFridge&&alexFridge.handFood>.012);
+    if(snack.enabled)snack.setLocalScale(.20*alexFridge.handFood,.17*alexFridge.handFood,.20*alexFridge.handFood);
+    book.enabled=using&&useId==='sofa';
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
     const miraUseId=miraUsing?game.otherSim.action.id:null;
+    const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,ACTIONS.fridge.duration):null;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'));
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
@@ -709,11 +724,14 @@ function boot() {
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
-      social:socialUsing?game.socialAction.kind:null,gait:miraGait,
+      social:socialUsing?game.socialAction.kind:null,
+      fridgeReach:miraFridge?.reach||0,fridgeEat:miraFridge?.eat||0,
+      fridgeChew:miraFridge?.chew||0,gait:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
     },animDt);
     applyCharacterAnimation(miraRig,animationStates.mira);
-    miraSnack.enabled=miraUsing&&miraUseId==='fridge';
+    miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
+    if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
@@ -724,8 +742,12 @@ function boot() {
       quilts[slot].body.setLocalScale(1.02,.15,quilt.depth);
       quilts[slot].trim.setPosition(bx,quilt.y+.09,quilt.trimZ);
     }
-    fridgeOpen=approach(fridgeOpen,(useId==='fridge'||miraUseId==='fridge')?1:0,4,animDt);
-    fridgeHinge.setEulerAngles(0,-64*fridgeOpen,0);
+    const activeFridge=alexFridge||miraFridge;
+    fridgeOpen=activeFridge?activeFridge.doorOpen:closeFridgeDoor(fridgeOpen,animDt);
+    fridgeHinge.setEulerAngles(0,FRIDGE_LAYOUT.doorAngle*fridgeOpen,0);
+    const shelfFood=activeFridge?.shelfFood||0;
+    fridgeFood.enabled=shelfFood>.012;
+    if(fridgeFood.enabled)fridgeFood.setLocalScale(.20*shelfFood,.18*shelfFood,.20*shelfFood);
     for(let i=0;i<showerDrops.length;i++){
       const drop=showerDrops[i];
       drop.enabled=(useId==='shower'||miraUseId==='shower');
