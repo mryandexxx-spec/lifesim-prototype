@@ -111,12 +111,16 @@ export function blendSeatRoot({freeRoot,seatedRoot,weight}={}){
 /** Shared stand-on-floor targets for future two-bone foot IK; directions are
  * authored relative to the furniture, not camera or per-model pixels.
  */
-export function seatFootTargets({seat,halfStance=.16,forward=.42}={}){
+export function seatFootTargets({seat,halfStance=.16,forward=.42,sideSigns=[-1,1]}={}){
   if(!seat||!seat.contact)throw new TypeError('Seat contact required');
   positive(halfStance,'halfStance');positive(forward,'forward');
+  if(!Array.isArray(sideSigns)||sideSigns.length!==2||
+    !sideSigns.every(s=>s===1||s===-1)||sideSigns[0]===sideSigns[1])
+    throw new RangeError('Invalid rig foot side mapping');
   const center={x:seat.contact.x,y:seat.floorY,z:seat.contact.z};
   const displacement=rotateSeatVector({x:0,y:0,z:forward},seat.yaw);
-  return [-halfStance,halfStance].map(x=>{
+  return sideSigns.map(sign=>{
+    const x=sign*halfStance;
     const lateral=rotateSeatVector({x,y:0,z:0},seat.yaw);
     return add(center,add(displacement,lateral));
   });
