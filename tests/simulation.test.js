@@ -41,3 +41,33 @@ test('autonomy picks most urgent need', () => {
   s.needs.energy=12; s.needs.hunger=22;
   assert.equal(autonomousChoice(s),'bed');
 });
+
+test('existing 0.1 save data remains readable without an autonomy field', () => {
+  const old={version:1, minutes:850, needs:{hunger:31,energy:44,hygiene:81,fun:58},position:{x:3.1,z:-2.2},action:{id:'fridge',phase:'walking',elapsed:0,automatic:false}};
+  const restored=loadGame(old);
+  assert.equal(restored.minutes,850);
+  assert.equal(restored.action.id,'fridge');
+  assert.equal(restored.autonomy.nextAt,480);
+  assert.equal(restored.needs.hunger,31);
+});
+
+test('nighttime behavior favours sleep before exhaustion', () => {
+  const state=newGame();
+  state.minutes=23*60;
+  state.needs.energy=57;
+  assert.equal(autonomousChoice(state),'bed');
+});
+
+test('autonomous behavior respects short breaks, but manual commands remain available', () => {
+  const state=newGame();
+  state.minutes=850;
+  state.needs.hunger=9;
+  state.autonomy.nextAt=900;
+  assert.equal(autonomousChoice(state),null);
+  assert.equal(chooseAction(state,'fridge',true),false);
+  assert.equal(chooseAction(state,'fridge'),true);
+  arrive(state);
+  tick(state,30);
+  assert.equal(state.action,null);
+  assert.ok(state.autonomy.nextAt > state.minutes);
+});

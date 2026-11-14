@@ -26,11 +26,12 @@ jobs:
           npm test
           node --check src/game.js
           node --check src/simulation.js
+          node --check src/navigation.js
       - name: Assemble static website
         run: |
           mkdir -p site/src
           cp index.html styles.css favicon.svg manifest.webmanifest .nojekyll site/
-          cp src/game.js src/simulation.js site/src/
+          cp src/game.js src/simulation.js src/navigation.js site/src/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

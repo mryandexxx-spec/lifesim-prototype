@@ -1,5 +1,6 @@
 import * as pc from 'playcanvas';
 import { ACTIONS, NEEDS, SAVE_KEY, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, readableTime } from './simulation.js';
+import { findPath, nearestWalkable } from './navigation.js';
 
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
@@ -16,6 +17,8 @@ const META = {
 };
 
 let selected = null;
+let beginAction = () => false;
+let resetRuntime = () => {};
 let toastTimeout;
 function toast(message) {
   const el = $('toast'); el.textContent = message; el.classList.add('show');
@@ -47,9 +50,10 @@ for (const id of Object.keys(META)) {
 $('close-action').addEventListener('click', () => select(null));
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
-  chooseAction(game, selected);
-  toast(`Алекс: ${ACTIONS[selected].label.toLowerCase()}`);
-  select(null);
+  if (beginAction(selected)) {
+    toast(`Алекс: ${ACTIONS[selected].label.toLowerCase()}`);
+    select(null);
+  }
 });
 $('pause-btn').addEventListener('click', () => {
   game.paused = !game.paused;
@@ -65,7 +69,7 @@ $('speed-btn').addEventListener('click', () => {
 $('save-btn').addEventListener('click', () => save());
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
-  game = newGame(); save(true); select(null); toast('Новая игра началась');
+  game = newGame(); resetRuntime(); save(true); select(null); toast('Новая игра началась');
 });
 window.addEventListener('pagehide', () => save(true));
 window.addEventListener('visibilitychange', () => { if (document.hidden) save(true); });
@@ -149,6 +153,11 @@ function boot() {
   box('fridge shadow seam',3.43,1.49,-2.26,1.06,.035,.03,M.trim);
   box('fridge handle top',3.01,1.69,-2.20,.055,.33,.08,M.slate);
   box('fridge handle bottom',3.01,1.12,-2.20,.055,.26,.08,M.slate);
+  // A hinged door gives visible feedback during a snack action.
+  const fridgeHinge = new pc.Entity('Fridge door hinge'); app.root.addChild(fridgeHinge);
+  fridgeHinge.setPosition(2.88,1.44,-2.21);
+  box('fridge door',.55,0,.055,1.08,.91,.08,M.cream,fridgeHinge);
+  box('door handle',.94,.07,.13,.05,.31,.055,M.slate,fridgeHinge);
   box('kitchen cabinet',1.68,.46,-3.31,2.20,.91,.89,M.paleWood);
   box('countertop',1.68,.95,-3.31,2.3,.11,1.01,M.cream);
   box('sink',1.04,1.017,-3.31,.66,.012,.43,M.slate);
@@ -192,21 +201,68 @@ function boot() {
   ball('plant leaf',4.45,1.38,3.42,.65,.74,.51,M.green);
   box('entry mat',-.65,.042,3.45,1.45,.012,.60,M.mint);
 
-  // Character assembled from basic primitives so the entire prototype is original.
+  // Character: small joint pivots allow walking, sitting and reaching without external assets.
   const avatar = new pc.Entity('Alex'); app.root.addChild(avatar);
   const torso = box('torso',0,.91,0,.47,.60,.32,M.shirt,avatar);
   ball('head',0,1.48,0,.46,.48,.42,M.skin,avatar);
   ball('hair cap',0,1.67,-.045,.47,.22,.46,M.hair,avatar);
   ball('hair fringe',.05,1.61,.11,.43,.16,.24,M.hair,avatar);
-  ball('eye left',-.115,1.50,.20,.05,.055,.04,M.black,avatar);
-  ball('eye right',.115,1.50,.20,.05,.055,.04,M.black,avatar);
-  box('shoes left',-.15,.115,.08,.19,.15,.33,M.black,avatar);
-  box('shoes right',.15,.115,.08,.19,.15,.33,M.black,avatar);
-  const leftLeg = box('left leg',-.15,.43,0,.16,.50,.19,M.trousers,avatar);
-  const rightLeg = box('right leg',.15,.43,0,.16,.50,.19,M.trousers,avatar);
-  const leftArm = box('left arm',-.33,.92,0,.15,.50,.18,M.skin,avatar);
-  const rightArm = box('right arm',.33,.92,0,.15,.50,.18,M.skin,avatar);
-  avatar.setPosition(game.position.x,0,game.position.z);
+  const leftEye=ball('eye left',-.115,1.50,.20,.05,.055,.04,M.black,avatar);
+  const rightEye=ball('eye right',.115,1.50,.20,.05,.055,.04,M.black,avatar);
+  const legPivot = [], armPivot = [];
+  for(const [side, x] of [['left',-.15], ['right',.15]]) {
+    const pivot=new pc.Entity(side+' hip');avatar.addChild(pivot);pivot.setLocalPosition(x,.72,0);
+    box(side+' leg',0,-.29,0,.16,.50,.19,M.trousers,pivot);
+    box(side+' shoe',0,-.605,.08,.19,.15,.33,M.black,pivot);
+    legPivot.push(pivot);
+  }
+  for(const [side, x] of [['left',-.33],['right',.33]]) {
+    const pivot=new pc.Entity(side+' shoulder'); avatar.addChild(pivot);pivot.setLocalPosition(x,1.17,0);
+    box(side+' arm',0,-.25,0,.15,.50,.18,M.skin,pivot);
+    armPivot.push(pivot);
+  }
+  const snack = ball('apple',0,-.51,.12,.20,.17,.20,M.yellow,armPivot[1]);
+  const book = box('book',0,-.51,.12,.28,.065,.29,M.green,armPivot[1]);
+  snack.enabled=false;book.enabled=false;
+  const showerDrops = Array.from({length:9},(_,i)=>{
+    const drop=ball('water drop '+i,-4.47+i*.14,2.02,2.20+(i%3)*.12,.058,.10,.06,M.blue);
+    drop.enabled=false;return drop;
+  });
+  const ACTOR_POSES = {
+    bed:    {x:-2.62,y:.81,z:-.64,pitch:-85,yaw:0},
+    sofa:   {x:1.35,y:.59,z:1.55,pitch:0,yaw:180},
+    shower: {x:-3.68,y:.18,z:2.44,pitch:0,yaw:0},
+    fridge: {x:3.48,y:0,z:-1.76,pitch:0,yaw:180}
+  };
+  if(game.action?.phase==='using') {
+    const [x,z]=ACTIONS[game.action.id].location;
+    game.position={x,z}; // old v0.1 saves used different stand positions
+  }
+  game.position=nearestWalkable(game.position);
+  const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0};
+  let facing=0, gait=0, effectTime=0, fridgeOpen=0;
+  let route=null, routeIndex=0, routeId=null;
+  const destination=id=>({x:ACTIONS[id].location[0],z:ACTIONS[id].location[1]});
+  function buildRoute(id) {
+    const points=findPath(game.position,destination(id));
+    if(!points) return false;
+    route=points;routeId=id;routeIndex=0;
+    return true;
+  }
+  beginAction=(id,automatic=false)=>{
+    if(!ACTIONS[id])return false;
+    if(!buildRoute(id)){
+      if(!automatic) toast('Алекс не может добраться до предмета');
+      else game.autonomy.nextAt=game.minutes+15;
+      return false;
+    }
+    return chooseAction(game,id,automatic);
+  };
+  resetRuntime=()=>{
+    route=null;routeId=null;routeIndex=0;facing=0;gait=0;fridgeOpen=0;
+    display.x=game.position.x;display.z=game.position.z;display.y=0;display.yaw=0;display.pitch=0;
+  };
+  avatar.setPosition(display.x,display.y,display.z);
 
   // Lighting and orbital camera.
   const sun = new pc.Entity('Sun'); sun.addComponent('light',{
@@ -275,40 +331,89 @@ function boot() {
   canvas.addEventListener('wheel',event=>{event.preventDefault();view.distance=Math.max(11,Math.min(24,view.distance+event.deltaY*.012));cameraUpdate();},{passive:false});
   canvas.addEventListener('contextmenu',event=>event.preventDefault());
 
-  let accumulator=0, uiTimer=0, autosaveTime=0, gait=0, lastStatus='';
+  let accumulator=0, uiTimer=0, autosaveTime=0, lastStatus='';
+  const approach = (a,b,rate,dt) => a+(b-a)*(1-Math.exp(-rate*dt));
+  const approachAngle=(a,b,rate,dt)=>a+((((b-a+540)%360)+360)%360-180)*(1-Math.exp(-rate*dt));
   app.on('update',dt=>{
     dt=Math.min(dt,.06);
     const active=!game.paused;
+    const animDt=active?dt:0;
     if(active){
       accumulator+=dt;
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
+        const previous=game.action?.id;
         tick(game,.30 * game.speed); // 1 real second = 3 game minutes at 1x.
+        if(previous && !game.action) toast('Алекс закончил: '+ACTIONS[previous].label.toLowerCase());
         accumulator-=.10;
       }
       if(game.action?.phase==='walking'){
-        const goal=ACTIONS[game.action.id].location;
-        const dx=goal[0]-game.position.x,dz=goal[1]-game.position.z;
-        const dist=Math.hypot(dx,dz),step=dt*1.75*game.speed;
-        if(dist<=step || dist<.065){game.position.x=goal[0];game.position.z=goal[1];arrive(game);}
-        else{
-          game.position.x+=dx/dist*step;game.position.z+=dz/dist*step;
-          avatar.setEulerAngles(0,Math.atan2(dx,dz)*180/Math.PI,0);
-          gait+=dt*11*game.speed;
+        if(routeId!==game.action.id || !route) {
+          if(!buildRoute(game.action.id)) {game.action=null;game.event='Путь недоступен';}
+        }
+        if(route && game.action?.phase==='walking') {
+          let remaining=dt*1.65*game.speed, hops=0;
+          while(remaining>0 && routeIndex<route.length && hops++<12) {
+            const next=route[routeIndex];
+            const dx=next.x-game.position.x,dz=next.z-game.position.z;
+            const dist=Math.hypot(dx,dz);
+            if(dist<.0001){routeIndex++;continue;}
+            facing=Math.atan2(dx,dz)*180/Math.PI;
+            const step=Math.min(dist,remaining);
+            game.position.x+=dx/dist*step;game.position.z+=dz/dist*step;
+            remaining-=step;
+            gait+=step*7.2;
+            if(dist-step<.0001){game.position.x=next.x;game.position.z=next.z;routeIndex++;}
+          }
+          if(routeIndex>=route.length){
+            const goal=destination(game.action.id);
+            game.position={x:goal.x,z:goal.z};
+            arrive(game);route=null;routeId=null;routeIndex=0;
+          }
         }
       }
-      if(!game.action){const idea=autonomousChoice(game);if(idea){chooseAction(game,idea,true);toast('Алекс сам решил: '+ACTIONS[idea].label.toLowerCase());}}
+      if(!game.action){
+        const idea=autonomousChoice(game);
+        if(idea && beginAction(idea,true))toast('Алекс сам решил: '+ACTIONS[idea].label.toLowerCase());
+      }
     }
+    const using=game.action?.phase==='using', useId=using?game.action.id:null;
     const walking=active && game.action?.phase==='walking';
-    avatar.setPosition(game.position.x,(walking?Math.abs(Math.sin(gait))*.05:0),game.position.z);
-    leftLeg.setLocalEulerAngles((walking?Math.sin(gait)*23:0),0,0);
-    rightLeg.setLocalEulerAngles((walking?-Math.sin(gait)*23:0),0,0);
-    leftArm.setLocalEulerAngles((walking?-Math.sin(gait)*17:0),0,0);
-    rightArm.setLocalEulerAngles((walking?Math.sin(gait)*17:0),0,0);
-    if(game.action?.phase==='using'){
-      // Small idle motion while using a piece of furniture.
-      torso.setLocalEulerAngles(0,0,Math.sin(performance.now()*.002)*1.5);
-    } else torso.setLocalEulerAngles(0,0,0);
+    const pose=useId?ACTOR_POSES[useId]:null;
+    const desired={
+      x:pose?pose.x:game.position.x,
+      y:pose?pose.y:(walking?Math.abs(Math.sin(gait))*.045:0),
+      z:pose?pose.z:game.position.z,
+      pitch:pose?pose.pitch:0,
+      yaw:pose?pose.yaw:facing
+    };
+    display.x=approach(display.x,desired.x,pose?3.4:11,animDt);
+    display.y=approach(display.y,desired.y,pose?3.4:10,animDt);
+    display.z=approach(display.z,desired.z,pose?3.4:11,animDt);
+    display.pitch=approach(display.pitch,desired.pitch,3.8,animDt);
+    display.yaw=approachAngle(display.yaw,desired.yaw,10,animDt);
+    avatar.setPosition(display.x,display.y,display.z);
+    avatar.setEulerAngles(display.pitch,display.yaw,0);
+    const wave=active?Math.sin(gait):0;
+    legPivot[0].setLocalEulerAngles(using && useId==='sofa'?67:walking?wave*25:0,0,0);
+    legPivot[1].setLocalEulerAngles(using && useId==='sofa'?67:walking?-wave*25:0,0,0);
+    armPivot[0].setLocalEulerAngles(using && useId==='shower'?35+Math.sin(effectTime*5)*16:using && useId==='sofa'?26:walking?-wave*18:0,0,0);
+    armPivot[1].setLocalEulerAngles(using && useId==='fridge'?-54+Math.sin(effectTime*4)*11:using && useId==='shower'?35-Math.sin(effectTime*5)*15:using && useId==='sofa'?35:walking?wave*18:0,0,0);
+    if(active) effectTime+=dt*game.speed;
+    torso.setLocalEulerAngles(0,0,using && useId!=='bed'?Math.sin(effectTime*2)*1.4:0);
+    const sleepy=using && useId==='bed';
+    leftEye.enabled=!sleepy;rightEye.enabled=!sleepy;
+    snack.enabled=using && useId==='fridge';book.enabled=using && useId==='sofa';
+    fridgeOpen=approach(fridgeOpen,using && useId==='fridge'?1:0,4,animDt);
+    fridgeHinge.setEulerAngles(0,-64*fridgeOpen,0);
+    for(let i=0;i<showerDrops.length;i++){
+      const drop=showerDrops[i];
+      drop.enabled=using && useId==='shower';
+      if(drop.enabled){
+        const t=(effectTime*.8+i*.17)%1;
+        drop.setLocalPosition(-4.42+(i%5)*.15,2.25-t*1.9,2.17+Math.floor(i/5)*.15);
+      }
+    }
     uiTimer+=dt;autosaveTime+=dt;
     if(uiTimer>.14){
       uiTimer=0;
@@ -322,7 +427,7 @@ function boot() {
       $('mood-label').textContent=Math.min(...NEEDS.map(x=>game.needs[x]))<30?'Нуждается в заботе':'Всё хорошо';
       $('pause-icon').textContent=game.paused?'▶':'Ⅱ';
       $('speed-btn').textContent=game.speed+'×';
-      const status=game.paused?'Пауза':game.action?.phase==='walking'?'Идёт к предмету':game.action?.phase==='using'?ACTIONS[game.action.id].label:game.event;
+      const status=game.paused?'Пауза':game.action?.phase==='walking'?'Идёт: '+ACTIONS[game.action.id].label.toLowerCase():game.action?.phase==='using'?ACTIONS[game.action.id].label+' · '+Math.min(100,Math.round(100*game.action.elapsed/ACTIONS[game.action.id].duration))+'%':game.event;
       if(status!==lastStatus){$('status-text').textContent=status;lastStatus=status;}
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.
       for(const [id,meta] of Object.entries(META)){
