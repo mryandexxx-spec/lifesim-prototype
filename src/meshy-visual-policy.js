@@ -54,12 +54,14 @@ export const MESHY_SEAT_RIG_PROFILE=Object.freeze({
 });
 
 /** 0.7c Safari regression guard. Unsafe XYZ/IK remains explicit QA opt-in. */
-export function meshSeatRuntimeSettings(seatParam=null,ikParam=null){
-  if(seatParam==='legacy')return {enabled:false,mode:'vertical',footIK:false};
-  if(seatParam==='full')return {
-    enabled:true,mode:'full',footIK:ikParam==='on'
-  };
-  return {enabled:true,mode:'vertical',footIK:false};
+export function meshSeatRuntimeSettings(seatParam=null,ikParam=null,legsParam=null){
+  if(seatParam==='legacy')
+    return {enabled:false,mode:'vertical',footIK:false,footPlant:false};
+  if(seatParam==='full')
+    return {enabled:true,mode:'full',footIK:ikParam==='on',footPlant:false};
+  // This foot-plant modifies only the thighs/shins near FULL seating.
+  // Unlike the unsafe experimental full XYZ IK, it never moves the avatar.
+  return {enabled:true,mode:'vertical',footIK:false,footPlant:legsParam!=='off'};
 }
 
 export const MESHY_VISUAL_KEY = 'lifesim.meshyVisual.v1';
