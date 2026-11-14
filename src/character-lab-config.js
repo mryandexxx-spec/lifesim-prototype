@@ -1,0 +1,66 @@
+/** Meshy Character Lab - engine-independent GLB metadata and preview policy. */
+export const CHARACTER_FILE_NAME = 'Meshy_AI_Casual_Animated_Young_Man_20261114_animated_mixamo_All_animation.glb';
+export const KNOWN_CLIPS = Object.freeze([
+  'Running', 'Walking', 'Call_Gesture', 'Idle_3', 'Idle_4',
+  'Listening_Gesture', 'Run_02', 'Sit_to_Stand_Transition_M',
+  'Stand_Talking_Angry', 'Wave_One_Hand'
+]);
+export const ONE_SHOT_CLIPS = Object.freeze(new Set([
+  'Sit_to_Stand_Transition_M', 'Wave_One_Hand', 'Call_Gesture'
+]));
+export const TARGET_HEIGHT_M = 1.78;
+export const MIN_GLB_SIZE = 20;
+export const GLB_MAGIC = 0x46546c67;
+
+export function chooseIdleClip(names) {
+  return names.find(name => /^idle(?:_|$)/i.test(name)) ?? names[0] ?? null;
+}
+
+export function isOneShotClip(name) {
+  return ONE_SHOT_CLIPS.has(name);
+}
+
+export function parseGlbHeader(arrayBuffer) {
+  if (!(arrayBuffer instanceof ArrayBuffer) || arrayBuffer.byteLength < 12) {
+    throw new Error('Файл слишком короткий для GLB.');
+  }
+  const view = new DataView(arrayBuffer);
+  if (view.getUint32(0, true) !== GLB_MAGIC) throw new Error('Это не GLB-файл.');
+  const version = view.getUint32(4, true);
+  if (version !== 2) throw new Error(`Неподдерживаемая версия glTF: ${version}.`);
+  const declaredLength = view.getUint32(8, true);
+  if (declaredLength !== arrayBuffer.byteLength) {
+    throw new Error('Размер файла не совпадает с заголовком GLB.');
+  }
+  if (declaredLength < MIN_GLB_SIZE) throw new Error('GLB содержит неполный заголовок.');
+  return {version, bytes:declaredLength};
+}
+
+export function characterFit(bounds, targetHeight = TARGET_HEIGHT_M) {
+  const {min, max} = bounds || {};
+  if (!min || !max) throw new Error('Границы модели недоступны.');
+  const height = max.y - min.y;
+  if (!Number.isFinite(height) || height <= 0 || !Number.isFinite(targetHeight) || targetHeight <= 0) {
+    throw new Error('Некорректные размеры модели.');
+  }
+  const scale = targetHeight / height;
+  return {
+    scale,
+    x: -(min.x + max.x) * .5 * scale,
+    y: -min.y * scale,
+    z: -(min.z + max.z) * .5 * scale,
+    height:targetHeight
+  };
+}
+
+export function summarizeClips(names) {
+  const seen = new Set();
+  const list = [];
+  for (const name of names) {
+    if (typeof name === 'string' && name.trim() && !seen.has(name)) {
+      list.push({name, loop:!isOneShotClip(name)});
+      seen.add(name);
+    }
+  }
+  return list;
+}
