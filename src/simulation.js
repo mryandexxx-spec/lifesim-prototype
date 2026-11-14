@@ -1,8 +1,9 @@
 /** Pure game rules: no PlayCanvas or browser imports. */
 import { createMind, restoreMind, refreshMind, rememberAction, psychologyScore } from './psychology.js';
+import {validBedSlot,BED_SLOTS} from './bed-layout.js';
 export const NEEDS = ['hunger', 'energy', 'hygiene', 'fun'];
 export const ACTIONS = Object.freeze({
-  bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [-0.82, -1.05] },
+  bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
   fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [3.48, -1.76] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [-2.18, 2.10] },
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 0.96, location: [1.35, 0.52] }
@@ -38,6 +39,8 @@ export function loadGame(data) {
   restoreMind(data.mind, next);
   if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase) && (next.autonomy.enabled || !data.action.automatic)) {
     next.action = { id: data.action.id, phase: data.action.phase, elapsed: Math.max(0, Math.min(1000, Number(data.action.elapsed) || 0)), automatic: Boolean(data.action.automatic) };
+    if(data.action.id==='bed'&&validBedSlot(data.action.bedSlot))
+      next.action.bedSlot=data.action.bedSlot;
   }
   return next;
 }

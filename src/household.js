@@ -3,6 +3,7 @@
  */
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled } from './simulation.js';
 import { refreshMind } from './psychology.js';
+import {BED_SLOTS,BED_DEFAULT_SLOT,availableBedSlot,validBedSlot} from './bed-layout.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 
@@ -50,6 +51,18 @@ export function loadHousehold(raw) {
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
   root.relationship=loadRelationship(raw.relationship,root.minutes);
   root.socialAction=loadSocialAction(raw.socialAction,root);
+  // Old v1 actions had no bedSlot. Assign deterministic non-overlapping slots;
+  // sanitize duplicate/unknown slot values on reloading both residents.
+  const used=[];
+  for(const id of HOUSEHOLD_IDS){
+    const resident=getActor(root,id);
+    if(resident.action?.id!=='bed')continue;
+    const requested=validBedSlot(resident.action.bedSlot)
+      ?resident.action.bedSlot:BED_DEFAULT_SLOT[id];
+    const slot=availableBedSlot(used,requested);
+    if(slot){resident.action.bedSlot=slot;used.push(slot);}
+    else resident.action=null;
+  }
   return root;
 }
 
@@ -65,8 +78,26 @@ export function selectResident(root,id) {
   return true;
 }
 
-/** Each piece of furniture has a single interaction slot. */
+/** A double bed has exactly two independently reserved physical halves.
+ * Occupancy is the active action's optional bedSlot, not a new save format.
+ */
+export function bedSlotFor(root,residentId='alex') {
+  if(!HOUSEHOLD_IDS.includes(residentId))return null;
+  const self=getActor(root,residentId);
+  if(self?.action?.id==='bed'&&validBedSlot(self.action.bedSlot))
+    return self.action.bedSlot;
+  const other=getActor(root,residentId==='alex'?'mira':'alex');
+  const taken=other?.action?.id==='bed'
+    ?[validBedSlot(other.action.bedSlot)?other.action.bedSlot:BED_DEFAULT_SLOT[residentId==='alex'?'mira':'alex']]:[];
+  return availableBedSlot(taken,BED_DEFAULT_SLOT[residentId]);
+}
+export function bedDestinationFor(root,residentId='alex'){
+  const slot=bedSlotFor(root,residentId);
+  return slot?{...BED_SLOTS[slot].approach}:null;
+}
+/** Beds capacity=2; each of the other furniture actions remains exclusive. */
 export function furnitureAvailable(root,itemId,residentId='alex') {
+  if(itemId==='bed')return bedSlotFor(root,residentId)!==null;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
   return other?.action?.id!==itemId;
 }
@@ -75,7 +106,10 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   const resident=getActor(root,residentId);
   if (!resident || (automatic && root.socialAction)) return false;
   if(!automatic && root.socialAction)cancelSocial(root);
-  return chooseAction(resident,itemId,automatic);
+  const slot=itemId==='bed'?bedSlotFor(root,residentId):null;
+  const chosen=chooseAction(resident,itemId,automatic);
+  if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
+  return chosen;
 }
 
 /** One global autonomy preference, mirrored into both independent actor controllers. */

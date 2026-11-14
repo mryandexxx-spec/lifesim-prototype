@@ -10,9 +10,11 @@ import { createAnimationState,stepAnimation,applyCharacterAnimation } from './an
 import {WALK_PHASE_PER_METER} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
+import {BED_SLOTS} from './bed-layout.js';
+import {createBedTransition,advanceBedTransition,bedTransitionPose} from './bed-transition.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
-  residentAutonomousChoice } from './household.js';
+  residentAutonomousChoice,bedDestinationFor } from './household.js';
 
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
@@ -223,8 +225,12 @@ function boot() {
   // Bed, blanket, headboard and pillows.
   box('bed frame',-2.62,.28,-1.42,2.42,.38,2.52,M.wood);
   box('mattress',-2.62,.52,-1.42,2.23,.22,2.36,M.white);
-  box('duvet',-2.62,.65,-.95,2.2,.15,1.45,M.mint);
-  box('duvet detail',-2.62,.735,-1.58,2.08,.025,.045,M.cream);
+  // Two separate quilts cover the two independent sleepers.
+  for(const [slot,color] of [['left',M.mint],['right',M.peach]]){
+    const bx=BED_SLOTS[slot].x;
+    box('duvet '+slot,bx,.80,-.95,1.02,.15,1.45,color);
+    box('duvet trim '+slot,bx,.89,-1.58,.98,.025,.045,M.cream);
+  }
   box('bed headboard',-2.62,.82,-2.69,2.47,.95,.17,M.paleWood);
   box('pillow left',-3.15,.69,-2.18,.87,.19,.50,M.cream);
   box('pillow right',-2.10,.69,-2.18,.87,.19,.50,M.peach);
@@ -301,6 +307,7 @@ function boot() {
   const miraRig=createCharacterRig(rigContext,'mira');
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
+  const bedStates={alex:createBedTransition(),mira:createBedTransition()};
   const {avatar,torso,leftEye,rightEye,legPivot,armPivot,snack,book,selected:alexSelected}=alexRig;
   const {avatar:miraAvatar,torso:miraTorso,leftEye:miraLeftEye,rightEye:miraRightEye,
     legPivot:miraLegPivot,armPivot:miraArmPivot,snack:miraSnack,book:miraBook,
@@ -310,18 +317,19 @@ function boot() {
     drop.enabled=false;return drop;
   });
   const ACTOR_POSES = {
-    bed:    {x:-2.62,y:.81,z:-.64,pitch:-85,yaw:0},
     sofa:   SOFA_POSE,
     shower: {x:-3.68,y:.18,z:2.44,pitch:0,yaw:0},
     fridge: {x:3.48,y:0,z:-1.76,pitch:0,yaw:180}
   };
   if(game.action?.phase==='using') {
-    const [x,z]=ACTIONS[game.action.id].location;
+    const dest=game.action.id==='bed'?bedDestinationFor(game,'alex'):null;
+    const [x,z]=dest?[dest.x,dest.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
   game.position=nearestWalkable(game.position);
   if(game.otherSim.action?.phase==='using') {
-    const [x,z]=ACTIONS[game.otherSim.action.id].location;
+    const dest=game.otherSim.action.id==='bed'?bedDestinationFor(game,'mira'):null;
+    const [x,z]=dest?[dest.x,dest.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
   }
   game.otherSim.position=nearestWalkable(game.otherSim.position);
@@ -337,10 +345,13 @@ function boot() {
     if (id) autonomyWaitSeconds[id]=0;
     else for(const key of HOUSEHOLD_IDS) autonomyWaitSeconds[key]=0;
   };
-  const destination=id=>({x:ACTIONS[id].location[0],z:ACTIONS[id].location[1]});
+  const destination=(id,residentId='alex')=>id==='bed'
+    ?bedDestinationFor(game,residentId)
+    :{x:ACTIONS[id].location[0],z:ACTIONS[id].location[1]};
   function buildRoute(id,actorId='alex') {
     const actor=getActor(game,actorId);
-    const points=findPath(actor.position,destination(id));
+    const goal=destination(id,actorId);
+    const points=goal&&findPath(actor.position,goal);
     if(!points) return false;
     paths[actorId]={points,index:0,id};
     return true;
@@ -390,6 +401,7 @@ function boot() {
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
     for(const id of HOUSEHOLD_IDS){
       sofaStates[id]=createSofaTransition();
+      bedStates[id]=createBedTransition();
       animationStates[id]=createAnimationState();
     }
     game.position=nearestWalkable(game.position);
@@ -526,7 +538,7 @@ function boot() {
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
         // If another command arrives during a sit, stand up completely first.
-        if(sofaStates[residentId].progress>0)continue;
+        if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0)continue;
         const socialWalking=game.socialAction?.phase==='walking' &&
           game.socialAction.initiator===residentId;
         const jobId=socialWalking?'social:'+game.socialAction.kind:
@@ -563,7 +575,7 @@ function boot() {
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
             }
             if(p.index>=p.points.length){
-              resident.position=socialWalking?{...game.socialAction.target}:destination(jobId);
+              resident.position=socialWalking?{...game.socialAction.target}:destination(jobId,residentId);
               if(socialWalking)arriveSocial(game);
               else arrive(resident);
               paths[residentId]={points:null,index:0,id:null};
@@ -595,8 +607,12 @@ function boot() {
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,useId==='sofa',animDt);
     const seatPose=sofaTransitionPose(sofaStates.alex);
     const seating=useId==='sofa'||sofaStates.alex.progress>0;
-    const pose=useId&&useId!=='sofa'?ACTOR_POSES[useId]:null;
-    const desired=seating?seatPose:{
+    bedStates.alex=advanceBedTransition(bedStates.alex,useId==='bed',
+      game.action?.bedSlot,animDt);
+    const bedPose=bedTransitionPose(bedStates.alex);
+    const bedding=Boolean(bedPose);
+    const pose=useId&&useId!=='sofa'&&useId!=='bed'?ACTOR_POSES[useId]:null;
+    const desired=bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:game.position.x,
       y:pose?pose.y:animationStates.alex.walkBob,
       z:pose?pose.z:game.position.z,
@@ -605,16 +621,16 @@ function boot() {
         ? Math.atan2(game.otherSim.position.x-game.position.x,
           game.otherSim.position.z-game.position.z)*180/Math.PI:facing
     };
-    display.x=approach(display.x,desired.x,seating||pose?9:11,animDt);
-    display.y=approach(display.y,desired.y,seating||pose?9:10,animDt);
-    display.z=approach(display.z,desired.z,seating||pose?9:11,animDt);
+    display.x=approach(display.x,desired.x,bedding||seating||pose?10:11,animDt);
+    display.y=approach(display.y,desired.y,bedding||seating||pose?10:10,animDt);
+    display.z=approach(display.z,desired.z,bedding||seating||pose?10:11,animDt);
     display.pitch=approach(display.pitch,desired.pitch,3.8,animDt);
     display.yaw=approachAngle(display.yaw,desired.yaw,10,animDt);
     avatar.setPosition(display.x,display.y,display.z);
     avatar.setEulerAngles(display.pitch,display.yaw,0);
     if(active)effectTime+=dt*game.speed;
     animationStates.alex=stepAnimation(animationStates.alex,{
-      id:'alex',walking:walking&&!seating,using:useId,
+      id:'alex',walking:walking&&!seating&&!bedding,using:useId,
       sofaWeight:seatPose.sofaWeight,social:socialUsing?game.socialAction.kind:null,
       gait,mood:game.mind?.mood?.value,energy:game.needs.energy
     },animDt);
@@ -628,8 +644,12 @@ function boot() {
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,miraUseId==='sofa',animDt);
     const miraSeatPose=sofaTransitionPose(sofaStates.mira);
     const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
-    const miraPose=miraUseId&&miraUseId!=='sofa'?ACTOR_POSES[miraUseId]:null;
-    const miraDesired=miraSeating?miraSeatPose:{
+    bedStates.mira=advanceBedTransition(bedStates.mira,miraUseId==='bed',
+      game.otherSim.action?.bedSlot,animDt);
+    const miraBedPose=bedTransitionPose(bedStates.mira);
+    const miraBedding=Boolean(miraBedPose);
+    const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'?ACTOR_POSES[miraUseId]:null;
+    const miraDesired=miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:game.otherSim.position.x,
       y:miraPose?miraPose.y:animationStates.mira.walkBob,
       z:miraPose?miraPose.z:game.otherSim.position.z,
@@ -638,15 +658,15 @@ function boot() {
         ? Math.atan2(game.position.x-game.otherSim.position.x,
           game.position.z-game.otherSim.position.z)*180/Math.PI:miraFacing
     };
-    miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraSeating||miraPose?9:11,animDt);
-    miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraSeating||miraPose?9:10,animDt);
-    miraDisplay.z=approach(miraDisplay.z,miraDesired.z,miraSeating||miraPose?9:11,animDt);
+    miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraBedding||miraSeating||miraPose?10:11,animDt);
+    miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraBedding||miraSeating||miraPose?10:10,animDt);
+    miraDisplay.z=approach(miraDisplay.z,miraDesired.z,miraBedding||miraSeating||miraPose?10:11,animDt);
     miraDisplay.pitch=approach(miraDisplay.pitch,miraDesired.pitch,3.8,animDt);
     miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,animDt);
     miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
     miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,0);
     animationStates.mira=stepAnimation(animationStates.mira,{
-      id:'mira',walking:miraWalking&&!miraSeating,using:miraUseId,
+      id:'mira',walking:miraWalking&&!miraSeating&&!miraBedding,using:miraUseId,
       sofaWeight:miraSeatPose.sofaWeight,
       social:socialUsing?game.socialAction.kind:null,gait:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
