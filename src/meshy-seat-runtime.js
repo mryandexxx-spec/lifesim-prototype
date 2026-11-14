@@ -84,7 +84,7 @@ export function createSkinnedSeatController({
         Math.abs(target.y-ankle.y)>.34)continue;
       const kneePole={
         x:hip.x+forward.x,
-        y:hip.y-profile.kneePoleDown,
+        y:hip.y-profile.kneePoleDown[i],
         z:hip.z+forward.z
       };
       let solution;
