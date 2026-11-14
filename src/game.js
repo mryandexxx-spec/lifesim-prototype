@@ -930,7 +930,14 @@ function boot() {
     // mattress placement, both bed slots, shower movement and opaque privacy.
     const meshyShown=meshyAlex.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
-      walking:walking&&!seating&&!bedding&&!alexShower,
+      // Preserve the Walking clip on pause: playback freezes but the
+      // resident has not arrived at the destination.
+      walking:(game.action?.phase==='walking'||
+        (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'))&&
+        !seating&&!bedding&&!alexShower,
+      worldMinutes:game.minutes,
+      mood:game.mind?.mood?.value,
+      energy:game.needs.energy,
       social:socialUsing?game.socialAction.kind:null,
       socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
       socialElapsed:socialUsing?game.socialAction.elapsed:null,

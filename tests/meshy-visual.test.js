@@ -6,7 +6,8 @@ import {
   MESHY_SOURCE_BOUNDS, MESHY_IDLE_FOOT_LOCAL_Y,
   REQUIRED_MESHY_CLIPS,meshVisualPreference,meshSeatRuntimeSettings,meshClipFor,canShowMeshy,
   availableMeshClips,ALEX_GREETING_CLIP,ALEX_GREETING_WINDOW_MINUTES,
-  alexGreetingClipTime
+  alexGreetingClipTime,ALEX_ALTERNATE_IDLE_CLIP,ALEX_IDLE_CYCLE_MINUTES,
+  alexIdleClipFor
 } from '../src/meshy-visual-policy.js';
 
 test('Meshy is an opt-out visual mode; legacy and URL overrides are supported',()=>{
@@ -124,4 +125,37 @@ test('Alex uses a real one-shot greeting only for his own friendly conversation'
     {social:'talk',initiator:true,elapsed:0,duration:0},
     {social:null,initiator:true,elapsed:0,duration:2.4}
   ])assert.equal(alexGreetingClipTime(params),null);
+});
+
+test('Alex idle alternates on a deterministic in-game clock; no new saved fields',()=>{
+  assert.equal(ALEX_ALTERNATE_IDLE_CLIP,'Idle_4');
+  assert.equal(ALEX_IDLE_CYCLE_MINUTES,30);
+  const idle={available:true,mood:70,energy:70};
+  assert.equal(alexIdleClipFor({...idle,minutes:480}),'Idle_3');
+  assert.equal(alexIdleClipFor({...idle,minutes:483}),'Idle_4');
+  assert.equal(alexIdleClipFor({...idle,minutes:487.99}),'Idle_4');
+  assert.equal(alexIdleClipFor({...idle,minutes:488}),'Idle_3');
+  assert.equal(alexIdleClipFor({...idle,minutes:513}),'Idle_4');
+  assert.equal(alexIdleClipFor({...idle,minutes:489,energy:23}),'Idle_4');
+  assert.equal(alexIdleClipFor({...idle,minutes:489,mood:20}),'Idle_4');
+  assert.equal(alexIdleClipFor({...idle,minutes:489,mood:70,energy:70}),'Idle_3');
+  assert.equal(alexIdleClipFor({...idle,minutes:NaN}),'Idle_3');
+  assert.equal(alexIdleClipFor({...idle,minutes:-1}),'Idle_3');
+  assert.equal(alexIdleClipFor({...idle,minutes:484,available:false}),'Idle_3');
+});
+test('free-only optional idle never overrides walking, relationships or furniture',()=>{
+  const idle={available:true,minutes:484,energy:12,mood:12};
+  assert.equal(alexIdleClipFor(idle),'Idle_4');
+  for(const signal of [
+    {walking:true},{social:'talk'},{social:'argue'},
+    {actionId:'sofa'},{actionId:'bed'},{actionId:'shower'},
+    {actionId:'fridge'},{bedBusy:true},{sofaBusy:true},
+    {showerBusy:true},{fridgeBusy:true}
+  ])assert.equal(alexIdleClipFor({...idle,...signal}),'Idle_3');
+});
+test('male source asset contains the optional Idle_4 clip without a new GLB',()=>{
+  const glb=readFileSync(new URL('../assets/characters/meshy-casual-v1.glb',import.meta.url));
+  const length=glb.readUInt32LE(12);
+  const json=JSON.parse(glb.subarray(20,20+length).toString('utf8'));
+  assert.ok(json.animations.some(clip=>clip.name===ALEX_ALTERNATE_IDLE_CLIP));
 });

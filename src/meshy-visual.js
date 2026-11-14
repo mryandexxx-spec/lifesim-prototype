@@ -1,6 +1,7 @@
 import {canShowMeshy, meshClipFor, availableMeshClips,
   MESHY_ASSET_URL, meshPlacement,MESHY_SEAT_RIG_PROFILE,
-  ALEX_GREETING_CLIP,alexGreetingClipTime} from './meshy-visual-policy.js';
+  ALEX_GREETING_CLIP,alexGreetingClipTime,ALEX_ALTERNATE_IDLE_CLIP,
+  alexIdleClipFor} from './meshy-visual-policy.js';
 import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} from './meshy-sofa-pose.js';
 import {createSkinnedSeatController} from './meshy-seat-runtime.js';
 import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
@@ -25,7 +26,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
   const state={status:'loading',ready:false,root:null,model:null,clip:null,visible:false,error:null,
     scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null,
     seatRuntime:null,seatWarning:false,greetingDuration:0,fridgeRuntime:null,
-    bedRuntime:null,showerRuntime:null,walkDuration:0};
+    bedRuntime:null,showerRuntime:null,walkDuration:0,
+    alternateIdleAvailable:false};
   let requested=false;
 
   function attach(container){
@@ -51,6 +53,9 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
         throw Error('Missing required Meshy animation clips');
       state.greetingDuration=clips.find(clip=>clip.name===ALEX_GREETING_CLIP)?.duration||0;
       state.walkDuration=clips.find(clip=>clip.name==='Walking')?.duration||0;
+      state.alternateIdleAvailable=clips.some(
+        clip=>clip.name===ALEX_ALTERNATE_IDLE_CLIP
+      );
       for(const clip of clips)model.anim.assignAnimation(
         clip.name,clip,undefined,1,
         !['Sit_to_Stand_Transition_M','Wave_One_Hand','Call_Gesture'].includes(clip.name)
@@ -148,7 +153,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,seat=null,seatMode='vertical',dt=0,
       bedBusy=false,bedFrame=null,showerBusy=false,showerFrame=null,fridgeBusy=false,
-      socialInitiator=false,socialElapsed=null,fridgeFrame=null}={}){
+      socialInitiator=false,socialElapsed=null,fridgeFrame=null,
+      worldMinutes=null,mood=null,energy=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
         preferred:requested,ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
@@ -293,7 +299,11 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
         state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
         return true;
       }
-      const target=meshClipFor({walking,social});
+      const target=walking||social
+        ? meshClipFor({walking,social})
+        : alexIdleClipFor({minutes:worldMinutes,mood,energy,walking,social,
+          actionId,sofaBusy,bedBusy,showerBusy,fridgeBusy,
+          available:state.alternateIdleAvailable});
       if(state.clip===MESHY_SOFA_CLIP){
         // Blend both the bone pose and its root-motion correction back to
         // regular locomotion, avoiding a 30-cm standing pose pop.
@@ -301,7 +311,9 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
       }
       anim.speed=1;
       if(target!==state.clip){
-        anim.baseLayer.transition(target,.20);
+        anim.baseLayer.transition(target,
+          target===ALEX_ALTERNATE_IDLE_CLIP||state.clip===ALEX_ALTERNATE_IDLE_CLIP
+            ?.28:.20);
         state.clip=target;
       }
       if(state.sofaRelease){

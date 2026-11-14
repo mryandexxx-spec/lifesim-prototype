@@ -83,6 +83,28 @@ export function meshClipFor({walking = false, social = null} = {}) {
   return 'Idle_3';
 }
 
+/**
+ * Optional original Idle_4 clip, used only while Alex is truly free.
+ * Small time windows depend on SIMULATION minutes, not per-render frames.
+ * A snapshot/load or x3 changes neither the chosen clip nor save schema.
+ * Since Idle_4 has no verified "sad" or "tired" semantic, mood/energy only
+ * adjust HOW OFTEN the variant appears, not what emotion it portrays.
+ */
+export const ALEX_ALTERNATE_IDLE_CLIP='Idle_4';
+export const ALEX_IDLE_CYCLE_MINUTES=30;
+export function alexIdleClipFor({minutes=null,mood=70,energy=70,walking=false,
+  social=null,actionId=null,sofaBusy=false,bedBusy=false,
+  showerBusy=false,fridgeBusy=false,available=false}={}){
+  if(!available||!Number.isFinite(minutes)||minutes<0||walking||social||
+    actionId!==null||sofaBusy||bedBusy||showerBusy||fridgeBusy)
+    return 'Idle_3';
+  const period=ALEX_IDLE_CYCLE_MINUTES;
+  const phase=((minutes%period)+period)%period;
+  const window=Number.isFinite(energy)&&energy<35?10:
+    Number.isFinite(mood)&&mood<45?8:5;
+  return phase>=3&&phase<3+window?ALEX_ALTERNATE_IDLE_CLIP:'Idle_3';
+}
+
 /** Start a real GLB greeting only for the initiator of a friendly conversation.
  * Time is derived from the simulation (not Date.now), so it freezes on pause
  * and resumes from the exact same state after reload or a speed change.

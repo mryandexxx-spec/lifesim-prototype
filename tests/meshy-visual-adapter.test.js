@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createMeshyVisual} from '../src/meshy-visual.js';
 import {REQUIRED_MESHY_CLIPS,meshPlacement} from '../src/meshy-visual-policy.js';
 
-function fixture({loadError=false,missClip=false}={}){
+function fixture({loadError=false,missClip=false,alternateIdle=false}={}){
   const events=[];
   const vertex=(x,y,z)=>({x,y,z,clone(){return vertex(x,y,z);}});
   class Entity{
@@ -55,7 +55,8 @@ function fixture({loadError=false,missClip=false}={}){
         const names=missClip?['Idle_3','Walking']:REQUIRED_MESHY_CLIPS;
         asset.resource={
           instantiateRenderEntity(){return model;},
-          animations:[...new Set([...names,'Wave_One_Hand'])].map(name=>({resource:{
+          animations:[...new Set([...names,'Wave_One_Hand',
+            ...(alternateIdle?['Idle_4']:[])])].map(name=>({resource:{
             name,duration:name==='Wave_One_Hand'?2.4:6.167
           }}))
         };
@@ -173,4 +174,38 @@ test('Alex waves on approaching friendly social, pauses, then returns to listeni
   assert.ok(f.events.some(e=>e[0]==='transition'&&e[1]==='Stand_Talking_Angry'));
   visual.update({...talk,socialElapsed:0,socialInitiator:false});
   assert.ok(f.events.some(e=>e[0]==='transition'&&e[1]==='Listening_Gesture'));
+});
+
+test('optional Idle_4 crossfades while free, pauses, and yields to social and walking',()=>{
+  const f=fixture({alternateIdle:true});
+  const visual=createMeshyVisual({pc:f.pc,app:f.app,rig:f.rig});
+  const idle={preferred:true,worldMinutes:483,mood:70,energy:70};
+  visual.update(idle);
+  assert.ok(f.events.some(([type,clip])=>type==='transition'&&clip==='Idle_4'));
+  assert.equal(f.renderers[0].enabled,false);
+  const count=f.events.length;
+  visual.update({...idle,paused:true,dt:0});
+  assert.equal(f.model.anim.playing,false);
+  assert.equal(f.events.length,count,'idle selection cannot switch when the clock freezes');
+  visual.update({...idle,walking:true});
+  assert.equal(f.events.at(-1)[1],'Walking');
+  visual.update({...idle,social:'argue',walking:false});
+  assert.equal(f.events.at(-1)[1],'Stand_Talking_Angry');
+  visual.update({...idle,worldMinutes:488,social:null});
+  assert.equal(f.events.at(-1)[1],'Idle_3');
+});
+test('optional idle is a safe fallback if older animation asset lacks Idle_4',()=>{
+  const f=fixture();
+  const visual=createMeshyVisual({pc:f.pc,app:f.app,rig:f.rig});
+  visual.update({preferred:true,worldMinutes:484,mood:20,energy:20});
+  assert.equal(f.renderers[0].enabled,false);
+  assert.ok(!f.events.some(([_,name])=>name==='Idle_4'));
+});
+test('game supplies saved simulation clock and preserves walk during pause',()=>{
+  const source=(await import('node:fs')).readFileSync(
+    new URL('../src/game.js',import.meta.url),'utf8');
+  assert.match(source,/worldMinutes:game\.minutes/);
+  assert.match(source,/mood:game\.mind\?\.mood\?\.value/);
+  assert.match(source,/energy:game\.needs\.energy/);
+  assert.match(source,/walking:\(game\.action\?\.phase==='walking'/);
 });
