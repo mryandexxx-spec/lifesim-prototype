@@ -86,7 +86,7 @@ $('show-lab-report').addEventListener('click',()=>{
   const box=$('lab-report');box.hidden=!box.hidden;
   if(box.hidden)return;
   $('lab-report-text').value=[
-    'LifeSim Meshy Character Lab — диагностический отчёт',
+    'Блин’С Meshy Character Lab — диагностический отчёт',
     `Модель: ${modelInfo?.title||'не загружена'}`,
     `Размер: ${formatAssetBytes(modelInfo?.bytes||0)}`,
     `Треугольников: ${modelInfo?.triangles??'—'}`,

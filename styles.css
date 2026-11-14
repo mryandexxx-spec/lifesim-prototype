@@ -145,3 +145,12 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   .action-sheet{bottom:calc(env(safe-area-inset-bottom) + 175px);}
   .mind-panel{bottom:calc(env(safe-area-inset-bottom) + 175px);}
 }
+
+/* Full-screen loading: safe areas, legible counter, no blocked UI after readiness. */
+.loading{padding:calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);}
+.loading strong{font-size:clamp(30px,8vw,44px);letter-spacing:-1px;}
+.loading-track{width:min(280px,82vw);height:9px;border-radius:99px;background:#cdded2;overflow:hidden;margin-top:8px;}
+.loading-track>div{width:0%;height:100%;background:#398c72;border-radius:inherit;transition:width .18s ease-out;}
+.loading .loading-count{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;color:#326f5a;}
+.loading #loading-status{max-width:310px;min-height:20px;}
+@media(prefers-reduced-motion:reduce){.loading-mark{animation:none}.loading-track>div{transition:none}}

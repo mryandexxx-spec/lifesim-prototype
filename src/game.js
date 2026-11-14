@@ -1,4 +1,6 @@
 import * as pc from 'playcanvas';
+import {createLoadingProgress} from './loading-progress.js';
+import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,dragCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
@@ -26,6 +28,13 @@ import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, g
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
 const canvas = $('game-canvas');
+const loadingProgress=createLoadingProgress(['scene','alex','mira'],({completed,total,failed})=>{
+  $('loading-count').textContent=completed+' / '+total;
+  $('loading-bar').style.width=(completed/total*100)+'%';
+  $('loading-status').textContent=failed
+    ? 'Не все модели доступны — используем резервные облики'
+    : completed===total?'Готово!':'Загружаем сцену и 3D-модели';
+});
 let game;
 try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
 catch { game = newHousehold(); }
@@ -383,13 +392,11 @@ function boot() {
   // controller remain authoritative; any GLB error falls back immediately.
   const meshyAlex=createMeshyVisual({pc,app,rig:alexRig,
     footIK:seatIKEnabled,footPlant:seatFootPlantEnabled,onStatus:(status,error)=>{
-    if(status==='ready'&&meshyPreferred)toast('3D-облик Meshy загружен для Алекса');
-    if(status==='error')toast('Meshy недоступен: сохранён обычный облик Алекса');
+    if(status==='ready'||status==='error')loadingProgress.finish('alex',status==='ready');
     if(error)console.warn('Meshy visual unavailable',error);
   }});
   const meshyMira=createMiraMeshyVisual({pc,app,rig:miraRig,onStatus:(status,error)=>{
-    if(status==='ready'&&meshyPreferred)toast('3D-облик Миры загружен');
-    if(status==='error')toast('Модель Миры недоступна: используется прежний облик');
+    if(status==='ready'||status==='error')loadingProgress.finish('mira',status==='ready');
     if(error)console.warn('Meshy Mira visual unavailable',error);
   }});
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
@@ -1034,12 +1041,27 @@ function boot() {
     if(autosaveTime>8){autosaveTime=0;save(true);}
   });
   app.start();
-  $('loading').hidden=true;
-  toast('Свайп — двигай комнату · два пальца — поворот и масштаб');
+  // Count the scene after rendering has had a chance to draw its first frame.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>loadingProgress.finish('scene')));
+  void loadingProgress.wait().then(({failed})=>{
+    $('loading').hidden=true;
+    toast(failed
+      ? 'Часть 3D-моделей недоступна — включены старые облики'
+      : 'Свайп — двигай комнату · два пальца — поворот и масштаб');
+  });
 }
 
-try { boot(); }
-catch(error) {
-  console.error('LifeSim startup failed',error);
-  $('loading').innerHTML = `<div class="loading-mark">!</div><strong>3D не запустился</strong><span>${String(error?.message || error).slice(0,170)}<br>Попробуй обновить страницу в Safari.</span>`;
-}
+void (async()=>{
+  // Register before PlayCanvas requests the character GLBs, including first visit.
+  await registerModelCache();
+  boot();
+})().catch(error=>{
+  console.error('Блин’С startup failed',error);
+  const el=$('loading');
+  el.replaceChildren();
+  const heading=document.createElement('strong');
+  heading.textContent='3D не запустился';
+  const hint=document.createElement('span');
+  hint.textContent=String(error?.message||error).slice(0,170)+' · Обнови страницу в Safari.';
+  el.append(heading,hint);
+});

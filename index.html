@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#ede8da" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="LifeSim: первый интерактивный прототип симулятора жизни." />
-  <title>LifeSim — Комната 01</title>
+  <meta name="description" content="Блин’С — уютный симулятор жизни для iPhone." />
+  <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./styles.css" />
@@ -17,12 +17,12 @@
 </head>
 <body>
   <div class="app-shell">
-    <canvas id="game-canvas" aria-label="Трёхмерная комната LifeSim"></canvas>
+    <canvas id="game-canvas" aria-label="Трёхмерная комната Блин’С"></canvas>
 
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>life<span>sim</span></b><small>prototype / 0.7c.2</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 0.7d</small></div>
       </div>
       <div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div>
     </header>
@@ -79,14 +79,26 @@
     </footer>
 
     <div class="toast" role="status" id="toast" aria-live="polite"></div>
-    <div class="loading" id="loading"><div class="loading-mark">✦</div><strong>Готовим комнату...</strong><span>LifeSim / прототип 0.6e</span></div>
+    <div class="loading" id="loading" role="status" aria-live="polite">
+      <div class="loading-mark" aria-hidden="true">✦</div>
+      <strong>Блин’С</strong>
+      <span>Готовим мир и жителей...</span>
+      <div class="loading-track" aria-hidden="true"><div id="loading-bar"></div></div>
+      <div id="loading-count" class="loading-count">0 / 3</div>
+      <span id="loading-status">Загружаем сцену и 3D-модели</span>
+    </div>
   </div>
   <script type="module" src="./src/game.js"></script>
   <script>
-    window.addEventListener('error', function (e) {
+    window.addEventListener('error', function () {
       const el = document.getElementById('loading');
       if (el && !el.hidden) {
-        el.innerHTML = '<div class="loading-mark">!</div><strong>Не удалось запустить 3D</strong><span>Проверь интернет и обнови страницу в Safari.<br>Для этого прототипа требуется загрузка PlayCanvas.</span>';
+        el.replaceChildren();
+        const heading=document.createElement('strong');
+        heading.textContent='Не удалось запустить 3D';
+        const hint=document.createElement('span');
+        hint.textContent='Проверь интернет и обнови страницу в Safari.';
+        el.append(heading,hint);
       }
     });
   </script>
