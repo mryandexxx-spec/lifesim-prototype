@@ -1,0 +1,123 @@
+/**
+ * LifeSim Interaction Anchors — engine-agnostic furniture interaction geometry.
+ * Unit: game-world meters. No PlayCanvas import, DOM, mesh bounds or saved fields.
+ *
+ * Coordinate contract:
+ *  - furniture.origin is the center of its seating surface in world X/Z;
+ *  - yaw degrees rotates furniture's local +Z toward the FRONT of the seat;
+ *  - seatHeight is the physical Y of the seat surface (not the couch root);
+ *  - seat slot contact anchor is on the top of the cushion;
+ *  - contactLocal is the character's ANIMATED seat contact in model space;
+ *  - model scale is measured once from stable geometry, NOT per furniture.
+ *
+ * InteractionController applies the returned root correction as the single
+ * source of seating placement. Procedural sofa root Y and imported motion must
+ * not be added again, or penetration is inevitable.
+ */
+const finite=(n,label)=>{
+  if(!Number.isFinite(n))throw new TypeError(label+' must be finite');
+  return n;
+};
+const positive=(n,label)=>{
+  finite(n,label);
+  if(n<=0)throw new RangeError(label+' must be > 0');
+  return n;
+};
+const vec=(v,name)=>{
+  if(!v||typeof v!=='object')throw new TypeError(name+' must be a vector');
+  return {x:finite(v.x,name+'.x'),y:finite(v.y,name+'.y'),z:finite(v.z,name+'.z')};
+};
+const clamp01=x=>Math.max(0,Math.min(1,Number.isFinite(x)?x:0));
+export const smoothContactWeight=w=>{
+  const t=clamp01(w);
+  return t*t*(3-2*t);
+};
+export function rotateSeatVector({x,y,z},yawDegrees){
+  const a=finite(yawDegrees,'yaw')*Math.PI/180;
+  const c=Math.cos(a),s=Math.sin(a);
+  return {x:x*c+z*s,y,z:-x*s+z*c};
+}
+const add=(a,b)=>({x:a.x+b.x,y:a.y+b.y,z:a.z+b.z});
+const sub=(a,b)=>({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
+const mul=(a,k)=>({x:a.x*k,y:a.y*k,z:a.z*k});
+
+/** A furniture TYPE provides dimensions; instances supply transforms/slot count.
+ * No avatar-specific constants are stored inside a seat.
+ */
+export function createSeatSurface({
+  id,origin,yaw=0,width,depth,seatHeight,floorY=0,
+  slots=1,sideMargin=.20,backClearance=.10,approachGap=.50
+}={}){
+  if(typeof id!=='string'||!id.trim())throw new TypeError('Furniture id required');
+  const center=vec(origin,'origin');
+  positive(width,'width');positive(depth,'depth');finite(seatHeight,'seatHeight');
+  finite(floorY,'floorY');finite(yaw,'yaw');
+  if(seatHeight<=floorY)throw new RangeError('Seat must be above floor');
+  if(!Number.isInteger(slots)||slots<1)throw new RangeError('Invalid number of seats');
+  if(sideMargin<0||!Number.isFinite(sideMargin)||sideMargin*2>=width)
+    throw new RangeError('Invalid seat margin');
+  if(backClearance<0||backClearance>=depth||!Number.isFinite(backClearance))
+    throw new RangeError('Invalid back clearance');
+  if(approachGap<0||!Number.isFinite(approachGap))
+    throw new RangeError('Invalid approach gap');
+  return Object.freeze({
+    id,origin:Object.freeze(center),yaw,width,depth,seatHeight,floorY,slots,
+    sideMargin,backClearance,approachGap
+  });
+}
+
+/** Stable slot markers rotate with the couch; no different code for chairs. */
+export function seatSlot(surface,index){
+  if(!Number.isInteger(index)||index<0||index>=surface.slots)
+    throw new RangeError('Seat index out of range');
+  const usable=surface.width-2*surface.sideMargin;
+  const localX=surface.slots===1?0:
+    -usable/2+usable*index/(surface.slots-1);
+  // The contact anchor lies near seat center, clear of the backrest.
+  const sitZ=surface.depth/2-surface.backClearance-surface.depth/2;
+  const seat=add({x:surface.origin.x,y:surface.seatHeight,z:surface.origin.z},
+    rotateSeatVector({x:localX,y:0,z:sitZ},surface.yaw));
+  const approach=add({x:surface.origin.x,y:surface.floorY,z:surface.origin.z},
+    rotateSeatVector({x:localX,y:0,z:surface.depth/2+surface.approachGap},surface.yaw));
+  return Object.freeze({id:surface.id+':'+index,index,
+    contact:Object.freeze(seat),approach:Object.freeze(approach),yaw:surface.yaw,
+    floorY:surface.floorY});
+}
+
+/** In-place placement: align pose-specific butt contact to sofa's surface.
+ * This is the only positional solver; animation supplies the body pose.
+ */
+export function solveSeatRoot({seat,contactLocal,scale,yaw=seat?.yaw,
+  clearance=.012}={}){
+  if(!seat||!seat.contact)throw new TypeError('Seat contact required');
+  const target=vec(seat.contact,'seat.contact');
+  const contact=vec(contactLocal,'contactLocal');
+  positive(scale,'scale');finite(yaw,'yaw');finite(clearance,'clearance');
+  if(clearance<0)throw new RangeError('Negative clearance');
+  const worldOffset=rotateSeatVector(mul(contact,scale),yaw);
+  return sub({x:target.x,y:target.y+clearance,z:target.z},worldOffset);
+}
+
+/** During enter / exit, blend root toward contact-solved placement by the
+ * animation contact weight. The foot IK layer is a separate second pass.
+ * Avoid adding a second sofa-specific Y-offset after this function.
+ */
+export function blendSeatRoot({freeRoot,seatedRoot,weight}={}){
+  const a=vec(freeRoot,'freeRoot'),b=vec(seatedRoot,'seatedRoot');
+  const t=smoothContactWeight(weight);
+  return add(mul(a,1-t),mul(b,t));
+}
+
+/** Shared stand-on-floor targets for future two-bone foot IK; directions are
+ * authored relative to the furniture, not camera or per-model pixels.
+ */
+export function seatFootTargets({seat,halfStance=.16,forward=.42}={}){
+  if(!seat||!seat.contact)throw new TypeError('Seat contact required');
+  positive(halfStance,'halfStance');positive(forward,'forward');
+  const center={x:seat.contact.x,y:seat.floorY,z:seat.contact.z};
+  const displacement=rotateSeatVector({x:0,y:0,z:forward},seat.yaw);
+  return [-halfStance,halfStance].map(x=>{
+    const lateral=rotateSeatVector({x,y:0,z:0},seat.yaw);
+    return add(center,add(displacement,lateral));
+  });
+}
