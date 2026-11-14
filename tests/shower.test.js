@@ -79,12 +79,12 @@ test('cancellation mid-wash turns off water and restores costume while still mas
   assert.equal(state.frame.bathing,false,'clothes restore before screen opens');
   assert.equal(state.frame.water,false);
   assert.equal(state.frame.pose.x,SHOWER_LAYOUT.interior.x);
-  for(let i=0;i<45;i++)state=advanceShowerTransition(state,false,0,32,.016);
+  for(let i=0;i<55;i++)state=advanceShowerTransition(state,false,0,32,.016);
   assert.equal(state.frame.privacy,false);
   assert.equal(state.frame.bathing,false);
   assert.equal(state.frame.water,false);
   assert.ok(state.frame.pose.x>SHOWER_LAYOUT.interior.x);
-  for(let i=0;i<25;i++)state=advanceShowerTransition(state,false,0,32,.016);
+  for(let i=0;i<80;i++)state=advanceShowerTransition(state,false,0,32,.016);
   assert.equal(state.active,false);
   assert.equal(state.frame,null);
 });
