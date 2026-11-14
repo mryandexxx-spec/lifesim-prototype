@@ -14,7 +14,9 @@ export const MEMORY_TEXT = Object.freeze({
   bed: 'Выспался и набрался сил',
   fridge: 'Вкусно перекусил',
   shower: 'Порадовался свежести после душа',
-  sofa: 'Приятно отдохнул на диване'
+  sofa: 'Приятно отдохнул на диване',
+  talk: 'Поговорил(а) с соседом',
+  argue: 'Поспорил(а) с соседом'
 });
 const IDS = Object.keys(WISHES);
 const LIMIT = 12;
@@ -35,7 +37,7 @@ export function recentMemoryEffect(mind, minutes) {
   return (mind.memories || []).reduce((sum, memory) => {
     const elapsed = clamp(minutes - memory.at, 0, 10000000);
     const strength = Math.max(0, 1 - elapsed / 360);
-    return sum + (memory.fulfilled ? 12 : 5) * strength;
+    return sum + (memory.id==='argue'?-18:memory.id==='talk'?11:memory.fulfilled?12:5)*strength;
   }, 0);
 }
 
@@ -45,7 +47,7 @@ export function calculateMood(needs, mind, minutes) {
   const average = values.reduce((a, b) => a + b, 0) / values.length;
   const worst = Math.min(...values);
   const comfort = (needs.fun * trait('curious') + needs.hygiene * trait('neat') + needs.energy * trait('cozy')) / (trait('curious') + trait('neat') + trait('cozy'));
-  const score = clamp(Math.round(20 + average * .48 + comfort * .27 + Math.min(17, recentMemoryEffect(mind, minutes)) - (worst < 25 ? (25 - worst) * .8 : 0)), 0, 100);
+  const score = clamp(Math.round(20 + average * .48 + comfort * .27 + clamp(recentMemoryEffect(mind, minutes), -24, 17) - (worst < 25 ? (25 - worst) * .8 : 0)), 0, 100);
   let label = 'Спокоен';
   if (worst < 20) {
     const lowest = values.indexOf(worst);
@@ -69,7 +71,7 @@ export function selectWish(state, except = null) {
     sofa: 30 * trait('curious') + (100 - n.fun) * .17
   };
   for (const memory of (state.mind?.memories || []).slice(-4)) {
-    if (state.minutes - memory.at < 180) weights[memory.id] -= 8;
+    if (weights[memory.id]!==undefined && state.minutes - memory.at < 180) weights[memory.id] -= 8;
   }
   if (except && weights[except] !== undefined) weights[except] -= 22;
   return IDS.slice().sort((a, b) => weights[b] - weights[a] || IDS.indexOf(a) - IDS.indexOf(b))[0];
@@ -103,7 +105,7 @@ export function restoreMind(raw, state) {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     if (Array.isArray(raw.memories)) {
       mind.memories = raw.memories.filter(m => m && typeof m === 'object' &&
-        IDS.includes(m.id) && finite(m.at) && m.at >= 0 && m.at <= state.minutes
+        Object.hasOwn(MEMORY_TEXT,m.id) && finite(m.at) && m.at >= 0 && m.at <= state.minutes
       ).slice(-LIMIT).map(m => ({ id: m.id, at: m.at, fulfilled: m.fulfilled === true }));
     }
     if (raw.wish && typeof raw.wish === 'object' && IDS.includes(raw.wish.id) &&

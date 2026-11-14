@@ -3,6 +3,8 @@
  */
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled } from './simulation.js';
 import { refreshMind } from './psychology.js';
+import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
+  tickSocial } from './relationships.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
 export const RESIDENT_NAMES = Object.freeze({ alex: 'Алекс', mira: 'Мира' });
@@ -23,6 +25,8 @@ export function newHousehold() {
   const state=newGame();
   state.otherSim=newMira(state.minutes);
   state.selectedSim='alex';
+  state.relationship=newRelationship(state.minutes);
+  state.socialAction=null;
   return state;
 }
 
@@ -44,6 +48,8 @@ export function loadHousehold(raw) {
   if (!root.autonomy.enabled && mira.action?.automatic) mira.action=null;
   root.otherSim=mira;
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
+  root.relationship=loadRelationship(raw.relationship,root.minutes);
+  root.socialAction=loadSocialAction(raw.socialAction,root);
   return root;
 }
 
@@ -67,7 +73,8 @@ export function furnitureAvailable(root,itemId,residentId='alex') {
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex') {
   if (!HOUSEHOLD_IDS.includes(residentId) || !furnitureAvailable(root,itemId,residentId)) return false;
   const resident=getActor(root,residentId);
-  if (!resident) return false;
+  if (!resident || (automatic && root.socialAction)) return false;
+  if(!automatic && root.socialAction)cancelSocial(root);
   return chooseAction(resident,itemId,automatic);
 }
 
@@ -75,6 +82,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
 export function setHouseholdAutonomy(root,enabled) {
   setAutonomyEnabled(root,enabled);
   if (root.otherSim) setAutonomyEnabled(root.otherSim,enabled);
+  if(!root.autonomy.enabled&&root.socialAction?.automatic)cancelSocial(root);
   return root.autonomy.enabled;
 }
 
@@ -92,9 +100,11 @@ export function tickHousehold(root,minutes) {
   tick(other,minutes);
   // Both clocks remain identical (including when paused).
   other.minutes=root.minutes;
+  tickSocial(root,minutes);
 }
 
 export function residentAutonomousChoice(root,id='alex') {
+  if(root.socialAction)return null;
   const resident=getActor(root,id);
   if (!root.autonomy.enabled || !resident) return null;
   resident.autonomy.enabled=root.autonomy.enabled;
