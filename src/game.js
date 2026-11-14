@@ -12,6 +12,7 @@ import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
+import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,bedDestinationFor } from './household.js';
@@ -247,13 +248,17 @@ function boot() {
   // Kitchen zone with tall fridge, little counter and upper cupboards.
   box('fridge',3.43,.99,-2.85,1.12,1.98,1.14,M.cream);
   box('fridge shadow seam',3.43,1.49,-2.26,1.06,.035,.03,M.trim);
-  box('fridge handle top',3.01,1.69,-2.20,.055,.33,.08,M.slate);
-  box('fridge handle bottom',3.01,1.12,-2.20,.055,.26,.08,M.slate);
-  // A hinged door gives visible feedback during a snack action.
+  box('fridge lower handle',3.01,.64,-2.20,.055,.27,.075,M.slate);
+  // Shelf is in front of the fridge body but behind the closed door.
+  box('fridge interior',3.43,1.46,-2.247,1.03,.85,.045,M.blue);
+  box('fridge interior shelf',3.43,1.25,-2.18,1.02,.045,.11,M.cream);
+  const fridgeFood=ball('fridge portion on shelf',3.24,1.38,-2.22,.20,.18,.20,M.yellow);
+  fridgeFood.enabled=false;
+  // A real right-side hinge opens away from the resident at left approach.
   const fridgeHinge = new pc.Entity('Fridge door hinge'); app.root.addChild(fridgeHinge);
-  fridgeHinge.setPosition(2.88,1.44,-2.21);
-  box('fridge door',.55,0,.055,1.08,.91,.08,M.cream,fridgeHinge);
-  box('door handle',.94,.07,.13,.05,.31,.055,M.slate,fridgeHinge);
+  fridgeHinge.setPosition(FRIDGE_LAYOUT.hinge.x,FRIDGE_LAYOUT.hinge.y,FRIDGE_LAYOUT.hinge.z);
+  box('fridge upper door',-.55,0,.055,FRIDGE_LAYOUT.doorWidth,.91,.08,M.cream,fridgeHinge);
+  box('door handle',-.94,.07,.13,.05,.31,.055,M.slate,fridgeHinge);
   box('kitchen cabinet',1.68,.46,-3.31,2.20,.91,.89,M.paleWood);
   box('countertop',1.68,.95,-3.31,2.3,.11,1.01,M.cream);
   box('sink',1.04,1.017,-3.31,.66,.012,.43,M.slate);
@@ -324,7 +329,7 @@ function boot() {
   const ACTOR_POSES = {
     sofa:   SOFA_POSE,
     shower: {x:-3.68,y:.18,z:2.44,pitch:0,yaw:0},
-    fridge: {x:3.48,y:0,z:-1.76,pitch:0,yaw:180}
+    fridge: {x:FRIDGE_LAYOUT.approach.x,y:0,z:FRIDGE_LAYOUT.approach.z,pitch:0,yaw:FRIDGE_FACING_YAW}
   };
   if(game.action?.phase==='using') {
     const dest=game.action.id==='bed'?bedDestinationFor(game,'alex'):null;
@@ -341,6 +346,11 @@ function boot() {
   const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0,roll:0};
   const miraDisplay={x:game.otherSim.position.x,y:0,z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
+  const fridgeLeaving={alex:false,mira:false};
+  const fridgeWasUsing={
+    alex:game.action?.id==='fridge'&&game.action.phase==='using',
+    mira:game.otherSim.action?.id==='fridge'&&game.otherSim.action.phase==='using'
+  };
   const paths={
     alex:{points:null,index:0,id:null},
     mira:{points:null,index:0,id:null}
@@ -404,6 +414,7 @@ function boot() {
   resetRuntime=()=>{
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
+    for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
     for(const id of HOUSEHOLD_IDS){
       sofaStates[id]=createSofaTransition();
       bedStates[id]=createBedTransition();
