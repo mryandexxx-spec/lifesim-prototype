@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>life<span>sim</span></b><small>prototype / 0.6f.2</small></div>
+        <div><b>life<span>sim</span></b><small>prototype / 0.6f.3</small></div>
       </div>
       <div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div>
     </header>
@@ -33,11 +33,12 @@
       <button id="pause-btn" class="round-control" type="button" aria-label="Пауза"><span id="pause-icon">Ⅱ</span></button>
       <button id="speed-btn" class="speed-control" type="button" aria-label="Скорость симуляции">1×</button>
       <button id="auto-btn" class="auto-control" type="button" aria-pressed="true" aria-label="Автономность включена. Нажмите, чтобы отключить"><span>Авто</span><small id="auto-state">ВКЛ</small></button>
+      <button id="rotate-camera-btn" class="rotate-control" type="button" aria-pressed="false" aria-label="Включить вращение камеры одним пальцем" title="Вращать камеру"><span aria-hidden="true">⟳</span><small aria-hidden="true">ПОВОРОТ</small></button>
       <button id="reset-camera-btn" class="round-control" type="button" aria-label="Вернуть камеру">⌖</button>
     </aside>
 
     <div class="scene-badge"><span class="status-dot"></span><span id="status-text">Свободное время</span></div>
-    <div class="hint" id="hint">↔ Свайп — переместить вид · два пальца — поворот и масштаб</div>
+    <div class="hint" id="hint">Один палец — перемещение · два — поворот/масштаб</div>
 
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
       <div class="action-header"><div><span id="action-category">Предмет</span><h2 id="action-title">Кровать</h2></div><button type="button" id="close-action" aria-label="Закрыть">×</button></div>
