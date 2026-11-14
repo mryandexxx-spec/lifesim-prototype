@@ -10,7 +10,7 @@ const smooth = (a,b,p) => {
   return v*v*(3-2*v);
 };
 const lerp=(a,b,t)=>a+(b-a)*t;
-const ACTIVE_EXIT_SECONDS=.98;
+const ACTIVE_EXIT_SECONDS=1.9;
 export const SHOWER_LAYOUT=Object.freeze({
   approach:Object.freeze({x:-2.18,z:2.10}),
   interior:Object.freeze({x:-3.64,y:.22,z:2.44}),
@@ -49,16 +49,16 @@ function exitFrame(from,elapsed){
   const p=clamp01(elapsed/ACTIVE_EXIT_SECONDS);
   // While the mask is closing we restore the intact everyday outfit FIRST.
   // Only after the full restoration does the opaque enclosure disappear.
-  const privacy=from.privacy&&p<.62;
-  const walk=smooth(.65,1,p);
+  const privacy=from.privacy&&p<.25;
+  const walk=smooth(.27,1,p);
   const pose={
     x:lerp(from.pose.x,SHOWER_LAYOUT.approach.x,walk),
     y:lerp(from.pose.y,0,walk),z:lerp(from.pose.z,SHOWER_LAYOUT.approach.z,walk),
-    pitch:0,yaw:lerp(from.pose.yaw,90,smooth(.60,.95,p)),roll:0
+    pitch:0,yaw:lerp(from.pose.yaw,90,smooth(.22,.93,p)),roll:0
   };
   return {
     progress:p,privacy,bathing:false,water:false,
-    stepWeight:p>=.65&&p<1?Math.sin(Math.PI*clamp01((p-.65)/.35)):0,
+    stepWeight:p>=.27&&p<1?Math.sin(Math.PI*clamp01((p-.27)/.73)):0,
     gaitMeters:Math.hypot(from.pose.x-pose.x,from.pose.z-pose.z),
     pose
   };
