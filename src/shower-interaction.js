@@ -13,7 +13,7 @@ const lerp=(a,b,t)=>a+(b-a)*t;
 const ACTIVE_EXIT_SECONDS=.98;
 export const SHOWER_LAYOUT=Object.freeze({
   approach:Object.freeze({x:-2.18,z:2.10}),
-  interior:Object.freeze({x:-3.64,z:2.44}),
+  interior:Object.freeze({x:-3.64,y:.22,z:2.44}),
   entryYaw:-90,
   privacyWidth:1.54,
   privacyDepth:1.55,
@@ -38,7 +38,7 @@ export function showerSequence(elapsed,duration=32,entryYaw=SHOWER_LAYOUT.entryY
     gaitMeters:Math.hypot(SHOWER_LAYOUT.interior.x-SHOWER_LAYOUT.approach.x,
       SHOWER_LAYOUT.interior.z-SHOWER_LAYOUT.approach.z)*walk,
     pose:{x:lerp(SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.interior.x,walk),
-      y:0,z:lerp(SHOWER_LAYOUT.approach.z,SHOWER_LAYOUT.interior.z,walk),
+      y:SHOWER_LAYOUT.interior.y*walk,z:lerp(SHOWER_LAYOUT.approach.z,SHOWER_LAYOUT.interior.z,walk),
       pitch:0,yaw,roll:0}
   };
 }
@@ -53,7 +53,7 @@ function exitFrame(from,elapsed){
   const walk=smooth(.65,1,p);
   const pose={
     x:lerp(from.pose.x,SHOWER_LAYOUT.approach.x,walk),
-    y:0,z:lerp(from.pose.z,SHOWER_LAYOUT.approach.z,walk),
+    y:lerp(from.pose.y,0,walk),z:lerp(from.pose.z,SHOWER_LAYOUT.approach.z,walk),
     pitch:0,yaw:lerp(from.pose.yaw,90,smooth(.60,.95,p)),roll:0
   };
   return {
