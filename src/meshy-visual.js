@@ -1,6 +1,7 @@
 import {canShowMeshy, meshClipFor, availableMeshClips,
-  MESHY_ASSET_URL, meshPlacement} from './meshy-visual-policy.js';
+  MESHY_ASSET_URL, meshPlacement,MESHY_SEAT_RIG_PROFILE} from './meshy-visual-policy.js';
 import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} from './meshy-sofa-pose.js';
+import {createSkinnedSeatController} from './meshy-seat-runtime.js';
 
 /**
  * Meshy visual adapter for the EXISTING LifeSim procedural character root.
@@ -15,7 +16,8 @@ export function createMeshyVisual({pc,app,rig,onStatus=()=>{}}) {
   const legacyRenderers=rig.avatar.findComponents('render')
     .filter(component=>!hiddenFromReplacement.has(component.entity));
   const state={status:'loading',ready:false,root:null,model:null,clip:null,visible:false,error:null,
-    scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null};
+    scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null,
+    seatRuntime:null,seatWarning:false};
   let requested=false;
 
   function attach(container){
@@ -48,6 +50,14 @@ export function createMeshyVisual({pc,app,rig,onStatus=()=>{}}) {
       // The root has identity local transform, and therefore follows the
       // existing Alex avatar's x/z, heading, paused movement and body lift.
       rig.avatar.addChild(root);
+      // A contact profile belongs to the imported humanoid, not any couch.
+      // Rendering falls back to the old clip offset if a future GLB has no
+      // compatible bone hierarchy (this does not block other game actions).
+      if(typeof model.findByName==='function')try{
+        state.seatRuntime=createSkinnedSeatController({
+          pc,model,avatar:rig.avatar,profile:MESHY_SEAT_RIG_PROFILE
+        });
+      }catch(error){console.warn('Meshy seat contact unavailable',error);}
       root.enabled=false;
       state.root=root;state.model=model;state.clip='Idle_3';
       state.ready=true;state.status='ready';
@@ -74,7 +84,7 @@ export function createMeshyVisual({pc,app,rig,onStatus=()=>{}}) {
     get status(){return state.status;},
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
-      sofaBusy=false,sofaWeight=0,dt=0,
+      sofaBusy=false,sofaWeight=0,seat=null,dt=0,
       bedBusy=false,showerBusy=false,fridgeBusy=false}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
@@ -96,11 +106,31 @@ export function createMeshyVisual({pc,app,rig,onStatus=()=>{}}) {
           state.clip=MESHY_SOFA_CLIP;
           state.sofaRelease=null;
         }
-        const correction=meshySofaOffset(sofaWeight,state.scale);
-        const lift=meshySofaVerticalLift(sofaWeight,state.scale,state.base.y);
-        state.sofaOffset={...correction,y:lift};
-        state.model.setLocalPosition(state.base.x+correction.x,
-          state.base.y+lift,state.base.z+correction.z);
+        if(seat && state.seatRuntime){
+          try{
+            const placed=state.seatRuntime.place({
+              seat,weight:sofaWeight,scale:state.scale,base:state.base
+            });
+            state.sofaOffset=placed.offset;
+          }catch(error){
+            // Keep the accepted 0.7b model rather than crashing gameplay if
+            // a malformed furniture prefab or rig contact cannot be solved.
+            if(!state.seatWarning){
+              state.seatWarning=true;
+              console.warn('Meshy contact solve fallback',error);
+            }
+            state.seatRuntime=null;
+          }
+        }
+        if(!seat||!state.seatRuntime){
+          // Backward-compatibility fallback for missing rig bones or bad seat
+          // metadata. The production sofa passes a SeatSurface by default.
+          const correction=meshySofaOffset(sofaWeight,state.scale);
+          const lift=meshySofaVerticalLift(sofaWeight,state.scale,state.base.y);
+          state.sofaOffset={...correction,y:lift};
+          state.model.setLocalPosition(state.base.x+correction.x,
+            state.base.y+lift,state.base.z+correction.z);
+        }
         // PlayCanvas 2.24 evaluates a manually scrubbed layer with speed=0.
         // The game's timeline, not the GLB root translation, owns the seat.
         anim.speed=0;
