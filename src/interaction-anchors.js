@@ -77,10 +77,13 @@ export function seatSlot(surface,index){
   const sitZ=surface.depth/2-surface.backClearance-surface.depth/2;
   const seat=add({x:surface.origin.x,y:surface.seatHeight,z:surface.origin.z},
     rotateSeatVector({x:localX,y:0,z:sitZ},surface.yaw));
+  const front=add({x:surface.origin.x,y:surface.floorY,z:surface.origin.z},
+    rotateSeatVector({x:localX,y:0,z:surface.depth/2},surface.yaw));
   const approach=add({x:surface.origin.x,y:surface.floorY,z:surface.origin.z},
     rotateSeatVector({x:localX,y:0,z:surface.depth/2+surface.approachGap},surface.yaw));
   return Object.freeze({id:surface.id+':'+index,index,
-    contact:Object.freeze(seat),approach:Object.freeze(approach),yaw:surface.yaw,
+    contact:Object.freeze(seat),approach:Object.freeze(approach),
+    front:Object.freeze(front),yaw:surface.yaw,
     floorY:surface.floorY});
 }
 
@@ -184,4 +187,37 @@ export function solveSeatHeightCorrection({
   if(Math.abs(delta)>maxCorrection)
     throw new RangeError('Unreliable pelvis contact: excessive height correction');
   return delta*smoothContactWeight(weight);
+}
+
+/**
+ * The ankle's target should be in front of the seat's PHYSICAL FRONT EDGE,
+ * not at a fixed distance from the pelvis. This prevents dangling calves
+ * intersecting deep/short couches when the same rig uses different furniture.
+ * footSoleDrop is calibrated once per rig from the skinned GLB toe/sole
+ * vertices relative to the ankle bone at its seated pose.
+ */
+export function seatGroundedAnkleTargets({seat,scale,halfStance=.17,
+  soleDrops=[.15,.15],frontClearance=.08,groundClearance=.008,
+  sideSigns=[1,-1]}={}){
+  if(!seat?.front||!seat?.contact)throw new TypeError('Seat front edge required');
+  positive(scale,'scale');positive(halfStance,'halfStance');
+  finite(frontClearance,'frontClearance');
+  finite(groundClearance,'groundClearance');
+  if(frontClearance<0||groundClearance<0)throw new RangeError('Negative clearance');
+  if(!Array.isArray(soleDrops)||soleDrops.length!==2||
+    !soleDrops.every(n=>Number.isFinite(n)&&n>0))
+    throw new RangeError('Invalid sole markers');
+  if(!Array.isArray(sideSigns)||sideSigns.length!==2||
+    !sideSigns.every(n=>n===1||n===-1)||sideSigns[0]===sideSigns[1])
+    throw new RangeError('Invalid foot side signs');
+  return sideSigns.map((side,i)=>{
+    const frontShift=rotateSeatVector({
+      x:side*halfStance,y:0,z:frontClearance
+    },seat.yaw);
+    return {
+      x:seat.front.x+frontShift.x,
+      y:seat.floorY+soleDrops[i]*scale+groundClearance,
+      z:seat.front.z+frontShift.z
+    };
+  });
 }
