@@ -75,7 +75,8 @@ export function createSkinnedSeatController({
     if(ik && feet.length===2 && weight>.62){
       const ikWeight=smoothContactWeight((weight-.62)/.38)*.82;
       const goals=seatFootTargets({
-        seat,halfStance:profile.halfStance,forward:profile.footForward
+        seat,halfStance:profile.halfStance,forward:profile.footForward,
+        sideSigns:profile.footSideSigns
       });
       for(let i=0;i<2;i++){
         const leg=feet[i];
