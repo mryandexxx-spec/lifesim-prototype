@@ -6,6 +6,8 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
+import {createMeshyVisual} from './meshy-visual.js';
+import {meshVisualPreference,MESHY_VISUAL_KEY} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
@@ -27,6 +29,26 @@ try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'))
 catch { game = newHousehold(); }
 const selectedActor = () => getActor(game,game.selectedSim);
 const selectedName = () => getActorName(game.selectedSim);
+const visualQuery = new URLSearchParams(window.location.search).get('model') || '';
+let meshyPreferred = meshVisualPreference(null,visualQuery);
+try { meshyPreferred=meshVisualPreference(localStorage.getItem(MESHY_VISUAL_KEY),visualQuery); }
+catch { /* Safari private mode may reject storage; use the in-memory choice. */ }
+function updateMeshModelButton(){
+  const button=$('mesh-model-btn');
+  button.setAttribute('aria-pressed',String(meshyPreferred));
+  button.setAttribute('aria-label',meshyPreferred
+    ? 'Алекс: модель Meshy. Нажмите, чтобы вернуть обычную модель.'
+    : 'Алекс: обычная модель. Нажмите, чтобы включить Meshy.');
+  $('mesh-model-state').textContent=meshyPreferred?'MESHY':'СТАРЫЙ';
+}
+$('mesh-model-btn').addEventListener('click',()=>{
+  meshyPreferred=!meshyPreferred;
+  try{localStorage.setItem(MESHY_VISUAL_KEY,meshyPreferred?'meshy':'legacy');}
+  catch{/* This is only a visual preference and never blocks gameplay. */}
+  updateMeshModelButton();
+  toast(meshyPreferred?'Алекс: включён облик Meshy':'Алекс: возвращён прежний облик');
+});
+updateMeshModelButton();
 
 const META = {
   bed: { title: 'Уютная кровать', category: 'Спальня', description: 'Сон восстанавливает энергию', icon: '☾', anchor: [-2.5, 1.22, -1.48] },
@@ -334,6 +356,13 @@ function boot() {
   const rigContext={pc,root:app.root,ball,box,cylinder,mat,materials:M};
   const alexRig=createCharacterRig(rigContext,'alex');
   const miraRig=createCharacterRig(rigContext,'mira');
+  // Visual-only experimental Alex skin. The procedural rig and every action
+  // controller remain authoritative; any GLB error falls back immediately.
+  const meshyAlex=createMeshyVisual({pc,app,rig:alexRig,onStatus:(status,error)=>{
+    if(status==='ready'&&meshyPreferred)toast('3D-облик Meshy загружен для Алекса');
+    if(status==='error')toast('Meshy недоступен: сохранён обычный облик Алекса');
+    if(error)console.warn('Meshy visual unavailable',error);
+  }});
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
   const bedStates={alex:createBedTransition(),mira:createBedTransition()};
@@ -453,6 +482,7 @@ function boot() {
       animationStates[id]=createAnimationState();
       applyShowerAppearance(id==='alex'?alexRig:miraRig,false,false);
     }
+    meshyAlex.reset();
     game.position=nearestWalkable(game.position);
     game.otherSim.position=nearestWalkable(game.otherSim.position);
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
@@ -846,6 +876,19 @@ function boot() {
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
+    // Alex uses Meshy for free locomotion and social states, but the original
+    // established rig remains active for furniture, fridge, bed and shower
+    // exit/privateness. Its simulation and save format never change.
+    meshyAlex.update({
+      preferred:meshyPreferred,paused:!active,
+      walking:walking&&!seating&&!bedding&&!alexShower,
+      social:socialUsing?game.socialAction.kind:null,
+      actionId:useId,
+      sofaBusy:sofaStates.alex.progress>0,
+      bedBusy:bedStates.alex.progress>0,
+      showerBusy:showerStates.alex.active,
+      fridgeBusy:fridgeLeaving.alex
+    });
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
     for(const slot of ['left','right']){
