@@ -4,7 +4,7 @@
  * Every angle eases toward a target instead of snapping on state transitions.
  */
 import {SOFA_HIP_PITCH,SOFA_KNEE_PITCH} from './pose-config.js';
-import {gaitTargets,gaitGroundOffset} from './locomotion.js';
+import {gaitTargets} from './locomotion.js';
 
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const blend=(a,b,rate,dt)=>a+(b-a)*(1-Math.exp(-rate*dt));
@@ -115,13 +115,20 @@ export function stepAnimation(previous,signals,dt) {
   }else if(action!=='bed'){
     armTarget=[Math.sin(t*1.5)*1.4,Math.sin(t*1.5+1.1)*1.4];
   }
-  // The previous slow smoothing filtered nearly half the 0.6b stride amplitude
-  // at 1.65 m/s, making changes almost invisible on a phone-sized figure.
+  // Only free walking gets exact distance-phase contact poses. The previous
+  // angle spring lagged several frames behind the moving root (much worse at
+  // 3×), making the stance foot skate; the weight already smooths starts/stops.
+  // Sofa/bed/shower/fridge/social poses keep their tested transition smoothing.
+  const contactWalk=(moving||walkWeight>.003)&&!action&&!social&&
+    !sofaWeight&&!bedStepWeight&&!bedSitWeight&&!bedReclineWeight;
   const speed=social?7:bedStepWeight>0||bedSitWeight>0||bedReclineWeight>0
     ?14:action==='fridge'?12:action?5.5:moving?18:8;
-  const legs=previous.legs.map((v,i)=>blend(v,legTarget[i],speed,step));
-  const knees=(previous.knees||[0,0]).map((v,i)=>blend(v,kneeTarget[i],speed,step));
-  const feet=(previous.feet||[0,0]).map((v,i)=>blend(v,footTarget[i],speed,step));
+  const legs=contactWalk?walkPose.hips:
+    previous.legs.map((v,i)=>blend(v,legTarget[i],speed,step));
+  const knees=contactWalk?walkPose.knees:
+    (previous.knees||[0,0]).map((v,i)=>blend(v,kneeTarget[i],speed,step));
+  const feet=contactWalk?walkPose.feet:
+    (previous.feet||[0,0]).map((v,i)=>blend(v,footTarget[i],speed,step));
   const arms=previous.arms.map((v,i)=>blend(v,armTarget[i],speed,step));
   const elbows=(previous.elbows||[0,0]).map((v,i)=>blend(v,elbowTarget[i],speed,step));
   const bedHipYaw=(previous.bedHipYaw||[0,0]).map((v,i)=>blend(v,bedYawTarget[i],12,step));
@@ -148,8 +155,10 @@ export function stepAnimation(previous,signals,dt) {
     inGait?walkPose.hipShift:0,14,step);
   const bodyLift=blend(safe(previous.bodyLift,0),
     inGait?walkPose.bodyLift:0,14,step);
-  const ground=inGait?gaitGroundOffset(legs,knees):0;
-  const walkBob=blend(safe(previous.walkBob,0),ground,13,step);
+  // The root dip and planted ankle geometry are analytically paired. Using
+  // a second smoothing pass on one but not the other breaks ground contact.
+  const walkBob=contactWalk?walkPose.rootOffset:
+    blend(safe(previous.walkBob,0),0,13,step);
 
   // Mood is a precomputed simulation snapshot. Animation does not decide mood.
   const upset=social==='argue'||mood<42;

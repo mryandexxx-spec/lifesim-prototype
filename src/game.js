@@ -713,6 +713,13 @@ function boot() {
       gait:alexShower?alexShower.gaitMeters*WALK_PHASE_PER_METER:gait,
       mood:game.mind?.mood?.value,energy:game.needs.energy
     },animDt);
+    // Contact gait is phase-accurate only when the root dip is applied in
+    // the SAME frame as its ankle joints; the old display spring lagged one.
+    // Never override the directly controlled bed/sofa/shower interaction root.
+    if(!alexShower&&!bedding&&!seating&&!pose&&!socialUsing){
+      display.y=animationStates.alex.walkBob;
+      avatar.setPosition(display.x,display.y,display.z);
+    }
     applyCharacterAnimation(alexRig,animationStates.alex);
     applyShowerAppearance(alexRig,Boolean(alexShower?.privacy),Boolean(alexShower?.bathing));
     snack.enabled=Boolean(alexFridge&&alexFridge.handFood>.012);
@@ -777,6 +784,10 @@ function boot() {
       gait:miraShower?miraShower.gaitMeters*WALK_PHASE_PER_METER:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
     },animDt);
+    if(!miraShower&&!miraBedding&&!miraSeating&&!miraPose&&!socialUsing){
+      miraDisplay.y=animationStates.mira.walkBob;
+      miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
+    }
     applyCharacterAnimation(miraRig,animationStates.mira);
     applyShowerAppearance(miraRig,Boolean(miraShower?.privacy),Boolean(miraShower?.bathing));
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);

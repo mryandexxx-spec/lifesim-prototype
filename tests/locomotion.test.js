@@ -17,13 +17,14 @@ test('stride cycle is tied to metres, not frame count or speed preset',()=>{
 
 test('opposite legs and arms swing; forward knee bends, toes lift',()=>{
   const p=gaitTargets(Math.PI/2,1,70);
-  assert.ok(p.hips[0]>20&&p.hips[1]<-20);
-  assert.ok(p.knees[1]>p.knees[0]+25);
-  assert.ok(p.feet[1]<-8&&p.feet[0]>0);
-  assert.ok(p.arms[0]<-25&&p.arms[1]>25);
-  assert.ok(p.elbows[0]>p.elbows[1]+20);
-  assert.ok(p.spineLean>3&&Math.abs(p.spineTwist)>6);
-  assert.ok(p.hipShift>.04);
+  // Left foot swings clear of the floor, right foot stays in stance.
+  assert.ok(p.hips[0]<-14&&Math.abs(p.hips[1])<16);
+  assert.ok(p.knees[0]>p.knees[1]+35);
+  assert.ok(Math.abs(p.hips[1]+p.knees[1]+p.feet[1])<.0001);
+  assert.ok(p.arms[0]<-16&&p.arms[1]>16);
+  assert.ok(p.elbows[0]>p.elbows[1]+8);
+  assert.ok(p.spineLean>2&&Math.abs(p.spineTwist)>2.5);
+  assert.ok(p.hipShift>.02);
   assert.ok(p.torsoRoll*p.pelvisRoll<0);
 });
 
@@ -52,14 +53,14 @@ test('walk eases in, then eases out without sudden leg or arm snaps',()=>{
   let a=createAnimationState();
   const first=stepAnimation(a,walk(),.016);
   assert.ok(first.walkWeight>0&&first.walkWeight<.15);
-  assert.ok(first.legs[0]>0&&first.legs[0]<6);
+  assert.ok(first.legs[0]<0&&first.legs[0]>-6);
   a=first;
   for(let i=0;i<70;i++)a=stepAnimation(a,walk(),.016);
   assert.ok(a.walkWeight>.98);
-  assert.ok(a.legs[0]>21);
+  assert.ok(a.legs[0]<-14);
   const stop=stepAnimation(a,{id:'alex',walking:false,gait:Math.PI/2},.016);
   assert.ok(stop.walkWeight<a.walkWeight);
-  assert.ok(stop.legs[0]>0&&stop.legs[0]<a.legs[0]);
+  assert.ok(stop.legs[0]<0&&stop.legs[0]>a.legs[0]);
   for(let i=0;i<110;i++)a=stepAnimation(a,{id:'alex',walking:false,gait:Math.PI/2},.016);
   assert.ok(Math.abs(a.legs[0])<.1);
   assert.ok(Math.abs(a.walkBob)<.02);
@@ -91,7 +92,8 @@ test('both residents use the same gait mathematics with different independent st
     alex=stepAnimation(alex,walk('alex',Math.PI/2),.016);
     mira=stepAnimation(mira,walk('mira',-Math.PI/2),.016);
   }
-  assert.ok(alex.legs[0]>20&&mira.legs[0]<-20);
+  assert.ok(alex.knees[0]>alex.knees[1]+35);
+  assert.ok(mira.knees[1]>mira.knees[0]+35);
   assert.ok(alex.walkWeight>.95&&mira.walkWeight>.95);
 });
 
