@@ -932,6 +932,8 @@ function boot() {
       preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:walking&&!seating&&!bedding&&!alexShower,
       social:socialUsing?game.socialAction.kind:null,
+      socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
+      socialElapsed:socialUsing?game.socialAction.elapsed:null,
       actionId:useId,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,

@@ -83,6 +83,19 @@ export function meshClipFor({walking = false, social = null} = {}) {
   return 'Idle_3';
 }
 
+/** Start a real GLB greeting only for the initiator of a friendly conversation.
+ * Time is derived from the simulation (not Date.now), so it freezes on pause
+ * and resumes from the exact same state after reload or a speed change.
+ */
+export const ALEX_GREETING_CLIP='Wave_One_Hand';
+export const ALEX_GREETING_WINDOW_MINUTES=3.6;
+export function alexGreetingClipTime({social=null,initiator=false,elapsed=null,duration=0}={}){
+  if(social!=='talk'||!initiator||!Number.isFinite(elapsed)||
+     elapsed<0||elapsed>=ALEX_GREETING_WINDOW_MINUTES||
+     !Number.isFinite(duration)||duration<=0)return null;
+  return duration*elapsed/ALEX_GREETING_WINDOW_MINUTES;
+}
+
 /** Sofa uses its audited Meshy sit clip; unretargeted bed/fridge/shower must retain legacy. */
 export function canShowMeshy({
   preferred = false, ready = false, actionId = null,

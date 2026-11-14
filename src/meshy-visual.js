@@ -1,5 +1,6 @@
 import {canShowMeshy, meshClipFor, availableMeshClips,
-  MESHY_ASSET_URL, meshPlacement,MESHY_SEAT_RIG_PROFILE} from './meshy-visual-policy.js';
+  MESHY_ASSET_URL, meshPlacement,MESHY_SEAT_RIG_PROFILE,
+  ALEX_GREETING_CLIP,alexGreetingClipTime} from './meshy-visual-policy.js';
 import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} from './meshy-sofa-pose.js';
 import {createSkinnedSeatController} from './meshy-seat-runtime.js';
 
@@ -17,7 +18,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
     .filter(component=>!hiddenFromReplacement.has(component.entity));
   const state={status:'loading',ready:false,root:null,model:null,clip:null,visible:false,error:null,
     scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null,
-    seatRuntime:null,seatWarning:false};
+    seatRuntime:null,seatWarning:false,greetingDuration:0};
   let requested=false;
 
   function attach(container){
@@ -41,6 +42,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
       const clips=(container.resource.animations||[]).map(item=>item.resource);
       if(!availableMeshClips(clips.map(clip=>clip.name)))
         throw Error('Missing required Meshy animation clips');
+      state.greetingDuration=clips.find(clip=>clip.name===ALEX_GREETING_CLIP)?.duration||0;
       for(const clip of clips)model.anim.assignAnimation(
         clip.name,clip,undefined,1,
         !['Sit_to_Stand_Transition_M','Wave_One_Hand','Call_Gesture'].includes(clip.name)
@@ -86,7 +88,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,seat=null,seatMode='vertical',dt=0,
-      bedBusy=false,showerBusy=false,fridgeBusy=false}={}){
+      bedBusy=false,showerBusy=false,fridgeBusy=false,
+      socialInitiator=false,socialElapsed=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
         preferred:requested,ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,fridgeBusy
@@ -147,6 +150,22 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
         }
         // The game's timeline, not independent GLB time/root motion, owns
         // the seat. The scrub was applied before the contact/foot pass.
+        return true;
+      }
+      const greetingTime=alexGreetingClipTime({
+        social,initiator:socialInitiator,elapsed:socialElapsed,
+        duration:state.greetingDuration
+      });
+      if(greetingTime!==null){
+        // Friendly greeting is a deterministic one-shot, not a looping clip.
+        if(state.clip!==ALEX_GREETING_CLIP){
+          anim.baseLayer.play(ALEX_GREETING_CLIP);
+          state.clip=ALEX_GREETING_CLIP;
+        }
+        anim.speed=0;
+        anim.playing=true;
+        anim.baseLayer.activeStateCurrentTime=greetingTime;
+        state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
         return true;
       }
       const target=meshClipFor({walking,social});

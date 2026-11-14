@@ -55,7 +55,9 @@ function fixture({loadError=false,missClip=false}={}){
         const names=missClip?['Idle_3','Walking']:REQUIRED_MESHY_CLIPS;
         asset.resource={
           instantiateRenderEntity(){return model;},
-          animations:names.map(name=>({resource:{name}}))
+          animations:[...new Set([...names,'Wave_One_Hand'])].map(name=>({resource:{
+            name,duration:name==='Wave_One_Hand'?2.4:6.167
+          }}))
         };
         asset.onReady();
       }
@@ -149,4 +151,26 @@ test('new Meshy sofa seat correction stays off when standing and clears the cush
   assert.equal(f.model.position[1],hold,'pause holds corrected seat height');
   visual.update({preferred:true,dt:.20});
   assert.ok(Math.abs(f.model.position[1]-base.y)<1e-8,'standing restores ground reference');
+});
+
+test('Alex waves on approaching friendly social, pauses, then returns to listening',()=>{
+  const f=fixture();
+  const visual=createMeshyVisual({pc:f.pc,app:f.app,rig:f.rig});
+  const talk={preferred:true,social:'talk',socialInitiator:true,actionId:null};
+  visual.update({...talk,socialElapsed:0,dt:.05});
+  assert.ok(f.events.some(e=>e[0]==='play'&&e[1]==='Wave_One_Hand'));
+  assert.equal(f.model.anim.baseLayer.activeStateCurrentTime,0);
+  assert.equal(f.model.anim.speed,0);
+  assert.equal(f.renderers[0].enabled,false);
+  visual.update({...talk,socialElapsed:1.8,paused:true,dt:0});
+  assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime-1.2)<.001);
+  visual.update({...talk,socialElapsed:1.8,paused:true,dt:0});
+  assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime-1.2)<.001);
+  visual.update({...talk,socialElapsed:3.6,dt:.1});
+  assert.ok(f.events.some(e=>e[0]==='transition'&&e[1]==='Listening_Gesture'));
+  assert.equal(f.model.anim.speed,1);
+  visual.update({preferred:true,social:'argue',socialInitiator:true,socialElapsed:0});
+  assert.ok(f.events.some(e=>e[0]==='transition'&&e[1]==='Stand_Talking_Angry'));
+  visual.update({...talk,socialElapsed:0,socialInitiator:false});
+  assert.ok(f.events.some(e=>e[0]==='transition'&&e[1]==='Listening_Gesture'));
 });

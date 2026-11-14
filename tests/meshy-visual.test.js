@@ -5,7 +5,8 @@ import {
   MESHY_ASSET_URL, MESHY_DISPLAY_HEIGHT, MESHY_VISUAL_KEY, meshPlacement,
   MESHY_SOURCE_BOUNDS, MESHY_IDLE_FOOT_LOCAL_Y,
   REQUIRED_MESHY_CLIPS,meshVisualPreference,meshSeatRuntimeSettings,meshClipFor,canShowMeshy,
-  availableMeshClips
+  availableMeshClips,ALEX_GREETING_CLIP,ALEX_GREETING_WINDOW_MINUTES,
+  alexGreetingClipTime
 } from '../src/meshy-visual-policy.js';
 
 test('Meshy is an opt-out visual mode; legacy and URL overrides are supported',()=>{
@@ -95,4 +96,18 @@ test('0.7c regression: full XYZ remains disabled; guarded shoe planting has roll
   assert.deepEqual(meshSeatRuntimeSettings(null,null,'off'),{
     enabled:true,mode:'vertical',footIK:false,footPlant:false
   });
+});
+
+test('Alex uses a real one-shot greeting only for his own friendly conversation',()=>{
+  assert.equal(ALEX_GREETING_CLIP,'Wave_One_Hand');
+  assert.equal(ALEX_GREETING_WINDOW_MINUTES,3.6);
+  assert.equal(alexGreetingClipTime({social:'talk',initiator:true,elapsed:0,duration:2.4}),0);
+  assert.ok(Math.abs(alexGreetingClipTime({social:'talk',initiator:true,elapsed:1.8,duration:2.4})-1.2)<1e-10);
+  for(const params of [
+    {social:'argue',initiator:true,elapsed:0,duration:2.4},
+    {social:'talk',initiator:false,elapsed:0,duration:2.4},
+    {social:'talk',initiator:true,elapsed:3.6,duration:2.4},
+    {social:'talk',initiator:true,elapsed:0,duration:0},
+    {social:null,initiator:true,elapsed:0,duration:2.4}
+  ])assert.equal(alexGreetingClipTime(params),null);
 });
