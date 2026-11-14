@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {createLoadingProgress} from '../src/loading-progress.js';
+import {registerModelCache} from '../src/model-cache.js';
 
 test('startup waits for scene plus both 3D models and reports integer progress',async()=>{
   const progress=[];
@@ -87,4 +88,20 @@ test('model service worker caches both GLBs and skips non-model routes',async()=
   assert.equal(requests.length,2);
   assert.equal(await request('/lifesim-prototype/src/game.js'),null);
   assert.equal(await request('/wrong/assets/characters/meshy-casual-v1.glb'),null);
+});
+
+test('first-visit cache registration waits for active service worker to claim page',async()=>{
+  let handler;
+  const sw={
+    controller:null,
+    register:async()=>({}),
+    addEventListener:(name,fn)=>{assert.equal(name,'controllerchange');handler=fn;},
+    removeEventListener:(name,fn)=>{assert.equal(name,'controllerchange');assert.equal(fn,handler);}
+  };
+  const outcome=registerModelCache(sw);
+  await Promise.resolve();
+  assert.equal(typeof handler,'function');
+  sw.controller={active:true};
+  handler();
+  assert.equal(await outcome,true);
 });
