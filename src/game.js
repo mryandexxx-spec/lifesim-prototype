@@ -7,6 +7,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import { createCharacterRig } from './characters.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
+import {WALK_PHASE_PER_METER} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
@@ -557,8 +558,8 @@ function boot() {
               const step=Math.min(dist,remaining);
               resident.position.x+=dx/dist*step;resident.position.z+=dz/dist*step;
               remaining-=step;
-              if(residentId==='alex')gait+=step*7.2;
-              else miraGait+=step*7.2;
+              if(residentId==='alex')gait+=step*WALK_PHASE_PER_METER;
+              else miraGait+=step*WALK_PHASE_PER_METER;
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
             }
             if(p.index>=p.points.length){
@@ -597,7 +598,7 @@ function boot() {
     const pose=useId&&useId!=='sofa'?ACTOR_POSES[useId]:null;
     const desired=seating?seatPose:{
       x:pose?pose.x:game.position.x,
-      y:pose?pose.y:(walking?Math.abs(Math.sin(gait))*.045:0),
+      y:pose?pose.y:animationStates.alex.walkBob,
       z:pose?pose.z:game.position.z,
       pitch:pose?pose.pitch:0,
       yaw:pose?pose.yaw:socialUsing
@@ -630,7 +631,7 @@ function boot() {
     const miraPose=miraUseId&&miraUseId!=='sofa'?ACTOR_POSES[miraUseId]:null;
     const miraDesired=miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:game.otherSim.position.x,
-      y:miraPose?miraPose.y:(miraWalking?Math.abs(Math.sin(miraGait))*.045:0),
+      y:miraPose?miraPose.y:animationStates.mira.walkBob,
       z:miraPose?miraPose.z:game.otherSim.position.z,
       pitch:miraPose?miraPose.pitch:0,
       yaw:miraPose?miraPose.yaw:socialUsing
