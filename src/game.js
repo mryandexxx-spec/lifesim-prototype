@@ -37,10 +37,12 @@ const visualQuery = new URLSearchParams(window.location.search).get('model') || 
 // Default is guarded vertical-only contact. Full XYZ+IK is explicitly opt-in,
 // not shipped as a user-facing default until it passes real-device QA.
 const seatQuery = new URLSearchParams(window.location.search);
-const seatSettings=meshSeatRuntimeSettings(seatQuery.get('seat'),seatQuery.get('ik'));
+const seatSettings=meshSeatRuntimeSettings(
+  seatQuery.get('seat'),seatQuery.get('ik'),seatQuery.get('legs'));
 const seatMode=seatSettings.mode;
 const seatContactEnabled=seatSettings.enabled;
 const seatIKEnabled=seatSettings.footIK;
+const seatFootPlantEnabled=seatSettings.footPlant;
 let meshyPreferred = meshVisualPreference(null,visualQuery);
 try { meshyPreferred=meshVisualPreference(localStorage.getItem(MESHY_VISUAL_KEY),visualQuery); }
 catch { /* Safari private mode may reject storage; use the in-memory choice. */ }
@@ -379,7 +381,8 @@ function boot() {
   const miraRig=createCharacterRig(rigContext,'mira');
   // Visual-only experimental Alex skin. The procedural rig and every action
   // controller remain authoritative; any GLB error falls back immediately.
-  const meshyAlex=createMeshyVisual({pc,app,rig:alexRig,footIK:seatIKEnabled,onStatus:(status,error)=>{
+  const meshyAlex=createMeshyVisual({pc,app,rig:alexRig,
+    footIK:seatIKEnabled,footPlant:seatFootPlantEnabled,onStatus:(status,error)=>{
     if(status==='ready'&&meshyPreferred)toast('3D-облик Meshy загружен для Алекса');
     if(status==='error')toast('Meshy недоступен: сохранён обычный облик Алекса');
     if(error)console.warn('Meshy visual unavailable',error);
