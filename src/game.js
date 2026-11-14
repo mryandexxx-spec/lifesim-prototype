@@ -879,16 +879,20 @@ function boot() {
     // Alex uses Meshy for free locomotion and social states, but the original
     // established rig remains active for furniture, fridge, bed and shower
     // exit/privateness. Its simulation and save format never change.
-    meshyAlex.update({
-      preferred:meshyPreferred,paused:!active,
+    const meshyShown=meshyAlex.update({
+      preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:walking&&!seating&&!bedding&&!alexShower,
       social:socialUsing?game.socialAction.kind:null,
       actionId:useId,
       sofaBusy:sofaStates.alex.progress>0,
+      sofaWeight:seatPose.sofaWeight,
       bedBusy:bedStates.alex.progress>0,
       showerBusy:showerStates.alex.active,
       fridgeBusy:fridgeLeaving.alex
     });
+    // The existing procedural book is attached to the old right elbow.
+    // Never let it float beside the Meshy hand until a real socket exists.
+    if(meshyShown&&useId==='sofa')book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
     for(const slot of ['left','right']){
