@@ -13,7 +13,11 @@ class Vec3{
   normalize(){let n=this.length();if(n){this.x/=n;this.y/=n;this.z/=n;}return this;}
   dot(v){return this.x*v.x+this.y*v.y+this.z*v.z;}
 }
-class Quat{}
+class Quat{
+  setFromDirections(){return this;}
+  mul2(){return this;}
+  slerp(){return this;}
+}
 class Mat4{
   copy(t){this.model=t.model;this.negative=t.negative;return this;}
   invert(){this.negative=!this.negative;return this;}
@@ -26,7 +30,8 @@ class Mat4{
     return out.set(q.x/scale,q.y/scale,q.z/scale);
   }
 }
-function environment({yaw=180}={}){
+function environment({yaw=180,withLegBones=false}={}){
+  let boneRotations=0;
   const base=meshPlacement();
   const avatar={origin:{x:1.35,y:-.225,z:1.44},yaw,
     getEulerAngles(){return {y:this.yaw};}};
@@ -45,7 +50,25 @@ function environment({yaw=180}={}){
       this.local={...off};
     },
     findByName(name){
-      if(name!==MESHY_SEAT_RIG_PROFILE.pelvisBone)return null;
+      if(name!==MESHY_SEAT_RIG_PROFILE.pelvisBone){
+        if(!withLegBones)return null;
+        const joints={
+          'mixamorig:LeftUpLeg':[.08183475,.53698005,-.71941992],
+          'mixamorig:LeftLeg':[.24037714,.50382335,-.39384406],
+          'mixamorig:LeftFoot':[.14496716,.14261694,-.45998932],
+          'mixamorig:RightUpLeg':[-.11809682,.54384804,-.70488976],
+          'mixamorig:RightLeg':[-.25909585,.52770487,-.36689592],
+          'mixamorig:RightFoot':[-.19542703,.15453119,-.34033732]
+        };
+        const p=joints[name];
+        if(!p)return null;
+        return {
+          getPosition(){return model.getWorldTransform().transformPoint(
+            new Vec3(p[0],p[1],p[2]));},
+          getRotation(){return new Quat();},
+          setRotation(){boneRotations++;}
+        };
+      }
       return {getWorldTransform(){
         return {transformPoint(point,out){
           const local={x:hipLocal.x+point.x,y:hipLocal.y+point.y,z:hipLocal.z+point.z};
@@ -59,7 +82,7 @@ function environment({yaw=180}={}){
     width:2.53,depth:1.05,seatHeight:.35
   }),0);
   const pc={Vec3,Quat,Mat4};
-  return {pc,model,avatar,seat,base,hipLocal};
+  return {pc,model,avatar,seat,base,hipLocal,get boneRotations(){return boneRotations;}};
 }
 test('runtime aligns current animated pelvis to world cushion anchor (no old root Y added)',()=>{
   const {pc,model,avatar,seat,base,hipLocal}=environment();
@@ -190,4 +213,49 @@ test('outlier pelvic transforms fail safely rather than moving the person metres
     horizontalOffset:{x:0,z:0}
   });
   close(idle.offset.y,0);
+});
+
+test('guarded sofa foot planting rotates ONLY thighs/shins, never relocates the mesh root',()=>{
+  const env=environment({withLegBones:true});
+  const controlled=createSkinnedSeatController({
+    pc:env.pc,model:env.model,avatar:env.avatar,
+    profile:MESHY_SEAT_RIG_PROFILE,footIK:false,footPlant:true
+  });
+  assert.equal(controlled.validFootChains,2);
+  const offset=meshySofaOffset(1,env.base.scale);
+  const result=controlled.placeVertical({
+    seat:env.seat,weight:1,base:env.base,scale:env.base.scale,
+    horizontalOffset:offset
+  });
+  assert.equal(result.footChains,2,'both knees and ankles have reachable targets');
+  assert.equal(env.boneRotations,4,'two thighs and two shins adjusted, no entire-body rotation');
+  close(result.offset.x,offset.x);
+  close(result.offset.z,offset.z);
+  assert.ok(result.offset.y>.0&&result.offset.y<.10);
+});
+test('legs=off keeps same safe cushion placement but performs no joint IK',()=>{
+  const env=environment({withLegBones:true});
+  const controlled=createSkinnedSeatController({
+    pc:env.pc,model:env.model,avatar:env.avatar,
+    profile:MESHY_SEAT_RIG_PROFILE,footIK:false,footPlant:false
+  });
+  const result=controlled.placeVertical({
+    seat:env.seat,weight:1,base:env.base,scale:env.base.scale,
+    horizontalOffset:meshySofaOffset(1,env.base.scale)
+  });
+  assert.equal(result.footChains,0);
+  assert.equal(env.boneRotations,0);
+});
+test('foot planting is disabled while walking into or standing up from sofa',()=>{
+  const env=environment({withLegBones:true});
+  const controlled=createSkinnedSeatController({
+    pc:env.pc,model:env.model,avatar:env.avatar,
+    profile:MESHY_SEAT_RIG_PROFILE,footIK:false,footPlant:true
+  });
+  const result=controlled.placeVertical({
+    seat:env.seat,weight:.55,base:env.base,scale:env.base.scale,
+    horizontalOffset:meshySofaOffset(.55,env.base.scale)
+  });
+  assert.equal(result.footChains,0);
+  assert.equal(env.boneRotations,0);
 });
