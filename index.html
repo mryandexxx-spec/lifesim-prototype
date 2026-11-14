@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>life<span>sim</span></b><small>prototype / 0.3</small></div>
+        <div><b>life<span>sim</span></b><small>prototype / 0.3.1</small></div>
       </div>
       <div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div>
     </header>
@@ -32,6 +32,7 @@
     <aside class="control-tray" aria-label="Управление временем">
       <button id="pause-btn" class="round-control" type="button" aria-label="Пауза"><span id="pause-icon">Ⅱ</span></button>
       <button id="speed-btn" class="speed-control" type="button" aria-label="Скорость симуляции">1×</button>
+      <button id="auto-btn" class="auto-control" type="button" aria-pressed="true" aria-label="Автономность включена. Нажмите, чтобы отключить"><span>Авто</span><small id="auto-state">ВКЛ</small></button>
       <button id="reset-camera-btn" class="round-control" type="button" aria-label="Вернуть камеру">⌖</button>
     </aside>
 
@@ -64,7 +65,7 @@
     </footer>
 
     <div class="toast" role="status" id="toast" aria-live="polite"></div>
-    <div class="loading" id="loading"><div class="loading-mark">✦</div><strong>Готовим комнату...</strong><span>LifeSim / прототип 0.3</span></div>
+    <div class="loading" id="loading"><div class="loading-mark">✦</div><strong>Готовим комнату...</strong><span>LifeSim / прототип 0.3.1</span></div>
   </div>
   <script type="module" src="./src/game.js"></script>
   <script>

@@ -9,6 +9,7 @@ export const ACTIONS = Object.freeze({
 });
 const DECAY = { hunger: 0.12, energy: 0.085, hygiene: 0.068, fun: 0.094 };
 export const SAVE_KEY = 'lifesim.room01.v1';
+export const AUTONOMY_WAIT_SECONDS = 12; // Real active-time seconds; x3 never shortens the wait.
 const clamp = value => Math.max(0, Math.min(100, value));
 
 export function newGame() {
@@ -16,7 +17,7 @@ export function newGame() {
     version: 1, minutes: 8 * 60, speed: 1, paused: false,
     needs: { hunger: 78, energy: 67, hygiene: 82, fun: 58 },
     position: { x: -0.25, z: 0.35 }, action: null, event: 'Свободное время',
-    autonomy: { nextAt: 480 },
+    autonomy: { nextAt: 480, enabled: true },
     mind: createMind(480)
   };
   refreshMind(state);
@@ -33,15 +34,41 @@ export function loadGame(data) {
     next.position.z = Math.max(-3.7, Math.min(3.7, data.position.z));
   }
   if (Number.isFinite(data.autonomy?.nextAt)) next.autonomy.nextAt = Math.max(0, Math.min(data.autonomy.nextAt, 10000000));
+  if (typeof data.autonomy?.enabled === 'boolean') next.autonomy.enabled = data.autonomy.enabled;
   restoreMind(data.mind, next);
-  if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase)) {
+  if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase) && (next.autonomy.enabled || !data.action.automatic)) {
     next.action = { id: data.action.id, phase: data.action.phase, elapsed: Math.max(0, Math.min(1000, Number(data.action.elapsed) || 0)), automatic: Boolean(data.action.automatic) };
   }
   return next;
 }
 
+/**
+ * Player preference is saved, but the visible wait after reopening is session-local.
+ * Disabling autonomy cancels only tasks selected by the simulation, never manual work.
+ */
+export function setAutonomyEnabled(state, enabled) {
+  state.autonomy.enabled = enabled === true;
+  if (!state.autonomy.enabled && state.action?.automatic) {
+    state.action = null;
+    state.event = 'Алекс ждёт указаний';
+  }
+  return state.autonomy.enabled;
+}
+
+/**
+ * Pure idle timer. Call once each rendered frame; never accelerate with game.speed.
+ * Pausing freezes elapsed time, while an action or disabled autonomy resets it.
+ */
+export function advanceAutonomyWait(elapsed, seconds, state) {
+  const previous = Number.isFinite(elapsed) ? Math.max(0, Math.min(AUTONOMY_WAIT_SECONDS, elapsed)) : 0;
+  if (state.paused) return previous;
+  if (!state.autonomy?.enabled || state.action) return 0;
+  if (!Number.isFinite(seconds) || seconds <= 0) return previous;
+  return Math.min(AUTONOMY_WAIT_SECONDS, previous + seconds);
+}
+
 export function chooseAction(state, id, automatic = false) {
-  if (!ACTIONS[id] || (automatic && state.minutes < state.autonomy.nextAt)) return false;
+  if (!ACTIONS[id] || (automatic && (!state.autonomy.enabled || state.minutes < state.autonomy.nextAt))) return false;
   state.action = { id, phase: 'walking', elapsed: 0, automatic };
   state.event = automatic ? 'Алекс решил: ' + ACTIONS[id].label.toLowerCase() : ACTIONS[id].label;
   return true;
@@ -73,7 +100,7 @@ export function tick(state, minutes) {
 }
 
 export function autonomousChoice(state) {
-  if (state.paused || state.action || state.minutes < state.autonomy.nextAt) return null;
+  if (state.paused || state.action || !state.autonomy.enabled || state.minutes < state.autonomy.nextAt) return null;
   const hour = Math.floor(state.minutes % 1440 / 60);
   const night = hour >= 22 || hour < 6;
   const critical = Math.min(...NEEDS.map(id => state.needs[id])) < 24;

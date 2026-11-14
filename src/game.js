@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import { ACTIONS, NEEDS, SAVE_KEY, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, readableTime } from './simulation.js';
+import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 
@@ -20,6 +20,7 @@ const META = {
 let selected = null;
 let beginAction = () => false;
 let resetRuntime = () => {};
+let restartAutonomyWait = () => {};
 let toastTimeout;
 function toast(message) {
   const el = $('toast'); el.textContent = message; el.classList.add('show');
@@ -86,10 +87,32 @@ $('speed-btn').addEventListener('click', () => {
   $('speed-btn').textContent = `${game.speed}×`;
   toast(game.speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
 });
+function updateAutoButton() {
+  const enabled = game.autonomy.enabled;
+  $('auto-btn').setAttribute('aria-pressed', String(enabled));
+  $('auto-btn').setAttribute('aria-label', enabled
+    ? 'Автономность включена. Нажмите, чтобы отключить'
+    : 'Автономность выключена. Нажмите, чтобы включить');
+  $('auto-state').textContent = enabled ? 'ВКЛ' : 'ВЫКЛ';
+}
+$('auto-btn').addEventListener('click', () => {
+  const enabled = setAutonomyEnabled(game, !game.autonomy.enabled);
+  restartAutonomyWait();
+  if (enabled) game.event = 'Свободное время';
+  updateAutoButton();
+  save(true);
+  toast(enabled ? 'Автономность включена. Алекс подумает перед действием.'
+    : 'Автономность выключена. Алекс ждёт твоих команд.');
+});
+updateAutoButton();
 $('save-btn').addEventListener('click', () => save());
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
-  game = newGame(); resetRuntime(); save(true); select(null); closeMindPanel(); toast('Новая игра началась');
+  const enabled = game.autonomy.enabled;
+  game = newGame();
+  setAutonomyEnabled(game, enabled); // Respect the player's choice across New Game.
+  resetRuntime(); restartAutonomyWait(); updateAutoButton();
+  save(true); select(null); closeMindPanel(); toast('Новая игра началась');
 });
 window.addEventListener('pagehide', () => save(true));
 window.addEventListener('visibilitychange', () => { if (document.hidden) save(true); });
@@ -262,6 +285,8 @@ function boot() {
   const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0};
   let facing=0, gait=0, effectTime=0, fridgeOpen=0;
   let route=null, routeIndex=0, routeId=null;
+  let autonomyWaitSeconds = 0;
+  restartAutonomyWait = () => { autonomyWaitSeconds = 0; };
   const destination=id=>({x:ACTIONS[id].location[0],z:ACTIONS[id].location[1]});
   function buildRoute(id) {
     const points=findPath(game.position,destination(id));
@@ -270,13 +295,15 @@ function boot() {
     return true;
   }
   beginAction=(id,automatic=false)=>{
-    if(!ACTIONS[id])return false;
+    if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     if(!buildRoute(id)){
       if(!automatic) toast('Алекс не может добраться до предмета');
       else game.autonomy.nextAt=game.minutes+15;
       return false;
     }
-    return chooseAction(game,id,automatic);
+    const started=chooseAction(game,id,automatic);
+    if (started) restartAutonomyWait();
+    return started;
   };
   resetRuntime=()=>{
     route=null;routeId=null;routeIndex=0;facing=0;gait=0;fridgeOpen=0;
@@ -392,7 +419,8 @@ function boot() {
           }
         }
       }
-      if(!game.action){
+      autonomyWaitSeconds = advanceAutonomyWait(autonomyWaitSeconds, dt, game);
+      if (!game.action && autonomyWaitSeconds >= AUTONOMY_WAIT_SECONDS) {
         const idea=autonomousChoice(game);
         if(idea && beginAction(idea,true))toast('Алекс сам решил: '+ACTIONS[idea].label.toLowerCase());
       }
@@ -466,7 +494,7 @@ function boot() {
       }
       $('pause-icon').textContent=game.paused?'▶':'Ⅱ';
       $('speed-btn').textContent=game.speed+'×';
-      const status=game.paused?'Пауза':game.action?.phase==='walking'?'Идёт: '+ACTIONS[game.action.id].label.toLowerCase():game.action?.phase==='using'?ACTIONS[game.action.id].label+' · '+Math.min(100,Math.round(100*game.action.elapsed/ACTIONS[game.action.id].duration))+'%':game.event;
+      const status=game.paused?'Пауза':!game.autonomy.enabled && !game.action?'Алекс ждёт указаний':game.action?.phase==='walking'?'Идёт: '+ACTIONS[game.action.id].label.toLowerCase():game.action?.phase==='using'?ACTIONS[game.action.id].label+' · '+Math.min(100,Math.round(100*game.action.elapsed/ACTIONS[game.action.id].duration))+'%':game.event;
       if(status!==lastStatus){$('status-text').textContent=status;lastStatus=status;}
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.
       for(const [id,meta] of Object.entries(META)){

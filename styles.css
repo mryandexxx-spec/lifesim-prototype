@@ -68,3 +68,9 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .mind-history li{font-size:11px;color:#667d6c;padding:7px 0;border-bottom:1px solid #edf0ec;}
 @media (max-width:700px){.mind-panel{bottom:calc(env(safe-area-inset-bottom) + 162px);} .character-tag small{max-width:154px;}}
 @media (max-height:560px){.mind-panel{bottom:calc(env(safe-area-inset-bottom) + 109px);max-height:55dvh;}}
+
+
+/* LifeSim 0.3.1 — clearly labeled touch control for optional autonomous behavior. */
+.control-tray .auto-control { width:55px;min-width:55px;padding:4px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1.2;font-size:11px;border-color:#b0d8bf;background:#e5f5e8;color:#357f60; }
+.control-tray .auto-control small { font-size:9px;font-weight:800;letter-spacing:.5px; }
+.control-tray .auto-control[aria-pressed="false"] { background:#f3f1ee;color:#777c77;border-color:#dfdfdc; }
