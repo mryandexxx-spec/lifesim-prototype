@@ -38,12 +38,24 @@ export function stepAnimation(previous,signals,dt) {
   // Progress lets the figure bend AFTER approaching and turning; the headless
   // animator remains backward compatible when no progress signal is supplied.
   const sofaWeight=clamp(safe(signals?.sofaWeight,action==='sofa'?1:0),0,1);
+  const bedSitWeight=clamp(safe(signals?.bedSitWeight,0),0,1);
+  const bedReclineWeight=clamp(safe(signals?.bedReclineWeight,action==='bed'?1:0),0,1);
   let legTarget=[0,0],kneeTarget=[0,0],footTarget=[0,0],armTarget=[0,0],
     elbowTarget=[0,0];
   if(sofaWeight>0){
     legTarget=[SOFA_HIP_PITCH*sofaWeight,SOFA_HIP_PITCH*sofaWeight];
     kneeTarget=[SOFA_KNEE_PITCH*sofaWeight,SOFA_KNEE_PITCH*sofaWeight];
     armTarget=[26*sofaWeight,35*sofaWeight];
+  }else if(bedSitWeight>0||bedReclineWeight>0){
+    // Sitting on the side is a real knee/hip bend; straighten the shins as
+    // the entire body reclines around the anchored pelvis.
+    const hip=-73*bedSitWeight-3*bedReclineWeight;
+    const knee=79*bedSitWeight+10*bedReclineWeight;
+    legTarget=[hip,hip];kneeTarget=[knee,knee];
+    armTarget=[24*bedSitWeight+9*bedReclineWeight,
+      28*bedSitWeight+11*bedReclineWeight];
+    elbowTarget=[28*bedSitWeight+14*bedReclineWeight,
+      30*bedSitWeight+14*bedReclineWeight];
   }else if(action==='shower'){
     armTarget=[36+Math.sin(t*5)*12,34-Math.sin(t*4.5)*12];
   }else if(action==='fridge'){
@@ -64,14 +76,14 @@ export function stepAnimation(previous,signals,dt) {
   }
   // The previous slow smoothing filtered nearly half the 0.6b stride amplitude
   // at 1.65 m/s, making changes almost invisible on a phone-sized figure.
-  const speed=social?7:action?5.5:moving?18:8;
+  const speed=social?7:bedSitWeight>0||bedReclineWeight>0?14:action?5.5:moving?18:8;
   const legs=previous.legs.map((v,i)=>blend(v,legTarget[i],speed,step));
   const knees=(previous.knees||[0,0]).map((v,i)=>blend(v,kneeTarget[i],speed,step));
   const feet=(previous.feet||[0,0]).map((v,i)=>blend(v,footTarget[i],speed,step));
   const arms=previous.arms.map((v,i)=>blend(v,armTarget[i],speed,step));
   const elbows=(previous.elbows||[0,0]).map((v,i)=>blend(v,elbowTarget[i],speed,step));
   // Light breathing and conversational emphasis, independent of gameplay logic.
-  const inGait=(moving||walkWeight>.003)&&!sofaWeight;
+  const inGait=(moving||walkWeight>.003)&&!sofaWeight&&!bedSitWeight&&!bedReclineWeight;
   const torsoTarget=action==='bed'?0:social
     ?Math.sin(t*(social==='argue'?4:2.5))*2.1
     :inGait?walkPose.torsoRoll:Math.sin(t*1.4)*.9;
@@ -83,7 +95,7 @@ export function stepAnimation(previous,signals,dt) {
   // Waist pivot brings head, shoulders, eyes and arms along as a coherent
   // upper-body volume. Head-to-hips lean is now visible from the isometric view.
   const spineLean=blend(safe(previous.spineLean,0),
-    inGait?walkPose.spineLean:0,12,step);
+    bedSitWeight>0?-11*bedSitWeight:inGait?walkPose.spineLean:0,12,step);
   const spineTwist=blend(safe(previous.spineTwist,0),
     inGait?walkPose.spineTwist:0,14,step);
   const spineRoll=blend(safe(previous.spineRoll,0),
@@ -101,7 +113,7 @@ export function stepAnimation(previous,signals,dt) {
   const mouthWidthTarget=upset?.061:happy?.109:.088;
   const mouthHeightTarget=upset?.022:happy?.025:.014;
   const browTarget=upset?13:happy?-5:0;
-  const sleeping=action==='bed';
+  const sleeping=action==='bed'&&bedReclineWeight>.65;
   const blink=t%4.1<.11;
   const eyeTarget=sleeping?.04:blink?.16:1;
   return {

@@ -48,11 +48,10 @@ test('manual Alex and Mira can reserve separate halves and recover energy togeth
   game.needs.energy=8;game.otherSim.needs.energy=10;
   assert.equal(chooseResidentAction(game,'bed',false,'alex'),true);
   assert.equal(chooseResidentAction(game,'bed',false,'mira'),true);
-  assert.equal(game.action.bedSlot,'left');
-  assert.equal(game.otherSim.action.bedSlot,'right');
+  assert.notEqual(game.action.bedSlot,game.otherSim.action.bedSlot);
   assert.equal(furnitureAvailable(game,'bed','alex'),true);
-  assert.deepEqual(bedDestinationFor(game,'alex'),BED_SLOTS.left.approach);
-  assert.deepEqual(bedDestinationFor(game,'mira'),BED_SLOTS.right.approach);
+  assert.deepEqual(bedDestinationFor(game,'alex'),BED_SLOTS[game.action.bedSlot].approach);
+  assert.deepEqual(bedDestinationFor(game,'mira'),BED_SLOTS[game.otherSim.action.bedSlot].approach);
   arrive(game);arrive(game.otherSim);
   tickHousehold(game,9);
   assert.ok(game.needs.energy>8&&game.otherSim.needs.energy>10);
@@ -77,15 +76,16 @@ test('save/reload preserves occupied halves and old v1 action objects migrate',(
   const serialized=JSON.stringify(s);
   const restored=loadHousehold(JSON.parse(serialized));
   assert.equal(restored.version,1);
-  assert.equal(restored.action.bedSlot,'left');
-  assert.equal(restored.otherSim.action.bedSlot,'right');
+  assert.equal(restored.action.bedSlot,s.action.bedSlot);
+  assert.equal(restored.otherSim.action.bedSlot,s.otherSim.action.bedSlot);
   assert.equal(restored.otherSim.needs.energy,17);
   assert.equal(restored.selectedSim,'alex');
   const old=JSON.parse(serialized);
   delete old.action.bedSlot;delete old.otherSim.action.bedSlot;
   const migrated=loadHousehold(old);
-  assert.equal(migrated.action.bedSlot,'left');
-  assert.equal(migrated.otherSim.action.bedSlot,'right');
+  assert.ok(validBedSlot(migrated.action.bedSlot));
+  assert.ok(validBedSlot(migrated.otherSim.action.bedSlot));
+  assert.notEqual(migrated.action.bedSlot,migrated.otherSim.action.bedSlot);
   const corrupt=JSON.parse(serialized);
   corrupt.action.bedSlot='right';corrupt.otherSim.action.bedSlot='right';
   const fixed=loadHousehold(corrupt);
@@ -102,10 +102,11 @@ test('one resident leaves bed and frees only their half; other stays asleep',()=
   assert.ok(chooseResidentAction(s,'fridge',false,'alex'));
   assert.equal(s.action.id,'fridge');
   assert.equal(s.otherSim.action.id,'bed');
-  assert.equal(s.otherSim.action.bedSlot,'right');
-  assert.equal(bedSlotFor(s,'alex'),'left');
+  const sleepingSide=s.otherSim.action.bedSlot;
+  assert.ok(validBedSlot(sleepingSide));
+  assert.notEqual(bedSlotFor(s,'alex'),sleepingSide);
   assert.ok(chooseResidentAction(s,'bed',false,'alex'));
-  assert.equal(s.action.bedSlot,'left');
+  assert.notEqual(s.action.bedSlot,sleepingSide);
 });
 test('disabling autonomy removes only automatic beds and retains manual sleep',()=>{
   const s=newHousehold();
@@ -114,7 +115,7 @@ test('disabling autonomy removes only automatic beds and retains manual sleep',(
   setHouseholdAutonomy(s,false);
   assert.equal(s.action,null);
   assert.equal(s.otherSim.action.id,'bed');
-  assert.equal(s.otherSim.action.bedSlot,'right');
+  assert.ok(validBedSlot(s.otherSim.action.bedSlot));
   assert.equal(s.autonomy.enabled,false);
 });
 test('two independent staged bed entries and exits produce smooth bounded motion',()=>{
@@ -123,7 +124,7 @@ test('two independent staged bed entries and exits produce smooth bounded motion
     assert.equal(advanceBedTransition(state,true,slot,0),state);
     assert.equal(advanceBedTransition(state,true,slot,NaN),state);
     let prior=null;
-    for(let i=0;i<160;i++){
+    for(let i=0;i<240;i++){
       state=advanceBedTransition(state,true,slot,1/60);
       const p=bedTransitionPose(state);
       assert.ok(p);
@@ -138,6 +139,7 @@ test('two independent staged bed entries and exits produce smooth bounded motion
     const lying=bedTransitionPose(state);
     assert.ok(near(lying.x,BED_SLOTS[slot].pose.x));
     assert.ok(near(lying.pitch,-85));
+    assert.ok(Math.abs(lying.roll)<.001);
     state=advance(state,false,null,BED_EXIT_SECONDS+.10);
     assert.equal(state.progress,0);
     assert.equal(bedTransitionPose(state),null);

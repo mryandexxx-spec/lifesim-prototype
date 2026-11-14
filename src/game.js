@@ -333,8 +333,8 @@ function boot() {
     game.otherSim.position={x,z};
   }
   game.otherSim.position=nearestWalkable(game.otherSim.position);
-  const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0};
-  const miraDisplay={x:game.otherSim.position.x,y:0,z:game.otherSim.position.z,yaw:0,pitch:0};
+  const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0,roll:0};
+  const miraDisplay={x:game.otherSim.position.x,y:0,z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
   const paths={
     alex:{points:null,index:0,id:null},
@@ -406,8 +406,8 @@ function boot() {
     }
     game.position=nearestWalkable(game.position);
     game.otherSim.position=nearestWalkable(game.otherSim.position);
-    Object.assign(display,{...game.position,y:0,yaw:0,pitch:0});
-    Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0});
+    Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
+    Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
   };
   avatar.setPosition(display.x,display.y,display.z);
   miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
@@ -624,14 +624,18 @@ function boot() {
     display.x=approach(display.x,desired.x,bedding||seating||pose?10:11,animDt);
     display.y=approach(display.y,desired.y,bedding||seating||pose?10:10,animDt);
     display.z=approach(display.z,desired.z,bedding||seating||pose?10:11,animDt);
-    display.pitch=approach(display.pitch,desired.pitch,3.8,animDt);
+    display.pitch=approach(display.pitch,desired.pitch,bedding?10:3.8,animDt);
     display.yaw=approachAngle(display.yaw,desired.yaw,10,animDt);
+    display.roll=approach(display.roll,bedPose?.roll||0,12,animDt);
     avatar.setPosition(display.x,display.y,display.z);
-    avatar.setEulerAngles(display.pitch,display.yaw,0);
+    avatar.setEulerAngles(display.pitch,display.yaw,display.roll);
     if(active)effectTime+=dt*game.speed;
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:walking&&!seating&&!bedding,using:useId,
-      sofaWeight:seatPose.sofaWeight,social:socialUsing?game.socialAction.kind:null,
+      sofaWeight:seatPose.sofaWeight,
+      bedSitWeight:bedPose?.bedSitWeight||0,
+      bedReclineWeight:bedPose?.bedReclineWeight||0,
+      social:socialUsing?game.socialAction.kind:null,
       gait,mood:game.mind?.mood?.value,energy:game.needs.energy
     },animDt);
     applyCharacterAnimation(alexRig,animationStates.alex);
@@ -661,13 +665,16 @@ function boot() {
     miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraBedding||miraSeating||miraPose?10:11,animDt);
     miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraBedding||miraSeating||miraPose?10:10,animDt);
     miraDisplay.z=approach(miraDisplay.z,miraDesired.z,miraBedding||miraSeating||miraPose?10:11,animDt);
-    miraDisplay.pitch=approach(miraDisplay.pitch,miraDesired.pitch,3.8,animDt);
+    miraDisplay.pitch=approach(miraDisplay.pitch,miraDesired.pitch,miraBedding?10:3.8,animDt);
     miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,animDt);
+    miraDisplay.roll=approach(miraDisplay.roll,miraBedPose?.roll||0,12,animDt);
     miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
-    miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,0);
+    miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,miraDisplay.roll);
     animationStates.mira=stepAnimation(animationStates.mira,{
       id:'mira',walking:miraWalking&&!miraSeating&&!miraBedding,using:miraUseId,
       sofaWeight:miraSeatPose.sofaWeight,
+      bedSitWeight:miraBedPose?.bedSitWeight||0,
+      bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       social:socialUsing?game.socialAction.kind:null,gait:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
     },animDt);

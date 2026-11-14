@@ -3,7 +3,8 @@
  */
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled } from './simulation.js';
 import { refreshMind } from './psychology.js';
-import {BED_SLOTS,BED_DEFAULT_SLOT,availableBedSlot,validBedSlot} from './bed-layout.js';
+import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
+import {findPath,nearestWalkable} from './navigation.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 
@@ -51,15 +52,20 @@ export function loadHousehold(raw) {
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
   root.relationship=loadRelationship(raw.relationship,root.minutes);
   root.socialAction=loadSocialAction(raw.socialAction,root);
-  // Old v1 actions had no bedSlot. Assign deterministic non-overlapping slots;
-  // sanitize duplicate/unknown slot values on reloading both residents.
+  // Legacy v1 had no bedSlot. Keep valid reservations first, then assign
+  // any remaining sleepers a distinct free half by actual route distance.
+  // No preference or ownership of a bed side by Alex or Mira.
   const used=[];
   for(const id of HOUSEHOLD_IDS){
     const resident=getActor(root,id);
-    if(resident.action?.id!=='bed')continue;
-    const requested=validBedSlot(resident.action.bedSlot)
-      ?resident.action.bedSlot:BED_DEFAULT_SLOT[id];
-    const slot=availableBedSlot(used,requested);
+    if(resident.action?.id!=='bed'||!validBedSlot(resident.action.bedSlot))continue;
+    if(!used.includes(resident.action.bedSlot))used.push(resident.action.bedSlot);
+    else delete resident.action.bedSlot;
+  }
+  for(const id of HOUSEHOLD_IDS){
+    const resident=getActor(root,id);
+    if(resident.action?.id!=='bed'||validBedSlot(resident.action.bedSlot))continue;
+    const slot=chooseFreeBedSlot(resident.position,used);
     if(slot){resident.action.bedSlot=slot;used.push(slot);}
     else resident.action=null;
   }
@@ -78,8 +84,28 @@ export function selectResident(root,id) {
   return true;
 }
 
-/** A double bed has exactly two independently reserved physical halves.
- * Occupancy is the active action's optional bedSlot, not a new save format.
+/** Choose the nearest *reachable* unoccupied bed half. This is not tied to
+ * identity; either resident can sleep on either side on different nights.
+ */
+export function chooseFreeBedSlot(position,occupied=[]) {
+  const origin=nearestWalkable(position);
+  let best=null,bestCost=Infinity;
+  for(const id of BED_SLOT_IDS){
+    if(occupied.includes(id))continue;
+    const to=BED_SLOTS[id].approach;
+    const path=findPath(origin,to);
+    if(!path)continue;
+    let prev=origin,cost=0;
+    for(const point of path){
+      cost+=Math.hypot(point.x-prev.x,point.z-prev.z);
+      prev=point;
+    }
+    if(cost<bestCost){best=id;bestCost=cost;}
+  }
+  return best;
+}
+/** Two independently reserved physical halves, no owner-specific defaults.
+ * Occupancy is kept in the existing optional v1 action.bedSlot.
  */
 export function bedSlotFor(root,residentId='alex') {
   if(!HOUSEHOLD_IDS.includes(residentId))return null;
@@ -87,9 +113,9 @@ export function bedSlotFor(root,residentId='alex') {
   if(self?.action?.id==='bed'&&validBedSlot(self.action.bedSlot))
     return self.action.bedSlot;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
-  const taken=other?.action?.id==='bed'
-    ?[validBedSlot(other.action.bedSlot)?other.action.bedSlot:BED_DEFAULT_SLOT[residentId==='alex'?'mira':'alex']]:[];
-  return availableBedSlot(taken,BED_DEFAULT_SLOT[residentId]);
+  const taken=other?.action?.id==='bed'&&validBedSlot(other.action.bedSlot)
+    ?[other.action.bedSlot]:[];
+  return chooseFreeBedSlot(self.position,taken);
 }
 export function bedDestinationFor(root,residentId='alex'){
   const slot=bedSlotFor(root,residentId);
