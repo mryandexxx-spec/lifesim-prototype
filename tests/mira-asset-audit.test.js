@@ -29,7 +29,7 @@ test('audit female GLB clip timelines and animated pelvis translation',()=>{
     return {name:a.name,seconds:Math.max(...first,0),channels:a.channels.length,hipTranslations:hip};
   });
   console.log('MIRA_ASSET_TRACKS',JSON.stringify(tracks));
-  const target=root.animations.find(a=>a.name==='Sit_to_Stand_Transition_F');
+  const target=root.animations.find(a=>a.name==='Look_Back_and_Sit');
   const c=target.channels.find(c=>pelvis.some(x=>x.id===c.target.node)&&c.target.path==='translation');
   const sampler=target.samplers[c.sampler],input=root.accessors[sampler.input],output=root.accessors[sampler.output];
   function sample(accessor,index){
@@ -37,7 +37,7 @@ test('audit female GLB clip timelines and animated pelvis translation',()=>{
     const base=binOffset+v.byteOffset+(accessor.byteOffset||0)+index*(v.byteStride||n*4);
     return Array.from({length:n},(_,k)=>glb.readFloatLE(base+k*4));
   }
-  console.log('MIRA_SOFA_HIP_KEYS',JSON.stringify(Array.from({length:input.count},(_,i)=>{
+  console.log('MIRA_LOOK_SIT_HIP_KEYS',JSON.stringify(Array.from({length:input.count},(_,i)=>{
     const t=sample(input,i)[0],v=sample(output,i);
     return [+t.toFixed(4),+v[0].toFixed(5),+v[1].toFixed(5),+v[2].toFixed(5)];
   })));
