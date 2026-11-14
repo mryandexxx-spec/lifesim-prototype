@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHARACTER_IDS, CHARACTER_PROFILES, createCharacterRig } from '../src/characters.js';
+import { CHARACTER_IDS, CHARACTER_PROFILES, HEAD_DIMENSIONS, faceSurfaceDepth, createCharacterRig } from '../src/characters.js';
 import { newHousehold,loadHousehold } from '../src/household.js';
 
 class Entity {
@@ -58,7 +58,7 @@ test('constructor builds both rig contracts once with correct animated pivot geo
     assert.ok(traverse(r.avatar).some(e=>/hair/.test(e.name)));
   }
   assert.notEqual(alex.avatar.name,mira.avatar.name);
-  assert.ok(created.length>=75 && created.length<110,'Keep the static mobile geometry bounded');
+  assert.ok(created.length>=48 && created.length<80,'Keep the static mobile geometry bounded');
 });
 test('rig only uses round geometry for person except the existing held book',()=>{
   const {ctx,created}=rigScene();
@@ -84,4 +84,40 @@ test('invalid resident ID is explicitly rejected before constructing geometry',(
   const {ctx,root}=rigScene();
   assert.throws(()=>createCharacterRig(ctx,'unknown'),RangeError);
   assert.equal(root.children.length,0);
+});
+
+test('facial details sit on head surface rather than floating in front of it',()=>{
+  const {ctx,root}=rigScene();
+  for(const id of CHARACTER_IDS){
+    const rig=createCharacterRig(ctx,id);
+    const body=traverse(rig.avatar);
+    const head=body.find(e=>e.name.endsWith(' head'));
+    assert.ok(head);
+    assert.deepEqual(head.scale,{x:HEAD_DIMENSIONS.width,y:HEAD_DIMENSIONS.height,z:HEAD_DIMENSIONS.depth});
+    for(const eye of [rig.leftEye,rig.rightEye]){
+      assert.ok(eye.position.z>=.15 && eye.position.z<.225,
+        'eye pivot should rest near the ellipsoid face, not 0.4 units away');
+      const children=traverse(eye);
+      assert.equal(children.filter(x=>/pupil$/.test(x.name)).length,1);
+      assert.equal(children.filter(x=>/catchlight$/.test(x.name)).length,1);
+      assert.ok(!children.some(x=>/white$|iris$|glint$/.test(x.name)));
+    }
+    const nose=body.find(x=>x.name.endsWith(' subtle nose'));
+    const mouth=body.find(x=>x.name.endsWith(' little smile'));
+    assert.ok(nose.position.z<.24 && mouth.position.z<.23);
+    assert.ok(nose.scale.x<.05 && mouth.scale.y<.03);
+  }
+  assert.ok(faceSurfaceDepth(0,0)>.2 && faceSurfaceDepth(.10,.035)<faceSurfaceDepth(0,0));
+});
+test('hair volumes stay adjacent to the head, not as detached side clusters',()=>{
+  const {ctx}=rigScene();
+  for(const id of CHARACTER_IDS){
+    const rig=createCharacterRig(ctx,id);
+    for(const node of traverse(rig.avatar).filter(x=>/hair|bob|fringe|side part/.test(x.name))){
+      if(!node.position)continue;
+      assert.ok(Math.abs(node.position.x)<=.24);
+      assert.ok(node.position.z<.17);
+      assert.ok(node.scale.x<.55);
+    }
+  }
 });
