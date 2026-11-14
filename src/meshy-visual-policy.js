@@ -1,7 +1,30 @@
 import {MESHY_SOFA_CLIP} from './meshy-sofa-pose.js';
 /** Pure, engine-independent Meshy appearance policy. Never mutates simulation/save. */
 export const MESHY_ASSET_URL = './assets/characters/meshy-casual-v1.glb';
-export const MESHY_DISPLAY_HEIGHT = 1.78;
+// Audited from the GLB POSITION accessor, NOT the dynamically animated skinned AABB.
+// The 0.7b runtime bound can vary with the loaded pose and shrink Alex on Safari.
+export const MESHY_SOURCE_BOUNDS = Object.freeze({
+  min:Object.freeze({x:-.4431179464,y:0,z:-.1300967932}),
+  max:Object.freeze({x:.4431178868,y:1.7000000477,z:.1300968230})
+});
+export const MESHY_IDLE_FOOT_LOCAL_Y = -.02791073;
+export const MESHY_DISPLAY_HEIGHT = 2.05;
+
+/** Stable asset-specific fit. The idle skinned feet are grounded at world y=0.
+ * This changes only Alex's visual mesh: navigation, collisions and saves are
+ * still driven by the existing original avatar.
+ */
+export function meshPlacement(targetHeight=MESHY_DISPLAY_HEIGHT){
+  if(!Number.isFinite(targetHeight)||targetHeight<=0)throw new RangeError('Invalid height');
+  const {min,max}=MESHY_SOURCE_BOUNDS;
+  const scale=targetHeight/(max.y-min.y);
+  return {
+    scale,
+    x:-(min.x+max.x)*scale/2,
+    y:-MESHY_IDLE_FOOT_LOCAL_Y*scale,
+    z:-(min.z+max.z)*scale/2
+  };
+}
 export const MESHY_VISUAL_KEY = 'lifesim.meshyVisual.v1';
 export const REQUIRED_MESHY_CLIPS = Object.freeze([
   'Idle_3','Walking','Listening_Gesture','Stand_Talking_Angry',MESHY_SOFA_CLIP
