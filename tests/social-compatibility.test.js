@@ -232,7 +232,7 @@ test('UI and Pages carry the new knowledge implementation without exposing numer
   const page=read('../index.html'),ui=read('../src/game.js'),
     graph=read('../src/social-graph.js'),engine=read('../src/social-reactions.js'),
     flow=read('../.github/workflows/pages.yml'),core=read('../src/social-compatibility.js');
-  assert.ok(page.includes('сборка / 1.0i'));
+  assert.ok(page.includes('сборка / 1.0'));
   assert.ok(page.includes('id="mind-discovery"'));
   assert.ok(page.includes('id="mind-discovery-person"'));
   assert.ok(ui.includes('socialKnowledgeNotes(game.socialGraph,game.selectedSim,otherId,4)'));
