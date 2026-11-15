@@ -46,7 +46,7 @@ test('F1 groups real multi-part primitives under saved instance nodes and rewire
 });
 test('F1 static deploy includes module and retains critical needs/assets',()=>{
   assert.match(workflow,/node --check src\/furniture-editor\.js/);
-  assert.match(workflow,/cp src\/furniture-catalog\.js src\/furniture-layout\.js src\/furniture-editor\.js site\/src\//);
+  assert.match(workflow,/cp src\/furniture-catalog\.js src\/furniture-layout\.js src\/furniture-editor\.js src\/furniture-transform\.js site\/src\//);
   assert.match(workflow,/cp src\/need-balance\.js site\/src\//);
   assert.ok(read('../src/household.js').includes('root.world={furniture:restoreFurnitureWorld'));
   assert.ok(read('../src/toilet-interaction.js').includes('TOILET_LAYOUT'));

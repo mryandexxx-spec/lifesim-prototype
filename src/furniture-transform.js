@@ -19,6 +19,8 @@ export function furniturePoint(world,prefabId,point,instanceId=null){
   if(!point||!Number.isFinite(point.x)||!Number.isFinite(point.z))return null;
   const origin=origins.get(prefabId),item=furnitureInstance(world,prefabId,instanceId);
   if(!origin||!item)return null;
+  // Exact legacy identity avoids a one-ulp drift in old v1 bed approach points.
+  if(item.x===origin.x&&item.z===origin.z&&item.yaw===0)return {...point};
   const delta=rotateLocal(point.x-origin.x,point.z-origin.z,item.yaw);
   return {...point,x:item.x+delta.x,z:item.z+delta.z};
 }
