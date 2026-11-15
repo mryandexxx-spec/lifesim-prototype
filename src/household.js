@@ -52,7 +52,9 @@ export function loadHousehold(raw) {
   if (!root.autonomy.enabled && mira.action?.automatic) mira.action=null;
   root.otherSim=mira;
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
-  root.relationship=loadRelationship(raw.relationship,root.minutes);
+  root.relationship=loadRelationship(raw.relationship,root.minutes,{
+    alex:root.mind.memories,mira:mira.mind.memories
+  });
   root.socialAction=loadSocialAction(raw.socialAction,root);
   // Legacy v1 had no bedSlot. Keep valid reservations first, then assign
   // any remaining sleepers a distinct free half by actual route distance.

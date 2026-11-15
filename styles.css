@@ -66,6 +66,15 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .mind-meter i{height:100%;display:block;width:70%;background:#81baa0;transition:width .3s;}
 .mind-emotion-section{padding:10px 12px;border-radius:14px;background:#f2f4ef;margin-bottom:12px;}
 .mind-emotions{font-size:11px;line-height:1.65;color:#486a57;margin-top:5px;white-space:pre-line;overflow-wrap:anywhere;}
+.mind-relationship-section{margin-bottom:12px;padding:11px 12px;background:#f1f6f2;border:1px solid #e4ebe4;border-radius:15px;}
+.mind-relationship-section .eyebrow b{color:#547b65;}
+.mind-relation-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:9px;}
+.mind-relation-axis{min-width:0;font-size:10px;font-weight:700;color:#57705e;}
+.mind-relation-axis output{display:block;font-size:10px;color:#3f7258;margin:3px 0;}
+.mind-relation-track{height:6px;overflow:hidden;background:#dfe9df;border-radius:9px;}
+.mind-relation-track i{display:block;background:#7bb79b;height:100%;width:50%;transition:width .3s;}
+.mind-relation-track.tension i{background:#d39b74;}
+.mind-sentiments{font-size:10px;line-height:1.5;color:#6c8270;margin-top:8px;white-space:pre-line;overflow-wrap:anywhere;}
 .mind-wish{padding:12px;border-radius:16px;background:#eaf5ed;margin-bottom:12px;}
 .mind-wish strong{display:block;color:#385d4a;font-size:14px;margin:5px 0 10px;}
 .mind-wish button{background:#3f9276;color:white;font-weight:800;border:0;border-radius:11px;padding:9px 12px;font-size:12px;width:100%;}

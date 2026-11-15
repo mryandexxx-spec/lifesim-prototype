@@ -216,7 +216,7 @@ test('game supplies both independent visual adapters and includes the female mod
   assert.match(workflow,/node --check src\/meshy-mira-visual\.js/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/Блин<span>’С<\/span>/);
-  assert.match(html,/сборка \/ 0\.8c/);
+  assert.match(html,/сборка \/ 0\.8d/);
 });
 
 test('audited female sit track interpolates measured pelvic translation, no per-sofa offsets',()=>{

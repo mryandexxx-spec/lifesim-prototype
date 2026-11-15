@@ -7,6 +7,7 @@ import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
+import {getPerspective,latestSentiments} from './social-perspective.js';
 import {visibleEmotions} from './emotion-engine.js';
 import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
@@ -1046,6 +1047,17 @@ function boot() {
           ?feelings.map(e=>e.icon+' '+e.label+' · '+e.intensity+'/100 · '+e.cause+
             ' · ещё '+Math.ceil(e.remaining)+' игр. мин.').join('\n')
           :'Сейчас нет сильных переживаний';
+        const perspective=getPerspective(game,game.selectedSim);
+        $('mind-relation-name').textContent='К '+getActorName(game.selectedSim==='alex'?'mira':'alex');
+        for(const axis of ['friendship','trust','tension']){
+          const value=Math.round(perspective[axis]);
+          $('mind-relation-'+axis).textContent=value+'/100';
+          $('mind-relation-'+axis+'-bar').style.width=value+'%';
+        }
+        const sentiments=latestSentiments(perspective,2);
+        $('mind-sentiments').textContent=sentiments.length
+          ?sentiments.map(item=>'• '+item.label+' · '+readableTime(item.at).day).join('\\n')
+          :'Общих событий пока мало';
         const list=$('mind-memories');
         list.replaceChildren();
         const memories=current.mind.memories.slice(-4).reverse();

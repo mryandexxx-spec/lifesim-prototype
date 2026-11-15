@@ -1,6 +1,7 @@
 /** Headless two-person social relationship simulation. */
 import { refreshMind } from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
+import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -33,14 +34,24 @@ export function canReconcile(root){
 }
 
 export function newRelationship(minutes=480) {
-  return {affinity:50,nextSocialAt:minutes+90,lastKind:null};
+  return {affinity:50,nextSocialAt:minutes+90,lastKind:null,
+    views:{alex:newPerspective(50),mira:newPerspective(50)}};
 }
-export function loadRelationship(data,minutes) {
+/** v1 compatibility: shared affinity keeps its exact historical semantics.
+ * Missing directed views are derived without replaying social events.
+ */
+export function loadRelationship(data,minutes,legacyMemories={}){
   const rel=newRelationship(minutes);
-  if(!data||typeof data!=='object'||Array.isArray(data))return rel;
-  if(Number.isFinite(data.affinity))rel.affinity=clamp(Math.round(data.affinity),0,100);
-  if(Number.isFinite(data.nextSocialAt))rel.nextSocialAt=clamp(data.nextSocialAt,0,10000000);
-  if(Object.hasOwn(SOCIAL_ACTIONS,data.lastKind))rel.lastKind=data.lastKind;
+  if(data&&typeof data==='object'&&!Array.isArray(data)){
+    if(Number.isFinite(data.affinity))rel.affinity=clamp(Math.round(data.affinity),0,100);
+    if(Number.isFinite(data.nextSocialAt))rel.nextSocialAt=clamp(data.nextSocialAt,0,10000000);
+    if(Object.hasOwn(SOCIAL_ACTIONS,data.lastKind))rel.lastKind=data.lastKind;
+  }
+  const views=data?.views;
+  rel.views={
+    alex:restorePerspective(views?.alex,rel.affinity,minutes,legacyMemories.alex),
+    mira:restorePerspective(views?.mira,rel.affinity,minutes,legacyMemories.mira)
+  };
   return rel;
 }
 export function relationshipLabel(value) {
@@ -104,6 +115,9 @@ export function tickSocial(root,minutes) {
     resident.mind.memories.push(memory);
     resident.mind.memories=resident.mind.memories.slice(-12);
     feelMemory(resident,memory);
+    // A completed shared interaction leaves two DIFFERENT impressions.
+    // The old affinity meter remains a backwards-compatible shared record.
+    applySocialPerspective(getPerspective(root,id),memory,resident,root.minutes);
     resident.autonomy.nextAt=root.minutes+15;
     resident.event=reconciled?'Удалось помириться'
       :s.kind==='talk'?'Приятно поговорили'
@@ -138,6 +152,10 @@ export function autonomousSocialChoice(root,id='alex') {
   // clocks, random rolls or a new save field.
   if(canReconcile(root)&&root.relationship.affinity<70&&
     lastSocialMemory(self)?.id==='regret')return 'talk';
+  const view=getPerspective(root,id);
+  // High personal tension may influence an idle person's voluntary response.
+  // This never disables the player's manual talk or argue controls.
+  if(self.needs.fun<35&&view?.tension>=65&&self.mind.mood.value<48)return 'argue';
   if(self.needs.fun<55&&root.relationship.affinity>=25)return 'talk';
   if(self.needs.fun<35&&root.relationship.affinity<25&&self.mind.mood.value<45)return 'argue';
   return null;

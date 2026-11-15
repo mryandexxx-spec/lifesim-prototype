@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 0.8c</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 0.8d</small></div>
       </div>
       <div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div>
     </header>
@@ -51,13 +51,22 @@
       <div class="mind-panel-head"><div><span class="eyebrow" id="mind-person">АЛЕКС / ВНУТРЕННИЙ МИР</span><h2>Внутренний мир</h2></div><button id="mind-close" aria-label="Закрыть панель" type="button">×</button></div>
       <div class="mind-mood"><span>Настроение</span><strong id="mind-mood-label">Спокоен</strong><div class="mind-meter"><i id="mind-mood-bar"></i></div></div>
       <div class="mind-emotion-section"><span class="eyebrow">ЧТО ЧУВСТВУЕТ И ПОЧЕМУ</span><div id="mind-emotions" class="mind-emotions" aria-live="off">Сейчас нет сильных переживаний</div></div>
+      <div class="mind-relationship-section" aria-label="Личное отношение к другому персонажу">
+        <span class="eyebrow">ЛИЧНОЕ ОТНОШЕНИЕ <b id="mind-relation-name">К МИРЕ</b></span>
+        <div class="mind-relation-grid">
+          <div class="mind-relation-axis"><span>Дружба</span><output id="mind-relation-friendship">50/100</output><div class="mind-relation-track"><i id="mind-relation-friendship-bar"></i></div></div>
+          <div class="mind-relation-axis"><span>Доверие</span><output id="mind-relation-trust">45/100</output><div class="mind-relation-track"><i id="mind-relation-trust-bar"></i></div></div>
+          <div class="mind-relation-axis"><span>Напряжение</span><output id="mind-relation-tension">0/100</output><div class="mind-relation-track tension"><i id="mind-relation-tension-bar"></i></div></div>
+        </div>
+        <div id="mind-sentiments" class="mind-sentiments">Общих событий пока мало</div>
+      </div>
       <div class="mind-wish"><span class="eyebrow">СЕЙЧАС ХОЧЕТ</span><strong id="mind-wish-label">Устроить уютный отдых</strong><button id="wish-do-btn" type="button">Помочь исполнить ↗</button></div>
       <div class="mind-traits"><span class="eyebrow">ЧЕРТЫ ХАРАКТЕРА</span><div class="mind-tags"><span id="mind-traits-label">Черты характера</span></div><div id="mind-preferences-label" class="mind-preferences">Интересы</div></div>
       <div class="mind-history"><span class="eyebrow">ПОСЛЕДНИЕ ВОСПОМИНАНИЯ</span><ul id="mind-memories"><li>Пока всё впереди</li></ul></div>
     </section>
 
     <section class="social-bar" aria-label="Отношения между жителями">
-      <div class="social-summary"><span class="social-icon" aria-hidden="true">♡</span><div><span class="social-title">ОТНОШЕНИЯ <span id="relationship-value">50/100</span></span><strong id="relationship-label">Нейтрально</strong><div class="social-meter"><i id="relationship-bar"></i></div></div></div>
+      <div class="social-summary"><span class="social-icon" aria-hidden="true">♡</span><div><span class="social-title">ОБЩИЙ УРОВЕНЬ <span id="relationship-value">50/100</span></span><strong id="relationship-label">Нейтрально</strong><div class="social-meter"><i id="relationship-bar"></i></div></div></div>
       <div class="social-controls"><span>Общение с <b id="social-partner">Мирой</b></span><div><button id="talk-btn" type="button">Поговорить</button><button id="argue-btn" type="button">Поспорить</button></div></div>
     </section>
     <div id="social-effect" class="social-effect" aria-hidden="true" hidden>♡</div>
