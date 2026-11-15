@@ -145,8 +145,11 @@ function scheduleCommand(command,residentId=game.selectedSim){
   }
   const task=enqueueAction(game.actionQueues,residentId,command);
   if(!task){toast('Не удалось добавить: очередь заполнена или действие недоступно');return false;}
-  toast(getActorName(residentId)+': запланировано — '+taskLabel({...task,residentId}));
+  // Successful commands are visible in the queue counter, not in a floating
+  // overlay over the game. Screen readers receive a nonblocking confirmation.
   renderQueuePanel(true);
+  $('queue-feedback').textContent=getActorName(residentId)+': добавлено в очередь — '+
+    taskLabel({...task,residentId});
   save(true);
   return true;
 }
@@ -211,6 +214,15 @@ function closeSocialPickers(){
   renderConversationPanel();renderSharedPanel();renderBranchPanel();renderSocialMenu();
 }
 function showSocialCategory(category){
+  // A multi-turn conversation requires the player's next answer, but opening
+  // it is opt-in. Its button becomes "Продолжить беседу" while active.
+  if(category==='conversation'&&game.socialAction?.conversation){
+    closeSocialPickers();
+    conversationTopicPicker=true;
+    select(null);closeMindPanel();
+    renderConversationPanel();
+    return;
+  }
   const peer=game.selectedSim==='alex'?'mira':'alex';
   const status=relationSummary(game.socialGraph,game.selectedSim,peer);
   if(category==='friendship'&&status.friendship==='none'){
@@ -232,16 +244,15 @@ for(const [id,category] of [
 $('social-menu-close').addEventListener('click',()=>{
   socialMenuCategory=null;renderSocialMenu();renderConversationPanel();renderSharedPanel();
 });
+// Close buttons dismiss only presentation. They must NEVER cancel a running
+// task; the deliberate "Прервать текущее действие" control lives in the queue.
 $('conversation-close').addEventListener('click',()=>{
-  if(game.socialAction?.conversation)cancelSocial(game);
   conversationTopicPicker=false;renderConversationPanel();
 });
 $('shared-close').addEventListener('click',()=>{
-  if(game.socialAction?.shared)cancelSocial(game);
   sharedPicker=false;renderSharedPanel();
 });
 $('branch-close').addEventListener('click',()=>{
-  if(game.socialAction?.branchAction)cancelSocial(game);
   branchPicker=false;renderBranchPanel();
 });
 // An unobtrusive seven-tap gesture reveals the full technical graph.
@@ -393,7 +404,9 @@ function renderBranchPanel(force=true){
   const key=JSON.stringify([branchPicker,game.selectedSim,s?.phase,active,game.paused,revision]);
   if(!force&&key===branchDisplayKey)return;
   branchDisplayKey=key;
-  const open=branchPicker||Boolean(active);
+  // This panel is a hidden diagnostic explorer, not a mandatory action modal.
+  // A normal social interaction must never open it automatically.
+  const open=branchPicker;
   $('branch-panel').hidden=!open;
   if(!open)return;
   const opts=$('branch-options');opts.replaceChildren();
@@ -433,7 +446,8 @@ function renderSharedPanel(force=true){
   const key=JSON.stringify([sharedPicker,socialMenuCategory,game.selectedSim,game.paused,action?.phase,session]);
   if(!force&&key===sharedDisplayKey)return;
   sharedDisplayKey=key;
-  const open=sharedPicker||Boolean(session);
+  // The shared activity is displayed in the optional queue UI, not a popup.
+  const open=sharedPicker;
   $('shared-panel').hidden=!open||Boolean(socialMenuCategory);
   if(!open)return;
   const options=$('shared-options');options.replaceChildren();
@@ -456,7 +470,7 @@ function renderSharedPanel(force=true){
     const status=document.createElement('p');
     status.className='shared-progress-text';
     status.textContent=action.phase==='walking'?'Сначала нужно встретиться':
-      'Продолжительность: '+progress+' игровых минут. Можно отменить.';
+      'Продолжительность: '+progress+' игровых минут. Остановить можно в очереди.';
     options.append(status);
     // The current joint activity stays active; the player can still plan
     // another gift or leisure action from the same panel.
@@ -499,11 +513,14 @@ function conversationButton(label,callback,secondary=false){
  */
 function renderConversationPanel(force=true){
   const s=game.socialAction,session=s?.conversation;
+  $('conversation-btn').textContent=session?'Продолжить беседу':'Беседа';
   const key=JSON.stringify([conversationTopicPicker,socialMenuCategory,game.selectedSim,game.paused,
     s?.phase,session?.topic,session?.phase,session?.turns]);
   if(!force&&key===conversationDisplayKey)return;
   conversationDisplayKey=key;
-  const open=conversationTopicPicker||Boolean(session);
+  // Even a live multi-turn conversation must stay dismissible and must not
+  // cover the game unless the player explicitly reopens it via "Беседа".
+  const open=conversationTopicPicker;
   $('conversation-panel').hidden=!open||Boolean(socialMenuCategory);
   if(!open)return;
   const options=$('conversation-options');

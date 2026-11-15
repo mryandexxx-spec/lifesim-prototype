@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=1.0o" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,9 +22,9 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.0n</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.0o</small></div>
       </div>
-      <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
+      <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
 
     <div id="hotspots" class="hotspots" aria-label="Предметы комнаты"></div>
@@ -96,7 +96,7 @@
     <section id="conversation-panel" class="conversation-panel" hidden aria-label="Многоходовый разговор">
       <div class="conversation-head">
         <div><span class="eyebrow">БЕСЕДА</span><h2 id="conversation-title">Выбери тему</h2><p id="conversation-subtitle">О чём поговорим?</p></div>
-        <button id="conversation-close" type="button" aria-label="Отменить беседу">×</button>
+        <button id="conversation-close" type="button" aria-label="Свернуть беседу, не прерывая действие">×</button>
       </div>
       <ol id="conversation-lines" class="conversation-lines"></ol>
       <div id="conversation-options" class="conversation-options"></div>
@@ -104,14 +104,14 @@
     <section id="shared-panel" class="conversation-panel shared-panel" hidden aria-label="Подарки и совместный досуг">
       <div class="conversation-head">
         <div><span class="eyebrow">СОВМЕСТНЫЕ ДЕЛА</span><h2 id="shared-title">Подарки и досуг</h2><p id="shared-subtitle">Что сделать вместе?</p></div>
-        <button id="shared-close" type="button" aria-label="Закрыть или отменить совместное дело">×</button>
+        <button id="shared-close" type="button" aria-label="Закрыть окно, не прерывая совместное дело">×</button>
       </div>
       <div id="shared-options" class="conversation-options"></div>
     </section>
     <section id="branch-panel" class="conversation-panel shared-panel" hidden aria-label="Знакомство, дружба и вражда">
       <div class="conversation-head">
         <div><span class="eyebrow">ОТНОШЕНИЯ</span><h2 id="branch-title">Знакомые</h2><p id="branch-subtitle">История и доступные действия</p></div>
-        <button id="branch-close" type="button" aria-label="Закрыть или отменить действие">×</button>
+        <button id="branch-close" type="button" aria-label="Закрыть окно, не прерывая действие">×</button>
       </div>
       <div id="branch-options" class="conversation-options"></div>
     </section>
@@ -144,7 +144,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js"></script>
+  <script type="module" src="./src/game.js?v=1.0o"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');
