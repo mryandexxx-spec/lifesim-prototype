@@ -22,7 +22,9 @@ const BRANCH_TAGS=Object.freeze({
   'rival.taunt':'socializing',
   'rival.truce':'socializing',
   'romance.flirt':'socializing',
-  'romance.confess':'socializing'
+  'romance.confess':'socializing',
+  'romance.date':'socializing',
+  'romance.breakup':'socializing'
 });
 const BRANCH_THRESHOLDS=Object.freeze({
   'acquaint.introduce':-Infinity,
@@ -32,7 +34,9 @@ const BRANCH_THRESHOLDS=Object.freeze({
   'rival.taunt':Infinity,
   'rival.truce':24,
   'romance.flirt':36,
-  'romance.confess':43
+  'romance.confess':43,
+  'romance.date':52,
+  'romance.breakup':42
 });
 const unwell=emotion=>['sadness','irritation','anxiety'].includes(emotion.kind);
 const delighted=emotion=>['joy','enthusiasm','inspiration'].includes(emotion.kind);

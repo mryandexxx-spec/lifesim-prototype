@@ -235,6 +235,30 @@ export function tickSocial(root,minutes){
           get(root,s.initiator)?.personality).bias});
     if(!response){root.socialAction=null;return false;}
     s.branchAction.resultType=response.type;
+    if(s.branchAction.id==='romance.date'||s.branchAction.id==='romance.breakup'){
+      // Pair commitments are a separate, explicitly completed graph milestone.
+      // Neither accepting a date nor voluntarily separating fabricates a
+      // generic talk memory, shared-affinity gain or an argument.
+      const completed=recordPairCompletion(root,s,response.type);
+      root.socialAction=null;
+      if(!completed)return false;
+      root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
+      const dating=response.type==='romance.date';
+      const separated=response.type==='romance.breakup';
+      get(root,s.initiator).event=dating?'Теперь встречаются':
+        separated?'Решил(а) завершить отношения':'Уважает отказ';
+      get(root,s.partner).event=dating?'Теперь встречаются':
+        separated?'Отношения закончились':'Предпочёл(ла) подождать';
+      for(const id of [s.initiator,s.partner])
+        get(root,id).autonomy.nextAt=root.minutes+15;
+      emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,
+        outcome:response.outcome,intensity:response.intensity,
+        eventType:'branch.reply'});
+      emitSocialReaction(root,{actorId:s.partner,responderId:s.initiator,
+        outcome:dating?'warm':separated?'awkward':'awkward',
+        eventType:'branch.initiator'});
+      return true;
+    }
     // Respectful romantic refusal: no quarrel, imposed fun, shared-affinity
     // penalty or fake positive memory. Only a canonical refusal + cooldown.
     if(s.branchAction.id.startsWith('romance.')&&!response.accepted){

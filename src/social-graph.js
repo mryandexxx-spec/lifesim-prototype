@@ -138,10 +138,11 @@ export function observePairViews(graph,idA,idB,views){
 }
 const POSITIVE=new Set(['talk','conversation.talk','gift.accepted','leisure.accepted',
   'acquaint.chat','friend.tease','friend.confide','rival.truce',
-  'romance.flirt','romance.confess']);
+  'romance.flirt','romance.confess','romance.date']);
 const NEGATIVE=new Set(['argue','conversation.argue','gift.refused','leisure.refused',
   'rival.taunt','friend.tease.refused','friend.confide.refused','rival.truce.refused','acquaint.chat.refused',
-  'romance.flirt.refused','romance.confess.refused']);
+  'romance.flirt.refused','romance.confess.refused',
+  'romance.date.refused','romance.breakup']);
 const TYPES=new Set([...POSITIVE,...NEGATIVE,'introduced']);
 const positive=type=>POSITIVE.has(type);
 const weights={
@@ -155,6 +156,7 @@ const weights={
   'rival.truce':{friendship:4,trust:6,tension:-10},
   'romance.flirt':{friendship:1,trust:1,tension:-1},
   'romance.confess':{friendship:2,trust:2,tension:-1},
+  'romance.date':{friendship:2,trust:2,tension:-1},
   argue:{friendship:-9,trust:-9,tension:12},
   'conversation.argue':{friendship:-9,trust:-9,tension:12},
   'gift.refused':{friendship:-2,trust:-3,tension:4},
@@ -165,7 +167,9 @@ const weights={
   'rival.truce.refused':{friendship:-2,trust:-2,tension:6},
   'acquaint.chat.refused':{friendship:-2,trust:-2,tension:3},
   'romance.flirt.refused':{friendship:0,trust:-1,tension:1},
-  'romance.confess.refused':{friendship:0,trust:-2,tension:2}
+  'romance.confess.refused':{friendship:0,trust:-2,tension:2},
+  'romance.date.refused':{friendship:0,trust:-1,tension:1},
+  'romance.breakup':{friendship:0,trust:-1,tension:1}
 };
 function recompute(pair){
   const [a,b]=pair.ids,v=pair.views;
@@ -199,7 +203,13 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
     event.actorId===event.targetId||!Number.isSafeInteger(graph?.nextSeq))return null;
   const romanceEvent=ROMANCE_ACTION_IDS.some(id=>
     event.type===id||event.type===id+'.refused');
-  if(romanceEvent&&!romanceSafety(graph,event.actorId,event.targetId).allowed)return null;
+  if(romanceEvent&&event.type!=='romance.breakup'&&
+    !romanceSafety(graph,event.actorId,event.targetId).allowed)return null;
+  // A canonical relationship milestone must be eligible even when written by
+  // a headless client directly; otherwise an event could bypass consent gates.
+  if(['romance.date','romance.breakup'].includes(event.type)&&
+    !romanceAvailability(graph,event.actorId,event.targetId,event.type,event.at).enabled)
+    return null;
   const pair=getOrCreatePair(graph,event.actorId,event.targetId);
   if(!pair)return null;
   if(pair.metAt===null)pair.metAt=event.at;
@@ -266,7 +276,9 @@ export const BRANCH_ACTIONS=Object.freeze({
   'rival.taunt':action('Высказать претензию','conflict','Нужна устойчивая неприязнь'),
   'rival.truce':action('Предложить перемирие','conflict','Примиряться пока не с кем'),
   'romance.flirt':action('Осторожно пофлиртовать','romance','Пока рано для флирта'),
-  'romance.confess':action('Признаться в симпатии','romance','Нужна взаимная симпатия')
+  'romance.confess':action('Признаться в симпатии','romance','Нужна взаимная симпатия'),
+  'romance.date':action('Предложить встречаться','romance','Необходимы взаимные чувства'),
+  'romance.breakup':action('Расстаться','romance','Вы пока не пара')
 });
 export function availableSocialActions(graph,a,b,minutes=0){
   if(!validPersonId(a)||!validPersonId(b)||a===b||
@@ -300,6 +312,12 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
     compatibilityBias:context.compatibilityBias??0
   });
   if(!reaction)return null;
+  if(id==='romance.breakup'){
+    // A resident may leave a relationship independently. A partner may be
+    // hurt or relieved, but cannot veto the separation.
+    return {accepted:true,type:id,id,outcome:reaction.score>=55?'awkward':'defensive',
+      intensity:reaction.intensity,label:'Больше не встречаются'};
+  }
   const isRomance=ROMANCE_ACTION_IDS.includes(id);
   // A romance request is a verbal invitation, not a forced physical act.
   // Missing or distressed current recipient data is a respectful refusal.
@@ -313,7 +331,8 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
     id==='rival.taunt'?id:accepted?id:id+'.refused';
   return {accepted,type,id,outcome:isRomance&&!accepted?'refused':reaction.outcome,
     intensity:reaction.intensity,label:isRomance
-      ?accepted?id==='romance.flirt'?'Ответил(а) на флирт':'Чувства приняты'
+      ?accepted?id==='romance.flirt'?'Ответил(а) на флирт':
+        id==='romance.date'?'Решили встречаться':'Чувства приняты'
         :'Собеседник предпочёл сохранить дистанцию'
       :accepted?
     id==='friend.tease'?'Шутку оценили':id==='friend.confide'?'Секрет принят':
@@ -363,7 +382,8 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
       p.events=Array.isArray(entry.events)?entry.events.filter(e=>record(e)&&
         Number.isSafeInteger(e.seq)&&e.seq>0&&e.seq<graph.nextSeq&&
         TYPES.has(e.type)&&safeAt(e.at)&&
-        (!ROMANCE_ACTION_IDS.some(id=>e.type===id||e.type===id+'.refused')||
+        (e.type==='romance.breakup'||
+          !ROMANCE_ACTION_IDS.some(id=>e.type===id||e.type===id+'.refused')||
           romanceSafety(graph,e.actorId,e.targetId).allowed)&&
         e.actorId!==e.targetId&&
         pairIds.includes(e.actorId)&&pairIds.includes(e.targetId)).slice(-EVENT_LIMIT)
@@ -378,6 +398,18 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
         p.lastAt===null?1e7:p.lastAt);
       // Preserve verified historical friendship milestones, no fresh events.
     }
+  }
+  // Save validation must also protect N-resident exclusivity. Reject a
+  // conflicting/stale commitment rather than silently forging two partners.
+  const occupied=new Set();
+  for(const pair of Object.values(graph.pairs)){
+    const bond=pair.romance?.bond;
+    if(bond?.status!=='dating')continue;
+    if(!romanceSafety(graph,...pair.ids).allowed||
+      pair.lastAt===null||!safeAt(bond.since)||
+      bond.since>pair.lastAt||pair.ids.some(id=>occupied.has(id))){
+      pair.romance.bond={status:'none',since:null,ex:false,lastEndedAt:null};
+    }else for(const id of pair.ids)occupied.add(id);
   }
   if(record(legacyPair)){
     const {ids:pairIds,at,views}=legacyPair;

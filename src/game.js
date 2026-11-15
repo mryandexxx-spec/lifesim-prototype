@@ -262,7 +262,8 @@ function renderSocialMenu(force=true){
   const targetId=game.selectedSim==='alex'?'mira':'alex';
   const status=relationSummary(game.socialGraph,game.selectedSim,targetId);
   const rev=game.socialGraph?.pairs?.[JSON.stringify([game.selectedSim,targetId].sort())]?.revision||0;
-  const key=JSON.stringify([category,game.selectedSim,status.friendship,status.rivalry,rev]);
+  const key=JSON.stringify([category,game.selectedSim,status.friendship,status.rivalry,rev,
+    category==='romance'?Math.floor(game.minutes/30):null]);
   if(!force&&key===socialMenuDisplayKey)return;
   socialMenuDisplayKey=key;
   $('social-menu-panel').hidden=!category;
