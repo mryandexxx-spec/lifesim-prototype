@@ -39,6 +39,7 @@ function fakeDom(){
           on?classes.add(name):classes.delete(name)},
         setAttribute:(key,value)=>attrs.set(key,value),
         removeAttribute:key=>attrs.delete(key),
+        querySelectorAll(){return this.children;},
         replaceChildren(){this.children=[];},
         append(...els){this.children.push(...els);},
         focus(){this.focused=true;},
@@ -160,7 +161,8 @@ test('1.0s: actual browser panel is compact, modal, unclosable and has end actio
     conversationOptions:()=>[{id:'daily.ask',label:'Как прошёл день?'}],
     conversationButton:(label,handler,secondary=false)=>({label,handler,secondary}),
     document:{createElement:()=>({textContent:'',className:''})},
-    endPlayerConversation:()=>{},CONVERSATION_MAX_TURNS:3
+    endPlayerConversation:()=>{},CONVERSATION_MAX_TURNS:3,
+    requiredChoiceFocus:{activate:required=>{if(required)$('conversation-panel').focus();},focusChoice:()=>{}}
   };
   runInNewContext(extract('function renderConversationPanel(force=true){',
     'renderConversationPanel();\nrenderSharedPanel();'),scope);
