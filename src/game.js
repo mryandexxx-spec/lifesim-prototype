@@ -301,7 +301,10 @@ $('mind-toggle').addEventListener('click', () => {
   const open = $('mind-panel').hidden;
   $('mind-panel').hidden = !open;
   $('mind-toggle').setAttribute('aria-expanded', String(open));
-  if (open){closeInsightPanel();setViewOpen(false);select(null);}
+  if (open){
+    closeInsightPanel();setViewOpen(false);closeSocialContext();
+    queueVisible=false;renderQueuePanel(true);select(null);
+  }
 });
 $('mind-close').addEventListener('click', closeMindPanel);
 $('wish-do-btn').addEventListener('click', () => {
@@ -312,7 +315,10 @@ $('wish-do-btn').addEventListener('click', () => {
   }
 });
 function select(id) {
-  if (id){closeInsightPanel();closeMindPanel();closeSocialContext();setViewOpen(false);}
+  if (id){
+    closeInsightPanel();closeMindPanel();closeSocialContext();setViewOpen(false);
+    queueVisible=false;renderQueuePanel(true);
+  }
   selected = id;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
