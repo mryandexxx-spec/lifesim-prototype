@@ -6,15 +6,19 @@ import {SOCIAL_NEED_INITIAL,SOCIAL_NEED_LEGACY_DEFAULT,socialNeedDecayRate} from
 import {validBedSlot,BED_SLOTS} from './bed-layout.js';
 import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
-export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun']);
+import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-interaction.js';
+export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','bladder']);
 export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
   bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
   fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
-  sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 0.96, location: [1.35, 0.52] }
+  sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 0.96, location: [1.35, 0.52] },
+  toilet: { label: 'Сходить в туалет', need: 'bladder', duration: 26,
+    benefitPerMinute: 2.7, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] }
 });
-const DECAY = { hunger: 0.12, energy: 0.085, hygiene: 0.068, fun: 0.094 };
+const DECAY = { hunger: 0.12, energy: 0.085, hygiene: 0.068, fun: 0.094, bladder:0.145 };
+export const BLADDER_LEGACY_DEFAULT=75;
 export const SAVE_KEY = 'lifesim.room01.v1';
 export const AUTONOMY_WAIT_SECONDS = 12; // Real active-time seconds; x3 never shortens the wait.
 const clamp = value => Math.max(0, Math.min(100, value));
@@ -22,7 +26,7 @@ const clamp = value => Math.max(0, Math.min(100, value));
 export function newGame(profile=DEMO_PROFILES.first) {
   const state = {
     version: 1, minutes: 8 * 60, speed: 1, paused: false,
-    needs: { hunger: 78, energy: 67, hygiene: 82, fun: 58, social:SOCIAL_NEED_INITIAL },
+    needs: { hunger: 78, energy: 67, hygiene: 82, fun: 58, social:SOCIAL_NEED_INITIAL, bladder:76 },
     position: { x: -0.25, z: 0.35 }, action: null, event: 'Свободное время',
     autonomy: { nextAt: 480, enabled: true },
     personality:restoreProfile(profile,DEMO_PROFILES.first),
@@ -41,6 +45,8 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
   // Missing field in a pre-M3 v1 save is neutral, never a fabricated
   // completed conversation, a reset of progress, or sudden isolation.
   if (!Number.isFinite(data.needs.social)) next.needs.social=SOCIAL_NEED_LEGACY_DEFAULT;
+  // M4 is an optional v1 field; don't reset old progress or invent accidents.
+  if (!Number.isFinite(data.needs.bladder)) next.needs.bladder=BLADDER_LEGACY_DEFAULT;
   if (Number.isFinite(data.position.x) && Number.isFinite(data.position.z)) {
     next.position.x = Math.max(-4.5, Math.min(4.5, data.position.x));
     next.position.z = Math.max(-3.7, Math.min(3.7, data.position.z));
@@ -121,15 +127,23 @@ export function tick(state, minutes) {
       const overlap=Math.max(0,Math.min(state.action.elapsed+amount,to)
         -Math.max(state.action.elapsed,from));
       gained=definition.benefitPerMinute*overlap/(SHOWER_WASH_END-SHOWER_WASH_START);
+    }else if(state.action.id==='toilet'){
+      // Real relief only during the privacy-enclosed seated window.
+      const from=definition.duration*TOILET_RELIEF_START;
+      const to=definition.duration*TOILET_RELIEF_END;
+      const overlap=Math.max(0,Math.min(state.action.elapsed+amount,to)
+        -Math.max(state.action.elapsed,from));
+      gained=definition.benefitPerMinute*overlap/(TOILET_RELIEF_END-TOILET_RELIEF_START);
     }
     // M2 affects enjoyment of optional rest, not animation time, eating,
     // sleep, shower privacy, or promises of physical self-care.
     if(state.action.id==='sofa')gained*=voluntaryMoodEfficiency(state,
       {type:'object',actionId:'sofa'});
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
+    refreshMind(state);
     state.action.elapsed += amount;
     if (state.action.elapsed >= definition.duration ||
-        (!['fridge','shower'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['fridge','shower','toilet'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       state.event = definition.label + ' — готово';
       rememberAction(state, state.action.id);
       state.autonomy.nextAt = state.minutes + 7; // short break between autonomous tasks
@@ -150,6 +164,7 @@ export function autonomousChoice(state) {
     { id: 'fridge', need: 'hunger', threshold: 43, weight: 1.25 },
     { id: 'bed', need: 'energy', threshold: 42, weight: 1.12 },
     { id: 'shower', need: 'hygiene', threshold: 40, weight: 0.95 },
+    { id: 'toilet', need: 'bladder', threshold: 53, weight: 1.67 },
     { id: 'sofa', need: 'fun', threshold: 37, weight: 0.90 }
   ];
   const scored = options.map(option => {

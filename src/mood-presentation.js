@@ -7,7 +7,7 @@ import {reactionBadgePoint} from './social-feedback.js';
 const clamp=value=>Number.isFinite(value)?Math.max(0,Math.min(100,value)):50;
 export const NEED_LABELS=Object.freeze({
   hunger:'Сытость',energy:'Энергия',hygiene:'Гигиена',fun:'Досуг',
-  social:'Общение'
+  social:'Общение',bladder:'Туалет'
 });
 export const NEED_TONES=Object.freeze([
   Object.freeze({id:'critical',min:0,label:'Критично',color:'#d9756a'}),
@@ -36,7 +36,8 @@ const NEED_REASONS=Object.freeze({
   energy:['Сильно устал','Нуждается в отдыхе'],
   hygiene:['Нуждается в душе','Хочет освежиться'],
   fun:['Сильно скучает','Не хватает досуга'],
-  social:['Чувствует одиночество','Не хватает общения']
+  social:['Чувствует одиночество','Не хватает общения'],
+  bladder:['Срочно нужно в туалет','Пора в туалет']
 });
 /** Causes only from validated needs and *actual* stored emotion receipts;
  * never claim a fictional event or invent a seventh need.

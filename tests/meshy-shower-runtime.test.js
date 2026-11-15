@@ -90,7 +90,7 @@ test('game keeps established opacity security and publishes new runtime',()=>{
   const visual=readFileSync(new URL('../src/meshy-visual.js',import.meta.url),'utf8');
   const chars=readFileSync(new URL('../src/characters.js',import.meta.url),'utf8');
   const pages=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
-  assert.match(game,/applyShowerAppearance\(alexRig,Boolean\(alexShower\?\.privacy\)/);
+  assert.match(game,/applyShowerAppearance\(alexRig,Boolean\(alexShower\?\.privacy\|\|alexToilet\?\.privacy\)/);
   assert.match(game,/showerPrivacy\.enabled=Boolean\(alexShower\?\.privacy\|\|miraShower\?\.privacy\)/);
   assert.match(game,/showerFrame:alexShower/);
   assert.match(chars,/rig\.avatar\.enabled=!masked/);

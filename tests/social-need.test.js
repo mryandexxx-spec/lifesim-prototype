@@ -28,8 +28,8 @@ function setSocial(root,value){
 
 test('M3: fresh residents have independent fifth social need and existing identifiers remain stable',()=>{
   const a=newGame(),b=newGame(),house=newHousehold();
-  assert.deepEqual(NEEDS,['hunger','energy','hygiene','fun','social']);
-  assert.deepEqual(PHYSICAL_NEEDS,['hunger','energy','hygiene','fun']);
+  assert.deepEqual(NEEDS,['hunger','energy','hygiene','fun','bladder','social']);
+  assert.deepEqual(PHYSICAL_NEEDS,['hunger','energy','hygiene','fun','bladder']);
   assert.equal(NEED_LABELS.social,'Общение');
   assert.equal(a.needs.social,SOCIAL_NEED_INITIAL);
   assert.equal(house.otherSim.needs.social,76);

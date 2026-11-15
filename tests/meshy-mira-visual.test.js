@@ -516,7 +516,7 @@ test('female shower preserves the game enforced opaque privacy boundary',()=>{
   const chars=readFileSync(new URL('../src/characters.js',import.meta.url),'utf8');
   const visual=readFileSync(new URL('../src/meshy-mira-visual.js',import.meta.url),'utf8');
   const shower=readFileSync(new URL('../src/shower-interaction.js',import.meta.url),'utf8');
-  assert.match(game,/applyShowerAppearance\(miraRig,Boolean\(miraShower\?\.privacy\)/);
+  assert.match(game,/applyShowerAppearance\(miraRig,Boolean\(miraShower\?\.privacy\|\|miraToilet\?\.privacy\)/);
   assert.match(game,/showerPrivacy\.enabled=Boolean\(alexShower\?\.privacy\|\|miraShower\?\.privacy\)/);
   assert.match(game,/showerFrame:miraShower/);
   assert.match(chars,/rig\.avatar\.enabled=!masked/);

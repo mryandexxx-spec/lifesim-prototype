@@ -9,7 +9,8 @@ import {refreshMind} from '../src/psychology.js';
 
 test('M1 palettes cover every boundary with predictable accessible bands',()=>{
   assert.equal(NEED_LABELS.hunger,'Сытость');
-  assert.deepEqual(NEEDS,['hunger','energy','hygiene','fun','social']);
+  assert.deepEqual(NEEDS,['hunger','energy','hygiene','fun','bladder','social']);
+  assert.equal(NEED_LABELS.bladder,'Туалет');
   assert.equal(NEED_LABELS.social,'Общение');
   for(const [n,label] of [[0,'Критично'],[19,'Критично'],[20,'Низко'],
     [44,'Низко'],[45,'Норма'],[74,'Норма'],[75,'Хорошо'],[100,'Хорошо']])
@@ -33,7 +34,7 @@ test('M1 reasons come from current needs and canonically validated emotions',()=
   const before=JSON.stringify(s);
   moodPresentation(s);moodReasons(s);
   assert.equal(JSON.stringify(s),before,'render views must be read-only');
-  s.needs={hunger:95,energy:96,hygiene:88,fun:93,social:92};
+  s.needs={hunger:95,energy:96,hygiene:88,fun:93,social:92,bladder:93};
   refreshMind(s);
   assert.deepEqual(moodReasons(s),['Основные потребности удовлетворены']);
 });

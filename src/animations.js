@@ -43,6 +43,8 @@ export function stepAnimation(previous,signals,dt) {
   // Progress lets the figure bend AFTER approaching and turning; the headless
   // animator remains backward compatible when no progress signal is supplied.
   const sofaWeight=clamp(safe(signals?.sofaWeight,action==='sofa'?1:0),0,1);
+  const toiletWeight=clamp(safe(signals?.toiletSitWeight,0),0,1);
+  const toiletStep=clamp(safe(signals?.toiletStep,0),0,1);
   const bedStepWeight=clamp(safe(signals?.bedStepWeight,0),0,1);
   const bedSitWeight=clamp(safe(signals?.bedSitWeight,0),0,1);
   const bedReclineWeight=clamp(safe(signals?.bedReclineWeight,action==='bed'?1:0),0,1);
@@ -84,6 +86,18 @@ export function stepAnimation(previous,signals,dt) {
         19*bedSitWeight+14*bedReclineWeight]
       :[19*bedSitWeight+14*bedReclineWeight,
         41*bedSitWeight+18*bedSwing+14*bedReclineWeight];
+  }else if(toiletWeight>0||action==='toilet'){
+    // Sitting is driven by the real toilet seat, never a generic standing idle
+    // through the recovery window. All private poses remain behind the opaque
+    // mosaic. Knees and thighs bend gradually before standing again.
+    legTarget=[-67*toiletWeight,-67*toiletWeight];
+    kneeTarget=[78*toiletWeight,78*toiletWeight];
+    armTarget=[12*toiletWeight,12*toiletWeight];
+    elbowTarget=[19*toiletWeight,19*toiletWeight];
+    if(toiletStep>.015){
+      legTarget=walkPose.hips.map((v,i)=>v*toiletStep+legTarget[i]*(1-toiletStep));
+      kneeTarget=walkPose.knees.map((v,i)=>v*toiletStep+kneeTarget[i]*(1-toiletStep));
+    }
   }else if(action==='shower' || signals?.showerExiting){
     const step=clamp(safe(signals?.showerStep,0),0,1);
     if(step>.015){
