@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.1d" />
+  <link rel="stylesheet" href="./styles.css?v=1.1e" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.1d</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.1e</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -145,7 +145,7 @@
     </section>
 
 
-    <footer class="dashboard">
+    <footer id="dashboard" class="dashboard" data-collapsed="false" aria-label="Панель персонажа">
       <div class="resident-column">
         <div class="resident-switch" role="group" aria-label="Кем управлять">
           <button id="pick-alex" type="button" aria-pressed="true">Алекс</button>
@@ -170,6 +170,7 @@
         </div>
         <button id="insight-toggle" type="button" class="insight-toggle" aria-controls="insight-panel" aria-expanded="false">Почему?</button>
       </div>
+      <button id="hud-toggle" class="hud-toggle" type="button" aria-controls="dashboard" aria-expanded="true" aria-label="Свернуть панель персонажа">⌄</button>
     </footer>
 
     <section id="insight-panel" class="insight-panel" hidden aria-labelledby="insight-title">
@@ -197,7 +198,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.1d"></script>
+  <script type="module" src="./src/game.js?v=1.1e"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');
