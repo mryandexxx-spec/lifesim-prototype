@@ -1,8 +1,7 @@
 /** Блин’С 0.8d: persistent directed views, independent of 3D and shared affinity.
  * Relationship state is distinct from emotions (short) and memories (history).
  */
-import {deriveAxes} from './trait-catalog.js';
-import {visibleEmotions} from './emotion-engine.js';
+import {socialImpressionFactor} from './social-reactions.js';
 
 export const RELATIONSHIP_VIEW_IDS=Object.freeze(['alex','mira']);
 export const SENTIMENT_LIMIT=8;
@@ -79,18 +78,7 @@ export function applySocialPerspective(view,memory,resident,minutes){
       'leisure.music','leisure.books','leisure.games','leisure.refused'].includes(memory.id))return false;
   const key=eventKey(memory.id,memory.at);
   if(view.sentiments.some(m=>eventKey(m.id,m.at)===key))return false;
-  const axes=deriveAxes(resident?.personality);
-  const positive=!['regret','hurt','gift.rejected','gift.refused','leisure.refused']
-    .includes(memory.id);
-  const feelings=visibleEmotions(resident?.mind,minutes,resident?.personality);
-  const active=feelings.find(e=>e.source===memory.id&&e.at===memory.at);
-  const intensity=active?.intensity??60;
-  const felt=clamp(.9+intensity/600,.9,1.1);
-  const positiveFactor=clamp(.7+axes.sociability*.25+axes.empathy*.25+
-    axes.optimism*.12,.7,1.2)*felt;
-  const negativeFactor=clamp(.77+axes.emotionalReactivity*.4+
-    (1-axes.resilience)*.2,.77,1.37)*felt;
-  const factor=positive?positiveFactor:negativeFactor;
+  const factor=socialImpressionFactor(resident,memory,minutes);
   const raw=memory.id==='talk'?{friendship:6,trust:3,tension:-3}:
     memory.id==='regret'?{friendship:-5,trust:-4,tension:5}:
     memory.id==='hurt'?{friendship:-10,trust:-11,tension:12}:

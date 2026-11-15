@@ -1,6 +1,7 @@
 /** Headless two-person social relationship simulation. */
 import { refreshMind } from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
+import {evaluateSocialReaction} from './social-reactions.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
@@ -139,6 +140,12 @@ export function cancelSocial(root) {
 function completeSocial(root,conversationScore=null){
   const s=root.socialAction,def=SOCIAL_ACTIONS[s?.kind];
   if(!def||!root.otherSim){root.socialAction=null;return false;}
+  // One-button talk/argue is never refused, preserving legacy semantics.
+  // Its individual effects go through socialImpressionFactor below.
+  evaluateSocialReaction({
+    kind:'direct',recipient:get(root,s.partner),
+    view:getPerspective(root,s.partner),minutes:root.minutes
+  });
   const reconciled=s.kind==='talk'&&canReconcile(root);
   // Old one-click talk/argue keep exact +8 / -12 / reconciliation +12.
   // A multi-turn talk has a single context-dependent signed result.
@@ -178,7 +185,8 @@ export function tickSocial(root,minutes){
   if(s.branchAction){
     s.elapsed+=minutes;
     if(s.elapsed<18)return false;
-    const response=resolveBranchResponse(root.socialGraph,s.initiator,s.partner,s.branchAction.id);
+    const response=resolveBranchResponse(root.socialGraph,s.initiator,s.partner,
+      s.branchAction.id,{recipient:get(root,s.partner),minutes:root.minutes});
     if(!response){root.socialAction=null;return false;}
     s.branchAction.resultType=response.type;
     s.kind=response.accepted?'talk':'argue';

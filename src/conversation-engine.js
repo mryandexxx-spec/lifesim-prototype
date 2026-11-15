@@ -1,7 +1,6 @@
 /** Original, headless 0.9a conversation engine. Saves only validated IDs, no player text. */
-import {deriveAxes,preferenceAffinity} from './trait-catalog.js';
 import {getPerspective} from './social-perspective.js';
-import {visibleEmotions} from './emotion-engine.js';
+import {evaluateSocialReaction} from './social-reactions.js';
 
 const row=(label,opener,tag,lines)=>Object.freeze({label,opener,tag,lines:Object.freeze(lines)});
 const saying=(label,line,yes,no,tone,weight)=>Object.freeze({label,line,yes,no,tone,weight});
@@ -71,14 +70,13 @@ export function evaluateResponse(root,initiator,topic,id){
   const partnerId=initiator==='alex'?'mira':'alex';
   const partner=partnerId==='alex'?root:root?.otherSim;
   if(!partner||!Number.isFinite(root?.minutes))return null;
-  const view=getPerspective(root,partnerId),axes=deriveAxes(partner.personality);
-  const emotion=visibleEmotions(partner.mind,root.minutes,partner.personality);
-  const upset=emotion.some(e=>['sadness','irritation','anxiety'].includes(e.kind)&&e.intensity>30);
-  const a=CONVERSATION_ACTS[id],taste=preferenceAffinity(partner.personality,CONVERSATION_TOPICS[topic].tag);
-  const score=40+view.trust*.19-view.tension*.38+axes.sociability*8+axes.empathy*8+
-    taste*19+(a.tone==='warm'?13:a.tone==='sharp'?-26:0)-(upset?12:0)+
-    (a.weight<0?a.weight*2:0);
-  return {accepted:score>=49,confidence:Math.round(clamp(score,0,100))};
+  const a=CONVERSATION_ACTS[id];
+  const reaction=evaluateSocialReaction({
+    kind:'conversation',recipient:partner,view:getPerspective(root,partnerId),
+    minutes:root.minutes,tag:CONVERSATION_TOPICS[topic].tag,
+    tone:a.tone,weight:a.weight
+  });
+  return reaction?{accepted:reaction.accepted,confidence:reaction.confidence}:null;
 }
 /** No social event is applied before explicit completion of the conversation. */
 export function chooseConversationTurn(root,id){

@@ -1,3 +1,4 @@
+import {evaluateSocialReaction} from './social-reactions.js';
 /** Блин’С social graph V1: N residents, N sparse links. No renderer/household imports.
  * Legacy two-resident values are observational inputs from an external adapter.
  */
@@ -235,15 +236,18 @@ export function availableSocialActions(graph,a,b){
     return {id,label:def.label,category:def.category,enabled,reason:enabled?'':def.reason};
   });
 }
-export function resolveBranchResponse(graph,a,b,id){
+export function resolveBranchResponse(graph,a,b,id,context={}){
   const available=availableSocialActions(graph,a,b).find(x=>x.id===id);
   if(!available?.enabled)return null;
-  const recipient=getDirectedView(graph,b,a)||view();
-  const base=recipient.trust*.42+recipient.friendship*.27-recipient.tension*.40;
-  const accepted=id==='acquaint.introduce'?true:id==='rival.taunt'?false:
-    id==='rival.truce'?base>=24:
-    id==='friend.tease'?base>=24:
-    id==='friend.confide'?base>=43:base>=6;
+  // The generic N-resident graph doesn't know rendering or resident shape.
+  // The runtime adapter can inject a recipient snapshot; old pure callers
+  // without a snapshot still get safe, neutral deterministic behavior.
+  const reaction=evaluateSocialReaction({
+    kind:'branch',actionId:id,recipient:context.recipient,
+    view:getDirectedView(graph,b,a)||view(),minutes:context.minutes??0
+  });
+  if(!reaction)return null;
+  const accepted=reaction.accepted;
   const type=id==='acquaint.introduce'?'introduced':
     id==='rival.taunt'?id:accepted?id:id+'.refused';
   return {accepted,type,id,label:accepted?

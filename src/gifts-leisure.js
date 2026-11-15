@@ -1,8 +1,8 @@
 /** Блин’С 0.9b — inventory, accepted gifts and shared leisure.
  * Pure simulation with an optional saved session; no renderer or wall clock.
  */
-import {deriveAxes,preferenceAffinity} from './trait-catalog.js';
-import {visibleEmotions,feelMemory} from './emotion-engine.js';
+import {evaluateSocialReaction} from './social-reactions.js';
+import {feelMemory} from './emotion-engine.js';
 import {getPerspective,applySocialPerspective} from './social-perspective.js';
 import {refreshMind} from './psychology.js';
 
@@ -80,22 +80,21 @@ export function evaluateGift(root,initiator,item){
   if(!resident(initiator)||!has(GIFT_CATALOG,item?.type))return null;
   const receiverId=other(initiator),receiver=actor(root,receiverId);
   if(!receiver)return null;
-  const axes=deriveAxes(receiver.personality);
-  const view=getPerspective(root,receiverId),taste=preferenceAffinity(receiver.personality,GIFT_CATALOG[item.type].tag);
-  const upset=visibleEmotions(receiver.mind,root.minutes,receiver.personality)
-    .some(e=>['irritation','sadness','anxiety'].includes(e.kind)&&e.intensity>40);
-  const value=45+taste*38+view.trust*.15-view.tension*.28+
-    axes.empathy*7-(upset?8:0);
-  return {accepted:value>=37,liked:value>=70,score:clamp(Math.round(value),0,100)};
+  const reaction=evaluateSocialReaction({
+    kind:'gift',recipient:receiver,view:getPerspective(root,receiverId),
+    minutes:root.minutes,tag:GIFT_CATALOG[item.type].tag
+  });
+  return reaction?{accepted:reaction.accepted,liked:reaction.liked,score:reaction.score}:null;
 }
 export function evaluateLeisure(root,initiator,id){
   if(!resident(initiator)||!has(LEISURE_CATALOG,id))return null;
   const peerId=other(initiator),peer=actor(root,peerId);
   if(!peer)return null;
-  const axes=deriveAxes(peer.personality),view=getPerspective(root,peerId);
-  const preference=preferenceAffinity(peer.personality,LEISURE_CATALOG[id].tag);
-  const score=43+preference*28+view.trust*.17-view.tension*.42+axes.sociability*8;
-  return {accepted:score>=42,score:clamp(Math.round(score),0,100)};
+  const reaction=evaluateSocialReaction({
+    kind:'leisure',recipient:peer,view:getPerspective(root,peerId),
+    minutes:root.minutes,tag:LEISURE_CATALOG[id].tag
+  });
+  return reaction?{accepted:reaction.accepted,score:reaction.score}:null;
 }
 const remember=(root,id,memoryId)=>{
   const person=actor(root,id);
