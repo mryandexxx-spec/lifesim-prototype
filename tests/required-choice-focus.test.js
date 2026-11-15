@@ -13,7 +13,7 @@ const fixture=()=>{
     getAttribute(k){return this.attributes[k]??null;},
     closest:()=>null
   });
-  const hud=element('hud'),canvas=element('world'),background=element('outside');
+  const hud=element('hud'),canvas=element('world'),background=element('outside'),plan=element('plan');
   hud.inert=true;
   const backdrop=element('backdrop');
   const panel=element('dialogue');
@@ -23,8 +23,8 @@ const fixture=()=>{
   const root={children:[canvas,hud,panel,backdrop]};
   doc.activeElement=background;
   const guard=createRequiredChoiceFocus({root,panel,backdrop,doc,
-    restoreFallback:background});
-  return {guard,doc,listeners,hud,canvas,backdrop,panel,opts,background};
+    restoreFallback:plan});
+  return {guard,doc,listeners,hud,canvas,backdrop,panel,opts,background,plan};
 };
 test('required modal inerts other app-shell siblings and keeps dialog interactive',()=>{
  const f=fixture(); f.guard.activate(true);
@@ -70,4 +70,12 @@ test('controller ignores focus and keyboard after choice is completed',()=>{
  assert.equal(cancelled,false);
  f.guard.dispose();
  assert.equal(f.listeners.has('keydown'),false);
+});
+
+test('when the original trigger was hidden, focus returns to visible live-plan button',()=>{
+ const f=fixture();
+ f.background.closest=()=>({hidden:true});
+ f.guard.activate(true);
+ f.guard.activate(false);
+ assert.equal(f.doc.activeElement,f.plan);
 });
