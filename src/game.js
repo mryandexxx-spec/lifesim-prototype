@@ -1624,15 +1624,272 @@ function boot() {
   // A second pointer disqualifies the whole touch until BOTH are released.
   const cameraGesture=createCameraGestureSession();
   const gesturePoint=e=>({id:e.pointerId,x:e.clientX,y:e.clientY});
+  // F1 edit mode: UI state is ephemeral; only confirmed domain transactions
+  // change the optional v1 world.furniture save extension. No action is consumed.
+  let editSession=null,editSelectedId=null,editDrag=null;
+  const ghostValid=mat('#3b9c73',{opacity:.23});
+  const ghostInvalid=mat('#b84d55',{opacity:.26});
+  const furnitureGhost=box('F1 placement preview',0,.075,0,.1,.038,.1,ghostValid);
+  furnitureGhost.enabled=false;
+  const lockedFurnitureIds=()=>{
+    const busy=new Set();
+    for(const id of HOUSEHOLD_IDS){
+      const actor=getActor(game,id);
+      if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
+      for(const pending of pendingActions(game.actionQueues,id))
+        if(pending.type==='object'&&pending.targetInstanceId)
+          busy.add(pending.targetInstanceId);
+    }
+    return [...busy];
+  };
+  const editorContext=()=>({lockedInstanceIds:lockedFurnitureIds(),
+    residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)});
+  const editorLabel=instanceId=>{
+    const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
+    return item?FURNITURE_CATALOG[item.prefabId].name:'Предмет';
+  };
+  const editorMessage=(reason)=>{
+    const messages={
+      'fixed-or-missing':'Предмет закреплён: его анимации и точки взаимодействия пока нельзя безопасно передвигать',
+      reserved:'Предмет занят или уже указан в очереди действий',
+      'room-bounds':'Слишком близко к стене или за пределами комнаты',
+      collision:'Здесь уже стоит другая мебель',
+      'resident-blocked':'Здесь стоит житель — перемести предмет в другое место',
+      'unreachable-bed':'После переноса к кровати нельзя подойти',
+      'unreachable-fridge':'После переноса нельзя добраться до холодильника',
+      'unreachable-shower':'После переноса нельзя добраться до душа',
+      'unreachable-toilet':'После переноса нельзя добраться до туалета',
+      'unreachable-sofa':'После переноса нельзя добраться до дивана',
+      'invalid-pose':'Это положение невозможно', 'unchanged':'Положение не изменилось',
+      'empty-history':'Больше нечего отменять или повторять'
+    };
+    return messages[reason]||'Не удалось разместить мебель безопасно';
+  };
+  const editorFeedback=(message,invalid=false)=>{
+    const element=$('furnish-feedback');
+    element.textContent=message;
+    element.dataset.invalid=String(invalid);
+  };
+  const editorItem=id=>game.world.furniture.instances.find(i=>i.instanceId===id);
+  const showGhost=(instanceId,pose=null,valid=true)=>{
+    const item=editorItem(instanceId);
+    if(!item||!canMoveFurniture(item)){furnitureGhost.enabled=false;return;}
+    const chosen=pose||item;
+    const rect=instanceRect(chosen,FURNITURE_CATALOG[item.prefabId].footprint);
+    furnitureGhost.setPosition((rect.minX+rect.maxX)/2,.075,
+      (rect.minZ+rect.maxZ)/2);
+    furnitureGhost.setLocalScale(Math.max(.1,rect.maxX-rect.minX),.038,
+      Math.max(.1,rect.maxZ-rect.minZ));
+    furnitureGhost.render.material=valid?ghostValid:ghostInvalid;
+    furnitureGhost.enabled=furnishMode;
+  };
+  const renderFurnitureSelection=()=>{
+    for(const button of $('furnish-items').querySelectorAll('button'))
+      button.setAttribute('aria-pressed',String(button.dataset.instanceId===editSelectedId));
+    const item=editorItem(editSelectedId);
+    const enabled=furnishMode&&canMoveFurniture(item);
+    for(const id of ['left','right','up','down','rotate'])
+      $('furnish-'+id).disabled=!enabled;
+    const history=editSession?.state();
+    $('furnish-undo').disabled=!furnishMode||!history?.canUndo;
+    $('furnish-redo').disabled=!furnishMode||!history?.canRedo;
+    $('furnish-title').textContent=item?'Обстановка · '+editorLabel(item.instanceId):'Обстановка';
+    showGhost(editSelectedId);
+  };
+  const chooseFurniture=id=>{
+    const item=editorItem(id);
+    editSelectedId=item?.instanceId||null;
+    renderFurnitureSelection();
+    if(item&&!canMoveFurniture(item))
+      editorFeedback(editorMessage('fixed-or-missing'),true);
+    else if(item)
+      editorFeedback(editorLabel(id)+': перетащи по полу или используй стрелки и поворот');
+    else editorFeedback('Выбери мебель в комнате или из списка');
+  };
+  for(const type of F1_MOVEABLE_PREFABS){
+    const item=game.world.furniture.instances.find(i=>i.prefabId===type);
+    if(!item)continue;
+    const button=document.createElement('button');
+    button.type='button';
+    button.dataset.instanceId=item.instanceId;
+    button.textContent=FURNITURE_CATALOG[type].name;
+    button.setAttribute('aria-pressed','false');
+    button.addEventListener('click',()=>chooseFurniture(item.instanceId));
+    $('furnish-items').append(button);
+  }
+  const commitFurniture=(instanceId,pose)=>{
+    if(!editSession||!furnishMode)return false;
+    const result=editSession.commit(instanceId,pose,editorContext());
+    if(!result.ok){
+      editorFeedback(editorMessage(result.reason),true);
+      updateDecorNodes();renderFurnitureSelection();return false;
+    }
+    game.world.furniture=result.world;
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    updateDecorNodes();
+    renderFurnitureSelection();
+    editorFeedback(editorLabel(instanceId)+' переставлен · изменения сохранены');
+    save(true);
+    return true;
+  };
+  const editorHistory=type=>{
+    if(!editSession||!furnishMode)return;
+    const result=type==='undo'?editSession.undo():editSession.redo();
+    if(!result.ok){editorFeedback(editorMessage(result.reason),true);return;}
+    game.world.furniture=result.world;
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    updateDecorNodes();
+    renderFurnitureSelection();
+    editorFeedback(type==='undo'?'Перемещение отменено':'Перемещение восстановлено');
+    save(true);
+  };
+  $('furnish-undo').addEventListener('click',()=>editorHistory('undo'));
+  $('furnish-redo').addEventListener('click',()=>editorHistory('redo'));
+  const editorStep=(dx,dz,dyaw=0)=>{
+    if(!furnishMode||!editSelectedId)return;
+    const item=editorItem(editSelectedId);
+    if(!canMoveFurniture(item))return;
+    const pose={x:Math.round((item.x+dx)*1000)/1000,
+      z:Math.round((item.z+dz)*1000)/1000,
+      yaw:(item.yaw+dyaw+360)%360};
+    commitFurniture(editSelectedId,pose);
+  };
+  $('furnish-left').addEventListener('click',()=>editorStep(-.25,0));
+  $('furnish-right').addEventListener('click',()=>editorStep(.25,0));
+  $('furnish-up').addEventListener('click',()=>editorStep(0,-.25));
+  $('furnish-down').addEventListener('click',()=>editorStep(0,.25));
+  $('furnish-rotate').addEventListener('click',()=>editorStep(0,0,90));
+  const exitFurniture=()=>{
+    if(!furnishMode)return;
+    editDrag=null;furnishMode=false;editSelectedId=null;editSession=null;
+    furnitureGhost.enabled=false;
+    updateDecorNodes();
+    document.querySelector('.app-shell').dataset.furnishMode='false';
+    $('furniture-editor').hidden=true;
+    $('furnish-toggle').setAttribute('aria-pressed','false');
+    $('furnish-toggle').setAttribute('aria-label','Войти в режим обстановки');
+    // Never mutate manual game.paused. Resume only if it was unpaused before.
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    renderPauseButton();renderFurnitureSelection();updateItemLabels();
+    save(true);
+  };
+  const enterFurniture=()=>{
+    if(furnishMode)return;
+    if(dialogueNeedsDecision(game)){
+      toast('Сначала выбери ответ или заверши разговор');return;
+    }
+    editSession=createFurnitureEditor(game.world.furniture);
+    furnishMode=true;
+    document.querySelector('.app-shell').dataset.furnishMode='true';
+    $('furniture-editor').hidden=false;
+    $('furnish-toggle').setAttribute('aria-pressed','true');
+    $('furnish-toggle').setAttribute('aria-label','Выйти из режима обстановки');
+    closeTour();closeMindPanel();closeInsightPanel();closeSocialContext();
+    select(null);setViewOpen(false);
+    conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
+    socialMenuCategory=null;queueVisible=false;
+    renderQueuePanel(true);renderSocialMenu();renderConversationPanel();
+    renderSharedPanel();renderBranchPanel();
+    chooseFurniture(null);
+    renderPauseButton();
+    editorFeedback('Время остановлено. Выбери телевизор, столик, растение или тумбочку.');
+  };
+  $('furnish-toggle').addEventListener('click',()=>furnishMode?exitFurniture():enterFurniture());
+  $('furnish-exit').addEventListener('click',exitFurniture);
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&furnishMode){event.preventDefault();exitFurniture();}
+  },true);
+  const furnitureRay=(pos)=>{
+    const rect=canvas.getBoundingClientRect();
+    const x=pos.x-rect.left,y=pos.y-rect.top;
+    return {near:camera.camera.screenToWorld(x,y,camera.camera.nearClip),
+      far:camera.camera.screenToWorld(x,y,camera.camera.farClip)};
+  };
+  const editorFloorAt=pos=>{
+    const {near,far}=furnitureRay(pos);
+    return furnitureFloorPoint(near,far);
+  };
+  const editorFurnitureAt=pos=>{
+    const {near,far}=furnitureRay(pos);
+    const boxes=game.world.furniture.instances.filter(item=>item.location==='home')
+      .map(item=>{
+        const rect=instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint);
+        const height={table:.63,nightstand:1.49,tv:2.0,plant:1.87,
+          bed:1.40,counter:2.50,fridge:2.2,sofa:1.3,shower:2.75,toilet:1.45}[item.prefabId]||2;
+        return {kind:'object',id:item.instanceId,bounds:{
+          min:{x:rect.minX,y:0,z:rect.minZ},
+          max:{x:rect.maxX,y:height,z:rect.maxZ}
+        }};
+      });
+    return pickWorldRayTarget(near,far,boxes)?.id||null;
+  };
+  const cancelEditorDrag=()=>{
+    if(!editDrag)return;
+    editDrag=null;updateDecorNodes();renderFurnitureSelection();
+  };
+  const startEditorDrag=event=>{
+    if(!furnishMode)return false;
+    if(editDrag){cancelEditorDrag();return true;}
+    const id=editorFurnitureAt(gesturePoint(event));
+    if(!id)return false; // Unoccupied floor continues to orbit/pan as usual.
+    chooseFurniture(id);
+    const item=editorItem(id);
+    if(!canMoveFurniture(item))return true;
+    const floor=editorFloorAt(gesturePoint(event));
+    if(!floor)return true;
+    editDrag={pointerId:event.pointerId,instanceId:id,
+      offsetX:item.x-floor.x,offsetZ:item.z-floor.z,
+      pose:{x:item.x,z:item.z,yaw:item.yaw},lastCheck:0,valid:true};
+    return true;
+  };
+  const moveEditorDrag=event=>{
+    if(!editDrag||editDrag.pointerId!==event.pointerId)return false;
+    const pt=editorFloorAt(gesturePoint(event));
+    if(!pt)return true;
+    const pose={x:snapFurnitureCoordinate(pt.x+editDrag.offsetX),
+      z:snapFurnitureCoordinate(pt.z+editDrag.offsetZ),yaw:editDrag.pose.yaw};
+    if(pose.x===editDrag.pose.x&&pose.z===editDrag.pose.z)return true;
+    editDrag.pose=pose;
+    // Full A* validation is expensive on iPhone: only compute when the
+    // snapped cell changes and not more than ten checks per second.
+    if(performance.now()-editDrag.lastCheck<95){
+      updateDecorNodes(editDrag.instanceId,pose);
+      showGhost(editDrag.instanceId,pose,true);
+      return true;
+    }
+    editDrag.lastCheck=performance.now();
+    const candidate=proposeFurnitureMove(game.world.furniture,editDrag.instanceId,pose,editorContext());
+    editDrag.valid=candidate.ok;
+    updateDecorNodes(editDrag.instanceId,pose);
+    showGhost(editDrag.instanceId,pose,candidate.ok);
+    editorFeedback(candidate.ok?'Отпусти, чтобы поставить предмет сюда':
+      editorMessage(candidate.reason),!candidate.ok);
+    return true;
+  };
+  const endEditorDrag=event=>{
+    if(!editDrag||editDrag.pointerId!==event.pointerId)return false;
+    const {instanceId,pose}=editDrag;
+    editDrag=null;
+    const item=editorItem(instanceId);
+    if(item&&(item.x!==pose.x||item.z!==pose.z))
+      commitFurniture(instanceId,pose);
+    else{updateDecorNodes();renderFurnitureSelection();}
+    return true;
+  };
   canvas.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse'&&event.button!==0)return;
     if(dialogueNeedsDecision(game))return;
     if(event.cancelable)event.preventDefault();
     try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
+    if(furnishMode&&startEditorDrag(event))return;
     cameraGesture.begin(gesturePoint(event),performance.now());
   });
   // Global listeners survive canvas leaving the viewport on iOS Safari.
   window.addEventListener('pointermove',event=>{
+    if(furnishMode&&editDrag){
+      if(event.cancelable)event.preventDefault();
+      moveEditorDrag(event);return;
+    }
     if(!cameraGesture.count())return;
     if(dialogueNeedsDecision(game)){cameraGesture.clear();return;}
     const result=cameraGesture.move(gesturePoint(event),view,
@@ -1662,7 +1919,16 @@ function boot() {
         max:{x:p.x+half,y:p.y+2.26,z:p.z+half}
       }});
     }
-    return pickWorldRayTarget(near,far,[...residents,...hitVolumes]);
+    // The movable coffee table must block object rays at its *new* position.
+    const table=game.world.furniture.instances.find(i=>i.prefabId==='table');
+    let blockers=[];
+    if(table&&table.location==='home'){
+      const r=instanceRect(table,FURNITURE_CATALOG.table.footprint);
+      blockers=[{kind:'blocker',id:'coffee-table',bounds:{
+        min:{x:r.minX,y:.28,z:r.minZ},max:{x:r.maxX,y:.48,z:r.maxZ}
+      }}];
+    }
+    return pickWorldRayTarget(near,far,[...residents,...hitVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -1675,8 +1941,10 @@ function boot() {
     tapCueTimeout=setTimeout(()=>{cue.hidden=true;},450);
   };
   const endPointer=event=>{
+    if(furnishMode&&endEditorDrag(event))return;
     const pos=cameraGesture.end(gesturePoint(event),performance.now());
     if(!pos||dialogueNeedsDecision(game))return;
+    if(furnishMode){chooseFurniture(editorFurnitureAt(pos));return;}
     const target=worldTargetAt(pos);
     if(target)confirmWorldTap(pos);
     if(target?.kind==='resident')openSocialContext(pos);
@@ -1685,9 +1953,12 @@ function boot() {
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
+    if(editDrag?.pointerId===event.pointerId)cancelEditorDrag();
     cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true});
   });
-  window.addEventListener('blur',()=>cameraGesture.clear());
+  window.addEventListener('blur',()=>{
+    cancelEditorDrag();cameraGesture.clear();
+  });
   canvas.addEventListener('wheel',event=>{
     event.preventDefault();
     setView(wheelCamera(view,event.deltaY));
