@@ -9,6 +9,7 @@ import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,wheelCamera} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
+import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
@@ -96,6 +97,58 @@ $('mesh-model-btn').addEventListener('click',()=>{
 });
 updateMeshModelButton();
 
+// Optional first-use explanation does not pause, enqueue or persist gameplay.
+// Only an independent localStorage *UI preference* tracks whether it was read.
+const uiTour=createUITour();
+let tourOpen=false;
+function closeTour({remember=true,restoreFocus=false}={}){
+  if(!tourOpen)return;
+  tourOpen=false;
+  $('tour-panel').hidden=true;
+  if(remember){
+    try{localStorage.setItem(UI_TOUR_STORAGE_KEY,'done');}
+    catch{/* Safari private browsing: play without persistent UI hints. */}
+  }
+  if(restoreFocus)$('view-toggle').focus({preventScroll:true});
+}
+function renderTour(){
+  const step=uiTour.current();
+  $('tour-progress').textContent=uiTour.progress();
+  $('tour-title').textContent=step.title;
+  $('tour-body').textContent=step.body;
+  $('tour-tip').textContent=step.hint;
+  $('tour-next').textContent=uiTour.index()===uiTour.length-1?'Играть':'Дальше';
+}
+function openTour(){
+  if(dialogueNeedsDecision(game))return false;
+  uiTour.reset();renderTour();
+  tourOpen=true;$('tour-panel').hidden=false;
+  $('tour-panel').focus({preventScroll:true});
+  return true;
+}
+$('tour-close').addEventListener('click',()=>closeTour({restoreFocus:true}));
+$('tour-skip').addEventListener('click',()=>closeTour({restoreFocus:true}));
+$('tour-next').addEventListener('click',()=>{
+  if(uiTour.next())renderTour();
+  else closeTour({restoreFocus:true});
+});
+$('tour-replay').addEventListener('click',()=>{
+  setViewOpen(false);
+  closeInsightPanel();closeMindPanel();closeSocialContext();select(null);
+  queueVisible=false;renderQueuePanel(true);
+  openTour();
+});
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&tourOpen&&!dialogueNeedsDecision(game)){
+    event.preventDefault();closeTour({restoreFocus:true});
+  }
+},true);
+document.addEventListener('pointerdown',event=>{
+  if(!tourOpen)return;
+  if($('tour-panel').contains(event.target)||$('tour-replay').contains(event.target))return;
+  closeTour({remember:true});
+},true);
+
 // View is a presentation-only popover: both existing preferences remain wired
 // to their original IDs and neither value enters the saved household schema.
 let viewOpen=false;
@@ -118,7 +171,7 @@ function setViewOpen(open,{restoreFocus=false}={}){
   $('view-panel').hidden=!viewOpen;
   $('view-toggle').setAttribute('aria-expanded',String(viewOpen));
   if(viewOpen){
-    closeInsightPanel();queueVisible=false;renderQueuePanel(true);
+    closeTour();closeInsightPanel();queueVisible=false;renderQueuePanel(true);
     closeSocialContext();
     select(null);
     requestAnimationFrame(positionViewPanel);
@@ -820,6 +873,7 @@ function renderConversationPanel(force=true){
   const panel=$('conversation-panel');
   const enteringRequired=required&&!panel.classList.contains('dialogue-required');
   if(enteringRequired){
+    closeTour();
     // A required answer supersedes every optional popover without cancelling
     // its REAL underlying FIFO action or affecting manual pause state.
     setViewOpen(false);closeInsightPanel();
@@ -2171,6 +2225,10 @@ function boot() {
   requestAnimationFrame(()=>requestAnimationFrame(()=>loadingProgress.finish('scene')));
   void loadingProgress.wait().then(({failed})=>{
     $('loading').hidden=true;
+    let seen='done';
+    try{seen=localStorage.getItem(UI_TOUR_STORAGE_KEY);}
+    catch{seen='done';/* Private mode never blocks loading. */}
+    if(shouldShowTour(seen)&&!dialogueNeedsDecision(game))openTour();
     toast(failed
       ? 'Часть 3D-моделей недоступна — включены старые облики'
       : 'Коснись жителя или мебели · МЕТКИ — названия предметов');
