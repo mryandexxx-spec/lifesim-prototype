@@ -1533,7 +1533,7 @@ function boot() {
       moodOrbit.hidden=true;
     }else{
       const p=orbitHead.getPosition();
-      const lift=orbitRig.head?.getPosition?.91:2.43;
+      const lift=orbitRig.head && typeof orbitRig.head.getPosition==='function' ? .91 : 2.43;
       const point=new pc.Vec3(p.x,p.y+lift,p.z);
       const pos=moodOrbitPoint(camera.camera.worldToScreen(point),
         camera.camera.viewMatrix.transformPoint(point),canvas.clientWidth,canvas.clientHeight);

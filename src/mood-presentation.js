@@ -23,7 +23,9 @@ export const MOOD_TONES=Object.freeze([
 ]);
 const toneFor=(value,scale)=>{
   const amount=clamp(value);
-  return {...scale.findLast(entry=>amount>=entry.min),value:Math.round(amount)};
+  let selected=scale[0];
+  for(const entry of scale)if(amount>=entry.min)selected=entry;
+  return {...selected,value:Math.round(amount)};
 };
 export function needPresentation(value){return toneFor(value,NEED_TONES);}
 export function moodTone(value){return toneFor(value,MOOD_TONES);}
