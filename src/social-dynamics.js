@@ -52,20 +52,62 @@ function recentLeisureChoice(pair){
   }
   return null;
 }
+/** Completed pair habits: who initiated on different game days matters;
+ * recent saturation is shared by both participants. Derived, never persisted.
+ */
+export const AUTONOMOUS_HABIT_WINDOW_DAYS=10;
+function completedActivity(e){
+  if(e.type==='talk'||e.type==='conversation.talk')return 'talk';
+  if(AUTONOMOUS_FRIEND_BRANCHES.includes(e.type))return 'branch.'+e.type;
+  if(e.type==='leisure.accepted'&&typeof e.token==='string'){
+    const match=/^auto\.leisure\.(music|books|games):[1-9][0-9]*$/.exec(e.token);
+    return match?'leisure.'+match[1]:null;
+  }
+  return null;
+}
+export function pairSocialHabits(pair,actorId,now){
+  const empty={recent:[],familiar:{}};
+  if(!validId(actorId)||!record(pair)||!Array.isArray(pair.ids)||
+    !pair.ids.includes(actorId)||!finite(now)||now<0||
+    !Array.isArray(pair.events))return empty;
+  const finished=pair.events.filter(e=>record(e)&&finite(e.at)&&
+    e.at<=now&&e.at>=now-AUTONOMOUS_HABIT_WINDOW_DAYS*DAY&&
+    pair.ids.includes(e.actorId)).map(e=>({
+      activity:completedActivity(e),actorId:e.actorId,day:Math.floor(e.at/DAY)
+    })).filter(e=>e.activity).slice(-16);
+  const days=new Map();
+  for(const e of finished){
+    if(e.actorId!==actorId)continue;
+    if(!days.has(e.activity))days.set(e.activity,new Set());
+    days.get(e.activity).add(e.day);
+  }
+  const familiar={};
+  for(const [key,observed] of days){
+    if(observed.size>=2)familiar[key]=Math.min(3,observed.size);
+  }
+  return {recent:finished.slice(-4).map(e=>e.activity),familiar};
+}
+
 /** A matching pleasant pastime is suggested, never a knowingly disliked one.
  * The receiver's actual reaction is still checked before and after execution.
  */
-function sharedInterest(self,recipient,pair,actorId){
+function sharedInterest(self,recipient,pair,actorId,now){
   const remembered=Array.isArray(pair?.knowledge?.[actorId])?
     pair.knowledge[actorId]:[];
   const last=recentLeisureChoice(pair);
+  const habits=pairSocialHabits(pair,actorId,now);
   return AUTONOMOUS_LEISURE.map(choiceId=>{
     const own=preferenceAffinity(self.personality,choiceId);
     const their=preferenceAffinity(recipient.personality,choiceId);
     const known=remembered.find(entry=>entry.tag===choiceId)?.stance;
     // We can suggest our own favourite pastime or a preference the partner
     // actually disclosed; unseen private tastes only veto obvious dislikes.
-    const score=own*4+(known==='likes'&&their>0?6:0);
+    const activity='leisure.'+choiceId;
+    const repeated=habits.recent.filter(key=>key===activity).length;
+    const familiarity=habits.familiar[activity]||0;
+    // Familiarity attracts, but A/B/A/B cycles must not become a habit loop.
+    const score=own*4+(known==='likes'&&their>0?6:0)+familiarity-
+      (repeated>=2?8:repeated===1?1:0);
     return {choiceId,score};
   }).filter(x=>x.choiceId!==last&&
     preferenceAffinity(self.personality,x.choiceId)>=0&&
@@ -192,22 +234,36 @@ export function proposeAutonomousSocial({
       directed.tension<32&&targetView.tension<40&&
       directed.trust>=52&&targetView.trust>=48){
       const lastType=latest?.type||null;
-      const hobby=sharedInterest(self,recipient,pair,actorId);
+      const habits=pairSocialHabits(pair,actorId,minutes);
+      const hobby=sharedInterest(self,recipient,pair,actorId,minutes);
       const enoughFun=self.needs.fun<55&&recipient.needs.fun<88;
       if(hobby&&enoughFun&&directed.friendship>=52){
         candidate.action={type:'shared',mode:'leisure',choiceId:hobby.choiceId};
       }else if(pair.friendship!=='none'&&directed.trust>=65&&
         targetView.trust>=55&&lastType!=='friend.confide'&&
-        style.id==='supportive'){
+        (style.id==='supportive'||habits.familiar['branch.friend.confide']>=2)){
         candidate.action={type:'branch',actionId:'friend.confide'};
       }else if(pair.friendship!=='none'&&directed.trust>=60&&
-        lastType!=='friend.tease'&&style.id==='playful'){
+        lastType!=='friend.tease'&&
+        (style.id==='playful'||habits.familiar['branch.friend.tease']>=2)){
         candidate.action={type:'branch',actionId:'friend.tease'};
-      }else if(pair.metAt!==null&&lastType==='talk'&&
+      }else if(pair.metAt!==null&&lastType!=='acquaint.chat'&&
+        (lastType==='talk'||habits.familiar['branch.acquaint.chat']>=2)&&
         directed.friendship>=50&&targetView.friendship>=47){
         candidate.action={type:'branch',actionId:'acquaint.chat'};
       }
     }
+    // Choosing nothing is valid when a recent activity has been overused.
+    // Reconciliation and rare serious conflict retain their special pathways.
+    const habits=pairSocialHabits(pair,actorId,minutes);
+    const proposedActivity=candidate.action?.type==='shared'
+      ?'leisure.'+candidate.action.choiceId
+      :candidate.action?.type==='branch'
+        ?'branch.'+candidate.action.actionId:candidate.kind;
+    if(!repair&&!distressed&&
+      habits.recent.filter(key=>key===proposedActivity).length>=2&&
+      finite(pair.lastAt)&&minutes-pair.lastAt<AUTONOMOUS_PAIR_COOLDOWN*2)
+      continue;
     if(!chosen||candidate.score>chosen.score||
       (candidate.score===chosen.score&&targetId<chosen.targetId))chosen=candidate;
   }

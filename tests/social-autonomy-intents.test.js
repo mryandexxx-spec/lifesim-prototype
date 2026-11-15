@@ -276,7 +276,7 @@ test('final player-facing and deploy wiring handles structured automation',()=>{
   const game=read('../src/game.js'),rel=read('../src/relationships.js'),
     core=read('../src/social-dynamics.js'),html=read('../index.html'),
     workflow=read('../.github/workflows/pages.yml');
-  assert.ok(html.includes('сборка / 1.0i'));
+  assert.ok(html.includes('сборка / 1.0j'));
   assert.ok(game.includes("plan.type==='shared'"));
   assert.ok(game.includes("plan.type==='branch'"));
   assert.ok(game.includes('shared.mode,shared.choiceId,automatic'));
