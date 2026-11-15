@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.0z" />
+  <link rel="stylesheet" href="./styles.css?v=1.1a" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.0z</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.1a</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -51,6 +51,7 @@
     <section id="view-panel" class="view-panel" hidden aria-label="Настройки вида комнаты">
       <div class="view-panel-head"><strong>Вид комнаты</strong><button id="view-close" type="button" aria-label="Закрыть настройки вида">×</button></div>
       <button id="item-labels-btn" class="item-labels-control" type="button" aria-pressed="false" aria-label="Показать подписи предметов"><span aria-hidden="true">⌗</span><span>Подписи предметов</span><small aria-hidden="true">МЕТКИ</small></button>
+      <button id="tour-replay" class="tour-replay" type="button" aria-controls="tour-panel">? <span>Как играть</span></button>
       <button id="mesh-model-btn" class="mesh-model-control" type="button" aria-pressed="true" aria-label="Алекс и Мира: 3D-модели Meshy. Нажмите, чтобы вернуть старые модели."><span aria-hidden="true">3D</span><span>Облики жителей</span><small id="mesh-model-state" aria-hidden="true">MESHY</small></button>
     </section>
 
@@ -58,6 +59,13 @@
       <span class="plan-current"><span class="status-dot" aria-hidden="true"></span><span id="status-text">Свободное время</span><span class="plan-chevron" aria-hidden="true">›</span></span>
       <span id="plan-upcoming" class="plan-upcoming" aria-hidden="true" hidden></span>
     </button>
+    <section id="tour-panel" class="tour-panel" hidden aria-labelledby="tour-title" aria-describedby="tour-body" tabindex="-1">
+      <div class="tour-head"><span class="eyebrow">ПЕРВЫЕ ШАГИ · <span id="tour-progress">1 из 3</span></span><button id="tour-close" type="button" aria-label="Закрыть подсказки">×</button></div>
+      <h2 id="tour-title">Осмотри квартиру</h2>
+      <p id="tour-body">Проведи одним пальцем, чтобы повернуть камеру.</p>
+      <p id="tour-tip" class="tour-tip">Камера не отдаёт персонажу команд.</p>
+      <div class="tour-actions"><button id="tour-skip" type="button">Пропустить</button><button id="tour-next" type="button">Дальше</button></div>
+    </section>
     <div class="hint" id="hint">Один палец — вращение · два — сдвиг и масштаб</div>
 
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
@@ -189,7 +197,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.0z"></script>
+  <script type="module" src="./src/game.js?v=1.1a"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');
