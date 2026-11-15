@@ -35,10 +35,12 @@ function elements(){
 }
 test('1.0o: successful enqueue is acknowledged in queue counter and never makes a large toast',()=>{
   const $=elements(),queues=newActionQueues(['alex','mira']);
-  const calls={queue:0,saves:0,toasts:[]};
+  const calls={queue:0,saves:0,toasts:[],priority:0};
   const scope={
     $,ACTIONS:{bed:{label:'Спать'}},getActorName:()=> 'Алекс',
     game:{selectedSim:'alex',actionQueues:queues},enqueueAction,pendingActions,
+    preemptAutomaticForManual:()=>{calls.priority++;return null;},
+    onManualCommandQueued:()=>{},
     resolveActionFurniture:()=>({instanceId:'home-bed-1'}),
     renderQueuePanel:()=>calls.queue++,
     save:()=>calls.saves++,toast:msg=>calls.toasts.push(msg)
@@ -48,6 +50,7 @@ test('1.0o: successful enqueue is acknowledged in queue counter and never makes 
   assert.equal(pendingActions(queues,'alex').length,1);
   assert.equal(calls.queue,1);
   assert.equal(calls.saves,1);
+  assert.equal(calls.priority,1,'manual priority runs after enqueue succeeds');
   assert.deepEqual(calls.toasts,[],'success does not create a toast over social controls');
   assert.match($('queue-feedback').textContent,/Алекс.*Спать/);
 });
