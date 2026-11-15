@@ -1,5 +1,6 @@
 import * as pc from 'playcanvas';
 import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
+import {pickWorldTarget} from './world-interactions.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,dragCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
@@ -106,6 +107,7 @@ let sharedDisplayKey='';
 let branchPicker=false;
 let branchDisplayKey='';
 let socialMenuCategory=null;
+let socialContextVisible=false; // UI-only: no changes to the saved simulation.
 let socialMenuDisplayKey='';
 let queueVisible=false;
 let queueDisplayKey='';
@@ -154,6 +156,12 @@ function scheduleCommand(command,residentId=game.selectedSim){
   $('queue-feedback').textContent=getActorName(residentId)+': добавлено в очередь — '+
     taskLabel({...task,residentId});
   save(true);
+  if(command.type!=='object'){
+    // A confirmed queue entry closes only presentation, never the action.
+    socialContextVisible=false;
+    socialMenuCategory=null;conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
+    renderSocialContext();renderSocialMenu();renderConversationPanel();renderSharedPanel();
+  }
   return true;
 }
 function queuedSocial(kind,extra={}){
@@ -180,7 +188,7 @@ $('wish-do-btn').addEventListener('click', () => {
   }
 });
 function select(id) {
-  if (id) closeMindPanel();
+  if (id){ closeMindPanel();closeSocialContext(); }
   selected = id;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -199,6 +207,26 @@ for (const id of Object.keys(META)) {
   el.addEventListener('click', () => select(id));
   $('hotspots').append(el); markers[id] = el;
 }
+// Persist only the optional display preference, never the game/save schema.
+// Default is a clean room; projecting the 3D object still enables a canvas tap.
+const ITEM_LABELS_PREF='lifesim.ui.itemLabels.v1';
+let itemLabelsVisible=false;
+try{itemLabelsVisible=localStorage.getItem(ITEM_LABELS_PREF)==='visible';}
+catch{/* In-memory default works in Safari private mode. */}
+function updateItemLabels(){
+  $('hotspots').hidden=!itemLabelsVisible;
+  const button=$('item-labels-btn');
+  button.setAttribute('aria-pressed',String(itemLabelsVisible));
+  button.setAttribute('aria-label',itemLabelsVisible
+    ?'Скрыть подписи предметов':'Показать подписи предметов');
+}
+$('item-labels-btn').addEventListener('click',()=>{
+  itemLabelsVisible=!itemLabelsVisible;
+  try{localStorage.setItem(ITEM_LABELS_PREF,itemLabelsVisible?'visible':'hidden');}
+  catch{/* UI preference is optional; never interrupt gameplay. */}
+  updateItemLabels();
+});
+updateItemLabels();
 $('close-action').addEventListener('click', () => select(null));
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
@@ -209,12 +237,30 @@ $('action-button').addEventListener('click', () => {
 // Legacy buttons remain hidden for old UI references; queue rather than interrupt.
 for(const kind of Object.keys(SOCIAL_ACTIONS))
   $(kind+'-btn').addEventListener('click',()=>queuedSocial(kind));
+function renderSocialContext(){
+  const open=socialContextVisible&&!socialMenuCategory&&!conversationTopicPicker&&
+    !sharedPicker&&!branchPicker&&!dialogueNeedsDecision(game);
+  $('social-context').hidden=!open;
+}
+function closeSocialContext(){
+  socialContextVisible=false;
+  closeSocialPickers();
+  renderSocialContext();
+}
+function openSocialContext(){
+  if(dialogueNeedsDecision(game))return;
+  select(null);closeMindPanel();closeSocialPickers();
+  socialContextVisible=true;
+  renderSocialContext();
+}
+$('social-context-close').addEventListener('click',closeSocialContext);
 function closeSocialPickers(){
   conversationTopicPicker=false;
   sharedPicker=false;
   branchPicker=false;
   socialMenuCategory=null;
   renderConversationPanel();renderSharedPanel();renderBranchPanel();renderSocialMenu();
+  renderSocialContext();
 }
 function showSocialCategory(category){
   // A multi-turn conversation requires the player's next answer, but opening
@@ -223,21 +269,21 @@ function showSocialCategory(category){
     closeSocialPickers();
     conversationTopicPicker=true;
     select(null);closeMindPanel();
-    renderConversationPanel();
+    renderConversationPanel();renderSocialContext();
     return;
   }
-  const peer=game.selectedSim==='alex'?'mira':'alex';
+  const peer=game.selectedSim='alex'?'mira':'alex';
   const status=relationSummary(game.socialGraph,game.selectedSim,peer);
   if(category==='friendship'&&status.friendship==='none'){
     toast('Дружеские действия пока недоступны');return;
   }
   closeSocialPickers();
   if(category==='shared'){
-    sharedPicker=true;select(null);closeMindPanel();renderSharedPanel();return;
+    sharedPicker=true;select(null);closeMindPanel();renderSharedPanel();renderSocialContext();return;
   }
   socialMenuCategory=category;
   select(null);closeMindPanel();
-  renderConversationPanel();renderSharedPanel();renderSocialMenu();
+  renderConversationPanel();renderSharedPanel();renderSocialMenu();renderSocialContext();
 }
 for(const [id,category] of [
   ['conversation-btn','conversation'],['humor-btn','humor'],
@@ -245,7 +291,7 @@ for(const [id,category] of [
   ['conflict-btn','conflict'],['shared-btn','shared']
 ])$(id).addEventListener('click',()=>showSocialCategory(category));
 $('social-menu-close').addEventListener('click',()=>{
-  socialMenuCategory=null;renderSocialMenu();renderConversationPanel();renderSharedPanel();
+  socialMenuCategory=null;renderSocialMenu();renderConversationPanel();renderSharedPanel();renderSocialContext();
 });
 // Close buttons dismiss only presentation. They must NEVER cancel a running
 // task; the deliberate "Прервать текущее действие" control lives in the queue.
@@ -538,6 +584,7 @@ function renderConversationPanel(force=true){
   const enteringRequired=required&&!panel.classList.contains('dialogue-required');
   panel.classList.toggle('dialogue-required',required);
   $('conversation-close').hidden=required;
+  $('dialogue-backdrop').hidden=!required;
   if(required){
     panel.setAttribute('role','dialog');
     panel.setAttribute('aria-modal','true');
@@ -605,6 +652,7 @@ renderSharedPanel();
 renderBranchPanel();
 renderSocialMenu();
 renderQueuePanel();
+renderSocialContext();
 function renderPauseButton(){
   const blocked=dialogueNeedsDecision(game);
   const paused=game.paused||blocked;
@@ -661,8 +709,8 @@ for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
     selectResident(game,id);
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
-    socialMenuCategory=null;
-    select(null); closeMindPanel(); updateResidentPicker();
+    socialMenuCategory=null;socialContextVisible=false;
+    select(null); closeMindPanel(); updateResidentPicker();renderSocialContext();
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
     renderSocialMenu();renderQueuePanel();save(true);
     toast('Теперь управляешь: '+selectedName());
@@ -1063,7 +1111,7 @@ function boot() {
   resetRuntime=()=>{
     reactionBadges.clear();clearSocialReactions(game);feedbackRoot=game;
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
-    socialMenuCategory=null;queueVisible=false;
+    socialMenuCategory=null;socialContextVisible=false;queueVisible=false;
     conversationDisplayKey='';sharedDisplayKey='';branchDisplayKey='';
     socialMenuDisplayKey='';queueDisplayKey='';
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
@@ -1149,6 +1197,7 @@ function boot() {
   };
   canvas.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse'&&event.button!==0)return;
+    if(dialogueNeedsDecision(game))return;
     if(event.cancelable)event.preventDefault();
     try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
     fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
@@ -1183,6 +1232,42 @@ function boot() {
       lastPinch=metrics?.distance??null;lastMidpoint=metrics;
     }
   });
+  // Neither labels nor an HTML overlay are required for touch hit testing:
+  // project the current world positions into camera screen coordinates.
+  const projectedObject=(id,meta)=>{
+    const anchor=new pc.Vec3(...meta.anchor);
+    const head=camera.camera.worldToScreen(anchor);
+    const lower=camera.camera.worldToScreen(
+      new pc.Vec3(meta.anchor[0],Math.max(.15,meta.anchor[1]-.95),meta.anchor[2]));
+    const viewPoint=camera.camera.viewMatrix.transformPoint(anchor);
+    return {kind:'object',id,x:head.x,y:(head.y+lower.y)/2,
+      rx:id==='bed'||id==='sofa'?75:56,
+      ry:Math.max(42,Math.abs(head.y-lower.y)*.65),
+      visible:viewPoint.z<0&&head.x>-50&&head.x<canvas.clientWidth+50&&
+        head.y>-80&&head.y<canvas.clientHeight+80};
+  };
+  const projectedResident=id=>{
+    const rig=reactionRigs[id];
+    if(!rig?.avatar||showerStates[id]?.active)return null;
+    const p=rig.avatar.getPosition();
+    const top=new pc.Vec3(p.x,p.y+2.25,p.z);
+    const feet=new pc.Vec3(p.x,p.y+.18,p.z);
+    const a=camera.camera.worldToScreen(top),b=camera.camera.worldToScreen(feet);
+    const viewPoint=camera.camera.viewMatrix.transformPoint(top);
+    const height=Math.abs(a.y-b.y);
+    return {kind:'resident',id,x:(a.x+b.x)/2,y:(a.y+b.y)/2,
+      rx:Math.max(27,Math.min(77,height*.33)),ry:Math.max(44,height*.55),
+      visible:viewPoint.z<0&&a.x>-60&&a.x<canvas.clientWidth+60&&
+        a.y>-100&&b.y<canvas.clientHeight+100};
+  };
+  const worldTargetAt=pos=>{
+    const rect=canvas.getBoundingClientRect();
+    const peer=game.selectedSim==='alex'?'mira':'alex';
+    return pickWorldTarget(pos.x-rect.left,pos.y-rect.top,[
+      projectedResident(peer),
+      ...Object.entries(META).map(([id,meta])=>projectedObject(id,meta))
+    ]);
+  };
   const endPointer=event=>{
     if(!fingers.has(event.pointerId))return;
     const tap=tapCandidate&&tapCandidate.id===event.pointerId&&
@@ -1191,16 +1276,11 @@ function boot() {
     const pos={x:event.clientX,y:event.clientY};
     fingers.delete(event.pointerId);
     tapCandidate=null;lastPinch=null;lastMidpoint=null;
-    if(tap){
-      let best=null,bestDist=65;
-      for(const [id,btn] of Object.entries(markers)){
-        if(btn.hidden)continue;
-        const rect=btn.getBoundingClientRect();
-        const dx=rect.left+rect.width/2-pos.x,dy=rect.top+rect.height/2-pos.y;
-        const dist=Math.hypot(dx,dy);
-        if(dist<bestDist){bestDist=dist;best=id;}
-      }
-      if(best)select(best);else select(null);
+    if(tap&&!dialogueNeedsDecision(game)){
+      const target=worldTargetAt(pos);
+      if(target?.kind==='resident')openSocialContext();
+      else if(target?.kind==='object')select(target.id);
+      else{closeSocialContext();select(null);}
     }
   };
   window.addEventListener('pointerup',endPointer);
@@ -1745,7 +1825,7 @@ function boot() {
           const li=document.createElement('li');li.textContent='Пока всё впереди';list.appendChild(li);
         }
       }
-      $('pause-icon').textContent=game.paused?'▶':'Ⅱ';
+      renderPauseButton(); // Includes the mandatory dialogue hold, not just manual pause.
       $('speed-btn').textContent=game.speed+'×';
       const status=game.paused?'Пауза':game.socialAction
         ? (game.socialAction.phase==='walking'?'Идёт на встречу: ':'Общаются: ')+SOCIAL_ACTIONS[game.socialAction.kind].label.toLowerCase()
