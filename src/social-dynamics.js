@@ -2,7 +2,7 @@
  * Both are derived from canonical completed graph events, not UI events.
  * No hardcoded residents, persistent shadow relationship score or randomness.
  */
-import {deriveAxes} from './trait-catalog.js';
+import {deriveAxes,preferenceAffinity} from './trait-catalog.js';
 import {episodeAppraisal} from './social-episodes.js';
 import {knownSocialCues} from './social-boundaries.js';
 
@@ -11,6 +11,10 @@ export const DYNAMIC_WINDOW_DAYS=14;
 export const AUTONOMOUS_PAIR_COOLDOWN=360; // Six in-game hours, not render seconds.
 export const AUTONOMOUS_REFUSAL_COOLDOWN=960;
 export const AUTONOMOUS_REPAIR_COOLDOWN=180; // Preserve gentle reconciliation after old 3h wait.
+export const AUTONOMOUS_LEISURE=Object.freeze(['music','books','games']);
+export const AUTONOMOUS_FRIEND_BRANCHES=Object.freeze([
+  'acquaint.chat','friend.tease','friend.confide'
+]);
 export const PAIR_DYNAMICS=Object.freeze({
   forming:{label:'Пока присматриваются',description:'Привычный способ общения ещё складывается'},
   supportive:{label:'Поддерживают друг друга',description:'Есть опыт добрых поступков и доверия'},
@@ -28,6 +32,46 @@ const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const finite=n=>Number.isFinite(n);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const validId=id=>typeof id==='string'&&/^[a-zA-Z][a-zA-Z0-9_-]{0,47}$/.test(id);
+const autonomyToken=(choiceId,seq)=>'auto.leisure.'+choiceId+':'+seq;
+/** Only fulfilled auto leisure has a typed token in the canonical graph;
+ * previewed and cancelled choices never acquire a history marker.
+ */
+export function autonomousLeisureToken(choiceId,seq){
+  return AUTONOMOUS_LEISURE.includes(choiceId)&&Number.isSafeInteger(seq)&&seq>0
+    ?autonomyToken(choiceId,seq):null;
+}
+/** Actions are distinct from a queued intent: an event token confirms completion. */
+function recentLeisureChoice(pair){
+  const recent=Array.isArray(pair?.events)?pair.events.slice(-4):[];
+  for(let i=recent.length-1;i>=0;i--){
+    if(recent[i].type==='leisure.accepted'&&typeof recent[i].token==='string'){
+      const match=/^auto\.leisure\.(music|books|games):[1-9][0-9]*$/.exec(recent[i].token);
+      if(match)return match[1];
+    }
+    if(recent[i].type!=='introduced')break;
+  }
+  return null;
+}
+/** A matching pleasant pastime is suggested, never a knowingly disliked one.
+ * The receiver's actual reaction is still checked before and after execution.
+ */
+function sharedInterest(self,recipient,pair,actorId){
+  const remembered=Array.isArray(pair?.knowledge?.[actorId])?
+    pair.knowledge[actorId]:[];
+  const last=recentLeisureChoice(pair);
+  return AUTONOMOUS_LEISURE.map(choiceId=>{
+    const own=preferenceAffinity(self.personality,choiceId);
+    const their=preferenceAffinity(recipient.personality,choiceId);
+    const known=remembered.find(entry=>entry.tag===choiceId)?.stance;
+    // We can suggest our own favourite pastime or a preference the partner
+    // actually disclosed; unseen private tastes only veto obvious dislikes.
+    const score=own*4+(known==='likes'&&their>0?6:0);
+    return {choiceId,score};
+  }).filter(x=>x.choiceId!==last&&
+    preferenceAffinity(self.personality,x.choiceId)>=0&&
+    preferenceAffinity(recipient.personality,x.choiceId)>=0&&x.score>=3)
+    .sort((a,b)=>b.score-a.score||a.choiceId.localeCompare(b.choiceId))[0]||null;
+}
 const needsSafe=x=>record(x)&&['energy','hunger','hygiene','fun'].every(k=>finite(x[k])&&x[k]>=0&&x[k]<=100);
 
 /** Slow-changing qualitative interpretation for a particular viewpoint.
@@ -142,6 +186,28 @@ export function proposeAutonomousSocial({
     const candidate={actorId,targetId,
       kind:distressed?'argue':'talk',
       style:style.id,score:Math.round(score)};
+    // Never turn a remorseful reconciliation into a playful detour.
+    // These are actual existing branch and leisure systems, not new rewards.
+    if(!repair&&!distressed&&recipientMood>=55&&mood>=45&&
+      directed.tension<32&&targetView.tension<40&&
+      directed.trust>=52&&targetView.trust>=48){
+      const lastType=latest?.type||null;
+      const hobby=sharedInterest(self,recipient,pair,actorId);
+      const enoughFun=self.needs.fun<55&&recipient.needs.fun<88;
+      if(hobby&&enoughFun&&directed.friendship>=52){
+        candidate.action={type:'shared',mode:'leisure',choiceId:hobby.choiceId};
+      }else if(pair.friendship!=='none'&&directed.trust>=65&&
+        targetView.trust>=55&&lastType!=='friend.confide'&&
+        style.id==='supportive'){
+        candidate.action={type:'branch',actionId:'friend.confide'};
+      }else if(pair.friendship!=='none'&&directed.trust>=60&&
+        lastType!=='friend.tease'&&style.id==='playful'){
+        candidate.action={type:'branch',actionId:'friend.tease'};
+      }else if(pair.metAt!==null&&lastType==='talk'&&
+        directed.friendship>=50&&targetView.friendship>=47){
+        candidate.action={type:'branch',actionId:'acquaint.chat'};
+      }
+    }
     if(!chosen||candidate.score>chosen.score||
       (candidate.score===chosen.score&&targetId<chosen.targetId))chosen=candidate;
   }

@@ -908,8 +908,8 @@ function boot() {
       if(len<bestLength){best={goal,points};bestLength=len;}
     }
     if(!best){if(!automatic&&!fromQueue)toast('Сейчас не получается подойти к собеседнику');return false;}
-    if(!(branchId?startBranchSocial(game,actorId,best.goal,branchId)
-      :shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId)
+    if(!(branchId?startBranchSocial(game,actorId,best.goal,branchId,automatic)
+      :shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId,automatic)
       :topic?startConversation(game,actorId,best.goal,topic)
       :startSocial(game,kind,actorId,best.goal,automatic)))return false;
     // Both residents are idle. Do not clear either existing action or path.
@@ -1234,10 +1234,20 @@ function boot() {
         if(!resident.action && autonomyWaitSeconds[residentId]>=AUTONOMY_WAIT_SECONDS){
           const socialIdea=autonomousSocialChoice(game,residentId);
           if(socialIdea){
-            if(beginSocial(socialIdea,true,residentId)){
-              toast(getActorName(residentId)+(socialIdea==='argue'
-                ?' захотел(а) высказать недовольство'
-                :' захотел(а) пообщаться'));
+            const plan=typeof socialIdea==='string'?{kind:socialIdea}:socialIdea;
+            const started=plan.type==='shared'
+              ?beginSocial('talk',true,residentId,null,
+                {mode:plan.mode,choiceId:plan.choiceId})
+              :plan.type==='branch'
+                ?beginSocial('talk',true,residentId,null,null,plan.actionId)
+                :beginSocial(plan.kind,true,residentId);
+            if(started){
+              const label=plan.type==='shared'
+                ?LEISURE_CATALOG[plan.choiceId]?.label.toLowerCase()
+                :plan.type==='branch'
+                  ?BRANCH_ACTIONS[plan.actionId]?.label.toLowerCase()
+                  :plan.kind==='argue'?'высказать недовольство':'пообщаться';
+              toast(getActorName(residentId)+' решил(а): '+(label||'пообщаться'));
               continue;
             }
             // If pathfinding or visual reservations refuse a proposal, do

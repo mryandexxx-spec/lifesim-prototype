@@ -5,8 +5,8 @@ import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction} from './social-feedback.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
 import {cueFromAnswer} from './social-boundaries.js';
-import {proposeAutonomousSocial} from './social-dynamics.js';
-import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor} from './gifts-leisure.js';
+import {proposeAutonomousSocial,AUTONOMOUS_FRIEND_BRANCHES,autonomousLeisureToken} from './social-dynamics.js';
+import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,evaluateLeisure} from './gifts-leisure.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
@@ -75,7 +75,11 @@ export function canStartSocial(root,kind,initiator,automatic=false) {
   // Player requests wait in a per-resident FIFO queue until both are idle.
   if(self.action||partner.action||root.paused)return false;
   if(automatic&&(!root.autonomy?.enabled||
-    root.minutes<root.relationship.nextSocialAt))return false;
+    root.minutes<root.relationship.nextSocialAt||
+    root.actionQueues?.byResident?.[initiator]?.length||
+    root.actionQueues?.byResident?.[otherId(initiator)]?.length||
+    !root.actionQueues?.byResident?.[initiator]||
+    !root.actionQueues?.byResident?.[otherId(initiator)]))return false;
   return true;
 }
 export function startSocial(root,kind,initiator,target,automatic=false) {
@@ -116,27 +120,38 @@ export function finishSocialConversation(root){
 /** Existing walk/animation/social reservation also supports gift/leisure.
  * Nothing changes until this shared action finishes its fixed game time.
  */
-export function startSharedSocial(root,initiator,target,mode,choiceId){
+export function startSharedSocial(root,initiator,target,mode,choiceId,automatic=false){
   const session=createSharedSession(root,initiator,mode,choiceId);
-  if(!session||!startSocial(root,'talk',initiator,target,false))return false;
+  // A spontaneous gift could consume player-owned items without permission;
+  // only voluntary leisure is allowed, and must appear welcome in preflight.
+  if(automatic&&(mode!=='leisure'||
+    evaluateLeisure(root,initiator,choiceId)?.accepted!==true))return false;
+  if(!session||!startSocial(root,'talk',initiator,target,automatic))return false;
   root.socialAction.shared=session;
   return true;
 }
 /** The adapter remains two-resident only; social-graph.js works with N stable IDs. */
-export function startBranchSocial(root,initiator,target,actionId){
+export function startBranchSocial(root,initiator,target,actionId,automatic=false){
   if(!root?.socialGraph||!availableSocialActions(root.socialGraph,initiator,otherId(initiator))
     .some(action=>action.id===actionId&&action.enabled))return false;
-  if(!startSocial(root,'talk',initiator,target,false))return false;
+  if(automatic&&(!AUTONOMOUS_FRIEND_BRANCHES.includes(actionId)||
+    resolveBranchResponse(root.socialGraph,initiator,otherId(initiator),actionId,{
+      recipient:get(root,otherId(initiator)),minutes:root.minutes,
+      compatibilityBias:socialCompatibility(get(root,otherId(initiator))?.personality,
+        get(root,initiator)?.personality).bias
+    })?.accepted!==true))return false;
+  if(!startSocial(root,'talk',initiator,target,automatic))return false;
   root.socialAction.branchAction={id:actionId};
   return true;
 }
-function recordPairCompletion(root,session,type){
+function recordPairCompletion(root,session,type,token=null){
   const graph=root.socialGraph,a=session.initiator,b=session.partner;
   if(!graph||!root.relationship?.views?.[a]||!root.relationship.views[b])return false;
   const views={[a]:root.relationship.views[a],[b]:root.relationship.views[b]};
   observePairViews(graph,a,b,views);
   return applySocialEvent(graph,{
-    actorId:a,targetId:b,type,at:root.minutes
+    actorId:a,targetId:b,type,at:root.minutes,
+    ...(typeof token==='string'?{token}:{})
   },{observedViews:views})||null;
 }
 export function arriveSocial(root) {
@@ -235,9 +250,13 @@ export function tickSocial(root,minutes){
     if(s.elapsed<duration)return false;
     const receipt=completeSharedSession(root);
     if(!receipt){root.socialAction=null;return false;}
+    const acceptedShared=receipt.kind!=='refused';
+    const autoLeisureToken=s.automatic&&s.shared.mode==='leisure'&&acceptedShared
+      ?autonomousLeisureToken(s.shared.choiceId,root.socialGraph?.nextSeq):null;
     const completed=recordPairCompletion(root,s,s.shared.mode==='gift'
       ?receipt.kind==='refused'?'gift.refused':'gift.accepted'
-      :receipt.kind==='refused'?'leisure.refused':'leisure.accepted');
+      :receipt.kind==='refused'?'leisure.refused':'leisure.accepted',
+      autoLeisureToken);
     const accepted=receipt.kind!=='refused';
     if(accepted&&completed){
       const tag=s.shared.mode==='gift'
@@ -276,15 +295,16 @@ export function loadSocialAction(data,root) {
   const session=data.conversation===undefined?null:restoreConversation(data.conversation);
   if(data.conversation!==undefined&&(!session||data.kind!=='talk'||data.automatic===true))
     return null;
-  if(data.shared!==undefined&&(!shared||session||data.kind!=='talk'||data.automatic===true))
-    return null;
+  if(data.shared!==undefined&&(!shared||session||data.kind!=='talk'||
+    (data.automatic===true&&shared.mode!=='leisure')))return null;
   const branch=data.branchAction;
   if(branch!==undefined&&(
     !branch||typeof branch!=='object'||Array.isArray(branch)||
     !Object.hasOwn(branch,'id')||Object.keys(branch).length!==1||
     !availableSocialActions(root.socialGraph,data.initiator,data.partner)
       .some(action=>action.id===branch.id&&action.enabled)||
-    session||shared||data.kind!=='talk'||data.automatic===true))return null;
+    session||shared||data.kind!=='talk'||
+    (data.automatic===true&&!AUTONOMOUS_FRIEND_BRANCHES.includes(branch.id))))return null;
   return {kind:data.kind,initiator:data.initiator,partner:data.partner,
     target:{x:data.target.x,z:data.target.z},phase:data.phase,
     elapsed:data.elapsed,automatic:data.automatic===true,
@@ -310,5 +330,5 @@ export function autonomousSocialChoice(root,id='alex') {
     reconcileTargetId:canReconcile(root)&&lastSocialMemory(get(root,id))?.id==='regret'
       ?otherId(id):null
   });
-  return idea?.kind??null;
+  return idea?.action?{kind:idea.kind,...idea.action}:idea?.kind??null;
 }
