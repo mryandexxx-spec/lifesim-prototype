@@ -83,7 +83,7 @@ export function proposeAutonomousSocial({
   if(Math.min(self.needs.energy,self.needs.hunger,self.needs.hygiene)<48)return null;
   const axes=deriveAxes(self.personality);
   const mood=finite(self.mind?.mood?.value)?self.mind.mood.value:50;
-  if(mood<34)return null;
+  if(mood<34&&reconcileTargetId===null)return null;
   const urge=clamp(65-self.needs.fun,0,65)*.8+axes.sociability*11-
     axes.independence*5+(mood>60?3:0);
   let chosen=null;

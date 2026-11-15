@@ -1235,7 +1235,9 @@ function boot() {
           const socialIdea=autonomousSocialChoice(game,residentId);
           if(socialIdea){
             if(beginSocial(socialIdea,true,residentId)){
-              toast(getActorName(residentId)+' захотел(а) пообщаться');
+              toast(getActorName(residentId)+(socialIdea==='argue'
+                ?' захотел(а) высказать недовольство'
+                :' захотел(а) пообщаться'));
               continue;
             }
             // If pathfinding or visual reservations refuse a proposal, do

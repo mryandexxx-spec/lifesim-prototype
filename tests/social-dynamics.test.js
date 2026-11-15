@@ -211,6 +211,32 @@ test('after a recent kind reply or refusal the couple is left in peace',()=>{
     'respectful conversation can resume after a long quiet interval');
 });
 
+test('rare high tension with low mood permits previous conflict behaviour but only when idle',()=>{
+  const g=newSocialGraph(ids);
+  markAcquainted(g,'nova','ember',480);
+  const c=context(g);
+  c.residents.nova.needs.fun=20;
+  c.residents.nova.mind.mood.value=38;
+  const p=getPair(g,'nova','ember');
+  p.views.nova.tension=90;
+  assert.equal(proposeAutonomousSocial(c)?.kind,'argue');
+  p.views.nova.tension=10;
+  assert.equal(proposeAutonomousSocial(c)?.kind,'talk');
+  c.queues.byResident.ember.push({seq:1,type:'object',actionId:'bed'});
+  assert.equal(proposeAutonomousSocial(c),null);
+});
+
+test('qualified remorse preserves a noninterrupting voluntary peace initiative',()=>{
+  const g=newSocialGraph(ids);
+  event(g,'nova','ember','argue',600);
+  const c=context(g,{minutes:600+180,reconcileTargetId:'nova',actorId:'ember'});
+  c.residents.ember.needs.fun=91;
+  c.residents.ember.mind.mood.value=31;
+  assert.equal(proposeAutonomousSocial(c)?.kind,'talk');
+  c.reconcileTargetId=null;
+  assert.equal(proposeAutonomousSocial(c),null);
+});
+
 test('recent quarrel triggers a longer rest, and hurt reduces voluntary pursuit',()=>{
   const g=newSocialGraph(ids);
   event(g,'nova','ember','argue',700);
