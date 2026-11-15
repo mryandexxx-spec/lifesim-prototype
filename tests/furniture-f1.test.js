@@ -8,8 +8,9 @@ import {newHousehold,loadHousehold} from '../src/household.js';
 import {isWalkable,findPath} from '../src/navigation.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const item=(w,type)=>w.instances.find(x=>x.prefabId===type);
-test('only self-contained procedural decor is initially editable; vital rigs locked',()=>{
-  assert.deepEqual(F1_MOVEABLE_PREFABS,['nightstand','table','tv','plant']);
+test('F1b functional prefab groups are selectable, while built-in counter stays fixed',()=>{
+  assert.deepEqual(F1_MOVEABLE_PREFABS,
+    ['nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet']);
   const w=newFurnitureWorld();
   for(const x of w.instances)
     assert.equal(canMoveFurniture(x),F1_MOVEABLE_PREFABS.includes(x.prefabId),x.prefabId);
@@ -53,15 +54,17 @@ test('after undo a different commit cuts off redo but not earlier history',()=>{
   assert.equal(session.commit(table.instanceId,{x:-.1,z:-1.35,yaw:0},opts).ok,true);
   assert.equal(session.redo().ok,false);
 });
-test('cannot move legacy bed, occupied WC, fridge, or a locked target',()=>{
+test('can access functional fixture transactions, but cannot move locked target or kitchen unit',()=>{
   const w=newFurnitureWorld(),editor=createFurnitureEditor(w);
-  for(const type of ['bed','fridge','sofa','shower','toilet','counter']){
+  for(const type of ['bed','fridge','sofa','shower','toilet']){
     const i=item(w,type);
-    assert.equal(editor.commit(i.instanceId,{x:i.x+.25,z:i.z,yaw:0}).reason,'fixed-or-missing');
+    assert.equal(canMoveFurniture(i),true);
+    assert.equal(editor.commit(i.instanceId,{x:i.x,z:i.z,yaw:0}).reason,'unchanged');
+    assert.equal(editor.commit(i.instanceId,{x:i.x+.25,z:i.z,yaw:0},
+      {lockedInstanceIds:[i.instanceId]}).reason,'reserved');
   }
-  const table=item(w,'table');
-  assert.equal(editor.commit(table.instanceId,{x:0,z:-1.35,yaw:0},
-    {lockedInstanceIds:[table.instanceId]}).reason,'reserved');
+  const counter=item(w,'counter');
+  assert.equal(editor.commit(counter.instanceId,{x:0,z:-1,yaw:0}).reason,'fixed-or-missing');
   assert.deepEqual(editor.state().world,w);
 });
 test('invalid edge, occupied resident, overlap, and no-op cannot modify state',()=>{

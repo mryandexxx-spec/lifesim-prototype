@@ -33,7 +33,7 @@ test('F1 edit mode freezes sim without overwriting persisted manual pause or que
   assert.match(game,/if\(dialogueNeedsDecision\(game\)\|\|furnishMode\)return/);
 });
 test('F1 groups real multi-part primitives under saved instance nodes and rewires table occlusion',()=>{
-  for(const type of ['nightstand','table','tv','plant']){
+  for(const type of ['nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet']){
     assert.ok(game.includes("withDecor('"+type+"'"),type);
   }
   assert.match(game,/entity\.setLocalPosition\(grouped\?x-decorDrawing\.origin\.x:x,y,/);
