@@ -139,7 +139,9 @@ export function autonomousChoice(state) {
   const scored = options.map(option => {
     const value = state.needs[option.need];
     const urgency = Math.max(0, option.threshold - value) * option.weight;
-    const bedtime = night && option.id === 'bed' && value < 67 ? (67-value) * 1.40 : 0;
+    // Sleep is a physiological priority at night, even if a leisure wish
+    // happens to be active. Temperament never overrides basic rest.
+    const bedtime = night && option.id === 'bed' && value < 67 ? 10+(67-value)*1.60 : 0;
     const base = urgency + bedtime;
     // No voluntary action at game start: let the player explore for the first hour.
     const eligible = base > 0 || (wishReady && state.mind?.wish?.id === option.id);

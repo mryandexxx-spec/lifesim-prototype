@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SAVE_KEY } from '../src/simulation.js';
+import {calculateMood} from '../src/psychology.js';
 import { newHousehold,loadHousehold,chooseResidentAction,setHouseholdAutonomy,tickHousehold } from '../src/household.js';
 import { SOCIAL_ACTIONS,canStartSocial,startSocial,arriveSocial,
   relationshipLabel,autonomousSocialChoice,cancelSocial,
@@ -123,8 +124,13 @@ test('argument memories distinguish initiator regret from partner hurt',()=>{
   complete(s,'argue','alex');
   assert.equal(s.mind.memories.at(-1).id,'regret');
   assert.equal(s.otherSim.mind.memories.at(-1).id,'hurt');
-  assert.ok(s.otherSim.mind.mood.value<s.mind.mood.value,
-    'hurt partner feels a stronger negative effect than the initiator');
+  // Mood baseline now varies by resident character and needs; compare
+  // each one's loss, not the two incomparable absolute mood values.
+  const neutral=person=>calculateMood(person.needs,{memories:[]},s.minutes,person.personality).value;
+  const initiatorDrop=neutral(s)-s.mind.mood.value;
+  const partnerDrop=neutral(s.otherSim)-s.otherSim.mind.mood.value;
+  assert.ok(partnerDrop>initiatorDrop,
+    'the hurt partner takes a stronger memory penalty than the regretful initiator');
   assert.equal(canReconcile(s),true);
   assert.equal(s.relationship.lastKind,'argue');
 });
