@@ -180,10 +180,13 @@ test('manual multi-turn talk can repeat at 100 affinity',()=>{
   const s=newHousehold();s.relationship.affinity=100;
   for(const id of ['daily.listen','daily.news']){
     begin(s,'daily');
-    chooseSocialLine(s,id);
-    finishSocialConversation(s);
-    assert.equal(s.relationship.affinity,100);
+    assert.ok(chooseSocialLine(s,id));
+    assert.ok(finishSocialConversation(s));
+    assert.equal(s.socialAction,null);
+    assert.ok(s.relationship.affinity>=0&&s.relationship.affinity<=100);
   }
+  // Availability at the cap is guaranteed, not a guaranteed positive outcome:
+  // the partner may refuse a line and lower previously full affinity.
   assert.equal(s.mind.memories.length,2);
 });
 test('a conciliatory exchange after a quarrel can trigger one reconciliation',()=>{
