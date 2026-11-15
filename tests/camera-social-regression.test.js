@@ -109,9 +109,11 @@ test('camera input is tracked beyond canvas for iOS, keeps single/multitouch saf
  assert.ok(src.includes("window.addEventListener('pointermove'"));
  assert.ok(src.includes("window.addEventListener('pointerup'"));
  assert.ok(src.includes("window.addEventListener('pointercancel'"));
- assert.ok(src.includes("dragCamera(view,dragMode"));
- assert.ok(src.includes("orbitCamera(view,dx,dy,2.0)"));
- assert.ok(src.includes('tapCandidate=null;lastPinch=null;lastMidpoint=null'));
+ assert.ok(src.includes("let oneFingerMode='orbit'"));
+ assert.ok(src.includes('createCameraGestureSession()'));
+ assert.ok(src.includes('cameraGesture.move(gesturePoint(event),view,'));
+ assert.ok(src.includes('cameraGesture.end(gesturePoint(event),performance.now())'));
+ assert.ok(src.includes('cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true})'));
 });
 test('renderer social controls remain enabled when partner busy or meter full',()=>{
  const src=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
