@@ -304,6 +304,7 @@ export function autonomousSocialChoice(root,id='alex') {
     enabled:root.autonomy?.enabled,paused:root.paused,
     socialBusy:Boolean(root.socialAction),
     nextSocialAt:root.relationship?.nextSocialAt??Infinity,
+    viewOverrides:root.relationship?.views??null,
     // Existing player-accepted behaviour: a genuinely remorseful actor may
     // initiate peace, but the wounded resident never has to propose it.
     reconcileTargetId:canReconcile(root)&&lastSocialMemory(get(root,id))?.id==='regret'

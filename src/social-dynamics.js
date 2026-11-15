@@ -10,6 +10,7 @@ const DAY=1440;
 export const DYNAMIC_WINDOW_DAYS=14;
 export const AUTONOMOUS_PAIR_COOLDOWN=360; // Six in-game hours, not render seconds.
 export const AUTONOMOUS_REFUSAL_COOLDOWN=960;
+export const AUTONOMOUS_REPAIR_COOLDOWN=180; // Preserve gentle reconciliation after old 3h wait.
 export const PAIR_DYNAMICS=Object.freeze({
   forming:{label:'Пока присматриваются',description:'Привычный способ общения ещё складывается'},
   supportive:{label:'Поддерживают друг друга',description:'Есть опыт добрых поступков и доверия'},
@@ -69,7 +70,7 @@ function safeEvent(pair,now){
  */
 export function proposeAutonomousSocial({
   graph,actorId,residents,queues,minutes,enabled=true,paused=false,
-  socialBusy=false,nextSocialAt=0
+  socialBusy=false,nextSocialAt=0,reconcileTargetId=null,viewOverrides=null
 }={}){
   if(!enabled||paused||socialBusy||!validId(actorId)||!finite(minutes)||
     minutes<540||minutes<nextSocialAt||!record(residents)||
@@ -100,12 +101,21 @@ export function proposeAutonomousSocial({
       recipient.needs.hygiene)<48)continue;
     const latest=safeEvent(pair,minutes);
     const severe=latest&&(conflict.has(latest.type)||refusals.has(latest.type));
+    // A remorseful initiator may make one gentle repair approach after the
+    // historical reconciliation window, not after every disagreement.
+    const repair=reconcileTargetId===targetId&&latest&&
+      (latest.type==='argue'||latest.type==='conversation.argue')&&
+      finite(pair.lastAt)&&minutes-pair.lastAt>=AUTONOMOUS_REPAIR_COOLDOWN;
     if(finite(pair.lastAt)&&minutes-pair.lastAt<
-      (severe?AUTONOMOUS_REFUSAL_COOLDOWN:AUTONOMOUS_PAIR_COOLDOWN))continue;
+      (repair?AUTONOMOUS_REPAIR_COOLDOWN:
+        severe?AUTONOMOUS_REFUSAL_COOLDOWN:AUTONOMOUS_PAIR_COOLDOWN))continue;
     const recipientMood=finite(recipient.mind?.mood?.value)
       ?recipient.mind.mood.value:50;
-    if(recipientMood<40)continue; // They may need privacy, not an unsolicited chat.
-    const directed=pair.views?.[actorId],targetView=pair.views?.[targetId];
+    if(recipientMood<(repair?25:40))continue; // No unsolicited pressure on someone in distress.
+    // The legacy two-person adapter may have live directed views that have
+    // not yet been copied into its canonical graph snapshot. Read-only bridge.
+    const directed=viewOverrides?.[actorId]??pair.views?.[actorId];
+    const targetView=viewOverrides?.[targetId]??pair.views?.[targetId];
     if(!record(directed)||!record(targetView))continue;
     const recipientWound=episodeAppraisal(pair,targetId,minutes);
     const style=pairDynamic(pair,actorId,minutes);
@@ -120,12 +130,18 @@ export function proposeAutonomousSocial({
       (directed.trust-45)*.12-directed.tension*.15+
       (targetView.tension>=70? -10:0);
     const dynamicWeight={forming:0,supportive:9,playful:6,strained:-15,distant:-18}[style.id];
-    const score=urge+relationship+dynamicWeight-restraint;
+    let score=urge+relationship+dynamicWeight-restraint;
+    // Reconciliation is a special motive, not an arbitrary need for fun.
+    if(repair)score=Math.max(score,38);
+    // Preserve rare spontaneous conflict driven by intense directed tension
+    // AND bad mood AND low fun, but never immediately repeat a recent fight.
+    const distressed=!repair&&!severe&&directed.tension>=85&&
+      mood<42&&self.needs.fun<35;
+    if(distressed)score+=20;
     if(score<26)continue; // Having nothing to say is a valid autonomous choice.
-    // Hostility is never chosen just to fill a need: avoid obsessive quarrels.
-    // The player can still initiate any permitted manual conflict.
-    const candidate={actorId,targetId,kind:'talk',style:style.id,
-      score:Math.round(score)};
+    const candidate={actorId,targetId,
+      kind:distressed?'argue':'talk',
+      style:style.id,score:Math.round(score)};
     if(!chosen||candidate.score>chosen.score||
       (candidate.score===chosen.score&&targetId<chosen.targetId))chosen=candidate;
   }
