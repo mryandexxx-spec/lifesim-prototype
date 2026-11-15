@@ -463,3 +463,61 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .world-tap-cue[hidden]{display:none!important;}
 @keyframes world-touch-pop{from{opacity:0;scale:.65}25%{opacity:1}to{opacity:0;scale:1.12}}
 @media(prefers-reduced-motion:reduce){.world-tap-cue{animation:none;opacity:.75;}}
+
+
+/* 1.0w UI4: only essential time/camera controls occupy the right edge.
+ * View toggles remain the same DOM nodes and preserve personal preferences.
+ */
+.control-tray .view-control{display:flex;flex-direction:column;align-items:center;
+ justify-content:center;gap:0;font-size:21px;line-height:1;}
+.control-tray .view-control small{font-size:9px;font-weight:800;margin-top:3px;letter-spacing:.5px;}
+.control-tray #view-toggle[aria-expanded="true"]{background:#397c66;color:#fff;border-color:#397c66;}
+.view-panel{position:absolute;z-index:26;left:var(--view-x,70px);
+ top:var(--view-y,154px);width:min(240px,calc(100vw - 78px));
+ padding:13px;display:flex;flex-direction:column;gap:8px;
+ border:1px solid #eff7f0;border-radius:18px;background:#fffdf8f8;
+ box-shadow:0 15px 37px #29493748;backdrop-filter:blur(17px);}
+.view-panel[hidden]{display:none!important;}
+.view-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.view-panel-head strong{color:#3a6550;font-size:15px;line-height:1.3;}
+.view-panel-head button{width:44px;height:44px;min-width:44px;border:0;
+ border-radius:11px;color:#54715d;background:#eaf2e9;font-size:24px;}
+.view-panel>.item-labels-control,.view-panel>.mesh-model-control{
+ width:100%;min-height:48px;padding:9px 11px;display:flex;align-items:center;
+ gap:9px;border-radius:12px;border:1px solid #d8e8dc;
+ background:#f4f9f2;color:#3c624d;text-align:left;font-size:13px;font-weight:800;
+ touch-action:manipulation;}
+.view-panel>.item-labels-control>span:first-child,.view-panel>.mesh-model-control>span:first-child{
+ width:30px;flex:none;text-align:center;font-size:20px;}
+.view-panel>.item-labels-control>span:nth-child(2),.view-panel>.mesh-model-control>span:nth-child(2){
+ flex:1;font-size:13px;}
+.view-panel>.item-labels-control small,.view-panel>.mesh-model-control small{
+ font-size:9px;font-weight:800;letter-spacing:.35px;}
+.view-panel>#item-labels-btn[aria-pressed="true"],
+.view-panel>#mesh-model-btn[aria-pressed="true"]{background:#dff1e6;border-color:#acd2bd;}
+/* Dynamic placement wins all legacy bottom-HUD rules; submenu replaces the
+ * categories in the very same vicinity without obscuring the bottom needs.
+ */
+#social-context.context-popover,
+#social-menu-panel.context-popover,
+#shared-panel.context-popover,
+#branch-panel.context-popover,
+#conversation-panel.context-popover:not(.dialogue-required){
+ position:absolute;left:var(--context-x,12px);top:var(--context-y,120px);
+ right:auto!important;bottom:auto!important;transform:none;
+ max-height:var(--context-max-height,50dvh);overflow-y:auto;
+ overscroll-behavior:contain;}
+#social-context.context-popover{width:min(355px,calc(100vw - 24px));}
+#social-menu-panel.context-popover{width:min(354px,calc(100vw - 24px));}
+#social-context .social-dismiss,
+.conversation-head button,.queue-head button,.queue-items li button{
+ min-width:44px;min-height:44px;touch-action:manipulation;}
+#social-context .social-dismiss{top:7px;right:7px;}
+#social-context .social-controls button{min-height:46px;font-size:12px;padding:10px;}
+.conversation-panel:not(.dialogue-required) .conversation-option{min-height:44px;font-size:13px;}
+.queue-active button{min-height:44px;font-size:12px;}
+#social-context .social-controls>span{font-size:12px;}
+/* Provide a visible focus ring for external keyboards and assistive input. */
+.view-panel button:focus-visible,.context-popover button:focus-visible{
+ outline:3px solid #347554;outline-offset:2px;}
+@media(max-height:560px){.view-panel{max-height:calc(100dvh - 24px);overflow-y:auto;}}
