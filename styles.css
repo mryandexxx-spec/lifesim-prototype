@@ -64,6 +64,8 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .mind-mood strong{display:block;font-size:18px;color:#385d4a;margin:3px 0 7px;}
 .mind-meter{height:8px;background:#e9f0e7;border-radius:12px;overflow:hidden;}
 .mind-meter i{height:100%;display:block;width:70%;background:#81baa0;transition:width .3s;}
+.mind-emotion-section{padding:10px 12px;border-radius:14px;background:#f2f4ef;margin-bottom:12px;}
+.mind-emotions{font-size:11px;line-height:1.65;color:#486a57;margin-top:5px;white-space:pre-line;overflow-wrap:anywhere;}
 .mind-wish{padding:12px;border-radius:16px;background:#eaf5ed;margin-bottom:12px;}
 .mind-wish strong{display:block;color:#385d4a;font-size:14px;margin:5px 0 10px;}
 .mind-wish button{background:#3f9276;color:white;font-weight:800;border:0;border-radius:11px;padding:9px 12px;font-size:12px;width:100%;}

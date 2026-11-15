@@ -1,5 +1,6 @@
 /** Headless two-person social relationship simulation. */
 import { refreshMind } from './psychology.js';
+import {feelMemory} from './emotion-engine.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -99,8 +100,10 @@ export function tickSocial(root,minutes) {
     resident.needs.fun=clamp(resident.needs.fun+def.fun,0,100);
     const memoryId=reconciled?'reconcile'
       :s.kind==='argue'?(id===s.initiator?'regret':'hurt'):'talk';
-    resident.mind.memories.push({id:memoryId,at:root.minutes,fulfilled:false});
+    const memory={id:memoryId,at:root.minutes,fulfilled:false};
+    resident.mind.memories.push(memory);
     resident.mind.memories=resident.mind.memories.slice(-12);
+    feelMemory(resident,memory);
     resident.autonomy.nextAt=root.minutes+15;
     resident.event=reconciled?'Удалось помириться'
       :s.kind==='talk'?'Приятно поговорили'

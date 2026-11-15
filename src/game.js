@@ -7,6 +7,7 @@ import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
+import {visibleEmotions} from './emotion-engine.js';
 import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js';
@@ -1040,6 +1041,11 @@ function boot() {
       $('mind-wish-label').textContent=wish?.label || 'Присматривается к миру';
       $('wish-do-btn').disabled=!wish;
       if (!$('mind-panel').hidden) {
+        const feelings=visibleEmotions(current.mind,current.minutes,current.personality).slice(0,3);
+        $('mind-emotions').textContent=feelings.length
+          ?feelings.map(e=>e.icon+' '+e.label+' · '+e.intensity+'/100 · '+e.cause+
+            ' · ещё '+Math.ceil(e.remaining)+' игр. мин.').join('\n')
+          :'Сейчас нет сильных переживаний';
         const list=$('mind-memories');
         list.replaceChildren();
         const memories=current.mind.memories.slice(-4).reverse();

@@ -1,6 +1,7 @@
 /** Headless LifeSim personality, emotions, wishes and event memory. No DOM, engine or I/O. */
 import {deriveAxes,preferenceAffinity} from './trait-catalog.js';
 import {activityReceipt} from './sim-events.js';
+import {feelMemory,pruneEmotions,restoreEmotions,emotionMoodImpact,memoryEmotionKey,visibleEmotions} from './emotion-engine.js';
 /** Deprecated public snapshot retained for older test/API consumers; gameplay uses per-resident profiles. */
 export const TRAITS = Object.freeze({
   neat: { label: 'Аккуратный', description: 'Любит чистоту и порядок', value: 0.82 },
@@ -34,13 +35,15 @@ const axesFor = state => deriveAxes(state?.personality);
 export function createMind(minutes = 480) {
   return {
     memories: [],
+    emotions: [],
     wish: { id: 'sofa', since: minutes, until: minutes + 480 },
     mood: { value: 70, label: 'Спокоен' }
   };
 }
 
-export function recentMemoryEffect(mind, minutes) {
+export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
   return (mind.memories || []).reduce((sum, memory) => {
+    if(excluded.has(memoryEmotionKey(memory)))return sum;
     const elapsed = clamp(minutes - memory.at, 0, 10000000);
     const strength = Math.max(0, 1 - elapsed / 360);
     // Identical social event, different memories: the initiator regrets
@@ -62,7 +65,9 @@ export function calculateMood(needs, mind, minutes, personality = null) {
   const weights=[.5+axes.creativity*.3+axes.sociability*.1,.5+axes.organization*.4,.5+axes.resilience*.4];
   const comfort=(needs.fun*weights[0]+needs.hygiene*weights[1]+needs.energy*weights[2])/
     weights.reduce((a,b)=>a+b,0);
-  const memories=recentMemoryEffect(mind,minutes)*(.75+axes.emotionalReactivity*.8);
+  const emotional=emotionMoodImpact(mind,minutes);
+  const memories=(recentMemoryEffect(mind,minutes,emotional.covered)+emotional.delta)*
+    (.75+axes.emotionalReactivity*.8);
   const optimism=(axes.optimism-.5)*14;
   const score=clamp(Math.round(20+average*.48+comfort*.27+
     clamp(memories,-24,17)+optimism-(worst<25?(25-worst)*.8:0)),0,100);
@@ -74,6 +79,12 @@ export function calculateMood(needs, mind, minutes, personality = null) {
   else if (score >= 68) label = 'Доволен';
   else if (score < 40) label = 'Подавлен';
   else if (score < 56) label = 'Не в настроении';
+  // Extreme needs stay readable. Otherwise a strong recent feeling explains
+  // the mood without changing the legacy 0–100 score's meaning.
+  if(worst>=20){
+    const primary=visibleEmotions(mind,minutes,personality)[0];
+    if(primary&&primary.intensity>=25)label=primary.label;
+  }
   return { value: score, label };
 }
 
@@ -99,6 +110,7 @@ export function selectWish(state, except = null) {
 
 export function refreshMind(state) {
   if (!state.mind || typeof state.mind !== 'object') state.mind = createMind(state.minutes);
+  pruneEmotions(state.mind,state.minutes);
   if (!state.mind.wish || state.minutes >= state.mind.wish.until) {
     const id = selectWish(state);
     state.mind.wish = { id, since: state.minutes, until: state.minutes + 480 };
@@ -111,8 +123,10 @@ export function rememberAction(state, id) {
   if (!receipt || !WISHES[receipt.actionId]) return;
   const mind = state.mind;
   const fulfilled = mind.wish?.id === id;
-  mind.memories.push({ id, at: state.minutes, fulfilled });
+  const memory={ id, at: state.minutes, fulfilled };
+  mind.memories.push(memory);
   mind.memories = mind.memories.slice(-LIMIT);
+  feelMemory(state,memory);
   if (fulfilled) {
     const next = selectWish(state, id);
     mind.wish = { id: next, since: state.minutes, until: state.minutes + 480 };
@@ -138,6 +152,7 @@ export function restoreMind(raw, state) {
       mind.wish = null; // regenerate against recent history
     }
   }
+  mind.emotions=restoreEmotions(raw,mind.memories,state.minutes,state.personality);
   state.mind = mind;
   refreshMind(state);
   return mind;
