@@ -10,6 +10,7 @@ import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,wheelCamera} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
+import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
@@ -439,7 +440,8 @@ function placeSocialPopover(panel){
     viewportWidth:w,viewportHeight:h,
     panelWidth:panel.offsetWidth||340,panelHeight:panel.offsetHeight||280,
     topInset:landscape?72:mobile?116:102,
-    bottomInset:landscape?122:mobile?226:144
+    bottomInset:Math.max(landscape?122:mobile?170:144,
+      Math.ceil($('dashboard').getBoundingClientRect().height)+12)
   });
   panel.style.setProperty('--context-x',pos.x+'px');
   panel.style.setProperty('--context-y',pos.y+'px');
@@ -1024,6 +1026,16 @@ for (const id of HOUSEHOLD_IDS) {
   });
 }
 updateResidentPicker();
+// Presentation-only HUD preference: never touches simulation or household saves.
+createHudPanel({
+  panel:$('dashboard'),toggle:$('hud-toggle'),
+  readPreference:()=>localStorage.getItem(HUD_COMPACT_KEY),
+  writePreference:value=>localStorage.setItem(HUD_COMPACT_KEY,value),
+  onChange:compact=>{
+    if(compact){closeMindPanel();closeInsightPanel();}
+    requestAnimationFrame(relayoutSocialPanels);
+  }
+});
 $('save-btn').addEventListener('click', () => save());
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
