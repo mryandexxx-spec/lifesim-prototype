@@ -347,7 +347,7 @@ test('1.0u release bundles M3 and preserves 1.0s contextual UX and 1.0t live pla
   assert.match(html,/id="item-labels-btn"/);
   assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(game,/dialogueNeedsDecision\(game\)/);
-  assert.match(game,/pickWorldTarget\(/);
+  assert.match(game,/pickWorldRayTarget\(/);
   assert.match(game,/planPreview\(/);
   assert.equal(pkg.version,'1.0.0-alpha.22');
   assert.equal(lock.version,pkg.version);
