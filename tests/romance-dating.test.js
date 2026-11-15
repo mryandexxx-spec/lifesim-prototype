@@ -255,7 +255,7 @@ test('1.0l: only category-backed actions, no imported renderer or age-life-cycle
   const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
   const html=read('../index.html'),game=read('../src/game.js'),
     romance=read('../src/romance.js');
-  assert.ok(html.includes('сборка / 1.0v'));
+  assert.ok(html.includes('сборка / 1.0w'));
   assert.ok(html.includes('id="romance-btn"'));
   assert.ok(game.includes("category==='romance'"));
   assert.ok(romance.includes("'romance.date'"));
