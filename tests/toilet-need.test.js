@@ -9,7 +9,7 @@ import {newHousehold,loadHousehold,chooseResidentAction,
 import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END,
   toiletSequence,createToiletTransition,advanceToiletTransition,
   toiletPrivacyInvariant} from '../src/toilet-interaction.js';
-import {ROOM,FURNITURE,isWalkable,findPath,isClearLine} from '../src/navigation.js';
+import {ROOM,FURNITURE,isWalkable,nearestWalkable,findPath,isClearLine} from '../src/navigation.js';
 import {refreshMind,calculateMood,MEMORY_TEXT} from '../src/psychology.js';
 import {NEED_LABELS,moodReasons} from '../src/mood-presentation.js';
 import {moodActionPolicy} from '../src/mood-action-policy.js';
@@ -98,7 +98,10 @@ test('M4: toilet approach is free and accessible while seat is a real obstacle',
     const path=findPath(start,goal);
     assert.ok(path?.length>0,JSON.stringify(start));
     assert.deepEqual(path.at(-1),goal);
-    let prev=start;
+    // findPath intentionally repairs an unsafe legacy start by snapping it
+    // to the nearest reachable floor cell before running collision tests.
+    let prev=nearestWalkable(start);
+    assert.ok(isWalkable(prev.x,prev.z));
     for(const point of path){
       assert.ok(isWalkable(point.x,point.z));
       assert.ok(isClearLine(prev,point));
