@@ -1681,6 +1681,19 @@ function boot() {
   furnitureGhost.enabled=false;
   const lockedFurnitureIds=()=>{
     const busy=new Set();
+    // A finished need action may still have a physical stand-up, dressing,
+    // masking or fridge-door-close animation. F1b forbids relocating those
+    // assemblies until all residents are visually clear of the fixture.
+    if(Object.values(bedStates).some(s=>s.progress>0))
+      busy.add('home-bed-1');
+    if(Object.values(sofaStates).some(s=>s.progress>0))
+      busy.add('home-sofa-1');
+    if(Object.values(showerStates).some(s=>s.active))
+      busy.add('home-shower-1');
+    if(Object.values(toiletStates).some(s=>s.active))
+      busy.add('home-toilet-1');
+    if(fridgeOpen>.001||Object.values(fridgeLeaving).some(Boolean))
+      busy.add('home-fridge-1');
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
@@ -1698,7 +1711,7 @@ function boot() {
   };
   const editorMessage=(reason)=>{
     const messages={
-      'fixed-or-missing':'Предмет закреплён: его анимации и точки взаимодействия пока нельзя безопасно передвигать',
+      'fixed-or-missing':'Встроенную кухню пока нельзя перемещать: она связана со стеной',
       reserved:'Предмет занят или уже указан в очереди действий',
       'room-bounds':'Слишком близко к стене или за пределами комнаты',
       collision:'Здесь уже стоит другая мебель',
@@ -1846,7 +1859,7 @@ function boot() {
     renderSharedPanel();renderBranchPanel();
     chooseFurniture(null);
     renderPauseButton();
-    editorFeedback('Время остановлено. Выбери телевизор, столик, растение или тумбочку.');
+    editorFeedback('Время остановлено. Выбери мебель: кровать, диван, холодильник, душ и WC теперь тоже можно переставлять, но не во время использования.');
   };
   $('furnish-toggle').addEventListener('click',()=>furnishMode?exitFurniture():enterFurniture());
   $('furnish-exit').addEventListener('click',exitFurniture);
@@ -2417,11 +2430,11 @@ function boot() {
     for(const slot of ['left','right']){
       const progress=Math.max(...Object.values(bedStates).map(s=>s.slot===slot?s.progress:0));
       const quilt=bedBeddingPose(progress),bx=BED_SLOTS[slot].x;
-      quilts[slot].body.setLocalPosition(bx-BED_LAYOUT.centerX,quilt.y,
-        quilt.z-BED_LAYOUT.centerZ);
+      quilts[slot].body.setLocalPosition(bx+2.62,quilt.y,
+        quilt.z+1.425);
       quilts[slot].body.setLocalScale(1.02,.15,quilt.depth);
-      quilts[slot].trim.setLocalPosition(bx-BED_LAYOUT.centerX,quilt.y+.09,
-        quilt.trimZ-BED_LAYOUT.centerZ);
+      quilts[slot].trim.setLocalPosition(bx+2.62,quilt.y+.09,
+        quilt.trimZ+1.425);
     }
     const activeFridge=alexFridge||miraFridge;
     fridgeOpen=activeFridge?activeFridge.doorOpen:closeFridgeDoor(fridgeOpen,animDt);
