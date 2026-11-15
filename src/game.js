@@ -370,21 +370,27 @@ function renderBranchPanel(force=true){
   $('branch-subtitle').textContent=active
     ?game.paused?'Пауза — взаимодействие остановлено':
       s.phase==='walking'?'Жители идут друг к другу':'Общаются — действие завершится по игровому времени'
-    :'Значимых хороших событий: '+status.positive+
-      ' · конфликтов: '+status.negative+' · дней общения: '+status.days;
+    :'ОТЛАДКА · хороших событий: '+status.positive+
+      ', конфликтов: '+status.negative+', общих дней: '+status.days;
   if(active){
     const p=document.createElement('p');p.className='shared-progress-text';
     p.textContent=BRANCH_ACTIONS[active.id]?.label||'Социальное действие';
     opts.append(p);return;
   }
+  const debug=document.createElement('p');debug.className='shared-progress-text';
+  const a=getPerspective(game,game.selectedSim),b=getPerspective(game,target);
+  debug.textContent='Направления · '+selectedName()+': '+Math.round(a.friendship)+' / '+
+    Math.round(a.trust)+' / '+Math.round(a.tension)+'; '+getActorName(target)+': '+
+    Math.round(b.friendship)+' / '+Math.round(b.trust)+' / '+Math.round(b.tension);
+  opts.append(debug);
   const hints=document.createElement('p');hints.className='shared-progress-text';
-  hints.textContent='Дружба: взаимное доверие и минимум 3 значимых события за 2 дня. Вражда: повторные конфликты.';
+  hints.textContent='Дружба: 3 события за 2 дня, взаимная дружба ≥65, доверие ≥50. Враги: ≥2 конфликта.';
   opts.append(hints);
   for(const action of availableSocialActions(game.socialGraph,game.selectedSim,target)){
     const button=conversationButton(action.label+(action.enabled?'':' · '+action.reason),()=>{
-      if(beginSocial('talk',false,game.selectedSim,null,null,action.id)){
+      if(queuedSocial('branch',{actionId:action.id})){
         branchPicker=false;renderBranchPanel();
-      }else toast('Не удалось начать общение');
+      }
     });
     button.disabled=!action.enabled||Boolean(game.socialAction);
     opts.append(button);
@@ -393,11 +399,11 @@ function renderBranchPanel(force=true){
 /** Browser-safe, stable controls: rerender only on a transition, never on a frame. */
 function renderSharedPanel(force=true){
   const action=game.socialAction,session=action?.shared;
-  const key=JSON.stringify([sharedPicker,game.selectedSim,game.paused,action?.phase,session]);
+  const key=JSON.stringify([sharedPicker,socialMenuCategory,game.selectedSim,game.paused,action?.phase,session]);
   if(!force&&key===sharedDisplayKey)return;
   sharedDisplayKey=key;
   const open=sharedPicker||Boolean(session);
-  $('shared-panel').hidden=!open;
+  $('shared-panel').hidden=!open||Boolean(socialMenuCategory);
   if(!open)return;
   const options=$('shared-options');options.replaceChildren();
   const own=getActorName(session?action.initiator:game.selectedSim);
@@ -434,18 +440,18 @@ function renderSharedPanel(force=true){
   for(const item of inventory){
     const def=GIFT_CATALOG[item.type];
     options.append(conversationButton(def.symbol+' '+def.label,()=>{
-      if(beginSocial('talk',false,game.selectedSim,null,{mode:'gift',choiceId:item.id})){
+      if(queuedSocial('shared',{mode:'gift',choiceId:item.id})){
         sharedPicker=false;renderSharedPanel();
-      }else toast('Не получилось вручить подарок');
+      }
     }));
   }
   const activities=document.createElement('h3');activities.textContent='Провести время вместе';
   options.append(activities);
   for(const [id,def] of Object.entries(LEISURE_CATALOG))
     options.append(conversationButton(def.symbol+' '+def.label,()=>{
-      if(beginSocial('talk',false,game.selectedSim,null,{mode:'leisure',choiceId:id})){
+      if(queuedSocial('shared',{mode:'leisure',choiceId:id})){
         sharedPicker=false;renderSharedPanel();
-      }else toast('Не удалось пригласить к досугу');
+      }
     }));
 }
 function conversationButton(label,callback,secondary=false){
@@ -460,12 +466,12 @@ function conversationButton(label,callback,secondary=false){
  */
 function renderConversationPanel(force=true){
   const s=game.socialAction,session=s?.conversation;
-  const key=JSON.stringify([conversationTopicPicker,game.selectedSim,game.paused,
+  const key=JSON.stringify([conversationTopicPicker,socialMenuCategory,game.selectedSim,game.paused,
     s?.phase,session?.topic,session?.phase,session?.turns]);
   if(!force&&key===conversationDisplayKey)return;
   conversationDisplayKey=key;
   const open=conversationTopicPicker||Boolean(session);
-  $('conversation-panel').hidden=!open;
+  $('conversation-panel').hidden=!open||Boolean(socialMenuCategory);
   if(!open)return;
   const options=$('conversation-options');
   options.replaceChildren();
@@ -480,7 +486,7 @@ function renderConversationPanel(force=true){
   if(!session){
     for(const [id,topic] of Object.entries(CONVERSATION_TOPICS))
       options.append(conversationButton(topic.label,()=>{
-        if(beginSocial('talk',false,game.selectedSim,id)){
+        if(queuedSocial('conversation',{topicId:id})){
           conversationTopicPicker=false;renderConversationPanel();
         }
       }));
@@ -523,6 +529,8 @@ function renderConversationPanel(force=true){
 renderConversationPanel();
 renderSharedPanel();
 renderBranchPanel();
+renderSocialMenu();
+renderQueuePanel();
 $('pause-btn').addEventListener('click', () => {
   game.paused = !game.paused;
   $('pause-icon').textContent = game.paused ? '▶' : 'Ⅱ';
@@ -571,8 +579,10 @@ for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
     selectResident(game,id);
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
+    socialMenuCategory=null;
     select(null); closeMindPanel(); updateResidentPicker();
-    renderConversationPanel();renderSharedPanel();renderBranchPanel();save(true);
+    renderConversationPanel();renderSharedPanel();renderBranchPanel();
+    renderSocialMenu();renderQueuePanel();save(true);
     toast('Теперь управляешь: '+selectedName());
   });
 }
@@ -881,20 +891,68 @@ function boot() {
       :shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId)
       :topic?startConversation(game,actorId,best.goal,topic)
       :startSocial(game,kind,actorId,best.goal,automatic)))return false;
-    // A manual invitation interrupts the partner's task but never bypasses
-    // its renderer exit transition (bed/sofa/shower/fridge). Drop obsolete A*.
-    if(!automatic){
-      const partnerId=actorId==='alex'?'mira':'alex';
-      paths[partnerId]={points:null,index:0,id:null};
-    }
+    // Both residents are idle. Do not clear either existing action or path.
     paths[actorId]={points:best.points,index:0,id:'social:'+kind};
     restartAutonomyWait();
     return true;
   };
+  dispatchPlannedActions=()=>{
+    if(game.paused)return [];
+    return dispatchActionQueues(game.actionQueues,{
+      canStart(residentId,command){
+        if(!HOUSEHOLD_IDS.includes(residentId)||game.socialAction)return false;
+        const actor=getActor(game,residentId);
+        if(actor.action||sofaStates[residentId].progress>0||
+          bedStates[residentId].progress>0||showerStates[residentId].active||
+          fridgeLeaving[residentId])return false;
+        if(command.type==='object')
+          return furnitureAvailable(game,command.actionId,residentId)&&
+            !(command.actionId==='shower'&&HOUSEHOLD_IDS.some(id=>
+              id!==residentId&&showerStates[id].active));
+        const partnerId=command.targetId;
+        // Current 3D scene is a two-person adapter; the queue core is N-person.
+        if(!HOUSEHOLD_IDS.includes(partnerId)||partnerId===residentId||
+          (residentId==='alex'?'mira':'alex')!==partnerId)return false;
+        const partner=getActor(game,partnerId);
+        if(partner.action||sofaStates[partnerId].progress>0||
+          bedStates[partnerId].progress>0||showerStates[partnerId].active||
+          fridgeLeaving[partnerId])return false;
+        // Older personal plans of the invitee take priority over new invites.
+        if((pendingActions(game.actionQueues,partnerId)[0]?.seq??Infinity)<
+          command.seq)return false;
+        if(!canStartSocial(game,command.type==='social'?command.actionId:'talk',
+          residentId,false))return false;
+        if(command.type==='branch'&&!availableSocialActions(
+          game.socialGraph,residentId,partnerId)
+          .some(a=>a.id===command.actionId&&a.enabled))return false;
+        if(command.type==='shared'&&command.mode==='gift'&&
+          !inventoryFor(game,residentId).some(item=>item.id===command.choiceId))
+          return false;
+        return true;
+      },
+      start(residentId,command){
+        if(command.type==='object')
+          return beginAction(command.actionId,false,residentId);
+        if(command.type==='social')
+          return beginSocial(command.actionId,false,residentId);
+        if(command.type==='conversation')
+          return beginSocial('talk',false,residentId,command.topicId);
+        if(command.type==='branch')
+          return beginSocial('talk',false,residentId,null,null,command.actionId);
+        if(command.type==='shared')
+          return beginSocial('talk',false,residentId,null,
+            {mode:command.mode,choiceId:command.choiceId});
+        return false;
+      }
+    });
+  };
   resetRuntime=()=>{
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
+    socialMenuCategory=null;queueVisible=false;
     conversationDisplayKey='';sharedDisplayKey='';branchDisplayKey='';
+    socialMenuDisplayKey='';queueDisplayKey='';
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
+    renderSocialMenu();renderQueuePanel();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
