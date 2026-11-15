@@ -18,7 +18,7 @@ import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
-  fixtureContactLayout} from './furniture-transform.js';
+  fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
@@ -1106,6 +1106,7 @@ function boot() {
   };
   const decorNodes=new Map();
   let decorDrawing=null;
+  let refreshSofaSeat=()=>{};
   const withDecor=(prefabId,render)=>{
     const origin=ORIGINAL_FURNITURE.find(i=>i.prefabId===prefabId);
     const current=game.world.furniture.instances.find(i=>i.instanceId===origin.instanceId)||origin;
@@ -1127,6 +1128,7 @@ function boot() {
       // PlayCanvas Y rotation has opposite XZ convention to rotateLocal.
       node.setEulerAngles(0,-pose.yaw,0);
     }
+    refreshSofaSeat();
   };
   const primitive = (type,name,x,y,z,sx,sy,sz,material,parent=app.root) => {
     const entity = new pc.Entity(name);
@@ -1350,23 +1352,32 @@ function boot() {
   // Furniture publishes its own physical seat dimensions/placement.
   // Future armchairs and couch variants register the same metadata and
   // reuse this controller: no per-sofa adjustments of the avatar's Y.
-  const livingSofaSurface=createSeatSurface({
-    id:'living-sofa',origin:{x:SOFA_LAYOUT.x,y:0,z:SOFA_LAYOUT.z},
-    yaw:SOFA_POSE.yaw,width:SOFA_LAYOUT.seatWidth,depth:SOFA_LAYOUT.seatDepth,
-    seatHeight:SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2,
-    floorY:0,slots:1,sideMargin:.35,backClearance:.10,approachGap:.50
-  });
-  const livingSofaSeat=seatSlot(livingSofaSurface,0);
+  const makeSofaSeat=()=>{
+    const center=furniturePoint(game.world,'sofa',
+      {x:SOFA_LAYOUT.x,z:SOFA_LAYOUT.z});
+    const instance=furnitureInstance(game.world,'sofa');
+    return seatSlot(createSeatSurface({
+      id:'living-sofa',origin:{x:center.x,y:0,z:center.z},
+      yaw:SOFA_POSE.yaw-instance.yaw,width:SOFA_LAYOUT.seatWidth,depth:SOFA_LAYOUT.seatDepth,
+      seatHeight:SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2,
+      floorY:0,slots:1,sideMargin:.35,backClearance:.10,approachGap:.50
+    }),0);
+  };
+  let livingSofaSeat=makeSofaSeat();
+  refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat();};
   const alexRig=createCharacterRig(rigContext,'alex');
   const miraRig=createCharacterRig(rigContext,'mira');
   // Visual-only experimental Alex skin. The procedural rig and every action
   // controller remain authoritative; any GLB error falls back immediately.
+  const liveFridgeLayout=()=>fixtureContactLayout(game.world,'fridge',FRIDGE_LAYOUT);
   const meshyAlex=createMeshyVisual({pc,app,rig:alexRig,
-    footIK:seatIKEnabled,footPlant:seatFootPlantEnabled,onStatus:(status,error)=>{
+    footIK:seatIKEnabled,footPlant:seatFootPlantEnabled,
+    fridgeLayout:liveFridgeLayout,onStatus:(status,error)=>{
     if(status==='ready'||status==='error')loadingProgress.finish('alex',status==='ready');
     if(error)console.warn('Meshy visual unavailable',error);
   }});
-  const meshyMira=createMiraMeshyVisual({pc,app,rig:miraRig,onStatus:(status,error)=>{
+  const meshyMira=createMiraMeshyVisual({pc,app,rig:miraRig,
+    fridgeLayout:liveFridgeLayout,onStatus:(status,error)=>{
     if(status==='ready'||status==='error')loadingProgress.finish('mira',status==='ready');
     if(error)console.warn('Meshy Mira visual unavailable',error);
   }});
@@ -2163,23 +2174,29 @@ function boot() {
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
-      game.action?.elapsed||0,ACTIONS.shower.duration,animDt,display.yaw);
-    const alexShower=showerStates.alex.frame;
+      game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
+      inverseFurniturePose(game.world,'shower',display).yaw);
+    const alexShower=showerStates.alex.frame?{...showerStates.alex.frame,
+      pose:furniturePose(game.world,'shower',showerStates.alex.frame.pose)}:null;
     toiletStates.alex=advanceToiletTransition(toiletStates.alex,useId==='toilet',
-      game.action?.elapsed||0,ACTIONS.toilet.duration,animDt,display.yaw);
-    const alexToilet=toiletStates.alex.frame;
+      game.action?.elapsed||0,ACTIONS.toilet.duration,animDt,
+      inverseFurniturePose(game.world,'toilet',display).yaw);
+    const alexToilet=toiletStates.alex.frame?{...toiletStates.alex.frame,
+      pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
     const walking=active&&(game.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'));
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
       useId==='sofa'&&bedStates.alex.progress===0&&!showerStates.alex.active,animDt);
-    const seatPose=sofaTransitionPose(sofaStates.alex);
+    const seatPose=furniturePose(game.world,'sofa',sofaTransitionPose(sofaStates.alex));
     const seating=useId==='sofa'||sofaStates.alex.progress>0;
     bedStates.alex=advanceBedTransition(bedStates.alex,
       useId==='bed'&&sofaStates.alex.progress===0&&!showerStates.alex.active,
-      game.action?.bedSlot,animDt,{...display});
-    const bedPose=bedTransitionPose(bedStates.alex);
+      game.action?.bedSlot,animDt,inverseFurniturePose(game.world,'bed',display));
+    const bedPose=bedStates.alex.progress>0
+      ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex)):null;
     const bedding=Boolean(bedPose);
-    const pose=useId&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'?ACTOR_POSES[useId]:null;
+    const pose=useId&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
+      ?furniturePose(game.world,useId,ACTOR_POSES[useId]):null;
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:game.position.x,
@@ -2251,23 +2268,29 @@ function boot() {
     const miraUseId=miraUsing?game.otherSim.action.id:null;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
-      game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,miraDisplay.yaw);
-    const miraShower=showerStates.mira.frame;
+      game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
+      inverseFurniturePose(game.world,'shower',miraDisplay).yaw);
+    const miraShower=showerStates.mira.frame?{...showerStates.mira.frame,
+      pose:furniturePose(game.world,'shower',showerStates.mira.frame.pose)}:null;
     toiletStates.mira=advanceToiletTransition(toiletStates.mira,miraUseId==='toilet',
-      game.otherSim.action?.elapsed||0,ACTIONS.toilet.duration,animDt,miraDisplay.yaw);
-    const miraToilet=toiletStates.mira.frame;
+      game.otherSim.action?.elapsed||0,ACTIONS.toilet.duration,animDt,
+      inverseFurniturePose(game.world,'toilet',miraDisplay).yaw);
+    const miraToilet=toiletStates.mira.frame?{...toiletStates.mira.frame,
+      pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'));
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
       miraUseId==='sofa'&&bedStates.mira.progress===0&&!showerStates.mira.active,animDt);
-    const miraSeatPose=sofaTransitionPose(sofaStates.mira);
+    const miraSeatPose=furniturePose(game.world,'sofa',sofaTransitionPose(sofaStates.mira));
     const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
     bedStates.mira=advanceBedTransition(bedStates.mira,
       miraUseId==='bed'&&sofaStates.mira.progress===0&&!showerStates.mira.active,
-      game.otherSim.action?.bedSlot,animDt,{...miraDisplay});
-    const miraBedPose=bedTransitionPose(bedStates.mira);
+      game.otherSim.action?.bedSlot,animDt,inverseFurniturePose(game.world,'bed',miraDisplay));
+    const miraBedPose=bedStates.mira.progress>0
+      ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira)):null;
     const miraBedding=Boolean(miraBedPose);
-    const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'?ACTOR_POSES[miraUseId]:null;
+    const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
+      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId]):null;
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:game.otherSim.position.x,
@@ -2394,9 +2417,11 @@ function boot() {
     for(const slot of ['left','right']){
       const progress=Math.max(...Object.values(bedStates).map(s=>s.slot===slot?s.progress:0));
       const quilt=bedBeddingPose(progress),bx=BED_SLOTS[slot].x;
-      quilts[slot].body.setPosition(bx,quilt.y,quilt.z);
+      quilts[slot].body.setLocalPosition(bx-BED_LAYOUT.centerX,quilt.y,
+        quilt.z-BED_LAYOUT.centerZ);
       quilts[slot].body.setLocalScale(1.02,.15,quilt.depth);
-      quilts[slot].trim.setPosition(bx,quilt.y+.09,quilt.trimZ);
+      quilts[slot].trim.setLocalPosition(bx-BED_LAYOUT.centerX,quilt.y+.09,
+        quilt.trimZ-BED_LAYOUT.centerZ);
     }
     const activeFridge=alexFridge||miraFridge;
     fridgeOpen=activeFridge?activeFridge.doorOpen:closeFridgeDoor(fridgeOpen,animDt);
