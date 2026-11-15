@@ -12,6 +12,7 @@ import {createCameraGestureSession} from './camera-gestures.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
+import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
   chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial,startBranchSocial } from './relationships.js';
@@ -247,6 +248,11 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
+  if(command.type==='object'){
+    const target=resolveActionFurniture(game.world,command.actionId,command.targetInstanceId);
+    if(!target){toast('Этот предмет недоступен');return false;}
+    command={...command,targetInstanceId:target.instanceId};
+  }
   // A physical gift has one ID and cannot be handed over twice.
   if(command.type==='shared'&&command.mode==='gift'&&(
     pendingActions(game.actionQueues,residentId).some(x=>
@@ -1297,16 +1303,18 @@ function boot() {
   };
   if(game.action?.phase==='using') {
     const dest=game.action.id==='bed'?bedDestinationFor(game,'alex'):null;
-    const [x,z]=dest?[dest.x,dest.z]:ACTIONS[game.action.id].location;
+    const actual=dest||furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId);
+    const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
-  game.position=nearestWalkable(game.position);
+  game.position=nearestWalkable(game.position,game.world);
   if(game.otherSim.action?.phase==='using') {
     const dest=game.otherSim.action.id==='bed'?bedDestinationFor(game,'mira'):null;
-    const [x,z]=dest?[dest.x,dest.z]:ACTIONS[game.otherSim.action.id].location;
+    const actual=dest||furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId);
+    const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
   }
-  game.otherSim.position=nearestWalkable(game.otherSim.position);
+  game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
   const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0,roll:0};
   const miraDisplay={x:game.otherSim.position.x,y:0,z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
@@ -1324,18 +1332,18 @@ function boot() {
     if (id) autonomyWaitSeconds[id]=0;
     else for(const key of HOUSEHOLD_IDS) autonomyWaitSeconds[key]=0;
   };
-  const destination=(id,residentId='alex')=>id==='bed'
+  const destination=(id,residentId='alex',targetInstanceId=null)=>id==='bed'
     ?bedDestinationFor(game,residentId)
-    :{x:ACTIONS[id].location[0],z:ACTIONS[id].location[1]};
-  function buildRoute(id,actorId='alex') {
+    :furnitureActionApproach(game.world,id,targetInstanceId);
+  function buildRoute(id,actorId='alex',targetInstanceId=null) {
     const actor=getActor(game,actorId);
-    const goal=destination(id,actorId);
-    const points=goal&&findPath(actor.position,goal);
+    const goal=destination(id,actorId,targetInstanceId);
+    const points=goal&&findPath(actor.position,goal,game.world);
     if(!points) return false;
     paths[actorId]={points,index:0,id};
     return true;
   }
-  beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false)=>{
+  beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
@@ -1348,16 +1356,16 @@ function boot() {
       if(!automatic&&!fromQueue)toast('Душевая пока занята: житель выходит');
       return false;
     }
-    if(!furnitureAvailable(game,id,actorId)){
+    if(!furnitureAvailable(game,id,actorId,targetInstanceId)){
       if(!automatic&&!fromQueue)toast('Предмет сейчас занят другим жителем');
       return false;
     }
-    if(!buildRoute(id,actorId)){
+    if(!buildRoute(id,actorId,targetInstanceId)){
       if(!automatic&&!fromQueue) toast(getActorName(actorId)+' не может добраться до предмета');
       else actor.autonomy.nextAt=game.minutes+15;
       return false;
     }
-    const started=chooseResidentAction(game,id,automatic,actorId);
+    const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
@@ -1373,7 +1381,7 @@ function boot() {
     let best=null,bestLength=Infinity;
     for(const [dx,dz] of offsets){
       const goal={x:partner.position.x+dx,z:partner.position.z+dz};
-      const points=findPath(self.position,goal);
+      const points=findPath(self.position,goal,game.world);
       if(!points)continue;
       let previous=self.position,len=0;
       for(const point of points){len+=Math.hypot(point.x-previous.x,point.z-previous.z);previous=point;}
@@ -1400,7 +1408,7 @@ function boot() {
           bedStates[residentId].progress>0||showerStates[residentId].active||
           toiletStates[residentId].active||fridgeLeaving[residentId])return false;
         if(command.type==='object')
-          return furnitureAvailable(game,command.actionId,residentId)&&
+          return furnitureAvailable(game,command.actionId,residentId,command.targetInstanceId)&&
             !(command.actionId==='shower'&&HOUSEHOLD_IDS.some(id=>
               id!==residentId&&showerStates[id].active))&&
             !(command.actionId==='toilet'&&HOUSEHOLD_IDS.some(id=>
@@ -1441,7 +1449,7 @@ function boot() {
       },
       start(residentId,command){
         if(command.type==='object')
-          return beginAction(command.actionId,false,residentId,true);
+          return beginAction(command.actionId,false,residentId,true,command.targetInstanceId);
         if(command.type==='social')
           return beginSocial(command.actionId,false,residentId,null,null,null,true);
         if(command.type==='conversation')
@@ -1491,8 +1499,8 @@ function boot() {
     }
     meshyAlex.reset();
     meshyMira.reset();
-    game.position=nearestWalkable(game.position);
-    game.otherSim.position=nearestWalkable(game.otherSim.position);
+    game.position=nearestWalkable(game.position,game.world);
+    game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
     showerPrivacy.enabled=false;
@@ -1683,8 +1691,8 @@ function boot() {
           let p=paths[residentId];
           if(p.id!==jobId || !p.points){
             const available=socialWalking
-              ? findPath(resident.position,game.socialAction.target)
-              : (buildRoute(jobId,residentId)?paths[residentId].points:null);
+              ? findPath(resident.position,game.socialAction.target,game.world)
+              : (buildRoute(jobId,residentId,resident.action?.targetInstanceId)?paths[residentId].points:null);
             if(!available){
               if(socialWalking)cancelSocial(game);
               else {resident.action=null;resident.event='Путь недоступен';}
@@ -1709,7 +1717,8 @@ function boot() {
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
             }
             if(p.index>=p.points.length){
-              resident.position=socialWalking?{...game.socialAction.target}:destination(jobId,residentId);
+              resident.position=socialWalking?{...game.socialAction.target}:
+                destination(jobId,residentId,resident.action?.targetInstanceId);
               if(socialWalking){
                 const partnerId=residentId==='alex'?'mira':'alex';
                 const partnerExiting=sofaStates[partnerId].progress>0||

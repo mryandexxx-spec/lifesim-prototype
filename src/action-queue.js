@@ -7,6 +7,7 @@ import {ACTIONS} from './simulation.js';
 import {CONVERSATION_TOPICS} from './conversation-engine.js';
 import {GIFT_CATALOG,LEISURE_CATALOG} from './gifts-leisure.js';
 import {BRANCH_ACTIONS} from './social-graph.js';
+import {validFurnitureInstanceId} from './furniture-catalog.js';
 
 export const ACTION_QUEUE_SCHEMA=1;
 export const MAX_ACTION_QUEUE=12;
@@ -19,8 +20,13 @@ export function sanitizeQueueCommand(id,raw,persons){
   if(!record(raw)||!Array.isArray(persons)||!persons.includes(id))return null;
   const type=raw.type;
   if(!ACTION_QUEUE_TYPES.includes(type))return null;
-  if(type==='object'&&known(ACTIONS,raw.actionId))
-    return {type,actionId:raw.actionId};
+  if(type==='object'&&known(ACTIONS,raw.actionId)){
+    if(raw.targetInstanceId!==undefined&&!validFurnitureInstanceId(raw.targetInstanceId))
+      return null;
+    return raw.targetInstanceId
+      ?{type,actionId:raw.actionId,targetInstanceId:raw.targetInstanceId}
+      :{type,actionId:raw.actionId};
+  }
   if(type==='object'||!pair(id,raw.targetId)||!persons.includes(raw.targetId))return null;
   const targetId=raw.targetId;
   if(type==='social'&&['talk','argue'].includes(raw.actionId))

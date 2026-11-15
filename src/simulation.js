@@ -7,6 +7,7 @@ import {validBedSlot,BED_SLOTS} from './bed-layout.js';
 import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
 import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-interaction.js';
+import {validFurnitureInstanceId} from './furniture-catalog.js';
 export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','bladder']);
 export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
@@ -58,6 +59,8 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     next.action = { id: data.action.id, phase: data.action.phase, elapsed: Math.max(0, Math.min(1000, Number(data.action.elapsed) || 0)), automatic: Boolean(data.action.automatic) };
     if(data.action.id==='bed'&&validBedSlot(data.action.bedSlot))
       next.action.bedSlot=data.action.bedSlot;
+    if(validFurnitureInstanceId(data.action.targetInstanceId))
+      next.action.targetInstanceId=data.action.targetInstanceId;
   }
   return next;
 }

@@ -9,6 +9,7 @@ import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
+import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './furniture-catalog.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 
@@ -40,6 +41,8 @@ export function newHousehold() {
   observePairViews(state.socialGraph,HOUSEHOLD_IDS[0],HOUSEHOLD_IDS[1],state.relationship.views);
   state.inventory=starterInventory();
   state.actionQueues=newActionQueues(HOUSEHOLD_IDS);
+  // F0 optional v1 extension; each piece has its own immutable instanceId.
+  state.world={furniture:newFurnitureWorld()};
   state.socialAction=null;
   return state;
 }
@@ -48,6 +51,7 @@ export function newHousehold() {
 export function loadHousehold(raw) {
   if (!raw || raw.version!==1) return newHousehold();
   const root=loadGame(raw,DEMO_PROFILES.first);
+  root.world={furniture:restoreFurnitureWorld(raw.world?.furniture)};
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
     raw.otherSim.version===1 && raw.otherSim.needs && raw.otherSim.position;
   // Ignore saved clock/speed/pause for Mira; the household has one shared clock.
@@ -65,6 +69,21 @@ export function loadHousehold(raw) {
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
   root.inventory=restoreInventory(raw.inventory);
   root.actionQueues=restoreActionQueues(raw.actionQueues,HOUSEHOLD_IDS);
+  // Retain the exact object target in persistent commands. Old un-targeted
+  // v1 commands migrate to deterministic original instance IDs once.
+  for(const id of HOUSEHOLD_IDS){
+    const sim=id==='alex'?root:mira;
+    if(sim.action){
+      const object=resolveActionFurniture(root.world,sim.action.id,sim.action.targetInstanceId);
+      if(object)sim.action.targetInstanceId=object.instanceId;
+      else sim.action=null; // no phantom action or silent rerouting to another item
+    }
+    for(const task of root.actionQueues.byResident[id]){
+      if(task.type!=='object'||task.targetInstanceId)continue;
+      const object=resolveActionFurniture(root.world,task.actionId);
+      if(object)task.targetInstanceId=object.instanceId;
+    }
+  }
   root.relationship=loadRelationship(raw.relationship,root.minutes,{
     alex:root.mind.memories,mira:mira.mind.memories
   });
@@ -91,7 +110,7 @@ export function loadHousehold(raw) {
   for(const id of HOUSEHOLD_IDS){
     const resident=getActor(root,id);
     if(resident.action?.id!=='bed'||validBedSlot(resident.action.bedSlot))continue;
-    const slot=chooseFreeBedSlot(resident.position,used);
+    const slot=chooseFreeBedSlot(resident.position,used,root.world);
     if(slot){resident.action.bedSlot=slot;used.push(slot);}
     else resident.action=null;
   }
@@ -113,13 +132,13 @@ export function selectResident(root,id) {
 /** Choose the nearest *reachable* unoccupied bed half. This is not tied to
  * identity; either resident can sleep on either side on different nights.
  */
-export function chooseFreeBedSlot(position,occupied=[]) {
-  const origin=nearestWalkable(position);
+export function chooseFreeBedSlot(position,occupied=[],world=null) {
+  const origin=nearestWalkable(position,world);
   let best=null,bestCost=Infinity;
   for(const id of BED_SLOT_IDS){
     if(occupied.includes(id))continue;
     const to=BED_SLOTS[id].approach;
-    const path=findPath(origin,to);
+    const path=findPath(origin,to,world);
     if(!path)continue;
     let prev=origin,cost=0;
     for(const point of path){
@@ -141,20 +160,25 @@ export function bedSlotFor(root,residentId='alex') {
   const other=getActor(root,residentId==='alex'?'mira':'alex');
   const taken=other?.action?.id==='bed'&&validBedSlot(other.action.bedSlot)
     ?[other.action.bedSlot]:[];
-  return chooseFreeBedSlot(self.position,taken);
+  return chooseFreeBedSlot(self.position,taken,root.world);
 }
 export function bedDestinationFor(root,residentId='alex'){
   const slot=bedSlotFor(root,residentId);
   return slot?{...BED_SLOTS[slot].approach}:null;
 }
 /** Beds capacity=2; each of the other furniture actions remains exclusive. */
-export function furnitureAvailable(root,itemId,residentId='alex') {
+export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceId=null) {
+  const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
+  if(!item)return false;
   if(itemId==='bed')return bedSlotFor(root,residentId)!==null;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
-  return other?.action?.id!==itemId;
+  return other?.action?.targetInstanceId!==item.instanceId &&
+    !(other?.action?.id===itemId&&!other.action.targetInstanceId);
 }
-export function chooseResidentAction(root,itemId,automatic=false,residentId='alex') {
-  if (!HOUSEHOLD_IDS.includes(residentId) || !furnitureAvailable(root,itemId,residentId)) return false;
+export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null) {
+  const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
+  if(!item||!HOUSEHOLD_IDS.includes(residentId)||
+    !furnitureAvailable(root,itemId,residentId,item.instanceId))return false;
   const resident=getActor(root,residentId);
   // Explicit actions never supersede an ongoing action or interrupt a social.
   // Future manual commands are stored by action-queue.js and dispatched later.
@@ -162,6 +186,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     (automatic && (root.paused||pendingActions(root.actionQueues,residentId).length)))return false;
   const slot=itemId==='bed'?bedSlotFor(root,residentId):null;
   const chosen=chooseAction(resident,itemId,automatic);
+  if(chosen)resident.action.targetInstanceId=item.instanceId;
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
   return chosen;
 }
