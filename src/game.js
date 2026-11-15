@@ -1496,7 +1496,10 @@ function boot() {
       $('branch-btn').disabled=false; // hidden debug entry only
       const branchStatus=relationSummary(game.socialGraph,game.selectedSim,
         game.selectedSim==='alex'?'mira':'alex');
-      $('friendship-btn').disabled=branchStatus.friendship==='none';
+      const friendshipLocked=branchStatus.friendship==='none';
+      $('friendship-btn').disabled=false; // tapping a lock explains it accessibly
+      $('friendship-btn').setAttribute('aria-disabled',String(friendshipLocked));
+      $('friendship-btn').textContent=friendshipLocked?'Дружба · 🔒':'Дружба';
       $('relationship-branch').textContent=branchStatus.label;
       if(socialMenuCategory)renderSocialMenu(false);
       renderQueuePanel(false);

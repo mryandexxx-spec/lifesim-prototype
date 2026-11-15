@@ -254,7 +254,8 @@ test('iPhone UI has five natural categories, hidden debug and safe editable queu
   assert.ok(src.includes('removeQueuedAction(game.actionQueues,residentId,task.seq)'));
   assert.ok(src.includes('dispatchPlannedActions()'));
   assert.ok(src.includes("pendingActions(game.actionQueues,residentId).length"));
-  assert.ok(src.includes("$('friendship-btn').disabled=branchStatus.friendship==='none'"));
+  assert.ok(src.includes("friendshipLocked?'Дружба · 🔒':'Дружба'"));
+  assert.ok(src.includes("setAttribute('aria-disabled',String(friendshipLocked))"));
   assert.ok(css.includes('.social-summary .dev-relationship'));
   assert.ok(workflow.includes('node --check src/action-queue.js'));
   assert.ok(workflow.includes('src/action-queue.js src/conversation-engine.js'));

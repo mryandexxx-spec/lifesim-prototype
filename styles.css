@@ -247,3 +247,7 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   #social-menu-panel{bottom:calc(env(safe-area-inset-bottom) + 265px);
     max-height:max(95px,calc(100dvh - 290px));}
 }
+
+.social-controls #friendship-btn[aria-disabled="true"]{
+  background:#aab6a9;color:#f9fff7;opacity:.85;
+}
