@@ -152,6 +152,9 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .social-controls>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;width:100%;}
 .social-controls #conversation-btn{background:#397b86;}
 .social-controls #shared-btn{background:#7a718f;}
+.social-controls #branch-btn{grid-column:1/-1;background:#527a99;}
+.branch-mini-status{font-size:10px;color:#477d6a;font-weight:800;display:block;margin:2px 0;}
+.conversation-option:disabled{opacity:.60;background:#f3f2ed;color:#85877f;cursor:not-allowed;}
 .shared-panel .conversation-options h3{font-size:11px;color:#587061;margin:9px 0 2px;}
 .shared-panel .shared-progress-text{font-size:11px;line-height:1.4;color:#607468;margin:5px 0 9px;}
 .social-controls button{white-space:nowrap;}

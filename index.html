@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 0.9b</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.0a</small></div>
       </div>
       <div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div>
     </header>
@@ -58,6 +58,7 @@
           <div class="mind-relation-axis"><span>Доверие</span><output id="mind-relation-trust">45/100</output><div class="mind-relation-track"><i id="mind-relation-trust-bar"></i></div></div>
           <div class="mind-relation-axis"><span>Напряжение</span><output id="mind-relation-tension">0/100</output><div class="mind-relation-track tension"><i id="mind-relation-tension-bar"></i></div></div>
         </div>
+        <div id="mind-relation-stage" class="mind-sentiments">Связь: знакомые</div>
         <div id="mind-sentiments" class="mind-sentiments">Общих событий пока мало</div>
       </div>
       <div class="mind-wish"><span class="eyebrow">СЕЙЧАС ХОЧЕТ</span><strong id="mind-wish-label">Устроить уютный отдых</strong><button id="wish-do-btn" type="button">Помочь исполнить ↗</button></div>
@@ -66,8 +67,8 @@
     </section>
 
     <section class="social-bar" aria-label="Отношения между жителями">
-      <div class="social-summary"><span class="social-icon" aria-hidden="true">♡</span><div><span class="social-title">ОБЩИЙ УРОВЕНЬ <span id="relationship-value">50/100</span></span><strong id="relationship-label">Нейтрально</strong><div class="social-meter"><i id="relationship-bar"></i></div></div></div>
-      <div class="social-controls"><span>Общение с <b id="social-partner">Мирой</b></span><div><button id="conversation-btn" type="button">Беседа</button><button id="shared-btn" type="button">Вместе</button><button id="talk-btn" type="button">Поговорить</button><button id="argue-btn" type="button">Поспорить</button></div></div>
+      <div class="social-summary"><span class="social-icon" aria-hidden="true">♡</span><div><span class="social-title">ОБЩИЙ УРОВЕНЬ <span id="relationship-value">50/100</span></span><strong id="relationship-label">Нейтрально</strong><span id="relationship-branch" class="branch-mini-status">Знакомые</span><div class="social-meter"><i id="relationship-bar"></i></div></div></div>
+      <div class="social-controls"><span>Общение с <b id="social-partner">Мирой</b></span><div><button id="conversation-btn" type="button">Беседа</button><button id="shared-btn" type="button">Вместе</button><button id="branch-btn" type="button">Связи</button><button id="talk-btn" type="button">Поговорить</button><button id="argue-btn" type="button">Поспорить</button></div></div>
     </section>
     <section id="conversation-panel" class="conversation-panel" hidden aria-label="Многоходовый разговор">
       <div class="conversation-head">
@@ -83,6 +84,13 @@
         <button id="shared-close" type="button" aria-label="Закрыть или отменить совместное дело">×</button>
       </div>
       <div id="shared-options" class="conversation-options"></div>
+    </section>
+    <section id="branch-panel" class="conversation-panel shared-panel" hidden aria-label="Знакомство, дружба и вражда">
+      <div class="conversation-head">
+        <div><span class="eyebrow">ОТНОШЕНИЯ</span><h2 id="branch-title">Знакомые</h2><p id="branch-subtitle">История и доступные действия</p></div>
+        <button id="branch-close" type="button" aria-label="Закрыть или отменить действие">×</button>
+      </div>
+      <div id="branch-options" class="conversation-options"></div>
     </section>
     <div id="social-effect" class="social-effect" aria-hidden="true" hidden>♡</div>
 
