@@ -193,9 +193,9 @@ test('1.0q: even a synthetic click on hidden X cannot dismiss a required prompt'
   assert.ok(dialogueNeedsDecision(root));
 });
 test('1.0s: Safari safe-area, compact modal, Pages copy, mood M1 still present',()=>{
-  assert.match(html,/сборка \/ 1\.1c/);
-  assert.match(html,/styles\.css\?v=1\.1c/);
-  assert.match(html,/src\/game\.js\?v=1\.1c/);
+  assert.match(html,/сборка \/ 1\.1d/);
+  assert.match(html,/styles\.css\?v=1\.1d/);
+  assert.match(html,/src\/game\.js\?v=1\.1d/);
   assert.match(html,/id="conversation-panel"[^>]+tabindex="-1"/);
   assert.match(css,/#conversation-panel\.dialogue-required\{/);
   assert.match(css,/width:min\(440px,calc\(100vw - 28px\)\)/);
