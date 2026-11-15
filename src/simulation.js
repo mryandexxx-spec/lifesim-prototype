@@ -1,5 +1,6 @@
 /** Pure game rules: no PlayCanvas or browser imports. */
 import { createMind, restoreMind, refreshMind, rememberAction, psychologyScore } from './psychology.js';
+import {DEMO_PROFILES,restoreProfile} from './trait-catalog.js';
 import {validBedSlot,BED_SLOTS} from './bed-layout.js';
 import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
@@ -15,21 +16,23 @@ export const SAVE_KEY = 'lifesim.room01.v1';
 export const AUTONOMY_WAIT_SECONDS = 12; // Real active-time seconds; x3 never shortens the wait.
 const clamp = value => Math.max(0, Math.min(100, value));
 
-export function newGame() {
+export function newGame(profile=DEMO_PROFILES.first) {
   const state = {
     version: 1, minutes: 8 * 60, speed: 1, paused: false,
     needs: { hunger: 78, energy: 67, hygiene: 82, fun: 58 },
     position: { x: -0.25, z: 0.35 }, action: null, event: 'Свободное время',
     autonomy: { nextAt: 480, enabled: true },
+    personality:restoreProfile(profile,DEMO_PROFILES.first),
     mind: createMind(480)
   };
   refreshMind(state);
   return state;
 }
 
-export function loadGame(data) {
-  if (!data || data.version !== 1 || !Number.isFinite(data.minutes) || !data.needs || !data.position) return newGame();
-  const next = newGame();
+export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
+  if (!data || data.version !== 1 || !Number.isFinite(data.minutes) || !data.needs || !data.position) return newGame(profileFallback);
+  const next = newGame(profileFallback);
+  next.personality=restoreProfile(data.personality,profileFallback);
   next.minutes = Math.max(0, Math.min(data.minutes, 10000000));
   for (const key of NEEDS) if (Number.isFinite(data.needs[key])) next.needs[key] = clamp(data.needs[key]);
   if (Number.isFinite(data.position.x) && Number.isFinite(data.position.z)) {

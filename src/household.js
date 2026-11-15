@@ -3,6 +3,7 @@
  */
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled } from './simulation.js';
 import { refreshMind } from './psychology.js';
+import {DEMO_PROFILES} from './trait-catalog.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
@@ -13,7 +14,7 @@ export const RESIDENT_NAMES = Object.freeze({ alex: 'Алекс', mira: 'Мир�
 export const RESIDENT_START = Object.freeze({ x: -0.80, z: 2.95 });
 
 function newMira(minutes=480) {
-  const mira=newGame();
+  const mira=newGame(DEMO_PROFILES.second);
   mira.position={ ...RESIDENT_START };
   mira.needs={ hunger: 72, energy: 86, hygiene: 75, fun: 72 };
   mira.minutes=minutes;
@@ -24,7 +25,7 @@ function newMira(minutes=480) {
 }
 
 export function newHousehold() {
-  const state=newGame();
+  const state=newGame(DEMO_PROFILES.first);
   state.otherSim=newMira(state.minutes);
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);
@@ -35,13 +36,14 @@ export function newHousehold() {
 /** Do not change save key or version: parse and sanitize each resident using v1 loader. */
 export function loadHousehold(raw) {
   if (!raw || raw.version!==1) return newHousehold();
-  const root=loadGame(raw);
+  const root=loadGame(raw,DEMO_PROFILES.first);
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
     raw.otherSim.version===1 && raw.otherSim.needs && raw.otherSim.position;
   // Ignore saved clock/speed/pause for Mira; the household has one shared clock.
   const mira=validMira
     ? loadGame({ ...raw.otherSim, minutes:root.minutes, paused:root.paused, speed:root.speed,
-        autonomy:{ ...raw.otherSim.autonomy, enabled:root.autonomy.enabled } })
+        autonomy:{ ...raw.otherSim.autonomy, enabled:root.autonomy.enabled } },
+        DEMO_PROFILES.second)
     : newMira(root.minutes);
   mira.minutes=root.minutes;
   mira.paused=root.paused;

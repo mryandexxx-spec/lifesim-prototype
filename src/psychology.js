@@ -1,4 +1,7 @@
 /** Headless LifeSim personality, emotions, wishes and event memory. No DOM, engine or I/O. */
+import {deriveAxes,preferenceAffinity} from './trait-catalog.js';
+import {activityReceipt} from './sim-events.js';
+/** Deprecated public snapshot retained for older test/API consumers; gameplay uses per-resident profiles. */
 export const TRAITS = Object.freeze({
   neat: { label: 'Аккуратный', description: 'Любит чистоту и порядок', value: 0.82 },
   cozy: { label: 'Ценит уют', description: 'Любит спокойные вечера и комфорт', value: 0.73 },
@@ -25,7 +28,7 @@ const IDS = Object.keys(WISHES);
 const LIMIT = 12;
 const finite = n => Number.isFinite(n);
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-const trait = id => TRAITS[id].value;
+const axesFor = state => deriveAxes(state?.personality);
 
 /** Only known item IDs and timestamps enter saved memories. */
 export function createMind(minutes = 480) {
@@ -51,12 +54,18 @@ export function recentMemoryEffect(mind, minutes) {
 }
 
 /** Mood is a derived snapshot, never trusted from localStorage. */
-export function calculateMood(needs, mind, minutes) {
+export function calculateMood(needs, mind, minutes, personality = null) {
   const values = [needs.hunger, needs.energy, needs.hygiene, needs.fun].map(x => clamp(finite(x) ? x : 50, 0, 100));
   const average = values.reduce((a, b) => a + b, 0) / values.length;
   const worst = Math.min(...values);
-  const comfort = (needs.fun * trait('curious') + needs.hygiene * trait('neat') + needs.energy * trait('cozy')) / (trait('curious') + trait('neat') + trait('cozy'));
-  const score = clamp(Math.round(20 + average * .48 + comfort * .27 + clamp(recentMemoryEffect(mind, minutes), -24, 17) - (worst < 25 ? (25 - worst) * .8 : 0)), 0, 100);
+  const axes=deriveAxes(personality);
+  const weights=[.5+axes.creativity*.3+axes.sociability*.1,.5+axes.organization*.4,.5+axes.resilience*.4];
+  const comfort=(needs.fun*weights[0]+needs.hygiene*weights[1]+needs.energy*weights[2])/
+    weights.reduce((a,b)=>a+b,0);
+  const memories=recentMemoryEffect(mind,minutes)*(.75+axes.emotionalReactivity*.8);
+  const optimism=(axes.optimism-.5)*14;
+  const score=clamp(Math.round(20+average*.48+comfort*.27+
+    clamp(memories,-24,17)+optimism-(worst<25?(25-worst)*.8:0)),0,100);
   let label = 'Спокоен';
   if (worst < 20) {
     const lowest = values.indexOf(worst);
@@ -71,13 +80,15 @@ export function calculateMood(needs, mind, minutes) {
 /** Deterministic wish generation, allowing identical saves to produce identical behavior. */
 export function selectWish(state, except = null) {
   const n = state.needs;
+  const axes=axesFor(state),taste=tag=>preferenceAffinity(state.personality,tag);
   const hour = Math.floor((state.minutes % 1440) / 60);
   const night = hour >= 22 || hour < 6;
   const weights = {
-    bed: 22 * trait('cozy') + (100 - n.energy) * .16 + (night ? 13 : 0),
-    fridge: 15 + (100 - n.hunger) * .20,
-    shower: 26 * trait('neat') + (100 - n.hygiene) * .16,
-    sofa: 30 * trait('curious') + (100 - n.fun) * .17
+    bed: 18+10*axes.resilience+(100-n.energy)*.16+(night?13:0)+taste('calm_leisure')*3,
+    fridge: 15+(100-n.hunger)*.20+taste('cooking')*4,
+    shower: 18+12*axes.organization+(100-n.hygiene)*.16,
+    sofa: 22+10*axes.creativity+8*axes.sociability+(100-n.fun)*.17+
+      taste('calm_leisure')*5+taste('socializing')*2
   };
   for (const memory of (state.mind?.memories || []).slice(-4)) {
     if (weights[memory.id]!==undefined && state.minutes - memory.at < 180) weights[memory.id] -= 8;
@@ -92,11 +103,12 @@ export function refreshMind(state) {
     const id = selectWish(state);
     state.mind.wish = { id, since: state.minutes, until: state.minutes + 480 };
   }
-  state.mind.mood = calculateMood(state.needs, state.mind, state.minutes);
+  state.mind.mood = calculateMood(state.needs, state.mind, state.minutes,state.personality);
 }
 
 export function rememberAction(state, id) {
-  if (!WISHES[id]) return;
+  const receipt=activityReceipt(id,state.minutes);
+  if (!receipt || !WISHES[receipt.actionId]) return;
   const mind = state.mind;
   const fulfilled = mind.wish?.id === id;
   mind.memories.push({ id, at: state.minutes, fulfilled });
@@ -135,11 +147,14 @@ export function restoreMind(raw, state) {
 export function psychologyScore(state, id, wishReady = true) {
   if (!WISHES[id]) return 0;
   const n = state.needs;
+  const axes=axesFor(state),taste=tag=>preferenceAffinity(state.personality,tag);
   const critical = Math.min(n.energy, n.hunger, n.hygiene, n.fun) < 24;
   let score = 0;
-  if (id === 'shower') score += (trait('neat') - .5) * 5;
-  if (id === 'bed') score += (trait('cozy') - .5) * 6;
-  if (id === 'sofa') score += (trait('curious') - .5) * 5;
+  if (id === 'shower') score += (axes.organization-.5)*7;
+  if (id === 'bed') score += (axes.resilience-.5)*5;
+  if (id === 'sofa') score += (axes.creativity+axes.sociability*.5-.75)*6+
+    taste('calm_leisure')*4+taste('socializing')*2;
+  if (id === 'fridge') score += taste('cooking')*3;
   if (!critical && wishReady && state.mind?.wish?.id === id) score += 11;
   if (id === 'sofa' && !critical && state.mind?.mood?.value < 48) score += 3;
   const last = state.mind?.memories?.at(-1);

@@ -32,6 +32,8 @@ jobs:
           node --check src/simulation.js
           node --check src/navigation.js
           node --check src/psychology.js
+          node --check src/trait-catalog.js
+          node --check src/sim-events.js
           node --check src/household.js
           node --check src/relationships.js
           node --check src/characters.js

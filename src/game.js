@@ -7,6 +7,7 @@ import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
+import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
@@ -184,9 +185,12 @@ function updateResidentPicker() {
   $('avatar-symbol').textContent=game.selectedSim==='alex' ? '☺' : '✿';
   $('mind-panel').setAttribute('aria-label','Внутренний мир: '+selectedName());
   $('mind-person').textContent=selectedName().toUpperCase()+' / ВНУТРЕННИЙ МИР';
-  $('mind-traits-label').textContent=game.selectedSim==='alex'
-    ? '✧ Аккуратный · ☾ Ценит уют · ♫ Любознательный'
-    : '✧ Внимательная · ☾ Любит уют · ♫ Любознательная';
+  const personality=selectedActor().personality;
+  $('mind-traits-label').textContent=traitLabels(personality).join(' · ')||'Характер не выбран';
+  const likes=interestLabels(personality,'likes'),dislikes=interestLabels(personality,'dislikes');
+  $('mind-preferences-label').textContent=
+    (likes.length?'Любит: '+likes.join(', '):'')+
+    (dislikes.length?' · Не любит: '+dislikes.join(', '):'');
 }
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{

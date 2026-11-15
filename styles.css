@@ -71,6 +71,7 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .mind-traits,.mind-history{margin-top:12px;}
 .mind-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
 .mind-tags span{background:#f0f4ee;color:#567864;border:1px solid #e2ebe2;border-radius:12px;padding:6px 9px;font-size:11px;font-weight:700;}
+.mind-preferences{color:#567864;font-size:11px;line-height:1.4;margin-top:7px;}
 .mind-history ul{list-style:none;padding:0;margin:7px 0 0;}
 .mind-history li{font-size:11px;color:#667d6c;padding:7px 0;border-bottom:1px solid #edf0ec;}
 @media (max-width:700px){.mind-panel{bottom:calc(env(safe-area-inset-bottom) + 162px);} .character-tag small{max-width:154px;}}
