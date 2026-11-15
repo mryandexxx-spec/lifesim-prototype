@@ -1794,7 +1794,7 @@ function boot() {
           const li=document.createElement('li');li.textContent='Пока всё впереди';list.appendChild(li);
         }
       }
-      $('pause-icon').textContent=game.paused?'▶':'Ⅱ';
+      renderPauseButton(); // Includes the mandatory dialogue hold, not just manual pause.
       $('speed-btn').textContent=game.speed+'×';
       const status=game.paused?'Пауза':game.socialAction
         ? (game.socialAction.phase==='walking'?'Идёт на встречу: ':'Общаются: ')+SOCIAL_ACTIONS[game.socialAction.kind].label.toLowerCase()
