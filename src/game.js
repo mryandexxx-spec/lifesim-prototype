@@ -2,6 +2,8 @@ import * as pc from 'playcanvas';
 import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
 import {pickWorldRayTarget} from './world-interactions.js';
 import {planPreview,planTaskIcon} from './plan-preview.js';
+import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
+import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,dragCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
@@ -90,6 +92,49 @@ $('mesh-model-btn').addEventListener('click',()=>{
   toast(meshyPreferred?'3D-облики Алекса и Миры включены':'Оба жителя: прежние облики');
 });
 updateMeshModelButton();
+
+// View is a presentation-only popover: both existing preferences remain wired
+// to their original IDs and neither value enters the saved household schema.
+let viewOpen=false;
+const positionViewPanel=()=>{
+  if(!viewOpen)return;
+  const b=$('view-toggle').getBoundingClientRect();
+  const appRect=canvas.getBoundingClientRect();
+  const panel=$('view-panel');
+  const pos=viewMenuPlacement({
+    buttonLeft:b.left-appRect.left,buttonTop:b.top-appRect.top,
+    viewportWidth:canvas.clientWidth,viewportHeight:canvas.clientHeight,
+    menuWidth:panel.offsetWidth||226,menuHeight:panel.offsetHeight||160
+  });
+  panel.style.setProperty('--view-x',pos.x+'px');
+  panel.style.setProperty('--view-y',pos.y+'px');
+};
+function setViewOpen(open,{restoreFocus=false}={}){
+  if(open&&dialogueNeedsDecision(game))return;
+  viewOpen=Boolean(open);
+  $('view-panel').hidden=!viewOpen;
+  $('view-toggle').setAttribute('aria-expanded',String(viewOpen));
+  if(viewOpen){
+    closeSocialContext();
+    select(null);
+    requestAnimationFrame(positionViewPanel);
+  }else if(restoreFocus){
+    $('view-toggle').focus({preventScroll:true});
+  }
+}
+$('view-toggle').addEventListener('click',()=>setViewOpen(!viewOpen));
+$('view-close').addEventListener('click',()=>setViewOpen(false,{restoreFocus:true}));
+document.addEventListener('pointerdown',event=>{
+  if(!viewOpen)return;
+  if($('view-panel').contains(event.target)||$('view-toggle').contains(event.target))return;
+  setViewOpen(false);
+},true);
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&viewOpen&&!dialogueNeedsDecision(game)){
+    event.preventDefault();setViewOpen(false,{restoreFocus:true});
+  }
+},true);
+window.addEventListener('resize',positionViewPanel);
 
 const META = {
   bed: { title: 'Уютная кровать', category: 'Спальня', description: 'Сон восстанавливает энергию', icon: '☾', anchor: [-2.5, 1.22, -1.48] },
