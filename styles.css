@@ -335,48 +335,73 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   .mood-overview-track i{transition:none;}
 }
 
-/* 1.0q: a genuine player choice is an exclusive full-screen dialogue, unlike
- * ordinary social actions. CSS safe areas protect iPhone notch/Home indicator.
+/* 1.0s: clean world by default. The label toggle reveals the old touch
+ * hotspots, while canvas hit areas keep unlabelled furniture usable.
  */
-#conversation-panel.dialogue-required{
-  position:fixed;inset:0;z-index:60;
-  width:100vw;height:100vh;height:100dvh;min-height:100dvh;
-  max-height:none;max-width:none;margin:0;
-  padding:calc(env(safe-area-inset-top) + 26px)
-    max(22px,env(safe-area-inset-right))
-    calc(env(safe-area-inset-bottom) + 28px)
-    max(22px,env(safe-area-inset-left));
-  border:0;border-radius:0;box-shadow:none;
-  background:linear-gradient(165deg,#e9f3e9 0%,#fffdf7 62%,#f6e9da 100%);
-  color:#345b49;overflow-y:auto;overscroll-behavior:contain;
-  display:flex;flex-direction:column;align-items:center;gap:14px;
+.hotspots[hidden],#social-context[hidden],.dialogue-backdrop[hidden]{display:none!important;}
+.control-tray .item-labels-control{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;line-height:1;background:#ffffffed;font-size:23px;}
+.control-tray .item-labels-control small{font-size:8px;font-weight:800;letter-spacing:.4px;margin-top:3px;}
+.control-tray #item-labels-btn[aria-pressed="true"]{background:#397c66;color:#fff;border-color:#397c66;}
+/* This is a temporary interaction popover, never a persistent bottom HUD. */
+#social-context{z-index:18;display:flex;flex-direction:column;align-items:stretch;gap:9px;width:min(355px,calc(100vw - 26px));padding:14px;}
+#social-context .social-summary{padding-right:25px;min-width:0;width:100%;}
+#social-context .social-controls{width:100%;align-items:stretch;}
+#social-context .social-controls>span{font-size:11px;}
+#social-context .social-controls>div{gap:7px;}
+#social-context .social-controls button{min-height:43px;font-size:12px;border-radius:11px;}
+#social-context .social-dismiss{position:absolute;top:8px;right:8px;min-width:32px;min-height:32px;border:0;border-radius:10px;background:#edf2e9;color:#516c59;font-size:22px;}
+/* Category options replace the context sheet, rather than stacking a second
+ * interactive panel over it on a narrow iPhone.
+ */
+#social-menu-panel{z-index:19;bottom:calc(env(safe-area-inset-bottom) + 183px);
+  left:max(12px,env(safe-area-inset-left));right:auto;max-height:min(54dvh,440px);}
+@media(max-height:560px){
+  #social-context{bottom:calc(env(safe-area-inset-bottom) + 104px);}
+  #social-menu-panel{bottom:calc(env(safe-area-inset-bottom) + 112px);max-height:calc(100dvh - 135px);}
 }
-#conversation-panel.dialogue-required[hidden]{display:none;}
-#conversation-panel.dialogue-required > *{width:min(540px,100%);}
-#conversation-panel.dialogue-required .conversation-head{padding-top:15px;}
-#conversation-panel.dialogue-required .conversation-head h2{font-size:clamp(25px,6vw,35px);line-height:1.18;}
-#conversation-panel.dialogue-required .conversation-head p{font-size:14px;line-height:1.45;color:#567c65;margin:12px 0 8px;}
+/* The world remains visible through a dimmed backdrop; the REQUIRED choice
+ * still blocks other taps and simulation until an answer or explicit Finish.
+ */
+.dialogue-backdrop{position:fixed;inset:0;z-index:55;background:#182b2380;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);touch-action:none;}
+#conversation-panel.dialogue-required{
+  position:fixed;z-index:60;inset:auto;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  bottom:auto;right:auto;margin:0;
+  width:min(440px,calc(100vw - 28px));height:auto;
+  min-height:0;max-height:min(76dvh,590px);
+  padding:20px 18px 18px;
+  background:#fffdf9;box-shadow:0 20px 75px #142c285e;
+  border:1px solid #e3f0e7;border-radius:23px;
+  color:#345b49;overflow-y:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;gap:9px;
+}
+#conversation-panel.dialogue-required[hidden]{display:none!important;}
+#conversation-panel.dialogue-required .conversation-head{padding:0;}
+#conversation-panel.dialogue-required .conversation-head h2{font-size:22px;line-height:1.2;}
+#conversation-panel.dialogue-required .conversation-head p{font-size:12px;line-height:1.35;color:#567c65;margin:6px 0 2px;}
 #conversation-panel.dialogue-required #conversation-close{display:none!important;}
-#conversation-panel.dialogue-required .conversation-lines{flex:1;min-height:95px;max-height:min(35dvh,340px);overflow-y:auto;}
-#conversation-panel.dialogue-required .conversation-lines li{font-size:15px;line-height:1.5;padding:12px 14px;margin:8px 0;border-radius:14px;}
-#conversation-panel.dialogue-required .conversation-options{margin-top:auto;display:grid;gap:11px;padding-top:10px;}
+#conversation-panel.dialogue-required .conversation-lines{flex:0 1 auto;min-height:0;max-height:22dvh;overflow-y:auto;overscroll-behavior:contain;}
+#conversation-panel.dialogue-required .conversation-lines li{font-size:13px;line-height:1.4;padding:9px 11px;margin:4px 0;border-radius:12px;}
+#conversation-panel.dialogue-required .conversation-options{display:grid;gap:8px;padding-top:6px;flex-shrink:0;}
 #conversation-panel.dialogue-required .conversation-option{
-  min-height:56px;padding:14px 17px;text-align:center;
-  font-size:16px;line-height:1.3;border-radius:15px;
-  border:1px solid #b7d5c2;box-shadow:0 4px 10px #274e3711;
+  min-height:47px;padding:11px 13px;text-align:center;
+  font-size:14px;line-height:1.35;border-radius:12px;
+  border:1px solid #b7d5c2;box-shadow:0 3px 9px #274e3711;
 }
 #conversation-panel.dialogue-required .conversation-option.secondary{
   border:1px solid #b98a82;color:#71483f;background:#fff0ea;
 }
 #conversation-panel.dialogue-required:focus{outline:none;}
-/* Loading must remain on top until assets are ready, even on a restored chat. */
-.loading{z-index:100;}
+/* Never cover a notch, Home indicator or a small landscape viewport. */
 @media(max-width:700px){
-  #conversation-panel.dialogue-required{padding-top:calc(env(safe-area-inset-top) + 16px);gap:10px;}
-  #conversation-panel.dialogue-required .conversation-lines li{font-size:13px;padding:9px 11px;}
-  #conversation-panel.dialogue-required .conversation-option{min-height:51px;font-size:15px;}
+  #conversation-panel.dialogue-required{max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 34px);width:min(410px,calc(100vw - 26px));}
 }
 @media(max-height:560px){
-  #conversation-panel.dialogue-required .conversation-lines{min-height:0;max-height:22dvh;}
-  #conversation-panel.dialogue-required .conversation-head h2{font-size:24px;}
+  #conversation-panel.dialogue-required{padding:13px 15px;gap:5px;}
+  #conversation-panel.dialogue-required .conversation-head h2{font-size:18px;}
+  #conversation-panel.dialogue-required .conversation-lines{max-height:16dvh;}
+  #conversation-panel.dialogue-required .conversation-option{min-height:44px;}
 }
+@media(prefers-reduced-motion:reduce){.dialogue-backdrop{backdrop-filter:none;-webkit-backdrop-filter:none;}}
+/* Loading must remain on top even when a restored chat needs an answer. */
+.loading{z-index:100;}
