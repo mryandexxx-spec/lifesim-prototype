@@ -300,3 +300,37 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 /* 1.0h: quietly evolving qualitative, viewpoint-specific pair patterns. */
 .mind-dynamic-section{margin-top:9px;padding-top:8px;border-top:1px solid #d9e6dd;}
 #mind-dynamic{white-space:normal;line-height:1.45;margin-top:5px;}
+
+/* M1: original selected-person mood orbit, not an EA crystal.
+   The immutable gameplay mood remains in psychology.js. */
+.mood-orbit{position:absolute;z-index:5;width:43px;height:43px;display:grid;place-items:center;
+  transform:translate(-50%,-50%);pointer-events:none;user-select:none;
+  color:var(--mood-tone,#63b69a);filter:drop-shadow(0 2px 5px #20392a75);}
+.mood-orbit[hidden]{display:none;}
+.mood-orbit svg{width:43px;height:43px;display:block;overflow:visible;}
+.mood-orbit svg path{stroke:currentColor;stroke-width:5.2;stroke-linecap:round;fill:none;}
+.mood-orbit .orbit-center{fill:currentColor;stroke:#ffffff;stroke-width:1.4;}
+.mood-orbit .orbit-light{fill:#ffffff;}
+.mood-overview{grid-column:2;grid-row:2;min-width:0;max-width:100%;margin-top:-3px;}
+.mood-overview-head{display:flex;align-items:center;gap:8px;min-width:0;color:#4b5d51;}
+.mood-overview-head>span{font-size:9px;letter-spacing:.55px;font-weight:800;flex:none;}
+.mood-overview-head strong{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mood-overview-head small{margin-left:auto;font-size:10px;color:#5b665c;flex:none;font-variant-numeric:tabular-nums;}
+.mood-overview-track{height:8px;margin-top:4px;border-radius:9px;background:#e5e8e2;overflow:hidden;}
+.mood-overview-track i{display:block;height:100%;width:70%;background:#63b69a;border-radius:9px;transition:width .25s,background .25s;}
+.mood-overview-reason{font-size:10px;line-height:1.25;color:#51695c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px;}
+.mind-mood-reasons{font-size:11px;line-height:1.4;color:#50685b;margin-top:7px;}
+.need[data-level="critical"] .need-copy>span{color:#a84943;}
+.need[data-level="low"] .need-copy>span{color:#88591c;}
+@media(max-width:700px){
+  .dashboard{row-gap:6px;padding-bottom:9px;}
+  .mood-overview{grid-column:1;grid-row:auto;margin-top:0;}
+  .mood-overview-reason{font-size:9px;}
+}
+@media(max-height:560px){
+  .mood-overview-reason{display:none;}
+  .mood-overview-track{height:6px;}
+}
+@media(prefers-reduced-motion:reduce){
+  .mood-overview-track i{transition:none;}
+}

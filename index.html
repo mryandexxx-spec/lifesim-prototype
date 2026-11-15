@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.0o" />
+  <link rel="stylesheet" href="./styles.css?v=1.0p" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,13 +22,22 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.0o</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.0p</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
 
     <div id="hotspots" class="hotspots" aria-label="Предметы комнаты"></div>
     <div id="reaction-layer" class="reaction-layer" aria-label="Реакции жителей" aria-live="off"></div>
+    <div id="mood-orbit" class="mood-orbit" aria-hidden="true" hidden>
+      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <path d="M10 14 A18 18 0 0 1 31 7"/>
+        <path d="M38 12 A18 18 0 0 1 40 31"/>
+        <path d="M31 41 A18 18 0 0 1 8 33"/>
+        <circle cx="24" cy="24" r="7" class="orbit-center"/>
+        <circle cx="24" cy="24" r="2.6" class="orbit-light"/>
+      </svg>
+    </div>
 
     <aside class="control-tray" aria-label="Управление временем">
       <button id="pause-btn" class="round-control" type="button" aria-label="Пауза"><span id="pause-icon">Ⅱ</span></button>
@@ -50,7 +59,7 @@
 
     <section class="mind-panel" id="mind-panel" hidden aria-label="Внутренний мир Алекса">
       <div class="mind-panel-head"><div><span class="eyebrow" id="mind-person">АЛЕКС / ВНУТРЕННИЙ МИР</span><h2>Внутренний мир</h2></div><button id="mind-close" aria-label="Закрыть панель" type="button">×</button></div>
-      <div class="mind-mood"><span>Настроение</span><strong id="mind-mood-label">Спокоен</strong><div class="mind-meter"><i id="mind-mood-bar"></i></div></div>
+      <div class="mind-mood"><span>Настроение</span><strong id="mind-mood-label">Спокоен</strong><div class="mind-meter"><i id="mind-mood-bar"></i></div><div id="mind-mood-reasons" class="mind-mood-reasons">Основные потребности удовлетворены</div></div>
       <div class="mind-emotion-section"><span class="eyebrow">ЧТО ЧУВСТВУЕТ И ПОЧЕМУ</span><div id="mind-emotions" class="mind-emotions" aria-live="off">Сейчас нет сильных переживаний</div></div>
       <div class="mind-relationship-section" aria-label="Личное отношение к другому персонажу">
         <span class="eyebrow">ЛИЧНОЕ ОТНОШЕНИЕ <b id="mind-relation-name">К МИРЕ</b></span>
@@ -126,12 +135,17 @@
         <button id="mind-toggle" class="character-tag" type="button" aria-controls="mind-panel" aria-expanded="false"><span id="avatar-symbol" class="avatar-icon">☺</span><div><strong id="resident-name">Алекс</strong><small id="mood-label">Спокоен</small><small id="wish-label">♫ Хочет отдохнуть</small></div><span class="mind-indicator" aria-hidden="true">⌄</span></button>
       </div>
       <div class="needs" aria-label="Потребности персонажа">
-        <div class="need" data-need="hunger"><span class="need-icon">◕</span><div class="need-copy"><span>Голод</span><div class="meter"><i id="bar-hunger"></i></div></div><output id="value-hunger">78</output></div>
+        <div class="need" data-need="hunger"><span class="need-icon">◕</span><div class="need-copy"><span>Сытость</span><div class="meter"><i id="bar-hunger"></i></div></div><output id="value-hunger">78</output></div>
         <div class="need" data-need="energy"><span class="need-icon">☾</span><div class="need-copy"><span>Энергия</span><div class="meter"><i id="bar-energy"></i></div></div><output id="value-energy">67</output></div>
         <div class="need" data-need="hygiene"><span class="need-icon">✧</span><div class="need-copy"><span>Гигиена</span><div class="meter"><i id="bar-hygiene"></i></div></div><output id="value-hygiene">82</output></div>
         <div class="need" data-need="fun"><span class="need-icon">♫</span><div class="need-copy"><span>Досуг</span><div class="meter"><i id="bar-fun"></i></div></div><output id="value-fun">58</output></div>
       </div>
       <div class="footer-actions"><button id="save-btn" type="button">Сохранить</button><button id="reset-btn" type="button">Новая игра</button></div>
+      <div id="mood-overview" class="mood-overview" role="meter" aria-label="Настроение выбранного персонажа" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70">
+        <div class="mood-overview-head"><span>НАСТРОЕНИЕ</span><strong id="mood-overview-title">Спокоен</strong><small id="mood-overview-value">70/100</small></div>
+        <div class="mood-overview-track"><i id="mood-overview-bar"></i></div>
+        <div id="mood-overview-reason" class="mood-overview-reason">Основные потребности удовлетворены</div>
+      </div>
     </footer>
 
     <div class="toast" role="status" id="toast" aria-live="polite"></div>
@@ -144,7 +158,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.0o"></script>
+  <script type="module" src="./src/game.js?v=1.0p"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');

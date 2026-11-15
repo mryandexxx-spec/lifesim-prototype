@@ -1,0 +1,27 @@
+name: Mood M1 branch verification (tests only, NO DEPLOY)
+on:
+  push:
+    branches:
+      - feature/mood-m1-20261115
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run full headless suite and syntax checks
+        run: |
+          npm ci
+          npm test
+          node --check src/mood-presentation.js
+          node --check src/game.js
+          node --check src/psychology.js
+          node --check src/reaction-badges.js
+      - name: Verify original mobile assets unchanged
+        run: |
+          echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -
+          echo "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a  assets/characters/meshy-mira-mobile-v1.glb" | sha256sum -c -

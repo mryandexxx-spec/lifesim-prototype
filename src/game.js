@@ -20,6 +20,7 @@ import {getPerspective,latestSentiments} from './social-perspective.js';
 import {visibleEmotions} from './emotion-engine.js';
 import {consumeSocialReactions,clearSocialReactions} from './social-feedback.js';
 import {createReactionBadges} from './reaction-badges.js';
+import {needPresentation,moodPresentation,moodOrbitPoint} from './mood-presentation.js';
 import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js';
@@ -850,6 +851,7 @@ function boot() {
     selected:miraSelected}=miraRig;
   const reactionBadges=createReactionBadges($('reaction-layer'));
   const reactionRigs={alex:alexRig,mira:miraRig};
+  const moodOrbit=$('mood-orbit');
   let feedbackRoot=game;
   const showerDrops = Array.from({length:9},(_,i)=>{
     const drop=ball('water drop '+i,-4.47+i*.14,2.02,2.20+(i%3)*.12,.058,.10,.06,M.blue);
@@ -1539,6 +1541,22 @@ function boot() {
     reactionBadges.update({dt,paused:game.paused,pc,camera,canvas,
       rigs:reactionRigs,
       visible:{alex:!showerStates.alex.active,mira:!showerStates.mira.active}});
+    // A persistent ORIGINAL orbit belongs only to the selected resident;
+    // social response icons take priority, and privacy must not leak position.
+    const orbitRig=reactionRigs[game.selectedSim];
+    const orbitHead=orbitRig?.head||orbitRig?.avatar;
+    if(!orbitHead?.getPosition||showerStates[game.selectedSim]?.active||
+       reactionBadges.count()>0){
+      moodOrbit.hidden=true;
+    }else{
+      const p=orbitHead.getPosition();
+      const lift=orbitRig.head && typeof orbitRig.head.getPosition==='function' ? .91 : 2.43;
+      const point=new pc.Vec3(p.x,p.y+lift,p.z);
+      const pos=moodOrbitPoint(camera.camera.worldToScreen(point),
+        camera.camera.viewMatrix.transformPoint(point),canvas.clientWidth,canvas.clientHeight);
+      moodOrbit.hidden=!pos;
+      if(pos){moodOrbit.style.left=pos.x+'px';moodOrbit.style.top=pos.y+'px';}
+    }
     uiTimer+=dt;autosaveTime+=dt;
     if(uiTimer>.14){
       uiTimer=0;
@@ -1583,15 +1601,31 @@ function boot() {
         renderSharedPanel(false);
       for(const need of NEEDS){
         const val=Math.round(current.needs[need]);
-        $('bar-'+need).style.width=val+'%';
-        $('bar-'+need).style.background=val<30?'#e2a074':val<55?'#e1c27d':'#80bda1';
+        const band=needPresentation(val);
+        const bar=$('bar-'+need);
+        bar.style.width=val+'%';
+        bar.style.background=band.color;
+        bar.closest('.need').dataset.level=band.id;
         $('value-'+need).textContent=val;
       }
+      const moodView=moodPresentation(current);
+      const moodTrack=$('mood-overview');
+      moodTrack.setAttribute('aria-valuenow',String(moodView.value));
+      moodTrack.setAttribute('aria-valuetext',current.mind.mood.label+' — '+moodView.description);
+      moodTrack.dataset.level=moodView.id;
+      $('mood-overview-title').textContent=current.mind.mood.label;
+      $('mood-overview-value').textContent=moodView.value+'/100';
+      $('mood-overview-bar').style.width=moodView.value+'%';
+      $('mood-overview-bar').style.background=moodView.color;
+      $('mood-overview-reason').textContent=moodView.description;
+      $('mood-orbit').style.setProperty('--mood-tone',moodView.color);
       $('mood-label').textContent=current.mind.mood.label;
       const wish=current.mind.wish && WISHES[current.mind.wish.id];
       $('wish-label').textContent=wish ? wish.symbol+' Хочет: '+wish.label : 'Думает о будущем';
       $('mind-mood-label').textContent=current.mind.mood.label+' · '+current.mind.mood.value+'/100';
       $('mind-mood-bar').style.width=current.mind.mood.value+'%';
+      $('mind-mood-bar').style.background=moodView.color;
+      $('mind-mood-reasons').textContent=moodView.description;
       $('mind-wish-label').textContent=wish?.label || 'Присматривается к миру';
       $('wish-do-btn').disabled=!wish;
       if (!$('mind-panel').hidden) {
