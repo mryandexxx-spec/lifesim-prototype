@@ -1,4 +1,4 @@
-/** Блин’С 1.0m: gradual care, directed feelings, explicit consent-based commitments.
+/** Блин’С 1.0n: directed love, committed pair climate and repair actions.
  * Stable person IDs, no graphics or gender assumptions. No romance without
  * an explicit adult life stage, no known family connections, and no consent.
  */
@@ -6,7 +6,8 @@ export const LIFE_STAGES=Object.freeze(['child','teen','adult','elder']);
 export const FAMILY_KINDS=Object.freeze(['parent','sibling']);
 export const ROMANCE_ACTION_IDS=Object.freeze([
   'romance.flirt','romance.confess','romance.date','romance.breakup',
-  'romance.tender','romance.propose','romance.marry','romance.divorce'
+  'romance.tender','romance.propose','romance.marry','romance.divorce',
+  'romance.checkin','romance.repair'
 ]);
 export const ROMANCE_COOLDOWN_MINUTES=1440;
 const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -17,6 +18,9 @@ const adult=stage=>stage==='adult'||stage==='elder';
 const view=()=>({attraction:0,boundary:'open',lastRefusedAt:null});
 const emptyBond=()=>({status:'none',since:null,ex:false,lastEndedAt:null});
 const COMMITTED=new Set(['dating','engaged','married']);
+const DAY=1440;
+const CONFLICT_WINDOW=7*DAY;
+const CONNECTION_WINDOW=5*DAY;
 const safeDays=(values,firstDay)=>Array.isArray(values)
   ?[...new Set(values.filter(day=>Number.isSafeInteger(day)&&
     day>=firstDay&&day<=6944))].slice(-8):[];
@@ -26,6 +30,30 @@ const careCount=(bond,id)=>Array.isArray(bond?.careDays?.[id])
   ?bond.careDays[id].length:0;
 const mutualCare=(bond,ids)=>ids.every(id=>careCount(bond,id)>=2);
 const bondActive=bond=>COMMITTED.has(bond?.status);
+/** Derived from canonical completed receipts + one bounded timestamp, never
+ * from UI clock callbacks; reading this function never changes a save.
+ */
+export function romanceClimate(graph,a,b,now=0){
+  const pair=pairFor(graph,a,b),bond=pair?.romance?.bond;
+  if(!bondActive(bond)||!time(now))return {state:'none',label:''};
+  const lastConnection=time(bond.lastConnectionAt)&&
+    bond.lastConnectionAt>=bond.since&&bond.lastConnectionAt<=now
+    ?bond.lastConnectionAt:bond.since;
+  const history=Array.isArray(pair.events)?pair.events.filter(e=>
+    time(e?.at)&&e.at>=bond.since&&e.at<=now):[];
+  const conflicts=history.filter(e=>
+    ['argue','conversation.argue','rival.taunt'].includes(e.type)&&
+    now-e.at<=CONFLICT_WINDOW);
+  const repairs=history.filter(e=>e.type==='romance.repair');
+  const conflict=conflicts.at(-1),repair=repairs.at(-1);
+  if(conflict&&(!repair||repair.seq<conflict.seq))
+    return {state:'strained',label:'После ссоры между ними напряжение'};
+  if(now-lastConnection>=CONNECTION_WINDOW)
+    return {state:'distant',label:'Им не хватает внимания друг к другу'};
+  if(conflict&&repair?.seq>conflict.seq&&now-repair.at<=2*DAY)
+    return {state:'recovering',label:'Постепенно находят общий язык'};
+  return {state:'steady',label:'Поддерживают близость'};
+}
 export function romanceLoveDescription(graph,a,b){
   const bond=pairFor(graph,a,b)?.romance?.bond;
   if(!bondActive(bond))return '';
@@ -59,6 +87,9 @@ export function restoreRomanceState(raw,ids,lastAt=null){
     if(since!==null&&COMMITTED.has(bond.status)){
       const dating={status:'dating',since,ex:former,lastEndedAt:ended,
         careDays:careFrom(bond.careDays,ids,Math.floor(since/1440))};
+      if(time(bond.lastConnectionAt)&&bond.lastConnectionAt>=since&&
+        bond.lastConnectionAt<=horizon)
+        dating.lastConnectionAt=bond.lastConnectionAt;
       // Validate the engagement on its own merits. A forged wedding must
       // never erase a genuine engagement that preceded it.
       const engagedAt=time(bond.engagedAt)&&bond.engagedAt>=since&&
@@ -179,6 +210,18 @@ export function romanceAvailability(graph,a,b,actionId,now=0){
   if(time(feelings[b].lastRefusedAt)&&
     now-feelings[b].lastRefusedAt<ROMANCE_COOLDOWN_MINUTES)
     return {enabled:false,reason:'После отказа нужно время'};
+  const climate=romanceClimate(graph,a,b,now);
+  if(actionId==='romance.repair')return bondActive(bond)&&climate.state==='strained'&&
+    src.trust>=25&&target.trust>=25
+      ?{enabled:true,reason:''}
+      :{enabled:false,reason:'Для примирения нужна недавняя ссора и доверие'};
+  if(actionId==='romance.checkin')return bondActive(bond)&&climate.state!=='strained'&&
+    src.trust>=30&&target.trust>=30&&
+    !(Array.isArray(pair.events)&&pair.events.some(e=>
+      e.type==='romance.checkin'&&e.actorId===a&&
+      Math.floor(e.at/DAY)===Math.floor(now/DAY)))
+      ?{enabled:true,reason:''}
+      :{enabled:false,reason:'Сейчас лучше дать время или обсудить обиду'};
   if(src.tension>=42||target.tension>=42||
     src.trust<49||target.trust<45||src.friendship<50||target.friendship<47)
     return {enabled:false,reason:'Сначала узнайте друг друга получше'};
@@ -200,6 +243,12 @@ export function romanceAvailability(graph,a,b,actionId,now=0){
     return {enabled:false,reason:'Для отношений нужно узнать чувства друг друга'};
   if(actionId==='romance.tender'&&!bondActive(bond))
     return {enabled:false,reason:'Сначала нужно стать парой'};
+  if(climate.state==='strained'&&
+    ['romance.tender','romance.propose','romance.marry'].includes(actionId))
+    return {enabled:false,reason:'Сначала стоит обсудить разногласия'};
+  if(climate.state==='distant'&&
+    ['romance.propose','romance.marry'].includes(actionId))
+    return {enabled:false,reason:'Сначала уделите друг другу внимание'};
   if(actionId==='romance.propose'&&(
     bond?.status!=='dating'||now-bond.since<3*1440||
     !mutualCare(bond,[a,b])||
@@ -244,11 +293,17 @@ export function recordRomanceReceipt(graph,pair,receipt){
   }else if(receipt.type==='romance.marry'&&bond.status==='engaged'){
     bond.status='married';bond.marriedAt=receipt.at;
   }else if(receipt.type==='romance.tender'&&bondActive(bond)){
+    bond.lastConnectionAt=receipt.at;
     const days=bond.careDays?.[receipt.actorId];
     const day=Math.floor(receipt.at/1440);
     if(Array.isArray(days)&&!days.includes(day)){
       days.push(day);bond.careDays[receipt.actorId]=days.slice(-8);
     }
+  }else if(['romance.checkin','romance.repair'].includes(receipt.type)&&
+    bondActive(bond)){
+    // Successful response restores emotional connection. Declined offers
+    // never move this date or clear a real argument.
+    bond.lastConnectionAt=receipt.at;
   }
   const actor=pair.romance?.views?.[receipt.actorId];
   const target=pair.romance?.views?.[receipt.targetId];
@@ -262,11 +317,13 @@ export function recordRomanceReceipt(graph,pair,receipt){
   const confession=receipt.type.startsWith('romance.confess');
   const dating=receipt.type.startsWith('romance.date');
   const tender=receipt.type==='romance.tender';
+  const checkin=receipt.type==='romance.checkin';
+  const repair=receipt.type==='romance.repair';
   const proposal=['romance.propose','romance.marry'].includes(receipt.type);
   actor.attraction=clamp(actor.attraction+(accepted?
-    proposal?4:tender?9:dating?7:confession?16:10:-5),0,100);
+    proposal?4:repair?5:checkin?3:tender?9:dating?7:confession?16:10:-5),0,100);
   target.attraction=clamp(target.attraction+(accepted?
-    proposal?4:tender?8:dating?7:confession?14:7:-1),0,100);
+    proposal?4:repair?5:checkin?3:tender?8:dating?7:confession?14:7:-1),0,100);
   if(!accepted)target.lastRefusedAt=receipt.at;
   return true;
 }

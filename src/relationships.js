@@ -236,7 +236,8 @@ export function tickSocial(root,minutes){
     if(!response){root.socialAction=null;return false;}
     s.branchAction.resultType=response.type;
     if(['romance.date','romance.breakup','romance.tender',
-      'romance.propose','romance.marry','romance.divorce'].includes(s.branchAction.id)){
+      'romance.propose','romance.marry','romance.divorce',
+      'romance.checkin','romance.repair'].includes(s.branchAction.id)){
       // A commitment or loving gesture is a verified canonical milestone,
       // never a fake generic talk, quarrel or automatic affinity reward.
       const completed=recordPairCompletion(root,s,response.type);
@@ -248,6 +249,8 @@ export function tickSocial(root,minutes){
       const notices={
         'romance.date':'Теперь встречаются',
         'romance.tender':'Проявил(а) нежность',
+        'romance.checkin':'Уделил(а) внимание',
+        'romance.repair':'Поговорил(а) об обиде',
         'romance.propose':'Обручились',
         'romance.marry':'Стали супругами',
         'romance.breakup':'Завершил(а) отношения',

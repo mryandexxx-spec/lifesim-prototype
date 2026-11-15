@@ -46,7 +46,7 @@ test('1.0k romantic category is separate from friendship, and no hidden numeric 
   const g=graph(),pair=getPair(g,'nova','ember');
   assert.deepEqual(ROMANCE_ACTION_IDS,['romance.flirt','romance.confess',
     'romance.date','romance.breakup','romance.tender','romance.propose',
-    'romance.marry','romance.divorce']);
+    'romance.marry','romance.divorce','romance.checkin','romance.repair']);
   assert.equal(pair.friendship,'none');
   assert.equal(action(g).enabled,true);
   assert.equal(action(g,'romance.confess').enabled,false);
@@ -249,7 +249,7 @@ test('shipped Safari menu and CI include romance module without showing formulas
   const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
   const html=read('../index.html'),game=read('../src/game.js'),
     ci=read('../.github/workflows/pages.yml'),romance=read('../src/romance.js');
-  assert.ok(html.includes('сборка / 1.0m'));
+  assert.ok(html.includes('сборка / 1.0n'));
   assert.ok(html.includes('id="romance-btn"'));
   assert.ok(html.includes('id="romance-status"'));
   assert.ok(game.includes("['romance-btn','romance']"));

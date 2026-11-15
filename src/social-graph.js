@@ -2,7 +2,7 @@ import {initialPairEpisodes,rememberPairReceipt,restorePairEpisodes,episodeAppra
 import {newSocialKnowledge,discoverPreference,restoreSocialKnowledge,discoveryNotes} from './social-compatibility.js';
 import {newSocialCues,observeSocialCue,restoreSocialCues,socialCueNotes,cueConversationBias} from './social-boundaries.js';
 import {evaluateSocialReaction} from './social-reactions.js';
-import {ROMANCE_ACTION_IDS,newRomanceState,restoreRomanceState,setLifeStage,
+import {ROMANCE_ACTION_IDS,newRomanceState,restoreRomanceState,romanceClimate,setLifeStage,
   addFamilyLink,romanceSafety,romanceAvailability,recordRomanceReceipt} from './romance.js';
 export {setLifeStage,addFamilyLink,romanceSafety,romanceAvailability} from './romance.js';
 /** Блин’С social graph V1: N residents, N sparse links. No renderer/household imports.
@@ -139,12 +139,14 @@ export function observePairViews(graph,idA,idB,views){
 const POSITIVE=new Set(['talk','conversation.talk','gift.accepted','leisure.accepted',
   'acquaint.chat','friend.tease','friend.confide','rival.truce',
   'romance.flirt','romance.confess','romance.date',
-  'romance.tender','romance.propose','romance.marry']);
+  'romance.tender','romance.propose','romance.marry',
+  'romance.checkin','romance.repair']);
 const NEGATIVE=new Set(['argue','conversation.argue','gift.refused','leisure.refused',
   'rival.taunt','friend.tease.refused','friend.confide.refused','rival.truce.refused','acquaint.chat.refused',
   'romance.flirt.refused','romance.confess.refused',
   'romance.date.refused','romance.breakup','romance.divorce',
-  'romance.tender.refused','romance.propose.refused','romance.marry.refused']);
+  'romance.tender.refused','romance.propose.refused','romance.marry.refused',
+  'romance.checkin.refused','romance.repair.refused']);
 const TYPES=new Set([...POSITIVE,...NEGATIVE,'introduced']);
 const positive=type=>POSITIVE.has(type);
 const weights={
@@ -162,6 +164,8 @@ const weights={
   'romance.tender':{friendship:1,trust:2,tension:-1},
   'romance.propose':{friendship:2,trust:2,tension:-1},
   'romance.marry':{friendship:2,trust:2,tension:-1},
+  'romance.checkin':{friendship:1,trust:2,tension:-1},
+  'romance.repair':{friendship:1,trust:3,tension:-3},
   argue:{friendship:-9,trust:-9,tension:12},
   'conversation.argue':{friendship:-9,trust:-9,tension:12},
   'gift.refused':{friendship:-2,trust:-3,tension:4},
@@ -178,7 +182,9 @@ const weights={
   'romance.divorce':{friendship:0,trust:-1,tension:1},
   'romance.tender.refused':{friendship:0,trust:-1,tension:1},
   'romance.propose.refused':{friendship:0,trust:-1,tension:1},
-  'romance.marry.refused':{friendship:0,trust:-1,tension:1}
+  'romance.marry.refused':{friendship:0,trust:-1,tension:1},
+  'romance.checkin.refused':{friendship:0,trust:0,tension:0},
+  'romance.repair.refused':{friendship:0,trust:0,tension:0}
 };
 function recompute(pair){
   const [a,b]=pair.ids,v=pair.views;
@@ -217,7 +223,8 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
   // A canonical relationship milestone must be eligible even when written by
   // a headless client directly; otherwise an event could bypass consent gates.
   if(['romance.date','romance.tender','romance.propose','romance.marry',
-    'romance.breakup','romance.divorce'].includes(event.type)&&
+    'romance.breakup','romance.divorce','romance.checkin',
+    'romance.repair'].includes(event.type)&&
     !romanceAvailability(graph,event.actorId,event.targetId,event.type,event.at).enabled)
     return null;
   const pair=getOrCreatePair(graph,event.actorId,event.targetId);
@@ -292,7 +299,9 @@ export const BRANCH_ACTIONS=Object.freeze({
   'romance.tender':action('Сказать нежные слова','romance','Сначала нужно стать парой'),
   'romance.propose':action('Предложить помолвку','romance','Нужна крепкая взаимная любовь'),
   'romance.marry':action('Обменяться брачными обещаниями','romance','Нужно время после помолвки'),
-  'romance.divorce':action('Оформить развод','romance','Вы пока не супруги')
+  'romance.divorce':action('Оформить развод','romance','Вы пока не супруги'),
+  'romance.checkin':action('Уделить внимание','romance','Нужно свободное общение'),
+  'romance.repair':action('Обсудить обиду','romance','Сначала должна возникнуть обида')
 });
 export function availableSocialActions(graph,a,b,minutes=0){
   if(!validPersonId(a)||!validPersonId(b)||a===b||
@@ -321,10 +330,16 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
   // The generic N-resident graph doesn't know rendering or resident shape.
   // The runtime adapter can inject a recipient snapshot; old pure callers
   // without a snapshot still get safe, neutral deterministic behavior.
+  const climate=romanceClimate(graph,a,b,context.minutes??0);
+  const romanceBias=id.startsWith('romance.')&&
+    !['romance.repair','romance.checkin','romance.breakup',
+      'romance.divorce'].includes(id)
+    ?climate.state==='strained'?-12:climate.state==='distant'?-8:0
+    :0;
   const reaction=evaluateSocialReaction({
     kind:'branch',actionId:id,recipient:context.recipient,
     view:getDirectedView(graph,b,a)||view(),minutes:context.minutes??0,
-    historyBias:episodeContext(graph,b,a,context.minutes??0).bias,
+    historyBias:episodeContext(graph,b,a,context.minutes??0).bias+romanceBias,
     compatibilityBias:context.compatibilityBias??0
   });
   if(!reaction)return null;
@@ -350,6 +365,8 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
       ?accepted?id==='romance.flirt'?'Ответил(а) на флирт':
         id==='romance.date'?'Решили встречаться':
         id==='romance.tender'?'Оценил(а) нежность':
+        id==='romance.checkin'?'Почувствовал(а) внимание':
+        id==='romance.repair'?'Удалось поговорить об обиде':
         id==='romance.propose'?'Обручились':
         id==='romance.marry'?'Стали супругами':'Чувства приняты'
         :'Собеседник предпочёл сохранить дистанцию'
