@@ -18,11 +18,17 @@ function extract(start,end){
 function elements(){
   const nodes=new Map();
   const $=id=>{
-    if(!nodes.has(id))nodes.set(id,{
-      hidden:false,textContent:'',handlers:{},addEventListener(type,callback){
-        this.handlers[type]=callback;
-      }
-    });
+    if(!nodes.has(id)){
+      const names=new Set();
+      nodes.set(id,{
+        hidden:false,textContent:'',handlers:{},setAttribute(){},
+        removeAttribute(){},focus(){},
+        classList:{contains:cls=>names.has(cls),toggle:(cls,on)=>{
+          if(on)names.add(cls);else names.delete(cls);
+        }},
+        addEventListener(type,callback){this.handlers[type]=callback;}
+      });
+    }
     return nodes.get(id);
   };
   return $;
@@ -71,12 +77,13 @@ test('1.0o: running gift/leisure interaction does not automatically open its pan
   scope.renderSharedPanel(true);
   assert.equal($('shared-panel').hidden,true);
 });
-test('1.0o: multi-turn conversation can run with its panel collapsed',()=>{
+test('1.0q: a walking conversation stays nonblocking until choices are actually required',()=>{
   const $=elements(),scope={
     $,game:{selectedSim:'alex',socialAction:{
-      phase:'using',conversation:{topic:'daily',phase:'choice',turns:[]}
+      phase:'walking',conversation:{topic:'daily',phase:'opening',turns:[]}
     },paused:false},
-    conversationTopicPicker:false,conversationDisplayKey:'',socialMenuCategory:null
+    dialogueNeedsDecision:()=>false,conversationTopicPicker:false,
+    conversationDisplayKey:'',socialMenuCategory:null
   };
   runInNewContext(extract('function renderConversationPanel(force=true){',
     'renderConversationPanel();\nrenderSharedPanel();'),scope);
@@ -98,6 +105,7 @@ test('1.0o: all three close buttons only dismiss presentation and preserve activ
     renderConversationPanel:()=>rendered.push('conversation'),
     renderSharedPanel:()=>rendered.push('shared'),
     renderBranchPanel:()=>rendered.push('branch'),
+    dialogueNeedsDecision:()=>false,
     cancelSocial:()=>{canceled++;}
   };
   runInNewContext(extract("$('conversation-close').addEventListener",
@@ -142,9 +150,9 @@ test('1.0o: a toast is compact, tap-through and cannot occlude lower mobile conv
   assert.ok(!game.includes("toast(getActorName(residentId)+': запланировано"));
 });
 test('1.0o: closure semantics and browser cache-busting are discoverable on iPhone',()=>{
-  assert.match(html,/сборка \/ 1\.0p/);
-  assert.match(html,/styles\.css\?v=1\.0p/);
-  assert.match(html,/src\/game\.js\?v=1\.0p/);
+  assert.match(html,/сборка \/ 1\.0q/);
+  assert.match(html,/styles\.css\?v=1\.0q/);
+  assert.match(html,/src\/game\.js\?v=1\.0q/);
   assert.match(html,/id="queue-feedback"[^>]+aria-live="polite"/);
   assert.match(html,/id="branch-close"[^>]+aria-label="Закрыть окно, не прерывая действие"/);
   assert.match(html,/id="conversation-close"[^>]+aria-label="Свернуть беседу, не прерывая действие"/);

@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,dragCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
@@ -248,6 +249,7 @@ $('social-menu-close').addEventListener('click',()=>{
 // Close buttons dismiss only presentation. They must NEVER cancel a running
 // task; the deliberate "Прервать текущее действие" control lives in the queue.
 $('conversation-close').addEventListener('click',()=>{
+  if(dialogueNeedsDecision(game))return; // Mandatory decisions have no close path.
   conversationTopicPicker=false;renderConversationPanel();
 });
 $('shared-close').addEventListener('click',()=>{
@@ -509,31 +511,58 @@ function conversationButton(label,callback,secondary=false){
   button.addEventListener('click',callback);
   return button;
 }
+/** End the conversation immediately; an empty one has no social rewards.
+ * Confirmed prior lines are applied exactly once on explicit completion.
+ */
+function endPlayerConversation(){
+  const outcome=applyDialogueDecision(game,root=>
+    root.socialAction?.conversation?.turns?.length
+      ?finishSocialConversation(root):cancelSocial(root));
+  if(!outcome)return false;
+  conversationTopicPicker=false;
+  save(true);
+  renderConversationPanel();
+  renderQueuePanel(true);
+  toast(typeof outcome==='object'?outcome.label:'Разговор завершён');
+  return true;
+}
 /** Only replace interactive DOM when the conversation actually changes.
  * Replacing buttons every game frame would swallow iPhone touch clicks.
  */
 function renderConversationPanel(force=true){
   const s=game.socialAction,session=s?.conversation;
+  const required=dialogueNeedsDecision(game);
   $('conversation-btn').textContent=session?'Продолжить беседу':'Беседа';
-  const key=JSON.stringify([conversationTopicPicker,socialMenuCategory,game.selectedSim,game.paused,
-    s?.phase,session?.topic,session?.phase,session?.turns]);
+  const panel=$('conversation-panel');
+  const enteringRequired=required&&!panel.classList.contains('dialogue-required');
+  panel.classList.toggle('dialogue-required',required);
+  $('conversation-close').hidden=required;
+  if(required){
+    panel.setAttribute('role','dialog');
+    panel.setAttribute('aria-modal','true');
+    panel.setAttribute('aria-labelledby','conversation-title');
+  }else panel.removeAttribute('aria-modal');
+  const key=JSON.stringify([conversationTopicPicker,required,socialMenuCategory,
+    game.selectedSim,game.paused,s?.phase,session?.topic,session?.phase,session?.turns]);
   if(!force&&key===conversationDisplayKey)return;
   conversationDisplayKey=key;
-  // Even a live multi-turn conversation must stay dismissible and must not
-  // cover the game unless the player explicitly reopens it via "Беседа".
-  const open=conversationTopicPicker;
-  $('conversation-panel').hidden=!open||Boolean(socialMenuCategory);
+  const open=conversationTopicPicker||required;
+  panel.hidden=!open||(!required&&Boolean(socialMenuCategory));
   if(!open)return;
+  if(enteringRequired)panel.focus({preventScroll:true});
   const options=$('conversation-options');
   options.replaceChildren();
   const list=$('conversation-lines');
   list.replaceChildren();
   $('conversation-title').textContent=session
     ?CONVERSATION_TOPICS[session.topic].label:'Выбери тему';
-  $('conversation-subtitle').textContent=session
-    ?(s.phase==='walking'?'Персонажи идут навстречу':
-      s.phase==='using'?'Разговор с '+getActorName(s.partner):'Подготовка беседы')
-    :'Начни разговор с '+getActorName(game.selectedSim==='alex'?'mira':'alex');
+  $('conversation-subtitle').textContent=required
+    ?'⏸ Игровое время остановлено · выбери ответ или заверши разговор'
+    :session
+      ?(s.phase==='walking'?'Персонажи идут навстречу':
+        game.paused?'Сними паузу, чтобы жители встретились':
+        s.phase==='using'?'Разговор с '+getActorName(s.partner):'Подготовка беседы')
+      :'Начни разговор с '+getActorName(game.selectedSim==='alex'?'mira':'alex');
   if(!session){
     for(const [id,topic] of Object.entries(CONVERSATION_TOPICS))
       options.append(conversationButton(topic.label,()=>{
@@ -551,41 +580,42 @@ function renderConversationPanel(force=true){
     list.append(li);
   }
   list.scrollTop=list.scrollHeight;
-  if(s.phase!=='using'||game.paused){
-    $('conversation-subtitle').textContent=game.paused
-      ?'Сними паузу, чтобы продолжить':'Персонажи идут навстречу';
-    return;
-  }
+  if(s.phase!=='using')return;
   if(session.phase==='response'){
     if(session.turns.length<CONVERSATION_MAX_TURNS)
       options.append(conversationButton('Продолжить беседу',()=>{
-        if(nextSocialLine(game))renderConversationPanel();
+        if(applyDialogueDecision(game,root=>nextSocialLine(root))){
+          save(true);renderConversationPanel();
+        }
       }));
-    options.append(conversationButton('Завершить разговор',()=>{
-      const outcome=finishSocialConversation(game);
-      if(outcome){toast(outcome.label);renderConversationPanel();}
-    },true));
-    return;
+  }else{
+    for(const choice of conversationOptions(session))
+      options.append(conversationButton(choice.label,()=>{
+        if(applyDialogueDecision(game,root=>chooseSocialLine(root,choice.id))){
+          save(true);renderConversationPanel();
+        }
+      }));
   }
-  for(const choice of conversationOptions(session))
-    options.append(conversationButton(choice.label,()=>{
-      if(chooseSocialLine(game,choice.id))renderConversationPanel();
-    }));
-  if(session.turns.length)
-    options.append(conversationButton('Завершить разговор',()=>{
-      const outcome=finishSocialConversation(game);
-      if(outcome){toast(outcome.label);renderConversationPanel();}
-    },true));
+  // This is the only exit from a required-choice dialogue.
+  options.append(conversationButton('Завершить разговор',endPlayerConversation,true));
 }
 renderConversationPanel();
 renderSharedPanel();
 renderBranchPanel();
 renderSocialMenu();
 renderQueuePanel();
+function renderPauseButton(){
+  const blocked=dialogueNeedsDecision(game);
+  const paused=game.paused||blocked;
+  $('pause-icon').textContent=paused?'▶':'Ⅱ';
+  $('pause-btn').setAttribute('aria-label',blocked
+    ?'Выбери реплику: игровое время остановлено'
+    :paused?'Продолжить':'Пауза');
+}
 $('pause-btn').addEventListener('click', () => {
+  if(dialogueNeedsDecision(game))return;
   game.paused = !game.paused;
-  $('pause-icon').textContent = game.paused ? '▶' : 'Ⅱ';
-  $('pause-btn').setAttribute('aria-label', game.paused ? 'Продолжить' : 'Пауза');
+  renderPauseButton();
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
 });
 $('speed-btn').addEventListener('click', () => {
@@ -1164,7 +1194,9 @@ function boot() {
   const approachAngle=(a,b,rate,dt)=>a+((((b-a+540)%360)+360)%360-180)*(1-Math.exp(-rate*dt));
   app.on('update',dt=>{
     dt=Math.min(dt,.06);
-    const active=!game.paused;
+    // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
+    // without altering the player's saved manual pause preference.
+    const active=!game.paused&&!dialogueNeedsDecision(game);
     const animDt=active?dt:0;
     if(active){
       accumulator+=dt;
@@ -1592,6 +1624,7 @@ function boot() {
       $('romance-climate').textContent=romanceClimate(game.socialGraph,
         game.selectedSim,game.selectedSim==='alex'?'mira':'alex',game.minutes).label;
       if(socialMenuCategory)renderSocialMenu(false);
+      renderPauseButton();
       renderQueuePanel(false);
       if(branchPicker||game.socialAction?.branchAction||!$('branch-panel').hidden)
         renderBranchPanel(false);

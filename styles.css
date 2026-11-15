@@ -334,3 +334,49 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 @media(prefers-reduced-motion:reduce){
   .mood-overview-track i{transition:none;}
 }
+
+/* 1.0q: a genuine player choice is an exclusive full-screen dialogue, unlike
+ * ordinary social actions. CSS safe areas protect iPhone notch/Home indicator.
+ */
+#conversation-panel.dialogue-required{
+  position:fixed;inset:0;z-index:60;
+  width:100vw;height:100vh;height:100dvh;min-height:100dvh;
+  max-height:none;max-width:none;margin:0;
+  padding:calc(env(safe-area-inset-top) + 26px)
+    max(22px,env(safe-area-inset-right))
+    calc(env(safe-area-inset-bottom) + 28px)
+    max(22px,env(safe-area-inset-left));
+  border:0;border-radius:0;box-shadow:none;
+  background:linear-gradient(165deg,#e9f3e9 0%,#fffdf7 62%,#f6e9da 100%);
+  color:#345b49;overflow-y:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+}
+#conversation-panel.dialogue-required[hidden]{display:none;}
+#conversation-panel.dialogue-required > *{width:min(540px,100%);}
+#conversation-panel.dialogue-required .conversation-head{padding-top:15px;}
+#conversation-panel.dialogue-required .conversation-head h2{font-size:clamp(25px,6vw,35px);line-height:1.18;}
+#conversation-panel.dialogue-required .conversation-head p{font-size:14px;line-height:1.45;color:#567c65;margin:12px 0 8px;}
+#conversation-panel.dialogue-required #conversation-close{display:none!important;}
+#conversation-panel.dialogue-required .conversation-lines{flex:1;min-height:95px;max-height:min(35dvh,340px);overflow-y:auto;}
+#conversation-panel.dialogue-required .conversation-lines li{font-size:15px;line-height:1.5;padding:12px 14px;margin:8px 0;border-radius:14px;}
+#conversation-panel.dialogue-required .conversation-options{margin-top:auto;display:grid;gap:11px;padding-top:10px;}
+#conversation-panel.dialogue-required .conversation-option{
+  min-height:56px;padding:14px 17px;text-align:center;
+  font-size:16px;line-height:1.3;border-radius:15px;
+  border:1px solid #b7d5c2;box-shadow:0 4px 10px #274e3711;
+}
+#conversation-panel.dialogue-required .conversation-option.secondary{
+  border:1px solid #b98a82;color:#71483f;background:#fff0ea;
+}
+#conversation-panel.dialogue-required:focus{outline:none;}
+/* Loading must remain on top until assets are ready, even on a restored chat. */
+.loading{z-index:100;}
+@media(max-width:700px){
+  #conversation-panel.dialogue-required{padding-top:calc(env(safe-area-inset-top) + 16px);gap:10px;}
+  #conversation-panel.dialogue-required .conversation-lines li{font-size:13px;padding:9px 11px;}
+  #conversation-panel.dialogue-required .conversation-option{min-height:51px;font-size:15px;}
+}
+@media(max-height:560px){
+  #conversation-panel.dialogue-required .conversation-lines{min-height:0;max-height:22dvh;}
+  #conversation-panel.dialogue-required .conversation-head h2{font-size:24px;}
+}
