@@ -253,7 +253,7 @@ test('UI exposes one social hub with safe buttons and full static Pages bundle',
     assert.ok(html.includes('id="'+id+'"'),id);
   assert.ok(game.includes('renderSharedPanel(false)'));
   assert.ok(game.includes('sharedDisplayKey'));
-  assert.ok(game.includes('startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId)'));
+  assert.ok(game.includes('startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId,automatic)'));
   assert.ok(game.includes('textContent'),'UI labels never injected from user save HTML');
   assert.ok(css.includes('#shared-btn'));
   assert.ok(workflow.includes('src/gifts-leisure.js src/household.js'));
