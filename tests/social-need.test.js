@@ -5,6 +5,7 @@ import {NEEDS,PHYSICAL_NEEDS,SAVE_KEY,newGame,loadGame,tick,
   chooseAction,autonomousChoice} from '../src/simulation.js';
 import {newHousehold,loadHousehold,tickHousehold,getActor} from '../src/household.js';
 import {refreshMind,calculateMood} from '../src/psychology.js';
+import {environmentSnapshot} from '../src/environment-effects.js';
 import {NEED_LABELS,moodReasons} from '../src/mood-presentation.js';
 import {socialNeedDecayRate,creditCompletedSocialNeed,
   SOCIAL_NEED_REWARDS,SOCIAL_NEED_INITIAL,
@@ -101,7 +102,8 @@ test('M3: loneliness affects only the existing derived mood and real reason list
   s.needs.social=3;refreshMind(s);
   assert.ok(s.mind.mood.value<content);
   assert.ok(moodReasons(s).includes('Чувствует одиночество'));
-  assert.equal(s.mind.mood.value,calculateMood(s.needs,s.mind,s.minutes,s.personality).value);
+  assert.equal(s.mind.mood.value,calculateMood(s.needs,s.mind,s.minutes,s.personality,
+    environmentSnapshot(s).delta).value);
   const untouched=JSON.stringify(s);moodReasons(s);
   assert.equal(JSON.stringify(s),untouched);
 });
