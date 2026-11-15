@@ -280,3 +280,7 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 /* 1.0f: what the selected resident actually learned about their partner. */
 .mind-discovery-section{margin-top:10px;padding-top:9px;border-top:1px solid #d9e6dd;}
 #mind-discovery{white-space:pre-line;line-height:1.55;margin-top:5px;}
+
+/* 1.0g: an inferred social cue is not an omniscient personality label. */
+.mind-social-cues-section{margin-top:10px;padding-top:9px;border-top:1px solid #d9e6dd;}
+#mind-social-cues{white-space:pre-line;line-height:1.55;margin-top:5px;}

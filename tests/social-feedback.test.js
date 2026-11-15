@@ -203,7 +203,7 @@ test('iPhone scene integrates original SVG badges above rig heads rather than ce
   const rig=read('../src/characters.js'),visual=read('../src/reaction-badges.js');
   const workflow=read('../.github/workflows/pages.yml');
   assert.ok(page.includes('id="reaction-layer"'));
-  assert.ok(page.includes('сборка / 1.0f'));
+  assert.ok(page.includes('сборка / 1.0g'));
   assert.ok(!page.includes('id="social-effect"'));
   assert.ok(game.includes('reactionBadges.show(consumeSocialReactions(game))'));
   assert.ok(game.includes('reactionBadges.update({dt,paused:game.paused'));
@@ -222,5 +222,5 @@ test('iPhone scene integrates original SVG badges above rig heads rather than ce
   }
   assert.ok(workflow.includes('node --check src/social-feedback.js'));
   assert.ok(workflow.includes('node --check src/reaction-badges.js'));
-  assert.ok(workflow.includes('src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/reaction-badges.js src/characters.js'));
+  assert.ok(workflow.includes('src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/reaction-badges.js src/characters.js'));
 });

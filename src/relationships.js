@@ -4,12 +4,13 @@ import {feelMemory} from './emotion-engine.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction} from './social-feedback.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
+import {cueFromAnswer} from './social-boundaries.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor} from './gifts-leisure.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
 import {availableSocialActions,resolveBranchResponse,observePairViews,
-  applySocialEvent,learnSocialPreference} from './social-graph.js';
+  applySocialEvent,learnSocialPreference,learnSocialCue} from './social-graph.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -189,6 +190,8 @@ function completeSocial(root,conversationScore=null){
       const tag=CONVERSATION_DISCOVERY_TAGS[turn.id];
       if(turn.accepted&&tag)learnSocialPreference(root.socialGraph,completed,
         s.initiator,s.partner,get(root,s.partner).personality,tag);
+      if(cueFromAnswer(turn.id,turn.accepted))learnSocialCue(root.socialGraph,completed,
+        s.initiator,s.partner,turn.id,turn.accepted);
     }
   }
   // Legacy one-button actions only show a response after their effects finish.

@@ -7,7 +7,7 @@ import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
   chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial,startBranchSocial } from './relationships.js';
-import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes} from './social-graph.js';
+import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes,socialCommunicationNotes} from './social-graph.js';
 import {latestEpisodes} from './social-episodes.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
@@ -1571,6 +1571,10 @@ function boot() {
         $('mind-discovery').textContent=learned.length
           ?learned.map(item=>'• '+item.text).join('\n')
           :'Пока не узнал(а) предпочтения собеседника';
+        const cues=socialCommunicationNotes(game.socialGraph,game.selectedSim,otherId,3);
+        $('mind-social-cues').textContent=cues.length
+          ?cues.map(item=>'• '+item.text).join('\n')
+          :'Пока не замечено особенностей общения';
         const list=$('mind-memories');
         list.replaceChildren();
         const memories=current.mind.memories.slice(-4).reverse();

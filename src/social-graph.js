@@ -1,5 +1,6 @@
 import {initialPairEpisodes,rememberPairReceipt,restorePairEpisodes,episodeAppraisal} from './social-episodes.js';
 import {newSocialKnowledge,discoverPreference,restoreSocialKnowledge,discoveryNotes} from './social-compatibility.js';
+import {newSocialCues,observeSocialCue,restoreSocialCues,socialCueNotes,cueConversationBias} from './social-boundaries.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 /** Блин’С social graph V1: N residents, N sparse links. No renderer/household imports.
  * Legacy two-resident values are observational inputs from an external adapter.
@@ -36,7 +37,7 @@ const makePair=(a,b)=>({
   counts:{positive:0,negative:0},positiveDays:[],
   counted:[],negativeSinceFriend:0,positiveSinceRival:0,
   friendship:'none',rivalry:'none',
-  lastAt:null,events:[],episodes:initialPairEpisodes(a,b),knowledge:newSocialKnowledge(a,b),revision:0
+  lastAt:null,events:[],episodes:initialPairEpisodes(a,b),knowledge:newSocialKnowledge(a,b),cues:newSocialCues(a,b),revision:0
 });
 const adj=graph=>{
   if(graph._links)return graph._links;
@@ -93,6 +94,18 @@ export function learnSocialPreference(graph,receipt,viewerId,targetId,targetProf
 /** Player-facing knowledge is per point of view; no spoilers for unseen traits. */
 export function socialKnowledgeNotes(graph,viewerId,targetId,limit=4){
   return discoveryNotes(getPair(graph,viewerId,targetId),viewerId,limit);
+}
+/** A one-sided communication observation, only after a committed conversation. */
+export function learnSocialCue(graph,receipt,viewerId,targetId,actionId,accepted){
+  const pair=getPair(graph,viewerId,targetId);
+  return pair?observeSocialCue(pair,receipt,viewerId,targetId,actionId,accepted):null;
+}
+/** Read-only cues and learned expectations, no technical probability in UI. */
+export function socialCommunicationNotes(graph,viewerId,targetId,limit=3){
+  return socialCueNotes(getPair(graph,viewerId,targetId),viewerId,limit);
+}
+export function socialCommunicationBias(graph,viewerId,targetId,actionId){
+  return cueConversationBias(getPair(graph,viewerId,targetId),viewerId,actionId);
 }
 export function getDirectedView(graph,sourceId,targetId){
   const pair=getPair(graph,sourceId,targetId);
@@ -314,6 +327,8 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
       p.episodes=restorePairEpisodes(entry.episodes,pairIds,graph.nextSeq,
         p.lastAt===null?1e7:p.lastAt);
       p.knowledge=restoreSocialKnowledge(entry.knowledge,pairIds,graph.nextSeq,
+        p.lastAt===null?1e7:p.lastAt);
+      p.cues=restoreSocialCues(entry.cues,pairIds,graph.nextSeq,
         p.lastAt===null?1e7:p.lastAt);
       // Preserve verified historical friendship milestones, no fresh events.
     }

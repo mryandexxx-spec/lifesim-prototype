@@ -1,6 +1,7 @@
 /** Original, headless 0.9a conversation engine. Saves only validated IDs, no player text. */
 import {getPerspective} from './social-perspective.js';
-import {episodeContext} from './social-graph.js';
+import {episodeContext,getPair} from './social-graph.js';
+import {boundaryDisposition,cueConversationBias} from './social-boundaries.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction,socialOutcome} from './social-feedback.js';
@@ -80,7 +81,9 @@ export function evaluateResponse(root,initiator,topic,id){
     tone:a.tone,weight:a.weight,
     historyBias:episodeContext(root.socialGraph,partnerId,initiator,root.minutes).bias,
     compatibilityBias:socialCompatibility(partner.personality,
-      (initiator==='alex'?root:root?.otherSim)?.personality).bias
+      (initiator==='alex'?root:root?.otherSim)?.personality).bias,
+    styleBias:boundaryDisposition(partner.personality,id)+
+      cueConversationBias(getPair(root.socialGraph,initiator,partnerId),initiator,id)
   });
   return reaction?{accepted:reaction.accepted,confidence:reaction.confidence}:null;
 }
