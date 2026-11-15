@@ -197,6 +197,38 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
 }
 
 /** One global autonomy preference, mirrored into both independent actor controllers. */
+/** A successfully queued player task outranks the addressed resident's own
+ * autonomous task. A spontaneous social task reserves BOTH participants:
+ * either can release it by receiving a player instruction. Never touch an
+ * ongoing MANUAL action or another resident's independent object work.
+ * Call only after enqueueAction succeeded.
+ */
+export function preemptAutomaticForManual(root,residentId){
+  if(!HOUSEHOLD_IDS.includes(residentId)||!root?.actionQueues)return null;
+  const resident=getActor(root,residentId);
+  const removed={residentId,objectId:null,objectPhase:null,socialInitiator:null};
+  if(resident?.action?.automatic===true){
+    removed.objectId=resident.action.id;
+    removed.objectPhase=resident.action.phase;
+    resident.action=null;
+    resident.event='Выполняет поручение игрока';
+  }
+  const social=root.socialAction;
+  if(social?.automatic===true &&
+    (social.initiator===residentId||social.partner===residentId)){
+    removed.socialInitiator=social.initiator;
+    cancelSocial(root);
+    for(const id of [social.initiator,social.partner]){
+      const actor=getActor(root,id);
+      if(actor)actor.event=id===residentId
+        ?'Выполняет поручение игрока':'Свободное время';
+    }
+  }
+  if(removed.objectId||removed.socialInitiator)
+    resident.autonomy.nextAt=Math.max(resident.autonomy.nextAt,root.minutes+7);
+  return removed;
+}
+
 export function setHouseholdAutonomy(root,enabled) {
   setAutonomyEnabled(root,enabled);
   if (root.otherSim) setAutonomyEnabled(root.otherSim,enabled);

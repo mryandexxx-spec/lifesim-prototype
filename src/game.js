@@ -56,7 +56,7 @@ import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './to
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
-  residentAutonomousChoice,bedDestinationFor } from './household.js';
+  residentAutonomousChoice,bedDestinationFor,preemptAutomaticForManual } from './household.js';
 
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
@@ -233,6 +233,7 @@ let debugTapCount=0;
 let debugTapAt=0;
 let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
+let onManualCommandQueued = () => {};
 let toastTimeout;
 function toast(message) {
   const el = $('toast'); el.textContent = message; el.classList.add('show');
@@ -272,6 +273,10 @@ function scheduleCommand(command,residentId=game.selectedSim){
   }
   const task=enqueueAction(game.actionQueues,residentId,command);
   if(!task){toast('Не удалось добавить: очередь заполнена или действие недоступно');return false;}
+  // A manual task has authority over the addressed person's spontaneous
+  // action, including being the partner of an autonomous conversation.
+  // Don't cancel anything if enqueue failed; keep older MANUAL plans intact.
+  onManualCommandQueued(preemptAutomaticForManual(game,residentId));
   // Successful commands are visible in the queue counter, not in a floating
   // overlay over the game. Screen readers receive a nonblocking confirmation.
   renderQueuePanel(true);
@@ -1438,6 +1443,25 @@ function boot() {
     if (id) autonomyWaitSeconds[id]=0;
     else for(const key of HOUSEHOLD_IDS) autonomyWaitSeconds[key]=0;
   };
+  onManualCommandQueued=removed=>{
+    if(!removed)return;
+    const {residentId,objectId,objectPhase,socialInitiator}=removed;
+    if(objectId){
+      // Reset stale walking A* state. Keep existing seat/bed/shower/WC
+      // transition controllers: their exit animation is a dispatch gate.
+      paths[residentId]={points:null,index:0,id:null};
+      // Fridge exit needs to complete closing its door before the next route.
+      if(objectId==='fridge'&&objectPhase==='using'&&fridgeOpen>.015)
+        fridgeLeaving[residentId]=true;
+    }
+    if(socialInitiator)
+      paths[socialInitiator]={points:null,index:0,id:null};
+    if(objectId||socialInitiator)restartAutonomyWait(residentId);
+  };
+  // Failed route searches used to repeat every 0.1s for the same queued
+  // head, including up to eight A* social approaches. On mobile this can
+  // monopolize the main thread and look like a frozen game.
+  const routeRetryAt=new Map(),routeFailures=new Map();
   const destination=(id,residentId='alex',targetInstanceId=null)=>id==='bed'
     ?bedDestinationFor(game,residentId)
     :furnitureActionApproach(game.world,id,targetInstanceId);
@@ -1484,9 +1508,15 @@ function boot() {
     }
     const self=getActor(game,actorId), partner=getActor(game,actorId==='alex'?'mira':'alex');
     const offsets=[[.84,0],[-.84,0],[0,.84],[0,-.84],[.62,.62],[-.62,.62],[.62,-.62],[-.62,-.62]];
-    let best=null,bestLength=Infinity;
-    for(const [dx,dz] of offsets){
+    const candidates=offsets.map(([dx,dz])=>{
       const goal={x:partner.position.x+dx,z:partner.position.z+dz};
+      return {goal,lowerBound:Math.hypot(goal.x-self.position.x,goal.z-self.position.z)};
+    }).sort((a,b)=>a.lowerBound-b.lowerBound);
+    let best=null,bestLength=Infinity;
+    for(const {goal,lowerBound} of candidates){
+      // Any path has length >= direct-line distance; later candidates
+      // cannot improve a better route if their lower bound is already >=.
+      if(lowerBound>=bestLength)break;
       const points=findPath(self.position,goal,game.world);
       if(!points)continue;
       let previous=self.position,len=0;
@@ -1509,6 +1539,7 @@ function boot() {
     const started=dispatchActionQueues(game.actionQueues,{
       canStart(residentId,command){
         if(!HOUSEHOLD_IDS.includes(residentId)||game.socialAction)return false;
+        if((routeRetryAt.get(command.seq)||0)>performance.now())return false;
         const actor=getActor(game,residentId);
         if(actor.action||sofaStates[residentId].progress>0||
           bedStates[residentId].progress>0||showerStates[residentId].active||
@@ -1554,18 +1585,36 @@ function boot() {
         refused.push({residentId,command,reason});
       },
       start(residentId,command){
+        let started=false;
         if(command.type==='object')
-          return beginAction(command.actionId,false,residentId,true,command.targetInstanceId);
-        if(command.type==='social')
-          return beginSocial(command.actionId,false,residentId,null,null,null,true);
-        if(command.type==='conversation')
-          return beginSocial('talk',false,residentId,command.topicId,null,null,true);
-        if(command.type==='branch')
-          return beginSocial('talk',false,residentId,null,null,command.actionId,true);
-        if(command.type==='shared')
-          return beginSocial('talk',false,residentId,null,
+          started=beginAction(command.actionId,false,residentId,true,command.targetInstanceId);
+        else if(command.type==='social')
+          started=beginSocial(command.actionId,false,residentId,null,null,null,true);
+        else if(command.type==='conversation')
+          started=beginSocial('talk',false,residentId,command.topicId,null,null,true);
+        else if(command.type==='branch')
+          started=beginSocial('talk',false,residentId,null,null,command.actionId,true);
+        else if(command.type==='shared')
+          started=beginSocial('talk',false,residentId,null,
             {mode:command.mode,choiceId:command.choiceId},null,true);
-        return false;
+        if(started){
+          routeRetryAt.delete(command.seq);
+          routeFailures.delete(command.seq);
+        }else{
+          // Retain the player's task and retry later; NEVER busy-loop A*
+          // on every fixed simulation step when a layout is unreachable.
+          if(routeRetryAt.size>=24){routeRetryAt.clear();routeFailures.clear();}
+          routeRetryAt.set(command.seq,performance.now()+900);
+          const count=(routeFailures.get(command.seq)||0)+1;
+          routeFailures.set(command.seq,count);
+          if(count===3){
+            const message=getActorName(residentId)+
+              ': путь пока недоступен — проверь расположение мебели или удали задание из очереди';
+            $('queue-feedback').textContent=message;
+            toast(message);
+          }
+        }
+        return started;
       }
     });
     if(refused.length){
