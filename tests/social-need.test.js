@@ -72,7 +72,7 @@ test('M3: restored social values clamp, corrupt values use neutral rather than N
 test('M3: social need decays only by real game minutes and stops completely on pause',()=>{
   const s=newGame(),initial=s.needs.social;
   const rate=socialNeedDecayRate(s.personality);
-  assert.ok(rate>=.04&&rate<=.075);
+  assert.ok(rate>=.018&&rate<=.030);
   tick(s,100);
   near(s.needs.social,initial-100*rate);
   s.paused=true;
@@ -80,7 +80,7 @@ test('M3: social need decays only by real game minutes and stops completely on p
   tick(s,500);
   assert.equal(JSON.stringify(s),snap);
   s.paused=false;
-  tick(s,3000);
+  tick(s,4500);
   assert.equal(s.needs.social,0);
   assert.ok(Number.isFinite(s.mind.mood.value));
 });
@@ -90,7 +90,7 @@ test('M3: a more outgoing personality loses social fulfilment a little faster',(
     preferences:{likes:[],dislikes:[]}});
   const outgoing=socialNeedDecayRate(DEMO_PROFILES.second);
   assert.ok(reserved<outgoing);
-  assert.ok(outgoing<.075);
+  assert.ok(outgoing<=.030);
 });
 
 test('M3: loneliness affects only the existing derived mood and real reason list',()=>{

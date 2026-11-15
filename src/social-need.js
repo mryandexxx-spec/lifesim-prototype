@@ -3,6 +3,7 @@
  * receipt in the household adapter. No event replay, UI/DOM, or RNG.
  */
 import {deriveAxes} from './trait-catalog.js';
+import {NEED_DECAY_PER_MINUTE,SOCIAL_DECAY_PERSONALITY_SPREAD} from './need-balance.js';
 
 export const SOCIAL_NEED_LEGACY_DEFAULT=75; // old v1 save: a neutral, non-critical start
 export const SOCIAL_NEED_INITIAL=78;
@@ -15,7 +16,8 @@ const validId=id=>typeof id==='string'&&/^[a-zA-Z][a-zA-Z0-9_-]{0,47}$/.test(id)
  */
 export function socialNeedDecayRate(profile){
   const sociability=deriveAxes(profile).sociability;
-  return Math.max(.04,Math.min(.075,.056+(sociability-.5)*.035));
+  return Math.max(.018,Math.min(.030,
+    NEED_DECAY_PER_MINUTE.social+(sociability-.5)*SOCIAL_DECAY_PERSONALITY_SPREAD));
 }
 
 /** Whitelist of successful, completed communication receipts. Neither an

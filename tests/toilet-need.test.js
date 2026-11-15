@@ -77,12 +77,12 @@ test('M4: invalid and malicious saved bladder scores are normalized, no reset of
 test('M4: decay is deterministic in game minutes, never while paused',()=>{
   const s=newGame(),value=s.needs.bladder;
   tick(s,20);
-  near(s.needs.bladder,value-20*.145);
+  near(s.needs.bladder,value-20*.046);
   s.paused=true;
   const snapshot=JSON.stringify(s);
   tick(s,500);
   assert.equal(JSON.stringify(s),snapshot);
-  s.paused=false;tick(s,1200);
+  s.paused=false;tick(s,2100);
   assert.equal(s.needs.bladder,0);
 });
 
@@ -170,12 +170,12 @@ test('M4: walking and early entry never restore bladder; gain starts only after 
   const before=s.needs.bladder;
   tick(s,4);
   assert.equal(s.action.phase,'walking');
-  near(s.needs.bladder,before-4*.145);
+  near(s.needs.bladder,before-4*.046);
   arrive(s);
   assert.equal(s.action.phase,'using');
   const t=ACTIONS.toilet.duration*TOILET_RELIEF_START;
   tick(s,t);
-  near(s.needs.bladder,before-(4+t)*.145);
+  near(s.needs.bladder,before-(4+t)*.046);
   const beforeRelief=s.needs.bladder;
   tick(s,3);
   assert.ok(s.needs.bladder>beforeRelief+5);

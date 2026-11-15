@@ -30,6 +30,7 @@ jobs:
           node --check src/model-cache.js
           node --check sw.js
           node --check src/simulation.js
+          node --check src/need-balance.js
           node --check src/navigation.js
           node --check src/psychology.js
           node --check src/mood-presentation.js
@@ -105,6 +106,7 @@ jobs:
           cp src/mood-action-policy.js site/src/
           cp src/social-need.js site/src/
           cp src/toilet-interaction.js site/src/
+          cp src/need-balance.js site/src/
           cp src/meshy-toilet-pose.js site/src/
       - name: Include optional Meshy character GLB when present
         run: |

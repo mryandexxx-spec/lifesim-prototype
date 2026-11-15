@@ -7,17 +7,19 @@ import {validBedSlot,BED_SLOTS} from './bed-layout.js';
 import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
 import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-interaction.js';
+import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','bladder']);
 export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
   bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
   fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
-  sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 0.96, location: [1.35, 0.52] },
+  sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
   toilet: { label: 'Сходить в туалет', need: 'bladder', duration: 26,
     benefitPerMinute: 2.7, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] }
 });
-const DECAY = { hunger: 0.12, energy: 0.085, hygiene: 0.068, fun: 0.094, bladder:0.145 };
+// Keep consumption rates in one independent balance contract, not duplicated
+// across simulation, social personality logic, the HUD or action handlers.
 export const BLADDER_LEGACY_DEFAULT=75;
 export const SAVE_KEY = 'lifesim.room01.v1';
 export const AUTONOMY_WAIT_SECONDS = 12; // Real active-time seconds; x3 never shortens the wait.
@@ -104,7 +106,7 @@ export function arrive(state) {
 export function tick(state, minutes) {
   if (state.paused || !Number.isFinite(minutes) || minutes <= 0) return;
   state.minutes += minutes;
-  for (const need of PHYSICAL_NEEDS) state.needs[need] = clamp(state.needs[need] - DECAY[need] * minutes);
+  for (const need of PHYSICAL_NEEDS) state.needs[need] = clamp(state.needs[need] - NEED_DECAY_PER_MINUTE[need] * minutes);
   // Social fulfilment changes only on a newly confirmed social receipt.
   const social=Number.isFinite(state.needs.social)?state.needs.social:SOCIAL_NEED_LEGACY_DEFAULT;
   state.needs.social=clamp(social-socialNeedDecayRate(state.personality)*minutes);
