@@ -1,7 +1,7 @@
 {
   "name": "lifesim-prototype",
   "private": true,
-  "version": "1.0.0-alpha.30",
+  "version": "1.0.0-alpha.31",
   "type": "module",
   "description": "Code-first PlayCanvas life simulation prototype. Run a local static HTTP server to preview.",
   "scripts": {
