@@ -5,7 +5,7 @@ import {newActionQueues,restoreActionQueues,pendingActions,enqueueAction,
   removeQueuedAction,queueHeads,dispatchActionQueues,MAX_ACTION_QUEUE,
   ACTION_QUEUE_TYPES,sanitizeQueueCommand} from '../src/action-queue.js';
 import {newHousehold,loadHousehold,chooseResidentAction,tickHousehold} from '../src/household.js';
-import {startSocial,arriveSocial,tickSocial,canStartSocial} from '../src/relationships.js';
+import {startSocial,arriveSocial,tickSocial,canStartSocial,autonomousSocialChoice} from '../src/relationships.js';
 import {arrive,ACTIONS,SAVE_KEY} from '../src/simulation.js';
 const ids=['nova','iris','riven','opal','ember'];
 const place={x:-.2,z:1.85};
@@ -258,4 +258,15 @@ test('iPhone UI has five natural categories, hidden debug and safe editable queu
   assert.ok(css.includes('.social-summary .dev-relationship'));
   assert.ok(workflow.includes('node --check src/action-queue.js'));
   assert.ok(workflow.includes('src/action-queue.js src/conversation-engine.js'));
+});
+test('autonomous social suggestions never preempt the manual queue of either participant',()=>{
+  const root=newHousehold();
+  root.minutes=900;
+  root.otherSim.minutes=900;
+  root.relationship.nextSocialAt=0;
+  root.needs.fun=20;
+  root.otherSim.needs.fun=20;
+  enqueueAction(root.actionQueues,'mira',obj('fridge'));
+  assert.equal(autonomousSocialChoice(root,'alex'),null);
+  assert.equal(autonomousSocialChoice(root,'mira'),null);
 });

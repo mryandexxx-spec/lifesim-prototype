@@ -239,3 +239,11 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 }
 @media(max-height:560px){#social-menu-panel{bottom:calc(env(safe-area-inset-bottom) + 225px);max-height:calc(100dvh - 245px);}
   .queue-panel{max-height:55dvh;}}
+
+/* Relationship stages are narrative labels; legacy numeric affinity stays in
+ * save data and the hidden diagnostic view, never a visible progression guide. */
+.social-summary #relationship-label{display:none;}
+@media(max-height:560px){
+  #social-menu-panel{bottom:calc(env(safe-area-inset-bottom) + 265px);
+    max-height:max(95px,calc(100dvh - 290px));}
+}
