@@ -17,6 +17,8 @@ import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect} from './furniture-cat
 import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
+import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
+  fixtureContactLayout} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
@@ -1147,7 +1149,9 @@ function boot() {
   const hitVolumes=[];
   const registerHitVolume=(id,kind,x,y,z,sx,sy,sz)=>{
     const pad=.035;
-    hitVolumes.push({kind,id,bounds:{
+    hitVolumes.push({kind,id,
+      fixtureType:decorDrawing?.origin.prefabId||null,
+      bounds:{
       min:{x:x-sx/2-pad,y:y-sy/2-pad,z:z-sz/2-pad},
       max:{x:x+sx/2+pad,y:y+sy/2+pad,z:z+sz/2+pad}
     }});
@@ -1184,13 +1188,14 @@ function boot() {
   box('shelf on left wall',-4.72,1.74,.15,.27,.1,1.2,M.paleWood);
   for (let i=0;i<3;i++) box('books',-4.69,1.91,-.25+i*.22,.21,.32,.13,[M.pink,M.cream,M.green][i]);
 
-  // Bed, blanket, headboard and pillows.
-  touchBox('bed','bed frame',BED_LAYOUT.centerX,BED_LAYOUT.frameY,BED_LAYOUT.centerZ,
+  // A physical bed is a single transform, including two separately reserved quilts.
+  const quilts={};
+  withDecor('bed',()=>{
+    touchBox('bed','bed frame',BED_LAYOUT.centerX,BED_LAYOUT.frameY,BED_LAYOUT.centerZ,
     2.42,BED_LAYOUT.frameHeight,2.52,M.wood);
   touchBox('bed','mattress',BED_LAYOUT.centerX,BED_LAYOUT.mattressY,BED_LAYOUT.centerZ,
     BED_LAYOUT.width,BED_LAYOUT.mattressHeight,BED_LAYOUT.depth,M.white);
   // Two separate quilts cover the two independent sleepers.
-  const quilts={};
   for(const [slot,color] of [['left',M.mint],['right',M.peach]]){
     const bx=BED_SLOTS[slot].x;
     quilts[slot]={
@@ -1201,6 +1206,7 @@ function boot() {
   touchBox('bed','bed headboard',-2.62,.82,-2.69,2.47,.95,.17,M.paleWood);
   touchBox('bed','pillow left',-3.15,.54,-2.18,.87,.19,.50,M.cream);
   touchBox('bed','pillow right',-2.10,.54,-2.18,.87,.19,.50,M.peach);
+  });
   withDecor('nightstand',()=>{
     box('side table',-4.23,.38,-3.35,.65,.64,.68,M.paleWood);
     cylinder('lamp base',-4.23,.76,-3.35,.22,.10,.22,M.white);
@@ -1208,20 +1214,25 @@ function boot() {
     cylinder('lamp shade',-4.23,1.17,-3.35,.45,.32,.45,M.yellow);
   });
 
-  // Kitchen zone with tall fridge, little counter and upper cupboards.
+  // The door pivot and shelf are children of the same moved fridge instance.
+  let fridgeFood,fridgeHinge;
+  withDecor('fridge',()=>{
   touchBox('fridge','fridge',3.43,.99,-2.85,1.12,1.98,1.14,M.cream);
   box('fridge shadow seam',3.43,1.49,-2.26,1.06,.035,.03,M.trim);
   box('fridge lower handle',3.01,.64,-2.20,.055,.27,.075,M.slate);
   // Shelf is in front of the fridge body but behind the closed door.
   box('fridge interior',3.43,1.46,-2.247,1.03,.85,.045,M.blue);
   box('fridge interior shelf',3.43,1.25,-2.18,1.02,.045,.11,M.cream);
-  const fridgeFood=ball('fridge portion on shelf',3.24,1.38,-2.22,.20,.18,.20,M.yellow);
+  fridgeFood=ball('fridge portion on shelf',3.24,1.38,-2.22,.20,.18,.20,M.yellow);
   fridgeFood.enabled=false;
   // A real right-side hinge opens away from the resident at left approach.
-  const fridgeHinge = new pc.Entity('Fridge door hinge'); app.root.addChild(fridgeHinge);
-  fridgeHinge.setPosition(FRIDGE_LAYOUT.hinge.x,FRIDGE_LAYOUT.hinge.y,FRIDGE_LAYOUT.hinge.z);
+  fridgeHinge = new pc.Entity('Fridge door hinge');
+  decorDrawing.node.addChild(fridgeHinge);
+  fridgeHinge.setLocalPosition(FRIDGE_LAYOUT.hinge.x-decorDrawing.origin.x,
+    FRIDGE_LAYOUT.hinge.y,FRIDGE_LAYOUT.hinge.z-decorDrawing.origin.z);
   box('fridge upper door',-.55,0,.055,FRIDGE_LAYOUT.doorWidth,.91,.08,M.cream,fridgeHinge);
   box('door handle',-.94,.07,.13,.05,.31,.055,M.slate,fridgeHinge);
+  });
   box('kitchen cabinet',1.68,.46,-3.31,2.20,.91,.89,M.paleWood);
   box('countertop',1.68,.95,-3.31,2.3,.11,1.01,M.cream);
   box('sink',1.04,1.017,-3.31,.66,.012,.43,M.slate);
@@ -1234,7 +1245,8 @@ function boot() {
   // Lounge with sofa, rug, coffee table and TV.
   box('living rug',1.24,.034,1.19,4.15,.015,3.1,M.cream);
   box('rug center',1.24,.045,1.19,3.84,.012,2.78,M.rug);
-  // Seat height and actor pose share the same dimensions.
+  // Complete seat and contact shell share the saved physical sofa instance.
+  withDecor('sofa',()=>{
   touchBox('sofa','sofa seat',SOFA_LAYOUT.x,SOFA_LAYOUT.seatCenterY,SOFA_LAYOUT.z,
     SOFA_LAYOUT.seatWidth,SOFA_LAYOUT.seatHeight,SOFA_LAYOUT.seatDepth,M.peach);
   touchBox('sofa','sofa back',SOFA_LAYOUT.x,SOFA_LAYOUT.backCenterY,SOFA_LAYOUT.backZ,
@@ -1247,6 +1259,7 @@ function boot() {
     .63,SOFA_LAYOUT.pillowHeight,.23,M.cream);
   touchBox('sofa','sofa pillow right',1.99,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
     .63,SOFA_LAYOUT.pillowHeight,.23,M.mint);
+  });
   // Leave a navigable front approach so residents do not cross the sofa arm.
   withDecor('table',()=>{
     // The blocker for ray-picking now follows the instance footprint below.
@@ -1261,7 +1274,9 @@ function boot() {
     box('tv stand',3.67,.80,.37,.35,.12,.28,M.black);
   });
 
-  // Shower corner: soft mint tiles and a simple visible frame.
+  // All shower pieces and the opaque privacy group follow ONE instance.
+  let showerPrivacy;
+  withDecor('shower',()=>{
   touchBox('shower','shower platform',-3.67,.12,2.50,1.85,.22,1.88,M.white);
   touchBox('shower','shower back',-4.72,1.48,2.55,.13,2.68,1.92,M.blue);
   touchBox('shower','shower bar',-2.72,1.31,3.38,.08,2.5,.08,M.slate);
@@ -1274,9 +1289,10 @@ function boot() {
   // One opaque texture is shared by 3 curved shell primitives (3 draw calls).
   // The full character rig is still hidden while privacy is active; this is
   // visual decoration, never a translucent renderer or a simulated censor.
-  const showerPrivacy=new pc.Entity('Floating mosaic shower privacy');
-  app.root.addChild(showerPrivacy);
-  showerPrivacy.setPosition(SHOWER_LAYOUT.interior.x,0,SHOWER_LAYOUT.interior.z);
+  showerPrivacy=new pc.Entity('Floating mosaic shower privacy');
+  decorDrawing.node.addChild(showerPrivacy);
+  showerPrivacy.setLocalPosition(SHOWER_LAYOUT.interior.x-decorDrawing.origin.x,
+    0,SHOWER_LAYOUT.interior.z-decorDrawing.origin.z);
   const mosaicMaterial=createPrivacyMosaicMaterial(pc,app.graphicsDevice);
   const veilWidth=SHOWER_LAYOUT.privacyWidth*.89;
   const veilDepth=SHOWER_LAYOUT.privacyDepth*.89;
@@ -1287,9 +1303,12 @@ function boot() {
   ball('shower mosaic base',0,.27,0,veilWidth,.30,veilDepth,
     mosaicMaterial,showerPrivacy);
   showerPrivacy.enabled=false;
+  });
 
   // M4: real ceramic toilet, own reachable front and opaque privacy.
-  // Each physical component registers its 3D AABB for UI3 camera ray picking.
+  // Each physical component registers its rotated 3D picking AABB.
+  let toiletPrivacy;
+  withDecor('toilet',()=>{
   touchBox('toilet','toilet porcelain pedestal',TOILET_LAYOUT.interior.x,.28,
     TOILET_LAYOUT.interior.z,.70,.51,.76,M.white);
   touchBox('toilet','toilet seat',TOILET_LAYOUT.interior.x,.52,
@@ -1300,9 +1319,10 @@ function boot() {
     TOILET_LAYOUT.interior.z+.36,.16,.045,.14,M.slate);
   cylinder('toilet ceramic opening',TOILET_LAYOUT.interior.x,.54,
     TOILET_LAYOUT.interior.z-.06,.50,.02,.47,M.blue);
-  const toiletPrivacy=new pc.Entity('Original opaque toilet privacy mosaic');
-  app.root.addChild(toiletPrivacy);
-  toiletPrivacy.setPosition(TOILET_LAYOUT.interior.x,0,TOILET_LAYOUT.interior.z);
+  toiletPrivacy=new pc.Entity('Original opaque toilet privacy mosaic');
+  decorDrawing.node.addChild(toiletPrivacy);
+  toiletPrivacy.setLocalPosition(TOILET_LAYOUT.interior.x-decorDrawing.origin.x,
+    0,TOILET_LAYOUT.interior.z-decorDrawing.origin.z);
   cylinder('toilet privacy shell',0,1.18,0,
     TOILET_LAYOUT.privacyWidth,1.98,TOILET_LAYOUT.privacyDepth,
     mosaicMaterial,toiletPrivacy);
@@ -1313,6 +1333,7 @@ function boot() {
     TOILET_LAYOUT.privacyWidth,.28,TOILET_LAYOUT.privacyDepth,
     mosaicMaterial,toiletPrivacy);
   toiletPrivacy.enabled=false;
+  });
 
   // Potted plant, decorations and an oversized welcoming mat.
   withDecor('plant',()=>{
@@ -1362,8 +1383,12 @@ function boot() {
   const reactionRigs={alex:alexRig,mira:miraRig};
   const moodOrbit=$('mood-orbit');
   let feedbackRoot=game;
-  const showerDrops = Array.from({length:9},(_,i)=>{
-    const drop=ball('water drop '+i,-4.47+i*.14,2.02,2.20+(i%3)*.12,.058,.10,.06,M.blue);
+  // Water drops are local to the physical shower, including all quarter turns.
+  const showerOrigin=ORIGINAL_FURNITURE.find(i=>i.prefabId==='shower');
+  const showerNode=decorNodes.get(showerOrigin.instanceId);
+  const showerDrops=Array.from({length:9},(_,i)=>{
+    const drop=ball('water drop '+i,-4.47+i*.14-showerOrigin.x,2.02,
+      2.20+(i%3)*.12-showerOrigin.z,.058,.10,.06,M.blue,showerNode);
     drop.enabled=false;return drop;
   });
   const ACTOR_POSES = {
@@ -1946,7 +1971,12 @@ function boot() {
         min:{x:r.minX,y:.28,z:r.minZ},max:{x:r.maxX,y:.48,z:r.maxZ}
       }}];
     }
-    return pickWorldRayTarget(near,far,[...residents,...hitVolumes,...blockers]);
+    const movedVolumes=hitVolumes.map(volume=>{
+      if(!volume.fixtureType)return volume;
+      return {...volume,bounds:furnitureBounds(game.world,volume.fixtureType,
+        volume.bounds)};
+    });
+    return pickWorldRayTarget(near,far,[...residents,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -2384,7 +2414,8 @@ function boot() {
       drop.enabled=waterOn;
       if(drop.enabled){
         const t=(effectTime*.8+i*.17)%1;
-        drop.setLocalPosition(-4.28+(i%5)*.22,2.13-t*1.8,3.25+(i%2)*.035);
+        drop.setLocalPosition(-4.28+(i%5)*.22-showerOrigin.x,2.13-t*1.8,
+          3.25+(i%2)*.035-showerOrigin.z);
       }
     }
     // An event is generated by the simulation only when the response happened.
@@ -2569,12 +2600,15 @@ function boot() {
       renderPlanPeek();
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.
       for(const [id,meta] of Object.entries(META)){
-        const p=camera.camera.worldToScreen(new pc.Vec3(...meta.anchor));
+        const placed=furniturePoint(game.world,id,
+          {x:meta.anchor[0],z:meta.anchor[2]});
+        const p=camera.camera.worldToScreen(new pc.Vec3(placed.x,meta.anchor[1],placed.z));
         const x=p.x;
         const y=p.y; // PlayCanvas worldToScreen already returns CSS pixels.
         const el=markers[id];
         el.style.left=x+'px';el.style.top=y+'px';
-        const pointInView = camera.camera.viewMatrix.transformPoint(new pc.Vec3(...meta.anchor));
+        const pointInView=camera.camera.viewMatrix.transformPoint(
+          new pc.Vec3(placed.x,meta.anchor[1],placed.z));
         el.hidden=pointInView.z>=0 || x<25 || x>canvas.clientWidth-30 || y<85 || y>canvas.clientHeight-116;
       }
     }
