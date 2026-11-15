@@ -1,39 +1,44 @@
 /** Headless navigation: room geometry in world X/Z coordinates, no PlayCanvas dependency. */
 import {FRIDGE_LAYOUT} from './fridge-interaction.js';
-import {TOILET_LAYOUT} from './toilet-interaction.js';
+import {newFurnitureWorld,furnitureObstacles} from './furniture-catalog.js';
 export const ROOM = Object.freeze({ minX: -4.62, maxX: 4.62, minZ: -3.96, maxZ: 3.98 });
 export const ACTOR_RADIUS = 0.26;
-export const FURNITURE = Object.freeze([
-  { id: 'bed', minX: -3.83, maxX: -1.41, minZ: -2.69, maxZ: -0.16 },
-  { id: 'nightstand', minX: -4.56, maxX: -3.90, minZ: -3.69, maxZ: -3.01 },
-  { id: 'counter', minX: 0.52, maxX: 2.87, minZ: -3.84, maxZ: -2.79 },
-  { id: 'fridge', minX: 2.86, maxX: 4.04, minZ: -3.49, maxZ: -2.26 },
-  { id: 'fridge-door-sweep', ...FRIDGE_LAYOUT.sweep },
-  { id: 'sofa', minX: -0.07, maxX: 2.78, minZ: 0.89, maxZ: 2.29 },
-  { id: 'table', minX: 0.59, maxX: 2.09, minZ: -0.65, maxZ: 0.13 },
-  { id: 'tv', minX: 3.43, maxX: 4.30, minZ: -0.49, maxZ: 1.18 },
-  { id: 'shower', minX: -4.65, maxX: -2.74, minZ: 1.54, maxZ: 3.49 },
-  { id: 'toilet', ...TOILET_LAYOUT.bounds },
-  { id: 'plant', minX: 3.83, maxX: 4.52, minZ: 2.78, maxZ: 3.66 }
-]);
+// Legacy export is generated from the same catalogue as the serializable layout.
+export const FURNITURE = Object.freeze(furnitureObstacles(newFurnitureWorld()));
+const layoutCache=new WeakMap();
+function furnitureData(layout){
+  return layout?.furniture?.instances?layout.furniture:layout?.instances?layout:null;
+}
+function obstaclesFor(layout){
+  const data=furnitureData(layout);
+  if(!data)return FURNITURE;
+  const hit=layoutCache.get(data);
+  if(hit&&hit.revision===data.revision)return hit.obstacles;
+  const obstacles=furnitureObstacles(data);
+  layoutCache.set(data,{revision:data.revision,obstacles,grid:null});
+  return obstacles;
+}
+function canWalk(x,z,obstacles){
+  if(!Number.isFinite(x)||!Number.isFinite(z))return false;
+  if(x<ROOM.minX||x>ROOM.maxX||z<ROOM.minZ||z>ROOM.maxZ)return false;
+  return !obstacles.some(rect=>x>=rect.minX-ACTOR_RADIUS&&x<=rect.maxX+ACTOR_RADIUS&&
+    z>=rect.minZ-ACTOR_RADIUS&&z<=rect.maxZ+ACTOR_RADIUS);
+}
+
 
 /** Obstacles include a walking clearance radius to protect the body. */
-export function isWalkable(x, z) {
-  if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
-  if (x < ROOM.minX || x > ROOM.maxX || z < ROOM.minZ || z > ROOM.maxZ) return false;
-  return !FURNITURE.some(rect =>
-    x >= rect.minX - ACTOR_RADIUS && x <= rect.maxX + ACTOR_RADIUS &&
-    z >= rect.minZ - ACTOR_RADIUS && z <= rect.maxZ + ACTOR_RADIUS);
+export function isWalkable(x,z,layout=null){
+  return canWalk(x,z,obstaclesFor(layout));
 }
 
 /** Conservative segment test; the walkable character never cuts through inflated furniture. */
-export function isClearLine(from, to) {
-  if (!isWalkable(from.x, from.z) || !isWalkable(to.x, to.z)) return false;
+export function isClearLine(from,to,layout=null){
+  if (!isWalkable(from.x, from.z,layout) || !isWalkable(to.x, to.z,layout)) return false;
   const dist = Math.hypot(to.x-from.x, to.z-from.z);
   const samples = Math.max(1, Math.ceil(dist / 0.075));
   for (let s = 1; s < samples; s++) {
     const t = s/samples;
-    if (!isWalkable(from.x + (to.x-from.x)*t, from.z + (to.z-from.z)*t)) return false;
+    if (!isWalkable(from.x + (to.x-from.x)*t, from.z + (to.z-from.z)*t,layout)) return false;
   }
   return true;
 }
@@ -51,7 +56,22 @@ for (let z=0; z<GRID.nz; z++) for (let x=0; x<GRID.nx; x++) {
   const p=gridPoint(x,z); gridWalkable[indexOf(x,z)] = isWalkable(p.x,p.z) ? 1 : 0;
 }
 const DELTAS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
-const nearestNode = point => {
+function gridFor(layout){
+  const data=furnitureData(layout);
+  if(!data)return gridWalkable;
+  const obstacles=obstaclesFor(data);
+  const entry=layoutCache.get(data);
+  if(entry.grid)return entry.grid;
+  const grid=new Uint8Array(GRID.nx*GRID.nz);
+  for(let z=0;z<GRID.nz;z++)for(let x=0;x<GRID.nx;x++){
+    const p=gridPoint(x,z);
+    grid[indexOf(x,z)]=canWalk(p.x,p.z,obstacles)?1:0;
+  }
+  entry.grid=grid;
+  return grid;
+}
+const nearestNode = (point,layout) => {
+  const gridWalkable=gridFor(layout);
   let best=-1, d=Infinity;
   for (let idx=0; idx<gridWalkable.length; idx++) {
     if (!gridWalkable[idx]) continue;
@@ -62,36 +82,37 @@ const nearestNode = point => {
 };
 
 /** Repair an old save position if it is inside a newly defined obstacle. */
-export function nearestWalkable(point) {
-  if (isWalkable(point.x,point.z)) return { x: point.x, z: point.z };
-  const index=nearestNode(point);
+export function nearestWalkable(point,layout=null) {
+  if (isWalkable(point.x,point.z,layout)) return { x: point.x, z: point.z };
+  const index=nearestNode(point,layout);
   return index<0 ? {x:0,z:0} : node(index);
 }
 
-function simplify(start, points) {
+function simplify(start, points,layout) {
   if (!points.length) return [];
   const route=[];
   let origin=start, i=0;
   while (i<points.length) {
     let furthest=i;
     for(let j=i; j<points.length; j++) {
-      if (isClearLine(origin,points[j])) furthest=j;
+      if (isClearLine(origin,points[j],layout)) furthest=j;
       else break;
     }
     // Some grid edges can be valid while the exact starting point is near a corner.
     // For those cases, use the next available waypoint rather than entering an obstacle.
-    if (!isClearLine(origin,points[furthest])) return null;
+    if (!isClearLine(origin,points[furthest],layout)) return null;
     route.push(points[furthest]); origin=points[furthest]; i=furthest+1;
   }
   return route;
 }
 
 /** Returns safe world waypoints (without the origin), or null when no route exists. */
-export function findPath(from, to) {
-  if (!isWalkable(to.x,to.z)) return null;
-  const start = nearestWalkable(from);
-  if (isClearLine(start,to)) return [to];
-  const initial=nearestNode(start), dest=nearestNode(to);
+export function findPath(from,to,layout=null){
+  const gridWalkable=gridFor(layout);
+  if(!isWalkable(to.x,to.z,layout))return null;
+  const start=nearestWalkable(from,layout);
+  if(isClearLine(start,to,layout))return [to];
+  const initial=nearestNode(start,layout), dest=nearestNode(to,layout);
   if (initial<0 || dest<0) return null;
   const count=GRID.nx*GRID.nz;
   const scores=new Float64Array(count).fill(Infinity), back=new Int32Array(count).fill(-1);
@@ -110,7 +131,7 @@ export function findPath(from, to) {
       points.reverse(); points.push(to);
       // Ensure link from precise start to first grid waypoint is collision-free.
       // Near-grid-boundary starts can use a nearby free node instead.
-      const route=simplify(start,points);
+      const route=simplify(start,points,layout);
       if(route) return route;
       return null;
     }
