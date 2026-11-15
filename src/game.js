@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
 import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
 import {pickWorldTarget} from './world-interactions.js';
+import {planPreview,planTaskIcon} from './plan-preview.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,dragCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
@@ -111,6 +112,7 @@ let socialContextVisible=false; // UI-only: no changes to the saved simulation.
 let socialMenuDisplayKey='';
 let queueVisible=false;
 let queueDisplayKey='';
+let planPeekKey='';
 let dispatchPlannedActions=()=>[];
 let debugTapCount=0;
 let debugTapAt=0;
@@ -391,7 +393,61 @@ function activeTaskLabel(id){
   const actor=getActor(game,id);
   return actor.action?ACTIONS[actor.action.id]?.label||'Занятие':null;
 }
+// A single, read-only status area opens the EXISTING full queue. It never
+// dispatches/removes commands and never mutates serialized simulation state.
+function renderPlanPeek(){
+  const residentId=game.selectedSim;
+  const actor=getActor(game,residentId);
+  let active=activeTaskLabel(residentId);
+  const social=game.socialAction;
+  const involved=social&&(social.initiator===residentId||social.partner===residentId);
+  const phase=involved?social.phase:actor.action?.phase;
+  if(active&&phase==='walking')active='Идёт · '+active;
+  else if(active&&phase==='using'&&!involved&&actor.action){
+    const duration=ACTIONS[actor.action.id]?.duration;
+    if(Number.isFinite(duration)&&duration>0)
+      active+=' · '+Math.min(100,Math.round(100*(actor.action.elapsed||0)/duration))+'%';
+  }
+  const plan=planPreview({
+    residentName:getActorName(residentId),
+    activeLabel:active,
+    pending:pendingActions(game.actionQueues,residentId),
+    taskName:task=>taskLabel({...task,residentId}),
+    paused:game.paused,
+    needsReply:dialogueNeedsDecision(game),
+    idleLabel:!game.autonomy.enabled?'Ждёт указаний':actor.event||'Свободное время'
+  });
+  const key=JSON.stringify([residentId,plan.heading,plan.upcoming,plan.more,queueVisible]);
+  if(key===planPeekKey)return;
+  planPeekKey=key;
+  $('status-text').textContent=plan.heading;
+  const list=$('plan-upcoming');list.replaceChildren();
+  for(const item of plan.upcoming){
+    const chip=document.createElement('span');chip.className='plan-chip';
+    const index=document.createElement('span');index.className='plan-chip-index';
+    index.textContent=item.index+'.';
+    const icon=document.createElement('span');icon.className='plan-chip-icon';
+    icon.textContent=planTaskIcon(item.type);
+    const label=document.createElement('span');label.className='plan-chip-label';
+    label.textContent=item.label;
+    chip.append(index,icon,label);list.append(chip);
+  }
+  if(plan.more){
+    const more=document.createElement('span');more.className='plan-more';
+    more.textContent='+'+plan.more;
+    list.append(more);
+  }
+  list.hidden=plan.upcoming.length===0;
+  const button=$('plan-peek');
+  button.setAttribute('aria-expanded',String(queueVisible));
+  button.setAttribute('aria-label',plan.accessible);
+}
+$('plan-peek').addEventListener('click',()=>{
+  queueVisible=!queueVisible;
+  renderQueuePanel(true);
+});
 function renderQueuePanel(force=true){
+  renderPlanPeek();
   const residentId=game.selectedSim;
   const pending=pendingActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
@@ -402,6 +458,7 @@ function renderQueuePanel(force=true){
   queueDisplayKey=key;
   $('queue-panel').hidden=!queueVisible;
   $('queue-toggle').setAttribute('aria-expanded',String(queueVisible));
+  $('plan-peek').setAttribute('aria-expanded',String(queueVisible));
   if(!queueVisible)return;
   $('queue-title').textContent='План: '+getActorName(residentId);
   const activeEl=$('queue-active');activeEl.replaceChildren();
@@ -1294,7 +1351,7 @@ function boot() {
   },{passive:false});
   canvas.addEventListener('contextmenu',event=>event.preventDefault());
 
-  let accumulator=0, uiTimer=0, autosaveTime=0, lastStatus='';
+  let accumulator=0, uiTimer=0, autosaveTime=0;
   const approach = (a,b,rate,dt) => a+(b-a)*(1-Math.exp(-rate*dt));
   const approachAngle=(a,b,rate,dt)=>a+((((b-a+540)%360)+360)%360-180)*(1-Math.exp(-rate*dt));
   app.on('update',dt=>{
@@ -1827,10 +1884,8 @@ function boot() {
       }
       renderPauseButton(); // Includes the mandatory dialogue hold, not just manual pause.
       $('speed-btn').textContent=game.speed+'×';
-      const status=game.paused?'Пауза':game.socialAction
-        ? (game.socialAction.phase==='walking'?'Идёт на встречу: ':'Общаются: ')+SOCIAL_ACTIONS[game.socialAction.kind].label.toLowerCase()
-        :!game.autonomy.enabled&&!current.action?selectedName()+' ждёт указаний':current.action?.phase==='walking'?'Идёт: '+ACTIONS[current.action.id].label.toLowerCase():current.action?.phase==='using'?ACTIONS[current.action.id].label+' · '+Math.min(100,Math.round(100*current.action.elapsed/ACTIONS[current.action.id].duration))+'%':current.event;
-      if(status!==lastStatus){$('status-text').textContent=status;lastStatus=status;}
+      // Live plan is now the single source of HUD status, not a second stale label.
+      renderPlanPeek();
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.
       for(const [id,meta] of Object.entries(META)){
         const p=camera.camera.worldToScreen(new pc.Vec3(...meta.anchor));
