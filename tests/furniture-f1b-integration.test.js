@@ -107,6 +107,8 @@ test('F1b busy fixture blocks editor relocation and game state retains queue/old
   assert.match(scene,/if\(Object\.values\(showerStates\)\.some\(s=>s\.active\)\)/);
   assert.match(scene,/if\(Object\.values\(toiletStates\)\.some\(s=>s\.active\)\)/);
   assert.match(scene,/if\(fridgeOpen>\.001\|\|Object\.values\(fridgeLeaving\)\.some\(Boolean\)\)/);
+  for(const key of ['bed','sofa','fridge','shower','toilet'])
+    assert.ok(scene.includes("lockPrefab('"+key+"')"),key);
 });
 test('F1b active visual timelines use transformed resident contact not mutable hardcoded constants',()=>{
   for(const phrase of [

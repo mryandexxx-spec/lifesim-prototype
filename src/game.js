@@ -1681,19 +1681,25 @@ function boot() {
   furnitureGhost.enabled=false;
   const lockedFurnitureIds=()=>{
     const busy=new Set();
+    const lockPrefab=prefabId=>{
+      // Conservative transient lock over all instances of this prefab:
+      // future F2 can add duplicates without original home-*-1 hardcodes.
+      for(const item of game.world.furniture.instances)
+        if(item.prefabId===prefabId&&item.location==='home')busy.add(item.instanceId);
+    };
     // A finished need action may still have a physical stand-up, dressing,
     // masking or fridge-door-close animation. F1b forbids relocating those
     // assemblies until all residents are visually clear of the fixture.
     if(Object.values(bedStates).some(s=>s.progress>0))
-      busy.add('home-bed-1');
+      lockPrefab('bed');
     if(Object.values(sofaStates).some(s=>s.progress>0))
-      busy.add('home-sofa-1');
+      lockPrefab('sofa');
     if(Object.values(showerStates).some(s=>s.active))
-      busy.add('home-shower-1');
+      lockPrefab('shower');
     if(Object.values(toiletStates).some(s=>s.active))
-      busy.add('home-toilet-1');
+      lockPrefab('toilet');
     if(fridgeOpen>.001||Object.values(fridgeLeaving).some(Boolean))
-      busy.add('home-fridge-1');
+      lockPrefab('fridge');
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
