@@ -734,3 +734,68 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   #dashboard[data-collapsed="true"] .mood-overview{grid-column:2;grid-row:2;padding-right:0;}
   #hud-toggle{top:-18px;height:40px;min-height:40px;}
 }
+
+
+/* Furniture F1: touch-first mobile edit mode, isolated from life simulation HUD. */
+.control-tray .furnish-toggle{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+  min-width:52px;height:52px;font-size:22px;line-height:1.1;color:#27634e;background:#e4f3e8;border-color:#c8ddcf;}
+.control-tray .furnish-toggle small{font-size:10px;letter-spacing:.5px;font-weight:850;}
+.control-tray .furnish-toggle[aria-pressed="true"]{background:#397c60;border-color:#397c60;color:white;}
+.app-shell[data-furnish-mode="true"] #dashboard,
+.app-shell[data-furnish-mode="true"] #hotspots,
+.app-shell[data-furnish-mode="true"] #plan-peek,
+.app-shell[data-furnish-mode="true"] #social-context,
+.app-shell[data-furnish-mode="true"] #reaction-layer,
+.app-shell[data-furnish-mode="true"] #mood-orbit,
+.app-shell[data-furnish-mode="true"] #hint,
+.app-shell[data-furnish-mode="true"] #action-sheet,
+.app-shell[data-furnish-mode="true"] #mind-panel,
+.app-shell[data-furnish-mode="true"] #insight-panel,
+.app-shell[data-furnish-mode="true"] #view-panel,
+.app-shell[data-furnish-mode="true"] #queue-panel,
+.app-shell[data-furnish-mode="true"] #conversation-panel,
+.app-shell[data-furnish-mode="true"] #shared-panel,
+.app-shell[data-furnish-mode="true"] #branch-panel,
+.app-shell[data-furnish-mode="true"] #tour-panel{display:none!important;}
+.app-shell[data-furnish-mode="true"] #pause-btn,
+.app-shell[data-furnish-mode="true"] #speed-btn,
+.app-shell[data-furnish-mode="true"] #auto-btn,
+.app-shell[data-furnish-mode="true"] #view-toggle,
+.app-shell[data-furnish-mode="true"] #mesh-model-btn,
+.app-shell[data-furnish-mode="true"] #queue-toggle{visibility:hidden;pointer-events:none;}
+.furniture-editor{position:absolute;z-index:19;bottom:0;left:0;right:0;
+  padding:12px max(14px,env(safe-area-inset-right)) max(13px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+  border-radius:22px 22px 0 0;background:#fffff9f5;border:1px solid #fff;
+  box-shadow:0 -9px 33px #1c483c35;backdrop-filter:blur(19px);-webkit-backdrop-filter:blur(19px);
+  display:flex;flex-direction:column;gap:8px;max-height:min(54dvh,340px);overflow:auto;overscroll-behavior:contain;}
+.furniture-editor[hidden]{display:none!important;}
+.furnish-header{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.furnish-header small{font-size:10px;color:#54816a;font-weight:800;letter-spacing:.55px;}
+.furnish-header h2{font-size:19px;line-height:1.2;color:#26593f;margin:1px 0 0;}
+.furnish-header button{min-width:105px;min-height:44px;border:0;border-radius:12px;background:#2c7d5d;color:#fff;font-size:13px;font-weight:850;}
+.furniture-editor p{margin:0;color:#476454;line-height:1.35;font-size:12px;}
+.furnish-items{display:flex;align-items:center;gap:7px;overflow:auto;flex-shrink:0;padding:2px 1px 6px;scrollbar-width:thin;}
+.furnish-items button{min-height:44px;flex:none;max-width:152px;border:1px solid #c8dfcc;
+ border-radius:12px;background:#f3f9ef;color:#3c6a4e;font-weight:780;padding:7px 11px;font-size:12px;}
+.furnish-items button[aria-pressed="true"]{background:#327d61;color:#fff;border-color:#327d61;}
+.furnish-commands{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.furnish-commands button{min-width:44px;min-height:44px;padding:7px 10px;border:1px solid #d0e0d0;
+ border-radius:12px;background:#f7faf2;color:#315c45;font-weight:850;font-size:18px;}
+.furnish-commands .furnish-main{font-size:12px;background:#e1eee2;}
+#furnish-undo,#furnish-redo{font-size:12px;}
+.furnish-commands button:disabled{opacity:.35;}
+.furniture-editor .furnish-feedback{font-size:11px;color:#4a745d;min-height:17px;}
+.furniture-editor .furnish-feedback[data-invalid="true"]{color:#aa4644;font-weight:750;}
+.furniture-editor button:focus-visible{outline:3px solid #237851;outline-offset:2px;}
+@media(max-width:370px){
+  .furniture-editor{gap:6px;padding-left:10px;padding-right:10px;}
+  .furnish-commands{gap:4px;}
+  .furnish-commands button{padding:5px 8px;}
+}
+@media(max-height:560px) and (orientation:landscape){
+  .furniture-editor{max-height:min(53dvh,235px);gap:4px;padding:6px max(15px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(15px,env(safe-area-inset-left));}
+  .furnish-header h2{font-size:15px;}.furnish-header button{min-height:38px;}
+  .furniture-editor #furnish-tip{display:none;}
+  .furnish-items button{min-height:37px;}
+  .furnish-commands button{min-height:38px;min-width:38px;}
+}

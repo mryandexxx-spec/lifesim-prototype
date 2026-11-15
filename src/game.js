@@ -13,6 +13,10 @@ import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.j
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
+import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect} from './furniture-catalog.js';
+import {proposeFurnitureMove} from './furniture-layout.js';
+import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
+  snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
@@ -25,7 +29,7 @@ import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} fr
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
   CONVERSATION_MAX_TURNS} from './conversation-engine.js';
-import { WISHES, MEMORY_TEXT } from './psychology.js';
+import { WISHES, MEMORY_TEXT, refreshMind } from './psychology.js';
 import {getPerspective,latestSentiments} from './social-perspective.js';
 import {visibleEmotions} from './emotion-engine.js';
 import {consumeSocialReactions,clearSocialReactions} from './social-feedback.js';
@@ -203,6 +207,7 @@ const META = {
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] }
 };
 
+let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
 let selected = null;
 let beginAction = () => false;
 let beginSocial = () => false;
@@ -315,7 +320,7 @@ function renderInsightPanel(force=true){
     const detail=document.createElement('small');detail.textContent=item.detail;
     content.append(title,detail);card.append(glyph,content);list.append(card);
   }
-  // Keep real room influences distinct from needs and canonical memories.
+  // M5 ambient causes are calculated from actual F1-layout instances.
   const ambient=$('insight-environment');
   ambient.replaceChildren();ambient.hidden=!info.environment?.length;
   for(const cause of info.environment||[]){
@@ -982,19 +987,21 @@ renderQueuePanel();
 renderSocialContext();
 function renderPauseButton(){
   const blocked=dialogueNeedsDecision(game);
-  const paused=game.paused||blocked;
+  const paused=game.paused||blocked||furnishMode;
   $('pause-icon').textContent=paused?'▶':'Ⅱ';
   $('pause-btn').setAttribute('aria-label',blocked
     ?'Выбери реплику: игровое время остановлено'
-    :paused?'Продолжить':'Пауза');
+    :furnishMode?'Обстановка: игровое время остановлено'
+      :paused?'Продолжить':'Пауза');
 }
 $('pause-btn').addEventListener('click', () => {
-  if(dialogueNeedsDecision(game))return;
+  if(dialogueNeedsDecision(game)||furnishMode)return;
   game.paused = !game.paused;
   renderPauseButton();
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
 });
 $('speed-btn').addEventListener('click', () => {
+  if(furnishMode)return;
   game.speed = game.speed === 1 ? 3 : 1;
   $('speed-btn').textContent = `${game.speed}×`;
   toast(game.speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
@@ -1008,6 +1015,7 @@ function updateAutoButton() {
   $('auto-state').textContent = enabled ? 'ВКЛ' : 'ВЫКЛ';
 }
 $('auto-btn').addEventListener('click', () => {
+  if(furnishMode)return;
   const enabled = setHouseholdAutonomy(game, !game.autonomy.enabled);
   restartAutonomyWait();
   if (enabled) game.event = 'Свободное время';
@@ -1094,12 +1102,40 @@ function boot() {
     white: mat('#fffdf7'), black: mat('#303c3a'), tan: mat('#be9d86'), blue: mat('#c5dbdd'), yellow: mat('#f7d68d'),
     skin: mat('#c88d6e'), hair: mat('#47382f'), shirt: mat('#4b967d'), trousers: mat('#566675'), rug: mat('#d6b8a5')
   };
+  const decorNodes=new Map();
+  let decorDrawing=null;
+  const withDecor=(prefabId,render)=>{
+    const origin=ORIGINAL_FURNITURE.find(i=>i.prefabId===prefabId);
+    const current=game.world.furniture.instances.find(i=>i.instanceId===origin.instanceId)||origin;
+    const node=new pc.Entity('F1 furniture / '+origin.instanceId);
+    app.root.addChild(node);
+    node.setPosition(current.x,0,current.z);
+    node.setEulerAngles(0,-current.yaw,0);
+    decorNodes.set(origin.instanceId,node);
+    const previous=decorDrawing;
+    decorDrawing={origin,node};
+    try{render();}finally{decorDrawing=previous;}
+  };
+  const updateDecorNodes=(previewId=null,previewPose=null)=>{
+    for(const [instanceId,node] of decorNodes){
+      const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
+      if(!item)continue;
+      const pose=instanceId===previewId&&previewPose?previewPose:item;
+      node.setPosition(pose.x,0,pose.z);
+      // PlayCanvas Y rotation has opposite XZ convention to rotateLocal.
+      node.setEulerAngles(0,-pose.yaw,0);
+    }
+  };
   const primitive = (type,name,x,y,z,sx,sy,sz,material,parent=app.root) => {
     const entity = new pc.Entity(name);
     entity.addComponent('render',{ type, material });
-    entity.setLocalPosition(x,y,z);
+    // Authored world-space geometry is converted once to a stable prefab-local
+    // scene transform. Existing animation roots remain unchanged and fixed.
+    const grouped=decorDrawing&&parent===app.root;
+    entity.setLocalPosition(grouped?x-decorDrawing.origin.x:x,y,
+      grouped?z-decorDrawing.origin.z:z);
     entity.setLocalScale(sx,sy,sz);
-    parent.addChild(entity);
+    (grouped?decorDrawing.node:parent).addChild(entity);
     return entity;
   };
   const box = (...args) => primitive('box', ...args);
@@ -1165,10 +1201,12 @@ function boot() {
   touchBox('bed','bed headboard',-2.62,.82,-2.69,2.47,.95,.17,M.paleWood);
   touchBox('bed','pillow left',-3.15,.54,-2.18,.87,.19,.50,M.cream);
   touchBox('bed','pillow right',-2.10,.54,-2.18,.87,.19,.50,M.peach);
-  box('side table',-4.23,.38,-3.35,.65,.64,.68,M.paleWood);
-  cylinder('lamp base',-4.23,.76,-3.35,.22,.10,.22,M.white);
-  cylinder('lamp stem',-4.23,.94,-3.35,.055,.32,.055,M.slate);
-  cylinder('lamp shade',-4.23,1.17,-3.35,.45,.32,.45,M.yellow);
+  withDecor('nightstand',()=>{
+    box('side table',-4.23,.38,-3.35,.65,.64,.68,M.paleWood);
+    cylinder('lamp base',-4.23,.76,-3.35,.22,.10,.22,M.white);
+    cylinder('lamp stem',-4.23,.94,-3.35,.055,.32,.055,M.slate);
+    cylinder('lamp shade',-4.23,1.17,-3.35,.45,.32,.45,M.yellow);
+  });
 
   // Kitchen zone with tall fridge, little counter and upper cupboards.
   touchBox('fridge','fridge',3.43,.99,-2.85,1.12,1.98,1.14,M.cream);
@@ -1210,13 +1248,18 @@ function boot() {
   touchBox('sofa','sofa pillow right',1.99,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
     .63,SOFA_LAYOUT.pillowHeight,.23,M.mint);
   // Leave a navigable front approach so residents do not cross the sofa arm.
-  blockerBox('coffee table top',1.34,.40,-.26,1.47,.12,.73,M.paleWood);
-  for(let x of [.74,1.94]) for(let z of [-.53,.01])
-    cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
-  box('tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
-  box('tv screen',3.52,1.35,.36,.16,1.07,1.62,M.dark);
-  box('tv glass',3.42,1.35,.36,.045,.89,1.44,M.slate);
-  box('tv stand',3.67,.80,.37,.35,.12,.28,M.black);
+  withDecor('table',()=>{
+    // The blocker for ray-picking now follows the instance footprint below.
+    box('coffee table top',1.34,.40,-.26,1.47,.12,.73,M.paleWood);
+    for(let x of [.74,1.94]) for(let z of [-.53,.01])
+      cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
+  });
+  withDecor('tv',()=>{
+    box('tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
+    box('tv screen',3.52,1.35,.36,.16,1.07,1.62,M.dark);
+    box('tv glass',3.42,1.35,.36,.045,.89,1.44,M.slate);
+    box('tv stand',3.67,.80,.37,.35,.12,.28,M.black);
+  });
 
   // Shower corner: soft mint tiles and a simple visible frame.
   touchBox('shower','shower platform',-3.67,.12,2.50,1.85,.22,1.88,M.white);
@@ -1272,11 +1315,13 @@ function boot() {
   toiletPrivacy.enabled=false;
 
   // Potted plant, decorations and an oversized welcoming mat.
-  cylinder('plant pot',4.19,.30,3.22,.58,.63,.58,M.rust);
-  cylinder('plant stem',4.19,.78,3.22,.10,.70,.10,M.darkGreen);
-  ball('leaf crown',4.20,1.27,3.2,1.02,.94,.91,M.leaf);
-  ball('plant leaf',3.93,1.10,3.08,.62,.63,.6,M.leaf2);
-  ball('plant leaf',4.45,1.38,3.42,.65,.74,.51,M.green);
+  withDecor('plant',()=>{
+    cylinder('plant pot',4.19,.30,3.22,.58,.63,.58,M.rust);
+    cylinder('plant stem',4.19,.78,3.22,.10,.70,.10,M.darkGreen);
+    ball('leaf crown',4.20,1.27,3.2,1.02,.94,.91,M.leaf);
+    ball('plant leaf',3.93,1.10,3.08,.62,.63,.6,M.leaf2);
+    ball('plant leaf',4.45,1.38,3.42,.65,.74,.51,M.green);
+  });
   box('entry mat',-.65,.042,3.45,1.45,.012,.60,M.mint);
 
   // Original reusable 0.5a rigs. Keep all existing motion/interaction pivot references.
@@ -1525,6 +1570,7 @@ function boot() {
     meshyMira.reset();
     game.position=nearestWalkable(game.position,game.world);
     game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
+    updateDecorNodes();
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
     showerPrivacy.enabled=false;
@@ -1590,15 +1636,278 @@ function boot() {
   // A second pointer disqualifies the whole touch until BOTH are released.
   const cameraGesture=createCameraGestureSession();
   const gesturePoint=e=>({id:e.pointerId,x:e.clientX,y:e.clientY});
+  // F1 edit mode: UI state is ephemeral; only confirmed domain transactions
+  // change the optional v1 world.furniture save extension. No action is consumed.
+  let editSession=null,editSelectedId=null,editDrag=null;
+  const ghostValid=mat('#3b9c73',{opacity:.23});
+  const ghostInvalid=mat('#b84d55',{opacity:.26});
+  const furnitureGhost=box('F1 placement preview',0,.075,0,.1,.038,.1,ghostValid);
+  furnitureGhost.enabled=false;
+  const lockedFurnitureIds=()=>{
+    const busy=new Set();
+    for(const id of HOUSEHOLD_IDS){
+      const actor=getActor(game,id);
+      if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
+      for(const pending of pendingActions(game.actionQueues,id))
+        if(pending.type==='object'&&pending.targetInstanceId)
+          busy.add(pending.targetInstanceId);
+    }
+    return [...busy];
+  };
+  const editorContext=()=>({lockedInstanceIds:lockedFurnitureIds(),
+    residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)});
+  const editorLabel=instanceId=>{
+    const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
+    return item?FURNITURE_CATALOG[item.prefabId].name:'Предмет';
+  };
+  const editorMessage=(reason)=>{
+    const messages={
+      'fixed-or-missing':'Предмет закреплён: его анимации и точки взаимодействия пока нельзя безопасно передвигать',
+      reserved:'Предмет занят или уже указан в очереди действий',
+      'room-bounds':'Слишком близко к стене или за пределами комнаты',
+      collision:'Здесь уже стоит другая мебель',
+      'resident-blocked':'Здесь стоит житель — перемести предмет в другое место',
+      'unreachable-bed':'После переноса к кровати нельзя подойти',
+      'unreachable-fridge':'После переноса нельзя добраться до холодильника',
+      'unreachable-shower':'После переноса нельзя добраться до душа',
+      'unreachable-toilet':'После переноса нельзя добраться до туалета',
+      'unreachable-sofa':'После переноса нельзя добраться до дивана',
+      'invalid-pose':'Это положение невозможно', 'unchanged':'Положение не изменилось',
+      'empty-history':'Больше нечего отменять или повторять'
+    };
+    return messages[reason]||'Не удалось разместить мебель безопасно';
+  };
+  const editorFeedback=(message,invalid=false)=>{
+    const element=$('furnish-feedback');
+    element.textContent=message;
+    element.dataset.invalid=String(invalid);
+  };
+  const editorItem=id=>game.world.furniture.instances.find(i=>i.instanceId===id);
+  const showGhost=(instanceId,pose=null,valid=true)=>{
+    const item=editorItem(instanceId);
+    if(!item||!canMoveFurniture(item)){furnitureGhost.enabled=false;return;}
+    const chosen=pose||item;
+    const rect=instanceRect(chosen,FURNITURE_CATALOG[item.prefabId].footprint);
+    furnitureGhost.setPosition((rect.minX+rect.maxX)/2,.075,
+      (rect.minZ+rect.maxZ)/2);
+    furnitureGhost.setLocalScale(Math.max(.1,rect.maxX-rect.minX),.038,
+      Math.max(.1,rect.maxZ-rect.minZ));
+    furnitureGhost.render.material=valid?ghostValid:ghostInvalid;
+    furnitureGhost.enabled=furnishMode;
+  };
+  const renderFurnitureSelection=()=>{
+    for(const button of $('furnish-items').querySelectorAll('button'))
+      button.setAttribute('aria-pressed',String(button.dataset.instanceId===editSelectedId));
+    const item=editorItem(editSelectedId);
+    const enabled=furnishMode&&canMoveFurniture(item);
+    for(const id of ['left','right','up','down','rotate'])
+      $('furnish-'+id).disabled=!enabled;
+    const history=editSession?.state();
+    $('furnish-undo').disabled=!furnishMode||!history?.canUndo;
+    $('furnish-redo').disabled=!furnishMode||!history?.canRedo;
+    $('furnish-title').textContent=item?'Обстановка · '+editorLabel(item.instanceId):'Обстановка';
+    showGhost(editSelectedId);
+  };
+  const chooseFurniture=id=>{
+    const item=editorItem(id);
+    editSelectedId=item?.instanceId||null;
+    renderFurnitureSelection();
+    if(item&&!canMoveFurniture(item))
+      editorFeedback(editorMessage('fixed-or-missing'),true);
+    else if(item)
+      editorFeedback(editorLabel(id)+': перетащи по полу или используй стрелки и поворот');
+    else editorFeedback('Выбери мебель в комнате или из списка');
+  };
+  for(const type of F1_MOVEABLE_PREFABS){
+    const item=game.world.furniture.instances.find(i=>i.prefabId===type);
+    if(!item)continue;
+    const button=document.createElement('button');
+    button.type='button';
+    button.dataset.instanceId=item.instanceId;
+    button.textContent=FURNITURE_CATALOG[type].name;
+    button.setAttribute('aria-pressed','false');
+    button.addEventListener('click',()=>chooseFurniture(item.instanceId));
+    $('furnish-items').append(button);
+  }
+  const commitFurniture=(instanceId,pose)=>{
+    if(!editSession||!furnishMode)return false;
+    const result=editSession.commit(instanceId,pose,editorContext());
+    if(!result.ok){
+      editorFeedback(editorMessage(result.reason),true);
+      updateDecorNodes();renderFurnitureSelection();return false;
+    }
+    game.world.furniture=result.world;
+    // M5 is causal: moving an instance recalculates both residents' live mood.
+    refreshMind(game,game.world);
+    refreshMind(game.otherSim,game.world);
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    updateDecorNodes();
+    renderFurnitureSelection();
+    editorFeedback(editorLabel(instanceId)+' переставлен · изменения сохранены');
+    save(true);
+    return true;
+  };
+  const editorHistory=type=>{
+    if(!editSession||!furnishMode)return;
+    const result=type==='undo'?editSession.undo():editSession.redo();
+    if(!result.ok){editorFeedback(editorMessage(result.reason),true);return;}
+    game.world.furniture=result.world;
+    // M5 is causal: moving an instance recalculates both residents' live mood.
+    refreshMind(game,game.world);
+    refreshMind(game.otherSim,game.world);
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    updateDecorNodes();
+    renderFurnitureSelection();
+    editorFeedback(type==='undo'?'Перемещение отменено':'Перемещение восстановлено');
+    save(true);
+  };
+  $('furnish-undo').addEventListener('click',()=>editorHistory('undo'));
+  $('furnish-redo').addEventListener('click',()=>editorHistory('redo'));
+  const editorStep=(dx,dz,dyaw=0)=>{
+    if(!furnishMode||!editSelectedId)return;
+    const item=editorItem(editSelectedId);
+    if(!canMoveFurniture(item))return;
+    const pose={x:Math.round((item.x+dx)*1000)/1000,
+      z:Math.round((item.z+dz)*1000)/1000,
+      yaw:(item.yaw+dyaw+360)%360};
+    commitFurniture(editSelectedId,pose);
+  };
+  $('furnish-left').addEventListener('click',()=>editorStep(-.25,0));
+  $('furnish-right').addEventListener('click',()=>editorStep(.25,0));
+  $('furnish-up').addEventListener('click',()=>editorStep(0,-.25));
+  $('furnish-down').addEventListener('click',()=>editorStep(0,.25));
+  $('furnish-rotate').addEventListener('click',()=>editorStep(0,0,90));
+  const exitFurniture=()=>{
+    if(!furnishMode)return;
+    editDrag=null;furnishMode=false;editSelectedId=null;editSession=null;
+    furnitureGhost.enabled=false;
+    updateDecorNodes();
+    document.querySelector('.app-shell').dataset.furnishMode='false';
+    $('furniture-editor').hidden=true;
+    $('furnish-toggle').setAttribute('aria-pressed','false');
+    $('furnish-toggle').setAttribute('aria-label','Войти в режим обстановки');
+    // Never mutate manual game.paused. Resume only if it was unpaused before.
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    renderPauseButton();renderFurnitureSelection();updateItemLabels();
+    save(true);
+  };
+  const enterFurniture=()=>{
+    if(furnishMode)return;
+    if(dialogueNeedsDecision(game)){
+      toast('Сначала выбери ответ или заверши разговор');return;
+    }
+    editSession=createFurnitureEditor(game.world.furniture);
+    furnishMode=true;
+    document.querySelector('.app-shell').dataset.furnishMode='true';
+    $('furniture-editor').hidden=false;
+    $('furnish-toggle').setAttribute('aria-pressed','true');
+    $('furnish-toggle').setAttribute('aria-label','Выйти из режима обстановки');
+    closeTour();closeMindPanel();closeInsightPanel();closeSocialContext();
+    select(null);setViewOpen(false);
+    conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
+    socialMenuCategory=null;queueVisible=false;
+    renderQueuePanel(true);renderSocialMenu();renderConversationPanel();
+    renderSharedPanel();renderBranchPanel();
+    chooseFurniture(null);
+    renderPauseButton();
+    editorFeedback('Время остановлено. Выбери телевизор, столик, растение или тумбочку.');
+  };
+  $('furnish-toggle').addEventListener('click',()=>furnishMode?exitFurniture():enterFurniture());
+  $('furnish-exit').addEventListener('click',exitFurniture);
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&furnishMode){event.preventDefault();exitFurniture();}
+  },true);
+  const furnitureRay=(pos)=>{
+    const rect=canvas.getBoundingClientRect();
+    const x=pos.x-rect.left,y=pos.y-rect.top;
+    return {near:camera.camera.screenToWorld(x,y,camera.camera.nearClip),
+      far:camera.camera.screenToWorld(x,y,camera.camera.farClip)};
+  };
+  const editorFloorAt=pos=>{
+    const {near,far}=furnitureRay(pos);
+    return furnitureFloorPoint(near,far);
+  };
+  const editorFurnitureAt=pos=>{
+    const {near,far}=furnitureRay(pos);
+    const boxes=game.world.furniture.instances.filter(item=>item.location==='home')
+      .map(item=>{
+        const rect=instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint);
+        const height={table:.63,nightstand:1.49,tv:2.0,plant:1.87,
+          bed:1.40,counter:2.50,fridge:2.2,sofa:1.3,shower:2.75,toilet:1.45}[item.prefabId]||2;
+        return {kind:'object',id:item.instanceId,bounds:{
+          min:{x:rect.minX,y:0,z:rect.minZ},
+          max:{x:rect.maxX,y:height,z:rect.maxZ}
+        }};
+      });
+    return pickWorldRayTarget(near,far,boxes)?.id||null;
+  };
+  const cancelEditorDrag=()=>{
+    if(!editDrag)return;
+    editDrag=null;updateDecorNodes();renderFurnitureSelection();
+  };
+  const startEditorDrag=event=>{
+    if(!furnishMode)return false;
+    if(editDrag){cancelEditorDrag();return true;}
+    const id=editorFurnitureAt(gesturePoint(event));
+    if(!id)return false; // Unoccupied floor continues to orbit/pan as usual.
+    chooseFurniture(id);
+    const item=editorItem(id);
+    if(!canMoveFurniture(item))return true;
+    const floor=editorFloorAt(gesturePoint(event));
+    if(!floor)return true;
+    editDrag={pointerId:event.pointerId,instanceId:id,
+      offsetX:item.x-floor.x,offsetZ:item.z-floor.z,
+      pose:{x:item.x,z:item.z,yaw:item.yaw},lastCheck:0,valid:true};
+    return true;
+  };
+  const moveEditorDrag=event=>{
+    if(!editDrag||editDrag.pointerId!==event.pointerId)return false;
+    const pt=editorFloorAt(gesturePoint(event));
+    if(!pt)return true;
+    const pose={x:snapFurnitureCoordinate(pt.x+editDrag.offsetX),
+      z:snapFurnitureCoordinate(pt.z+editDrag.offsetZ),yaw:editDrag.pose.yaw};
+    if(pose.x===editDrag.pose.x&&pose.z===editDrag.pose.z)return true;
+    editDrag.pose=pose;
+    // Full A* validation is expensive on iPhone: only compute when the
+    // snapped cell changes and not more than ten checks per second.
+    if(performance.now()-editDrag.lastCheck<95){
+      updateDecorNodes(editDrag.instanceId,pose);
+      showGhost(editDrag.instanceId,pose,true);
+      return true;
+    }
+    editDrag.lastCheck=performance.now();
+    const candidate=proposeFurnitureMove(game.world.furniture,editDrag.instanceId,pose,editorContext());
+    editDrag.valid=candidate.ok;
+    updateDecorNodes(editDrag.instanceId,pose);
+    showGhost(editDrag.instanceId,pose,candidate.ok);
+    editorFeedback(candidate.ok?'Отпусти, чтобы поставить предмет сюда':
+      editorMessage(candidate.reason),!candidate.ok);
+    return true;
+  };
+  const endEditorDrag=event=>{
+    if(!editDrag||editDrag.pointerId!==event.pointerId)return false;
+    const {instanceId,pose}=editDrag;
+    editDrag=null;
+    const item=editorItem(instanceId);
+    if(item&&(item.x!==pose.x||item.z!==pose.z))
+      commitFurniture(instanceId,pose);
+    else{updateDecorNodes();renderFurnitureSelection();}
+    return true;
+  };
   canvas.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse'&&event.button!==0)return;
     if(dialogueNeedsDecision(game))return;
     if(event.cancelable)event.preventDefault();
     try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
+    if(furnishMode&&startEditorDrag(event))return;
     cameraGesture.begin(gesturePoint(event),performance.now());
   });
   // Global listeners survive canvas leaving the viewport on iOS Safari.
   window.addEventListener('pointermove',event=>{
+    if(furnishMode&&editDrag){
+      if(event.cancelable)event.preventDefault();
+      moveEditorDrag(event);return;
+    }
     if(!cameraGesture.count())return;
     if(dialogueNeedsDecision(game)){cameraGesture.clear();return;}
     const result=cameraGesture.move(gesturePoint(event),view,
@@ -1628,7 +1937,16 @@ function boot() {
         max:{x:p.x+half,y:p.y+2.26,z:p.z+half}
       }});
     }
-    return pickWorldRayTarget(near,far,[...residents,...hitVolumes]);
+    // The movable coffee table must block object rays at its *new* position.
+    const table=game.world.furniture.instances.find(i=>i.prefabId==='table');
+    let blockers=[];
+    if(table&&table.location==='home'){
+      const r=instanceRect(table,FURNITURE_CATALOG.table.footprint);
+      blockers=[{kind:'blocker',id:'coffee-table',bounds:{
+        min:{x:r.minX,y:.28,z:r.minZ},max:{x:r.maxX,y:.48,z:r.maxZ}
+      }}];
+    }
+    return pickWorldRayTarget(near,far,[...residents,...hitVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -1641,8 +1959,10 @@ function boot() {
     tapCueTimeout=setTimeout(()=>{cue.hidden=true;},450);
   };
   const endPointer=event=>{
+    if(furnishMode&&endEditorDrag(event))return;
     const pos=cameraGesture.end(gesturePoint(event),performance.now());
     if(!pos||dialogueNeedsDecision(game))return;
+    if(furnishMode){chooseFurniture(editorFurnitureAt(pos));return;}
     const target=worldTargetAt(pos);
     if(target)confirmWorldTap(pos);
     if(target?.kind==='resident')openSocialContext(pos);
@@ -1651,9 +1971,12 @@ function boot() {
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
+    if(editDrag?.pointerId===event.pointerId)cancelEditorDrag();
     cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true});
   });
-  window.addEventListener('blur',()=>cameraGesture.clear());
+  window.addEventListener('blur',()=>{
+    cancelEditorDrag();cameraGesture.clear();
+  });
   canvas.addEventListener('wheel',event=>{
     event.preventDefault();
     setView(wheelCamera(view,event.deltaY));
@@ -1667,7 +1990,7 @@ function boot() {
     dt=Math.min(dt,.06);
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
-    const active=!game.paused&&!dialogueNeedsDecision(game);
+    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game);
     const animDt=active?dt:0;
     if(active){
       accumulator+=dt;
@@ -2093,7 +2416,7 @@ function boot() {
       feedbackActive:socialFlashLeft>0
     });
     $('social-result').hidden=!layers.showFeedback;
-    reactionBadges.update({dt,paused:game.paused,pc,camera,canvas,
+    reactionBadges.update({dt,paused:game.paused||furnishMode,pc,camera,canvas,
       rigs:reactionRigs,
       visible:{alex:!showerStates.alex.active&&!toiletStates.alex.active,
         mira:!showerStates.mira.active&&!toiletStates.mira.active}});

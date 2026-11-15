@@ -6,14 +6,15 @@ const src=read('../src/game.js'),html=read('../index.html'),css=read('../styles.
 test('UI3 camera ray uses CSS pixels instead of projected screen ellipses',()=>{
   assert.match(src,/camera\.camera\.screenToWorld\(x,y,camera\.camera\.nearClip\)/);
   assert.match(src,/camera\.camera\.screenToWorld\(x,y,camera\.camera\.farClip\)/);
-  assert.match(src,/return pickWorldRayTarget\(near,far,\[\.\.\.residents,\.\.\.hitVolumes\]\)/);
+  assert.match(src,/return pickWorldRayTarget\(near,far,\[\.\.\.residents,\.\.\.hitVolumes,\.\.\.blockers\]\)/);
   assert.ok(!src.includes('const projectedObject='));
 });
 test('UI3 registers each interactive object by geometry and allows future pieces',()=>{
   assert.match(src,/const registerHitVolume=\(id,kind,x,y,z,sx,sy,sz\)=>/);
   for(const id of ['bed','fridge','sofa','shower','toilet'])
     assert.ok(src.includes("touchBox('"+id+"'"),id+' is registered');
-  assert.ok(src.includes("blockerBox('coffee table top'"));
+  assert.match(src,/const table=game\.world\.furniture\.instances\.find\(i=>i\.prefabId==='table'\)/);
+  assert.match(src,/kind:'blocker',id:'coffee-table'/);
 });
 test('UI3 tests only non-selected 3D residents and honors shower privacy',()=>{
   assert.match(src,/if\(id===game\.selectedSim\|\|!reactionRigs\[id\]\|\|showerStates\[id\]\?\.active\|\|[\s\S]*toiletStates\[id\]\?\.active\)continue/);

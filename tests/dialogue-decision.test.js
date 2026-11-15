@@ -64,7 +64,7 @@ test('1.0q: mandatory choice applies only to a real using-phase multi-turn socia
   assert.equal(dialogueNeedsDecision(root),false);
 });
 test('1.0q: simulation time and animation stop while player has decisions',()=>{
-  assert.ok(gameSource.includes('const active=!game.paused&&!dialogueNeedsDecision(game);'));
+  assert.ok(gameSource.includes('const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game);'));
   assert.ok(gameSource.includes('const animDt=active?dt:0;'));
   assert.ok(gameSource.includes('tickHousehold(game,.30 * game.speed)'));
   assert.ok(gameSource.includes('renderPauseButton();'));
