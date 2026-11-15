@@ -5,6 +5,8 @@ import {MIRA_SOFA_CLIP,MIRA_SOFA_DURATION,miraSofaClipTime,miraSofaOffset}
 import {MIRA_SLEEP_CLIP,MIRA_SLEEP_DURATION,miraBedPose,createMiraBedController}
   from './meshy-mira-bed.js';
 import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
+import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
+  from './meshy-shower-runtime.js';
 
 /** Read undeformed geometry AABBs, never pose-dependent meshInstance.aabb.
  * The validated female GLB has one original skinned mesh.
@@ -38,7 +40,8 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
   const state={ready:false,status:'loading',error:null,
     root:null,model:null,clip:null,visible:false,base:null,
     sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null,
-    bedReady:false,bedRuntime:null,fridgeRuntime:null};
+    bedReady:false,bedRuntime:null,fridgeRuntime:null,
+    showerRuntime:null,walkDuration:0};
   function attach(asset){
     const model=asset.resource.instantiateRenderEntity();
     const root=new pc.Entity('Meshy Mira visual');
@@ -52,6 +55,7 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       const clips=(asset.resource.animations||[]).map(item=>item.resource);
       if(!miraHasClips(clips.map(clip=>clip.name)))
         throw Error('Missing required female Meshy clips');
+      state.walkDuration=clips.find(clip=>clip.name==='Walking_Woman')?.duration||0;
       const sourceSeat=clips.find(clip=>clip.name===MIRA_SOFA_CLIP);
       // The audited pelvis curve is tied to this exact source clip duration.
       // Future model replacements retain legacy sofa until re-audited.
@@ -112,6 +116,26 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
         state.fridgeRuntime=null;
         console.warn('Mira fridge skin unavailable',error);
       }
+      // The entire rig.avatar, including this child Meshy root, is hidden
+      // whenever the game's opaque showerPrivacy enclosure is active.
+      // Wash overlays run behind that mask; only clothed walk-in/out is visible.
+      try{
+        if(pc.Script&&model.findByName&&state.walkDuration>0){
+          const shower=createMeshyShowerController({pc,model});
+          if(shower.ready){
+            if(!model.script)model.addComponent('script');
+            class MiraShowerPostUpdate extends pc.Script{
+              static scriptName='blinsMiraShowerPostUpdate';
+              postUpdate(){shower.apply();}
+            }
+            model.script.create(MiraShowerPostUpdate);
+            state.showerRuntime=shower;
+          }
+        }
+      }catch(error){
+        state.showerRuntime=null;
+        console.warn('Mira shower skin unavailable',error);
+      }
       root.enabled=false;
       Object.assign(state,{ready:true,status:'ready',root,model,clip:'Idle_7',base});
       onStatus('ready');
@@ -139,12 +163,14 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,dt=0,
       bedBusy=false,bedFrame=null,bedProgress=0,
-      showerBusy=false,fridgeBusy=false,fridgeFrame=null}={}){
+      showerBusy=false,showerFrame=null,
+      fridgeBusy=false,fridgeFrame=null}={}){
       const show=canShowMiraMeshy({
         preferred,ready:state.ready,actionId,
         sofaBusy,sofaReady:state.sofaReady,
-        bedBusy,bedReady:state.bedReady,showerBusy,fridgeBusy,
-        fridgeReady:Boolean(state.fridgeRuntime?.ready)
+        bedBusy,bedReady:state.bedReady,showerBusy,
+        showerReady:Boolean(state.showerRuntime?.ready),
+        fridgeBusy,fridgeReady:Boolean(state.fridgeRuntime?.ready)
       });
       if(state.visible!==show){
         for(const renderer of legacyRenderers)renderer.enabled=!show;
@@ -154,14 +180,48 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       if(!show||!state.model){
         state.bedRuntime?.setFrame(null);
         state.fridgeRuntime?.setFrame(null);
+        state.showerRuntime?.setFrame(null);
         return show;
       }
+      const shower=actionId==='shower'||showerBusy;
+      state.showerRuntime?.setFrame(shower?showerFrame:null,paused);
       const fridge=actionId==='fridge'||fridgeBusy;
       state.fridgeRuntime?.setFrame(
         fridge&&actionId==='fridge'?fridgeFrame:null
       );
       const sofa=actionId==='sofa'||sofaBusy;
       const anim=state.model.anim;
+      if(shower){
+        // The shared showerSequence owns root x/y/z/yaw, water, mask, wrap
+        // and walking distance. This branch only chooses Mira's skinned clip.
+        state.bedRuntime?.setFrame(null);
+        const phase=meshyShowerPose(showerFrame);
+        const gait=phase?.walking===true;
+        const target=gait?'Walking_Woman':'Idle_7';
+        if(state.clip!==target){
+          // Walking time is explicitly scrubbed at speed=0; NEVER leave a
+          // timed crossfade pending (0.7j sitting-sleep regression).
+          if(gait)anim.baseLayer.play(target);
+          else{
+            anim.speed=1;
+            anim.baseLayer.transition(target,.16);
+          }
+          state.clip=target;
+        }
+        state.sofaRelease=null;
+        state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
+        const walkingTime=gait
+          ?showerWalkClipTime(phase.gaitMeters,state.walkDuration):null;
+        if(walkingTime!==null){
+          anim.speed=0;
+          anim.playing=true;
+          anim.baseLayer.activeStateCurrentTime=walkingTime;
+        }else{
+          anim.speed=1;
+          anim.playing=!paused;
+        }
+        return true;
+      }
       if(sofa){
         state.bedRuntime?.setFrame(null);
         if(state.clip!==MIRA_SOFA_CLIP){
@@ -256,6 +316,7 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       state.sofaRelease=null;
       state.bedRuntime?.setFrame(null);
       state.fridgeRuntime?.setFrame(null);
+      state.showerRuntime?.setFrame(null);
       state.model.anim.speed=1;
       const {base}=state;
       state.model.setLocalPosition(base.x,base.y,base.z);

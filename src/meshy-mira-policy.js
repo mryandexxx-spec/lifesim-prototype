@@ -34,15 +34,17 @@ export function miraMeshPlacement(bounds,targetHeight=MIRA_DISPLAY_HEIGHT){
     y:-min.y*scale+MIRA_IDLE_GROUND_OFFSET,
     z:-(min.z+max.z)*.5*scale};
 }
-/** Guard each female furniture overlay independently. Shower stays on the
- * privacy-safe original fallback until its skinned walk/pose is verified.
+/** Guard each female furniture overlay independently. The canonical game
+ * avatar/mosaic enforces shower privacy even when a Meshy overlay is enabled.
  */
 export function canShowMiraMeshy({preferred=false,ready=false,actionId=null,
   sofaBusy=false,sofaReady=false,
-  bedBusy=false,bedReady=false,showerBusy=false,
+  bedBusy=false,bedReady=false,showerBusy=false,showerReady=false,
   fridgeBusy=false,fridgeReady=false}={}){
   const eligible=actionId===null||(actionId==='sofa'&&sofaReady)||
-    (actionId==='bed'&&bedReady)||(actionId==='fridge'&&fridgeReady);
+    (actionId==='bed'&&bedReady)||(actionId==='fridge'&&fridgeReady)||
+    (actionId==='shower'&&showerReady);
   return Boolean(preferred&&ready&&eligible&&(!sofaBusy||sofaReady)&&
-    (!bedBusy||bedReady)&&!showerBusy&&(!fridgeBusy||fridgeReady));
+    (!bedBusy||bedReady)&&(!showerBusy||showerReady)&&
+    (!fridgeBusy||fridgeReady));
 }

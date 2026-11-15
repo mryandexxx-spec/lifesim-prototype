@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {bedTransitionPose} from '../src/bed-transition.js';
 import {fridgeSequence} from '../src/fridge-interaction.js';
+import {showerSequence,advanceShowerTransition,showerPrivacyInvariant}
+  from '../src/shower-interaction.js';
+import {meshyShowerPose,MESHY_SHOWER_BONES,showerWalkClipTime}
+  from '../src/meshy-shower-runtime.js';
 import {MIRA_MESHY_URL,MIRA_REQUIRED_CLIPS,MIRA_DISPLAY_HEIGHT,
   MIRA_IDLE_GROUND_OFFSET,miraHasClips,miraClipFor,
   miraMeshPlacement,canShowMiraMeshy} from '../src/meshy-mira-policy.js';
@@ -48,7 +52,8 @@ test('female visuals use a guarded authored sofa, but retain fallback elsewhere'
 function fixture({loadError=false,missingClip=false,noStaticBounds=false,
   sofaClip=false,sofaDuration=MIRA_SOFA_DURATION,
   bedClips=false,bedDuration=MIRA_SLEEP_DURATION,missingHip=false,
-  fridgeBones=false,missingFridgeHand=false}={}){
+  fridgeBones=false,missingFridgeHand=false,
+  showerBones=false,missingShowerBone=false,walkDuration=1.8}={}){
   const events=[];
   class Entity{
     constructor(name){this.name=name;this.enabled=true;this.children=[];}
@@ -87,6 +92,16 @@ function fixture({loadError=false,missingClip=false,noStaticBounds=false,
       this.rotation={x:q.x,y:q.y,z:q.z,w:q.w};}};
     model.findByName=name=>name==='mixamorig:Hips'&&!missingHip?hip:null;
     model.mockHip=hip;
+  }
+  if(showerBones){
+    const showerJoints=Object.fromEntries(MESHY_SHOWER_BONES.map(name=>[
+      name,{angles:[],getLocalRotation:()=>new Quat(),
+        setLocalRotation(q){this.angles.push(q.x);}}
+    ]));
+    if(missingShowerBone)delete showerJoints['mixamorig:LeftForeArm'];
+    const previous=model.findByName?.bind(model);
+    model.findByName=name=>showerJoints[name]||previous?.(name)||null;
+    model.mockShowerBones=showerJoints;
   }
   if(fridgeBones){
     const point=(x,y,z)=>({x,y,z});
@@ -142,7 +157,8 @@ function fixture({loadError=false,missingClip=false,noStaticBounds=false,
     asset.resource={instantiateRenderEntity(){return model;},
       animations:clips.map(name=>({resource:{name,
         duration:name===MIRA_SOFA_CLIP?sofaDuration:
-          name===MIRA_SLEEP_CLIP?bedDuration:6.2}}))};
+          name===MIRA_SLEEP_CLIP?bedDuration:
+          name==='Walking_Woman'?walkDuration:6.2}}))};
     asset.onReady();
   }}};
   return {pc,app,rig,model,events,renderers};
@@ -200,7 +216,7 @@ test('game supplies both independent visual adapters and includes the female mod
   assert.match(workflow,/node --check src\/meshy-mira-visual\.js/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/Блин<span>’С<\/span>/);
-  assert.match(html,/сборка \/ 0\.7k/);
+  assert.match(html,/сборка \/ 0\.7l/);
 });
 
 test('audited female sit track interpolates measured pelvic translation, no per-sofa offsets',()=>{
@@ -396,4 +412,110 @@ test('Mira fridge post-Anim script uses shared prefab contact and hides procedur
   assert.match(game,/fridgeFrame:miraFridge/);
   assert.match(game,/if\(miraMeshShown&&miraUseId==='fridge'\)miraSnack\.enabled=false/);
   assert.match(male,/layout=FRIDGE_LAYOUT,resident='Alex'/);
+});
+ 
+test('Mira keeps the same skinned body on shower entry and dressed exit',()=>{
+  const f=fixture({showerBones:true});
+  const visual=createMiraMeshyVisual(f);
+  assert.equal(visual.ready,true);
+  assert.ok(f.model.script.instances.some(x=>typeof x.postUpdate==='function'));
+  const phase=p=>showerSequence(p*32,32);
+  const entry=phase(.12);
+  visual.update({preferred:true,actionId:'shower',showerBusy:true,
+    showerFrame:entry});
+  assert.equal(f.renderers[0].enabled,false,'not the old body on entry');
+  assert.equal(f.model.anim.speed,0);
+  assert.ok(f.events.some(([kind,clip])=>kind==='play'&&clip==='Walking_Woman'),
+    'scrubbed walk MUST switch immediately, not use a frozen crossfade');
+  assert.ok(!f.events.some(([kind,clip])=>kind==='transition'&&clip==='Walking_Woman'));
+  assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime-
+    showerWalkClipTime(entry.gaitMeters,1.8))<1e-9);
+  // Shared game privacy mask hides the entire avatar, including Meshy.
+  const wet=phase(.53);
+  assert.ok(wet.privacy&&wet.water&&showerPrivacyInvariant(wet));
+  visual.update({preferred:true,actionId:'shower',showerBusy:true,
+    showerFrame:wet});
+  assert.equal(f.renderers[0].enabled,false);
+  f.model.script.instances.forEach(script=>script.postUpdate());
+  for(const joint of Object.values(f.model.mockShowerBones))
+    assert.ok(joint.angles.length>0,'wash bone postUpdate is active only in private');
+  const out=advanceShowerTransition({active:true,enterYaw:-90,
+    frame:wet,exit:null},false,0,32,1);
+  assert.ok(out.frame.privacy===false||out.frame.bathing===false);
+  visual.update({preferred:true,actionId:null,showerBusy:true,
+    showerFrame:out.frame});
+  assert.equal(f.renderers[0].enabled,false,'no skin swap during exit');
+  visual.update({preferred:true,actionId:null,showerBusy:true,
+    showerFrame:out.frame,paused:true});
+  assert.equal(f.model.anim.playing,true,
+    'distance-scrubbed gait uses static source sampling even on pause');
+  visual.update({preferred:true,actionId:null,showerBusy:false,
+    showerFrame:null});
+  assert.equal(f.renderers[0].enabled,false);
+  visual.reset();
+  assert.equal(f.model.anim.speed,1);
+});
+test('Mira shower guard falls back on unsupported bones or invalid walking duration',()=>{
+  for(const opt of [{},{showerBones:true,missingShowerBone:true},
+    {showerBones:true,walkDuration:0}]){
+    const f=fixture(opt),v=createMiraMeshyVisual(f);
+    v.update({preferred:true,actionId:'shower',
+      showerBusy:true,showerFrame:showerSequence(32*.50,32)});
+    assert.equal(f.renderers[0].enabled,true);
+  }
+  const ready={preferred:true,ready:true};
+  assert.equal(canShowMiraMeshy({...ready,actionId:'shower'}),false);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'shower',showerReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,showerBusy:true,showerReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,showerBusy:true,showerReady:false}),false);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'bed',
+    bedReady:true,showerReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'fridge',
+    fridgeReady:true,showerReady:true}),true);
+});
+test('female shower never animates visible washing and freezes on pause',()=>{
+  const f=fixture({showerBones:true}),v=createMiraMeshyVisual(f);
+  const phase=p=>showerSequence(p*32,32);
+  const bones=f.model.mockShowerBones;
+  const show=(frame,paused=false)=>v.update({preferred:true,
+    actionId:'shower',showerBusy:true,showerFrame:frame,paused});
+  show(phase(.12));
+  f.model.script.instances.forEach(x=>x.postUpdate());
+  assert.ok(Object.values(bones).every(x=>x.angles.length===0),
+    'visible walking has no wash motion');
+  show(phase(.50),true);
+  f.model.script.instances.forEach(x=>x.postUpdate());
+  assert.ok(Object.values(bones).every(x=>x.angles.length===0),
+    'paused wash produces no extra joint rotations');
+  show(phase(.50),false);
+  f.model.script.instances.forEach(x=>x.postUpdate());
+  assert.ok(Object.values(bones).every(x=>x.angles.length===1));
+  show({...phase(.50),privacy:false},false);
+  f.model.script.instances.forEach(x=>x.postUpdate());
+  assert.ok(Object.values(bones).every(x=>x.angles.length===1),
+    'a missing privacy mask forbids washing joints');
+  show(null);
+  f.model.script.instances.forEach(x=>x.postUpdate());
+  assert.ok(Object.values(bones).every(x=>x.angles.length===1));
+});
+test('female shower preserves the game enforced opaque privacy boundary',()=>{
+  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const chars=readFileSync(new URL('../src/characters.js',import.meta.url),'utf8');
+  const visual=readFileSync(new URL('../src/meshy-mira-visual.js',import.meta.url),'utf8');
+  const shower=readFileSync(new URL('../src/shower-interaction.js',import.meta.url),'utf8');
+  assert.match(game,/applyShowerAppearance\(miraRig,Boolean\(miraShower\?\.privacy\)/);
+  assert.match(game,/showerPrivacy\.enabled=Boolean\(alexShower\?\.privacy\|\|miraShower\?\.privacy\)/);
+  assert.match(game,/showerFrame:miraShower/);
+  assert.match(chars,/rig\.avatar\.enabled=!masked/);
+  assert.match(shower,/const privacy=p>=\.23&&p<\.94/);
+  assert.match(visual,/class MiraShowerPostUpdate extends pc\.Script/);
+  assert.match(visual,/postUpdate\(\)\{shower\.apply\(\);\}/);
+  assert.match(visual,/showerReady:Boolean\(state\.showerRuntime\?\.ready\)/);
+  assert.match(visual,/if\(gait\)anim\.baseLayer\.play\(target\)/);
+  for(let i=0;i<=100;i++){
+    const frame=showerSequence(i/100*32,32);
+    assert.equal(showerPrivacyInvariant(frame),true);
+    const pose=meshyShowerPose(frame);
+    assert.equal(Boolean(pose.washing>0)&&!frame.privacy,false);
+  }
 });

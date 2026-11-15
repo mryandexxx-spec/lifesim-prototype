@@ -913,9 +913,9 @@ function boot() {
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
-    // Mira retains one 3D skin for sofa, bed and fridge. The original
-    // game owns the door, action choreography, food needs and save state;
-    // shower remains covered by the original privacy-safe fallback.
+    // Mira retains one 3D skin for sofa, bed, fridge and clothed shower
+    // entry/exit. The original game owns shower water, cover, full avatar
+    // privacy and all simulation/save state; no private body is visible.
     const miraMeshShown=meshyMira.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:(game.otherSim.action?.phase==='walking'||
@@ -929,6 +929,7 @@ function boot() {
       bedFrame:miraBedPose,
       bedProgress:bedStates.mira.progress,
       showerBusy:showerStates.mira.active,
+      showerFrame:miraShower,
       fridgeBusy:fridgeLeaving.mira,
       fridgeFrame:miraFridge
     });
