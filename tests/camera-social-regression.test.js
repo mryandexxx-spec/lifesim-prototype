@@ -69,10 +69,11 @@ test('zero affinity also permits argue and talk, with bounds and no save migrati
  }
  assert.equal(startSocial(s,'talk','alex',place),true);
  arriveSocial(s);tickSocial(s,SOCIAL_ACTIONS.talk.duration+1);
- assert.equal(s.relationship.affinity,8);
+ assert.equal(s.relationship.affinity,12,'first conversation after quarrel is reconciliation');
+ assert.equal(s.mind.memories.at(-1).id,'reconcile');
  const restored=loadHousehold(JSON.parse(JSON.stringify(s)));
  assert.equal(restored.version,1);
- assert.equal(restored.relationship.affinity,8);
+ assert.equal(restored.relationship.affinity,12);
 });
 test('manual talk interrupts partner furniture job, automatic talks still wait',()=>{
  const s=newHousehold();
