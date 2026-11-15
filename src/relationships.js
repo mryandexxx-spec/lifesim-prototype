@@ -3,11 +3,13 @@ import { refreshMind } from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction} from './social-feedback.js';
+import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
+import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor} from './gifts-leisure.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
 import {availableSocialActions,resolveBranchResponse,observePairViews,
-  applySocialEvent} from './social-graph.js';
+  applySocialEvent,learnSocialPreference} from './social-graph.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -131,9 +133,9 @@ function recordPairCompletion(root,session,type){
   if(!graph||!root.relationship?.views?.[a]||!root.relationship.views[b])return false;
   const views={[a]:root.relationship.views[a],[b]:root.relationship.views[b]};
   observePairViews(graph,a,b,views);
-  return Boolean(applySocialEvent(graph,{
+  return applySocialEvent(graph,{
     actorId:a,targetId:b,type,at:root.minutes
-  },{observedViews:views}));
+  },{observedViews:views})||null;
 }
 export function arriveSocial(root) {
   if(root.socialAction?.phase!=='walking')return false;
@@ -179,8 +181,16 @@ function completeSocial(root,conversationScore=null){
       :id===s.initiator?'Сожалеет о ссоре':'Обиделся после ссоры';
     refreshMind(resident);
   }
-  recordPairCompletion(root,s,s.branchAction?.resultType||
+  const completed=recordPairCompletion(root,s,s.branchAction?.resultType||
     (s.conversation?'conversation.'+s.kind:s.kind));
+  if(completed&&s.conversation){
+    // No premature discovery from a started, abandoned or merely queued talk.
+    for(const turn of s.conversation.turns||[]){
+      const tag=CONVERSATION_DISCOVERY_TAGS[turn.id];
+      if(turn.accepted&&tag)learnSocialPreference(root.socialGraph,completed,
+        s.initiator,s.partner,get(root,s.partner).personality,tag);
+    }
+  }
   // Legacy one-button actions only show a response after their effects finish.
   if(directReaction){
     emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,
@@ -201,7 +211,9 @@ export function tickSocial(root,minutes){
     s.elapsed+=minutes;
     if(s.elapsed<18)return false;
     const response=resolveBranchResponse(root.socialGraph,s.initiator,s.partner,
-      s.branchAction.id,{recipient:get(root,s.partner),minutes:root.minutes});
+      s.branchAction.id,{recipient:get(root,s.partner),minutes:root.minutes,
+        compatibilityBias:socialCompatibility(get(root,s.partner)?.personality,
+          get(root,s.initiator)?.personality).bias});
     if(!response){root.socialAction=null;return false;}
     s.branchAction.resultType=response.type;
     s.kind=response.accepted?'talk':'argue';
@@ -219,10 +231,18 @@ export function tickSocial(root,minutes){
     if(s.elapsed<duration)return false;
     const receipt=completeSharedSession(root);
     if(!receipt){root.socialAction=null;return false;}
-    recordPairCompletion(root,s,s.shared.mode==='gift'
+    const completed=recordPairCompletion(root,s,s.shared.mode==='gift'
       ?receipt.kind==='refused'?'gift.refused':'gift.accepted'
       :receipt.kind==='refused'?'leisure.refused':'leisure.accepted');
     const accepted=receipt.kind!=='refused';
+    if(accepted&&completed){
+      const tag=s.shared.mode==='gift'
+        ?GIFT_CATALOG[inventoryFor(root,s.partner)
+          .find(item=>item.id===s.shared.choiceId)?.type]?.tag
+        :LEISURE_CATALOG[s.shared.choiceId]?.tag;
+      if(tag)learnSocialPreference(root.socialGraph,completed,
+        s.initiator,s.partner,get(root,s.partner).personality,tag);
+    }
     const recipientOutcome=!accepted?'refused':
       receipt.kind==='liked'||s.shared.mode==='leisure'?'warm':'neutral';
     emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,

@@ -1,4 +1,5 @@
 import {initialPairEpisodes,rememberPairReceipt,restorePairEpisodes,episodeAppraisal} from './social-episodes.js';
+import {newSocialKnowledge,discoverPreference,restoreSocialKnowledge,discoveryNotes} from './social-compatibility.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 /** Блин’С social graph V1: N residents, N sparse links. No renderer/household imports.
  * Legacy two-resident values are observational inputs from an external adapter.
@@ -35,7 +36,7 @@ const makePair=(a,b)=>({
   counts:{positive:0,negative:0},positiveDays:[],
   counted:[],negativeSinceFriend:0,positiveSinceRival:0,
   friendship:'none',rivalry:'none',
-  lastAt:null,events:[],episodes:initialPairEpisodes(a,b),revision:0
+  lastAt:null,events:[],episodes:initialPairEpisodes(a,b),knowledge:newSocialKnowledge(a,b),revision:0
 });
 const adj=graph=>{
   if(graph._links)return graph._links;
@@ -83,6 +84,15 @@ export function getOrCreatePair(graph,idA,idB){
  */
 export function episodeContext(graph,personId,otherId,minutes){
   return episodeAppraisal(getPair(graph,personId,otherId),personId,minutes);
+}
+/** Only a confirmed canonical event can disclose a real interest. */
+export function learnSocialPreference(graph,receipt,viewerId,targetId,targetProfile,tag){
+  const pair=getPair(graph,viewerId,targetId);
+  return pair?discoverPreference(pair,receipt,viewerId,targetId,targetProfile,tag):null;
+}
+/** Player-facing knowledge is per point of view; no spoilers for unseen traits. */
+export function socialKnowledgeNotes(graph,viewerId,targetId,limit=4){
+  return discoveryNotes(getPair(graph,viewerId,targetId),viewerId,limit);
 }
 export function getDirectedView(graph,sourceId,targetId){
   const pair=getPair(graph,sourceId,targetId);
@@ -253,7 +263,8 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
   const reaction=evaluateSocialReaction({
     kind:'branch',actionId:id,recipient:context.recipient,
     view:getDirectedView(graph,b,a)||view(),minutes:context.minutes??0,
-    historyBias:episodeContext(graph,b,a,context.minutes??0).bias
+    historyBias:episodeContext(graph,b,a,context.minutes??0).bias,
+    compatibilityBias:context.compatibilityBias??0
   });
   if(!reaction)return null;
   const accepted=reaction.accepted;
@@ -301,6 +312,8 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
           targetId:e.targetId,...(typeof e.token==='string'&&e.token.length<=80?{token:e.token}:{})})):[];
       p.lastAt=safeAt(entry.lastAt)?entry.lastAt:null;
       p.episodes=restorePairEpisodes(entry.episodes,pairIds,graph.nextSeq,
+        p.lastAt===null?1e7:p.lastAt);
+      p.knowledge=restoreSocialKnowledge(entry.knowledge,pairIds,graph.nextSeq,
         p.lastAt===null?1e7:p.lastAt);
       // Preserve verified historical friendship milestones, no fresh events.
     }

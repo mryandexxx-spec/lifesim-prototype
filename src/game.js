@@ -7,7 +7,7 @@ import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
   chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial,startBranchSocial } from './relationships.js';
-import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext} from './social-graph.js';
+import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes} from './social-graph.js';
 import {latestEpisodes} from './social-episodes.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
@@ -1566,6 +1566,11 @@ function boot() {
           ?episodes.map(item=>'• '+item.label+' · '+readableTime(item.at).day).join('\n')+
             (unresolved.unresolved?'\n• Доверие ещё восстанавливается':'')
           :'Пока нет значимых совместных событий';
+        const learned=socialKnowledgeNotes(game.socialGraph,game.selectedSim,otherId,4);
+        $('mind-discovery-person').textContent='О '+getActorName(otherId);
+        $('mind-discovery').textContent=learned.length
+          ?learned.map(item=>'• '+item.text).join('\n')
+          :'Пока не узнал(а) предпочтения собеседника';
         const list=$('mind-memories');
         list.replaceChildren();
         const memories=current.mind.memories.slice(-4).reverse();
