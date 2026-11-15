@@ -109,7 +109,15 @@ export function arrive(state) {
 export function tick(state, minutes,world=state?.world??null) {
   if (state.paused || !Number.isFinite(minutes) || minutes <= 0) return;
   state.minutes += minutes;
-  for (const need of PHYSICAL_NEEDS) state.needs[need] = clamp(state.needs[need] - NEED_DECAY_PER_MINUTE[need] * minutes);
+  // Actual sofa rest suspends Energy consumption, but walking to the sofa
+  // and time after standing up still cost Energy. No imaginary bonus.
+  const sofaRestMinutes=state.action?.id==='sofa'&&state.action.phase==='using'
+    ?Math.min(minutes,Math.max(0,ACTIONS.sofa.duration-state.action.elapsed))
+    :0;
+  for(const need of PHYSICAL_NEEDS){
+    const elapsed=need==='energy'?minutes-sofaRestMinutes:minutes;
+    state.needs[need]=clamp(state.needs[need]-NEED_DECAY_PER_MINUTE[need]*elapsed);
+  }
   // Social fulfilment changes only on a newly confirmed social receipt.
   const social=Number.isFinite(state.needs.social)?state.needs.social:SOCIAL_NEED_LEGACY_DEFAULT;
   state.needs.social=clamp(social-socialNeedDecayRate(state.personality)*minutes);
