@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.0r" />
+  <link rel="stylesheet" href="./styles.css?v=1.0s" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,12 +22,12 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.0r</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.0s</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
 
-    <div id="hotspots" class="hotspots" aria-label="Предметы комнаты"></div>
+    <div id="hotspots" class="hotspots" aria-label="Предметы комнаты" hidden></div>
     <div id="reaction-layer" class="reaction-layer" aria-label="Реакции жителей" aria-live="off"></div>
     <div id="mood-orbit" class="mood-orbit" aria-hidden="true" hidden>
       <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
@@ -44,6 +44,7 @@
       <button id="speed-btn" class="speed-control" type="button" aria-label="Скорость симуляции">1×</button>
       <button id="auto-btn" class="auto-control" type="button" aria-pressed="true" aria-label="Автономность включена. Нажмите, чтобы отключить"><span>Авто</span><small id="auto-state">ВКЛ</small></button>
       <button id="rotate-camera-btn" class="rotate-control" type="button" aria-pressed="false" aria-label="Включить вращение камеры одним пальцем" title="Вращать камеру"><span aria-hidden="true">⟳</span><small aria-hidden="true">ПОВОРОТ</small></button>
+      <button id="item-labels-btn" class="item-labels-control" type="button" aria-pressed="false" aria-label="Показать подписи предметов"><span aria-hidden="true">⌗</span><small aria-hidden="true">МЕТКИ</small></button>
       <button id="reset-camera-btn" class="round-control" type="button" aria-label="Вернуть камеру">⌖</button>
       <button id="mesh-model-btn" class="mesh-model-control" type="button" aria-pressed="true" aria-label="Алекс и Мира: 3D-модели Meshy. Нажмите, чтобы вернуть старые модели."><span aria-hidden="true">3D</span><small id="mesh-model-state" aria-hidden="true">MESHY</small></button>
     </aside>
@@ -84,14 +85,15 @@
       <div class="mind-history"><span class="eyebrow">ПОСЛЕДНИЕ ВОСПОМИНАНИЯ</span><ul id="mind-memories"><li>Пока всё впереди</li></ul></div>
     </section>
 
-    <section class="social-bar" aria-label="Отношения между жителями">
+    <section class="social-bar" id="social-context" hidden aria-label="Взаимодействие с другим жителем">
+      <button id="social-context-close" class="social-dismiss" type="button" aria-label="Закрыть взаимодействие">×</button>
       <div class="social-summary"><span class="social-icon" aria-hidden="true">♡</span><div><span class="social-title">ОТНОШЕНИЯ <span id="relationship-value" class="dev-relationship">50/100</span></span><strong id="relationship-label">Нейтрально</strong><span id="relationship-branch" class="branch-mini-status">Знакомые</span><span id="romance-status" class="branch-mini-status">Пока нет романтической истории</span><span id="romance-depth" class="branch-mini-status"></span><span id="romance-climate" class="branch-mini-status"></span><div class="social-meter"><i id="relationship-bar"></i></div></div></div>
       <div class="social-controls"><span>Общение с <b id="social-partner">Мирой</b></span><div><button id="conversation-btn" type="button">Беседа</button><button id="humor-btn" type="button">Юмор</button><button id="friendship-btn" type="button">Дружба</button><button id="romance-btn" type="button">Романтика</button><button id="conflict-btn" type="button">Конфликт</button><button id="shared-btn" type="button">Вместе</button><button id="branch-btn" type="button" hidden>Связи</button><button id="talk-btn" type="button" hidden>Поговорить</button><button id="argue-btn" type="button" hidden>Поспорить</button></div></div>
     </section>
     <section id="social-menu-panel" class="conversation-panel" hidden aria-label="Социальные взаимодействия">
       <div class="conversation-head">
         <div><span class="eyebrow">ОБЩЕНИЕ</span><h2 id="social-menu-title">Беседа</h2><p id="social-menu-subtitle">Что предложим?</p></div>
-        <button id="social-menu-close" type="button" aria-label="Закрыть общение">×</button>
+        <button id="social-menu-close" type="button" aria-label="Назад к категориям взаимодействия">←</button>
       </div>
       <div id="social-menu-options" class="conversation-options"></div>
     </section>
@@ -102,6 +104,7 @@
       <ol id="queue-items" class="queue-items"></ol>
       <p id="queue-empty" class="queue-hint" hidden>Пока ничего не запланировано</p>
     </section>
+    <div id="dialogue-backdrop" class="dialogue-backdrop" hidden aria-hidden="true"></div>
     <section id="conversation-panel" class="conversation-panel" hidden tabindex="-1" aria-label="Многоходовый разговор">
       <div class="conversation-head">
         <div><span class="eyebrow">БЕСЕДА</span><h2 id="conversation-title">Выбери тему</h2><p id="conversation-subtitle">О чём поговорим?</p></div>
@@ -158,7 +161,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.0r"></script>
+  <script type="module" src="./src/game.js?v=1.0s"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');
