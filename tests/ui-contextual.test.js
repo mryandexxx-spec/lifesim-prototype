@@ -10,7 +10,7 @@ test('1.0s: social controls are not permanently visible on the 3D scene',()=>{
 });
 test('1.0s: tapping ONLY the inactive resident opens social categories',()=>{
   assert.match(src,/return pickWorldRayTarget\(near,far,\[\.\.\.residents,\.\.\.hitVolumes\]\)/);
-  assert.match(src,/if\(target\?\.kind==='resident'\)openSocialContext\(\)/);
+  assert.match(src,/if\(target\?\.kind==='resident'\)openSocialContext\(pos\)/);
   assert.match(src,/if\(dialogueNeedsDecision\(game\)\)return;/);
   assert.match(src,/\$\('social-context-close'\).addEventListener\('click',closeSocialContext\)/);
 });
