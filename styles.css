@@ -149,7 +149,9 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .social-meter i{display:block;background:#c08095;width:50%;height:100%;transition:width .3s;}
 .social-controls{min-width:0;display:flex;flex-direction:column;gap:5px;align-items:flex-end;}
 .social-controls>span{font-size:9px;color:#667c6e;white-space:nowrap;}
-.social-controls>div{display:flex;gap:5px;}
+.social-controls>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;width:100%;}
+.social-controls #conversation-btn{grid-column:1/-1;background:#397b86;}
+.social-controls button{white-space:nowrap;}
 .social-controls button{border:0;border-radius:9px;padding:9px 9px;font-size:10px;font-weight:800;background:#4c977a;color:#fff;min-height:34px;}
 .social-controls #argue-btn{background:#eee0df;color:#965f62;}
 .social-controls button:disabled{opacity:.4;}
