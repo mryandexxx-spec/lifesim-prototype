@@ -71,9 +71,9 @@ test('UI5 inspector genuinely renders current resident only, textContent prevent
   assert.equal(JSON.stringify(game),before.replace('"selectedSim":"alex"','"selectedSim":"mira"'));
 });
 test('UI5 release keeps Safari and both new presenter files deployed',()=>{
-  assert.match(html,/сборка \/ 1\.1a/);
-  assert.match(html,/styles\.css\?v=1\.1a/);
-  assert.match(html,/src\/game\.js\?v=1\.1a/);
+  assert.match(html,/сборка \/ 1\.0aa/);
+  assert.match(html,/styles\.css\?v=1\.0aa/);
+  assert.match(html,/src\/game\.js\?v=1\.0aa/);
   assert.match(workflow,/node --check src\/insight-presentation\.js/);
   assert.match(workflow,/cp src\/insight-presentation\.js site\/src\//);
   assert.ok(html.includes('id="bar-social"'));
