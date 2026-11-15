@@ -250,7 +250,8 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
   const accepted=reaction.accepted;
   const type=id==='acquaint.introduce'?'introduced':
     id==='rival.taunt'?id:accepted?id:id+'.refused';
-  return {accepted,type,id,label:accepted?
+  return {accepted,type,id,outcome:reaction.outcome,
+    intensity:reaction.intensity,label:accepted?
     id==='friend.tease'?'Шутку оценили':id==='friend.confide'?'Секрет принят':
     id==='rival.truce'?'Удалось начать примирение':
     id==='acquaint.introduce'?'Познакомились!':'Узнали друг друга получше':

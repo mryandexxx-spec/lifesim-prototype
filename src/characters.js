@@ -67,7 +67,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   const outfitMeshes=[pelvis,torso];
   outfitMeshes.push(upperBall(name+' collar',0,1.245,.164,.16,.055,.032,collar));
   upperCylinder(name+' neck',0,1.303,0,.115,.17,.116,skin);
-  upperBall(name+' head',0,headY,0,
+  const head=upperBall(name+' head',0,headY,0,
     HEAD_DIMENSIONS.width,HEAD_DIMENSIONS.height,HEAD_DIMENSIONS.depth,skin);
 
   // Closely fitting hair masses. No protruding Mickey-ear buns or detached curls.
@@ -151,7 +151,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   const selected=cylinder(name+' selected',0,.018,0,.79,.025,.79,
     mat(p.select,{opacity:.30}),avatar);
   return {
-    avatar,torso,upperBody,pelvis,anklePivot,shoes:shoeMeshes,elbowPivot,
+    avatar,head,torso,upperBody,pelvis,anklePivot,shoes:shoeMeshes,elbowPivot,
     leftEye:eyes[0],rightEye:eyes[1],brows,mouth:smile,
     legPivot,kneePivot,armPivot,snack,book,selected,outfitMeshes,showerWrap
   };

@@ -1,6 +1,7 @@
 /** Original, headless 0.9a conversation engine. Saves only validated IDs, no player text. */
 import {getPerspective} from './social-perspective.js';
 import {evaluateSocialReaction} from './social-reactions.js';
+import {emitSocialReaction,socialOutcome} from './social-feedback.js';
 
 const row=(label,opener,tag,lines)=>Object.freeze({label,opener,tag,lines:Object.freeze(lines)});
 const saying=(label,line,yes,no,tone,weight)=>Object.freeze({label,line,yes,no,tone,weight});
@@ -87,6 +88,13 @@ export function chooseConversationTurn(root,id){
   c.turns.push({id,accepted:reaction.accepted});
   c.score+=contribution(id,reaction.accepted);
   c.phase='response';
+  // A spoken reply really happened now; a queued invitation does not.
+  emitSocialReaction(root,{
+    actorId:s.initiator,responderId:s.partner,eventType:'conversation.line',
+    outcome:socialOutcome({kind:'conversation',accepted:reaction.accepted,
+      score:reaction.confidence,tone:CONVERSATION_ACTS[id].tone}),
+    intensity:Math.min(100,Math.max(30,Math.abs(reaction.confidence-50)*2))
+  });
   return reaction;
 }
 export function continueConversation(root){

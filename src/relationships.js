@@ -2,6 +2,7 @@
 import { refreshMind } from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
 import {evaluateSocialReaction} from './social-reactions.js';
+import {emitSocialReaction} from './social-feedback.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
@@ -100,7 +101,12 @@ export function finishSocialConversation(root){
   const outcome=conversationOutcome(session);
   if(!outcome)return null;
   social.kind=outcome.kind;
-  completeSocial(root,outcome.score);
+  if(!completeSocial(root,outcome.score))return null;
+  // Each completed conversation can leave its initiator with a different feeling.
+  emitSocialReaction(root,{
+    actorId:social.partner,responderId:social.initiator,
+    eventType:'conversation.finish',outcome:outcome.kind==='argue'?'awkward':'neutral'
+  });
   return outcome;
 }
 /** Existing walk/animation/social reservation also supports gift/leisure.
@@ -142,8 +148,8 @@ function completeSocial(root,conversationScore=null){
   if(!def||!root.otherSim){root.socialAction=null;return false;}
   // One-button talk/argue is never refused, preserving legacy semantics.
   // Its individual effects go through socialImpressionFactor below.
-  evaluateSocialReaction({
-    kind:'direct',recipient:get(root,s.partner),
+  const directReaction=s.branchAction||s.conversation?null:evaluateSocialReaction({
+    kind:'direct',actionId:s.kind,recipient:get(root,s.partner),
     view:getPerspective(root,s.partner),minutes:root.minutes
   });
   const reconciled=s.kind==='talk'&&canReconcile(root);
@@ -175,6 +181,15 @@ function completeSocial(root,conversationScore=null){
   }
   recordPairCompletion(root,s,s.branchAction?.resultType||
     (s.conversation?'conversation.'+s.kind:s.kind));
+  // Legacy one-button actions only show a response after their effects finish.
+  if(directReaction){
+    emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,
+      outcome:directReaction.outcome,intensity:directReaction.intensity,
+      eventType:'direct.reply'});
+    emitSocialReaction(root,{actorId:s.partner,responderId:s.initiator,
+      outcome:s.kind==='argue'?'awkward':directReaction.outcome,
+      eventType:'direct.initiator'});
+  }
   root.socialAction=null;
   return true;
 }
@@ -190,7 +205,12 @@ export function tickSocial(root,minutes){
     if(!response){root.socialAction=null;return false;}
     s.branchAction.resultType=response.type;
     s.kind=response.accepted?'talk':'argue';
-    return completeSocial(root,response.accepted?6:-5);
+    if(!completeSocial(root,response.accepted?6:-5))return false;
+    emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,
+      outcome:response.outcome,intensity:response.intensity,eventType:'branch.reply'});
+    emitSocialReaction(root,{actorId:s.partner,responderId:s.initiator,
+      outcome:response.accepted?'neutral':'awkward',eventType:'branch.initiator'});
+    return true;
   }
   if(s.shared){
     const duration=sharedDuration(s.shared);
@@ -202,6 +222,13 @@ export function tickSocial(root,minutes){
     recordPairCompletion(root,s,s.shared.mode==='gift'
       ?receipt.kind==='refused'?'gift.refused':'gift.accepted'
       :receipt.kind==='refused'?'leisure.refused':'leisure.accepted');
+    const accepted=receipt.kind!=='refused';
+    const recipientOutcome=!accepted?'refused':
+      receipt.kind==='liked'||s.shared.mode==='leisure'?'warm':'neutral';
+    emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,
+      outcome:recipientOutcome,eventType:s.shared.mode+'.reply'});
+    emitSocialReaction(root,{actorId:s.partner,responderId:s.initiator,
+      outcome:accepted?'neutral':'awkward',eventType:s.shared.mode+'.initiator'});
     root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
     root.socialAction=null;
     return true;

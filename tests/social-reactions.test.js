@@ -149,6 +149,6 @@ test('new reaction core is included in both CI syntax checks and deployed Pages 
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.ok(workflow.includes('node --check src/social-reactions.js'));
   assert.ok(workflow.includes('src/social-reactions.js src/characters.js'));
-  assert.ok(html.includes('сборка / 1.0c'));
+  assert.ok(html.includes('сборка / 1.0d'));
   assert.ok(!Object.keys(socialReactionContext(respondent(),view(),510)).includes('residentId'));
 });

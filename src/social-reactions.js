@@ -6,6 +6,7 @@
  */
 import {deriveAxes,preferenceAffinity} from './trait-catalog.js';
 import {visibleEmotions} from './emotion-engine.js';
+import {socialOutcome} from './social-feedback.js';
 
 export const SOCIAL_REACTION_KINDS=Object.freeze(['conversation','gift','leisure','branch','direct']);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -95,8 +96,11 @@ export function evaluateSocialReaction({
   accepted=score>=threshold;
   // A confrontation is intentionally hostile; introducing oneself is
   // always possible if the relationship graph unlocked that option.
-  return {accepted,score:clamp(Math.round(score),0,100),
-    confidence:clamp(Math.round(score),0,100),
+  const normalized=clamp(Math.round(score),0,100);
+  return {accepted,score:normalized,confidence:normalized,
+    outcome:socialOutcome({kind,accepted,score:normalized,tone,actionId}),
+    intensity:clamp(Math.round(Math.abs(score-threshold)*1.4),20,100)||
+      (Number.isFinite(threshold)?20:65),
     ...(kind==='gift'?{liked:accepted&&score>=70}:{})};
 }
 /** All role-specific relationship impressions, including old talk/argue,
