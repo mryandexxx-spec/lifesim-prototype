@@ -46,6 +46,7 @@
       <button id="auto-btn" class="auto-control" type="button" aria-pressed="true" aria-label="Автономность включена. Нажмите, чтобы отключить"><span>Авто</span><small id="auto-state">ВКЛ</small></button>
       <button id="rotate-camera-btn" class="rotate-control" type="button" aria-pressed="false" aria-label="Одним пальцем вращать камеру. Нажмите для перемещения" title="Одним пальцем перемещать"><span aria-hidden="true">⟳</span><small aria-hidden="true">ПОВОРОТ</small></button>
       <button id="reset-camera-btn" class="round-control" type="button" aria-label="Вернуть камеру">⌖</button>
+      <button id="furnish-toggle" class="furnish-toggle" type="button" aria-pressed="false" aria-controls="furniture-editor" aria-label="Войти в режим обстановки"><span aria-hidden="true">▦</span><small aria-hidden="true">ДОМ</small></button>
       <button id="view-toggle" class="view-control" type="button" aria-controls="view-panel" aria-expanded="false" aria-label="Настройки вида"><span aria-hidden="true">◉</span><small aria-hidden="true">ВИД</small></button>
     </aside>
     <section id="view-panel" class="view-panel" hidden aria-label="Настройки вида комнаты">
@@ -67,6 +68,25 @@
       <div class="tour-actions"><button id="tour-skip" type="button">Пропустить</button><button id="tour-next" type="button">Дальше</button></div>
     </section>
     <div class="hint" id="hint">Один палец — вращение · два — сдвиг и масштаб</div>
+
+    <section id="furniture-editor" class="furniture-editor" aria-labelledby="furnish-title" hidden>
+      <div class="furnish-header">
+        <div><small>ДОМ · РЕЖИМ РЕДАКТИРОВАНИЯ</small><h2 id="furnish-title">Обстановка</h2></div>
+        <button id="furnish-exit" type="button">✓ В жизнь</button>
+      </div>
+      <p id="furnish-tip">Выбери предмет на сцене или ниже. Один палец по предмету — перетащить; двумя — камера.</p>
+      <div id="furnish-items" class="furnish-items" role="group" aria-label="Предметы для перемещения"></div>
+      <div class="furnish-commands" role="group" aria-label="Перемещение, поворот и история">
+        <button type="button" id="furnish-left" aria-label="Сдвинуть предмет влево по комнате">←</button>
+        <button type="button" id="furnish-right" aria-label="Сдвинуть предмет вправо по комнате">→</button>
+        <button type="button" id="furnish-up" aria-label="Сдвинуть предмет к дальней стене">↑</button>
+        <button type="button" id="furnish-down" aria-label="Сдвинуть предмет к ближней стене">↓</button>
+        <button type="button" id="furnish-rotate" class="furnish-main">⟳ Поворот</button>
+        <button type="button" id="furnish-undo">↶ Отмена</button>
+        <button type="button" id="furnish-redo">↷ Вернуть</button>
+      </div>
+      <p id="furnish-feedback" class="furnish-feedback" role="status" aria-live="polite">Мир остановлен. Встроенная мебель пока закреплена для сохранности анимаций.</p>
+    </section>
 
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
       <div class="action-header"><div><span id="action-category">Предмет</span><h2 id="action-title">Кровать</h2></div><button type="button" id="close-action" aria-label="Закрыть">×</button></div>
