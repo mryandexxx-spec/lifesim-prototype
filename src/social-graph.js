@@ -1,3 +1,4 @@
+import {initialPairEpisodes,rememberPairReceipt,restorePairEpisodes,episodeAppraisal} from './social-episodes.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 /** Блин’С social graph V1: N residents, N sparse links. No renderer/household imports.
  * Legacy two-resident values are observational inputs from an external adapter.
@@ -34,7 +35,7 @@ const makePair=(a,b)=>({
   counts:{positive:0,negative:0},positiveDays:[],
   counted:[],negativeSinceFriend:0,positiveSinceRival:0,
   friendship:'none',rivalry:'none',
-  lastAt:null,events:[],revision:0
+  lastAt:null,events:[],episodes:initialPairEpisodes(a,b),revision:0
 });
 const adj=graph=>{
   if(graph._links)return graph._links;
@@ -76,6 +77,12 @@ export function getOrCreatePair(graph,idA,idB){
   graph.pairs[key]=pair;
   if(graph._links){graph._links.get(a)?.add(key);graph._links.get(b)?.add(key);}
   return pair;
+}
+/** Existing generic pair owns all lasting episodes; only a derived bias is passed
+ * to the single social-reactions evaluator. No mutable duplicated relationship.
+ */
+export function episodeContext(graph,personId,otherId,minutes){
+  return episodeAppraisal(getPair(graph,personId,otherId),personId,minutes);
 }
 export function getDirectedView(graph,sourceId,targetId){
   const pair=getPair(graph,sourceId,targetId);
@@ -193,6 +200,7 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
     ...(typeof event.token==='string'&&event.token.length<=80?{token:event.token}:{})};
   pair.events.push(receipt);
   pair.events=pair.events.slice(-EVENT_LIMIT);
+  rememberPairReceipt(pair,receipt);
   pair.lastAt=event.at;
   pair.revision++;
   recompute(pair);
@@ -244,7 +252,8 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
   // without a snapshot still get safe, neutral deterministic behavior.
   const reaction=evaluateSocialReaction({
     kind:'branch',actionId:id,recipient:context.recipient,
-    view:getDirectedView(graph,b,a)||view(),minutes:context.minutes??0
+    view:getDirectedView(graph,b,a)||view(),minutes:context.minutes??0,
+    historyBias:episodeContext(graph,b,a,context.minutes??0).bias
   });
   if(!reaction)return null;
   const accepted=reaction.accepted;
@@ -291,6 +300,8 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
         .map(e=>({seq:e.seq,type:e.type,at:e.at,actorId:e.actorId,
           targetId:e.targetId,...(typeof e.token==='string'&&e.token.length<=80?{token:e.token}:{})})):[];
       p.lastAt=safeAt(entry.lastAt)?entry.lastAt:null;
+      p.episodes=restorePairEpisodes(entry.episodes,pairIds,graph.nextSeq,
+        p.lastAt===null?1e7:p.lastAt);
       // Preserve verified historical friendship milestones, no fresh events.
     }
   }

@@ -1,5 +1,6 @@
 /** Original, headless 0.9a conversation engine. Saves only validated IDs, no player text. */
 import {getPerspective} from './social-perspective.js';
+import {episodeContext} from './social-graph.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction,socialOutcome} from './social-feedback.js';
 
@@ -75,7 +76,8 @@ export function evaluateResponse(root,initiator,topic,id){
   const reaction=evaluateSocialReaction({
     kind:'conversation',recipient:partner,view:getPerspective(root,partnerId),
     minutes:root.minutes,tag:CONVERSATION_TOPICS[topic].tag,
-    tone:a.tone,weight:a.weight
+    tone:a.tone,weight:a.weight,
+    historyBias:episodeContext(root.socialGraph,partnerId,initiator,root.minutes).bias
   });
   return reaction?{accepted:reaction.accepted,confidence:reaction.confidence}:null;
 }

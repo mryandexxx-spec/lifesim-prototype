@@ -62,7 +62,7 @@ function stateEffect(c,kind){
  * but the personalized impression is resolved by socialImpressionFactor.
  */
 export function evaluateSocialReaction({
-  kind,recipient,view,minutes,tag=null,tone='neutral',weight=0,actionId=null
+  kind,recipient,view,minutes,tag=null,tone='neutral',weight=0,actionId=null,historyBias=0
 }={}){
   if(!SOCIAL_REACTION_KINDS.includes(kind)||!Number.isFinite(minutes)||minutes<0)return null;
   if(kind==='branch'&&!Object.hasOwn(BRANCH_THRESHOLDS,actionId))return null;
@@ -93,6 +93,9 @@ export function evaluateSocialReaction({
       axes.sociability*8+axes.empathy*8+stateEffect(c,'conversation');
     threshold=-Infinity;
   }
+  // A severe directed memory influences choices, not legacy guaranteed
+  // talk/argue or any saved shared-affinity rule.
+  if(kind!=='direct')score+=clamp(safe(historyBias,0),-30,30);
   accepted=score>=threshold;
   // A confrontation is intentionally hostile; introducing oneself is
   // always possible if the relationship graph unlocked that option.

@@ -7,7 +7,8 @@ import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
   chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial,startBranchSocial } from './relationships.js';
-import {availableSocialActions,relationSummary,BRANCH_ACTIONS} from './social-graph.js';
+import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext} from './social-graph.js';
+import {latestEpisodes} from './social-episodes.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
@@ -1555,6 +1556,16 @@ function boot() {
         $('mind-sentiments').textContent=sentiments.length
           ?sentiments.map(item=>'• '+item.label+' · '+readableTime(item.at).day).join('\n')
           :'Общих событий пока мало';
+        // Long-lived story events belong to the directed graph, not the
+        // short (12-item) personal mood log or the old affinity bar.
+        const otherId=game.selectedSim==='alex'?'mira':'alex';
+        const memoryPair=getPair(game.socialGraph,game.selectedSim,otherId);
+        const episodes=latestEpisodes(memoryPair,game.selectedSim,game.minutes,3);
+        const unresolved=episodeContext(game.socialGraph,game.selectedSim,otherId,game.minutes);
+        $('mind-episodes').textContent=episodes.length
+          ?episodes.map(item=>'• '+item.label+' · '+readableTime(item.at).day).join('\n')+
+            (unresolved.unresolved?'\n• Доверие ещё восстанавливается':'')
+          :'Пока нет значимых совместных событий';
         const list=$('mind-memories');
         list.replaceChildren();
         const memories=current.mind.memories.slice(-4).reverse();

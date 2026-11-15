@@ -2,6 +2,7 @@
  * Pure simulation with an optional saved session; no renderer or wall clock.
  */
 import {evaluateSocialReaction} from './social-reactions.js';
+import {episodeContext} from './social-graph.js';
 import {feelMemory} from './emotion-engine.js';
 import {getPerspective,applySocialPerspective} from './social-perspective.js';
 import {refreshMind} from './psychology.js';
@@ -82,7 +83,8 @@ export function evaluateGift(root,initiator,item){
   if(!receiver)return null;
   const reaction=evaluateSocialReaction({
     kind:'gift',recipient:receiver,view:getPerspective(root,receiverId),
-    minutes:root.minutes,tag:GIFT_CATALOG[item.type].tag
+    minutes:root.minutes,tag:GIFT_CATALOG[item.type].tag,
+    historyBias:episodeContext(root.socialGraph,receiverId,initiator,root.minutes).bias
   });
   return reaction?{accepted:reaction.accepted,liked:reaction.liked,score:reaction.score}:null;
 }
@@ -92,7 +94,8 @@ export function evaluateLeisure(root,initiator,id){
   if(!peer)return null;
   const reaction=evaluateSocialReaction({
     kind:'leisure',recipient:peer,view:getPerspective(root,peerId),
-    minutes:root.minutes,tag:LEISURE_CATALOG[id].tag
+    minutes:root.minutes,tag:LEISURE_CATALOG[id].tag,
+    historyBias:episodeContext(root.socialGraph,peerId,initiator,root.minutes).bias
   });
   return reaction?{accepted:reaction.accepted,score:reaction.score}:null;
 }
