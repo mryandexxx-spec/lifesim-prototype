@@ -10,7 +10,7 @@ const fixture=()=>{
   };
   const element=(name)=>({name,inert:false,isConnected:true,hidden:false,attributes:{},
     focus(){doc.activeElement=this;},
-    getAttribute:k=>this.attributes[k]??null,
+    getAttribute(k){return this.attributes[k]??null;},
     closest:()=>null
   });
   const hud=element('hud'),canvas=element('world'),background=element('outside');
