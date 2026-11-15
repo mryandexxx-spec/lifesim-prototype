@@ -203,7 +203,7 @@ test('iPhone scene integrates original SVG badges above rig heads rather than ce
   const rig=read('../src/characters.js'),visual=read('../src/reaction-badges.js');
   const workflow=read('../.github/workflows/pages.yml');
   assert.ok(page.includes('id="reaction-layer"'));
-  assert.ok(page.includes('сборка / 1.0'));
+  assert.ok(page.includes('сборка / 1.1'));
   assert.ok(!page.includes('id="social-effect"'));
   assert.ok(game.includes('const reactions=consumeSocialReactions(game)'));
   assert.ok(game.includes('reactionBadges.show(reactions)'));
