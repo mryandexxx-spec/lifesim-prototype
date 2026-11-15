@@ -11,7 +11,8 @@ import {SHOWER_LAYOUT,showerSequence,showerPrivacyInvariant} from '../src/shower
 import {TOILET_LAYOUT,toiletSequence,toiletPrivacyInvariant} from '../src/toilet-interaction.js';
 import {FRIDGE_LAYOUT} from '../src/fridge-interaction.js';
 import {bedDestinationFor,chooseFreeBedSlot,newHousehold,loadHousehold} from '../src/household.js';
-import {findPath} from '../src/navigation.js';
+import {findPath,isWalkable} from '../src/navigation.js';
+import {proposeFurnitureMove} from '../src/furniture-layout.js';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const scene=read('../src/game.js');
 const house=read('../src/household.js');
@@ -120,4 +121,23 @@ test('F1b active visual timelines use transformed resident contact not mutable h
     "inverseFurniturePose(game.world,'bed',display)",
     "inverseFurniturePose(game.world,'bed',miraDisplay)"
   ])assert.ok(scene.includes(phrase),phrase);
+});
+
+test('each functional item has at least one valid relocated placement with both residents reachable',()=>{
+  const residentA={x:-.8,z:2.95},residentB={x:0,z:0};
+  const deltas=[[.25,0],[-.25,0],[0,.25],[0,-.25],[.5,0],[-.5,0],
+    [0,.5],[0,-.5],[.75,0],[-.75,0],[0,.75],[0,-.75]];
+  for(const type of ['bed','sofa','fridge','shower','toilet']){
+    const w=newFurnitureWorld(),item=w.instances.find(i=>i.prefabId===type);
+    let success=null;
+    for(const [dx,dz] of deltas){
+      const result=proposeFurnitureMove(w,item.instanceId,{
+        x:item.x+dx,z:item.z+dz,yaw:item.yaw
+      },{residents:[residentA,residentB]});
+      if(result.ok){success=result;break;}
+    }
+    assert.ok(success,type+' must have a safe real placement');
+    assert.ok(isWalkable(residentA.x,residentA.z,success.world));
+    assert.ok(isWalkable(residentB.x,residentB.z,success.world));
+  }
 });
