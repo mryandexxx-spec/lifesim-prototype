@@ -20,7 +20,8 @@ import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
  * the same skin for dressed entry/exit, but the entire avatar is hidden
  * behind the existing opaque privacy enclosure for washing.
  */
-export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStatus=()=>{}}) {
+export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
+  fridgeLayout=null,onStatus=()=>{}}) {
   const hiddenFromReplacement=new Set([rig.selected,rig.snack,rig.book,rig.showerWrap]);
   const legacyRenderers=rig.avatar.findComponents('render')
     .filter(component=>!hiddenFromReplacement.has(component.entity));
@@ -79,7 +80,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
       // A stable post-Anim script for the right arm and hand-attached snack.
       // If the rig lacks bones or Script support, retain procedural fridge.
       try{
-        const fridge=createMeshyFridgeController({pc,model,avatar:rig.avatar});
+        const fridge=createMeshyFridgeController({pc,model,avatar:rig.avatar,
+          layout:fridgeLayout||undefined});
         if(fridge.ready&&pc.Script&&typeof model.addComponent==='function'){
           class FridgePostUpdate extends pc.Script{
             static scriptName='blinsAlexFridgePostUpdate';

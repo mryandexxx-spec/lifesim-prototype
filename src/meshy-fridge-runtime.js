@@ -29,8 +29,10 @@ export function createMeshyFridgeController({
   const forearm=model.findByName('mixamorig:RightForeArm');
   const hand=model.findByName('mixamorig:RightHand');
   const head=model.findByName('mixamorig:Head');
-  if(!upper||!forearm||!hand||!head||!layout?.handle||
-    !layout?.shelfTarget||!Number.isFinite(layout.handleY))return unavailable;
+  const layoutNow=()=>typeof layout==='function'?layout():layout;
+  const first=layoutNow();
+  if(!upper||!forearm||!hand||!head||!first?.handle||
+    !first?.shelfTarget||!Number.isFinite(first.handleY))return unavailable;
 
   // One small snack mesh per imported model, parented to the REAL hand bone.
   const food=new pc.Entity('Meshy '+resident+' hand snack');
@@ -81,8 +83,10 @@ export function createMeshyFridgeController({
     transform.transformVector(poleDirection,poleWorld);
     const mouth={x:headPos.x+frontWorld.x,y:headPos.y-.135,
       z:headPos.z+frontWorld.z};
-    const handle={x:layout.handle.x,y:layout.handleY,z:layout.handle.z};
-    const shelf=layout.shelfTarget;
+    const current=layoutNow();
+    if(!current?.handle||!current?.shelfTarget)return false;
+    const handle={x:current.handle.x,y:current.handleY,z:current.handle.z};
+    const shelf=current.shelfTarget;
     const total=pose.handle+pose.shelf+pose.mouth;
     const target={x:0,y:0,z:0};
     for(const [point,weight] of [

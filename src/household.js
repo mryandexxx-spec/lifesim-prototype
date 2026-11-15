@@ -10,6 +10,7 @@ import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLif
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
 import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './furniture-catalog.js';
+import {furniturePoint} from './furniture-transform.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 
@@ -141,7 +142,7 @@ export function chooseFreeBedSlot(position,occupied=[],world=null) {
   let best=null,bestCost=Infinity;
   for(const id of BED_SLOT_IDS){
     if(occupied.includes(id))continue;
-    const to=BED_SLOTS[id].approach;
+    const to=furniturePoint(world,'bed',BED_SLOTS[id].approach);
     const path=findPath(origin,to,world);
     if(!path)continue;
     let prev=origin,cost=0;
@@ -168,7 +169,7 @@ export function bedSlotFor(root,residentId='alex') {
 }
 export function bedDestinationFor(root,residentId='alex'){
   const slot=bedSlotFor(root,residentId);
-  return slot?{...BED_SLOTS[slot].approach}:null;
+  return slot?furniturePoint(root.world,'bed',BED_SLOTS[slot].approach):null;
 }
 /** Beds capacity=2; each of the other furniture actions remains exclusive. */
 export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceId=null) {

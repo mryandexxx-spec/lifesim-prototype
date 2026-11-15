@@ -3,6 +3,7 @@ import {FURNITURE_CATALOG,instanceRect,restoreFurnitureWorld,
   furnitureObstacles,furnitureActionApproach} from './furniture-catalog.js';
 import {ROOM,isWalkable,findPath} from './navigation.js';
 import {BED_SLOTS} from './bed-layout.js';
+import {furniturePoint} from './furniture-transform.js';
 
 const validPose=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&[0,90,180,270].includes(p.yaw);
 const overlap=(a,b)=>Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*
@@ -36,7 +37,8 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
     if(!person||!Number.isFinite(person.x)||!Number.isFinite(person.z))continue;
     if(!isWalkable(person.x,person.z,candidate))return {ok:false,reason:'resident-blocked'};
     // Either sleeping side must remain reachable for essential self-care.
-    if(!Object.values(BED_SLOTS).some(slot=>findPath(person,slot.approach,candidate)))
+    if(!Object.values(BED_SLOTS).some(slot=>
+      findPath(person,furniturePoint(candidate,'bed',slot.approach),candidate)))
       return {ok:false,reason:'unreachable-bed'};
     for(const action of ['fridge','shower','toilet','sofa']){
       const goal=furnitureActionApproach(candidate,action);

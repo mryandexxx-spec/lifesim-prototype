@@ -34,7 +34,7 @@ export function miraStaticSourceBounds(renderRoot){
  * The existing avatar controls motion and sofa seat root; the authored
  * female sitting clip drives ONLY the skinned pose with X/Z motion removed.
  */
-export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
+export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,onStatus=()=>{}}){
   const preserved=new Set([rig.selected,rig.snack,rig.book,rig.showerWrap]);
   const legacyRenderers=rig.avatar.findComponents('render')
     .filter(component=>!preserved.has(component.entity));
@@ -102,7 +102,8 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       try{
         if(pc.Script&&model.findByName){
           const fridge=createMeshyFridgeController({
-            pc,model,avatar:rig.avatar,resident:'Mira'
+            pc,model,avatar:rig.avatar,resident:'Mira',
+            layout:fridgeLayout||undefined
           });
           if(fridge.ready){
             if(!model.script)model.addComponent('script');

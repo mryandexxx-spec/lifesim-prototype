@@ -1,12 +1,13 @@
-/** F1: safe finite furniture edit history; no DOM, PlayCanvas or wall-clock.
- * Initial controllable set contains only self-contained decorative assemblies:
- * procedural bed, seat, fridge, shower and WC have fixed authored pose controllers
- * and CANNOT be moved until a future coherent interaction-anchor migration.
+/** F1b: data-first household editor with scene/contact-safe functional fixtures.
+ * The built-in kitchen counter is immovable until kitchen/wall construction;
+ * all other authored fixtures are grouped and transformed by one world adapter.
  */
 import {FURNITURE_CATALOG,restoreFurnitureWorld} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
 
-export const F1_MOVEABLE_PREFABS=Object.freeze(['nightstand','table','tv','plant']);
+export const F1_MOVEABLE_PREFABS=Object.freeze([
+  'nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet'
+]);
 export const F1_GRID_STEP=.25;
 export function canMoveFurniture(instance){
   return !!instance&&instance.location==='home'&&
