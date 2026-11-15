@@ -214,6 +214,7 @@ export function relationSummary(graph,sourceId,targetId){
 }
 const action=(label,category,reason)=>Object.freeze({label,category,reason});
 export const BRANCH_ACTIONS=Object.freeze({
+  'acquaint.introduce':action('Представиться','acquaintance','Вы уже знакомы'),
   'acquaint.chat':action('Узнать друг друга получше','acquaintance','Сначала нужно познакомиться'),
   'friend.tease':action('Дружески подшутить','friendship','Нужна взаимная дружба'),
   'friend.confide':action('Доверить секрет','friendship','Нужна взаимная дружба и доверие'),
@@ -225,7 +226,8 @@ export function availableSocialActions(graph,a,b){
     !graph?.persons?.includes(a)||!graph.persons.includes(b))return [];
   const pair=getPair(graph,a,b),status=relationSummary(graph,a,b);
   return Object.entries(BRANCH_ACTIONS).map(([id,def])=>{
-    const enabled=id==='acquaint.chat'?status.met:
+    const enabled=id==='acquaint.introduce'?!status.met:
+      id==='acquaint.chat'?status.met:
       id==='friend.tease'?status.friendship!=='none':
       id==='friend.confide'?status.friendship!=='none'&&
         (pair?.views[a]?.trust??0)>=60:
@@ -236,16 +238,18 @@ export function availableSocialActions(graph,a,b){
 export function resolveBranchResponse(graph,a,b,id){
   const available=availableSocialActions(graph,a,b).find(x=>x.id===id);
   if(!available?.enabled)return null;
-  const recipient=getDirectedView(graph,b,a);
+  const recipient=getDirectedView(graph,b,a)||view();
   const base=recipient.trust*.42+recipient.friendship*.27-recipient.tension*.40;
-  const accepted=id==='rival.taunt'?false:
+  const accepted=id==='acquaint.introduce'?true:id==='rival.taunt'?false:
     id==='rival.truce'?base>=24:
     id==='friend.tease'?base>=24:
     id==='friend.confide'?base>=43:base>=6;
-  const type=id==='rival.taunt'?id:accepted?id:id+'.refused';
+  const type=id==='acquaint.introduce'?'introduced':
+    id==='rival.taunt'?id:accepted?id:id+'.refused';
   return {accepted,type,id,label:accepted?
     id==='friend.tease'?'Шутку оценили':id==='friend.confide'?'Секрет принят':
-    id==='rival.truce'?'Удалось начать примирение':'Узнали друг друга получше':
+    id==='rival.truce'?'Удалось начать примирение':
+    id==='acquaint.introduce'?'Познакомились!':'Узнали друг друга получше':
     id==='rival.taunt'?'Снова разгорелся конфликт':'Собеседнику сейчас не подошло'};
 }
 /** Restoration validates IDs, pair keys, limits and counter shape; no events replay. */

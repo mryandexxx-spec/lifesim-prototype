@@ -1,3 +1,15 @@
+test('unknown residents can introduce themselves without earning free friendship',()=>{
+  const g=newSocialGraph(ids);
+  const actions=availableSocialActions(g,'nova','ember');
+  assert.equal(actions.find(a=>a.id==='acquaint.introduce').enabled,true);
+  assert.equal(actions.find(a=>a.id==='acquaint.chat').enabled,false);
+  assert.equal(resolveBranchResponse(g,'nova','ember','acquaint.introduce').type,'introduced');
+  assert.ok(event(g,'nova','ember','introduced',480));
+  assert.equal(relationSummary(g,'nova','ember').label,'Знакомые');
+  assert.equal(getPair(g,'nova','ember').counts.positive,0);
+  assert.equal(availableSocialActions(g,'nova','ember').find(a=>a.id==='acquaint.introduce').enabled,false);
+});
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
