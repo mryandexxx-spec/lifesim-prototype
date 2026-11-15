@@ -9,6 +9,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial,startBranchSocial } from './relationships.js';
 import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes,socialCommunicationNotes} from './social-graph.js';
 import {latestEpisodes} from './social-episodes.js';
+import {pairDynamic} from './social-dynamics.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
@@ -1232,9 +1233,15 @@ function boot() {
         autonomyWaitSeconds[residentId]=advanceAutonomyWait(autonomyWaitSeconds[residentId],dt,resident);
         if(!resident.action && autonomyWaitSeconds[residentId]>=AUTONOMY_WAIT_SECONDS){
           const socialIdea=autonomousSocialChoice(game,residentId);
-          if(socialIdea && beginSocial(socialIdea,true,residentId)){
-            toast(getActorName(residentId)+' захотел(а) поговорить');
-            continue;
+          if(socialIdea){
+            if(beginSocial(socialIdea,true,residentId)){
+              toast(getActorName(residentId)+' захотел(а) пообщаться');
+              continue;
+            }
+            // If pathfinding or visual reservations refuse a proposal, do
+            // not retry it every frame and do not disturb either resident.
+            resident.autonomy.nextAt=game.minutes+15;
+            restartAutonomyWait(residentId);
           }
           const idea=residentAutonomousChoice(game,residentId);
           if(idea && beginAction(idea,true,residentId))
@@ -1560,6 +1567,8 @@ function boot() {
         // short (12-item) personal mood log or the old affinity bar.
         const otherId=game.selectedSim==='alex'?'mira':'alex';
         const memoryPair=getPair(game.socialGraph,game.selectedSim,otherId);
+        const dynamic=pairDynamic(memoryPair,game.selectedSim,game.minutes);
+        $('mind-dynamic').textContent=dynamic.label+' · '+dynamic.description;
         const episodes=latestEpisodes(memoryPair,game.selectedSim,game.minutes,3);
         const unresolved=episodeContext(game.socialGraph,game.selectedSim,otherId,game.minutes);
         $('mind-episodes').textContent=episodes.length

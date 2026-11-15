@@ -5,6 +5,7 @@ import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction} from './social-feedback.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
 import {cueFromAnswer} from './social-boundaries.js';
+import {proposeAutonomousSocial} from './social-dynamics.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor} from './gifts-leisure.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
@@ -291,25 +292,18 @@ export function loadSocialAction(data,root) {
     ...(shared?{shared}:{}),
     ...(branch?{branchAction:{id:branch.id}}:{})};
 }
+/** Current scene adapter stays two-person; policy core handles N IDs.
+ * No automatic invitation reserves or deletes a player's FIFO action here.
+ */
 export function autonomousSocialChoice(root,id='alex') {
-  if(!validId(id)||!root.relationship||!root.autonomy.enabled||
-    root.minutes<540||root.minutes<root.relationship.nextSocialAt||root.socialAction||root.paused)return null;
-  const self=get(root,id),partner=get(root,otherId(id));
-  if(!self||!partner||self.action||partner.action||
-    root.actionQueues?.byResident?.[id]?.length||
-    root.actionQueues?.byResident?.[otherId(id)]?.length)return null;
-  if(Math.min(self.needs.energy,self.needs.hunger,self.needs.hygiene,
-    partner.needs.energy,partner.needs.hunger,partner.needs.hygiene)<40)return null;
-  // The one who started the last quarrel may initiate making peace
-  // once the normal three-hour social cooldown passes. Do not use wall
-  // clocks, random rolls or a new save field.
-  if(canReconcile(root)&&root.relationship.affinity<70&&
-    lastSocialMemory(self)?.id==='regret')return 'talk';
-  const view=getPerspective(root,id);
-  // High personal tension may influence an idle person's voluntary response.
-  // This never disables the player's manual talk or argue controls.
-  if(self.needs.fun<35&&view?.tension>=65&&self.mind.mood.value<48)return 'argue';
-  if(self.needs.fun<55&&root.relationship.affinity>=25)return 'talk';
-  if(self.needs.fun<35&&root.relationship.affinity<25&&self.mind.mood.value<45)return 'argue';
-  return null;
+  if(!validId(id)||!root?.otherSim)return null;
+  const idea=proposeAutonomousSocial({
+    graph:root.socialGraph,actorId:id,
+    residents:{alex:root,mira:root.otherSim},
+    queues:root.actionQueues,minutes:root.minutes,
+    enabled:root.autonomy?.enabled,paused:root.paused,
+    socialBusy:Boolean(root.socialAction),
+    nextSocialAt:root.relationship?.nextSocialAt??Infinity
+  });
+  return idea?.kind??null;
 }

@@ -243,7 +243,7 @@ test('mobile scene and Pages include optional personal cue UI, not numeric thres
    graph=read('../src/social-graph.js'),relation=read('../src/relationships.js'),
    response=read('../src/social-reactions.js'),workflow=read('../.github/workflows/pages.yml'),
    core=read('../src/social-boundaries.js');
- assert.ok(html.includes('сборка / 1.0g'));
+ assert.ok(html.includes('сборка / 1.0h'));
  assert.ok(html.includes('id="mind-social-cues"'));
  assert.ok(html.includes('КАК ЛУЧШЕ ОБЩАТЬСЯ'));
  assert.ok(ui.includes('socialCommunicationNotes(game.socialGraph,game.selectedSim,otherId,3)'));
@@ -252,7 +252,7 @@ test('mobile scene and Pages include optional personal cue UI, not numeric thres
  assert.ok(graph.includes('restoreSocialCues(entry.cues'));
  assert.ok(response.includes('styleBias=0'));
  assert.ok(workflow.includes('node --check src/social-boundaries.js'));
- assert.ok(workflow.includes('src/social-compatibility.js src/social-boundaries.js src/reaction-badges.js'));
+ assert.ok(workflow.includes('src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/reaction-badges.js'));
  assert.ok(!/\b(alex|mira|document|localStorage|playcanvas)\b/i.test(core));
  assert.equal(CUE_LIMIT,5);
 });
