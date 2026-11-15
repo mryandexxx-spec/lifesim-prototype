@@ -1331,6 +1331,16 @@ function boot() {
     }
     return pickWorldRayTarget(near,far,[...residents,...hitVolumes]);
   };
+  let tapCueTimeout=null;
+  const confirmWorldTap=pos=>{
+    const cue=$('world-tap-cue');
+    const rect=canvas.getBoundingClientRect();
+    cue.style.left=(pos.x-rect.left)+'px';
+    cue.style.top=(pos.y-rect.top)+'px';
+    cue.hidden=false;
+    clearTimeout(tapCueTimeout);
+    tapCueTimeout=setTimeout(()=>{cue.hidden=true;},450);
+  };
   const endPointer=event=>{
     if(!fingers.has(event.pointerId))return;
     const tap=tapCandidate&&tapCandidate.id===event.pointerId&&
@@ -1341,6 +1351,7 @@ function boot() {
     tapCandidate=null;lastPinch=null;lastMidpoint=null;
     if(tap&&!dialogueNeedsDecision(game)){
       const target=worldTargetAt(pos);
+      if(target)confirmWorldTap(pos);
       if(target?.kind==='resident')openSocialContext();
       else if(target?.kind==='object')select(target.id);
       else{closeSocialContext();select(null);}
@@ -1912,7 +1923,7 @@ function boot() {
     $('loading').hidden=true;
     toast(failed
       ? 'Часть 3D-моделей недоступна — включены старые облики'
-      : 'Свайп — двигай комнату · два пальца — поворот и масштаб');
+      : 'Коснись жителя или мебели · МЕТКИ — названия предметов');
   });
 }
 
