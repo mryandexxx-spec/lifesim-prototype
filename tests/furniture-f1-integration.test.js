@@ -12,6 +12,9 @@ test('F1 mobile UI has real mode enter/exit, four actual movable objects and acc
     'furnish-undo','furnish-redo','furnish-feedback'])
     assert.ok(html.includes('id="'+id+'"'),id);
   assert.match(html,/id="furnish-toggle"[^>]+aria-pressed="false"/);
+  assert.ok(html.indexOf('id="furnish-toggle"')>html.indexOf('id="pause-btn"'));
+  assert.ok(html.indexOf('id="furnish-toggle"')<html.indexOf('id="speed-btn"'),
+    'F1 entrance remains visible on a short landscape iPhone');
   assert.match(html,/id="furniture-editor"[^>]+hidden/);
   assert.match(css,/\.furniture-editor\[hidden\]\{display:none!important;/);
   assert.match(css,/\.app-shell\[data-furnish-mode="true"\] #dashboard/);
