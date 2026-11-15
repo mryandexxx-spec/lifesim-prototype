@@ -22,6 +22,7 @@ import {visibleEmotions} from './emotion-engine.js';
 import {consumeSocialReactions,clearSocialReactions} from './social-feedback.js';
 import {createReactionBadges} from './reaction-badges.js';
 import {needPresentation,moodPresentation,moodOrbitPoint} from './mood-presentation.js';
+import {moodActionPolicy} from './mood-action-policy.js';
 import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js';
@@ -982,7 +983,8 @@ function boot() {
     return true;
   };
   dispatchPlannedActions=()=>{
-    if(game.paused)return [];
+    if(game.paused||dialogueNeedsDecision(game))return [];
+    const refused=[];
     const started=dispatchActionQueues(game.actionQueues,{
       canStart(residentId,command){
         if(!HOUSEHOLD_IDS.includes(residentId)||game.socialAction)return false;
@@ -1015,6 +1017,19 @@ function boot() {
           return false;
         return true;
       },
+      // No refusal when a task is blocked by another person or furniture.
+      // This callback runs only for a startable HEAD, never on enqueue or on
+      // an action already walking/using. Partner's consent stays separate.
+      beforeStart(residentId,command){
+        const policy=moodActionPolicy(getActor(game,residentId),command);
+        return policy.willing?null:policy.reason;
+      },
+      onRefused(residentId,command,reason){
+        const resident=getActor(game,residentId);
+        resident.event=reason;
+        resident.autonomy.nextAt=Math.max(resident.autonomy.nextAt,game.minutes+12);
+        refused.push({residentId,command,reason});
+      },
       start(residentId,command){
         if(command.type==='object')
           return beginAction(command.actionId,false,residentId,true);
@@ -1030,9 +1045,19 @@ function boot() {
         return false;
       }
     });
-    // Persist active task and removed queue entry in the SAME v1 snapshot,
-    // so a page reload cannot replay a consumed plan.
-    if(started.length)save(true);
+    if(refused.length){
+      // A self-refusal is not partner rejection: no socialGraph receipt,
+      // memory, affection change or cancellation of a running task.
+      const last=refused[refused.length-1];
+      const message=getActorName(last.residentId)+': '+last.reason+
+        ' — '+taskLabel(last.command).toLowerCase();
+      $('queue-feedback').textContent=message;
+      renderQueuePanel(true);
+      toast(message); // small pointer-transparent corner notification (1.0o)
+    }
+    // Persist both actual starts and rejected HEAD removal atomically in v1,
+    // so a reload cannot replay a self-refused command.
+    if(started.length||refused.length)save(true);
     return started;
   };
   resetRuntime=()=>{
@@ -1301,12 +1326,18 @@ function boot() {
           const socialIdea=autonomousSocialChoice(game,residentId);
           if(socialIdea){
             const plan=typeof socialIdea==='string'?{kind:socialIdea}:socialIdea;
-            const started=plan.type==='shared'
+            const intent=plan.type==='shared'
+              ?{type:'shared',mode:plan.mode,choiceId:plan.choiceId}
+              :plan.type==='branch'
+                ?{type:'branch',actionId:plan.actionId}
+                :{type:'social',actionId:plan.kind};
+            const willing=moodActionPolicy(resident,intent,{automatic:true}).willing;
+            const started=willing&&(plan.type==='shared'
               ?beginSocial('talk',true,residentId,null,
                 {mode:plan.mode,choiceId:plan.choiceId})
               :plan.type==='branch'
                 ?beginSocial('talk',true,residentId,null,null,plan.actionId)
-                :beginSocial(plan.kind,true,residentId);
+                :beginSocial(plan.kind,true,residentId));
             if(started){
               const label=plan.type==='shared'
                 ?LEISURE_CATALOG[plan.choiceId]?.label.toLowerCase()
@@ -1316,9 +1347,9 @@ function boot() {
               toast(getActorName(residentId)+' решил(а): '+(label||'пообщаться'));
               continue;
             }
-            // If pathfinding or visual reservations refuse a proposal, do
-            // not retry it every frame and do not disturb either resident.
-            resident.autonomy.nextAt=game.minutes+15;
+            // Busy routes need a retry cooldown; bad mood instead permits
+            // ordinary self-care choice below without wasting this frame.
+            if(willing)resident.autonomy.nextAt=game.minutes+15;
             restartAutonomyWait(residentId);
           }
           const idea=residentAutonomousChoice(game,residentId);

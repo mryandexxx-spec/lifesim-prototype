@@ -90,14 +90,28 @@ export function queueHeads(queues){
     .map(([residentId,items])=>({residentId,command:items[0]}))
     .sort((a,b)=>a.command.seq-b.command.seq);
 }
-/** Explicitly acknowledged dispatch: never remove the pending task until
- * the runtime really accepted it. One head per resident per pass, FIFO.
+/** Explicitly acknowledged dispatch: never remove a pending task until
+ * execution accepts it, or the same resident explicitly refuses OPTIONAL
+ * work at the dispatch boundary. A refusal is not an action-completion event,
+ * and a later queue entry must wait for a later dispatch pass (strict FIFO).
  */
-export function dispatchActionQueues(queues,{canStart,start}={}){
+export function dispatchActionQueues(queues,{canStart,start,beforeStart,onRefused}={}){
   if(typeof canStart!=='function'||typeof start!=='function')return [];
   const started=[];
   for(const {residentId,command} of queueHeads(queues)){
     if(!canStart(residentId,command))continue;
+    // Keep the "resource busy" retry semantics separate from an actual
+    // initiator refusal, evaluated only when the head could start.
+    const refusal=typeof beforeStart==='function'
+      ?beforeStart(residentId,command):null;
+    if(typeof refusal==='string'&&refusal.length>0){
+      const current=pendingActions(queues,residentId);
+      if(current[0]?.seq===command.seq){
+        current.shift();
+        if(typeof onRefused==='function')onRefused(residentId,command,refusal);
+      }
+      continue;
+    }
     if(start(residentId,command)===true){
       const current=pendingActions(queues,residentId);
       if(current[0]?.seq===command.seq)current.shift();

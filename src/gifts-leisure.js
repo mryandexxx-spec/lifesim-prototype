@@ -7,6 +7,7 @@ import {socialCompatibility} from './social-compatibility.js';
 import {feelMemory} from './emotion-engine.js';
 import {getPerspective,applySocialPerspective} from './social-perspective.js';
 import {refreshMind} from './psychology.js';
+import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 
 export const GIFT_CATALOG=Object.freeze({
   book:Object.freeze({label:'Книга историй',symbol:'📖',tag:'books'}),
@@ -149,10 +150,15 @@ export function completeSharedSession(root){
     if(!evaluation)return null;
     if(evaluation.accepted){
       kind='completed';
+      // Snapshot productivity BEFORE the success memory/emotion is recorded;
+      // that new positive receipt must not retroactively amplify its own fun.
+      const pastime={type:'shared',mode:'leisure'};
+      const giverGain=12*voluntaryMoodEfficiency(giver,pastime);
+      const receiverGain=12*voluntaryMoodEfficiency(receiver,pastime);
       const mem='leisure.'+session.choiceId;
       remember(root,from,mem);remember(root,to,mem);
-      giver.needs.fun=clamp(giver.needs.fun+12,0,100);
-      receiver.needs.fun=clamp(receiver.needs.fun+12,0,100);
+      giver.needs.fun=clamp(giver.needs.fun+giverGain,0,100);
+      receiver.needs.fun=clamp(receiver.needs.fun+receiverGain,0,100);
       delta=4;message='Хорошо провели время вместе';
     }else{
       kind='refused';

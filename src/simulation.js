@@ -1,6 +1,7 @@
 /** Pure game rules: no PlayCanvas or browser imports. */
 import { createMind, restoreMind, refreshMind, rememberAction, psychologyScore } from './psychology.js';
 import {DEMO_PROFILES,restoreProfile} from './trait-catalog.js';
+import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {validBedSlot,BED_SLOTS} from './bed-layout.js';
 import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
@@ -113,6 +114,10 @@ export function tick(state, minutes) {
         -Math.max(state.action.elapsed,from));
       gained=definition.benefitPerMinute*overlap/(SHOWER_WASH_END-SHOWER_WASH_START);
     }
+    // M2 affects enjoyment of optional rest, not animation time, eating,
+    // sleep, shower privacy, or promises of physical self-care.
+    if(state.action.id==='sofa')gained*=voluntaryMoodEfficiency(state,
+      {type:'object',actionId:'sofa'});
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
     state.action.elapsed += amount;
     if (state.action.elapsed >= definition.duration ||
