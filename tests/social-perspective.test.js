@@ -210,6 +210,6 @@ test('selected-perspective HUD is wired to DOM and bundled into GitHub Pages',as
   assert.ok(html.includes('id="mind-relation-name"'));
   assert.ok(game.includes('getPerspective(game,game.selectedSim)'));
   assert.ok(game.includes("join('\\n')"),'UI separates two sentiments using an actual newline');
-  assert.ok(workflow.includes('src/social-perspective.js src/social-graph.js src/conversation-engine.js src/gifts-leisure.js src/household.js'));
+  assert.ok(workflow.includes('src/social-perspective.js src/social-graph.js src/action-queue.js src/conversation-engine.js src/gifts-leisure.js src/household.js'));
   assert.ok(workflow.includes('node --check src/social-perspective.js'));
 });

@@ -37,6 +37,7 @@ jobs:
           node --check src/emotion-engine.js
           node --check src/social-perspective.js
           node --check src/social-graph.js
+          node --check src/action-queue.js
           node --check src/conversation-engine.js
           node --check src/gifts-leisure.js
           node --check src/household.js
@@ -74,7 +75,7 @@ jobs:
         run: |
           mkdir -p site/src
           cp index.html character-lab.html character-lab-mira.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
-          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/trait-catalog.js src/sim-events.js src/emotion-engine.js src/social-perspective.js src/social-graph.js src/conversation-engine.js src/gifts-leisure.js src/household.js src/relationships.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js src/interaction-anchors.js src/meshy-seat-runtime.js src/meshy-fridge-runtime.js src/meshy-bed-runtime.js src/meshy-shower-runtime.js src/loading-progress.js src/model-cache.js src/meshy-mira-visual.js src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js site/src/
+          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/trait-catalog.js src/sim-events.js src/emotion-engine.js src/social-perspective.js src/social-graph.js src/action-queue.js src/conversation-engine.js src/gifts-leisure.js src/household.js src/relationships.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js src/interaction-anchors.js src/meshy-seat-runtime.js src/meshy-fridge-runtime.js src/meshy-bed-runtime.js src/meshy-shower-runtime.js src/loading-progress.js src/model-cache.js src/meshy-mira-visual.js src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js site/src/
       - name: Include optional Meshy character GLB when present
         run: |
           mkdir -p site/assets/characters

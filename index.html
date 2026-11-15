@@ -22,9 +22,9 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.0a</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.0b</small></div>
       </div>
-      <div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div>
+      <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
 
     <div id="hotspots" class="hotspots" aria-label="Предметы комнаты"></div>
@@ -67,8 +67,22 @@
     </section>
 
     <section class="social-bar" aria-label="Отношения между жителями">
-      <div class="social-summary"><span class="social-icon" aria-hidden="true">♡</span><div><span class="social-title">ОБЩИЙ УРОВЕНЬ <span id="relationship-value">50/100</span></span><strong id="relationship-label">Нейтрально</strong><span id="relationship-branch" class="branch-mini-status">Знакомые</span><div class="social-meter"><i id="relationship-bar"></i></div></div></div>
-      <div class="social-controls"><span>Общение с <b id="social-partner">Мирой</b></span><div><button id="conversation-btn" type="button">Беседа</button><button id="shared-btn" type="button">Вместе</button><button id="branch-btn" type="button">Связи</button><button id="talk-btn" type="button">Поговорить</button><button id="argue-btn" type="button">Поспорить</button></div></div>
+      <div class="social-summary"><span class="social-icon" aria-hidden="true">♡</span><div><span class="social-title">ОТНОШЕНИЯ <span id="relationship-value" class="dev-relationship">50/100</span></span><strong id="relationship-label">Нейтрально</strong><span id="relationship-branch" class="branch-mini-status">Знакомые</span><div class="social-meter"><i id="relationship-bar"></i></div></div></div>
+      <div class="social-controls"><span>Общение с <b id="social-partner">Мирой</b></span><div><button id="conversation-btn" type="button">Беседа</button><button id="humor-btn" type="button">Юмор</button><button id="friendship-btn" type="button">Дружба</button><button id="conflict-btn" type="button">Конфликт</button><button id="shared-btn" type="button">Вместе</button><button id="branch-btn" type="button" hidden>Связи</button><button id="talk-btn" type="button" hidden>Поговорить</button><button id="argue-btn" type="button" hidden>Поспорить</button></div></div>
+    </section>
+    <section id="social-menu-panel" class="conversation-panel" hidden aria-label="Социальные взаимодействия">
+      <div class="conversation-head">
+        <div><span class="eyebrow">ОБЩЕНИЕ</span><h2 id="social-menu-title">Беседа</h2><p id="social-menu-subtitle">Что предложим?</p></div>
+        <button id="social-menu-close" type="button" aria-label="Закрыть общение">×</button>
+      </div>
+      <div id="social-menu-options" class="conversation-options"></div>
+    </section>
+    <section id="queue-panel" class="queue-panel" hidden aria-label="Очередь действий выбранного жителя">
+      <div class="queue-head"><div><span class="eyebrow">ПЛАН НА ДЕНЬ</span><h2 id="queue-title">Очередь</h2></div>
+        <button type="button" id="queue-close" aria-label="Закрыть очередь">×</button></div>
+      <div id="queue-active" class="queue-active"></div>
+      <ol id="queue-items" class="queue-items"></ol>
+      <p id="queue-empty" class="queue-hint" hidden>Пока ничего не запланировано</p>
     </section>
     <section id="conversation-panel" class="conversation-panel" hidden aria-label="Многоходовый разговор">
       <div class="conversation-head">
