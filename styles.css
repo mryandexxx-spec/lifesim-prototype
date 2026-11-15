@@ -190,3 +190,12 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .loading .loading-count{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;color:#326f5a;}
 .loading #loading-status{max-width:310px;min-height:20px;}
 @media(prefers-reduced-motion:reduce){.loading-mark{animation:none}.loading-track>div{transition:none}}
+
+/* 1.0a: branch options sit ABOVE the three-row social toolbar on phones. */
+#branch-panel{bottom:calc(env(safe-area-inset-bottom) + 288px);max-height:min(48dvh,360px);}
+@media(max-width:700px){
+  #branch-panel{bottom:calc(env(safe-area-inset-bottom) + 337px);max-height:min(43dvh,calc(100dvh - 355px));}
+}
+@media(max-height:560px){
+  #branch-panel{bottom:calc(env(safe-area-inset-bottom) + 245px);max-height:calc(100dvh - 260px);}
+}

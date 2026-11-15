@@ -1,3 +1,44 @@
+test('in-game friendly branch is unlocked only after mutual status and completes once',()=>{
+  const s=newHousehold(),g=s.socialGraph;
+  for(const id of ['alex','mira']){
+    s.relationship.views[id].friendship=80;
+    s.relationship.views[id].trust=76;
+    s.relationship.views[id].tension=0;
+  }
+  for(const [type,at] of [['talk',480],['gift.accepted',485],['leisure.accepted',1950]])
+    applySocialEvent(g,{type,at,actorId:'alex',targetId:'mira'},
+      {observedViews:{alex:s.relationship.views.alex,mira:s.relationship.views.mira}});
+  assert.equal(relationSummary(g,'alex','mira').friendship,'friends');
+  assert.equal(startBranchSocial(s,'alex',place,'friend.tease'),true);
+  arriveSocial(s);
+  tickSocial(s,19);
+  assert.equal(s.socialAction,null);
+  assert.equal(s.relationship.affinity,56);
+  assert.equal(g.pairs[pairKey('alex','mira')].events.at(-1).type,'friend.tease');
+  assert.equal(g.pairs[pairKey('alex','mira')].counts.positive,4);
+  tickSocial(s,19);
+  assert.equal(g.pairs[pairKey('alex','mira')].counts.positive,4);
+});
+test('in-game mutual enemies can confront and record asymmetric conflict',()=>{
+  const s=newHousehold(),g=s.socialGraph;
+  for(const id of ['alex','mira']){
+    s.relationship.views[id].friendship=14;
+    s.relationship.views[id].trust=12;
+    s.relationship.views[id].tension=92;
+  }
+  const observed={alex:s.relationship.views.alex,mira:s.relationship.views.mira};
+  for(const [type,at] of [['argue',480],['rival.taunt',520]])
+    applySocialEvent(g,{type,at,actorId:'alex',targetId:'mira'},{observedViews:observed});
+  assert.equal(relationSummary(g,'alex','mira').rivalry,'mutual');
+  assert.equal(startBranchSocial(s,'mira',place,'rival.taunt'),true);
+  arriveSocial(s);tickSocial(s,19);
+  assert.equal(s.socialAction,null);
+  assert.equal(s.relationship.affinity,45);
+  assert.equal(s.mind.memories.at(-1).id,'hurt');
+  assert.equal(s.otherSim.mind.memories.at(-1).id,'regret');
+  assert.equal(g.pairs[pairKey('alex','mira')].events.at(-1).type,'rival.taunt');
+});
+
 test('unknown residents can introduce themselves without earning free friendship',()=>{
   const g=newSocialGraph(ids);
   const actions=availableSocialActions(g,'nova','ember');
