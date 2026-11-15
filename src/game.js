@@ -8,6 +8,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
   chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial,startBranchSocial } from './relationships.js';
 import {availableSocialActions,relationSummary,BRANCH_ACTIONS} from './social-graph.js';
+import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
   CONVERSATION_MAX_TURNS} from './conversation-engine.js';
@@ -96,6 +97,13 @@ let sharedPicker=false;
 let sharedDisplayKey='';
 let branchPicker=false;
 let branchDisplayKey='';
+let socialMenuCategory=null;
+let socialMenuDisplayKey='';
+let queueVisible=false;
+let queueDisplayKey='';
+let dispatchPlannedActions=()=>[];
+let debugTapCount=0;
+let debugTapAt=0;
 let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let toastTimeout;
@@ -106,6 +114,31 @@ function toast(message) {
 function save(silent = false) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); if (!silent) toast('Игра сохранена на этом устройстве'); }
   catch { if (!silent) toast('Не удалось сохранить: браузер запретил хранилище'); }
+}
+function taskLabel(task){
+  if(!task)return 'Неизвестное действие';
+  if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
+  if(task.type==='social')return SOCIAL_ACTIONS[task.actionId]?.label||'Общение';
+  if(task.type==='conversation')return 'Беседа: '+(CONVERSATION_TOPICS[task.topicId]?.label||'Разговор');
+  if(task.type==='branch')return BRANCH_ACTIONS[task.actionId]?.label||'Общение';
+  if(task.type==='shared'){
+    if(task.mode==='gift')return 'Подарить: '+(GIFT_CATALOG[inventoryFor(game,task.residentId||game.selectedSim)
+      .find(x=>x.id===task.choiceId)?.type]?.label||'предмет');
+    return LEISURE_CATALOG[task.choiceId]?.label||'Совместный досуг';
+  }
+  return 'Действие';
+}
+function scheduleCommand(command,residentId=game.selectedSim){
+  const task=enqueueAction(game.actionQueues,residentId,command);
+  if(!task){toast('Не удалось добавить: очередь заполнена или действие недоступно');return false;}
+  toast(getActorName(residentId)+': запланировано — '+taskLabel({...task,residentId}));
+  renderQueuePanel(true);
+  return true;
+}
+function queuedSocial(kind,extra={}){
+  const targetId=game.selectedSim==='alex'?'mira':'alex';
+  return scheduleCommand({type:kind==='talk'||kind==='argue'?'social':kind,
+    targetId,...extra,...(kind==='talk'||kind==='argue'?{actionId:kind}:{})});
 }
 function closeMindPanel() {
   $('mind-panel').hidden = true;
@@ -120,7 +153,7 @@ $('mind-toggle').addEventListener('click', () => {
 $('mind-close').addEventListener('click', closeMindPanel);
 $('wish-do-btn').addEventListener('click', () => {
   const id = selectedActor().mind?.wish?.id;
-  if (id && beginAction(id)) {
+  if (id && scheduleCommand({type:'object',actionId:id})) {
     closeMindPanel();
     toast(selectedName()+' исполняет желание: ' + WISHES[id].label.toLowerCase());
   }
@@ -148,53 +181,177 @@ for (const id of Object.keys(META)) {
 $('close-action').addEventListener('click', () => select(null));
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
-  if (beginAction(selected)) {
-    toast(`${selectedName()}: ${ACTIONS[selected].label.toLowerCase()}`);
+  if (scheduleCommand({type:'object',actionId:selected})) {
     select(null);
   }
 });
-for(const kind of Object.keys(SOCIAL_ACTIONS)){
-  $(kind+'-btn').addEventListener('click',()=>{
-    conversationTopicPicker=false;branchPicker=false;
-    renderConversationPanel();renderBranchPanel();
-    if(beginSocial(kind)) {
-      sharedPicker=false;renderSharedPanel();
-      select(null);closeMindPanel();
-      toast(selectedName()+' хочет '+(kind==='talk'?'поговорить':'поспорить')+' с '+getActorName(game.selectedSim==='alex'?'mira':'alex'));
-    }
-  });
+// Legacy buttons remain hidden for old UI references; queue rather than interrupt.
+for(const kind of Object.keys(SOCIAL_ACTIONS))
+  $(kind+'-btn').addEventListener('click',()=>queuedSocial(kind));
+function closeSocialPickers(){
+  conversationTopicPicker=false;
+  sharedPicker=false;
+  branchPicker=false;
+  socialMenuCategory=null;
+  renderConversationPanel();renderSharedPanel();renderBranchPanel();renderSocialMenu();
 }
-$('conversation-btn').addEventListener('click',()=>{
-  if(game.socialAction)return;
-  sharedPicker=false;branchPicker=false;
-  renderSharedPanel();renderBranchPanel();
-  conversationTopicPicker=true;
-  select(null);closeMindPanel();
-  renderConversationPanel();
+function showSocialCategory(category){
+  const peer=game.selectedSim==='alex'?'mira':'alex';
+  const status=relationSummary(game.socialGraph,game.selectedSim,peer);
+  if(category==='friendship'&&status.friendship==='none'){
+    toast('Дружеские действия пока недоступны');return;
+  }
+  closeSocialPickers();
+  if(category==='shared'){
+    sharedPicker=true;select(null);closeMindPanel();renderSharedPanel();return;
+  }
+  socialMenuCategory=category;
+  select(null);closeMindPanel();renderSocialMenu();
+}
+for(const [id,category] of [
+  ['conversation-btn','conversation'],['humor-btn','humor'],
+  ['friendship-btn','friendship'],['conflict-btn','conflict'],['shared-btn','shared']
+])$(id).addEventListener('click',()=>showSocialCategory(category));
+$('social-menu-close').addEventListener('click',()=>{
+  socialMenuCategory=null;renderSocialMenu();renderConversationPanel();renderSharedPanel();
 });
 $('conversation-close').addEventListener('click',()=>{
   if(game.socialAction?.conversation)cancelSocial(game);
   conversationTopicPicker=false;renderConversationPanel();
 });
-$('shared-btn').addEventListener('click',()=>{
-  if(game.socialAction)return;
-  conversationTopicPicker=false;branchPicker=false;
-  renderConversationPanel();renderBranchPanel();
-  sharedPicker=true;select(null);closeMindPanel();renderSharedPanel();
-});
 $('shared-close').addEventListener('click',()=>{
   if(game.socialAction?.shared)cancelSocial(game);
   sharedPicker=false;renderSharedPanel();
 });
-$('branch-btn').addEventListener('click',()=>{
-  if(game.socialAction)return;
-  conversationTopicPicker=false;sharedPicker=false;
-  renderConversationPanel();renderSharedPanel();
-  branchPicker=true;select(null);closeMindPanel();renderBranchPanel();
-});
 $('branch-close').addEventListener('click',()=>{
   if(game.socialAction?.branchAction)cancelSocial(game);
   branchPicker=false;renderBranchPanel();
+});
+// An unobtrusive seven-tap gesture reveals the full technical graph.
+$('relationship-branch').addEventListener('click',()=>{
+  const now=Date.now();
+  if(now-debugTapAt>3500)debugTapCount=0;
+  debugTapAt=now;
+  if(++debugTapCount>=7){
+    debugTapCount=0;
+    closeSocialPickers();
+    branchPicker=true;renderBranchPanel();
+  }
+});
+if(new URLSearchParams(window.location.search).get('debug')==='relations')
+  branchPicker=true;
+function renderSocialMenu(force=true){
+  const category=socialMenuCategory;
+  const targetId=game.selectedSim==='alex'?'mira':'alex';
+  const status=relationSummary(game.socialGraph,game.selectedSim,targetId);
+  const rev=game.socialGraph?.pairs?.[JSON.stringify([game.selectedSim,targetId].sort())]?.revision||0;
+  const key=JSON.stringify([category,game.selectedSim,status.friendship,status.rivalry,rev]);
+  if(!force&&key===socialMenuDisplayKey)return;
+  socialMenuDisplayKey=key;
+  $('social-menu-panel').hidden=!category;
+  if(!category)return;
+  const titles={conversation:'Беседа',humor:'Юмор',friendship:'Дружба',
+    conflict:'Конфликт'};
+  $('social-menu-title').textContent=titles[category]||'Общение';
+  $('social-menu-subtitle').textContent='Выбери взаимодействие с '+getActorName(targetId);
+  const options=$('social-menu-options');options.replaceChildren();
+  const add=(label,request)=>{
+    options.append(conversationButton(label,()=>{
+      if(scheduleCommand({targetId,...request})){
+        socialMenuCategory=null;renderSocialMenu();
+      }
+    }));
+  };
+  const addTopic=id=>{
+    const topic=CONVERSATION_TOPICS[id];
+    if(topic)add(topic.label,{type:'conversation',topicId:id});
+  };
+  const addBranch=id=>{
+    const found=availableSocialActions(game.socialGraph,game.selectedSim,targetId)
+      .find(a=>a.id===id);
+    if(found?.enabled)add(found.label,{type:'branch',actionId:id});
+  };
+  if(category==='conversation'){
+    add('Поговорить',{type:'social',actionId:'talk'});
+    addBranch('acquaint.introduce');
+    addBranch('acquaint.chat');
+    for(const id of ['daily','hobbies','plans','support'])addTopic(id);
+  }else if(category==='humor'){
+    addTopic('humor');
+    addBranch('friend.tease');
+  }else if(category==='friendship'){
+    addBranch('friend.tease');
+    addBranch('friend.confide');
+  }else if(category==='conflict'){
+    add('Поспорить',{type:'social',actionId:'argue'});
+    addTopic('conflict');
+    addBranch('rival.taunt');
+    addBranch('rival.truce');
+  }
+}
+function activeTaskLabel(id){
+  const s=game.socialAction;
+  if(s&&(s.initiator===id||s.partner===id)){
+    if(s.conversation)return 'Беседа с '+getActorName(s.partner===id?s.initiator:s.partner);
+    if(s.branchAction)return BRANCH_ACTIONS[s.branchAction.id]?.label||'Общение';
+    if(s.shared)return s.shared.mode==='gift'?'Вручает или принимает подарок':'Проводит время вместе';
+    return SOCIAL_ACTIONS[s.kind]?.label||'Общается';
+  }
+  const actor=getActor(game,id);
+  return actor.action?ACTIONS[actor.action.id]?.label||'Занятие':null;
+}
+function renderQueuePanel(force=true){
+  const residentId=game.selectedSim;
+  const pending=pendingActions(game.actionQueues,residentId);
+  const active=activeTaskLabel(residentId);
+  const key=JSON.stringify([queueVisible,residentId,pending,active,game.socialAction?.phase,
+    getActor(game,residentId).action?.phase]);
+  $('queue-toggle').textContent='Очередь · '+pending.length;
+  if(!force&&key===queueDisplayKey)return;
+  queueDisplayKey=key;
+  $('queue-panel').hidden=!queueVisible;
+  $('queue-toggle').setAttribute('aria-expanded',String(queueVisible));
+  if(!queueVisible)return;
+  $('queue-title').textContent='План: '+getActorName(residentId);
+  const activeEl=$('queue-active');activeEl.replaceChildren();
+  const label=document.createElement('div');
+  label.textContent=active?'Сейчас: '+active:'Сейчас: свободен';
+  activeEl.append(label);
+  if(active){
+    const stop=document.createElement('button');stop.type='button';
+    stop.textContent='Прервать текущее действие';
+    stop.addEventListener('click',()=>{
+      const social=game.socialAction;
+      if(social&&(social.initiator===residentId||social.partner===residentId))
+        cancelSocial(game);
+      else getActor(game,residentId).action=null;
+      renderQueuePanel(true);
+      toast('Текущее действие остановлено по твоей команде');
+    });
+    activeEl.append(stop);
+  }
+  const list=$('queue-items');list.replaceChildren();
+  for(const [index,task] of pending.entries()){
+    const li=document.createElement('li');
+    const name=document.createElement('span');
+    name.textContent=(index+1)+'. '+taskLabel({...task,residentId});
+    const remove=document.createElement('button');
+    remove.type='button';remove.textContent='×';
+    remove.setAttribute('aria-label','Удалить из очереди: '+taskLabel({...task,residentId}));
+    remove.addEventListener('click',()=>{
+      if(removeQueuedAction(game.actionQueues,residentId,task.seq)){
+        renderQueuePanel(true);save(true);
+      }
+    });
+    li.append(name,remove);list.append(li);
+  }
+  $('queue-empty').hidden=pending.length>0;
+}
+$('queue-toggle').addEventListener('click',()=>{
+  queueVisible=!queueVisible;renderQueuePanel();
+});
+$('queue-close').addEventListener('click',()=>{
+  queueVisible=false;renderQueuePanel();
 });
 function renderBranchPanel(force=true){
   const s=game.socialAction,active=s?.branchAction;
