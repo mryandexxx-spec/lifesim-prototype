@@ -83,7 +83,8 @@ test('1.0q: a walking conversation stays nonblocking until choices are actually 
       phase:'walking',conversation:{topic:'daily',phase:'opening',turns:[]}
     },paused:false},
     dialogueNeedsDecision:()=>false,conversationTopicPicker:false,
-    conversationDisplayKey:'',socialMenuCategory:null
+    conversationDisplayKey:'',socialMenuCategory:null,
+    requiredChoiceFocus:{activate:()=>{},focusChoice:()=>{}}
   };
   runInNewContext(extract('function renderConversationPanel(force=true){',
     'renderConversationPanel();\nrenderSharedPanel();'),scope);
