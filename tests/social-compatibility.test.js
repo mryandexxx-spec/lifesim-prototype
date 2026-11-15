@@ -9,7 +9,7 @@ import {newSocialGraph,applySocialEvent,getPair,learnSocialPreference,
   socialKnowledgeNotes,restoreSocialGraph,episodeContext} from '../src/social-graph.js';
 import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {startConversation,chooseSocialLine,finishSocialConversation,
-  arriveSocial,continueConversation,startSharedSocial,cancelSocial} from '../src/relationships.js';
+  arriveSocial,startSharedSocial,cancelSocial} from '../src/relationships.js';
 import {evaluateResponse} from '../src/conversation-engine.js';
 import {GIFT_DURATION,sharedDuration} from '../src/gifts-leisure.js';
 import {SAVE_KEY} from '../src/simulation.js';
