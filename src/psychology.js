@@ -1,6 +1,7 @@
 /** Headless LifeSim personality, emotions, wishes and event memory. No DOM, engine or I/O. */
 import {deriveAxes,preferenceAffinity} from './trait-catalog.js';
 import {activityReceipt} from './sim-events.js';
+import {environmentSnapshot,ENVIRONMENT_MOOD_LIMIT} from './environment-effects.js';
 import {feelMemory,pruneEmotions,restoreEmotions,emotionMoodImpact,memoryEmotionKey,visibleEmotions} from './emotion-engine.js';
 /** Deprecated public snapshot retained for older test/API consumers; gameplay uses per-resident profiles. */
 export const TRAITS = Object.freeze({
@@ -70,7 +71,7 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
 }
 
 /** Mood is a derived snapshot, never trusted from localStorage. */
-export function calculateMood(needs, mind, minutes, personality = null) {
+export function calculateMood(needs, mind, minutes, personality = null,environment=0) {
   const values = [needs.hunger, needs.energy, needs.hygiene, needs.fun,
     needs.social,needs.bladder].map((x,i) => clamp(finite(x) ? x : i>=4?75:50, 0, 100));
   const average = values.reduce((a, b) => a + b, 0) / values.length;
@@ -84,7 +85,8 @@ export function calculateMood(needs, mind, minutes, personality = null) {
     (.75+axes.emotionalReactivity*.8);
   const optimism=(axes.optimism-.5)*14;
   const score=clamp(Math.round(20+average*.48+comfort*.27+
-    clamp(memories,-24,17)+optimism-(worst<25?(25-worst)*.8:0)),0,100);
+    clamp(memories,-24,17)+optimism-(worst<25?(25-worst)*.8:0)+
+    clamp(finite(environment)?environment:0,-ENVIRONMENT_MOOD_LIMIT,ENVIRONMENT_MOOD_LIMIT)),0,100);
   let label = 'Спокоен';
   if (worst < 20) {
     const lowest = values.indexOf(worst);
@@ -122,14 +124,15 @@ export function selectWish(state, except = null) {
   return IDS.slice().sort((a, b) => weights[b] - weights[a] || IDS.indexOf(a) - IDS.indexOf(b))[0];
 }
 
-export function refreshMind(state) {
+export function refreshMind(state,world=state?.world??null) {
   if (!state.mind || typeof state.mind !== 'object') state.mind = createMind(state.minutes);
   pruneEmotions(state.mind,state.minutes);
   if (!state.mind.wish || state.minutes >= state.mind.wish.until) {
     const id = selectWish(state);
     state.mind.wish = { id, since: state.minutes, until: state.minutes + 480 };
   }
-  state.mind.mood = calculateMood(state.needs, state.mind, state.minutes,state.personality);
+  state.mind.mood = calculateMood(state.needs, state.mind, state.minutes,
+    state.personality,environmentSnapshot(state,world).delta);
 }
 
 export function rememberAction(state, id) {

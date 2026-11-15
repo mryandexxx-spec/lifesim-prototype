@@ -293,7 +293,7 @@ function renderInsightPanel(force=true){
   if(!insightOpen)return;
   const partnerId=HOUSEHOLD_IDS.find(id=>id!==game.selectedSim);
   const info=residentMoodInsight(selectedActor(),{
-    residentName:selectedName(),
+    residentName:selectedName(),world:game.world,
     partnerName:partnerId?getActorName(partnerId):null,
     relationLabel:partnerId
       ?relationSummary(game.socialGraph,game.selectedSim,partnerId)?.label:null,
@@ -313,6 +313,18 @@ function renderInsightPanel(force=true){
     const title=document.createElement('strong');title.textContent=item.title;
     const detail=document.createElement('small');detail.textContent=item.detail;
     content.append(title,detail);card.append(glyph,content);list.append(card);
+  }
+  // Keep real room influences distinct from needs and canonical memories.
+  const ambient=$('insight-environment');
+  ambient.replaceChildren();ambient.hidden=!info.environment?.length;
+  for(const cause of info.environment||[]){
+    const line=document.createElement('div');line.className='insight-cause';
+    const glyph=document.createElement('span');glyph.className='insight-cause-symbol';
+    glyph.setAttribute('aria-hidden','true');glyph.textContent=cause.symbol;
+    const copy=document.createElement('span');copy.className='insight-cause-text';
+    const title=document.createElement('strong');title.textContent=cause.title;
+    const detail=document.createElement('small');detail.textContent=cause.detail;
+    copy.append(title,detail);line.append(glyph,copy);ambient.append(line);
   }
   const feeling=$('insight-feeling');
   feeling.replaceChildren();feeling.hidden=!info.feeling;
@@ -2142,7 +2154,7 @@ function boot() {
         bar.closest('.need').dataset.level=band.id;
         $('value-'+need).textContent=val;
       }
-      const moodView=moodPresentation(current);
+      const moodView=moodPresentation(current,game.world);
       const moodTrack=$('mood-overview');
       moodTrack.setAttribute('aria-valuenow',String(moodView.value));
       moodTrack.setAttribute('aria-valuetext',current.mind.mood.label+' — '+moodView.description);

@@ -35,6 +35,7 @@ jobs:
           node --check src/furniture-catalog.js
           node --check src/furniture-layout.js
           node --check src/psychology.js
+          node --check src/environment-effects.js
           node --check src/mood-presentation.js
           node --check src/trait-catalog.js
           node --check src/sim-events.js
@@ -110,6 +111,7 @@ jobs:
           cp src/social-need.js site/src/
           cp src/toilet-interaction.js site/src/
           cp src/need-balance.js site/src/
+          cp src/environment-effects.js site/src/
           cp src/meshy-toilet-pose.js site/src/
       - name: Include optional Meshy character GLB when present
         run: |

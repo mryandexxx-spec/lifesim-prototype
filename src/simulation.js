@@ -106,14 +106,14 @@ export function arrive(state) {
   state.action.elapsed = 0;
 }
 
-export function tick(state, minutes) {
+export function tick(state, minutes,world=state?.world??null) {
   if (state.paused || !Number.isFinite(minutes) || minutes <= 0) return;
   state.minutes += minutes;
   for (const need of PHYSICAL_NEEDS) state.needs[need] = clamp(state.needs[need] - NEED_DECAY_PER_MINUTE[need] * minutes);
   // Social fulfilment changes only on a newly confirmed social receipt.
   const social=Number.isFinite(state.needs.social)?state.needs.social:SOCIAL_NEED_LEGACY_DEFAULT;
   state.needs.social=clamp(social-socialNeedDecayRate(state.personality)*minutes);
-  refreshMind(state);
+  refreshMind(state,world);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
     const amount = Math.min(minutes, Math.max(0, definition.duration - state.action.elapsed));
@@ -145,7 +145,7 @@ export function tick(state, minutes) {
     if(state.action.id==='sofa')gained*=voluntaryMoodEfficiency(state,
       {type:'object',actionId:'sofa'});
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
-    refreshMind(state);
+    refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= definition.duration ||
         (!['fridge','shower','toilet'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
