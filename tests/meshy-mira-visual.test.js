@@ -447,8 +447,21 @@ test('Mira keeps the same skinned body on shower entry and dressed exit',()=>{
   assert.equal(f.renderers[0].enabled,false,'no skin swap during exit');
   visual.update({preferred:true,actionId:null,showerBusy:true,
     showerFrame:out.frame,paused:true});
+  assert.equal(f.model.anim.playing,false,
+    'before the exit walk starts, a pause freezes idle pose');
+  let exiting=out;
+  for(let i=0;i<16;i++)
+    exiting=advanceShowerTransition(exiting,false,0,32,.06);
+  assert.ok(exiting.frame.stepWeight>.025,'exit has reached the walking phase');
+  visual.update({preferred:true,actionId:null,showerBusy:true,
+    showerFrame:exiting.frame,paused:true});
+  assert.equal(f.model.anim.speed,0);
   assert.equal(f.model.anim.playing,true,
-    'distance-scrubbed gait uses static source sampling even on pause');
+    'paused walking frame is sampled from distance, never a timed transition');
+  const hold=f.model.anim.baseLayer.activeStateCurrentTime;
+  visual.update({preferred:true,actionId:null,showerBusy:true,
+    showerFrame:exiting.frame,paused:true});
+  assert.equal(f.model.anim.baseLayer.activeStateCurrentTime,hold);
   visual.update({preferred:true,actionId:null,showerBusy:false,
     showerFrame:null});
   assert.equal(f.renderers[0].enabled,false);
