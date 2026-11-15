@@ -152,6 +152,7 @@ test('M5 Pages bundles the real scene module, HUD explanation, and single canoni
   assert.ok(scene.includes('world:game.world'));
   assert.ok(scene.includes("const ambient=$('insight-environment')"));
   assert.match(html,/id="insight-environment"/);
+  assert.match(read('../styles.css'),/#insight-environment\\[hidden\\]\\{display:none!important;\\}/);
   assert.match(psychology,/environmentSnapshot\(state,world\)\.delta/);
   assert.match(psychology,/calculateMood\(needs, mind, minutes/);
   assert.ok(!scene.includes('environmentMoodAward'));
