@@ -2,6 +2,7 @@ import * as pc from 'playcanvas';
 import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
 import {pickWorldRayTarget} from './world-interactions.js';
 import {planPreview,planTaskIcon} from './plan-preview.js';
+import {residentMoodInsight,socialReactionInsight,insightLayerPolicy} from './insight-presentation.js';
 import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {createLoadingProgress} from './loading-progress.js';
@@ -115,6 +116,7 @@ function setViewOpen(open,{restoreFocus=false}={}){
   $('view-panel').hidden=!viewOpen;
   $('view-toggle').setAttribute('aria-expanded',String(viewOpen));
   if(viewOpen){
+    closeInsightPanel();queueVisible=false;renderQueuePanel(true);
     closeSocialContext();
     select(null);
     requestAnimationFrame(positionViewPanel);
@@ -159,6 +161,8 @@ let socialMenuDisplayKey='';
 let queueVisible=false;
 let queueDisplayKey='';
 let planPeekKey='';
+let insightOpen=false,insightDisplayKey='';
+let socialFlashLeft=0;
 let dispatchPlannedActions=()=>[];
 let debugTapCount=0;
 let debugTapAt=0;
@@ -217,6 +221,78 @@ function queuedSocial(kind,extra={}){
   return scheduleCommand({type:kind==='talk'||kind==='argue'?'social':kind,
     targetId,...extra,...(kind==='talk'||kind==='argue'?{actionId:kind}:{})});
 }
+// Explanation reads only the selected actor's own verified state and viewpoint.
+function closeInsightPanel(){
+  insightOpen=false;
+  $('insight-panel').hidden=true;
+  $('insight-toggle').setAttribute('aria-expanded','false');
+}
+function renderInsightPanel(force=true){
+  if(!insightOpen)return;
+  const partnerId=HOUSEHOLD_IDS.find(id=>id!==game.selectedSim);
+  const info=residentMoodInsight(selectedActor(),{
+    residentName:selectedName(),
+    partnerName:partnerId?getActorName(partnerId):null,
+    relationLabel:partnerId
+      ?relationSummary(game.socialGraph,game.selectedSim,partnerId)?.label:null,
+    perspective:getPerspective(game,game.selectedSim)
+  });
+  const key=JSON.stringify([game.selectedSim,info]);
+  if(!force&&key===insightDisplayKey)return;
+  insightDisplayKey=key;
+  $('insight-title').textContent='Почему '+info.name+' так себя чувствует?';
+  $('insight-summary').textContent=info.mood+' · '+info.summary;
+  const list=$('insight-causes');list.replaceChildren();
+  for(const item of info.needs){
+    const card=document.createElement('div');card.className='insight-cause';
+    const glyph=document.createElement('span');glyph.className='insight-cause-symbol';
+    glyph.setAttribute('aria-hidden','true');glyph.textContent=item.symbol;
+    const content=document.createElement('span');content.className='insight-cause-text';
+    const title=document.createElement('strong');title.textContent=item.title;
+    const detail=document.createElement('small');detail.textContent=item.detail;
+    content.append(title,detail);card.append(glyph,content);list.append(card);
+  }
+  const feeling=$('insight-feeling');
+  feeling.replaceChildren();feeling.hidden=!info.feeling;
+  if(info.feeling){
+    const title=document.createElement('strong');title.textContent=
+      info.feeling.symbol+' '+info.feeling.title;
+    const detail=document.createElement('small');detail.textContent=info.feeling.detail;
+    feeling.append(title,detail);
+  }
+  const relationship=$('insight-relationship');
+  relationship.replaceChildren();relationship.hidden=!info.relation;
+  if(info.relation){
+    const title=document.createElement('strong');
+    title.textContent=info.relation.title+' · '+info.relation.status;
+    const detail=document.createElement('small');
+    detail.textContent=info.relation.recent;
+    relationship.append(title,detail);
+  }
+  $('insight-guidance').textContent=info.guidance;
+}
+$('insight-toggle').addEventListener('click',()=>{
+  if(dialogueNeedsDecision(game))return;
+  const open=!insightOpen;
+  if(open){
+    setViewOpen(false);closeSocialContext();closeMindPanel();select(null);
+    queueVisible=false;renderQueuePanel(true);
+  }
+  insightOpen=open;
+  $('insight-panel').hidden=!insightOpen;
+  $('insight-toggle').setAttribute('aria-expanded',String(insightOpen));
+  if(insightOpen)renderInsightPanel(true);
+});
+$('insight-close').addEventListener('click',()=>{
+  closeInsightPanel();$('insight-toggle').focus({preventScroll:true});
+});
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&insightOpen&&!dialogueNeedsDecision(game)){
+    event.preventDefault();closeInsightPanel();
+    $('insight-toggle').focus({preventScroll:true});
+  }
+},true);
+
 function closeMindPanel() {
   $('mind-panel').hidden = true;
   $('mind-toggle').setAttribute('aria-expanded', 'false');
@@ -225,7 +301,7 @@ $('mind-toggle').addEventListener('click', () => {
   const open = $('mind-panel').hidden;
   $('mind-panel').hidden = !open;
   $('mind-toggle').setAttribute('aria-expanded', String(open));
-  if (open) select(null);
+  if (open){closeInsightPanel();setViewOpen(false);select(null);}
 });
 $('mind-close').addEventListener('click', closeMindPanel);
 $('wish-do-btn').addEventListener('click', () => {
@@ -236,7 +312,7 @@ $('wish-do-btn').addEventListener('click', () => {
   }
 });
 function select(id) {
-  if (id){ closeMindPanel();closeSocialContext(); }
+  if (id){closeInsightPanel();closeMindPanel();closeSocialContext();setViewOpen(false);}
   selected = id;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -328,6 +404,7 @@ function closeSocialContext(){
 }
 function openSocialContext(pos){
   if(dialogueNeedsDecision(game))return;
+  closeInsightPanel();queueVisible=false;renderQueuePanel(true);
   select(null);closeMindPanel();closeSocialPickers();setViewOpen(false);
   const rect=canvas.getBoundingClientRect();
   socialAnchor=pos?{x:pos.x-rect.left,y:pos.y-rect.top}:null;
@@ -732,7 +809,7 @@ function renderConversationPanel(force=true){
   if(enteringRequired){
     // A required answer supersedes every optional popover without cancelling
     // its REAL underlying FIFO action or affecting manual pause state.
-    setViewOpen(false);
+    setViewOpen(false);closeInsightPanel();
     socialContextVisible=false;socialAnchor=null;socialMenuCategory=null;
     sharedPicker=false;branchPicker=false;
     renderSocialContext();renderSocialMenu();renderSharedPanel();renderBranchPanel();
@@ -870,7 +947,7 @@ function updateResidentPicker() {
 }
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
-    selectResident(game,id);
+    selectResident(game,id);closeInsightPanel();
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
     select(null); closeMindPanel(); updateResidentPicker();renderSocialContext();
@@ -886,7 +963,7 @@ $('reset-btn').addEventListener('click', () => {
   const enabled = game.autonomy.enabled;
   game = newHousehold();
   setHouseholdAutonomy(game, enabled); // Keep the player's chosen play style.
-  resetRuntime(); restartAutonomyWait(); updateAutoButton(); updateResidentPicker();
+  closeInsightPanel();resetRuntime(); restartAutonomyWait(); updateAutoButton(); updateResidentPicker();
   save(true); select(null); closeMindPanel(); toast('Новая игра началась');
 });
 window.addEventListener('pagehide', () => save(true));
@@ -1294,6 +1371,7 @@ function boot() {
   };
   resetRuntime=()=>{
     reactionBadges.clear();clearSocialReactions(game);feedbackRoot=game;
+    closeInsightPanel();socialFlashLeft=0;$('social-result').hidden=true;
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;queueVisible=false;
     conversationDisplayKey='';sharedDisplayKey='';branchDisplayKey='';
