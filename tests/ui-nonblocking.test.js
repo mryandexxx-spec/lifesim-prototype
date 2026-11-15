@@ -39,6 +39,7 @@ test('1.0o: successful enqueue is acknowledged in queue counter and never makes 
   const scope={
     $,ACTIONS:{bed:{label:'Спать'}},getActorName:()=> 'Алекс',
     game:{selectedSim:'alex',actionQueues:queues},enqueueAction,pendingActions,
+    resolveActionFurniture:()=>({instanceId:'home-bed-1'}),
     renderQueuePanel:()=>calls.queue++,
     save:()=>calls.saves++,toast:msg=>calls.toasts.push(msg)
   };
