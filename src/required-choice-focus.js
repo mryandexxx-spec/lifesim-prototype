@@ -23,7 +23,9 @@ export function createRequiredChoiceFocus({root,panel,backdrop,doc,restoreFallba
     }else{
       for(const [el,was] of priorInert)el.inert=was;
       priorInert.clear();
-      const candidate=previousFocus?.isConnected!==false?previousFocus:restoreFallback;
+      const available=previousFocus&&previousFocus.isConnected!==false&&
+        !previousFocus.hidden&&!previousFocus.closest?.('[hidden]');
+      const candidate=available?previousFocus:restoreFallback;
       previousFocus=null;
       focus(candidate);
     }
