@@ -1117,6 +1117,9 @@ function boot() {
           game.socialAction?.shared||game.socialAction?.branchAction
           ?null:game.socialAction?.kind;
         tickHousehold(game,.30 * game.speed); // Both share the clock; no double advancement.
+        // A completed job frees its own resident; planned commands start only
+        // after both participant states and render transition guards allow it.
+        dispatchPlannedActions();
         if(prevAlex && !game.action) toast('Алекс закончил: '+ACTIONS[prevAlex].label.toLowerCase());
         if(prevMira && !game.otherSim.action) toast('Мира закончила: '+ACTIONS[prevMira].label.toLowerCase());
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
@@ -1198,7 +1201,9 @@ function boot() {
       // Real active-time wait is independent for each sim and unaffected by game speed.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
-        if(game.socialAction){autonomyWaitSeconds[residentId]=0;continue;}
+        if(game.socialAction||pendingActions(game.actionQueues,residentId).length){
+          autonomyWaitSeconds[residentId]=0;continue;
+        }
         autonomyWaitSeconds[residentId]=advanceAutonomyWait(autonomyWaitSeconds[residentId],dt,resident);
         if(!resident.action && autonomyWaitSeconds[residentId]>=AUTONOMY_WAIT_SECONDS){
           const socialIdea=autonomousSocialChoice(game,residentId);
@@ -1462,16 +1467,21 @@ function boot() {
       $('relationship-label').textContent=relationshipLabel(relation.affinity);
       $('relationship-bar').style.width=relation.affinity+'%';
       $('social-partner').textContent=game.selectedSim==='alex'?'Мирой':'Алексом';
-      // Affinity reaching 0 or 100 is only a meter clamp. Player-requested
-      // talk/argue stays available; the partner's current task is interruptible.
+      // Categories stay clickable while another task runs: clicks only queue.
+      // Friendship options unlock by progression, not exposed numeric gauges.
       const busy=Boolean(game.socialAction);
       for(const kind of Object.keys(SOCIAL_ACTIONS))$(kind+'-btn').disabled=busy;
-      $('conversation-btn').disabled=busy;
-      $('shared-btn').disabled=busy;
-      $('branch-btn').disabled=busy;
+      $('conversation-btn').disabled=false;
+      $('humor-btn').disabled=false;
+      $('shared-btn').disabled=false;
+      $('conflict-btn').disabled=false;
+      $('branch-btn').disabled=false; // hidden debug entry only
       const branchStatus=relationSummary(game.socialGraph,game.selectedSim,
         game.selectedSim==='alex'?'mira':'alex');
+      $('friendship-btn').disabled=branchStatus.friendship==='none';
       $('relationship-branch').textContent=branchStatus.label;
+      if(socialMenuCategory)renderSocialMenu(false);
+      renderQueuePanel(false);
       if(branchPicker||game.socialAction?.branchAction||!$('branch-panel').hidden)
         renderBranchPanel(false);
       if(conversationTopicPicker||game.socialAction?.conversation||!$('conversation-panel').hidden)
@@ -1509,8 +1519,7 @@ function boot() {
         const perspective=getPerspective(game,game.selectedSim);
         const branch=relationSummary(game.socialGraph,game.selectedSim,
           game.selectedSim==='alex'?'mira':'alex');
-        $('mind-relation-stage').textContent='Связь: '+branch.label+
-          ' · Значимых хороших событий: '+branch.positive+', конфликтов: '+branch.negative;
+        $('mind-relation-stage').textContent='Ваша связь: '+branch.label;
         $('mind-relation-name').textContent='К '+getActorName(game.selectedSim==='alex'?'mira':'alex');
         for(const axis of ['friendship','trust','tension']){
           const value=Math.round(perspective[axis]);
