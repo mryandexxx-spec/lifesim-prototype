@@ -6,7 +6,8 @@ import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, cho
 import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
-  chooseSocialLine,nextSocialLine,finishSocialConversation } from './relationships.js';
+  chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial } from './relationships.js';
+import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
   CONVERSATION_MAX_TURNS} from './conversation-engine.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
@@ -90,6 +91,8 @@ let beginAction = () => false;
 let beginSocial = () => false;
 let conversationTopicPicker=false;
 let conversationDisplayKey='';
+let sharedPicker=false;
+let sharedDisplayKey='';
 let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let toastTimeout;
@@ -152,6 +155,7 @@ for(const kind of Object.keys(SOCIAL_ACTIONS)){
     conversationTopicPicker=false;
     renderConversationPanel();
     if(beginSocial(kind)) {
+      sharedPicker=false;renderSharedPanel();
       select(null);closeMindPanel();
       toast(selectedName()+' хочет '+(kind==='talk'?'поговорить':'поспорить')+' с '+getActorName(game.selectedSim==='alex'?'mira':'alex'));
     }
@@ -159,6 +163,7 @@ for(const kind of Object.keys(SOCIAL_ACTIONS)){
 }
 $('conversation-btn').addEventListener('click',()=>{
   if(game.socialAction)return;
+  sharedPicker=false;renderSharedPanel();
   conversationTopicPicker=true;
   select(null);closeMindPanel();
   renderConversationPanel();
@@ -167,6 +172,73 @@ $('conversation-close').addEventListener('click',()=>{
   if(game.socialAction?.conversation)cancelSocial(game);
   conversationTopicPicker=false;renderConversationPanel();
 });
+$('shared-btn').addEventListener('click',()=>{
+  if(game.socialAction)return;
+  conversationTopicPicker=false;renderConversationPanel();
+  sharedPicker=true;select(null);closeMindPanel();renderSharedPanel();
+});
+$('shared-close').addEventListener('click',()=>{
+  if(game.socialAction?.shared)cancelSocial(game);
+  sharedPicker=false;renderSharedPanel();
+});
+/** Browser-safe, stable controls: rerender only on a transition, never on a frame. */
+function renderSharedPanel(force=true){
+  const action=game.socialAction,session=action?.shared;
+  const key=JSON.stringify([sharedPicker,game.selectedSim,game.paused,action?.phase,session]);
+  if(!force&&key===sharedDisplayKey)return;
+  sharedDisplayKey=key;
+  const open=sharedPicker||Boolean(session);
+  $('shared-panel').hidden=!open;
+  if(!open)return;
+  const options=$('shared-options');options.replaceChildren();
+  const own=getActorName(session?action.initiator:game.selectedSim);
+  const peer=getActorName(session?action.partner:
+    game.selectedSim==='alex'?'mira':'alex');
+  $('shared-subtitle').textContent=session
+    ?game.paused?'На паузе — время не идёт':
+      action.phase==='walking'?own+' идёт к '+peer:
+      'Занимаются вместе · действие завершится по игровому времени'
+    :'Выбери подарок или занятие для '+peer;
+  if(session){
+    const item=session.mode==='gift'
+      ?inventoryFor(game,action.initiator).find(x=>x.id===session.choiceId)
+      :null;
+    const label=session.mode==='gift'?GIFT_CATALOG[item?.type]?.label||'Подарок':
+      LEISURE_CATALOG[session.choiceId]?.label||'Досуг';
+    $('shared-title').textContent=label;
+    const progress=sharedDuration(session);
+    const status=document.createElement('p');
+    status.className='shared-progress-text';
+    status.textContent=action.phase==='walking'?'Сначала нужно встретиться':
+      'Продолжительность: '+progress+' игровых минут. Можно отменить.';
+    options.append(status);
+    return;
+  }
+  $('shared-title').textContent='Подарки и досуг';
+  const inventory=inventoryFor(game,game.selectedSim);
+  const gifts=document.createElement('h3');gifts.textContent='Подарить из инвентаря ('+inventory.length+')';
+  options.append(gifts);
+  if(!inventory.length){
+    const empty=document.createElement('p');empty.className='shared-progress-text';
+    empty.textContent='Пока нет вещей для подарка';options.append(empty);
+  }
+  for(const item of inventory){
+    const def=GIFT_CATALOG[item.type];
+    options.append(conversationButton(def.symbol+' '+def.label,()=>{
+      if(beginSocial('talk',false,game.selectedSim,null,{mode:'gift',choiceId:item.id})){
+        sharedPicker=false;renderSharedPanel();
+      }else toast('Не получилось вручить подарок');
+    }));
+  }
+  const activities=document.createElement('h3');activities.textContent='Провести время вместе';
+  options.append(activities);
+  for(const [id,def] of Object.entries(LEISURE_CATALOG))
+    options.append(conversationButton(def.symbol+' '+def.label,()=>{
+      if(beginSocial('talk',false,game.selectedSim,null,{mode:'leisure',choiceId:id})){
+        sharedPicker=false;renderSharedPanel();
+      }else toast('Не удалось пригласить к досугу');
+    }));
+}
 function conversationButton(label,callback,secondary=false){
   const button=document.createElement('button');
   button.type='button';button.textContent=label;
@@ -240,6 +312,7 @@ function renderConversationPanel(force=true){
     },true));
 }
 renderConversationPanel();
+renderSharedPanel();
 $('pause-btn').addEventListener('click', () => {
   game.paused = !game.paused;
   $('pause-icon').textContent = game.paused ? '▶' : 'Ⅱ';
@@ -287,8 +360,9 @@ function updateResidentPicker() {
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
     selectResident(game,id);
-    conversationTopicPicker=false;
-    select(null); closeMindPanel(); updateResidentPicker(); renderConversationPanel(); save(true);
+    conversationTopicPicker=false;sharedPicker=false;
+    select(null); closeMindPanel(); updateResidentPicker();
+    renderConversationPanel();renderSharedPanel();save(true);
     toast('Теперь управляешь: '+selectedName());
   });
 }
@@ -576,7 +650,7 @@ function boot() {
   };
 
   // Meet beside the other resident at a walkable, reachable point.
-  beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null)=>{
+  beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null)=>{
     if(!canStartSocial(game,kind,actorId,automatic)){
       if(!automatic)toast('Собеседник занят или разговор уже идёт');
       return false;
@@ -593,7 +667,8 @@ function boot() {
       if(len<bestLength){best={goal,points};bestLength=len;}
     }
     if(!best){if(!automatic)toast('Сейчас не получается подойти к собеседнику');return false;}
-    if(!(topic?startConversation(game,actorId,best.goal,topic)
+    if(!(shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId)
+      :topic?startConversation(game,actorId,best.goal,topic)
       :startSocial(game,kind,actorId,best.goal,automatic)))return false;
     // A manual invitation interrupts the partner's task but never bypasses
     // its renderer exit transition (bed/sofa/shower/fridge). Drop obsolete A*.
@@ -606,9 +681,9 @@ function boot() {
     return true;
   };
   resetRuntime=()=>{
-    conversationTopicPicker=false;
-    conversationDisplayKey='';
-    renderConversationPanel();
+    conversationTopicPicker=false;sharedPicker=false;
+    conversationDisplayKey='';sharedDisplayKey='';
+    renderConversationPanel();renderSharedPanel();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
@@ -767,11 +842,15 @@ function boot() {
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
-        const socialBefore=game.socialAction?.conversation?null:game.socialAction?.kind;
+        const sharedBefore=game.socialAction?.shared?game.socialAction.initiator:null;
+      const socialBefore=game.socialAction?.conversation||game.socialAction?.shared
+        ?null:game.socialAction?.kind;
         tickHousehold(game,.30 * game.speed); // Both share the clock; no double advancement.
         if(prevAlex && !game.action) toast('Алекс закончил: '+ACTIONS[prevAlex].label.toLowerCase());
         if(prevMira && !game.otherSim.action) toast('Мира закончила: '+ACTIONS[prevMira].label.toLowerCase());
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
+      if(sharedBefore&&!game.socialAction)
+        toast(getActor(game,sharedBefore).event);
         accumulator-=.10;
       }
       // On cancellation, finish closing before the former fridge user departs.
@@ -1115,8 +1194,11 @@ function boot() {
       const busy=Boolean(game.socialAction);
       for(const kind of Object.keys(SOCIAL_ACTIONS))$(kind+'-btn').disabled=busy;
       $('conversation-btn').disabled=busy;
+      $('shared-btn').disabled=busy;
       if(conversationTopicPicker||game.socialAction?.conversation||!$('conversation-panel').hidden)
         renderConversationPanel(false);
+      if(sharedPicker||game.socialAction?.shared||!$('shared-panel').hidden)
+        renderSharedPanel(false);
       const socialFx=$('social-effect');
       socialFx.hidden=!socialUsing;
       if(socialUsing){
