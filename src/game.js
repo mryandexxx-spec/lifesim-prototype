@@ -154,6 +154,7 @@ let branchPicker=false;
 let branchDisplayKey='';
 let socialMenuCategory=null;
 let socialContextVisible=false; // UI-only: no changes to the saved simulation.
+let socialAnchor=null; // CSS position from tapped world resident, never serialized.
 let socialMenuDisplayKey='';
 let queueVisible=false;
 let queueDisplayKey='';
@@ -205,7 +206,7 @@ function scheduleCommand(command,residentId=game.selectedSim){
   save(true);
   if(command.type!=='object'){
     // A confirmed queue entry closes only presentation, never the action.
-    socialContextVisible=false;
+    socialContextVisible=false;socialAnchor=null;
     socialMenuCategory=null;conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     renderSocialContext();renderSocialMenu();renderConversationPanel();renderSharedPanel();
   }
@@ -284,19 +285,52 @@ $('action-button').addEventListener('click', () => {
 // Legacy buttons remain hidden for old UI references; queue rather than interrupt.
 for(const kind of Object.keys(SOCIAL_ACTIONS))
   $(kind+'-btn').addEventListener('click',()=>queuedSocial(kind));
+// One interaction anchor serves categories and their second-level options.
+// Position within the usable area: avoid topbar, mini-plan and bottom needs.
+function placeSocialPopover(panel){
+  if(!socialAnchor||panel.hidden||panel.classList.contains('dialogue-required')){
+    panel.classList.remove('context-popover');
+    return;
+  }
+  panel.classList.add('context-popover');
+  const w=canvas.clientWidth||window.innerWidth,h=canvas.clientHeight||window.innerHeight;
+  const landscape=h<560;
+  const mobile=w<=700;
+  const pos=contextualPlacement({
+    anchorX:socialAnchor.x,anchorY:socialAnchor.y,
+    viewportWidth:w,viewportHeight:h,
+    panelWidth:panel.offsetWidth||340,panelHeight:panel.offsetHeight||280,
+    topInset:landscape?72:mobile?116:102,
+    bottomInset:landscape?122:mobile?226:144
+  });
+  panel.style.setProperty('--context-x',pos.x+'px');
+  panel.style.setProperty('--context-y',pos.y+'px');
+  panel.style.setProperty('--context-max-height',pos.maxHeight+'px');
+}
+function relayoutSocialPanels(){
+  for(const id of ['social-context','social-menu-panel','shared-panel',
+    'conversation-panel','branch-panel'])placeSocialPopover($(id));
+}
+const scheduleSocialPosition=()=>requestAnimationFrame(relayoutSocialPanels);
+window.addEventListener('resize',scheduleSocialPosition);
 function renderSocialContext(){
   const open=socialContextVisible&&!socialMenuCategory&&!conversationTopicPicker&&
     !sharedPicker&&!branchPicker&&!dialogueNeedsDecision(game);
   $('social-context').hidden=!open;
+  if(open)scheduleSocialPosition();
+  else $('social-context').classList.remove('context-popover');
 }
 function closeSocialContext(){
   socialContextVisible=false;
+  socialAnchor=null;
   closeSocialPickers();
   renderSocialContext();
 }
-function openSocialContext(){
+function openSocialContext(pos){
   if(dialogueNeedsDecision(game))return;
-  select(null);closeMindPanel();closeSocialPickers();
+  select(null);closeMindPanel();closeSocialPickers();setViewOpen(false);
+  const rect=canvas.getBoundingClientRect();
+  socialAnchor=pos?{x:pos.x-rect.left,y:pos.y-rect.top}:null;
   socialContextVisible=true;
   renderSocialContext();
 }
@@ -319,7 +353,7 @@ function showSocialCategory(category){
     renderConversationPanel();renderSocialContext();
     return;
   }
-  const peer=game.selectedSim='alex'?'mira':'alex';
+  const peer=game.selectedSim==='alex'?'mira':'alex';
   const status=relationSummary(game.socialGraph,game.selectedSim,peer);
   if(category==='friendship'&&status.friendship==='none'){
     toast('Дружеские действия пока недоступны');return;
@@ -375,7 +409,8 @@ function renderSocialMenu(force=true){
   if(!force&&key===socialMenuDisplayKey)return;
   socialMenuDisplayKey=key;
   $('social-menu-panel').hidden=!category;
-  if(!category)return;
+  if(!category){$('social-menu-panel').classList.remove('context-popover');return;}
+  scheduleSocialPosition();
   const titles={conversation:'Беседа',humor:'Юмор',friendship:'Дружба',
     romance:'Романтика',conflict:'Конфликт'};
   $('social-menu-title').textContent=titles[category]||'Общение';
@@ -560,6 +595,7 @@ function renderBranchPanel(force=true){
   // A normal social interaction must never open it automatically.
   const open=branchPicker;
   $('branch-panel').hidden=!open;
+  if(open)scheduleSocialPosition();
   if(!open)return;
   const opts=$('branch-options');opts.replaceChildren();
   $('branch-title').textContent=status.label;
@@ -601,6 +637,7 @@ function renderSharedPanel(force=true){
   // The shared activity is displayed in the optional queue UI, not a popup.
   const open=sharedPicker;
   $('shared-panel').hidden=!open||Boolean(socialMenuCategory);
+  if(open&&!socialMenuCategory)scheduleSocialPosition();
   if(!open)return;
   const options=$('shared-options');options.replaceChildren();
   const own=getActorName(session?action.initiator:game.selectedSim);
@@ -698,6 +735,7 @@ function renderConversationPanel(force=true){
   conversationDisplayKey=key;
   const open=conversationTopicPicker||required;
   panel.hidden=!open||(!required&&Boolean(socialMenuCategory));
+  if(open&&!required&&!socialMenuCategory)scheduleSocialPosition();
   if(!open)return;
   if(enteringRequired)panel.focus({preventScroll:true});
   const options=$('conversation-options');
@@ -811,7 +849,7 @@ for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
     selectResident(game,id);
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
-    socialMenuCategory=null;socialContextVisible=false;
+    socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
     select(null); closeMindPanel(); updateResidentPicker();renderSocialContext();
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
     renderSocialMenu();renderQueuePanel();save(true);
@@ -1234,7 +1272,7 @@ function boot() {
   resetRuntime=()=>{
     reactionBadges.clear();clearSocialReactions(game);feedbackRoot=game;
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
-    socialMenuCategory=null;socialContextVisible=false;queueVisible=false;
+    socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;queueVisible=false;
     conversationDisplayKey='';sharedDisplayKey='';branchDisplayKey='';
     socialMenuDisplayKey='';queueDisplayKey='';
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
@@ -1397,7 +1435,7 @@ function boot() {
     if(tap&&!dialogueNeedsDecision(game)){
       const target=worldTargetAt(pos);
       if(target)confirmWorldTap(pos);
-      if(target?.kind==='resident')openSocialContext();
+      if(target?.kind==='resident')openSocialContext(pos);
       else if(target?.kind==='object')select(target.id);
       else{closeSocialContext();select(null);}
     }
