@@ -1,6 +1,6 @@
 /** Блин’С 1.0e — bounded, directional episodic social memory.
  * Pure records belong to the canonical socialGraph pair, not a second bond.
- * No character-name branches, DOM, PlayCanvas, network or random seeds.
+ * No character-name branches, browser APIs, renderer or random seeds.
  */
 export const EPISODE_LIMIT=18;
 export const EPISODE_DAY=1440;
