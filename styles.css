@@ -464,6 +464,22 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 @keyframes world-touch-pop{from{opacity:0;scale:.65}25%{opacity:1}to{opacity:0;scale:1.12}}
 @media(prefers-reduced-motion:reduce){.world-tap-cue{animation:none;opacity:.75;}}
 
+/* M4 — six genuine needs, now including a recoverable toilet action.
+ * 3 × 2 on iPhone instead of unreadable six narrow horizontal bars. */
+.needs{grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;}
+.need[data-need="bladder"] .need-icon{font-size:11px;font-weight:900;letter-spacing:-.3px;}
+@media(max-width:800px){
+  .needs{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px 9px;}
+  .need-copy>span{font-size:10px;}
+}
+@media(max-width:370px){
+  .needs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 7px;}
+  .need-copy>span{font-size:9px;}
+}
+@media(max-height:560px){
+  .needs{gap:5px;}
+}
+
 
 /* 1.0w UI4: only essential time/camera controls occupy the right edge.
  * View toggles remain the same DOM nodes and preserve personal preferences.

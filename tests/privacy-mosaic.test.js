@@ -73,8 +73,10 @@ test('game builds curved mosaic cloud with shared material instead of solid boot
   assert.ok(!game.includes("box('solid shower privacy'"));
   assert.ok(!game.includes('M.privacy,showerPrivacy'));
   assert.ok(game.includes('showerPrivacy.enabled=Boolean(alexShower?.privacy||miraShower?.privacy)'));
-  assert.ok(game.includes('applyShowerAppearance(alexRig,Boolean(alexShower?.privacy),Boolean(alexShower?.bathing))'));
-  assert.ok(game.includes('applyShowerAppearance(miraRig,Boolean(miraShower?.privacy),Boolean(miraShower?.bathing))'));
+  assert.ok(game.includes('applyShowerAppearance(alexRig,Boolean(alexShower?.privacy||alexToilet?.privacy),Boolean(alexShower?.bathing))'));
+  assert.ok(game.includes('applyShowerAppearance(miraRig,Boolean(miraShower?.privacy||miraToilet?.privacy),Boolean(miraShower?.bathing))'));
+  assert.ok(game.includes("cylinder('toilet privacy shell'"));
+  assert.ok(game.includes('toiletPrivacy.enabled=Boolean(alexToilet?.privacy||miraToilet?.privacy)'));
   assert.ok(SHOWER_LAYOUT.privacyHeight>2);
 });
 test('mosaic visual change never changes mask choreography, cancellation or saved states',()=>{

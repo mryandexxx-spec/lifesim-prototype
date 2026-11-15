@@ -1,5 +1,6 @@
 /** Headless navigation: room geometry in world X/Z coordinates, no PlayCanvas dependency. */
 import {FRIDGE_LAYOUT} from './fridge-interaction.js';
+import {TOILET_LAYOUT} from './toilet-interaction.js';
 export const ROOM = Object.freeze({ minX: -4.62, maxX: 4.62, minZ: -3.96, maxZ: 3.98 });
 export const ACTOR_RADIUS = 0.26;
 export const FURNITURE = Object.freeze([
@@ -12,6 +13,7 @@ export const FURNITURE = Object.freeze([
   { id: 'table', minX: 0.59, maxX: 2.09, minZ: -0.65, maxZ: 0.13 },
   { id: 'tv', minX: 3.43, maxX: 4.30, minZ: -0.49, maxZ: 1.18 },
   { id: 'shower', minX: -4.65, maxX: -2.74, minZ: 1.54, maxZ: 3.49 },
+  { id: 'toilet', ...TOILET_LAYOUT.bounds },
   { id: 'plant', minX: 3.83, maxX: 4.52, minZ: 2.78, maxZ: 3.66 }
 ]);
 
