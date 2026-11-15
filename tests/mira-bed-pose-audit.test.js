@@ -44,7 +44,7 @@ test('audit female joint positions for authored lying and sleeping clips',()=>{
       const delta=rotate(p.q,v.t);
       return world[i]={q:mul(p.q,v.r),p:p.p.map((x,k)=>x+delta[k])};
     };
-    return Object.fromEntries(['Hips','Head','LeftFoot','RightFoot','LeftUpLeg','RightUpLeg','Spine2','LeftHand']
+    return Object.fromEntries(['Hips','Head','LeftFoot','RightFoot','LeftUpLeg','RightUpLeg','LeftLeg','RightLeg','Spine2','LeftHand']
       .map(b=>{const idx=g.nodes.findIndex(n=>n.name==='mixamorig:'+b);
         return [b,compute(idx).p.map(x=>+x.toFixed(3))];}));
   };
