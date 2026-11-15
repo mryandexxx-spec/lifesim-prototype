@@ -167,7 +167,8 @@ export function proposeAutonomousSocial({
   if(!record(self)||self.action||!needsSafe(self.needs)||
     self.autonomy?.enabled===false||self.paused===true||
     (queues?.byResident?.[actorId]?.length||0)>0)return null;
-  if(Math.min(self.needs.energy,self.needs.hunger,self.needs.hygiene)<48)return null;
+  if(Math.min(self.needs.energy,self.needs.hunger,self.needs.hygiene,
+    finite(self.needs.bladder)?self.needs.bladder:75)<48)return null;
   const axes=deriveAxes(self.personality);
   const mood=finite(self.mind?.mood?.value)?self.mind.mood.value:50;
   if(mood<34&&reconcileTargetId===null)return null;
@@ -188,7 +189,8 @@ export function proposeAutonomousSocial({
       (queues?.byResident?.[targetId]?.length||0)>0||
       !record(pair)||!finite(pair.metAt)||pair.metAt>minutes)continue;
     if(Math.min(recipient.needs.energy,recipient.needs.hunger,
-      recipient.needs.hygiene)<48)continue;
+      recipient.needs.hygiene,
+      finite(recipient.needs.bladder)?recipient.needs.bladder:75)<48)continue;
     const latest=safeEvent(pair,minutes);
     const severe=latest&&(conflict.has(latest.type)||refusals.has(latest.type));
     // A remorseful initiator may make one gentle repair approach after the

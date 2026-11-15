@@ -18,6 +18,7 @@ export const MEMORY_TEXT = Object.freeze({
   bed: 'Выспался и набрался сил',
   fridge: 'Вкусно перекусил',
   shower: 'Порадовался свежести после душа',
+  toilet: 'Почувствовал облегчение',
   sofa: 'Приятно отдохнул на диване',
   talk: 'Поговорил(а) с соседом',
   argue: 'Поспорил(а) с соседом', // compatibility: existing v1 saves
@@ -71,7 +72,7 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
 /** Mood is a derived snapshot, never trusted from localStorage. */
 export function calculateMood(needs, mind, minutes, personality = null) {
   const values = [needs.hunger, needs.energy, needs.hygiene, needs.fun,
-    needs.social].map((x,i) => clamp(finite(x) ? x : i===4?75:50, 0, 100));
+    needs.social,needs.bladder].map((x,i) => clamp(finite(x) ? x : i>=4?75:50, 0, 100));
   const average = values.reduce((a, b) => a + b, 0) / values.length;
   const worst = Math.min(...values);
   const axes=deriveAxes(personality);
@@ -87,7 +88,7 @@ export function calculateMood(needs, mind, minutes, personality = null) {
   let label = 'Спокоен';
   if (worst < 20) {
     const lowest = values.indexOf(worst);
-    label = ['Очень голоден', 'Измотан', 'Не в духе', 'Скучает','Одиноко'][lowest];
+    label = ['Очень голоден', 'Измотан', 'Не в духе', 'Скучает','Одиноко','Срочно в туалет'][lowest];
   } else if (score >= 83) label = 'Вдохновлён';
   else if (score >= 68) label = 'Доволен';
   else if (score < 40) label = 'Подавлен';
@@ -133,7 +134,9 @@ export function refreshMind(state) {
 
 export function rememberAction(state, id) {
   const receipt=activityReceipt(id,state.minutes);
-  if (!receipt || !WISHES[receipt.actionId]) return;
+  // Toilet is completed essential care, not a frivolous generated wish.
+  // Still allow its actual completion memory, never auto-create a wish.
+  if (!receipt || (!WISHES[receipt.actionId]&&receipt.actionId!=='toilet')) return;
   const mind = state.mind;
   const fulfilled = mind.wish?.id === id;
   const memory={ id, at: state.minutes, fulfilled };
@@ -176,7 +179,8 @@ export function psychologyScore(state, id, wishReady = true) {
   if (!WISHES[id]) return 0;
   const n = state.needs;
   const axes=axesFor(state),taste=tag=>preferenceAffinity(state.personality,tag);
-  const critical = Math.min(n.energy, n.hunger, n.hygiene, n.fun) < 24;
+  const critical = Math.min(n.energy, n.hunger, n.hygiene, n.fun,
+    Number.isFinite(n.bladder)?n.bladder:75) < 24;
   let score = 0;
   if (id === 'shower') score += (axes.organization-.5)*7;
   if (id === 'bed') score += (axes.resilience-.5)*5;

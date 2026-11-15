@@ -6,8 +6,8 @@ import {calculateMood} from './psychology.js';
 import {deriveAxes} from './trait-catalog.js';
 
 const clamp=(value,lo,hi)=>Math.max(lo,Math.min(hi,value));
-const safeNeeds=needs=>Object.fromEntries(['hunger','energy','hygiene','fun','social']
-  .map(key=>[key,clamp(Number.isFinite(needs?.[key])?needs[key]:key==='social'?75:50,0,100)]));
+const safeNeeds=needs=>Object.fromEntries(['hunger','energy','hygiene','fun','social','bladder']
+  .map(key=>[key,clamp(Number.isFinite(needs?.[key])?needs[key]:['social','bladder'].includes(key)?75:50,0,100)]));
 const record=value=>Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
 const important=new Set(['fridge','bed','shower','toilet']);
 const direct=new Set(['talk','argue']);
@@ -46,7 +46,7 @@ export function moodActionPolicy(resident,command,options={}){
   const threshold=effortThreshold(command,options);
   // A very depleted person does not force themselves into optional work merely
   // because a recent positive emotion temporarily masks exhaustion.
-  const urgent=needs.energy<16||needs.hunger<14;
+  const urgent=needs.energy<16||needs.hunger<14||needs.bladder<15;
   const refusalThreshold=threshold===null?null:
     clamp(Math.round(threshold+(0.5-personality.resilience)*14),16,42);
   const willing=refusalThreshold===null||(!urgent&&mood>=refusalThreshold);
@@ -55,6 +55,7 @@ export function moodActionPolicy(resident,command,options={}){
   const efficiency=productivity(command)?clamp(factor,0.85,1.12):1;
   const reason=willing?null:needs.energy<25?'Сильно устал и пока не готов к этому':
     needs.hunger<22?'Слишком голоден для этого занятия':
+    needs.bladder<22?'Сначала нужно в туалет':
     'Сейчас не в настроении для этого занятия';
   return {mood,efficiency,willing,reason,threshold:refusalThreshold};
 }
