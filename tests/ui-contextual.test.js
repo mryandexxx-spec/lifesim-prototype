@@ -9,7 +9,7 @@ test('1.0s: social controls are not permanently visible on the 3D scene',()=>{
   assert.match(css,/#social-context\[hidden\],\.dialogue-backdrop\[hidden\]\{display:none!important;\}/);
 });
 test('1.0s: tapping ONLY the inactive resident opens social categories',()=>{
-  assert.match(src,/const peer=game.selectedSim==='alex'\?'mira':'alex';\s*return pickWorldTarget/);
+  assert.match(src,/return pickWorldRayTarget\(near,far,\[\.\.\.residents,\.\.\.hitVolumes\]\)/);
   assert.match(src,/if\(target\?\.kind==='resident'\)openSocialContext\(\)/);
   assert.match(src,/if\(dialogueNeedsDecision\(game\)\)return;/);
   assert.match(src,/\$\('social-context-close'\).addEventListener\('click',closeSocialContext\)/);
@@ -21,9 +21,10 @@ test('1.0s: furniture labels hidden by default, reversible via side control',()=
   assert.match(src,/\$\('hotspots'\).hidden=!itemLabelsVisible/);
   assert.match(src,/localStorage.setItem\(ITEM_LABELS_PREF/);
 });
-test('1.0s: hidden labels do not remove projected furniture tap actions',()=>{
-  assert.match(src,/const projectedObject=\(id,meta\)=>/);
-  assert.match(src,/\.\.\.Object.entries\(META\).map/);
+test('1.0u: hidden labels do not remove depth-aware furniture tap actions',()=>{
+  assert.match(src,/const hitVolumes=\[\];/);
+  assert.match(src,/const touchBox=\(id,name,x,y,z,sx,sy,sz,material\)=>/);
+  assert.match(src,/return pickWorldRayTarget\(near,far,\[\.\.\.residents,\.\.\.hitVolumes\]\)/);
   assert.match(src,/else if\(target\?\.kind==='object'\)select\(target.id\)/);
   assert.ok(!src.includes('if(btn.hidden)continue;'));
 });
