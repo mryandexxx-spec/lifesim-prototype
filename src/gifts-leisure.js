@@ -94,7 +94,7 @@ export function evaluateLeisure(root,initiator,id){
   if(!peer)return null;
   const axes=deriveAxes(peer.personality),view=getPerspective(root,peerId);
   const preference=preferenceAffinity(peer.personality,LEISURE_CATALOG[id].tag);
-  const score=43+preference*28+view.trust*.17-view.tension*.28+axes.sociability*8;
+  const score=43+preference*28+view.trust*.17-view.tension*.42+axes.sociability*8;
   return {accepted:score>=42,score:clamp(Math.round(score),0,100)};
 }
 const remember=(root,id,memoryId)=>{
