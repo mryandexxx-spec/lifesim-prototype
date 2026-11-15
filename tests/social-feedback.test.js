@@ -222,5 +222,5 @@ test('iPhone scene integrates original SVG badges above rig heads rather than ce
   }
   assert.ok(workflow.includes('node --check src/social-feedback.js'));
   assert.ok(workflow.includes('node --check src/reaction-badges.js'));
-  assert.ok(workflow.includes('src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/reaction-badges.js src/characters.js'));
+  assert.ok(workflow.includes('src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js src/characters.js'));
 });

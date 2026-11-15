@@ -252,7 +252,7 @@ test('mobile scene and Pages include optional personal cue UI, not numeric thres
  assert.ok(graph.includes('restoreSocialCues(entry.cues'));
  assert.ok(response.includes('styleBias=0'));
  assert.ok(workflow.includes('node --check src/social-boundaries.js'));
- assert.ok(workflow.includes('src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/reaction-badges.js'));
+ assert.ok(workflow.includes('src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js'));
  assert.ok(!/\b(alex|mira|document|localStorage|playcanvas)\b/i.test(core));
  assert.equal(CUE_LIMIT,5);
 });

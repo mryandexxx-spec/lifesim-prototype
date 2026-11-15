@@ -284,6 +284,6 @@ test('final player-facing and deploy wiring handles structured automation',()=>{
   assert.ok(rel.includes('autonomousLeisureToken'));
   assert.ok(core.includes('last=recentLeisureChoice(pair)'));
   assert.ok(workflow.includes('node --check src/social-dynamics.js'));
-  assert.ok(workflow.includes('src/social-boundaries.js src/social-dynamics.js src/reaction-badges.js'));
+  assert.ok(workflow.includes('src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js'));
   assert.ok(!/\b(alex|mira|document|localStorage|playcanvas)\b/i.test(core));
 });

@@ -313,7 +313,7 @@ test('Pages, text-only UI and save contract include the read-only pair dynamics'
   assert.ok(js.includes('resident.autonomy.nextAt=game.minutes+15'));
   assert.ok(relation.includes('proposeAutonomousSocial({'));
   assert.ok(flow.includes('node --check src/social-dynamics.js'));
-  assert.ok(flow.includes('src/social-boundaries.js src/social-dynamics.js src/reaction-badges.js'));
+  assert.ok(flow.includes('src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js'));
   assert.ok(!/\b(alex|mira|document|localStorage|playcanvas)\b/i.test(module));
   assert.ok(!module.includes('Math.random('));
   assert.ok(!module.includes('enqueueAction('));

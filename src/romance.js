@@ -105,7 +105,12 @@ export function romanceAvailability(graph,a,b,actionId,now=0){
     return {enabled:false,reason:'Сначала узнайте друг друга получше'};
   if(actionId==='romance.confess'&&(
     feelings[a].attraction<24||feelings[b].attraction<15||
-    src.trust<58||target.trust<54))
+    src.trust<58||target.trust<54||
+    // Being a gracious recipient is not the same as taking initiative.
+    // A confession needs at least one completed reciprocal flirt.
+    !Array.isArray(pair.events)||!pair.events.some(e=>
+      e.type==='romance.flirt'&&e.actorId===b&&e.targetId===a&&
+      Number.isFinite(e.at)&&e.at<=now&&now-e.at<=14*1440)))
     return {enabled:false,reason:'Пока рано открывать чувства'};
   return {enabled:true,reason:''};
 }

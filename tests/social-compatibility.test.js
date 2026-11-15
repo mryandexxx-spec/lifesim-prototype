@@ -241,7 +241,7 @@ test('UI and Pages carry the new knowledge implementation without exposing numer
   assert.ok(graph.includes('restoreSocialKnowledge(entry.knowledge'));
   assert.ok(engine.includes('compatibilityBias'));
   assert.ok(flow.includes('node --check src/social-compatibility.js'));
-  assert.ok(flow.includes('src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/reaction-badges.js'));
+  assert.ok(flow.includes('src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js'));
   assert.ok(!/\b(alex|mira|document|localStorage|playcanvas)\b/i.test(core),
     'headless ID-agnostic implementation');
 });

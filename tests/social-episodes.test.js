@@ -231,7 +231,7 @@ test('UI, workflow and current saved scheme expose stories without copying Sims 
   assert.ok(js.includes('latestEpisodes(memoryPair,game.selectedSim,game.minutes,3)'));
   assert.ok(js.includes('Доверие ещё восстанавливается'));
   assert.ok(workflow.includes('node --check src/social-episodes.js'));
-  assert.ok(workflow.includes('src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/reaction-badges.js'));
+  assert.ok(workflow.includes('src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js'));
   assert.ok(game.includes('rememberPairReceipt(pair,receipt)'));
   assert.ok(game.includes('restorePairEpisodes(entry.episodes'));
   assert.ok(!/\b(alex|mira|PlayCanvas|document|localStorage)\b/i.test(
