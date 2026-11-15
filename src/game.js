@@ -5,7 +5,10 @@ import {CAMERA_INITIAL,dragCamera,orbitCamera,pinchCamera,wheelCamera} from './c
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
-  arriveSocial, cancelSocial, autonomousSocialChoice } from './relationships.js';
+  arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
+  chooseSocialLine,nextSocialLine,finishSocialConversation } from './relationships.js';
+import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
+  CONVERSATION_MAX_TURNS} from './conversation-engine.js';
 import { WISHES, MEMORY_TEXT } from './psychology.js';
 import {getPerspective,latestSentiments} from './social-perspective.js';
 import {visibleEmotions} from './emotion-engine.js';
@@ -85,6 +88,8 @@ const META = {
 let selected = null;
 let beginAction = () => false;
 let beginSocial = () => false;
+let conversationTopicPicker=false;
+let conversationDisplayKey='';
 let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let toastTimeout;
@@ -144,12 +149,97 @@ $('action-button').addEventListener('click', () => {
 });
 for(const kind of Object.keys(SOCIAL_ACTIONS)){
   $(kind+'-btn').addEventListener('click',()=>{
+    conversationTopicPicker=false;
+    renderConversationPanel();
     if(beginSocial(kind)) {
       select(null);closeMindPanel();
       toast(selectedName()+' хочет '+(kind==='talk'?'поговорить':'поспорить')+' с '+getActorName(game.selectedSim==='alex'?'mira':'alex'));
     }
   });
 }
+$('conversation-btn').addEventListener('click',()=>{
+  if(game.socialAction)return;
+  conversationTopicPicker=true;
+  select(null);closeMindPanel();
+  renderConversationPanel();
+});
+$('conversation-close').addEventListener('click',()=>{
+  if(game.socialAction?.conversation)cancelSocial(game);
+  conversationTopicPicker=false;renderConversationPanel();
+});
+function conversationButton(label,callback,secondary=false){
+  const button=document.createElement('button');
+  button.type='button';button.textContent=label;
+  button.className=secondary?'conversation-option secondary':'conversation-option';
+  button.addEventListener('click',callback);
+  return button;
+}
+/** Only replace interactive DOM when the conversation actually changes.
+ * Replacing buttons every game frame would swallow iPhone touch clicks.
+ */
+function renderConversationPanel(force=true){
+  const s=game.socialAction,session=s?.conversation;
+  const key=JSON.stringify([conversationTopicPicker,game.selectedSim,game.paused,
+    s?.phase,session?.topic,session?.phase,session?.turns]);
+  if(!force&&key===conversationDisplayKey)return;
+  conversationDisplayKey=key;
+  const open=conversationTopicPicker||Boolean(session);
+  $('conversation-panel').hidden=!open;
+  if(!open)return;
+  const options=$('conversation-options');
+  options.replaceChildren();
+  const list=$('conversation-lines');
+  list.replaceChildren();
+  $('conversation-title').textContent=session
+    ?CONVERSATION_TOPICS[session.topic].label:'Выбери тему';
+  $('conversation-subtitle').textContent=session
+    ?(s.phase==='walking'?'Персонажи идут навстречу':
+      s.phase==='using'?'Разговор с '+getActorName(s.partner):'Подготовка беседы')
+    :'Начни разговор с '+getActorName(game.selectedSim==='alex'?'mira':'alex');
+  if(!session){
+    for(const [id,topic] of Object.entries(CONVERSATION_TOPICS))
+      options.append(conversationButton(topic.label,()=>{
+        if(beginSocial('talk',false,game.selectedSim,id)){
+          conversationTopicPicker=false;renderConversationPanel();
+        }
+      }));
+    return;
+  }
+  for(const entry of conversationTranscript(session)){
+    const li=document.createElement('li');
+    li.textContent=(entry.speaker==='initiator'?getActorName(s.initiator):getActorName(s.partner))+
+      ': '+entry.line;
+    li.className=entry.speaker==='initiator'?'conversation-speaker':'conversation-reply';
+    list.append(li);
+  }
+  list.scrollTop=list.scrollHeight;
+  if(s.phase!=='using'||game.paused){
+    $('conversation-subtitle').textContent=game.paused
+      ?'Сними паузу, чтобы продолжить':'Персонажи идут навстречу';
+    return;
+  }
+  if(session.phase==='response'){
+    if(session.turns.length<CONVERSATION_MAX_TURNS)
+      options.append(conversationButton('Продолжить беседу',()=>{
+        if(nextSocialLine(game))renderConversationPanel();
+      }));
+    options.append(conversationButton('Завершить разговор',()=>{
+      const outcome=finishSocialConversation(game);
+      if(outcome){toast(outcome.label);renderConversationPanel();}
+    },true));
+    return;
+  }
+  for(const choice of conversationOptions(session))
+    options.append(conversationButton(choice.label,()=>{
+      if(chooseSocialLine(game,choice.id))renderConversationPanel();
+    }));
+  if(session.turns.length)
+    options.append(conversationButton('Завершить разговор',()=>{
+      const outcome=finishSocialConversation(game);
+      if(outcome){toast(outcome.label);renderConversationPanel();}
+    },true));
+}
+renderConversationPanel();
 $('pause-btn').addEventListener('click', () => {
   game.paused = !game.paused;
   $('pause-icon').textContent = game.paused ? '▶' : 'Ⅱ';
@@ -197,7 +287,8 @@ function updateResidentPicker() {
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
     selectResident(game,id);
-    select(null); closeMindPanel(); updateResidentPicker(); save(true);
+    conversationTopicPicker=false;
+    select(null); closeMindPanel(); updateResidentPicker(); renderConversationPanel(); save(true);
     toast('Теперь управляешь: '+selectedName());
   });
 }
@@ -485,7 +576,7 @@ function boot() {
   };
 
   // Meet beside the other resident at a walkable, reachable point.
-  beginSocial=(kind,automatic=false,actorId=game.selectedSim)=>{
+  beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null)=>{
     if(!canStartSocial(game,kind,actorId,automatic)){
       if(!automatic)toast('Собеседник занят или разговор уже идёт');
       return false;
@@ -502,7 +593,8 @@ function boot() {
       if(len<bestLength){best={goal,points};bestLength=len;}
     }
     if(!best){if(!automatic)toast('Сейчас не получается подойти к собеседнику');return false;}
-    if(!startSocial(game,kind,actorId,best.goal,automatic))return false;
+    if(!(topic?startConversation(game,actorId,best.goal,topic)
+      :startSocial(game,kind,actorId,best.goal,automatic)))return false;
     // A manual invitation interrupts the partner's task but never bypasses
     // its renderer exit transition (bed/sofa/shower/fridge). Drop obsolete A*.
     if(!automatic){
@@ -514,6 +606,9 @@ function boot() {
     return true;
   };
   resetRuntime=()=>{
+    conversationTopicPicker=false;
+    conversationDisplayKey='';
+    renderConversationPanel();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
@@ -672,7 +767,7 @@ function boot() {
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
-        const socialBefore=game.socialAction?.kind;
+        const socialBefore=game.socialAction?.conversation?null:game.socialAction?.kind;
         tickHousehold(game,.30 * game.speed); // Both share the clock; no double advancement.
         if(prevAlex && !game.action) toast('Алекс закончил: '+ACTIONS[prevAlex].label.toLowerCase());
         if(prevMira && !game.otherSim.action) toast('Мира закончила: '+ACTIONS[prevMira].label.toLowerCase());
@@ -1019,6 +1114,9 @@ function boot() {
       // talk/argue stays available; the partner's current task is interruptible.
       const busy=Boolean(game.socialAction);
       for(const kind of Object.keys(SOCIAL_ACTIONS))$(kind+'-btn').disabled=busy;
+      $('conversation-btn').disabled=busy;
+      if(conversationTopicPicker||game.socialAction?.conversation||!$('conversation-panel').hidden)
+        renderConversationPanel(false);
       const socialFx=$('social-effect');
       socialFx.hidden=!socialUsing;
       if(socialUsing){
