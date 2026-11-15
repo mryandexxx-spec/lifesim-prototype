@@ -262,3 +262,24 @@ test('M2: policies and callbacks are wired in game without bypassing UI, saves o
   assert.match(workflow,/npm test/);
   assert.doesNotMatch(workflow,/deploy-pages|upload-pages|pages: write/);
 });
+
+test('1.0r release includes M2 in Pages, preserves 1.0q dialogue, M1 and Safari cache URLs',()=>{
+  const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
+  const lock=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url),'utf8'));
+  assert.match(workflow,/node --check src\/mood-action-policy\.js/);
+  assert.match(workflow,/cp src\/mood-action-policy\.js site\/src\//);
+  assert.match(workflow,/src\/game\.js src\/simulation\.js/);
+  assert.match(workflow,/src\/mood-presentation\.js src\/social-perspective\.js/);
+  assert.match(workflow,/src\/conversation-engine\.js src\/dialogue-decision\.js src\/gifts-leisure\.js/);
+  assert.match(html,/сборка \/ 1\.0r/);
+  assert.match(html,/styles\.css\?v=1\.0r/);
+  assert.match(html,/src\/game\.js\?v=1\.0r/);
+  assert.match(html,/id="mood-orbit"/);
+  assert.match(html,/id="mood-overview"/);
+  assert.match(html,/id="conversation-panel"/);
+  assert.equal(pkg.version,'1.0.0-alpha.18');
+  assert.equal(lock.version,pkg.version);
+  assert.equal(lock.packages[''].version,pkg.version);
+});
