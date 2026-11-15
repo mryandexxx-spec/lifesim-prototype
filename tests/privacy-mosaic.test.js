@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {MOSAIC_SIZE,MOSAIC_COLUMNS,MOSAIC_ROWS,privacyMosaicPixels,
   createPrivacyMosaicMaterial} from '../src/privacy-mosaic.js';
+import {TOILET_LAYOUT} from '../src/toilet-interaction.js';
 import {SHOWER_LAYOUT,showerSequence,showerPrivacyInvariant,
   createShowerTransition,advanceShowerTransition} from '../src/shower-interaction.js';
 
