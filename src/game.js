@@ -10,6 +10,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes,socialCommunicationNotes} from './social-graph.js';
 import {latestEpisodes} from './social-episodes.js';
 import {pairDynamic} from './social-dynamics.js';
+import {romanceStatus} from './romance.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
@@ -225,7 +226,8 @@ function showSocialCategory(category){
 }
 for(const [id,category] of [
   ['conversation-btn','conversation'],['humor-btn','humor'],
-  ['friendship-btn','friendship'],['conflict-btn','conflict'],['shared-btn','shared']
+  ['friendship-btn','friendship'],['romance-btn','romance'],
+  ['conflict-btn','conflict'],['shared-btn','shared']
 ])$(id).addEventListener('click',()=>showSocialCategory(category));
 $('social-menu-close').addEventListener('click',()=>{
   socialMenuCategory=null;renderSocialMenu();renderConversationPanel();renderSharedPanel();
@@ -266,7 +268,7 @@ function renderSocialMenu(force=true){
   $('social-menu-panel').hidden=!category;
   if(!category)return;
   const titles={conversation:'Беседа',humor:'Юмор',friendship:'Дружба',
-    conflict:'Конфликт'};
+    romance:'Романтика',conflict:'Конфликт'};
   $('social-menu-title').textContent=titles[category]||'Общение';
   $('social-menu-subtitle').textContent='Выбери взаимодействие с '+getActorName(targetId);
   const options=$('social-menu-options');options.replaceChildren();
@@ -282,7 +284,7 @@ function renderSocialMenu(force=true){
     if(topic)add(topic.label,{type:'conversation',topicId:id});
   };
   const addBranch=id=>{
-    const found=availableSocialActions(game.socialGraph,game.selectedSim,targetId)
+    const found=availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
       .find(a=>a.id===id);
     if(found?.enabled)add(found.label,{type:'branch',actionId:id});
   };
@@ -297,6 +299,18 @@ function renderSocialMenu(force=true){
   }else if(category==='friendship'){
     addBranch('friend.tease');
     addBranch('friend.confide');
+  }else if(category==='romance'){
+    const options=availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
+      .filter(action=>action.category==='romance');
+    for(const action of options){
+      if(action.enabled)add(action.label,{type:'branch',actionId:action.id});
+    }
+    if(!options.some(action=>action.enabled)){
+      const hint=document.createElement('p');
+      hint.className='shared-progress-text';
+      hint.textContent=options[0]?.reason||'Для романтики пока не время';
+      $('social-menu-options').append(hint);
+    }
   }else if(category==='conflict'){
     add('Поспорить',{type:'social',actionId:'argue'});
     addTopic('conflict');
@@ -402,7 +416,7 @@ function renderBranchPanel(force=true){
   const hints=document.createElement('p');hints.className='shared-progress-text';
   hints.textContent='Дружба: 3 события за 2 дня, взаимная дружба ≥65, доверие ≥50. Враги: ≥2 конфликта.';
   opts.append(hints);
-  for(const action of availableSocialActions(game.socialGraph,game.selectedSim,target)){
+  for(const action of availableSocialActions(game.socialGraph,game.selectedSim,target,game.minutes)){
     const button=conversationButton(action.label+(action.enabled?'':' · '+action.reason),()=>{
       if(queuedSocial('branch',{actionId:action.id})){
         branchPicker=false;renderBranchPanel();
@@ -944,7 +958,7 @@ function boot() {
         if(!canStartSocial(game,command.type==='social'?command.actionId:'talk',
           residentId,false))return false;
         if(command.type==='branch'&&!availableSocialActions(
-          game.socialGraph,residentId,partnerId)
+          game.socialGraph,residentId,partnerId,game.minutes)
           .some(a=>a.id===command.actionId&&a.enabled))return false;
         if(command.type==='shared'&&command.mode==='gift'&&
           !inventoryFor(game,residentId).some(item=>item.id===command.choiceId))
@@ -1525,6 +1539,7 @@ function boot() {
       $('conversation-btn').disabled=false;
       $('humor-btn').disabled=false;
       $('shared-btn').disabled=false;
+      $('romance-btn').disabled=false;
       $('conflict-btn').disabled=false;
       $('branch-btn').disabled=false; // hidden debug entry only
       const branchStatus=relationSummary(game.socialGraph,game.selectedSim,
@@ -1534,6 +1549,8 @@ function boot() {
       $('friendship-btn').setAttribute('aria-disabled',String(friendshipLocked));
       $('friendship-btn').textContent=friendshipLocked?'Дружба · 🔒':'Дружба';
       $('relationship-branch').textContent=branchStatus.label;
+      $('romance-status').textContent=romanceStatus(game.socialGraph,game.selectedSim,
+        game.selectedSim==='alex'?'mira':'alex');
       if(socialMenuCategory)renderSocialMenu(false);
       renderQueuePanel(false);
       if(branchPicker||game.socialAction?.branchAction||!$('branch-panel').hidden)

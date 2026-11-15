@@ -2,6 +2,9 @@ import {initialPairEpisodes,rememberPairReceipt,restorePairEpisodes,episodeAppra
 import {newSocialKnowledge,discoverPreference,restoreSocialKnowledge,discoveryNotes} from './social-compatibility.js';
 import {newSocialCues,observeSocialCue,restoreSocialCues,socialCueNotes,cueConversationBias} from './social-boundaries.js';
 import {evaluateSocialReaction} from './social-reactions.js';
+import {ROMANCE_ACTION_IDS,newRomanceState,restoreRomanceState,setLifeStage,
+  addFamilyLink,romanceSafety,romanceAvailability,recordRomanceReceipt} from './romance.js';
+export {setLifeStage,addFamilyLink,romanceSafety,romanceAvailability} from './romance.js';
 /** Блин’С social graph V1: N residents, N sparse links. No renderer/household imports.
  * Legacy two-resident values are observational inputs from an external adapter.
  */
@@ -36,7 +39,7 @@ const makePair=(a,b)=>({
   ids:[a,b],metAt:null,views:{[a]:view(),[b]:view()},
   counts:{positive:0,negative:0},positiveDays:[],
   counted:[],negativeSinceFriend:0,positiveSinceRival:0,
-  friendship:'none',rivalry:'none',
+  friendship:'none',rivalry:'none',romance:newRomanceState([a,b]),
   lastAt:null,events:[],episodes:initialPairEpisodes(a,b),knowledge:newSocialKnowledge(a,b),cues:newSocialCues(a,b),revision:0
 });
 const adj=graph=>{
@@ -56,7 +59,7 @@ export function newSocialGraph(personIds=[]){
     if(!validPersonId(id)||persons.includes(id))throw new TypeError('Duplicate or invalid resident id');
     persons.push(id);
   }
-  return {schema:GRAPH_SCHEMA,persons,nextSeq:1,pairs:{}};
+  return {schema:GRAPH_SCHEMA,persons,nextSeq:1,pairs:{},lifeStages:{},familyLinks:[]};
 }
 export function registerPerson(graph,id){
   if(!record(graph)||!validPersonId(id)||!Array.isArray(graph.persons))return false;
@@ -134,9 +137,11 @@ export function observePairViews(graph,idA,idB,views){
   return true;
 }
 const POSITIVE=new Set(['talk','conversation.talk','gift.accepted','leisure.accepted',
-  'acquaint.chat','friend.tease','friend.confide','rival.truce']);
+  'acquaint.chat','friend.tease','friend.confide','rival.truce',
+  'romance.flirt','romance.confess']);
 const NEGATIVE=new Set(['argue','conversation.argue','gift.refused','leisure.refused',
-  'rival.taunt','friend.tease.refused','friend.confide.refused','rival.truce.refused','acquaint.chat.refused']);
+  'rival.taunt','friend.tease.refused','friend.confide.refused','rival.truce.refused','acquaint.chat.refused',
+  'romance.flirt.refused','romance.confess.refused']);
 const TYPES=new Set([...POSITIVE,...NEGATIVE,'introduced']);
 const positive=type=>POSITIVE.has(type);
 const weights={
@@ -148,6 +153,8 @@ const weights={
   'friend.tease':{friendship:4,trust:3,tension:-2},
   'friend.confide':{friendship:6,trust:6,tension:-3},
   'rival.truce':{friendship:4,trust:6,tension:-10},
+  'romance.flirt':{friendship:1,trust:1,tension:-1},
+  'romance.confess':{friendship:2,trust:2,tension:-1},
   argue:{friendship:-9,trust:-9,tension:12},
   'conversation.argue':{friendship:-9,trust:-9,tension:12},
   'gift.refused':{friendship:-2,trust:-3,tension:4},
@@ -156,7 +163,9 @@ const weights={
   'friend.tease.refused':{friendship:-4,trust:-5,tension:7},
   'friend.confide.refused':{friendship:-3,trust:-6,tension:6},
   'rival.truce.refused':{friendship:-2,trust:-2,tension:6},
-  'acquaint.chat.refused':{friendship:-2,trust:-2,tension:3}
+  'acquaint.chat.refused':{friendship:-2,trust:-2,tension:3},
+  'romance.flirt.refused':{friendship:0,trust:-1,tension:1},
+  'romance.confess.refused':{friendship:0,trust:-2,tension:2}
 };
 function recompute(pair){
   const [a,b]=pair.ids,v=pair.views;
@@ -188,6 +197,9 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
   if(!record(event)||!TYPES.has(event.type)||!safeAt(event.at)||
     !validPersonId(event.actorId)||!validPersonId(event.targetId)||
     event.actorId===event.targetId||!Number.isSafeInteger(graph?.nextSeq))return null;
+  const romanceEvent=ROMANCE_ACTION_IDS.some(id=>
+    event.type===id||event.type===id+'.refused');
+  if(romanceEvent&&!romanceSafety(graph,event.actorId,event.targetId).allowed)return null;
   const pair=getOrCreatePair(graph,event.actorId,event.targetId);
   if(!pair)return null;
   if(pair.metAt===null)pair.metAt=event.at;
@@ -224,6 +236,7 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
   pair.events.push(receipt);
   pair.events=pair.events.slice(-EVENT_LIMIT);
   rememberPairReceipt(pair,receipt);
+  if(romanceEvent)recordRomanceReceipt(graph,pair,receipt);
   pair.lastAt=event.at;
   pair.revision++;
   recompute(pair);
@@ -251,13 +264,20 @@ export const BRANCH_ACTIONS=Object.freeze({
   'friend.tease':action('Дружески подшутить','friendship','Нужна взаимная дружба'),
   'friend.confide':action('Доверить секрет','friendship','Нужна взаимная дружба и доверие'),
   'rival.taunt':action('Высказать претензию','conflict','Нужна устойчивая неприязнь'),
-  'rival.truce':action('Предложить перемирие','conflict','Примиряться пока не с кем')
+  'rival.truce':action('Предложить перемирие','conflict','Примиряться пока не с кем'),
+  'romance.flirt':action('Осторожно пофлиртовать','romance','Пока рано для флирта'),
+  'romance.confess':action('Признаться в симпатии','romance','Нужна взаимная симпатия')
 });
-export function availableSocialActions(graph,a,b){
+export function availableSocialActions(graph,a,b,minutes=0){
   if(!validPersonId(a)||!validPersonId(b)||a===b||
     !graph?.persons?.includes(a)||!graph.persons.includes(b))return [];
   const pair=getPair(graph,a,b),status=relationSummary(graph,a,b);
   return Object.entries(BRANCH_ACTIONS).map(([id,def])=>{
+    if(ROMANCE_ACTION_IDS.includes(id)){
+      const decision=romanceAvailability(graph,a,b,id,minutes);
+      return {id,label:def.label,category:def.category,enabled:decision.enabled,
+        reason:decision.reason};
+    }
     const enabled=id==='acquaint.introduce'?!status.met:
       id==='acquaint.chat'?status.met:
       id==='friend.tease'?status.friendship!=='none':
@@ -268,7 +288,7 @@ export function availableSocialActions(graph,a,b){
   });
 }
 export function resolveBranchResponse(graph,a,b,id,context={}){
-  const available=availableSocialActions(graph,a,b).find(x=>x.id===id);
+  const available=availableSocialActions(graph,a,b,context.minutes??0).find(x=>x.id===id);
   if(!available?.enabled)return null;
   // The generic N-resident graph doesn't know rendering or resident shape.
   // The runtime adapter can inject a recipient snapshot; old pure callers
@@ -280,11 +300,22 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
     compatibilityBias:context.compatibilityBias??0
   });
   if(!reaction)return null;
-  const accepted=reaction.accepted;
+  const isRomance=ROMANCE_ACTION_IDS.includes(id);
+  // A romance request is a verbal invitation, not a forced physical act.
+  // Missing or distressed current recipient data is a respectful refusal.
+  const recipient=context.recipient;
+  const willing=!isRomance||(Number.isFinite(recipient?.mind?.mood?.value)&&
+    recipient.mind.mood.value>=44&&
+    ['energy','hunger','hygiene'].every(k=>
+      Number.isFinite(recipient?.needs?.[k])&&recipient.needs[k]>=42));
+  const accepted=reaction.accepted&&willing;
   const type=id==='acquaint.introduce'?'introduced':
     id==='rival.taunt'?id:accepted?id:id+'.refused';
-  return {accepted,type,id,outcome:reaction.outcome,
-    intensity:reaction.intensity,label:accepted?
+  return {accepted,type,id,outcome:isRomance&&!accepted?'refused':reaction.outcome,
+    intensity:reaction.intensity,label:isRomance
+      ?accepted?id==='romance.flirt'?'Ответил(а) на флирт':'Чувства приняты'
+        :'Собеседник предпочёл сохранить дистанцию'
+      :accepted?
     id==='friend.tease'?'Шутку оценили':id==='friend.confide'?'Секрет принят':
     id==='rival.truce'?'Удалось начать примирение':
     id==='acquaint.introduce'?'Познакомились!':'Узнали друг друга получше':
@@ -296,6 +327,14 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
   const saved=good&&Array.isArray(raw.persons)?raw.persons.filter(validPersonId):[];
   const ids=[...new Set([...saved,...personIds.filter(validPersonId)])].slice(0,MAX_PEOPLE);
   const graph=newSocialGraph(ids);
+  if(good&&record(raw.lifeStages))
+    for(const id of ids){
+      if(Object.hasOwn(raw.lifeStages,id))setLifeStage(graph,id,raw.lifeStages[id]);
+    }
+  if(good&&Array.isArray(raw.familyLinks))
+    for(const edge of raw.familyLinks.slice(0,2048)){
+      if(record(edge))addFamilyLink(graph,edge.from,edge.to,edge.kind);
+    }
   if(good&&Number.isSafeInteger(raw.nextSeq)&&raw.nextSeq>=1&&raw.nextSeq<=1e9)
     graph.nextSeq=raw.nextSeq;
   if(good&&record(raw.pairs)){
@@ -317,9 +356,16 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
         p[k]=Number.isSafeInteger(entry[k])?clamp(entry[k],0,100000):0;
       if(['none','friends','close'].includes(entry.friendship))p.friendship=entry.friendship;
       if(['none','oneSided','mutual'].includes(entry.rivalry))p.rivalry=entry.rivalry;
+      p.romance=restoreRomanceState(entry.romance,pairIds);
+      // A corrupted/underage/related save never imports romantic progress.
+      if(!romanceSafety(graph,pairIds[0],pairIds[1]).allowed)
+        p.romance=newRomanceState(pairIds);
       p.events=Array.isArray(entry.events)?entry.events.filter(e=>record(e)&&
         Number.isSafeInteger(e.seq)&&e.seq>0&&e.seq<graph.nextSeq&&
-        TYPES.has(e.type)&&safeAt(e.at)&&e.actorId!==e.targetId&&
+        TYPES.has(e.type)&&safeAt(e.at)&&
+        (!ROMANCE_ACTION_IDS.some(id=>e.type===id||e.type===id+'.refused')||
+          romanceSafety(graph,e.actorId,e.targetId).allowed)&&
+        e.actorId!==e.targetId&&
         pairIds.includes(e.actorId)&&pairIds.includes(e.targetId)).slice(-EVENT_LIMIT)
         .map(e=>({seq:e.seq,type:e.type,at:e.at,actorId:e.actorId,
           targetId:e.targetId,...(typeof e.token==='string'&&e.token.length<=80?{token:e.token}:{})})):[];

@@ -6,7 +6,7 @@ import { refreshMind } from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory} from './gifts-leisure.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
-import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews} from './social-graph.js';
+import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
@@ -33,6 +33,9 @@ export function newHousehold() {
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);
   state.socialGraph=newSocialGraph(HOUSEHOLD_IDS);
+  // Both demonstrator residents are explicitly written as adults, no guess
+  // from gender, name or 3D model. Unknown NPCs remain age-unverified.
+  for(const id of HOUSEHOLD_IDS)setLifeStage(state.socialGraph,id,'adult');
   markAcquainted(state.socialGraph,HOUSEHOLD_IDS[0],HOUSEHOLD_IDS[1],state.minutes);
   observePairViews(state.socialGraph,HOUSEHOLD_IDS[0],HOUSEHOLD_IDS[1],state.relationship.views);
   state.inventory=starterInventory();
@@ -69,6 +72,11 @@ export function loadHousehold(raw) {
   root.socialGraph=restoreSocialGraph(raw.socialGraph,HOUSEHOLD_IDS,{
     ids:HOUSEHOLD_IDS,at:root.minutes,views:root.relationship.views
   });
+  // Legacy 1.0j and earlier saves had no life-stage registry at all.
+  // Only the two known demo adults receive a migration default; an explicit
+  // new registry missing/invalid age does not gain unearned adult eligibility.
+  if(!raw.socialGraph||!Object.hasOwn(raw.socialGraph,'lifeStages'))
+    for(const id of HOUSEHOLD_IDS)setLifeStage(root.socialGraph,id,'adult');
   root.socialAction=loadSocialAction(raw.socialAction,root);
   // Legacy v1 had no bedSlot. Keep valid reservations first, then assign
   // any remaining sleepers a distinct free half by actual route distance.

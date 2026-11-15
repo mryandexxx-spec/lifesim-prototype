@@ -132,7 +132,7 @@ export function startSharedSocial(root,initiator,target,mode,choiceId,automatic=
 }
 /** The adapter remains two-resident only; social-graph.js works with N stable IDs. */
 export function startBranchSocial(root,initiator,target,actionId,automatic=false){
-  if(!root?.socialGraph||!availableSocialActions(root.socialGraph,initiator,otherId(initiator))
+  if(!root?.socialGraph||!availableSocialActions(root.socialGraph,initiator,otherId(initiator),root.minutes)
     .some(action=>action.id===actionId&&action.enabled))return false;
   if(automatic&&(!AUTONOMOUS_FRIEND_BRANCHES.includes(actionId)||
     resolveBranchResponse(root.socialGraph,initiator,otherId(initiator),actionId,{
@@ -235,6 +235,21 @@ export function tickSocial(root,minutes){
           get(root,s.initiator)?.personality).bias});
     if(!response){root.socialAction=null;return false;}
     s.branchAction.resultType=response.type;
+    // Respectful romantic refusal: no quarrel, imposed fun, shared-affinity
+    // penalty or fake positive memory. Only a canonical refusal + cooldown.
+    if(s.branchAction.id.startsWith('romance.')&&!response.accepted){
+      const declined=recordPairCompletion(root,s,response.type);
+      root.socialAction=null;
+      if(!declined)return false;
+      root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
+      get(root,s.initiator).event='Уважает отказ';
+      get(root,s.partner).event='Обозначил(а) границы';
+      emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,
+        outcome:'refused',eventType:'branch.reply'});
+      emitSocialReaction(root,{actorId:s.partner,responderId:s.initiator,
+        outcome:'awkward',eventType:'branch.initiator'});
+      return true;
+    }
     s.kind=response.accepted?'talk':'argue';
     if(!completeSocial(root,response.accepted?6:-5))return false;
     emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,
@@ -301,7 +316,7 @@ export function loadSocialAction(data,root) {
   if(branch!==undefined&&(
     !branch||typeof branch!=='object'||Array.isArray(branch)||
     !Object.hasOwn(branch,'id')||Object.keys(branch).length!==1||
-    !availableSocialActions(root.socialGraph,data.initiator,data.partner)
+    !availableSocialActions(root.socialGraph,data.initiator,data.partner,root.minutes)
       .some(action=>action.id===branch.id&&action.enabled)||
     session||shared||data.kind!=='talk'||
     (data.automatic===true&&!AUTONOMOUS_FRIEND_BRANCHES.includes(branch.id))))return null;
