@@ -285,6 +285,7 @@ export function recordRomanceReceipt(graph,pair,receipt){
     bond.status='none';bond.since=null;bond.ex=true;
     bond.lastEndedAt=receipt.at;
     delete bond.engagedAt;delete bond.marriedAt;delete bond.careDays;
+    delete bond.lastConnectionAt;
   }else if(receipt.type==='romance.date'&&bond.status==='none'){
     bond.status='dating';bond.since=receipt.at;
     bond.careDays=careFrom(null,pair.ids,Math.floor(receipt.at/1440));
