@@ -55,7 +55,12 @@ export const FURNITURE_CATALOG=Object.freeze(Object.fromEntries(original.map(ite
   return [item.prefabId,Object.freeze({
     prefabId:item.prefabId,name:item.name,category:item.category,
     actionId:item.actionId||null,capabilities:Object.freeze(item.capabilities),
-    footprint,extras,approach,rendererKey:item.prefabId,version:1
+    footprint,extras,approach,rendererKey:item.prefabId,version:1,
+    maxOccupants:item.prefabId==='bed'?2:1,
+    sellable:!['shower','toilet'].includes(item.prefabId),
+    price:null, // F2 will set player-facing prices before enabling transactions.
+    effects:Object.freeze([]), // F3/F4 hook effects into actual action receipts.
+    interactionSlots:approach?Object.freeze([{kind:'approach',position:approach}]):Object.freeze([])
   })];
 })));
 export const LEGACY_FURNITURE_IDS=Object.freeze(Object.fromEntries(original.map(item=>

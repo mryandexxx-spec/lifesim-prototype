@@ -333,7 +333,9 @@ test('M4: UI3 ray picking and real toilet 3D/opaque timeline are integrated on b
   assert.match(ui,/data-need="bladder"/);
   assert.match(ui,/id="plan-peek"/);
   assert.match(css,/M4 — six genuine needs/);
-  assert.match(nav,/id: 'toilet'/);
+  // F0 generates the unchanged M4 toilet obstacle from the unified catalogue.
+  assert.match(nav,/furnitureObstacles\(newFurnitureWorld\(\)\)/);
+  assert.ok(FURNITURE.some(rect=>rect.id==='toilet'));
   assert.match(animations,/toiletSitWeight/);
   assert.match(workflow,/npm test/);
   assert.doesNotMatch(workflow,/deploy-pages|upload-pages|pages: write/);
