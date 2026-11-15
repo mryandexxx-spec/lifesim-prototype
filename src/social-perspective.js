@@ -11,7 +11,16 @@ export const SENTIMENTS=Object.freeze({
   argue:Object.freeze({label:'Давний спор',tone:'negative'}),
   regret:Object.freeze({label:'Сожалеет о ссоре',tone:'negative'}),
   hurt:Object.freeze({label:'Помнит обиду',tone:'negative'}),
-  reconcile:Object.freeze({label:'Примирение',tone:'positive'})
+  reconcile:Object.freeze({label:'Примирение',tone:'positive'}),
+  'gift.given':Object.freeze({label:'Подарил вещь',tone:'positive'}),
+  'gift.liked':Object.freeze({label:'Подарок понравился',tone:'positive'}),
+  'gift.neutral':Object.freeze({label:'Принял подарок',tone:'positive'}),
+  'gift.rejected':Object.freeze({label:'Его подарок не приняли',tone:'negative'}),
+  'gift.refused':Object.freeze({label:'Отказался от подарка',tone:'negative'}),
+  'leisure.music':Object.freeze({label:'Слушали музыку вместе',tone:'positive'}),
+  'leisure.books':Object.freeze({label:'Читали вместе',tone:'positive'}),
+  'leisure.games':Object.freeze({label:'Играли вместе',tone:'positive'}),
+  'leisure.refused':Object.freeze({label:'Отказались от досуга',tone:'negative'})
 });
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const finite=Number.isFinite;
@@ -65,11 +74,14 @@ export function getPerspective(root,id='alex'){
  */
 export function applySocialPerspective(view,memory,resident,minutes){
   if(!record(view)||!validMoment(memory,minutes)||!Array.isArray(view.sentiments)||
-    !['talk','regret','hurt','reconcile'].includes(memory.id))return false;
+    !['talk','regret','hurt','reconcile',
+      'gift.given','gift.liked','gift.neutral','gift.rejected','gift.refused',
+      'leisure.music','leisure.books','leisure.games','leisure.refused'].includes(memory.id))return false;
   const key=eventKey(memory.id,memory.at);
   if(view.sentiments.some(m=>eventKey(m.id,m.at)===key))return false;
   const axes=deriveAxes(resident?.personality);
-  const positive=memory.id==='talk'||memory.id==='reconcile';
+  const positive=!['regret','hurt','gift.rejected','gift.refused','leisure.refused']
+    .includes(memory.id);
   const feelings=visibleEmotions(resident?.mind,minutes,resident?.personality);
   const active=feelings.find(e=>e.source===memory.id&&e.at===memory.at);
   const intensity=active?.intensity??60;
@@ -82,7 +94,14 @@ export function applySocialPerspective(view,memory,resident,minutes){
   const raw=memory.id==='talk'?{friendship:6,trust:3,tension:-3}:
     memory.id==='regret'?{friendship:-5,trust:-4,tension:5}:
     memory.id==='hurt'?{friendship:-10,trust:-11,tension:12}:
-    {friendship:7,trust:10,tension:-10};
+    memory.id==='reconcile'?{friendship:7,trust:10,tension:-10}:
+    memory.id==='gift.liked'?{friendship:7,trust:6,tension:-4}:
+    memory.id==='gift.given'?{friendship:2,trust:2,tension:-1}:
+    memory.id==='gift.neutral'?{friendship:2,trust:2,tension:0}:
+    memory.id==='gift.rejected'||memory.id==='gift.refused'
+      ?{friendship:-2,trust:-2,tension:3}:
+    memory.id==='leisure.refused'?{friendship:-2,trust:-1,tension:2}:
+    {friendship:5,trust:3,tension:-3};
   for(const axis of ['friendship','trust','tension']){
     const safe=finite(view[axis])?view[axis]:newPerspective()[axis];
     view[axis]=clamp(Math.round(safe+raw[axis]*factor),0,100);

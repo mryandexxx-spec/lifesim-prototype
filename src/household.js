@@ -4,6 +4,7 @@
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled } from './simulation.js';
 import { refreshMind } from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
+import {starterInventory,restoreInventory} from './gifts-leisure.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
@@ -29,6 +30,7 @@ export function newHousehold() {
   state.otherSim=newMira(state.minutes);
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);
+  state.inventory=starterInventory();
   state.socialAction=null;
   return state;
 }
@@ -52,6 +54,7 @@ export function loadHousehold(raw) {
   if (!root.autonomy.enabled && mira.action?.automatic) mira.action=null;
   root.otherSim=mira;
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
+  root.inventory=restoreInventory(raw.inventory);
   root.relationship=loadRelationship(raw.relationship,root.minutes,{
     alex:root.mind.memories,mira:mira.mind.memories
   });

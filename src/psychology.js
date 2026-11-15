@@ -23,7 +23,16 @@ export const MEMORY_TEXT = Object.freeze({
   argue: 'Поспорил(а) с соседом', // compatibility: existing v1 saves
   regret: 'Сожалеет о споре',
   hurt: 'Обида после спора',
-  reconcile: 'Помирились после спора'
+  reconcile: 'Помирились после спора',
+  'gift.given':'Подарил(а) вещь другому жителю',
+  'gift.liked':'Получил(а) приятный подарок',
+  'gift.neutral':'Вежливо принял(а) подарок',
+  'gift.rejected':'Подарок не приняли',
+  'gift.refused':'Отказался(ась) от подарка',
+  'leisure.music':'Послушали музыку вместе',
+  'leisure.books':'Вместе читали и обсуждали книги',
+  'leisure.games':'Играли вместе',
+  'leisure.refused':'Совместный досуг не сложился'
 });
 const IDS = Object.keys(WISHES);
 const LIMIT = 12;
@@ -49,7 +58,10 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
     // Identical social event, different memories: the initiator regrets
     // starting a quarrel, while their partner feels hurt. Old saved
     // 'argue' events keep their original effect; reconciliation heals.
-    const socialEffect={argue:-18,regret:-13,hurt:-22,talk:11,reconcile:18};
+    const socialEffect={argue:-18,regret:-13,hurt:-22,talk:11,reconcile:18,
+      'gift.given':7,'gift.liked':14,'gift.neutral':5,'gift.rejected':-9,
+      'gift.refused':-5,'leisure.music':11,'leisure.books':11,
+      'leisure.games':11,'leisure.refused':-5};
     const effect=Object.hasOwn(socialEffect,memory.id)
       ?socialEffect[memory.id]:memory.fulfilled?12:5;
     return sum+effect*strength;

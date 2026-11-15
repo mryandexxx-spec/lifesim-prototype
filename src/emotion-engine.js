@@ -24,7 +24,16 @@ export const EMOTION_SOURCES=Object.freeze({
   argue:Object.freeze({kind:'irritation',cause:'Ссора',mood:-18}),
   regret:Object.freeze({kind:'sadness',cause:'Сожалеет о ссоре',mood:-13}),
   hurt:Object.freeze({kind:'sadness',cause:'Обиделся после ссоры',mood:-22}),
-  reconcile:Object.freeze({kind:'joy',cause:'Удалось помириться',mood:18})
+  reconcile:Object.freeze({kind:'joy',cause:'Удалось помириться',mood:18}),
+  'gift.given':Object.freeze({kind:'joy',cause:'Вручил подарок',mood:7}),
+  'gift.liked':Object.freeze({kind:'joy',cause:'Получил желанный подарок',mood:14}),
+  'gift.neutral':Object.freeze({kind:'calm',cause:'Принял подарок',mood:5}),
+  'gift.rejected':Object.freeze({kind:'sadness',cause:'Подарок не приняли',mood:-9}),
+  'gift.refused':Object.freeze({kind:'irritation',cause:'Не понравился подарок',mood:-5}),
+  'leisure.music':Object.freeze({kind:'enthusiasm',cause:'Музыка вместе',mood:11}),
+  'leisure.books':Object.freeze({kind:'inspiration',cause:'Совместное чтение',mood:11}),
+  'leisure.games':Object.freeze({kind:'joy',cause:'Совместная игра',mood:11}),
+  'leisure.refused':Object.freeze({kind:'sadness',cause:'Не удалось провести время вместе',mood:-5})
 });
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const isRecord=v=>Boolean(v)&&typeof v==='object'&&!Array.isArray(v);

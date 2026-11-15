@@ -3,6 +3,7 @@ import { refreshMind } from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
+import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -103,6 +104,15 @@ export function finishSocialConversation(root){
   completeSocial(root,outcome.score);
   return outcome;
 }
+/** Existing walk/animation/social reservation also supports gift/leisure.
+ * Nothing changes until this shared action finishes its fixed game time.
+ */
+export function startSharedSocial(root,initiator,target,mode,choiceId){
+  const session=createSharedSession(root,initiator,mode,choiceId);
+  if(!session||!startSocial(root,'talk',initiator,target,false))return false;
+  root.socialAction.shared=session;
+  return true;
+}
 export function arriveSocial(root) {
   if(root.socialAction?.phase!=='walking')return false;
   root.socialAction.phase='using';root.socialAction.elapsed=0;return true;
@@ -148,27 +158,43 @@ export function tickSocial(root,minutes){
   const s=root.socialAction;
   if(root.paused||!Number.isFinite(minutes)||minutes<=0||s?.phase!=='using')return false;
   if(s.conversation)return false; // explicit multi-turn choices decide the finish
+  if(s.shared){
+    const duration=sharedDuration(s.shared);
+    if(!duration){root.socialAction=null;return false;}
+    s.elapsed+=minutes;
+    if(s.elapsed<duration)return false;
+    const receipt=completeSharedSession(root);
+    if(!receipt){root.socialAction=null;return false;}
+    root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
+    root.socialAction=null;
+    return true;
+  }
   const def=SOCIAL_ACTIONS[s.kind];
   if(!def)return false;
   s.elapsed+=minutes;
   return s.elapsed>=def.duration?completeSocial(root):false;
 }
 export function loadSocialAction(data,root) {
+  const shared=data?.shared===undefined?null:restoreSharedSession(data.shared,root,data.initiator);
+  const duration=shared?sharedDuration(shared):SOCIAL_ACTIONS[data?.kind]?.duration;
   if(!data||typeof data!=='object'||Array.isArray(data)||
     !Object.hasOwn(SOCIAL_ACTIONS,data.kind)||!validId(data.initiator)||
     data.partner!==otherId(data.initiator)||!['walking','using'].includes(data.phase)||
     !data.target||!Number.isFinite(data.target.x)||!Number.isFinite(data.target.z)||
     Math.abs(data.target.x)>4.65||Math.abs(data.target.z)>4.01||
-    !Number.isFinite(data.elapsed)||data.elapsed<0||data.elapsed>=SOCIAL_ACTIONS[data.kind].duration||
+    !Number.isFinite(data.elapsed)||data.elapsed<0||data.elapsed>=duration||
     (!root.autonomy.enabled&&data.automatic===true))return null;
   if(get(root,data.initiator).action||get(root,data.partner).action)return null;
   const session=data.conversation===undefined?null:restoreConversation(data.conversation);
   if(data.conversation!==undefined&&(!session||data.kind!=='talk'||data.automatic===true))
     return null;
+  if(data.shared!==undefined&&(!shared||session||data.kind!=='talk'||data.automatic===true))
+    return null;
   return {kind:data.kind,initiator:data.initiator,partner:data.partner,
     target:{x:data.target.x,z:data.target.z},phase:data.phase,
     elapsed:data.elapsed,automatic:data.automatic===true,
-    ...(session?{conversation:session}:{})};
+    ...(session?{conversation:session}:{}),
+    ...(shared?{shared}:{})};
 }
 export function autonomousSocialChoice(root,id='alex') {
   if(!validId(id)||!root.relationship||!root.autonomy.enabled||
