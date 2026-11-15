@@ -2,6 +2,7 @@
 import { refreshMind } from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
+import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -84,6 +85,24 @@ export function startSocial(root,kind,initiator,target,automatic=false) {
   partner.event='Ждёт общения';
   return true;
 }
+/** Multi-turn sessions reuse the existing path reservation and social poses. */
+export function startConversation(root,initiator,target,topic){
+  const session=createConversation(topic);
+  if(!session||!startSocial(root,'talk',initiator,target,false))return false;
+  root.socialAction.conversation=session;
+  return true;
+}
+export const chooseSocialLine=(root,id)=>chooseConversationTurn(root,id);
+export const nextSocialLine=root=>continueConversation(root);
+export function finishSocialConversation(root){
+  const social=root?.socialAction,session=social?.conversation;
+  if(root?.paused||social?.phase!=='using'||!session)return null;
+  const outcome=conversationOutcome(session);
+  if(!outcome)return null;
+  social.kind=outcome.kind;
+  completeSocial(root,outcome.score);
+  return outcome;
+}
 export function arriveSocial(root) {
   if(root.socialAction?.phase!=='walking')return false;
   root.socialAction.phase='using';root.socialAction.elapsed=0;return true;
@@ -92,18 +111,16 @@ export function cancelSocial(root) {
   if(!root.socialAction)return false;
   root.socialAction=null;return true;
 }
-export function tickSocial(root,minutes) {
-  const s=root.socialAction;
-  if(root.paused||!Number.isFinite(minutes)||minutes<=0||s?.phase!=='using')return false;
-  const def=SOCIAL_ACTIONS[s.kind];
+function completeSocial(root,conversationScore=null){
+  const s=root.socialAction,def=SOCIAL_ACTIONS[s?.kind];
   if(!def||!root.otherSim){root.socialAction=null;return false;}
-  s.elapsed+=minutes;
-  if(s.elapsed<def.duration)return false;
   const reconciled=s.kind==='talk'&&canReconcile(root);
-  // A deliberate conversation after a quarrel rebuilds trust a little
-  // faster than ordinary small talk, but never breaches the 0–100 cap.
-  const affinityGain=reconciled?def.affinity+4:def.affinity;
-  root.relationship.affinity=clamp(root.relationship.affinity+affinityGain,0,100);
+  // Old one-click talk/argue keep exact +8 / -12 / reconciliation +12.
+  // A multi-turn talk has a single context-dependent signed result.
+  const gain=conversationScore===null
+    ?(reconciled?def.affinity+4:def.affinity)
+    :(reconciled?Math.max(4,conversationScore)+4:conversationScore);
+  root.relationship.affinity=clamp(root.relationship.affinity+gain,0,100);
   root.relationship.lastKind=s.kind;
   root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
   for(const id of ['alex','mira']){
@@ -127,6 +144,15 @@ export function tickSocial(root,minutes) {
   root.socialAction=null;
   return true;
 }
+export function tickSocial(root,minutes){
+  const s=root.socialAction;
+  if(root.paused||!Number.isFinite(minutes)||minutes<=0||s?.phase!=='using')return false;
+  if(s.conversation)return false; // explicit multi-turn choices decide the finish
+  const def=SOCIAL_ACTIONS[s.kind];
+  if(!def)return false;
+  s.elapsed+=minutes;
+  return s.elapsed>=def.duration?completeSocial(root):false;
+}
 export function loadSocialAction(data,root) {
   if(!data||typeof data!=='object'||Array.isArray(data)||
     !Object.hasOwn(SOCIAL_ACTIONS,data.kind)||!validId(data.initiator)||
@@ -136,9 +162,13 @@ export function loadSocialAction(data,root) {
     !Number.isFinite(data.elapsed)||data.elapsed<0||data.elapsed>=SOCIAL_ACTIONS[data.kind].duration||
     (!root.autonomy.enabled&&data.automatic===true))return null;
   if(get(root,data.initiator).action||get(root,data.partner).action)return null;
+  const session=data.conversation===undefined?null:restoreConversation(data.conversation);
+  if(data.conversation!==undefined&&(!session||data.kind!=='talk'||data.automatic===true))
+    return null;
   return {kind:data.kind,initiator:data.initiator,partner:data.partner,
     target:{x:data.target.x,z:data.target.z},phase:data.phase,
-    elapsed:data.elapsed,automatic:data.automatic===true};
+    elapsed:data.elapsed,automatic:data.automatic===true,
+    ...(session?{conversation:session}:{})};
 }
 export function autonomousSocialChoice(root,id='alex') {
   if(!validId(id)||!root.relationship||!root.autonomy.enabled||
