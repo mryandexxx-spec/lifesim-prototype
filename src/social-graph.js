@@ -52,7 +52,7 @@ export function newSocialGraph(personIds=[]){
     if(!validPersonId(id)||persons.includes(id))throw new TypeError('Duplicate or invalid resident id');
     persons.push(id);
   }
-  return {schema:GRAPH_SCHEMA,persons,nextSeq:1,pairs:Object.create(null)};
+  return {schema:GRAPH_SCHEMA,persons,nextSeq:1,pairs:{}};
 }
 export function registerPerson(graph,id){
   if(!record(graph)||!validPersonId(id)||!Array.isArray(graph.persons))return false;
