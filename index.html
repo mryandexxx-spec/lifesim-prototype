@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.0t" />
+  <link rel="stylesheet" href="./styles.css?v=1.0u" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.0t</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.0u</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -145,6 +145,7 @@
         <div class="need" data-need="energy"><span class="need-icon">☾</span><div class="need-copy"><span>Энергия</span><div class="meter"><i id="bar-energy"></i></div></div><output id="value-energy">67</output></div>
         <div class="need" data-need="hygiene"><span class="need-icon">✧</span><div class="need-copy"><span>Гигиена</span><div class="meter"><i id="bar-hygiene"></i></div></div><output id="value-hygiene">82</output></div>
         <div class="need" data-need="fun"><span class="need-icon">♫</span><div class="need-copy"><span>Досуг</span><div class="meter"><i id="bar-fun"></i></div></div><output id="value-fun">58</output></div>
+        <div class="need" data-need="social"><span class="need-icon" aria-hidden="true">♧</span><div class="need-copy"><span>Общение</span><div class="meter"><i id="bar-social"></i></div></div><output id="value-social">78</output></div>
       </div>
       <div class="footer-actions"><button id="save-btn" type="button">Сохранить</button><button id="reset-btn" type="button">Новая игра</button></div>
       <div id="mood-overview" class="mood-overview" role="meter" aria-label="Настроение выбранного персонажа" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70">
@@ -164,7 +165,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.0t"></script>
+  <script type="module" src="./src/game.js?v=1.0u"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');

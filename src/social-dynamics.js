@@ -171,7 +171,11 @@ export function proposeAutonomousSocial({
   const axes=deriveAxes(self.personality);
   const mood=finite(self.mind?.mood?.value)?self.mind.mood.value:50;
   if(mood<34&&reconcileTargetId===null)return null;
-  const urge=clamp(65-self.needs.fun,0,65)*.8+axes.sociability*11-
+  // A real missing social need increases willingness to seek company; it
+  // cannot override the existing exhaustion, consent or pair cooldown gates.
+  const socialLevel=finite(self.needs.social)?clamp(self.needs.social,0,100):75;
+  const socialUrge=clamp(65-socialLevel,0,65)*.85;
+  const urge=clamp(65-self.needs.fun,0,65)*.8+socialUrge+axes.sociability*11-
     axes.independence*5+(mood>60?3:0);
   let chosen=null;
   for(const targetId of graph.persons){
