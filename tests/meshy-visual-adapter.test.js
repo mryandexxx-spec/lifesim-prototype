@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createMeshyVisual} from '../src/meshy-visual.js';
+import {toiletSequence} from '../src/toilet-interaction.js';
 import {REQUIRED_MESHY_CLIPS,meshPlacement} from '../src/meshy-visual-policy.js';
 
 function fixture({loadError=false,missClip=false,alternateIdle=false}={}){
@@ -209,4 +210,27 @@ test('game supplies saved simulation clock and preserves walk during pause',()=>
   assert.match(source,/mood:game\.mind\?\.mood\?\.value/);
   assert.match(source,/energy:game\.needs\.energy/);
   assert.match(source,/walking:\(game\.action\?\.phase==='walking'/);
+});
+
+test('Alex Meshy stays attached to toilet during authored walk, sit, frozen pause and exit',()=>{
+  const f=fixture(),v=createMeshyVisual({pc:f.pc,app:f.app,rig:f.rig});
+  const frame=p=>toiletSequence(p*26,26);
+  v.update({preferred:true,actionId:'toilet',toiletBusy:true,
+    toiletFrame:frame(.17)});
+  assert.equal(f.renderers[0].enabled,false);
+  assert.ok(f.events.some(e=>e[0]==='play'&&e[1]==='Walking'));
+  v.update({preferred:true,actionId:'toilet',toiletBusy:true,
+    toiletFrame:frame(.55),paused:true,dt:0});
+  assert.equal(f.renderers[0].enabled,false);
+  assert.ok(f.events.some(e=>e[0]==='play'&&e[1]==='Sit_to_Stand_Transition_M'));
+  assert.equal(f.model.anim.speed,0);
+  assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime)<.01);
+  const seatedZ=f.model.position[2];
+  v.update({preferred:true,actionId:null,toiletBusy:true,
+    toiletFrame:frame(.82),paused:true,dt:0});
+  assert.ok(f.model.position[2]<seatedZ+.3);
+  v.update({preferred:true,actionId:null,toiletBusy:false,dt:.016});
+  assert.equal(f.renderers[0].enabled,false);
+  v.reset();
+  assert.equal(f.model.position[2],meshPlacement().z);
 });

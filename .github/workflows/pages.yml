@@ -72,6 +72,7 @@ jobs:
           node --check src/fridge-interaction.js
           node --check src/shower-interaction.js
           node --check src/toilet-interaction.js
+          node --check src/meshy-toilet-pose.js
           node --check src/privacy-mosaic.js
           node --check src/character-lab.js
           node --check src/character-lab-config.js
@@ -104,6 +105,7 @@ jobs:
           cp src/mood-action-policy.js site/src/
           cp src/social-need.js site/src/
           cp src/toilet-interaction.js site/src/
+          cp src/meshy-toilet-pose.js site/src/
       - name: Include optional Meshy character GLB when present
         run: |
           mkdir -p site/assets/characters

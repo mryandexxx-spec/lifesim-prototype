@@ -8,6 +8,7 @@ import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
 import {createMeshyBedController} from './meshy-bed-runtime.js';
 import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
   from './meshy-shower-runtime.js';
+import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
 
 /**
  * Meshy visual adapter for the EXISTING LifeSim procedural character root.
@@ -26,7 +27,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
   const state={status:'loading',ready:false,root:null,model:null,clip:null,visible:false,error:null,
     scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null,
     seatRuntime:null,seatWarning:false,greetingDuration:0,fridgeRuntime:null,
-    bedRuntime:null,showerRuntime:null,walkDuration:0,
+    bedRuntime:null,showerRuntime:null,walkDuration:0,toiletReady:false,
     alternateIdleAvailable:false};
   let requested=false;
 
@@ -53,6 +54,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
         throw Error('Missing required Meshy animation clips');
       state.greetingDuration=clips.find(clip=>clip.name===ALEX_GREETING_CLIP)?.duration||0;
       state.walkDuration=clips.find(clip=>clip.name==='Walking')?.duration||0;
+      state.toiletReady=state.walkDuration>0&&hasToiletSitClip(clips,'alex');
       state.alternateIdleAvailable=clips.some(
         clip=>clip.name===ALEX_ALTERNATE_IDLE_CLIP
       );
@@ -152,7 +154,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,seat=null,seatMode='vertical',dt=0,
-      bedBusy=false,bedFrame=null,showerBusy=false,showerFrame=null,fridgeBusy=false,
+      bedBusy=false,bedFrame=null,showerBusy=false,showerFrame=null,
+      toiletBusy=false,toiletFrame=null,fridgeBusy=false,
       socialInitiator=false,socialElapsed=null,fridgeFrame=null,
       worldMinutes=null,mood=null,energy=null}={}){
       requested=preferred;
@@ -160,7 +163,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
         preferred:requested,ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
         fridgeBusy,fridgeReady:Boolean(state.fridgeRuntime?.ready),
         bedReady:Boolean(state.bedRuntime?.ready),
-        showerReady:Boolean(state.showerRuntime?.ready)
+        showerReady:Boolean(state.showerRuntime?.ready),
+        toiletBusy,toiletReady:state.toiletReady
       });
       if(state.visible!==useMeshy){
         for(const comp of legacyRenderers)comp.enabled=!useMeshy;
@@ -203,6 +207,29 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,onStat
           anim.speed=1;
           anim.playing=!paused;
         }
+        return true;
+      }
+      if(actionId==='toilet'||toiletBusy){
+        // The game owns root, mask and toilet timeline; only the skinned
+        // pose and imported pelvic translation are handled here.
+        const anim=state.model.anim;
+        const pose=meshyToiletPose(toiletFrame,{
+          resident:'alex',scale:state.scale,walkDuration:state.walkDuration
+        });
+        if(!pose)return true;
+        if(state.clip!==pose.clip){
+          // A timed crossfade remains stuck at speed 0; direct sampling
+          // is deterministic through pause, save/reload and 3x speed.
+          anim.baseLayer.play(pose.clip);
+          state.clip=pose.clip;
+        }
+        state.sofaRelease=null;
+        state.model.setLocalPosition(state.base.x+pose.offset.x,
+          state.base.y,state.base.z+pose.offset.z);
+        if(pose.time!==null){
+          anim.speed=0;anim.playing=true;
+          anim.baseLayer.activeStateCurrentTime=pose.time;
+        }else{anim.speed=1;anim.playing=!paused;}
         return true;
       }
       if(bed){

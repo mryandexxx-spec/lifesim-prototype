@@ -8,6 +8,8 @@ test('M4 production Pages includes the physical toilet code and keeps existing U
   assert.ok(workflow.includes('cp src/toilet-interaction.js site/src/'));
   assert.ok(workflow.includes('cp src/insight-presentation.js site/src/'));
   assert.ok(workflow.includes('cp src/camera-gestures.js site/src/'));
+  assert.ok(workflow.includes('node --check src/meshy-toilet-pose.js'));
+  assert.ok(workflow.includes('cp src/meshy-toilet-pose.js site/src/'));
   assert.ok(workflow.includes('node --check src/required-choice-focus.js'));
 });
 test('M4 Safari release cache bust is consistent with package and lock',()=>{

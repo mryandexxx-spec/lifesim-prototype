@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {bedTransitionPose} from '../src/bed-transition.js';
+import {toiletSequence} from '../src/toilet-interaction.js';
 import {fridgeSequence} from '../src/fridge-interaction.js';
 import {showerSequence,advanceShowerTransition,showerPrivacyInvariant}
   from '../src/shower-interaction.js';
@@ -531,4 +532,27 @@ test('female shower preserves the game enforced opaque privacy boundary',()=>{
     const pose=meshyShowerPose(frame);
     assert.equal(Boolean(pose.washing>0)&&!frame.privacy,false);
   }
+});
+
+test('Mira keeps her authored skinned body at the toilet and restores idle after a paused exit',()=>{
+  const f=fixture({sofaClip:true}),v=createMiraMeshyVisual(f);
+  const frame=p=>toiletSequence(p*26,26);
+  v.update({preferred:true,actionId:'toilet',toiletBusy:true,
+    toiletFrame:frame(.18)});
+  assert.equal(f.renderers[0].enabled,false);
+  assert.ok(f.events.some(e=>e[0]==='play'&&e[1]==='Walking_Woman'));
+  v.update({preferred:true,actionId:'toilet',toiletBusy:true,
+    toiletFrame:frame(.52),paused:true,dt:0});
+  assert.equal(f.renderers[0].enabled,false);
+  assert.ok(f.events.some(e=>e[0]==='play'&&e[1]===MIRA_SOFA_CLIP));
+  assert.equal(f.model.anim.speed,0);
+  assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime-MIRA_SOFA_DURATION)<.001);
+  const seatedZ=f.model.position[2];
+  assert.ok(Number.isFinite(seatedZ));
+  v.update({preferred:true,toiletBusy:true,toiletFrame:frame(.95),paused:true});
+  assert.equal(f.renderers[0].enabled,false);
+  v.update({preferred:true,toiletBusy:false});
+  assert.equal(f.renderers[0].enabled,false);
+  v.reset();
+  assert.ok(f.events.some(e=>e[0]==='play'&&e[1]==='Idle_7'));
 });
