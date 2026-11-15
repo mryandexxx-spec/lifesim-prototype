@@ -20,7 +20,9 @@ export function meshyFridgePose(frame){
  * repositioned. The base Mixamo Idle animation resets bones every frame;
  * this controller must be called from Script.postUpdate, AFTER Anim update.
  */
-export function createMeshyFridgeController({pc,model,avatar,layout=FRIDGE_LAYOUT}={}){
+export function createMeshyFridgeController({
+  pc,model,avatar,layout=FRIDGE_LAYOUT,resident='Alex'
+}={}){
   const unavailable={ready:false,setFrame(){},apply(){return false;}};
   if(!model?.findByName||!avatar||!pc?.Vec3||!pc?.Quat)return unavailable;
   const upper=model.findByName('mixamorig:RightArm');
@@ -31,7 +33,7 @@ export function createMeshyFridgeController({pc,model,avatar,layout=FRIDGE_LAYOU
     !layout?.shelfTarget||!Number.isFinite(layout.handleY))return unavailable;
 
   // One small snack mesh per imported model, parented to the REAL hand bone.
-  const food=new pc.Entity('Meshy Alex hand snack');
+  const food=new pc.Entity('Meshy '+resident+' hand snack');
   const material=new pc.StandardMaterial();
   material.diffuse=new pc.Color(1,.70,.28);
   material.update();

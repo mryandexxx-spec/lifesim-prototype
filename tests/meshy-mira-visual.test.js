@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {bedTransitionPose} from '../src/bed-transition.js';
+import {fridgeSequence} from '../src/fridge-interaction.js';
 import {MIRA_MESHY_URL,MIRA_REQUIRED_CLIPS,MIRA_DISPLAY_HEIGHT,
   MIRA_IDLE_GROUND_OFFSET,miraHasClips,miraClipFor,
   miraMeshPlacement,canShowMiraMeshy} from '../src/meshy-mira-policy.js';
@@ -46,7 +47,8 @@ test('female visuals use a guarded authored sofa, but retain fallback elsewhere'
 });
 function fixture({loadError=false,missingClip=false,noStaticBounds=false,
   sofaClip=false,sofaDuration=MIRA_SOFA_DURATION,
-  bedClips=false,bedDuration=MIRA_SLEEP_DURATION,missingHip=false}={}){
+  bedClips=false,bedDuration=MIRA_SLEEP_DURATION,missingHip=false,
+  fridgeBones=false,missingFridgeHand=false}={}){
   const events=[];
   class Entity{
     constructor(name){this.name=name;this.enabled=true;this.children=[];}
@@ -56,6 +58,10 @@ function fixture({loadError=false,missingClip=false,noStaticBounds=false,
     setLocalScale(...s){this.scale=s;}
     setLocalPosition(...p){this.position=p;}
     addComponent(type){
+      if(type==='render'){
+        this.renderComponent={enabled:true};
+        return;
+      }
       if(type==='script'){
         this.script={instances:[],create:(Script)=>{
           const instance=new Script();
@@ -74,12 +80,30 @@ function fixture({loadError=false,missingClip=false,noStaticBounds=false,
   const renderers=[body,selection,snack,book,showerWrap].map(entity=>({entity,enabled:true}));
   const avatar=new Entity('Mira');avatar.renderers=renderers;
   const rig={avatar,selected:selection,snack,book,showerWrap};
+  avatar.getWorldTransform=()=>({transformVector:(v,out)=>out.set(v.x,v.y,v.z)});
   const model=new Entity('Meshy Mira');
   if(bedClips){
     const hip={rotation:null,setLocalRotation(q){
       this.rotation={x:q.x,y:q.y,z:q.z,w:q.w};}};
     model.findByName=name=>name==='mixamorig:Hips'&&!missingHip?hip:null;
     model.mockHip=hip;
+  }
+  if(fridgeBones){
+    const point=(x,y,z)=>({x,y,z});
+    const skeleton={
+      'mixamorig:RightArm':point(2.62,1.46,-1.78),
+      'mixamorig:RightForeArm':point(2.81,1.25,-1.88),
+      'mixamorig:RightHand':point(2.99,1.05,-1.99),
+      'mixamorig:Head':point(2.55,1.72,-1.77)
+    };
+    const bones=Object.fromEntries(Object.entries(skeleton).map(([key,position])=>
+      [key,{getPosition:()=>new Vec3(position.x,position.y,position.z),
+        getRotation:()=>new Quat(),setRotation(){},
+        addChild(child){child.parent=this;this.child=child;}}]));
+    if(missingFridgeHand)delete bones['mixamorig:RightHand'];
+    const previous=model.findByName?.bind(model);
+    model.findByName=name=>bones[name]||previous?.(name)||null;
+    model.mockFridgeBones=bones;
   }
   const staticBounds={getMin:()=>({...validBounds.min}),getMax:()=>({...validBounds.max})};
   model.renderers=[{entity:model,meshInstances:[{aabb:{getMin:()=>({y:-99}),getMax:()=>({y:99})},
@@ -89,13 +113,23 @@ function fixture({loadError=false,missingClip=false,noStaticBounds=false,
     set(x,y,z,w){Object.assign(this,{x,y,z,w});return this;}
     setFromAxisAngle(_axis,deg){this.set(Math.sin(deg*Math.PI/360),0,0,
       Math.cos(deg*Math.PI/360));return this;}
+    setFromDirections(){return this;}
+    slerp(a){return this.set(a.x,a.y,a.z,a.w);}
     mul2(a,b){this.set(a.w*b.x+a.x*b.w+a.y*b.z-a.z*b.y,
       a.w*b.y-a.x*b.z+a.y*b.w+a.z*b.x,
       a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w,
       a.w*b.w-a.x*b.x-a.y*b.y-a.z*b.z);return this;}
   }
-  class Vec3{constructor(x,y,z){Object.assign(this,{x,y,z});}}
-  const pc={Entity,Quat,Vec3,Script:class {},Asset:class {
+  class Vec3{
+    constructor(x=0,y=0,z=0){this.set(x,y,z);}
+    set(x,y,z){Object.assign(this,{x,y,z});return this;}
+    length(){return Math.hypot(this.x,this.y,this.z);}
+    normalize(){const n=this.length()||1;
+      this.x/=n;this.y/=n;this.z/=n;return this;}
+    dot(b){return this.x*b.x+this.y*b.y+this.z*b.z;}
+  }
+  const pc={Entity,Quat,Vec3,Color:class{},StandardMaterial:class{update(){}},
+    Script:class {},Asset:class {
     constructor(name,type,file){this.file=file;}
     ready(cb){this.onReady=cb;}
     once(type,cb){this.onError=cb;}
@@ -166,7 +200,7 @@ test('game supplies both independent visual adapters and includes the female mod
   assert.match(workflow,/node --check src\/meshy-mira-visual\.js/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/Блин<span>’С<\/span>/);
-  assert.match(html,/сборка \/ 0\.7j\.1/);
+  assert.match(html,/сборка \/ 0\.7k/);
 });
 
 test('audited female sit track interpolates measured pelvic translation, no per-sofa offsets',()=>{
@@ -294,4 +328,72 @@ test('Mira bed seeks final native lying frame directly even from sitting and on 
       bedFrame:frame(.40),bedProgress:.40});
     assert.ok(f.events.some(([kind,clip])=>kind==='play'&&clip===MIRA_SOFA_CLIP));
   }
+});
+
+test('Mira fridge uses the actual skinned right hand and retains 3D on entry, food and exit',()=>{
+  const f=fixture({fridgeBones:true}),v=createMiraMeshyVisual(f);
+  assert.equal(v.ready,true);
+  const hands=f.model.mockFridgeBones;
+  const scripts=f.model.script.instances;
+  assert.ok(scripts.some(x=>typeof x.postUpdate==='function'));
+  const update=(elapsed,extra={})=>v.update({
+    preferred:true,actionId:'fridge',fridgeFrame:fridgeSequence(elapsed,26),
+    ...extra
+  });
+  update(26*.16);
+  assert.equal(f.renderers[0].enabled,false);
+  assert.ok(f.events.some(([kind,name])=>kind==='transition'&&name==='Idle_7')||
+    f.events.some(([kind,name])=>kind==='play'&&name==='Idle_7'));
+  // The food is a child of the right-hand bone, never the game root.
+  const foodEntity=f.model.mockFridgeBones['mixamorig:RightHand'].child;
+  assert.ok(foodEntity);
+  assert.equal(foodEntity.parent,hands['mixamorig:RightHand']);
+  assert.equal(foodEntity.name,'Meshy Mira hand snack');
+  scripts.forEach(script=>script.postUpdate());
+  assert.equal(foodEntity.enabled,false,'snack is not shown during door contact');
+  update(26*.77);
+  scripts.forEach(script=>script.postUpdate());
+  assert.equal(foodEntity.enabled,true,'snack is attached to imported hand while eating');
+  assert.equal(f.renderers[0].enabled,false,'no procedural Mira body swap');
+  v.update({preferred:true,fridgeBusy:true,fridgeFrame:null});
+  scripts.forEach(script=>script.postUpdate());
+  assert.equal(f.renderers[0].enabled,false,'3D body remains on door closing');
+  assert.equal(foodEntity.enabled,false,'food is cleared after interrupted action');
+  v.update({preferred:true,fridgeBusy:false});
+  assert.equal(f.renderers[0].enabled,false);
+  v.reset();
+  scripts.forEach(script=>script.postUpdate());
+  assert.equal(foodEntity.enabled,false);
+});
+test('female fridge feature gates missing bones and keeps bed/sofa independent',()=>{
+  for(const f of [fixture(),fixture({fridgeBones:true,missingFridgeHand:true})]){
+    const visual=createMiraMeshyVisual(f);
+    visual.update({preferred:true,actionId:'fridge',
+      fridgeFrame:fridgeSequence(26*.77,26),fridgeBusy:true});
+    assert.equal(f.renderers[0].enabled,true,
+      'incomplete imported skeleton must fall back to old fridge');
+  }
+  const ready={preferred:true,ready:true};
+  assert.equal(canShowMiraMeshy({...ready,actionId:'fridge',fridgeReady:false}),false);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'fridge',fridgeReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,fridgeBusy:true,fridgeReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,fridgeBusy:true,fridgeReady:false}),false);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'bed',bedReady:true,
+    fridgeReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'sofa',sofaReady:true,
+    fridgeReady:true}),true);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'shower',
+    fridgeReady:true}),false);
+});
+test('Mira fridge post-Anim script uses shared prefab contact and hides procedural snack',()=>{
+  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const visual=readFileSync(new URL('../src/meshy-mira-visual.js',import.meta.url),'utf8');
+  const male=readFileSync(new URL('../src/meshy-fridge-runtime.js',import.meta.url),'utf8');
+  assert.match(visual,/class MiraFridgePostUpdate extends pc\.Script/);
+  assert.match(visual,/postUpdate\(\)\{fridge\.apply\(\);\}/);
+  assert.match(visual,/fridgeReady:Boolean\(state\.fridgeRuntime\?\.ready\)/);
+  assert.match(visual,/resident:'Mira'/);
+  assert.match(game,/fridgeFrame:miraFridge/);
+  assert.match(game,/if\(miraMeshShown&&miraUseId==='fridge'\)miraSnack\.enabled=false/);
+  assert.match(male,/layout=FRIDGE_LAYOUT,resident='Alex'/);
 });

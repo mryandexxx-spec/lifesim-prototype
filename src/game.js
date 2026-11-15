@@ -913,9 +913,9 @@ function boot() {
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
     miraBook.enabled=miraUsing&&miraUseId==='sofa';
-    // Mira now retains her authored 3D skin for sofa and both bed sides.
-    // Fridge/shower still use privacy-safe or action-safe procedural fallback;
-    // all shared game navigation, occupancy and save state stay unchanged.
+    // Mira retains one 3D skin for sofa, bed and fridge. The original
+    // game owns the door, action choreography, food needs and save state;
+    // shower remains covered by the original privacy-safe fallback.
     const miraMeshShown=meshyMira.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:(game.otherSim.action?.phase==='walking'||
@@ -929,10 +929,13 @@ function boot() {
       bedFrame:miraBedPose,
       bedProgress:bedStates.mira.progress,
       showerBusy:showerStates.mira.active,
-      fridgeBusy:fridgeLeaving.mira
+      fridgeBusy:fridgeLeaving.mira,
+      fridgeFrame:miraFridge
     });
     // The procedural book belongs to a hidden elbow; never show it floating.
     if(miraMeshShown&&miraUseId==='sofa')miraBook.enabled=false;
+    // The old snack is on the hidden procedural elbow, not the Meshy hand.
+    if(miraMeshShown&&miraUseId==='fridge')miraSnack.enabled=false;
     // Alex stays on the same 3D rig for bed and fridge when their verified
     // skeleton controllers exist. The original simulation/root still owns
     // mattress placement, both bed slots, shower movement and opaque privacy.

@@ -89,6 +89,7 @@ test('real bone targets rotate only shoulder and forearm, never game root',()=>{
   controller.setFrame(fridgeSequence(26*.77,26));
   controller.apply();
   assert.equal(controller.food.enabled,true);
+  assert.equal(controller.food.name,'Meshy Alex hand snack');
   controller.setFrame(null);
   assert.equal(controller.apply(),false);
   assert.equal(controller.food.enabled,false);

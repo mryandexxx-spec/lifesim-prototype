@@ -34,14 +34,15 @@ export function miraMeshPlacement(bounds,targetHeight=MIRA_DISPLAY_HEIGHT){
     y:-min.y*scale+MIRA_IDLE_GROUND_OFFSET,
     z:-(min.z+max.z)*.5*scale};
 }
-/** Authored female sofa and bed clips are separately gated. Food and shower
- * remain on the original fallback until their skinned actions are verified.
+/** Guard each female furniture overlay independently. Shower stays on the
+ * privacy-safe original fallback until its skinned walk/pose is verified.
  */
 export function canShowMiraMeshy({preferred=false,ready=false,actionId=null,
   sofaBusy=false,sofaReady=false,
-  bedBusy=false,bedReady=false,showerBusy=false,fridgeBusy=false}={}){
+  bedBusy=false,bedReady=false,showerBusy=false,
+  fridgeBusy=false,fridgeReady=false}={}){
   const eligible=actionId===null||(actionId==='sofa'&&sofaReady)||
-    (actionId==='bed'&&bedReady);
+    (actionId==='bed'&&bedReady)||(actionId==='fridge'&&fridgeReady);
   return Boolean(preferred&&ready&&eligible&&(!sofaBusy||sofaReady)&&
-    (!bedBusy||bedReady)&&!showerBusy&&!fridgeBusy);
+    (!bedBusy||bedReady)&&!showerBusy&&(!fridgeBusy||fridgeReady));
 }

@@ -4,6 +4,7 @@ import {MIRA_SOFA_CLIP,MIRA_SOFA_DURATION,miraSofaClipTime,miraSofaOffset}
   from './meshy-mira-sofa.js';
 import {MIRA_SLEEP_CLIP,MIRA_SLEEP_DURATION,miraBedPose,createMiraBedController}
   from './meshy-mira-bed.js';
+import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
 
 /** Read undeformed geometry AABBs, never pose-dependent meshInstance.aabb.
  * The validated female GLB has one original skinned mesh.
@@ -37,7 +38,7 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
   const state={ready:false,status:'loading',error:null,
     root:null,model:null,clip:null,visible:false,base:null,
     sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null,
-    bedReady:false,bedRuntime:null};
+    bedReady:false,bedRuntime:null,fridgeRuntime:null};
   function attach(asset){
     const model=asset.resource.instantiateRenderEntity();
     const root=new pc.Entity('Meshy Mira visual');
@@ -89,6 +90,28 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
           console.warn('Mira bed skin unavailable',error);
         }
       }
+      // Reuse the tested right-arm/fridge-prefab controller also used by
+      // Alex. Separate instance, skinned hand prop and post-Anim script:
+      // no sharing resident bones, snacks or game state.
+      try{
+        if(pc.Script&&model.findByName){
+          const fridge=createMeshyFridgeController({
+            pc,model,avatar:rig.avatar,resident:'Mira'
+          });
+          if(fridge.ready){
+            if(!model.script)model.addComponent('script');
+            class MiraFridgePostUpdate extends pc.Script{
+              static scriptName='blinsMiraFridgePostUpdate';
+              postUpdate(){fridge.apply();}
+            }
+            model.script.create(MiraFridgePostUpdate);
+            state.fridgeRuntime=fridge;
+          }
+        }
+      }catch(error){
+        state.fridgeRuntime=null;
+        console.warn('Mira fridge skin unavailable',error);
+      }
       root.enabled=false;
       Object.assign(state,{ready:true,status:'ready',root,model,clip:'Idle_7',base});
       onStatus('ready');
@@ -116,11 +139,12 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,dt=0,
       bedBusy=false,bedFrame=null,bedProgress=0,
-      showerBusy=false,fridgeBusy=false}={}){
+      showerBusy=false,fridgeBusy=false,fridgeFrame=null}={}){
       const show=canShowMiraMeshy({
         preferred,ready:state.ready,actionId,
         sofaBusy,sofaReady:state.sofaReady,
-        bedBusy,bedReady:state.bedReady,showerBusy,fridgeBusy
+        bedBusy,bedReady:state.bedReady,showerBusy,fridgeBusy,
+        fridgeReady:Boolean(state.fridgeRuntime?.ready)
       });
       if(state.visible!==show){
         for(const renderer of legacyRenderers)renderer.enabled=!show;
@@ -129,8 +153,13 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       }
       if(!show||!state.model){
         state.bedRuntime?.setFrame(null);
+        state.fridgeRuntime?.setFrame(null);
         return show;
       }
+      const fridge=actionId==='fridge'||fridgeBusy;
+      state.fridgeRuntime?.setFrame(
+        fridge&&actionId==='fridge'?fridgeFrame:null
+      );
       const sofa=actionId==='sofa'||sofaBusy;
       const anim=state.model.anim;
       if(sofa){
@@ -181,6 +210,20 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
         return true;
       }
       state.bedRuntime?.setFrame(null);
+      if(fridge){
+        // The shared action root already faces the prefab; postUpdate
+        // reaches its world-space handle, shelf and mouth from Mira's bones.
+        const clip='Idle_7';
+        if(state.clip!==clip){
+          anim.baseLayer.transition(clip,.20);
+          state.clip=clip;
+        }
+        state.sofaRelease=null;
+        state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
+        anim.speed=1;
+        anim.playing=!paused;
+        return true;
+      }
       const clip=miraClipFor({walking,social});
       if(state.clip===MIRA_SOFA_CLIP){
         state.sofaRelease={remaining:.2,offset:{...state.sofaOffset}};
@@ -212,6 +255,7 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
       state.sofaOffset={x:0,z:0};
       state.sofaRelease=null;
       state.bedRuntime?.setFrame(null);
+      state.fridgeRuntime?.setFrame(null);
       state.model.anim.speed=1;
       const {base}=state;
       state.model.setLocalPosition(base.x,base.y,base.z);

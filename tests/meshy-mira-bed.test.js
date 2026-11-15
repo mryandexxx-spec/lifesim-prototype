@@ -118,6 +118,8 @@ test('guarded female bed and Pages game wiring preserve fallback, privacy and ol
   assert.equal(canShowMiraMeshy({...ready,bedBusy:true,bedReady:false}),false);
   for(const actionId of ['fridge','shower'])
     assert.equal(canShowMiraMeshy({...ready,actionId,bedReady:true}),false);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'fridge',
+    fridgeReady:true,bedReady:true}),true);
   const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
   const visual=readFileSync(new URL('../src/meshy-mira-visual.js',import.meta.url),'utf8');
   const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
