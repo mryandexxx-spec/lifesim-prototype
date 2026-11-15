@@ -44,6 +44,7 @@ jobs:
           node --check src/world-interactions.js
           node --check src/plan-preview.js
           node --check src/ui-layout.js
+          node --check src/insight-presentation.js
           node --check src/required-choice-focus.js
           node --check src/mood-action-policy.js
           node --check src/social-need.js
@@ -93,6 +94,7 @@ jobs:
           cp index.html character-lab.html character-lab-mira.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
           mkdir -p site/src
           cp src/plan-preview.js src/ui-layout.js src/required-choice-focus.js site/src/
+          cp src/insight-presentation.js site/src/
           cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/trait-catalog.js src/sim-events.js src/emotion-engine.js src/mood-presentation.js src/social-perspective.js src/social-graph.js src/action-queue.js src/conversation-engine.js src/dialogue-decision.js src/world-interactions.js src/gifts-leisure.js src/household.js src/relationships.js src/social-reactions.js src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js src/interaction-anchors.js src/meshy-seat-runtime.js src/meshy-fridge-runtime.js src/meshy-bed-runtime.js src/meshy-shower-runtime.js src/loading-progress.js src/model-cache.js src/meshy-mira-visual.js src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js site/src/
           cp src/mood-action-policy.js site/src/
           cp src/social-need.js site/src/
