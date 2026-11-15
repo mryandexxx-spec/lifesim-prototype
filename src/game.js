@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
-import {pickWorldTarget} from './world-interactions.js';
+import {pickWorldRayTarget} from './world-interactions.js';
 import {planPreview,planTaskIcon} from './plan-preview.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
@@ -826,6 +826,27 @@ function boot() {
   const ball = (...args) => primitive('sphere', ...args);
   const cylinder = (...args) => primitive('cylinder', ...args);
 
+  // Each furniture part registers its ACTUAL authored geometry, not a hardcoded
+  // circle around a label. Future furniture needs only use the same wrapper.
+  const hitVolumes=[];
+  const registerHitVolume=(id,kind,x,y,z,sx,sy,sz)=>{
+    const pad=.035;
+    hitVolumes.push({kind,id,bounds:{
+      min:{x:x-sx/2-pad,y:y-sy/2-pad,z:z-sz/2-pad},
+      max:{x:x+sx/2+pad,y:y+sy/2+pad,z:z+sz/2+pad}
+    }});
+  };
+  const touchBox=(id,name,x,y,z,sx,sy,sz,material)=>{
+    const visual=box(name,x,y,z,sx,sy,sz,material);
+    registerHitVolume(id,'object',x,y,z,sx,sy,sz);
+    return visual;
+  };
+  const blockerBox=(name,x,y,z,sx,sy,sz,material)=>{
+    const visual=box(name,x,y,z,sx,sy,sz,material);
+    registerHitVolume(name,'blocker',x,y,z,sx,sy,sz);
+    return visual;
+  };
+
   // Room platform: visible cutaway walls, planks, and sunlight accents.
   box('foundation',0,-0.28,0,10.5,.47,9.2,M.edge);
   box('floor',0,-0.032,0,10,.12,8.65,M.floor);
@@ -848,9 +869,9 @@ function boot() {
   for (let i=0;i<3;i++) box('books',-4.69,1.91,-.25+i*.22,.21,.32,.13,[M.pink,M.cream,M.green][i]);
 
   // Bed, blanket, headboard and pillows.
-  box('bed frame',BED_LAYOUT.centerX,BED_LAYOUT.frameY,BED_LAYOUT.centerZ,
+  touchBox('bed','bed frame',BED_LAYOUT.centerX,BED_LAYOUT.frameY,BED_LAYOUT.centerZ,
     2.42,BED_LAYOUT.frameHeight,2.52,M.wood);
-  box('mattress',BED_LAYOUT.centerX,BED_LAYOUT.mattressY,BED_LAYOUT.centerZ,
+  touchBox('bed','mattress',BED_LAYOUT.centerX,BED_LAYOUT.mattressY,BED_LAYOUT.centerZ,
     BED_LAYOUT.width,BED_LAYOUT.mattressHeight,BED_LAYOUT.depth,M.white);
   // Two separate quilts cover the two independent sleepers.
   const quilts={};
@@ -861,16 +882,16 @@ function boot() {
       trim:box('duvet trim '+slot,bx,.62,-.69,.98,.025,.045,M.cream)
     };
   }
-  box('bed headboard',-2.62,.82,-2.69,2.47,.95,.17,M.paleWood);
-  box('pillow left',-3.15,.54,-2.18,.87,.19,.50,M.cream);
-  box('pillow right',-2.10,.54,-2.18,.87,.19,.50,M.peach);
+  touchBox('bed','bed headboard',-2.62,.82,-2.69,2.47,.95,.17,M.paleWood);
+  touchBox('bed','pillow left',-3.15,.54,-2.18,.87,.19,.50,M.cream);
+  touchBox('bed','pillow right',-2.10,.54,-2.18,.87,.19,.50,M.peach);
   box('side table',-4.23,.38,-3.35,.65,.64,.68,M.paleWood);
   cylinder('lamp base',-4.23,.76,-3.35,.22,.10,.22,M.white);
   cylinder('lamp stem',-4.23,.94,-3.35,.055,.32,.055,M.slate);
   cylinder('lamp shade',-4.23,1.17,-3.35,.45,.32,.45,M.yellow);
 
   // Kitchen zone with tall fridge, little counter and upper cupboards.
-  box('fridge',3.43,.99,-2.85,1.12,1.98,1.14,M.cream);
+  touchBox('fridge','fridge',3.43,.99,-2.85,1.12,1.98,1.14,M.cream);
   box('fridge shadow seam',3.43,1.49,-2.26,1.06,.035,.03,M.trim);
   box('fridge lower handle',3.01,.64,-2.20,.055,.27,.075,M.slate);
   // Shelf is in front of the fridge body but behind the closed door.
@@ -896,20 +917,20 @@ function boot() {
   box('living rug',1.24,.034,1.19,4.15,.015,3.1,M.cream);
   box('rug center',1.24,.045,1.19,3.84,.012,2.78,M.rug);
   // Seat height and actor pose share the same dimensions.
-  box('sofa seat',SOFA_LAYOUT.x,SOFA_LAYOUT.seatCenterY,SOFA_LAYOUT.z,
+  touchBox('sofa','sofa seat',SOFA_LAYOUT.x,SOFA_LAYOUT.seatCenterY,SOFA_LAYOUT.z,
     SOFA_LAYOUT.seatWidth,SOFA_LAYOUT.seatHeight,SOFA_LAYOUT.seatDepth,M.peach);
-  box('sofa back',SOFA_LAYOUT.x,SOFA_LAYOUT.backCenterY,SOFA_LAYOUT.backZ,
+  touchBox('sofa','sofa back',SOFA_LAYOUT.x,SOFA_LAYOUT.backCenterY,SOFA_LAYOUT.backZ,
     2.52,SOFA_LAYOUT.backHeight,.29,M.rust);
-  box('sofa arm left',.11,SOFA_LAYOUT.armCenterY,SOFA_LAYOUT.z,
+  touchBox('sofa','sofa arm left',.11,SOFA_LAYOUT.armCenterY,SOFA_LAYOUT.z,
     .30,SOFA_LAYOUT.armHeight,1.21,M.rust);
-  box('sofa arm right',2.58,SOFA_LAYOUT.armCenterY,SOFA_LAYOUT.z,
+  touchBox('sofa','sofa arm right',2.58,SOFA_LAYOUT.armCenterY,SOFA_LAYOUT.z,
     .30,SOFA_LAYOUT.armHeight,1.21,M.rust);
-  box('sofa pillow left',.72,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
+  touchBox('sofa','sofa pillow left',.72,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
     .63,SOFA_LAYOUT.pillowHeight,.23,M.cream);
-  box('sofa pillow right',1.99,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
+  touchBox('sofa','sofa pillow right',1.99,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
     .63,SOFA_LAYOUT.pillowHeight,.23,M.mint);
   // Leave a navigable front approach so residents do not cross the sofa arm.
-  box('coffee table top',1.34,.40,-.26,1.47,.12,.73,M.paleWood);
+  blockerBox('coffee table top',1.34,.40,-.26,1.47,.12,.73,M.paleWood);
   for(let x of [.74,1.94]) for(let z of [-.53,.01])
     cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
   box('tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
@@ -918,11 +939,11 @@ function boot() {
   box('tv stand',3.67,.80,.37,.35,.12,.28,M.black);
 
   // Shower corner: soft mint tiles and a simple visible frame.
-  box('shower platform',-3.67,.12,2.50,1.85,.22,1.88,M.white);
-  box('shower back',-4.72,1.48,2.55,.13,2.68,1.92,M.blue);
-  box('shower bar',-2.72,1.31,3.38,.08,2.5,.08,M.slate);
-  box('shower rim',-3.66,2.53,3.40,1.86,.08,.09,M.slate);
-  box('shower curtain',-3.67,1.60,3.40,1.70,1.61,.055,M.glass);
+  touchBox('shower','shower platform',-3.67,.12,2.50,1.85,.22,1.88,M.white);
+  touchBox('shower','shower back',-4.72,1.48,2.55,.13,2.68,1.92,M.blue);
+  touchBox('shower','shower bar',-2.72,1.31,3.38,.08,2.5,.08,M.slate);
+  touchBox('shower','shower rim',-3.66,2.53,3.40,1.86,.08,.09,M.slate);
+  touchBox('shower','shower curtain',-3.67,1.60,3.40,1.70,1.61,.055,M.glass);
   cylinder('shower head',-4.41,2.27,2.19,.46,.09,.46,M.slate);
   cylinder('shower pipe',-4.41,1.85,2.19,.065,.80,.065,M.slate);
   box('shower towel',-2.55,.89,3.69,.45,.7,.08,M.mint);
@@ -1289,41 +1310,26 @@ function boot() {
       lastPinch=metrics?.distance??null;lastMidpoint=metrics;
     }
   });
-  // Neither labels nor an HTML overlay are required for touch hit testing:
-  // project the current world positions into camera screen coordinates.
-  const projectedObject=(id,meta)=>{
-    const anchor=new pc.Vec3(...meta.anchor);
-    const head=camera.camera.worldToScreen(anchor);
-    const lower=camera.camera.worldToScreen(
-      new pc.Vec3(meta.anchor[0],Math.max(.15,meta.anchor[1]-.95),meta.anchor[2]));
-    const viewPoint=camera.camera.viewMatrix.transformPoint(anchor);
-    return {kind:'object',id,x:head.x,y:(head.y+lower.y)/2,
-      rx:id==='bed'||id==='sofa'?75:56,
-      ry:Math.max(42,Math.abs(head.y-lower.y)*.65),
-      visible:viewPoint.z<0&&head.x>-50&&head.x<canvas.clientWidth+50&&
-        head.y>-80&&head.y<canvas.clientHeight+80};
-  };
-  const projectedResident=id=>{
-    const rig=reactionRigs[id];
-    if(!rig?.avatar||showerStates[id]?.active)return null;
-    const p=rig.avatar.getPosition();
-    const top=new pc.Vec3(p.x,p.y+2.25,p.z);
-    const feet=new pc.Vec3(p.x,p.y+.18,p.z);
-    const a=camera.camera.worldToScreen(top),b=camera.camera.worldToScreen(feet);
-    const viewPoint=camera.camera.viewMatrix.transformPoint(top);
-    const height=Math.abs(a.y-b.y);
-    return {kind:'resident',id,x:(a.x+b.x)/2,y:(a.y+b.y)/2,
-      rx:Math.max(27,Math.min(77,height*.33)),ry:Math.max(44,height*.55),
-      visible:viewPoint.z<0&&a.x>-60&&a.x<canvas.clientWidth+60&&
-        a.y>-100&&b.y<canvas.clientHeight+100};
-  };
+  // CSS-pixel tap -> PlayCanvas camera ray -> nearest ACTUAL registered 3D
+  // piece. An object behind the sofa/counter does not win because it has a
+  // closer 2D icon, and furniture stays selectable with labels hidden.
   const worldTargetAt=pos=>{
     const rect=canvas.getBoundingClientRect();
-    const peer=game.selectedSim==='alex'?'mira':'alex';
-    return pickWorldTarget(pos.x-rect.left,pos.y-rect.top,[
-      projectedResident(peer),
-      ...Object.entries(META).map(([id,meta])=>projectedObject(id,meta))
-    ]);
+    const x=pos.x-rect.left,y=pos.y-rect.top;
+    const near=camera.camera.screenToWorld(x,y,camera.camera.nearClip);
+    const far=camera.camera.screenToWorld(x,y,camera.camera.farClip);
+    const residents=[];
+    for(const id of HOUSEHOLD_IDS){
+      if(id===game.selectedSim||!reactionRigs[id]||showerStates[id]?.active)continue;
+      const p=reactionRigs[id].avatar?.getPosition();
+      if(!p)continue;
+      const half=.43;
+      residents.push({kind:'resident',id,bounds:{
+        min:{x:p.x-half,y:p.y-.06,z:p.z-half},
+        max:{x:p.x+half,y:p.y+2.26,z:p.z+half}
+      }});
+    }
+    return pickWorldRayTarget(near,far,[...residents,...hitVolumes]);
   };
   const endPointer=event=>{
     if(!fingers.has(event.pointerId))return;
