@@ -7,7 +7,8 @@ import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
-import {CAMERA_INITIAL,dragCamera,orbitCamera,pinchCamera,wheelCamera} from './camera-controls.js';
+import {CAMERA_INITIAL,wheelCamera} from './camera-controls.js';
+import {createCameraGestureSession} from './camera-gestures.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
@@ -1436,72 +1437,52 @@ function boot() {
     setView(CAMERA_INITIAL);
     toast('Камера сброшена');
   });
-  // Default one-finger pan is preserved. Tapping the visible rotate control
-  // changes only the drag interpretation; it never changes the saved game.
-  let dragMode='pan';
+  // UI6: scene touch defaults to one-finger orbit (look around), while two
+  // fingers translate and pinch the camera. The existing rotate button remains
+  // a discoverable single-finger PAN alternative; no save or gameplay writes.
+  let oneFingerMode='orbit';
   const rotateButton=$('rotate-camera-btn');
-  rotateButton.addEventListener('click',()=>{
-    dragMode=dragMode==='pan'?'orbit':'pan';
-    const rotating=dragMode==='orbit';
-    rotateButton.setAttribute('aria-pressed',String(rotating));
-    rotateButton.setAttribute('aria-label',rotating
-      ?'Режим вращения включён. Нажмите для перемещения камеры'
-      :'Включить вращение камеры одним пальцем');
-    rotateButton.title=rotating?'Перемещать камеру':'Вращать камеру';
-    $('hint').textContent=rotating?'Один палец — вращение · два — поворот/масштаб'
-      :'Один палец — перемещение · два — поворот/масштаб';
-    toast(rotating?'Вращение камеры: проведи одним пальцем'
-      :'Перемещение камеры: проведи одним пальцем');
-  });
-
-  // 1 finger grabs/pans the room; 2 fingers orbit and pinch in mobile Safari.
-  // A multi-touch gesture never accidentally becomes a tap on furniture.
-  const fingers=new Map();
-  let tapCandidate=null,lastPinch=null,lastMidpoint=null;
-  const twoFingerMetrics=()=>{
-    const points=[...fingers.values()];
-    if(points.length!==2)return null;
-    return {
-      distance:Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y),
-      x:(points[0].x+points[1].x)/2,
-      y:(points[0].y+points[1].y)/2
-    };
+  const showCameraMode=()=>{
+    const panning=oneFingerMode==='pan';
+    rotateButton.setAttribute('aria-pressed',String(panning));
+    rotateButton.setAttribute('aria-label',panning
+      ?'Одним пальцем перемещать камеру. Нажмите для вращения'
+      :'Одним пальцем вращать камеру. Нажмите для перемещения');
+    rotateButton.title=panning?'Одним пальцем вращать':'Одним пальцем перемещать';
+    rotateButton.querySelector('small').textContent=panning?'СДВИГ':'ПОВОРОТ';
+    $('hint').textContent=panning
+      ?'Один палец — сдвиг · два — сдвиг и масштаб'
+      :'Один палец — вращение · два — сдвиг и масштаб';
   };
+  rotateButton.addEventListener('click',()=>{
+    oneFingerMode=oneFingerMode==='orbit'?'pan':'orbit';
+    showCameraMode();
+    toast(oneFingerMode==='pan'
+      ?'Камера: перемещай одним пальцем'
+      :'Камера: вращай одним пальцем');
+  });
+  showCameraMode();
+
+  // Pure session separates a deliberate tap from any rotation/pan/pinch.
+  // A second pointer disqualifies the whole touch until BOTH are released.
+  const cameraGesture=createCameraGestureSession();
+  const gesturePoint=e=>({id:e.pointerId,x:e.clientX,y:e.clientY});
   canvas.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse'&&event.button!==0)return;
     if(dialogueNeedsDecision(game))return;
     if(event.cancelable)event.preventDefault();
     try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
-    fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-    if(fingers.size===1){
-      tapCandidate={id:event.pointerId,t:performance.now(),travel:0};
-      lastPinch=null;lastMidpoint=null;
-    }else{
-      tapCandidate=null;
-      const metrics=twoFingerMetrics();
-      lastPinch=metrics?.distance??null;lastMidpoint=metrics;
-    }
+    cameraGesture.begin(gesturePoint(event),performance.now());
   });
-  // Window-level listeners continue a swipe even when iOS pointer capture
-  // fails or a finger crosses a hotspot / the edge of the canvas.
+  // Global listeners survive canvas leaving the viewport on iOS Safari.
   window.addEventListener('pointermove',event=>{
-    if(!fingers.has(event.pointerId))return;
-    if(event.cancelable)event.preventDefault();
-    const prev=fingers.get(event.pointerId);
-    fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-    if(fingers.size===1){
-      const dx=event.clientX-prev.x,dy=event.clientY-prev.y;
-      if(tapCandidate)tapCandidate.travel+=Math.hypot(dx,dy);
-      if(dx||dy)setView(dragCamera(view,dragMode,dx,dy,canvas.clientHeight));
-    }else if(fingers.size===2){
-      const metrics=twoFingerMetrics();
-      if(metrics&&lastMidpoint){
-        const dx=metrics.x-lastMidpoint.x,dy=metrics.y-lastMidpoint.y;
-        let next=orbitCamera(view,dx,dy,2.0);
-        if(lastPinch)next=pinchCamera(next,lastPinch,metrics.distance);
-        setView(next);
-      }
-      lastPinch=metrics?.distance??null;lastMidpoint=metrics;
+    if(!cameraGesture.count())return;
+    if(dialogueNeedsDecision(game)){cameraGesture.clear();return;}
+    const result=cameraGesture.move(gesturePoint(event),view,
+      canvas.clientHeight,{oneFinger:oneFingerMode});
+    if(result.changed){
+      if(event.cancelable)event.preventDefault();
+      setView(result.view);
     }
   });
   // CSS-pixel tap -> PlayCanvas camera ray -> nearest ACTUAL registered 3D
@@ -1536,26 +1517,19 @@ function boot() {
     tapCueTimeout=setTimeout(()=>{cue.hidden=true;},450);
   };
   const endPointer=event=>{
-    if(!fingers.has(event.pointerId))return;
-    const tap=tapCandidate&&tapCandidate.id===event.pointerId&&
-      fingers.size===1&&tapCandidate.travel<10&&
-      performance.now()-tapCandidate.t<360;
-    const pos={x:event.clientX,y:event.clientY};
-    fingers.delete(event.pointerId);
-    tapCandidate=null;lastPinch=null;lastMidpoint=null;
-    if(tap&&!dialogueNeedsDecision(game)){
-      const target=worldTargetAt(pos);
-      if(target)confirmWorldTap(pos);
-      if(target?.kind==='resident')openSocialContext(pos);
-      else if(target?.kind==='object')select(target.id);
-      else{closeSocialContext();select(null);}
-    }
+    const pos=cameraGesture.end(gesturePoint(event),performance.now());
+    if(!pos||dialogueNeedsDecision(game))return;
+    const target=worldTargetAt(pos);
+    if(target)confirmWorldTap(pos);
+    if(target?.kind==='resident')openSocialContext(pos);
+    else if(target?.kind==='object')select(target.id);
+    else{closeSocialContext();select(null);}
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
-    fingers.delete(event.pointerId);
-    tapCandidate=null;lastPinch=null;lastMidpoint=null;
+    cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true});
   });
+  window.addEventListener('blur',()=>cameraGesture.clear());
   canvas.addEventListener('wheel',event=>{
     event.preventDefault();
     setView(wheelCamera(view,event.deltaY));
