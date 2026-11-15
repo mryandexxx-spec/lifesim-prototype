@@ -249,7 +249,7 @@ test('shipped Safari menu and CI include romance module without showing formulas
   const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
   const html=read('../index.html'),game=read('../src/game.js'),
     ci=read('../.github/workflows/pages.yml'),romance=read('../src/romance.js');
-  assert.ok(html.includes('сборка / 1.0q'));
+  assert.ok(html.includes('сборка / 1.0r'));
   assert.ok(html.includes('id="romance-btn"'));
   assert.ok(html.includes('id="romance-status"'));
   assert.ok(game.includes("['romance-btn','romance']"));
