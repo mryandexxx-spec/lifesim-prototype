@@ -37,7 +37,7 @@ export function romanceLoveDescription(graph,a,b){
 export function newRomanceState(ids){
   return {views:Object.fromEntries(ids.map(id=>[id,view()])),bond:emptyBond()};
 }
-export function restoreRomanceState(raw,ids){
+export function restoreRomanceState(raw,ids,lastAt=null){
   const fresh=newRomanceState(ids);
   for(const id of ids){
     const source=raw?.views?.[id];
@@ -52,16 +52,21 @@ export function restoreRomanceState(raw,ids){
   if(record(bond)){
     const ended=time(bond.lastEndedAt)?bond.lastEndedAt:null;
     const former=bond.ex===true;
-    const since=time(bond.since)?bond.since:null;
+    const horizon=time(lastAt)?lastAt:1e7;
+    const since=time(bond.since)&&bond.since<=horizon?bond.since:null;
     // Each milestone is independently validated; a tampered wedding does
     // not invent a marriage, but a genuinely dated pair remains dated.
     if(since!==null&&COMMITTED.has(bond.status)){
       const dating={status:'dating',since,ex:former,lastEndedAt:ended,
         careDays:careFrom(bond.careDays,ids,Math.floor(since/1440))};
-      const engagedAt=time(bond.engagedAt)&&bond.engagedAt>=since
+      const engagedAt=time(bond.engagedAt)&&bond.engagedAt>=since&&
+        bond.engagedAt<=horizon&&
+        (bond.status!=='married'||!time(bond.marriedAt)||
+          bond.engagedAt<=bond.marriedAt)
         ?bond.engagedAt:null;
       const marriedAt=time(bond.marriedAt)&&engagedAt!==null&&
-        bond.marriedAt>=engagedAt?bond.marriedAt:null;
+        bond.marriedAt>=engagedAt&&bond.marriedAt<=horizon
+        ?bond.marriedAt:null;
       fresh.bond=dating;
       if(['engaged','married'].includes(bond.status)&&engagedAt!==null){
         fresh.bond.status='engaged';fresh.bond.engagedAt=engagedAt;

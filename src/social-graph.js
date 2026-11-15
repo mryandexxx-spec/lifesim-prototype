@@ -394,7 +394,7 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
         p[k]=Number.isSafeInteger(entry[k])?clamp(entry[k],0,100000):0;
       if(['none','friends','close'].includes(entry.friendship))p.friendship=entry.friendship;
       if(['none','oneSided','mutual'].includes(entry.rivalry))p.rivalry=entry.rivalry;
-      p.romance=restoreRomanceState(entry.romance,pairIds);
+      p.romance=restoreRomanceState(entry.romance,pairIds,entry.lastAt);
       // A corrupted/underage/related save never imports romantic progress.
       if(!romanceSafety(graph,pairIds[0],pairIds[1]).allowed)
         p.romance=newRomanceState(pairIds);
@@ -423,7 +423,7 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
   const occupied=new Set();
   for(const pair of Object.values(graph.pairs)){
     const bond=pair.romance?.bond;
-    if(bond?.status!=='dating')continue;
+    if(!['dating','engaged','married'].includes(bond?.status))continue;
     if(!romanceSafety(graph,...pair.ids).allowed||
       pair.lastAt===null||!safeAt(bond.since)||bond.since>pair.lastAt||
       (bond.status==='engaged'&&(!safeAt(bond.engagedAt)||

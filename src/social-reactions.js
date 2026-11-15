@@ -43,7 +43,7 @@ const BRANCH_THRESHOLDS=Object.freeze({
   'romance.breakup':42,
   'romance.tender':40,
   'romance.propose':59,
-  'romance.marry':61,
+  'romance.marry':53,
   'romance.divorce':42
 });
 const unwell=emotion=>['sadness','irritation','anxiety'].includes(emotion.kind);
