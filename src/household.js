@@ -5,6 +5,7 @@ import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEna
 import { refreshMind } from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory} from './gifts-leisure.js';
+import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
@@ -30,6 +31,9 @@ export function newHousehold() {
   state.otherSim=newMira(state.minutes);
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);
+  state.socialGraph=newSocialGraph(HOUSEHOLD_IDS);
+  markAcquainted(state.socialGraph,HOUSEHOLD_IDS[0],HOUSEHOLD_IDS[1],state.minutes);
+  observePairViews(state.socialGraph,HOUSEHOLD_IDS[0],HOUSEHOLD_IDS[1],state.relationship.views);
   state.inventory=starterInventory();
   state.socialAction=null;
   return state;
@@ -57,6 +61,10 @@ export function loadHousehold(raw) {
   root.inventory=restoreInventory(raw.inventory);
   root.relationship=loadRelationship(raw.relationship,root.minutes,{
     alex:root.mind.memories,mira:mira.mind.memories
+  });
+  // The fixed two-resident household is only a legacy adapter for the N-person graph.
+  root.socialGraph=restoreSocialGraph(raw.socialGraph,HOUSEHOLD_IDS,{
+    ids:HOUSEHOLD_IDS,at:root.minutes,views:root.relationship.views
   });
   root.socialAction=loadSocialAction(raw.socialAction,root);
   // Legacy v1 had no bedSlot. Keep valid reservations first, then assign

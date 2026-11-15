@@ -105,7 +105,7 @@ export function observePairViews(graph,idA,idB,views){
 const POSITIVE=new Set(['talk','conversation.talk','gift.accepted','leisure.accepted',
   'acquaint.chat','friend.tease','friend.confide','rival.truce']);
 const NEGATIVE=new Set(['argue','conversation.argue','gift.refused','leisure.refused',
-  'rival.taunt','friend.tease.refused','friend.confide.refused','rival.truce.refused']);
+  'rival.taunt','friend.tease.refused','friend.confide.refused','rival.truce.refused','acquaint.chat.refused']);
 const TYPES=new Set([...POSITIVE,...NEGATIVE,'introduced']);
 const positive=type=>POSITIVE.has(type);
 const weights={
@@ -124,7 +124,8 @@ const weights={
   'rival.taunt':{friendship:-7,trust:-5,tension:12},
   'friend.tease.refused':{friendship:-4,trust:-5,tension:7},
   'friend.confide.refused':{friendship:-3,trust:-6,tension:6},
-  'rival.truce.refused':{friendship:-2,trust:-2,tension:6}
+  'rival.truce.refused':{friendship:-2,trust:-2,tension:6},
+  'acquaint.chat.refused':{friendship:-2,trust:-2,tension:3}
 };
 function recompute(pair){
   const [a,b]=pair.ids,v=pair.views;
@@ -241,7 +242,7 @@ export function resolveBranchResponse(graph,a,b,id){
     id==='rival.truce'?base>=24:
     id==='friend.tease'?base>=24:
     id==='friend.confide'?base>=43:base>=6;
-  const type=accepted?id:id+'.refused';
+  const type=id==='rival.taunt'?id:accepted?id:id+'.refused';
   return {accepted,type,id,label:accepted?
     id==='friend.tease'?'Шутку оценили':id==='friend.confide'?'Секрет принят':
     id==='rival.truce'?'Удалось начать примирение':'Узнали друг друга получше':

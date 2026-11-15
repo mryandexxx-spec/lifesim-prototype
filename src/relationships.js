@@ -4,6 +4,8 @@ import {feelMemory} from './emotion-engine.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
+import {availableSocialActions,resolveBranchResponse,observePairViews,
+  applySocialEvent} from './social-graph.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -113,6 +115,23 @@ export function startSharedSocial(root,initiator,target,mode,choiceId){
   root.socialAction.shared=session;
   return true;
 }
+/** The adapter remains two-resident only; social-graph.js works with N stable IDs. */
+export function startBranchSocial(root,initiator,target,actionId){
+  if(!root?.socialGraph||!availableSocialActions(root.socialGraph,initiator,otherId(initiator))
+    .some(action=>action.id===actionId&&action.enabled))return false;
+  if(!startSocial(root,'talk',initiator,target,false))return false;
+  root.socialAction.branchAction={id:actionId};
+  return true;
+}
+function recordPairCompletion(root,session,type){
+  const graph=root.socialGraph,a=session.initiator,b=session.partner;
+  if(!graph||!root.relationship?.views?.[a]||!root.relationship.views[b])return false;
+  const views={[a]:root.relationship.views[a],[b]:root.relationship.views[b]};
+  observePairViews(graph,a,b,views);
+  return Boolean(applySocialEvent(graph,{
+    actorId:a,targetId:b,type,at:root.minutes
+  },{observedViews:views}));
+}
 export function arriveSocial(root) {
   if(root.socialAction?.phase!=='walking')return false;
   root.socialAction.phase='using';root.socialAction.elapsed=0;return true;
@@ -151,6 +170,8 @@ function completeSocial(root,conversationScore=null){
       :id===s.initiator?'Сожалеет о ссоре':'Обиделся после ссоры';
     refreshMind(resident);
   }
+  recordPairCompletion(root,s,s.branchAction?.resultType||
+    (s.conversation?'conversation.'+s.kind:s.kind));
   root.socialAction=null;
   return true;
 }
@@ -158,6 +179,15 @@ export function tickSocial(root,minutes){
   const s=root.socialAction;
   if(root.paused||!Number.isFinite(minutes)||minutes<=0||s?.phase!=='using')return false;
   if(s.conversation)return false; // explicit multi-turn choices decide the finish
+  if(s.branchAction){
+    s.elapsed+=minutes;
+    if(s.elapsed<18)return false;
+    const response=resolveBranchResponse(root.socialGraph,s.initiator,s.partner,s.branchAction.id);
+    if(!response){root.socialAction=null;return false;}
+    s.branchAction.resultType=response.type;
+    s.kind=response.accepted?'talk':'argue';
+    return completeSocial(root,response.accepted?6:-5);
+  }
   if(s.shared){
     const duration=sharedDuration(s.shared);
     if(!duration){root.socialAction=null;return false;}
@@ -165,6 +195,9 @@ export function tickSocial(root,minutes){
     if(s.elapsed<duration)return false;
     const receipt=completeSharedSession(root);
     if(!receipt){root.socialAction=null;return false;}
+    recordPairCompletion(root,s,s.shared.mode==='gift'
+      ?receipt.kind==='refused'?'gift.refused':'gift.accepted'
+      :receipt.kind==='refused'?'leisure.refused':'leisure.accepted');
     root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
     root.socialAction=null;
     return true;
@@ -190,11 +223,19 @@ export function loadSocialAction(data,root) {
     return null;
   if(data.shared!==undefined&&(!shared||session||data.kind!=='talk'||data.automatic===true))
     return null;
+  const branch=data.branchAction;
+  if(branch!==undefined&&(
+    !branch||typeof branch!=='object'||Array.isArray(branch)||
+    !Object.hasOwn(branch,'id')||Object.keys(branch).length!==1||
+    !availableSocialActions(root.socialGraph,data.initiator,data.partner)
+      .some(action=>action.id===branch.id&&action.enabled)||
+    session||shared||data.kind!=='talk'||data.automatic===true))return null;
   return {kind:data.kind,initiator:data.initiator,partner:data.partner,
     target:{x:data.target.x,z:data.target.z},phase:data.phase,
     elapsed:data.elapsed,automatic:data.automatic===true,
     ...(session?{conversation:session}:{}),
-    ...(shared?{shared}:{})};
+    ...(shared?{shared}:{}),
+    ...(branch?{branchAction:{id:branch.id}}:{})};
 }
 export function autonomousSocialChoice(root,id='alex') {
   if(!validId(id)||!root.relationship||!root.autonomy.enabled||
