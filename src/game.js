@@ -6,7 +6,8 @@ import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, cho
 import { findPath, nearestWalkable } from './navigation.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
-  chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial } from './relationships.js';
+  chooseSocialLine,nextSocialLine,finishSocialConversation,startSharedSocial,startBranchSocial } from './relationships.js';
+import {availableSocialActions,relationSummary,BRANCH_ACTIONS} from './social-graph.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
   CONVERSATION_MAX_TURNS} from './conversation-engine.js';
@@ -93,6 +94,8 @@ let conversationTopicPicker=false;
 let conversationDisplayKey='';
 let sharedPicker=false;
 let sharedDisplayKey='';
+let branchPicker=false;
+let branchDisplayKey='';
 let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let toastTimeout;
@@ -152,8 +155,8 @@ $('action-button').addEventListener('click', () => {
 });
 for(const kind of Object.keys(SOCIAL_ACTIONS)){
   $(kind+'-btn').addEventListener('click',()=>{
-    conversationTopicPicker=false;
-    renderConversationPanel();
+    conversationTopicPicker=false;branchPicker=false;
+    renderConversationPanel();renderBranchPanel();
     if(beginSocial(kind)) {
       sharedPicker=false;renderSharedPanel();
       select(null);closeMindPanel();
@@ -163,7 +166,8 @@ for(const kind of Object.keys(SOCIAL_ACTIONS)){
 }
 $('conversation-btn').addEventListener('click',()=>{
   if(game.socialAction)return;
-  sharedPicker=false;renderSharedPanel();
+  sharedPicker=false;branchPicker=false;
+  renderSharedPanel();renderBranchPanel();
   conversationTopicPicker=true;
   select(null);closeMindPanel();
   renderConversationPanel();
@@ -174,13 +178,61 @@ $('conversation-close').addEventListener('click',()=>{
 });
 $('shared-btn').addEventListener('click',()=>{
   if(game.socialAction)return;
-  conversationTopicPicker=false;renderConversationPanel();
+  conversationTopicPicker=false;branchPicker=false;
+  renderConversationPanel();renderBranchPanel();
   sharedPicker=true;select(null);closeMindPanel();renderSharedPanel();
 });
 $('shared-close').addEventListener('click',()=>{
   if(game.socialAction?.shared)cancelSocial(game);
   sharedPicker=false;renderSharedPanel();
 });
+$('branch-btn').addEventListener('click',()=>{
+  if(game.socialAction)return;
+  conversationTopicPicker=false;sharedPicker=false;
+  renderConversationPanel();renderSharedPanel();
+  branchPicker=true;select(null);closeMindPanel();renderBranchPanel();
+});
+$('branch-close').addEventListener('click',()=>{
+  if(game.socialAction?.branchAction)cancelSocial(game);
+  branchPicker=false;renderBranchPanel();
+});
+function renderBranchPanel(force=true){
+  const s=game.socialAction,active=s?.branchAction;
+  const target=game.selectedSim==='alex'?'mira':'alex';
+  const status=relationSummary(game.socialGraph,game.selectedSim,target);
+  const pairKey=JSON.stringify([game.selectedSim,target].sort());
+  const revision=game.socialGraph?.pairs?.[pairKey]?.revision||0;
+  const key=JSON.stringify([branchPicker,game.selectedSim,s?.phase,active,game.paused,revision]);
+  if(!force&&key===branchDisplayKey)return;
+  branchDisplayKey=key;
+  const open=branchPicker||Boolean(active);
+  $('branch-panel').hidden=!open;
+  if(!open)return;
+  const opts=$('branch-options');opts.replaceChildren();
+  $('branch-title').textContent=status.label;
+  $('branch-subtitle').textContent=active
+    ?game.paused?'Пауза — взаимодействие остановлено':
+      s.phase==='walking'?'Жители идут друг к другу':'Общаются — действие завершится по игровому времени'
+    :'Значимых хороших событий: '+status.positive+
+      ' · конфликтов: '+status.negative+' · дней общения: '+status.days;
+  if(active){
+    const p=document.createElement('p');p.className='shared-progress-text';
+    p.textContent=BRANCH_ACTIONS[active.id]?.label||'Социальное действие';
+    opts.append(p);return;
+  }
+  const hints=document.createElement('p');hints.className='shared-progress-text';
+  hints.textContent='Дружба: взаимное доверие и минимум 3 значимых события за 2 дня. Вражда: повторные конфликты.';
+  opts.append(hints);
+  for(const action of availableSocialActions(game.socialGraph,game.selectedSim,target)){
+    const button=conversationButton(action.label+(action.enabled?'':' · '+action.reason),()=>{
+      if(beginSocial('talk',false,game.selectedSim,null,null,action.id)){
+        branchPicker=false;renderBranchPanel();
+      }else toast('Не удалось начать общение');
+    });
+    button.disabled=!action.enabled||Boolean(game.socialAction);
+    opts.append(button);
+  }
+}
 /** Browser-safe, stable controls: rerender only on a transition, never on a frame. */
 function renderSharedPanel(force=true){
   const action=game.socialAction,session=action?.shared;
@@ -313,6 +365,7 @@ function renderConversationPanel(force=true){
 }
 renderConversationPanel();
 renderSharedPanel();
+renderBranchPanel();
 $('pause-btn').addEventListener('click', () => {
   game.paused = !game.paused;
   $('pause-icon').textContent = game.paused ? '▶' : 'Ⅱ';
@@ -360,9 +413,9 @@ function updateResidentPicker() {
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
     selectResident(game,id);
-    conversationTopicPicker=false;sharedPicker=false;
+    conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     select(null); closeMindPanel(); updateResidentPicker();
-    renderConversationPanel();renderSharedPanel();save(true);
+    renderConversationPanel();renderSharedPanel();renderBranchPanel();save(true);
     toast('Теперь управляешь: '+selectedName());
   });
 }
@@ -650,7 +703,7 @@ function boot() {
   };
 
   // Meet beside the other resident at a walkable, reachable point.
-  beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null)=>{
+  beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null,branchId=null)=>{
     if(!canStartSocial(game,kind,actorId,automatic)){
       if(!automatic)toast('Собеседник занят или разговор уже идёт');
       return false;
@@ -667,7 +720,8 @@ function boot() {
       if(len<bestLength){best={goal,points};bestLength=len;}
     }
     if(!best){if(!automatic)toast('Сейчас не получается подойти к собеседнику');return false;}
-    if(!(shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId)
+    if(!(branchId?startBranchSocial(game,actorId,best.goal,branchId)
+      :shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId)
       :topic?startConversation(game,actorId,best.goal,topic)
       :startSocial(game,kind,actorId,best.goal,automatic)))return false;
     // A manual invitation interrupts the partner's task but never bypasses
@@ -681,9 +735,9 @@ function boot() {
     return true;
   };
   resetRuntime=()=>{
-    conversationTopicPicker=false;sharedPicker=false;
-    conversationDisplayKey='';sharedDisplayKey='';
-    renderConversationPanel();renderSharedPanel();
+    conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
+    conversationDisplayKey='';sharedDisplayKey='';branchDisplayKey='';
+    renderConversationPanel();renderSharedPanel();renderBranchPanel();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
@@ -843,14 +897,18 @@ function boot() {
       while(accumulator>=.10){
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
         const sharedBefore=game.socialAction?.shared?game.socialAction.initiator:null;
-      const socialBefore=game.socialAction?.conversation||game.socialAction?.shared
-        ?null:game.socialAction?.kind;
+        const branchBefore=game.socialAction?.branchAction?.id||null;
+        const socialBefore=game.socialAction?.conversation||
+          game.socialAction?.shared||game.socialAction?.branchAction
+          ?null:game.socialAction?.kind;
         tickHousehold(game,.30 * game.speed); // Both share the clock; no double advancement.
         if(prevAlex && !game.action) toast('Алекс закончил: '+ACTIONS[prevAlex].label.toLowerCase());
         if(prevMira && !game.otherSim.action) toast('Мира закончила: '+ACTIONS[prevMira].label.toLowerCase());
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
       if(sharedBefore&&!game.socialAction)
         toast(getActor(game,sharedBefore).event);
+      if(branchBefore&&!game.socialAction)
+        toast('Завершено: '+BRANCH_ACTIONS[branchBefore].label);
         accumulator-=.10;
       }
       // On cancellation, finish closing before the former fridge user departs.
@@ -1195,6 +1253,12 @@ function boot() {
       for(const kind of Object.keys(SOCIAL_ACTIONS))$(kind+'-btn').disabled=busy;
       $('conversation-btn').disabled=busy;
       $('shared-btn').disabled=busy;
+      $('branch-btn').disabled=busy;
+      const branchStatus=relationSummary(game.socialGraph,game.selectedSim,
+        game.selectedSim==='alex'?'mira':'alex');
+      $('relationship-branch').textContent=branchStatus.label;
+      if(branchPicker||game.socialAction?.branchAction||!$('branch-panel').hidden)
+        renderBranchPanel(false);
       if(conversationTopicPicker||game.socialAction?.conversation||!$('conversation-panel').hidden)
         renderConversationPanel(false);
       if(sharedPicker||game.socialAction?.shared||!$('shared-panel').hidden)
@@ -1228,6 +1292,10 @@ function boot() {
             ' · ещё '+Math.ceil(e.remaining)+' игр. мин.').join('\n')
           :'Сейчас нет сильных переживаний';
         const perspective=getPerspective(game,game.selectedSim);
+        const branch=relationSummary(game.socialGraph,game.selectedSim,
+          game.selectedSim==='alex'?'mira':'alex');
+        $('mind-relation-stage').textContent='Связь: '+branch.label+
+          ' · Значимых хороших событий: '+branch.positive+', конфликтов: '+branch.negative;
         $('mind-relation-name').textContent='К '+getActorName(game.selectedSim==='alex'?'mira':'alex');
         for(const axis of ['friendship','trust','tension']){
           const value=Math.round(perspective[axis]);
