@@ -48,10 +48,22 @@ test('audit female joint positions for authored lying and sleeping clips',()=>{
       .map(b=>{const idx=g.nodes.findIndex(n=>n.name==='mixamorig:'+b);
         return [b,compute(idx).p.map(x=>+x.toFixed(3))];}));
   };
-  for(const [name,t] of [
-    ['Idle_7',0],['Look_Back_and_Sit',2.26666665],['sleep',0],
-    ['sleep',2.6],['sleep',5.7],['Lie_Down_Hands_Spread',0],
-    ['Lie_Down_Hands_Spread',3.7]
-  ])console.log('MIRA_POSE_AUDIT',JSON.stringify({name,t,joints:at(name,t)}));
+  // Reproduce the owner's Safari defect: a stuck Look_Back_and_Sit frame
+  // keeps the torso upright and the legs dangling, whereas the authored
+  // final sleep frame is FLAT. The visuals must actually activate sleep.
+  const sitting=at('Look_Back_and_Sit',2.26666665);
+  const sleeping=at('sleep',5.7);
+  const flatLie=at('Lie_Down_Hands_Spread',3.7);
+  const relativeY=(joints,bone)=>joints[bone][1]-joints.Hips[1];
+  assert.ok(relativeY(sitting,'Head')>.35,
+    'the first clip ends sitting upright');
+  for(const pose of [sleeping,flatLie]){
+    for(const bone of ['Head','LeftLeg','RightLeg','LeftFoot','RightFoot']){
+      assert.ok(Math.abs(relativeY(pose,bone))<.14,
+        `${bone} must be close to the mattress plane in a native lying pose`);
+    }
+    assert.ok(pose.LeftFoot[2]-pose.Hips[2]>.75,
+      'sleep legs should extend forward, not hang down from the hips');
+  }
   assert.ok(g.nodes.some(n=>n.name==='mixamorig:LeftFoot'));
 });

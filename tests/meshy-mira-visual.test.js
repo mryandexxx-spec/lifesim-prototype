@@ -166,7 +166,7 @@ test('game supplies both independent visual adapters and includes the female mod
   assert.match(workflow,/node --check src\/meshy-mira-visual\.js/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/Блин<span>’С<\/span>/);
-  assert.match(html,/сборка \/ 0\.7j/);
+  assert.match(html,/сборка \/ 0\.7j\.1/);
 });
 
 test('audited female sit track interpolates measured pelvic translation, no per-sofa offsets',()=>{
@@ -241,8 +241,11 @@ test('Mira bed uses original female sit-to-sleep clips without swapping skin',()
   assert.ok(f.events.some(([kind,name])=>kind==='play'&&name==='Look_Back_and_Sit'));
   v.update({preferred:true,actionId:'bed',bedBusy:true,bedFrame:bedPose(.73),
     bedProgress:.73,paused:false});
-  assert.ok(f.events.some(([kind,name])=>kind==='transition'&&name==='sleep'));
+  assert.ok(f.events.some(([kind,name])=>kind==='play'&&name==='sleep'));
+  assert.ok(!f.events.some(([kind,name])=>kind==='transition'&&name==='sleep'),
+    'a timed crossfade freezes while both bed clips are scrubbed at speed=0');
   assert.ok(f.model.anim.baseLayer.activeStateCurrentTime>0);
+  assert.equal(f.model.anim.speed,0,'native sleep time is game-progress driven');
   assert.ok(f.model.script.instances.length>0);
   f.model.script.instances[0].postUpdate();
   const rotation=f.model.mockHip.rotation;
@@ -265,5 +268,30 @@ test('missing hip, changed sleep duration or absent clips fall back only on bed'
     v.update({preferred:true,actionId:'bed',bedBusy:true,
       bedFrame:bedTransitionPose({progress:.9,slot:'right'}),bedProgress:.9});
     assert.equal(f.renderers[0].enabled,true);
+  }
+});
+
+test('Mira bed seeks final native lying frame directly even from sitting and on pause',()=>{
+  for(const side of ['left','right']){
+    const f=fixture({bedClips:true}),v=createMiraMeshyVisual(f);
+    const frame=p=>bedTransitionPose({progress:p,slot:side});
+    v.update({preferred:true,actionId:'bed',bedBusy:true,
+      bedFrame:frame(.49),bedProgress:.49,paused:true,dt:0});
+    assert.ok(f.events.some(([kind,clip])=>kind==='play'&&clip===MIRA_SOFA_CLIP));
+    v.update({preferred:true,actionId:'bed',bedBusy:true,
+      bedFrame:frame(1),bedProgress:1,paused:true,dt:0});
+    assert.ok(f.events.some(([kind,clip])=>kind==='play'&&clip==='sleep'),
+      'bed must activate sleep immediately, not wait for a frozen transition');
+    assert.ok(!f.events.some(([kind,clip])=>kind==='transition'&&clip==='sleep'));
+    assert.equal(f.model.anim.speed,0);
+    assert.ok(Math.abs(f.model.anim.baseLayer.activeStateCurrentTime-MIRA_SLEEP_DURATION)<1e-8);
+    assert.equal(f.renderers[0].enabled,false);
+    const count=f.events.length;
+    v.update({preferred:true,actionId:'bed',bedBusy:true,
+      bedFrame:frame(1),bedProgress:1,paused:true,dt:0});
+    assert.equal(f.events.length,count,'frozen sleep clip must not restart');
+    v.update({preferred:true,actionId:'bed',bedBusy:true,
+      bedFrame:frame(.40),bedProgress:.40});
+    assert.ok(f.events.some(([kind,clip])=>kind==='play'&&clip===MIRA_SOFA_CLIP));
   }
 });

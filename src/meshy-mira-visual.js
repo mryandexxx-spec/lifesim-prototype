@@ -159,11 +159,13 @@ export function createMiraMeshyVisual({pc,app,rig,onStatus=()=>{}}){
         state.bedRuntime?.setFrame(pose);
         if(!pose)return true;
         if(state.clip!==pose.clip){
-          // Skinned bed: use authored sit and native sleep in both directions.
-          // The script postUpdate cancels the duplicated procedural root pitch.
-          if(state.clip===MIRA_SOFA_CLIP&&pose.clip===MIRA_SLEEP_CLIP)
-            anim.baseLayer.transition(pose.clip,.18);
-          else anim.baseLayer.play(pose.clip);
+          // Both imported bed clips are explicitly sampled from the game's
+          // reversible action progress (anim.speed=0 below). A timed Anim
+          // transition also uses the component clock; at speed=0 it never
+          // completes and leaves Mira visibly sitting during sleep.
+          // End of Look_Back_and_Sit and start of sleep are adjacent seated
+          // poses in the audited GLB, so switch them immediately, then sample.
+          anim.baseLayer.play(pose.clip);
           state.clip=pose.clip;
         }
         state.sofaRelease=null;
