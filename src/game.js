@@ -13,6 +13,10 @@ import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.j
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
+import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect} from './furniture-catalog.js';
+import {proposeFurnitureMove} from './furniture-layout.js';
+import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
+  snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
@@ -203,6 +207,7 @@ const META = {
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] }
 };
 
+let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
 let selected = null;
 let beginAction = () => false;
 let beginSocial = () => false;
@@ -970,19 +975,21 @@ renderQueuePanel();
 renderSocialContext();
 function renderPauseButton(){
   const blocked=dialogueNeedsDecision(game);
-  const paused=game.paused||blocked;
+  const paused=game.paused||blocked||furnishMode;
   $('pause-icon').textContent=paused?'▶':'Ⅱ';
   $('pause-btn').setAttribute('aria-label',blocked
     ?'Выбери реплику: игровое время остановлено'
-    :paused?'Продолжить':'Пауза');
+    :furnishMode?'Обстановка: игровое время остановлено'
+      :paused?'Продолжить':'Пауза');
 }
 $('pause-btn').addEventListener('click', () => {
-  if(dialogueNeedsDecision(game))return;
+  if(dialogueNeedsDecision(game)||furnishMode)return;
   game.paused = !game.paused;
   renderPauseButton();
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
 });
 $('speed-btn').addEventListener('click', () => {
+  if(furnishMode)return;
   game.speed = game.speed === 1 ? 3 : 1;
   $('speed-btn').textContent = `${game.speed}×`;
   toast(game.speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
@@ -996,6 +1003,7 @@ function updateAutoButton() {
   $('auto-state').textContent = enabled ? 'ВКЛ' : 'ВЫКЛ';
 }
 $('auto-btn').addEventListener('click', () => {
+  if(furnishMode)return;
   const enabled = setHouseholdAutonomy(game, !game.autonomy.enabled);
   restartAutonomyWait();
   if (enabled) game.event = 'Свободное время';
@@ -1082,12 +1090,40 @@ function boot() {
     white: mat('#fffdf7'), black: mat('#303c3a'), tan: mat('#be9d86'), blue: mat('#c5dbdd'), yellow: mat('#f7d68d'),
     skin: mat('#c88d6e'), hair: mat('#47382f'), shirt: mat('#4b967d'), trousers: mat('#566675'), rug: mat('#d6b8a5')
   };
+  const decorNodes=new Map();
+  let decorDrawing=null;
+  const withDecor=(prefabId,render)=>{
+    const origin=ORIGINAL_FURNITURE.find(i=>i.prefabId===prefabId);
+    const current=game.world.furniture.instances.find(i=>i.instanceId===origin.instanceId)||origin;
+    const node=new pc.Entity('F1 furniture / '+origin.instanceId);
+    app.root.addChild(node);
+    node.setPosition(current.x,0,current.z);
+    node.setEulerAngles(0,-current.yaw,0);
+    decorNodes.set(origin.instanceId,node);
+    const previous=decorDrawing;
+    decorDrawing={origin,node};
+    try{render();}finally{decorDrawing=previous;}
+  };
+  const updateDecorNodes=(previewId=null,previewPose=null)=>{
+    for(const [instanceId,node] of decorNodes){
+      const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
+      if(!item)continue;
+      const pose=instanceId===previewId&&previewPose?previewPose:item;
+      node.setPosition(pose.x,0,pose.z);
+      // PlayCanvas Y rotation has opposite XZ convention to rotateLocal.
+      node.setEulerAngles(0,-pose.yaw,0);
+    }
+  };
   const primitive = (type,name,x,y,z,sx,sy,sz,material,parent=app.root) => {
     const entity = new pc.Entity(name);
     entity.addComponent('render',{ type, material });
-    entity.setLocalPosition(x,y,z);
+    // Authored world-space geometry is converted once to a stable prefab-local
+    // scene transform. Existing animation roots remain unchanged and fixed.
+    const grouped=decorDrawing&&parent===app.root;
+    entity.setLocalPosition(grouped?x-decorDrawing.origin.x:x,y,
+      grouped?z-decorDrawing.origin.z:z);
     entity.setLocalScale(sx,sy,sz);
-    parent.addChild(entity);
+    (grouped?decorDrawing.node:parent).addChild(entity);
     return entity;
   };
   const box = (...args) => primitive('box', ...args);
@@ -1153,10 +1189,12 @@ function boot() {
   touchBox('bed','bed headboard',-2.62,.82,-2.69,2.47,.95,.17,M.paleWood);
   touchBox('bed','pillow left',-3.15,.54,-2.18,.87,.19,.50,M.cream);
   touchBox('bed','pillow right',-2.10,.54,-2.18,.87,.19,.50,M.peach);
-  box('side table',-4.23,.38,-3.35,.65,.64,.68,M.paleWood);
-  cylinder('lamp base',-4.23,.76,-3.35,.22,.10,.22,M.white);
-  cylinder('lamp stem',-4.23,.94,-3.35,.055,.32,.055,M.slate);
-  cylinder('lamp shade',-4.23,1.17,-3.35,.45,.32,.45,M.yellow);
+  withDecor('nightstand',()=>{
+    box('side table',-4.23,.38,-3.35,.65,.64,.68,M.paleWood);
+    cylinder('lamp base',-4.23,.76,-3.35,.22,.10,.22,M.white);
+    cylinder('lamp stem',-4.23,.94,-3.35,.055,.32,.055,M.slate);
+    cylinder('lamp shade',-4.23,1.17,-3.35,.45,.32,.45,M.yellow);
+  });
 
   // Kitchen zone with tall fridge, little counter and upper cupboards.
   touchBox('fridge','fridge',3.43,.99,-2.85,1.12,1.98,1.14,M.cream);
@@ -1198,13 +1236,18 @@ function boot() {
   touchBox('sofa','sofa pillow right',1.99,SOFA_LAYOUT.pillowCenterY,SOFA_LAYOUT.pillowZ,
     .63,SOFA_LAYOUT.pillowHeight,.23,M.mint);
   // Leave a navigable front approach so residents do not cross the sofa arm.
-  blockerBox('coffee table top',1.34,.40,-.26,1.47,.12,.73,M.paleWood);
-  for(let x of [.74,1.94]) for(let z of [-.53,.01])
-    cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
-  box('tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
-  box('tv screen',3.52,1.35,.36,.16,1.07,1.62,M.dark);
-  box('tv glass',3.42,1.35,.36,.045,.89,1.44,M.slate);
-  box('tv stand',3.67,.80,.37,.35,.12,.28,M.black);
+  withDecor('table',()=>{
+    // The blocker for ray-picking now follows the instance footprint below.
+    box('coffee table top',1.34,.40,-.26,1.47,.12,.73,M.paleWood);
+    for(let x of [.74,1.94]) for(let z of [-.53,.01])
+      cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
+  });
+  withDecor('tv',()=>{
+    box('tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
+    box('tv screen',3.52,1.35,.36,.16,1.07,1.62,M.dark);
+    box('tv glass',3.42,1.35,.36,.045,.89,1.44,M.slate);
+    box('tv stand',3.67,.80,.37,.35,.12,.28,M.black);
+  });
 
   // Shower corner: soft mint tiles and a simple visible frame.
   touchBox('shower','shower platform',-3.67,.12,2.50,1.85,.22,1.88,M.white);
@@ -1260,11 +1303,13 @@ function boot() {
   toiletPrivacy.enabled=false;
 
   // Potted plant, decorations and an oversized welcoming mat.
-  cylinder('plant pot',4.19,.30,3.22,.58,.63,.58,M.rust);
-  cylinder('plant stem',4.19,.78,3.22,.10,.70,.10,M.darkGreen);
-  ball('leaf crown',4.20,1.27,3.2,1.02,.94,.91,M.leaf);
-  ball('plant leaf',3.93,1.10,3.08,.62,.63,.6,M.leaf2);
-  ball('plant leaf',4.45,1.38,3.42,.65,.74,.51,M.green);
+  withDecor('plant',()=>{
+    cylinder('plant pot',4.19,.30,3.22,.58,.63,.58,M.rust);
+    cylinder('plant stem',4.19,.78,3.22,.10,.70,.10,M.darkGreen);
+    ball('leaf crown',4.20,1.27,3.2,1.02,.94,.91,M.leaf);
+    ball('plant leaf',3.93,1.10,3.08,.62,.63,.6,M.leaf2);
+    ball('plant leaf',4.45,1.38,3.42,.65,.74,.51,M.green);
+  });
   box('entry mat',-.65,.042,3.45,1.45,.012,.60,M.mint);
 
   // Original reusable 0.5a rigs. Keep all existing motion/interaction pivot references.
@@ -1513,6 +1558,7 @@ function boot() {
     meshyMira.reset();
     game.position=nearestWalkable(game.position,game.world);
     game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
+    updateDecorNodes();
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
     showerPrivacy.enabled=false;
@@ -1655,7 +1701,7 @@ function boot() {
     dt=Math.min(dt,.06);
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
-    const active=!game.paused&&!dialogueNeedsDecision(game);
+    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game);
     const animDt=active?dt:0;
     if(active){
       accumulator+=dt;
@@ -2081,7 +2127,7 @@ function boot() {
       feedbackActive:socialFlashLeft>0
     });
     $('social-result').hidden=!layers.showFeedback;
-    reactionBadges.update({dt,paused:game.paused,pc,camera,canvas,
+    reactionBadges.update({dt,paused:game.paused||furnishMode,pc,camera,canvas,
       rigs:reactionRigs,
       visible:{alex:!showerStates.alex.active&&!toiletStates.alex.active,
         mira:!showerStates.mira.active&&!toiletStates.mira.active}});
