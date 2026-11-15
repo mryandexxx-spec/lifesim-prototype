@@ -129,6 +129,15 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
+  // A physical gift has one ID and cannot be handed over twice.
+  if(command.type==='shared'&&command.mode==='gift'&&(
+    pendingActions(game.actionQueues,residentId).some(x=>
+      x.type==='shared'&&x.mode==='gift'&&x.choiceId===command.choiceId)||
+    (game.socialAction?.initiator===residentId&&
+      game.socialAction?.shared?.mode==='gift'&&
+      game.socialAction.shared.choiceId===command.choiceId))){
+    toast('Этот подарок уже ожидает передачи');return false;
+  }
   const task=enqueueAction(game.actionQueues,residentId,command);
   if(!task){toast('Не удалось добавить: очередь заполнена или действие недоступно');return false;}
   toast(getActorName(residentId)+': запланировано — '+taskLabel({...task,residentId}));
@@ -430,9 +439,11 @@ function renderSharedPanel(force=true){
     status.textContent=action.phase==='walking'?'Сначала нужно встретиться':
       'Продолжительность: '+progress+' игровых минут. Можно отменить.';
     options.append(status);
-    return;
+    // The current joint activity stays active; the player can still plan
+    // another gift or leisure action from the same panel.
+    if(!sharedPicker)return;
   }
-  $('shared-title').textContent='Подарки и досуг';
+  $('shared-title').textContent=session?'Запланировать следующее':'Подарки и досуг';
   const inventory=inventoryFor(game,game.selectedSim);
   const gifts=document.createElement('h3');gifts.textContent='Подарить из инвентаря ('+inventory.length+')';
   options.append(gifts);

@@ -270,3 +270,9 @@ test('autonomous social suggestions never preempt the manual queue of either par
   assert.equal(autonomousSocialChoice(root,'alex'),null);
   assert.equal(autonomousSocialChoice(root,'mira'),null);
 });
+test('active gift does not close the leisure picker or allow scheduling the same item twice',()=>{
+  const ui=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  assert.ok(ui.includes("if(!sharedPicker)return;"));
+  assert.ok(ui.includes("game.socialAction.shared.choiceId===command.choiceId"));
+  assert.ok(ui.includes("session?'Запланировать следующее':'Подарки и досуг'"));
+});
