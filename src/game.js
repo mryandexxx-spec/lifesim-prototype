@@ -912,7 +912,7 @@ function boot() {
   };
   dispatchPlannedActions=()=>{
     if(game.paused)return [];
-    return dispatchActionQueues(game.actionQueues,{
+    const started=dispatchActionQueues(game.actionQueues,{
       canStart(residentId,command){
         if(!HOUSEHOLD_IDS.includes(residentId)||game.socialAction)return false;
         const actor=getActor(game,residentId);
@@ -959,6 +959,10 @@ function boot() {
         return false;
       }
     });
+    // Persist active task and removed queue entry in the SAME v1 snapshot,
+    // so a page reload cannot replay a consumed plan.
+    if(started.length)save(true);
+    return started;
   };
   resetRuntime=()=>{
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
