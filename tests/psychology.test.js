@@ -109,3 +109,23 @@ test('pause freezes psychological state and memories', () => {
   tick(s,1000);
   assert.equal(JSON.stringify(s),before);
 });
+
+test('social recollections have role-specific emotional weight and survive safe v1 loading',()=>{
+  const s=newGame();s.minutes=900;
+  s.needs={hunger:80,energy:80,hygiene:80,fun:80};
+  const mind=id=>({memories:[{id,at:900,fulfilled:false}]});
+  const hurt=calculateMood(s.needs,mind('hurt'),900);
+  const regret=calculateMood(s.needs,mind('regret'),900);
+  const repaired=calculateMood(s.needs,mind('reconcile'),900);
+  assert.ok(hurt.value<regret.value);
+  assert.ok(repaired.value>regret.value);
+  assert.ok(MEMORY_TEXT.reconcile&&MEMORY_TEXT.regret&&MEMORY_TEXT.hurt);
+  const data=JSON.parse(JSON.stringify(s));
+  data.mind={wish:s.mind.wish,memories:[{id:'hurt',at:895},{id:'reconcile',at:899},
+    {id:'alien_script',at:900},{id:'regret',at:900}],mood:{value:999,label:'BAD'}};
+  const restored=loadGame(data);
+  assert.deepEqual(restored.mind.memories.map(x=>x.id),
+    ['hurt','reconcile','regret']);
+  assert.notEqual(restored.mind.mood.label,'BAD');
+  assert.equal(restored.version,1);
+});

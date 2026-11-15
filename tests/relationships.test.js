@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { SAVE_KEY } from '../src/simulation.js';
 import { newHousehold,loadHousehold,chooseResidentAction,setHouseholdAutonomy,tickHousehold } from '../src/household.js';
 import { SOCIAL_ACTIONS,canStartSocial,startSocial,arriveSocial,
-  relationshipLabel,autonomousSocialChoice,cancelSocial } from '../src/relationships.js';
+  relationshipLabel,autonomousSocialChoice,cancelSocial,
+  canReconcile,RECONCILIATION_WINDOW_MINUTES } from '../src/relationships.js';
 const place={x:-.2,z:1.85};
 function complete(root,kind='talk',id='alex') {
   assert.equal(startSocial(root,kind,id,place),true);
@@ -36,8 +37,10 @@ test('disagreement hurts relationship and both moods',()=>{
   const s=newHousehold(),before=s.mind.mood.value;
   complete(s,'argue','mira');
   assert.equal(s.relationship.affinity,38);
-  assert.equal(s.mind.memories.at(-1).id,'argue');
-  assert.equal(s.otherSim.mind.memories.at(-1).id,'argue');
+  assert.equal(s.mind.memories.at(-1).id,'hurt',
+    'when Mira starts an argument, Alex feels hurt');
+  assert.equal(s.otherSim.mind.memories.at(-1).id,'regret',
+    'the one who started the argument regrets it');
   assert.ok(s.mind.mood.value<before);
 });
 test('score clamps 0–100 and memories are bounded to 12',()=>{
@@ -113,4 +116,89 @@ test('invalid social targets or IDs are rejected',()=>{
   assert.equal(startSocial(s,'talk','alex',{x:Infinity,z:1}),false);
   assert.equal(startSocial(s,'argue','alex',{x:55,z:0}),false);
   assert.equal(startSocial(s,'bad','alex',place),false);
+});
+
+test('argument memories distinguish initiator regret from partner hurt',()=>{
+  const s=newHousehold();
+  complete(s,'argue','alex');
+  assert.equal(s.mind.memories.at(-1).id,'regret');
+  assert.equal(s.otherSim.mind.memories.at(-1).id,'hurt');
+  assert.ok(s.otherSim.mind.mood.value<s.mind.mood.value,
+    'hurt partner feels a stronger negative effect than the initiator');
+  assert.equal(canReconcile(s),true);
+  assert.equal(s.relationship.lastKind,'argue');
+});
+test('a follow-up conversation remembers reconciliation, restores trust and mood',()=>{
+  const s=newHousehold();
+  complete(s,'argue','mira');
+  assert.equal(s.relationship.affinity,38);
+  const beforeA=s.mind.mood.value,beforeM=s.otherSim.mind.mood.value;
+  assert.equal(canReconcile(s),true);
+  complete(s,'talk','alex');
+  assert.equal(s.relationship.affinity,50,'reconciliation adds 12 instead of 8');
+  assert.equal(s.relationship.lastKind,'talk');
+  assert.equal(s.mind.memories.at(-1).id,'reconcile');
+  assert.equal(s.otherSim.mind.memories.at(-1).id,'reconcile');
+  assert.equal(canReconcile(s),false,'do not reconcile the same fight twice');
+  assert.ok(s.mind.mood.value>beforeA);
+  assert.ok(s.otherSim.mind.mood.value>beforeM);
+  const saved=loadHousehold(JSON.parse(JSON.stringify(s)));
+  assert.equal(saved.mind.memories.at(-1).id,'reconcile');
+  assert.equal(saved.otherSim.mind.memories.at(-1).id,'reconcile');
+  assert.equal(saved.relationship.affinity,50);
+  complete(saved,'talk','alex');
+  assert.equal(saved.relationship.affinity,58,'normal talk returns to +8');
+  assert.equal(saved.mind.memories.at(-1).id,'talk');
+});
+test('reconciliation expires; old v1 argument saves can still make peace',()=>{
+  const old=newHousehold();
+  old.minutes=800;old.otherSim.minutes=800;
+  old.relationship.lastKind='argue';
+  old.mind.memories.push({id:'argue',at:790,fulfilled:false});
+  old.otherSim.mind.memories.push({id:'argue',at:790,fulfilled:false});
+  assert.equal(canReconcile(old),true);
+  const loaded=loadHousehold(JSON.parse(JSON.stringify(old)));
+  assert.equal(canReconcile(loaded),true);
+  complete(loaded,'talk');
+  assert.equal(loaded.mind.memories.at(-1).id,'reconcile');
+  const expired=newHousehold();
+  expired.minutes=1000;expired.otherSim.minutes=1000;
+  expired.relationship.lastKind='argue';
+  expired.mind.memories=[{id:'argue',at:1000-RECONCILIATION_WINDOW_MINUTES-1}];
+  expired.otherSim.mind.memories=[{id:'argue',at:1000-RECONCILIATION_WINDOW_MINUTES-1}];
+  assert.equal(canReconcile(expired),false);
+  complete(expired,'talk');
+  assert.equal(expired.relationship.affinity,58);
+  assert.equal(expired.mind.memories.at(-1).id,'talk');
+});
+test('initiator may autonomously repair an argument after cooldown without ignoring needs',()=>{
+  const s=newHousehold();
+  complete(s,'argue','mira');
+  s.minutes=s.relationship.nextSocialAt+1;s.otherSim.minutes=s.minutes;
+  s.needs={hunger:87,energy:85,hygiene:90,fun:91};
+  s.otherSim.needs={hunger:88,energy:85,hygiene:92,fun:91};
+  assert.equal(autonomousSocialChoice(s,'mira'),'talk');
+  assert.equal(autonomousSocialChoice(s,'alex'),null,
+    'hurt partner is not forced into a talk just because the other regrets');
+  s.otherSim.needs.energy=12;
+  assert.equal(autonomousSocialChoice(s,'mira'),null);
+  s.otherSim.needs.energy=88;
+  setHouseholdAutonomy(s,false);
+  assert.equal(autonomousSocialChoice(s,'mira'),null);
+});
+test('an interrupted or paused reconciliation adds no memories or bonus',()=>{
+  const s=newHousehold();
+  complete(s,'argue','alex');
+  const before=s.relationship.affinity;
+  assert.equal(startSocial(s,'talk','mira',place),true);
+  arriveSocial(s);
+  s.paused=true;tickHousehold(s,45);
+  assert.equal(s.relationship.affinity,before);
+  assert.equal(s.mind.memories.length,1);
+  s.paused=false;
+  cancelSocial(s);
+  tickHousehold(s,120);
+  assert.equal(s.relationship.affinity,before);
+  assert.equal(s.mind.memories.length,1);
+  assert.equal(canReconcile(s),true);
 });

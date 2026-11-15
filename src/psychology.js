@@ -16,7 +16,10 @@ export const MEMORY_TEXT = Object.freeze({
   shower: 'Порадовался свежести после душа',
   sofa: 'Приятно отдохнул на диване',
   talk: 'Поговорил(а) с соседом',
-  argue: 'Поспорил(а) с соседом'
+  argue: 'Поспорил(а) с соседом', // compatibility: existing v1 saves
+  regret: 'Сожалеет о споре',
+  hurt: 'Обида после спора',
+  reconcile: 'Помирились после спора'
 });
 const IDS = Object.keys(WISHES);
 const LIMIT = 12;
@@ -37,7 +40,13 @@ export function recentMemoryEffect(mind, minutes) {
   return (mind.memories || []).reduce((sum, memory) => {
     const elapsed = clamp(minutes - memory.at, 0, 10000000);
     const strength = Math.max(0, 1 - elapsed / 360);
-    return sum + (memory.id==='argue'?-18:memory.id==='talk'?11:memory.fulfilled?12:5)*strength;
+    // Identical social event, different memories: the initiator regrets
+    // starting a quarrel, while their partner feels hurt. Old saved
+    // 'argue' events keep their original effect; reconciliation heals.
+    const socialEffect={argue:-18,regret:-13,hurt:-22,talk:11,reconcile:18};
+    const effect=Object.hasOwn(socialEffect,memory.id)
+      ?socialEffect[memory.id]:memory.fulfilled?12:5;
+    return sum+effect*strength;
   }, 0);
 }
 
