@@ -729,6 +729,14 @@ function renderConversationPanel(force=true){
   $('conversation-btn').textContent=session?'Продолжить беседу':'Беседа';
   const panel=$('conversation-panel');
   const enteringRequired=required&&!panel.classList.contains('dialogue-required');
+  if(enteringRequired){
+    // A required answer supersedes every optional popover without cancelling
+    // its REAL underlying FIFO action or affecting manual pause state.
+    setViewOpen(false);
+    socialContextVisible=false;socialAnchor=null;socialMenuCategory=null;
+    sharedPicker=false;branchPicker=false;
+    renderSocialContext();renderSocialMenu();renderSharedPanel();renderBranchPanel();
+  }
   panel.classList.toggle('dialogue-required',required);
   $('conversation-close').hidden=required;
   $('dialogue-backdrop').hidden=!required;
