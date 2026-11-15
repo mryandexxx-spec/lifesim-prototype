@@ -56,6 +56,22 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 #wish-label{color:#608b73;margin-top:3px;font-size:9px;line-height:1.2;white-space:nowrap;}
 .mind-panel{position:absolute;z-index:12;bottom:calc(env(safe-area-inset-bottom) + 172px);left:max(13px,env(safe-area-inset-left));width:min(370px,calc(100vw - 26px));max-height:min(60dvh,400px);overflow-y:auto;overscroll-behavior:contain;background:#fffffffa;border:1px solid #ffffffe8;border-radius:24px;padding:16px 17px;box-shadow:0 14px 52px #304c3c4a;backdrop-filter:blur(18px);}
 .mind-panel[hidden]{display:none;}
+/* 0.9a touch-safe contextual conversation overlay: isolated from 3D scene taps. */
+.conversation-panel{position:absolute;z-index:15;bottom:calc(env(safe-area-inset-bottom) + 177px);right:max(12px,env(safe-area-inset-right));width:min(360px,calc(100vw - 24px));max-height:min(57dvh,450px);overflow-y:auto;overscroll-behavior:contain;background:#fffffff7;border:1px solid #ebf1e8;border-radius:22px;padding:14px;box-shadow:0 16px 48px #2949374a;}
+.conversation-panel[hidden]{display:none;}
+.conversation-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.conversation-head h2{font-size:18px;color:#355f48;margin:4px 0;}
+.conversation-head p{font-size:11px;color:#728575;margin:4px 0 8px;}
+.conversation-head button{border:0;background:#eef3ec;border-radius:10px;width:34px;height:34px;min-width:34px;color:#355f48;font-size:23px;}
+.conversation-lines{list-style:none;margin:7px 0;padding:0;max-height:115px;overflow-y:auto;}
+.conversation-lines li{padding:6px 8px;margin:3px 0;border-radius:9px;font-size:11px;line-height:1.4;color:#3b5847;background:#f0f6ee;}
+.conversation-lines li.conversation-reply{background:#f6f2e8;color:#685e4a;}
+.conversation-options{display:grid;grid-template-columns:1fr;gap:6px;}
+.conversation-option{min-height:36px;padding:8px 11px;border-radius:10px;border:1px solid #bdd8c7;background:#edf7f1;text-align:left;color:#2f614b;font-weight:750;font-size:12px;}
+.conversation-option.secondary{background:#faf7f1;border-color:#e2d9ca;color:#716953;}
+.conversation-option:focus-visible{outline:2px solid #347554;outline-offset:2px;}
+@media(max-width:700px){.conversation-panel{bottom:calc(env(safe-area-inset-bottom) + 168px);max-height:49dvh;}}
+@media(max-height:560px){.conversation-panel{bottom:calc(env(safe-area-inset-bottom) + 110px);max-height:53dvh;}}
 .mind-panel-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:13px;}
 .mind-panel h2{font-size:21px;margin:3px 0 0;color:#334f41;line-height:1.2;}
 .eyebrow{display:block;letter-spacing:1px;font-size:9px;font-weight:800;color:#8fa697;}
