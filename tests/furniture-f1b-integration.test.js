@@ -80,6 +80,7 @@ test('fridge door hinge, hand targets, water, quilt and Meshy seat are instance-
     "const liveFridgeLayout=()=>fixtureContactLayout(game.world,'fridge',FRIDGE_LAYOUT)",
     "fridgeLayout:liveFridgeLayout",
     "fridgeOpen>.001",
+    "fridgeHinge.setLocalEulerAngles(0,FRIDGE_LAYOUT.doorAngle*fridgeOpen,0)",
     "drop.setLocalPosition(-4.28+(i%5)*.22-showerOrigin.x",
     "quilts[slot].body.setLocalPosition",
     "const makeSofaSeat=()=>",

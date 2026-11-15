@@ -2438,7 +2438,7 @@ function boot() {
     }
     const activeFridge=alexFridge||miraFridge;
     fridgeOpen=activeFridge?activeFridge.doorOpen:closeFridgeDoor(fridgeOpen,animDt);
-    fridgeHinge.setEulerAngles(0,FRIDGE_LAYOUT.doorAngle*fridgeOpen,0);
+    fridgeHinge.setLocalEulerAngles(0,FRIDGE_LAYOUT.doorAngle*fridgeOpen,0);
     const shelfFood=activeFridge?.shelfFood||0;
     fridgeFood.enabled=shelfFood>.012;
     if(fridgeFood.enabled)fridgeFood.setLocalScale(.20*shelfFood,.18*shelfFood,.20*shelfFood);

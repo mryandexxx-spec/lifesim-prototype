@@ -22,7 +22,8 @@ test('1.0s: furniture labels hidden by default, reversible via side control',()=
   assert.match(src,/localStorage.setItem\(ITEM_LABELS_PREF/);
 });
 test('1.0u: hidden labels do not remove depth-aware furniture tap actions',()=>{
-  assert.match(src,/const movedVolumes=\[\];/);
+  assert.match(src,/const hitVolumes=\[\];/);
+  assert.match(src,/const movedVolumes=hitVolumes\.map\(volume=>/);
   assert.match(src,/const touchBox=\(id,name,x,y,z,sx,sy,sz,material\)=>/);
   assert.match(src,/return pickWorldRayTarget\(near,far,\[\.\.\.residents,\.\.\.movedVolumes,\.\.\.blockers\]\)/);
   assert.match(src,/else if\(target\?\.kind==='object'\)select\(target.id\)/);
