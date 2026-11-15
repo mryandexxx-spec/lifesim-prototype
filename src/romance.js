@@ -59,11 +59,10 @@ export function restoreRomanceState(raw,ids,lastAt=null){
     if(since!==null&&COMMITTED.has(bond.status)){
       const dating={status:'dating',since,ex:former,lastEndedAt:ended,
         careDays:careFrom(bond.careDays,ids,Math.floor(since/1440))};
+      // Validate the engagement on its own merits. A forged wedding must
+      // never erase a genuine engagement that preceded it.
       const engagedAt=time(bond.engagedAt)&&bond.engagedAt>=since&&
-        bond.engagedAt<=horizon&&
-        (bond.status!=='married'||!time(bond.marriedAt)||
-          bond.engagedAt<=bond.marriedAt)
-        ?bond.engagedAt:null;
+        bond.engagedAt<=horizon?bond.engagedAt:null;
       const marriedAt=time(bond.marriedAt)&&engagedAt!==null&&
         bond.marriedAt>=engagedAt&&bond.marriedAt<=horizon
         ?bond.marriedAt:null;
