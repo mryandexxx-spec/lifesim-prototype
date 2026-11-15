@@ -10,7 +10,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes,socialCommunicationNotes} from './social-graph.js';
 import {latestEpisodes} from './social-episodes.js';
 import {pairDynamic} from './social-dynamics.js';
-import {romanceStatus} from './romance.js';
+import {romanceStatus,romanceLoveDescription} from './romance.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
@@ -1552,6 +1552,8 @@ function boot() {
       $('relationship-branch').textContent=branchStatus.label;
       $('romance-status').textContent=romanceStatus(game.socialGraph,game.selectedSim,
         game.selectedSim==='alex'?'mira':'alex');
+      $('romance-depth').textContent=romanceLoveDescription(game.socialGraph,
+        game.selectedSim,game.selectedSim==='alex'?'mira':'alex');
       if(socialMenuCategory)renderSocialMenu(false);
       renderQueuePanel(false);
       if(branchPicker||game.socialAction?.branchAction||!$('branch-panel').hidden)

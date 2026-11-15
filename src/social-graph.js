@@ -138,11 +138,13 @@ export function observePairViews(graph,idA,idB,views){
 }
 const POSITIVE=new Set(['talk','conversation.talk','gift.accepted','leisure.accepted',
   'acquaint.chat','friend.tease','friend.confide','rival.truce',
-  'romance.flirt','romance.confess','romance.date']);
+  'romance.flirt','romance.confess','romance.date',
+  'romance.tender','romance.propose','romance.marry']);
 const NEGATIVE=new Set(['argue','conversation.argue','gift.refused','leisure.refused',
   'rival.taunt','friend.tease.refused','friend.confide.refused','rival.truce.refused','acquaint.chat.refused',
   'romance.flirt.refused','romance.confess.refused',
-  'romance.date.refused','romance.breakup']);
+  'romance.date.refused','romance.breakup','romance.divorce',
+  'romance.tender.refused','romance.propose.refused','romance.marry.refused']);
 const TYPES=new Set([...POSITIVE,...NEGATIVE,'introduced']);
 const positive=type=>POSITIVE.has(type);
 const weights={
@@ -157,6 +159,9 @@ const weights={
   'romance.flirt':{friendship:1,trust:1,tension:-1},
   'romance.confess':{friendship:2,trust:2,tension:-1},
   'romance.date':{friendship:2,trust:2,tension:-1},
+  'romance.tender':{friendship:1,trust:2,tension:-1},
+  'romance.propose':{friendship:2,trust:2,tension:-1},
+  'romance.marry':{friendship:2,trust:2,tension:-1},
   argue:{friendship:-9,trust:-9,tension:12},
   'conversation.argue':{friendship:-9,trust:-9,tension:12},
   'gift.refused':{friendship:-2,trust:-3,tension:4},
@@ -169,7 +174,11 @@ const weights={
   'romance.flirt.refused':{friendship:0,trust:-1,tension:1},
   'romance.confess.refused':{friendship:0,trust:-2,tension:2},
   'romance.date.refused':{friendship:0,trust:-1,tension:1},
-  'romance.breakup':{friendship:0,trust:-1,tension:1}
+  'romance.breakup':{friendship:0,trust:-1,tension:1},
+  'romance.divorce':{friendship:0,trust:-1,tension:1},
+  'romance.tender.refused':{friendship:0,trust:-1,tension:1},
+  'romance.propose.refused':{friendship:0,trust:-1,tension:1},
+  'romance.marry.refused':{friendship:0,trust:-1,tension:1}
 };
 function recompute(pair){
   const [a,b]=pair.ids,v=pair.views;
@@ -203,11 +212,12 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
     event.actorId===event.targetId||!Number.isSafeInteger(graph?.nextSeq))return null;
   const romanceEvent=ROMANCE_ACTION_IDS.some(id=>
     event.type===id||event.type===id+'.refused');
-  if(romanceEvent&&event.type!=='romance.breakup'&&
+  if(romanceEvent&&!['romance.breakup','romance.divorce'].includes(event.type)&&
     !romanceSafety(graph,event.actorId,event.targetId).allowed)return null;
   // A canonical relationship milestone must be eligible even when written by
   // a headless client directly; otherwise an event could bypass consent gates.
-  if(['romance.date','romance.breakup'].includes(event.type)&&
+  if(['romance.date','romance.tender','romance.propose','romance.marry',
+    'romance.breakup','romance.divorce'].includes(event.type)&&
     !romanceAvailability(graph,event.actorId,event.targetId,event.type,event.at).enabled)
     return null;
   const pair=getOrCreatePair(graph,event.actorId,event.targetId);
@@ -278,7 +288,11 @@ export const BRANCH_ACTIONS=Object.freeze({
   'romance.flirt':action('Осторожно пофлиртовать','romance','Пока рано для флирта'),
   'romance.confess':action('Признаться в симпатии','romance','Нужна взаимная симпатия'),
   'romance.date':action('Предложить встречаться','romance','Необходимы взаимные чувства'),
-  'romance.breakup':action('Расстаться','romance','Вы пока не пара')
+  'romance.breakup':action('Расстаться','romance','Вы пока не пара'),
+  'romance.tender':action('Сказать нежные слова','romance','Сначала нужно стать парой'),
+  'romance.propose':action('Предложить помолвку','romance','Нужна крепкая взаимная любовь'),
+  'romance.marry':action('Обменяться брачными обещаниями','romance','Нужно время после помолвки'),
+  'romance.divorce':action('Оформить развод','romance','Вы пока не супруги')
 });
 export function availableSocialActions(graph,a,b,minutes=0){
   if(!validPersonId(a)||!validPersonId(b)||a===b||
@@ -287,7 +301,9 @@ export function availableSocialActions(graph,a,b,minutes=0){
   return Object.entries(BRANCH_ACTIONS).map(([id,def])=>{
     if(ROMANCE_ACTION_IDS.includes(id)){
       const decision=romanceAvailability(graph,a,b,id,minutes);
-      return {id,label:def.label,category:def.category,enabled:decision.enabled,
+      const label=id==='romance.breakup'&&pair?.romance?.bond?.status==='engaged'
+        ?'Разорвать помолвку':def.label;
+      return {id,label,category:def.category,enabled:decision.enabled,
         reason:decision.reason};
     }
     const enabled=id==='acquaint.introduce'?!status.met:
@@ -312,11 +328,11 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
     compatibilityBias:context.compatibilityBias??0
   });
   if(!reaction)return null;
-  if(id==='romance.breakup'){
-    // A resident may leave a relationship independently. A partner may be
-    // hurt or relieved, but cannot veto the separation.
+  if(['romance.breakup','romance.divorce'].includes(id)){
+    // Ending a union is never a partner-vetoed request.
     return {accepted:true,type:id,id,outcome:reaction.score>=55?'awkward':'defensive',
-      intensity:reaction.intensity,label:'Больше не встречаются'};
+      intensity:reaction.intensity,
+      label:id==='romance.divorce'?'Брак завершён':'Решили больше не быть парой'};
   }
   const isRomance=ROMANCE_ACTION_IDS.includes(id);
   // A romance request is a verbal invitation, not a forced physical act.
@@ -332,7 +348,10 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
   return {accepted,type,id,outcome:isRomance&&!accepted?'refused':reaction.outcome,
     intensity:reaction.intensity,label:isRomance
       ?accepted?id==='romance.flirt'?'Ответил(а) на флирт':
-        id==='romance.date'?'Решили встречаться':'Чувства приняты'
+        id==='romance.date'?'Решили встречаться':
+        id==='romance.tender'?'Оценил(а) нежность':
+        id==='romance.propose'?'Обручились':
+        id==='romance.marry'?'Стали супругами':'Чувства приняты'
         :'Собеседник предпочёл сохранить дистанцию'
       :accepted?
     id==='friend.tease'?'Шутку оценили':id==='friend.confide'?'Секрет принят':
@@ -382,7 +401,7 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
       p.events=Array.isArray(entry.events)?entry.events.filter(e=>record(e)&&
         Number.isSafeInteger(e.seq)&&e.seq>0&&e.seq<graph.nextSeq&&
         TYPES.has(e.type)&&safeAt(e.at)&&
-        (e.type==='romance.breakup'||
+        (['romance.breakup','romance.divorce'].includes(e.type)||
           !ROMANCE_ACTION_IDS.some(id=>e.type===id||e.type===id+'.refused')||
           romanceSafety(graph,e.actorId,e.targetId).allowed)&&
         e.actorId!==e.targetId&&
@@ -406,8 +425,13 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
     const bond=pair.romance?.bond;
     if(bond?.status!=='dating')continue;
     if(!romanceSafety(graph,...pair.ids).allowed||
-      pair.lastAt===null||!safeAt(bond.since)||
-      bond.since>pair.lastAt||pair.ids.some(id=>occupied.has(id))){
+      pair.lastAt===null||!safeAt(bond.since)||bond.since>pair.lastAt||
+      (bond.status==='engaged'&&(!safeAt(bond.engagedAt)||
+        bond.engagedAt>pair.lastAt))||
+      (bond.status==='married'&&(!safeAt(bond.engagedAt)||
+        !safeAt(bond.marriedAt)||bond.marriedAt>pair.lastAt||
+        bond.engagedAt>bond.marriedAt))||
+      pair.ids.some(id=>occupied.has(id))){
       pair.romance.bond={status:'none',since:null,ex:false,lastEndedAt:null};
     }else for(const id of pair.ids)occupied.add(id);
   }

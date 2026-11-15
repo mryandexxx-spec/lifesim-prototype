@@ -235,27 +235,34 @@ export function tickSocial(root,minutes){
           get(root,s.initiator)?.personality).bias});
     if(!response){root.socialAction=null;return false;}
     s.branchAction.resultType=response.type;
-    if(s.branchAction.id==='romance.date'||s.branchAction.id==='romance.breakup'){
-      // Pair commitments are a separate, explicitly completed graph milestone.
-      // Neither accepting a date nor voluntarily separating fabricates a
-      // generic talk memory, shared-affinity gain or an argument.
+    if(['romance.date','romance.breakup','romance.tender',
+      'romance.propose','romance.marry','romance.divorce'].includes(s.branchAction.id)){
+      // A commitment or loving gesture is a verified canonical milestone,
+      // never a fake generic talk, quarrel or automatic affinity reward.
       const completed=recordPairCompletion(root,s,response.type);
       root.socialAction=null;
       if(!completed)return false;
       root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
-      const dating=response.type==='romance.date';
-      const separated=response.type==='romance.breakup';
-      get(root,s.initiator).event=dating?'Теперь встречаются':
-        separated?'Решил(а) завершить отношения':'Уважает отказ';
-      get(root,s.partner).event=dating?'Теперь встречаются':
-        separated?'Отношения закончились':'Предпочёл(ла) подождать';
+      const accepted=response.accepted;
+      const separated=['romance.breakup','romance.divorce'].includes(response.type);
+      const notices={
+        'romance.date':'Теперь встречаются',
+        'romance.tender':'Проявил(а) нежность',
+        'romance.propose':'Обручились',
+        'romance.marry':'Стали супругами',
+        'romance.breakup':'Завершил(а) отношения',
+        'romance.divorce':'Брак завершён'
+      };
+      get(root,s.initiator).event=notices[response.type]||'Уважает отказ';
+      get(root,s.partner).event=notices[response.type]||
+        'Предпочёл(ла) сохранить дистанцию';
       for(const id of [s.initiator,s.partner])
         get(root,id).autonomy.nextAt=root.minutes+15;
       emitSocialReaction(root,{actorId:s.initiator,responderId:s.partner,
         outcome:response.outcome,intensity:response.intensity,
         eventType:'branch.reply'});
       emitSocialReaction(root,{actorId:s.partner,responderId:s.initiator,
-        outcome:dating?'warm':separated?'awkward':'awkward',
+        outcome:separated?'awkward':accepted?'warm':'awkward',
         eventType:'branch.initiator'});
       return true;
     }
