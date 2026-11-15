@@ -133,6 +133,7 @@ function scheduleCommand(command,residentId=game.selectedSim){
   if(!task){toast('Не удалось добавить: очередь заполнена или действие недоступно');return false;}
   toast(getActorName(residentId)+': запланировано — '+taskLabel({...task,residentId}));
   renderQueuePanel(true);
+  save(true);
   return true;
 }
 function queuedSocial(kind,extra={}){
@@ -155,7 +156,7 @@ $('wish-do-btn').addEventListener('click', () => {
   const id = selectedActor().mind?.wish?.id;
   if (id && scheduleCommand({type:'object',actionId:id})) {
     closeMindPanel();
-    toast(selectedName()+' исполняет желание: ' + WISHES[id].label.toLowerCase());
+    toast(selectedName()+': в очереди желание — '+WISHES[id].label.toLowerCase());
   }
 });
 function select(id) {
@@ -206,7 +207,8 @@ function showSocialCategory(category){
     sharedPicker=true;select(null);closeMindPanel();renderSharedPanel();return;
   }
   socialMenuCategory=category;
-  select(null);closeMindPanel();renderSocialMenu();
+  select(null);closeMindPanel();
+  renderConversationPanel();renderSharedPanel();renderSocialMenu();
 }
 for(const [id,category] of [
   ['conversation-btn','conversation'],['humor-btn','humor'],
@@ -325,7 +327,8 @@ function renderQueuePanel(force=true){
       if(social&&(social.initiator===residentId||social.partner===residentId))
         cancelSocial(game);
       else getActor(game,residentId).action=null;
-      renderQueuePanel(true);
+      getActor(game,residentId).event='Действие прервано по команде игрока';
+      renderQueuePanel(true);save(true);
       toast('Текущее действие остановлено по твоей команде');
     });
     activeEl.append(stop);
@@ -846,21 +849,21 @@ function boot() {
     paths[actorId]={points,index:0,id};
     return true;
   }
-  beginAction=(id,automatic=false,actorId=game.selectedSim)=>{
+  beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
     // physical cubicle: the prior user must finish dressing and exiting first.
     if(id==='shower'&&HOUSEHOLD_IDS.some(other=>other!==actorId&&showerStates[other].active)){
-      if(!automatic)toast('Душевая пока занята: житель выходит');
+      if(!automatic&&!fromQueue)toast('Душевая пока занята: житель выходит');
       return false;
     }
     if(!furnitureAvailable(game,id,actorId)){
-      if(!automatic)toast('Предмет сейчас занят другим жителем');
+      if(!automatic&&!fromQueue)toast('Предмет сейчас занят другим жителем');
       return false;
     }
     if(!buildRoute(id,actorId)){
-      if(!automatic) toast(getActorName(actorId)+' не может добраться до предмета');
+      if(!automatic&&!fromQueue) toast(getActorName(actorId)+' не может добраться до предмета');
       else actor.autonomy.nextAt=game.minutes+15;
       return false;
     }
@@ -870,9 +873,9 @@ function boot() {
   };
 
   // Meet beside the other resident at a walkable, reachable point.
-  beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null,branchId=null)=>{
+  beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null,branchId=null,fromQueue=false)=>{
     if(!canStartSocial(game,kind,actorId,automatic)){
-      if(!automatic)toast('Собеседник занят или разговор уже идёт');
+      if(!automatic&&!fromQueue)toast('Собеседник занят или разговор уже идёт');
       return false;
     }
     const self=getActor(game,actorId), partner=getActor(game,actorId==='alex'?'mira':'alex');
@@ -886,7 +889,7 @@ function boot() {
       for(const point of points){len+=Math.hypot(point.x-previous.x,point.z-previous.z);previous=point;}
       if(len<bestLength){best={goal,points};bestLength=len;}
     }
-    if(!best){if(!automatic)toast('Сейчас не получается подойти к собеседнику');return false;}
+    if(!best){if(!automatic&&!fromQueue)toast('Сейчас не получается подойти к собеседнику');return false;}
     if(!(branchId?startBranchSocial(game,actorId,best.goal,branchId)
       :shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId)
       :topic?startConversation(game,actorId,best.goal,topic)
@@ -932,16 +935,16 @@ function boot() {
       },
       start(residentId,command){
         if(command.type==='object')
-          return beginAction(command.actionId,false,residentId);
+          return beginAction(command.actionId,false,residentId,true);
         if(command.type==='social')
-          return beginSocial(command.actionId,false,residentId);
+          return beginSocial(command.actionId,false,residentId,null,null,null,true);
         if(command.type==='conversation')
-          return beginSocial('talk',false,residentId,command.topicId);
+          return beginSocial('talk',false,residentId,command.topicId,null,null,true);
         if(command.type==='branch')
-          return beginSocial('talk',false,residentId,null,null,command.actionId);
+          return beginSocial('talk',false,residentId,null,null,command.actionId,true);
         if(command.type==='shared')
           return beginSocial('talk',false,residentId,null,
-            {mode:command.mode,choiceId:command.choiceId});
+            {mode:command.mode,choiceId:command.choiceId},null,true);
         return false;
       }
     });

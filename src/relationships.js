@@ -237,7 +237,9 @@ export function autonomousSocialChoice(root,id='alex') {
   if(!validId(id)||!root.relationship||!root.autonomy.enabled||
     root.minutes<540||root.minutes<root.relationship.nextSocialAt||root.socialAction||root.paused)return null;
   const self=get(root,id),partner=get(root,otherId(id));
-  if(!self||!partner||self.action||partner.action)return null;
+  if(!self||!partner||self.action||partner.action||
+    root.actionQueues?.byResident?.[id]?.length||
+    root.actionQueues?.byResident?.[otherId(id)]?.length)return null;
   if(Math.min(self.needs.energy,self.needs.hunger,self.needs.hygiene,
     partner.needs.energy,partner.needs.hunger,partner.needs.hygiene)<40)return null;
   // The one who started the last quarrel may initiate making peace
