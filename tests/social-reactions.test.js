@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {socialCompatibility} from '../src/social-compatibility.js';
 import {evaluateSocialReaction,socialReactionContext,socialImpressionFactor,
   SOCIAL_REACTION_KINDS} from '../src/social-reactions.js';
 import {newSocialGraph,getOrCreatePair,resolveBranchResponse} from '../src/social-graph.js';
@@ -118,22 +119,23 @@ test('direct legacy talk and argument cannot be blocked by mood, but memory impr
 
 test('legacy adapters agree with the shared reaction interpreter without changing saved session format',()=>{
   const root=newHousehold();
+  const compatibilityBias=socialCompatibility(root.otherSim.personality,root.personality).bias;
   const response=evaluateResponse(root,'alex','support','support.listen');
   const same=evaluateSocialReaction({
     kind:'conversation',recipient:root.otherSim,
     view:root.relationship.views.mira,minutes:root.minutes,
-    tag:'socializing',tone:'warm',weight:4
+    tag:'socializing',tone:'warm',weight:4,compatibilityBias
   });
   assert.deepEqual(response,{accepted:same.accepted,confidence:same.confidence});
   const gift=evaluateGift(root,'alex',{type:'postcard'});
   const sameGift=evaluateSocialReaction({
     kind:'gift',recipient:root.otherSim,view:root.relationship.views.mira,
-    minutes:root.minutes,tag:'music'
+    minutes:root.minutes,tag:'music',compatibilityBias
   });
   assert.equal(gift.accepted,sameGift.accepted);
   assert.equal(evaluateLeisure(root,'alex','music').accepted,evaluateSocialReaction({
     kind:'leisure',recipient:root.otherSim,view:root.relationship.views.mira,
-    minutes:root.minutes,tag:'music'
+    minutes:root.minutes,tag:'music',compatibilityBias
   }).accepted);
   const old=JSON.parse(JSON.stringify(root));
   delete old.actionQueues;delete old.socialGraph;
