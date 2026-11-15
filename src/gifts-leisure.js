@@ -27,8 +27,9 @@ const other=id=>id==='alex'?'mira':'alex';
 const actor=(root,id)=>id==='mira'?root.otherSim:root;
 const has=(catalog,id)=>typeof id==='string'&&Object.hasOwn(catalog,id);
 export function starterInventory(){
-  return {alex:[{id:'a1',type:'book'},{id:'a2',type:'sketch'}],
-    mira:[{id:'m1',type:'postcard'},{id:'m2',type:'boardgame'}]};
+  // Each person starts with a thoughtful gift matching the OTHER's interests.
+  return {alex:[{id:'a1',type:'postcard'},{id:'a2',type:'sketch'}],
+    mira:[{id:'m1',type:'book'},{id:'m2',type:'boardgame'}]};
 }
 /** Missing inventory is an OLD v1 save; a present empty inventory stays empty.
  * Strict whitelist, de-duplication across both owners and bounded arrays.
