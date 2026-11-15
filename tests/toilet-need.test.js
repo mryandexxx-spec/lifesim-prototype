@@ -13,6 +13,7 @@ import {ROOM,FURNITURE,isWalkable,nearestWalkable,findPath,isClearLine} from '..
 import {refreshMind,calculateMood,MEMORY_TEXT} from '../src/psychology.js';
 import {NEED_LABELS,moodReasons} from '../src/mood-presentation.js';
 import {moodActionPolicy} from '../src/mood-action-policy.js';
+import {environmentSnapshot} from '../src/environment-effects.js';
 import {newActionQueues,enqueueAction,pendingActions,
   restoreActionQueues,dispatchActionQueues} from '../src/action-queue.js';
 import {activityReceipt} from '../src/sim-events.js';
@@ -263,8 +264,8 @@ test('M4: severe bladder need lowers the one canonical mood, explains its cause'
   s.needs.bladder=3;refreshMind(s);
   assert.ok(s.mind.mood.value<good);
   assert.ok(moodReasons(s).includes('Срочно нужно в туалет'));
-  assert.equal(calculateMood(s.needs,s.mind,s.minutes,s.personality).value,
-    s.mind.mood.value);
+  assert.equal(calculateMood(s.needs,s.mind,s.minutes,s.personality,
+    environmentSnapshot(s).delta).value,s.mind.mood.value);
 });
 
 test('M4: restored running toilet keeps exact elapsed and needs, without a second save schema',()=>{

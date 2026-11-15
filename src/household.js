@@ -43,6 +43,7 @@ export function newHousehold() {
   state.actionQueues=newActionQueues(HOUSEHOLD_IDS);
   // F0 optional v1 extension; each piece has its own immutable instanceId.
   state.world={furniture:newFurnitureWorld()};
+  refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
   return state;
 }
@@ -97,6 +98,9 @@ export function loadHousehold(raw) {
   if(!raw.socialGraph||!Object.hasOwn(raw.socialGraph,'lifeStages'))
     for(const id of HOUSEHOLD_IDS)setLifeStage(root.socialGraph,id,'adult');
   root.socialAction=loadSocialAction(raw.socialAction,root);
+  // F0 committed furniture is now a first-class ambient mood input for both
+  // residents; no ambient field or fabricated memory is persisted.
+  refreshMind(root,root.world);refreshMind(mira,root.world);
   // Legacy v1 had no bedSlot. Keep valid reservations first, then assign
   // any remaining sleepers a distinct free half by actual route distance.
   // No preference or ownership of a bed side by Alex or Mira.
@@ -209,8 +213,8 @@ export function tickHousehold(root,minutes) {
   other.paused=root.paused;
   other.speed=root.speed;
   other.autonomy.enabled=root.autonomy.enabled;
-  tick(root,minutes);
-  tick(other,minutes);
+  tick(root,minutes,root.world);
+  tick(other,minutes,root.world);
   // Both clocks remain identical (including when paused).
   other.minutes=root.minutes;
   tickSocial(root,minutes);

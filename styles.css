@@ -573,6 +573,8 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .insight-summary{font-size:13px;line-height:1.45;color:#3c7155;
  font-weight:800;margin:7px 0 10px;}
 .insight-causes{display:grid;gap:6px;}
+#insight-environment{margin-top:8px;padding-top:8px;border-top:1px solid #d9e5db;}
+#insight-environment[hidden]{display:none!important;}
 .insight-cause{display:flex;gap:9px;align-items:center;padding:9px 11px;
  border:1px solid #e0eee3;background:#f1f8f1;border-radius:11px;min-width:0;}
 .insight-cause-symbol{font-size:23px;color:#479078;flex:0 0 30px;text-align:center;}

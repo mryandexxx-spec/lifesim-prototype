@@ -3,6 +3,7 @@
  */
 import {visibleEmotions} from './emotion-engine.js';
 import {reactionBadgePoint} from './social-feedback.js';
+import {environmentSnapshot} from './environment-effects.js';
 
 const clamp=value=>Number.isFinite(value)?Math.max(0,Math.min(100,value)):50;
 export const NEED_LABELS=Object.freeze({
@@ -42,7 +43,7 @@ const NEED_REASONS=Object.freeze({
 /** Causes only from validated needs and *actual* stored emotion receipts;
  * never claim a fictional event or invent a seventh need.
  */
-export function moodReasons(resident,{limit=3}={}){
+export function moodReasons(resident,{limit=3,world=resident?.world??null}={}){
   const max=Number.isInteger(limit)?Math.max(0,Math.min(limit,3)):3;
   const needs=resident?.needs||{};
   const reasons=Object.keys(NEED_REASONS)
@@ -55,15 +56,17 @@ export function moodReasons(resident,{limit=3}={}){
     if(!reasons.includes(emotion.cause))reasons.push(emotion.cause);
   }
   if(reasons.length===0){
-    if(Object.keys(NEED_REASONS).every(key=>Number.isFinite(needs[key])&&needs[key]>=75))
+    const atmosphere=environmentSnapshot(resident,world).causes;
+    if(atmosphere.length)reasons.push(atmosphere[0].title);
+    else if(Object.keys(NEED_REASONS).every(key=>Number.isFinite(needs[key])&&needs[key]>=75))
       reasons.push('Основные потребности удовлетворены');
     else reasons.push('Сейчас нет сильных переживаний');
   }
   return reasons.slice(0,max);
 }
-export function moodPresentation(resident){
+export function moodPresentation(resident,world=resident?.world??null){
   const band=moodTone(resident?.mind?.mood?.value);
-  return {...band,description:moodReasons(resident).join(' · ')};
+  return {...band,description:moodReasons(resident,{world}).join(' · ')};
 }
 /** Same tested camera-space safety as ephemeral reactions; the UI uses a
  * separate head offset and hides while a real social response is showing.

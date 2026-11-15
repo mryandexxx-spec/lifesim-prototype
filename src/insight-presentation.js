@@ -5,6 +5,7 @@ import {moodReasons,needPresentation,NEED_LABELS} from './mood-presentation.js';
 import {visibleEmotions} from './emotion-engine.js';
 import {latestSentiments} from './social-perspective.js';
 import {SOCIAL_OUTCOME_LABELS} from './social-feedback.js';
+import {environmentSnapshot} from './environment-effects.js';
 
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 const cleanName=(value,other='Житель')=>
@@ -28,13 +29,17 @@ const needHighlights=resident=>Object.entries(NEED_LABELS)
  */
 export function residentMoodInsight(resident,{
   residentName='Житель',partnerName=null,
-  relationLabel=null,perspective=null
+  relationLabel=null,perspective=null,world=resident?.world??null
 }={}){
   const name=cleanName(residentName);
   const emotions=visibleEmotions(resident?.mind,resident?.minutes,resident?.personality)
     .filter(e=>e.intensity>=20).slice(0,2);
-  const reasons=moodReasons(resident);
+  const reasons=moodReasons(resident,{world});
   const needs=needHighlights(resident);
+  const environment=environmentSnapshot(resident,world).causes.slice(0,2).map(c=>({
+    type:'environment',symbol:c.symbol,title:c.title,detail:c.detail,
+    direction:c.delta<0?'negative':'positive'
+  }));
   const feeling=emotions.length?{
     type:'feeling',symbol:emotions[0].icon,title:emotions[0].label,
     detail:'Причина: '+emotions[0].cause
@@ -54,6 +59,7 @@ export function residentMoodInsight(resident,{
       ?resident.mind.mood.label:'Спокоен',
     summary:reasons[0]||'Сейчас нет сильных переживаний',
     needs,
+    environment,
     feeling,
     relation,
     reasons:reasons.slice(0,3),
@@ -61,6 +67,8 @@ export function residentMoodInsight(resident,{
     // Use a summary worded as an observation, not a deterministic promise.
     guidance:needs.length?'Сначала можно позаботиться о потребностях':
       feeling?'Недавние события отражаются на настроении':
+      environment.some(e=>e.direction==='negative')?'В проходах тесновато':
+      environment.length?'Обстановка немного влияет на настроение':
       'Сейчас нет явных причин для беспокойства'
   };
 }

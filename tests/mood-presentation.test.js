@@ -36,7 +36,7 @@ test('M1 reasons come from current needs and canonically validated emotions',()=
   assert.equal(JSON.stringify(s),before,'render views must be read-only');
   s.needs={hunger:95,energy:96,hygiene:88,fun:93,social:92,bladder:93};
   refreshMind(s);
-  assert.deepEqual(moodReasons(s),['Основные потребности удовлетворены']);
+  assert.ok(moodReasons(s).includes('Уютно возле дивана'));
 });
 
 test('M1 mood display does not trust forged saved labels or create imaginary memories',()=>{
@@ -95,7 +95,7 @@ test('M1 browser contracts are mobile-safe and reaction layer independent',()=>{
   assert.match(game,/reactionBadges\.count\(\)>0/);
   assert.match(game,/showerStates\[game\.selectedSim\]\?\.active/);
   assert.match(game,/moodOrbitPoint\(camera\.camera\.worldToScreen/);
-  assert.match(game,/moodView=moodPresentation\(current\)/);
+  assert.match(game,/moodView=moodPresentation\(current,game\.world\)/);
   assert.match(workflow,/npm test/);
   assert.doesNotMatch(workflow,/deploy-pages|upload-pages|pages: write/);
 });

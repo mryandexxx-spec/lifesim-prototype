@@ -4,6 +4,7 @@
  */
 import {calculateMood} from './psychology.js';
 import {deriveAxes} from './trait-catalog.js';
+import {environmentSnapshot} from './environment-effects.js';
 
 const clamp=(value,lo,hi)=>Math.max(lo,Math.min(hi,value));
 const safeNeeds=needs=>Object.fromEntries(['hunger','energy','hygiene','fun','social','bladder']
@@ -41,7 +42,8 @@ export function moodActionPolicy(resident,command,options={}){
   const needs=safeNeeds(resident?.needs);
   const mind=record(resident?.mind)?resident.mind:{memories:[],emotions:[]};
   const minutes=Number.isFinite(resident?.minutes)?Math.max(0,resident.minutes):480;
-  const mood=calculateMood(needs,mind,minutes,resident?.personality).value;
+  const mood=calculateMood(needs,mind,minutes,resident?.personality,
+    environmentSnapshot(resident,options.world??resident?.world??null).delta).value;
   const personality=deriveAxes(resident?.personality);
   const threshold=effortThreshold(command,options);
   // A very depleted person does not force themselves into optional work merely
