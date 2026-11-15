@@ -10,6 +10,7 @@ import {newActionQueues,enqueueAction,pendingActions,dispatchActionQueues,
   restoreActionQueues,removeQueuedAction} from '../src/action-queue.js';
 import {startSharedSocial,arriveSocial} from '../src/relationships.js';
 import {LEISURE_CATALOG} from '../src/gifts-leisure.js';
+import {NEED_DECAY_PER_MINUTE} from '../src/need-balance.js';
 
 const clone=v=>JSON.parse(JSON.stringify(v));
 const point={x:-.2,z:1.85};
@@ -109,7 +110,7 @@ test('M2: sofa experience changes fun gain but never movement or fixed action du
     arrive(s);assert.equal(s.action.phase,'using');
     const before=s.needs.fun;
     tick(s,1);
-    return {s,gained:s.needs.fun-before+.094};
+    return {s,gained:s.needs.fun-before+NEED_DECAY_PER_MINUTE.fun};
   };
   const low=make(8,12,17),high=make(94,94,94);
   assert.ok(high.gained>low.gained+0.07);
@@ -124,7 +125,7 @@ test('M2: essential sleeping gets exactly original benefit regardless of bad moo
   assert.equal(chooseAction(s,'bed'),true);arrive(s);
   const before=s.needs.energy;
   tick(s,5);
-  assert.ok(Math.abs(s.needs.energy-(before+5*(.74-.085)))<1e-6);
+  assert.ok(Math.abs(s.needs.energy-(before+5*(.74-NEED_DECAY_PER_MINUTE.energy)))<1e-6);
   assert.equal(s.action.elapsed,5);
 });
 
