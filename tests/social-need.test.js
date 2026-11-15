@@ -323,3 +323,28 @@ test('M3: browser HUD has fifth need, compact layout, and required dialogue stil
   assert.match(workflow,/npm test/);
   assert.doesNotMatch(workflow,/deploy-pages|upload-pages|pages: write/);
 });
+
+test('1.0t release bundles the fifth need and preserves the 1.0s contextual iPhone UX',()=>{
+  const yml=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const css=readFileSync(new URL('../styles.css',import.meta.url),'utf8');
+  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
+  const lock=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url),'utf8'));
+  assert.match(yml,/node --check src\/social-need\.js/);
+  assert.match(yml,/cp src\/social-need\.js site\/src\//);
+  assert.match(yml,/cp src\/mood-action-policy\.js site\/src\//);
+  assert.match(yml,/src\/world-interactions\.js/);
+  assert.match(html,/сборка \/ 1\.0t/);
+  assert.match(html,/styles\.css\?v=1\.0t/);
+  assert.match(html,/src\/game\.js\?v=1\.0t/);
+  assert.match(html,/id="bar-social"/);
+  assert.match(html,/id="mood-overview"/);
+  assert.match(html,/id="item-labels-btn"/);
+  assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(game,/dialogueNeedsDecision\(game\)/);
+  assert.match(game,/pickWorldTarget\(/);
+  assert.equal(pkg.version,'1.0.0-alpha.20');
+  assert.equal(lock.version,pkg.version);
+  assert.equal(lock.packages[''].version,pkg.version);
+});
