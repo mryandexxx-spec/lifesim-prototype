@@ -2,10 +2,12 @@
 import { createMind, restoreMind, refreshMind, rememberAction, psychologyScore } from './psychology.js';
 import {DEMO_PROFILES,restoreProfile} from './trait-catalog.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
+import {SOCIAL_NEED_INITIAL,SOCIAL_NEED_LEGACY_DEFAULT,socialNeedDecayRate} from './social-need.js';
 import {validBedSlot,BED_SLOTS} from './bed-layout.js';
 import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
-export const NEEDS = ['hunger', 'energy', 'hygiene', 'fun'];
+export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun']);
+export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
   bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
   fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
@@ -20,7 +22,7 @@ const clamp = value => Math.max(0, Math.min(100, value));
 export function newGame(profile=DEMO_PROFILES.first) {
   const state = {
     version: 1, minutes: 8 * 60, speed: 1, paused: false,
-    needs: { hunger: 78, energy: 67, hygiene: 82, fun: 58 },
+    needs: { hunger: 78, energy: 67, hygiene: 82, fun: 58, social:SOCIAL_NEED_INITIAL },
     position: { x: -0.25, z: 0.35 }, action: null, event: 'Свободное время',
     autonomy: { nextAt: 480, enabled: true },
     personality:restoreProfile(profile,DEMO_PROFILES.first),
@@ -36,6 +38,9 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
   next.personality=restoreProfile(data.personality,profileFallback);
   next.minutes = Math.max(0, Math.min(data.minutes, 10000000));
   for (const key of NEEDS) if (Number.isFinite(data.needs[key])) next.needs[key] = clamp(data.needs[key]);
+  // Missing field in a pre-M3 v1 save is neutral, never a fabricated
+  // completed conversation, a reset of progress, or sudden isolation.
+  if (!Number.isFinite(data.needs.social)) next.needs.social=SOCIAL_NEED_LEGACY_DEFAULT;
   if (Number.isFinite(data.position.x) && Number.isFinite(data.position.z)) {
     next.position.x = Math.max(-4.5, Math.min(4.5, data.position.x));
     next.position.z = Math.max(-3.7, Math.min(3.7, data.position.z));
@@ -93,7 +98,10 @@ export function arrive(state) {
 export function tick(state, minutes) {
   if (state.paused || !Number.isFinite(minutes) || minutes <= 0) return;
   state.minutes += minutes;
-  for (const need of NEEDS) state.needs[need] = clamp(state.needs[need] - DECAY[need] * minutes);
+  for (const need of PHYSICAL_NEEDS) state.needs[need] = clamp(state.needs[need] - DECAY[need] * minutes);
+  // Social fulfilment changes only on a newly confirmed social receipt.
+  const social=Number.isFinite(state.needs.social)?state.needs.social:SOCIAL_NEED_LEGACY_DEFAULT;
+  state.needs.social=clamp(social-socialNeedDecayRate(state.personality)*minutes);
   refreshMind(state);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
@@ -134,7 +142,9 @@ export function autonomousChoice(state) {
   if (state.paused || state.action || !state.autonomy.enabled || state.minutes < state.autonomy.nextAt) return null;
   const hour = Math.floor(state.minutes % 1440 / 60);
   const night = hour >= 22 || hour < 6;
-  const critical = Math.min(...NEEDS.map(id => state.needs[id])) < 24;
+  const critical = Math.min(...PHYSICAL_NEEDS.map(id => state.needs[id])) < 24;
+  // A lonely resident may still take care of basic needs or seek a real
+  // social interaction; there is deliberately no imaginary 'social sofa'.
   const wishReady = !critical && state.minutes >= 540;
   const options = [
     { id: 'fridge', need: 'hunger', threshold: 43, weight: 1.25 },

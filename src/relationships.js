@@ -1,5 +1,6 @@
 /** Headless two-person social relationship simulation. */
 import { refreshMind } from './psychology.js';
+import {creditCompletedSocialNeed} from './social-need.js';
 import {feelMemory} from './emotion-engine.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction} from './social-feedback.js';
@@ -149,10 +150,19 @@ function recordPairCompletion(root,session,type,token=null){
   if(!graph||!root.relationship?.views?.[a]||!root.relationship.views[b])return false;
   const views={[a]:root.relationship.views[a],[b]:root.relationship.views[b]};
   observePairViews(graph,a,b,views);
-  return applySocialEvent(graph,{
+  const committed=applySocialEvent(graph,{
     actorId:a,targetId:b,type,at:root.minutes,
     ...(typeof token==='string'?{token}:{})
   },{observedViews:views})||null;
+  // Only NEW canonical positive receipts can refill the fifth need:
+  // never queued, walked-to, refused, cancelled, reloaded or replayed.
+  // Household is only a two-resident adapter; the need function itself
+  // accepts arbitrary person IDs without referring to Alex or Mira.
+  if(committed&&creditCompletedSocialNeed({[a]:get(root,a),[b]:get(root,b)},committed)){
+    refreshMind(get(root,a));
+    refreshMind(get(root,b));
+  }
+  return committed;
 }
 export function arriveSocial(root) {
   if(root.socialAction?.phase!=='walking')return false;

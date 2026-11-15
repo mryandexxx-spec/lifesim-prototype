@@ -70,7 +70,8 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
 
 /** Mood is a derived snapshot, never trusted from localStorage. */
 export function calculateMood(needs, mind, minutes, personality = null) {
-  const values = [needs.hunger, needs.energy, needs.hygiene, needs.fun].map(x => clamp(finite(x) ? x : 50, 0, 100));
+  const values = [needs.hunger, needs.energy, needs.hygiene, needs.fun,
+    needs.social].map((x,i) => clamp(finite(x) ? x : i===4?75:50, 0, 100));
   const average = values.reduce((a, b) => a + b, 0) / values.length;
   const worst = Math.min(...values);
   const axes=deriveAxes(personality);
@@ -86,7 +87,7 @@ export function calculateMood(needs, mind, minutes, personality = null) {
   let label = 'Спокоен';
   if (worst < 20) {
     const lowest = values.indexOf(worst);
-    label = ['Очень голоден', 'Измотан', 'Не в духе', 'Скучает'][lowest];
+    label = ['Очень голоден', 'Измотан', 'Не в духе', 'Скучает','Одиноко'][lowest];
   } else if (score >= 83) label = 'Вдохновлён';
   else if (score >= 68) label = 'Доволен';
   else if (score < 40) label = 'Подавлен';

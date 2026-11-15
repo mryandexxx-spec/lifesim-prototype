@@ -380,3 +380,22 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   #conversation-panel.dialogue-required .conversation-lines{min-height:0;max-height:22dvh;}
   #conversation-panel.dialogue-required .conversation-head h2{font-size:24px;}
 }
+
+/* M3: fifth, actual social need in a mobile-first dashboard. No fake social
+   activity: the bar follows residents' persistent needs.social 0..100. */
+.needs{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;}
+@media(max-width:700px){
+  .needs{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px 10px;}
+  .dashboard{row-gap:7px;}
+  .hint{bottom:calc(env(safe-area-inset-bottom) + 184px);}
+  .action-sheet{bottom:calc(env(safe-area-inset-bottom) + 184px);}
+}
+@media(max-width:370px){
+  .needs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 6px;}
+  .need-copy>span{font-size:9px;}
+}
+@media(max-height:560px){
+  .needs{gap:5px;}
+  .need-icon{font-size:14px;}
+  .need-copy>span{font-size:9px;}
+}
