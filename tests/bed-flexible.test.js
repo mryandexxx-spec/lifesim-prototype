@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {BED_SLOTS,BED_SLOT_IDS} from '../src/bed-layout.js';
-import {newHousehold,loadHousehold,chooseResidentAction,
+import {newHousehold,loadHousehold,chooseResidentAction,tickHousehold,
   bedSlotFor,chooseFreeBedSlot} from '../src/household.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose} from '../src/bed-transition.js';
+import {arrive,ACTIONS} from '../src/simulation.js';
 import {createAnimationState,stepAnimation} from '../src/animations.js';
 
 const close=(a,b,t=.01)=>Math.abs(a-b)<=t;
@@ -41,7 +42,9 @@ test('same resident can select the other half on a later sleep',()=>{
   g.position={...BED_SLOTS.left.approach};
   assert.ok(chooseResidentAction(g,'bed',false,'alex'));
   assert.equal(g.action.bedSlot,'left');
-  assert.ok(chooseResidentAction(g,'sofa',false,'alex'));
+  assert.equal(chooseResidentAction(g,'sofa',false,'alex'),false,
+    'a new request must not replace ongoing sleep');
+  arrive(g);tickHousehold(g,ACTIONS.bed.duration+1);
   g.position={...BED_SLOTS.right.approach};
   assert.ok(chooseResidentAction(g,'bed',false,'alex'));
   assert.equal(g.action.bedSlot,'right');

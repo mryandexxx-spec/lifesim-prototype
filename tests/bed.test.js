@@ -101,12 +101,16 @@ test('one resident leaves bed and frees only their half; other stays asleep',()=
   chooseResidentAction(s,'bed',false,'alex');
   chooseResidentAction(s,'bed',false,'mira');
   arrive(s);arrive(s.otherSim);
+  assert.equal(chooseResidentAction(s,'fridge',false,'alex'),false,
+    'a queued request cannot interrupt sleep');
+  s.action=null; // explicit user cancellation, never implicit replacement
   assert.ok(chooseResidentAction(s,'fridge',false,'alex'));
-  assert.equal(s.action.id,'fridge');
   assert.equal(s.otherSim.action.id,'bed');
   const sleepingSide=s.otherSim.action.bedSlot;
   assert.ok(validBedSlot(sleepingSide));
   assert.notEqual(bedSlotFor(s,'alex'),sleepingSide);
+  assert.equal(chooseResidentAction(s,'bed',false,'alex'),false);
+  s.action=null; // explicit cancellation of fridge action
   assert.ok(chooseResidentAction(s,'bed',false,'alex'));
   assert.notEqual(s.action.bedSlot,sleepingSide);
 });

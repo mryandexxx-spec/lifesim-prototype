@@ -75,13 +75,16 @@ test('zero affinity also permits argue and talk, with bounds and no save migrati
  assert.equal(restored.version,1);
  assert.equal(restored.relationship.affinity,12);
 });
-test('manual talk interrupts partner furniture job, automatic talks still wait',()=>{
+test('manual and automatic talks wait for active furniture to finish',()=>{
  const s=newHousehold();
  assert.equal(chooseResidentAction(s,'bed',false,'mira'),true);
- assert.equal(canStartSocial(s,'talk','alex',false),true);
+ assert.equal(canStartSocial(s,'talk','alex',false),false);
  assert.equal(canStartSocial(s,'talk','alex',true),false);
+ assert.equal(startSocial(s,'talk','alex',place,false),false);
+ assert.equal(s.otherSim.action.id,'bed');
+ s.otherSim.action=null; // explicit user cancellation, not hidden overwriting
+ assert.equal(canStartSocial(s,'talk','alex',false),true);
  assert.equal(startSocial(s,'talk','alex',place,false),true);
- assert.equal(s.otherSim.action,null);
  assert.ok(s.socialAction);
  assert.equal(canStartSocial(s,'argue','mira'),false);
  assert.equal(cancelSocial(s),true);
@@ -115,6 +118,7 @@ test('renderer social controls remain enabled when partner busy or meter full',(
  assert.ok(src.includes('const busy=Boolean(game.socialAction);'));
  assert.ok(!src.includes("const busy=Boolean(game.socialAction) || Boolean(getActor"));
  assert.ok(src.includes('const partnerExiting=sofaStates[partnerId].progress>0'));
- assert.ok(src.includes("paths[partnerId]={points:null,index:0,id:null};"));
+ assert.ok(!src.includes("paths[partnerId]={points:null,index:0,id:null};"),
+   'no new invitation can delete the other resident route');
  assert.ok(src.includes('if(partnerExiting){'));
 });

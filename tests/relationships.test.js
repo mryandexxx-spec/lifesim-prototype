@@ -54,12 +54,15 @@ test('score clamps 0–100 and memories are bounded to 12',()=>{
   assert.equal(relationshipLabel(50),'Нейтрально');
   assert.equal(relationshipLabel(80),'Дружески');
 });
-test('player may invite a busy partner, while overlapping social actions remain blocked',()=>{
+test('manual invitation never interrupts a busy partner, and starts after they finish',()=>{
   const s=newHousehold();
   assert.equal(chooseResidentAction(s,'sofa',false,'mira'),true);
+  assert.equal(canStartSocial(s,'talk','alex'),false);
+  assert.equal(startSocial(s,'talk','alex',place),false);
+  assert.equal(s.otherSim.action.id,'sofa');
+  s.otherSim.action=null; // only explicit user cancellation frees the partner
   assert.equal(canStartSocial(s,'talk','alex'),true);
   assert.equal(startSocial(s,'talk','alex',place),true);
-  assert.equal(s.otherSim.action,null,'manual interaction interrupts busy partner');
   assert.equal(startSocial(s,'argue','mira',place),false);
   assert.equal(cancelSocial(s),true);
   assert.equal(s.mind.memories.length,0);
@@ -71,6 +74,9 @@ test('paused, walking and interrupted events do not count',()=>{
   arriveSocial(s);s.paused=true;tickHousehold(s,60);
   assert.equal(s.relationship.affinity,50);
   s.paused=false;
+  assert.equal(chooseResidentAction(s,'bed',false,'alex'),false);
+  assert.ok(s.socialAction,'new object command does not interrupt social');
+  assert.equal(cancelSocial(s),true);
   assert.equal(chooseResidentAction(s,'bed',false,'alex'),true);
   assert.equal(s.socialAction,null);assert.equal(s.mind.memories.length,0);
 });

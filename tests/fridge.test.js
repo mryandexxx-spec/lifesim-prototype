@@ -114,6 +114,9 @@ test('fridge belongs to one user at a time, then can be used by the other',()=>{
   assert.ok(chooseResidentAction(s,'sofa',false,'alex'));
   arrive(s.otherSim);tickHousehold(s,ACTIONS.fridge.duration);
   assert.equal(s.otherSim.action,null);
+  assert.equal(chooseResidentAction(s,'fridge',false,'alex'),false,
+    'the other resident must finish their sofa action');
+  arrive(s);tickHousehold(s,ACTIONS.sofa.duration+1);
   assert.ok(chooseResidentAction(s,'fridge',false,'alex'));
 });
 test('reload mid-snack v1 reconstructs door and food stage without new schema',()=>{

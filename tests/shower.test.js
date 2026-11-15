@@ -180,6 +180,9 @@ test('shower remains exclusive for two residents, manual and autonomous modes wo
   assert.equal(chooseResidentAction(s,'fridge',false,'alex'),true);
   arrive(s.otherSim);tickHousehold(s,32);
   assert.equal(s.otherSim.action,null);
+  assert.equal(chooseResidentAction(s,'shower',false,'alex'),false,
+    'fridge still belongs to this resident until completion');
+  arrive(s);tickHousehold(s,ACTIONS.fridge.duration+1);
   assert.equal(chooseResidentAction(s,'shower',false,'alex'),true);
   assert.equal(setHouseholdAutonomy(s,false),false);
   assert.equal(s.action.id,'shower','manual action survives auto-off');
@@ -209,8 +212,8 @@ test('old save, other actions and new action requests never add new persisted vi
   const visual=advanceShowerTransition(null,true,13,32,.016);
   assert.ok(visual.frame.privacy);
   assert.equal(JSON.stringify(t),before,'transient animations cannot mutate saved household');
-  assert.equal(chooseResidentAction(t,'sofa',false,'alex'),true);
-  assert.equal(t.action.id,'sofa');
+  assert.equal(chooseResidentAction(t,'sofa',false,'alex'),false);
+  assert.equal(t.action.id,'shower','new intent cannot displace active shower');
   assert.equal(ACTIONS.bed.duration,60);
   assert.equal(ACTIONS.fridge.duration,26);
 });
