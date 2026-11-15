@@ -20,7 +20,8 @@ test('UI6 accepts only a deliberate pointerup tap for world commands',()=>{
  assert.match(src,/if\(target\?\.kind==='resident'\)openSocialContext\(pos\)/);
  assert.match(src,/else if\(target\?\.kind==='object'\)select\(target\.id\)/);
  assert.match(src,/pointercancel'[\s\S]*?\{cancel:true\}/);
- assert.match(src,/window\.addEventListener\('blur',\(\)=>cameraGesture\.clear\(\)\)/);
+ assert.match(src,/window\.addEventListener\('blur',\(\)=>\{/);
+ assert.match(src,/cancelEditorDrag\(\);cameraGesture\.clear\(\)/);
 });
 test('UI6 preserves fallback, strict dialogue, camera reset and iPhone pointer capture',()=>{
  assert.match(src,/rotateButton\.addEventListener\('click'/);
