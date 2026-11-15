@@ -84,7 +84,7 @@ test('directed view scores differ, never spread to unrelated pairs',()=>{
   assert.equal(getDirectedView(g,'nova','ember').friendship,92);
   assert.equal(getDirectedView(g,'ember','nova').friendship,17);
   assert.equal(getDirectedView(g,'nova','iris').friendship,50);
-  assert.equal(getDirectedView(g,'nova','ember'),getDirectedView(g,'ember','nova'),false);
+  assert.notEqual(getDirectedView(g,'nova','ember'),getDirectedView(g,'ember','nova'));
   assert.equal(getPair(g,'nova','iris').counts.positive,0);
 });
 test('friendship needs mutual numbers, three diverse positive episodes and two days',()=>{
