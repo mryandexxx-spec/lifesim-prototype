@@ -378,7 +378,7 @@ test('view shows milestone reasons and touch UI includes new module in Pages art
     assert.ok(html.includes('id="'+id+'"'),id);
   assert.ok(ui.includes('renderBranchPanel(false)'));
   assert.ok(ui.includes('branchDisplayKey'));
-  assert.ok(ui.includes('startBranchSocial(game,actorId,best.goal,branchId)'));
+  assert.ok(ui.includes('startBranchSocial(game,actorId,best.goal,branchId,automatic)'));
   assert.ok(workflow.includes('node --check src/social-graph.js'));
   assert.ok(workflow.includes('src/social-graph.js src/action-queue.js src/conversation-engine.js'));
 });
