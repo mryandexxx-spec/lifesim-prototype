@@ -697,6 +697,14 @@ function conversationButton(label,callback,secondary=false){
   button.addEventListener('click',callback);
   return button;
 }
+// The mandatory UI is the ONLY interactive subtree while a reply is owed.
+const requiredChoiceFocus=createRequiredChoiceFocus({
+  root:document.querySelector('.app-shell'),
+  panel:$('conversation-panel'),
+  backdrop:$('dialogue-backdrop'),
+  doc:document,
+  restoreFallback:$('plan-peek')
+});
 /** End the conversation immediately; an empty one has no social rewards.
  * Confirmed prior lines are applied exactly once on explicit completion.
  */
@@ -728,17 +736,20 @@ function renderConversationPanel(force=true){
     panel.setAttribute('role','dialog');
     panel.setAttribute('aria-modal','true');
     panel.setAttribute('aria-labelledby','conversation-title');
-  }else panel.removeAttribute('aria-modal');
+    panel.setAttribute('aria-describedby','conversation-subtitle');
+  }else {panel.removeAttribute('aria-modal');panel.removeAttribute('aria-describedby');}
   const key=JSON.stringify([conversationTopicPicker,required,socialMenuCategory,
     game.selectedSim,game.paused,s?.phase,session?.topic,session?.phase,session?.turns]);
   if(!force&&key===conversationDisplayKey)return;
   conversationDisplayKey=key;
   const open=conversationTopicPicker||required;
+  const options=$('conversation-options');
+  const formerFocusIndex=required
+    ?Array.from(options.querySelectorAll('button')).indexOf(document.activeElement):-1;
   panel.hidden=!open||(!required&&Boolean(socialMenuCategory));
   if(open&&!required&&!socialMenuCategory)scheduleSocialPosition();
+  requiredChoiceFocus.activate(required);
   if(!open)return;
-  if(enteringRequired)panel.focus({preventScroll:true});
-  const options=$('conversation-options');
   options.replaceChildren();
   const list=$('conversation-lines');
   list.replaceChildren();
@@ -768,7 +779,10 @@ function renderConversationPanel(force=true){
     list.append(li);
   }
   list.scrollTop=list.scrollHeight;
-  if(s.phase!=='using')return;
+  if(s.phase!=='using'){
+    if(required)requiredChoiceFocus.focusChoice(enteringRequired?0:formerFocusIndex);
+    return;
+  }
   if(session.phase==='response'){
     if(session.turns.length<CONVERSATION_MAX_TURNS)
       options.append(conversationButton('Продолжить беседу',()=>{
@@ -786,6 +800,7 @@ function renderConversationPanel(force=true){
   }
   // This is the only exit from a required-choice dialogue.
   options.append(conversationButton('Завершить разговор',endPlayerConversation,true));
+  if(required)requiredChoiceFocus.focusChoice(enteringRequired?0:formerFocusIndex);
 }
 renderConversationPanel();
 renderSharedPanel();
