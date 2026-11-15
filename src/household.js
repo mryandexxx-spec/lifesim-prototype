@@ -5,6 +5,7 @@ import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEna
 import { refreshMind } from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory} from './gifts-leisure.js';
+import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
@@ -35,6 +36,7 @@ export function newHousehold() {
   markAcquainted(state.socialGraph,HOUSEHOLD_IDS[0],HOUSEHOLD_IDS[1],state.minutes);
   observePairViews(state.socialGraph,HOUSEHOLD_IDS[0],HOUSEHOLD_IDS[1],state.relationship.views);
   state.inventory=starterInventory();
+  state.actionQueues=newActionQueues(HOUSEHOLD_IDS);
   state.socialAction=null;
   return state;
 }
@@ -59,6 +61,7 @@ export function loadHousehold(raw) {
   root.otherSim=mira;
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
   root.inventory=restoreInventory(raw.inventory);
+  root.actionQueues=restoreActionQueues(raw.actionQueues,HOUSEHOLD_IDS);
   root.relationship=loadRelationship(raw.relationship,root.minutes,{
     alex:root.mind.memories,mira:mira.mind.memories
   });
@@ -145,8 +148,10 @@ export function furnitureAvailable(root,itemId,residentId='alex') {
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex') {
   if (!HOUSEHOLD_IDS.includes(residentId) || !furnitureAvailable(root,itemId,residentId)) return false;
   const resident=getActor(root,residentId);
-  if (!resident || (automatic && root.socialAction)) return false;
-  if(!automatic && root.socialAction)cancelSocial(root);
+  // Explicit actions never supersede an ongoing action or interrupt a social.
+  // Future manual commands are stored by action-queue.js and dispatched later.
+  if (!resident || resident.action || root.socialAction ||
+    (automatic && (root.paused||pendingActions(root.actionQueues,residentId).length)))return false;
   const slot=itemId==='bed'?bedSlotFor(root,residentId):null;
   const chosen=chooseAction(resident,itemId,automatic);
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
@@ -179,7 +184,7 @@ export function tickHousehold(root,minutes) {
 }
 
 export function residentAutonomousChoice(root,id='alex') {
-  if(root.socialAction)return null;
+  if(root.socialAction||pendingActions(root.actionQueues,id).length)return null;
   const resident=getActor(root,id);
   if (!root.autonomy.enabled || !resident) return null;
   resident.autonomy.enabled=root.autonomy.enabled;

@@ -76,7 +76,8 @@ export function advanceAutonomyWait(elapsed, seconds, state) {
 }
 
 export function chooseAction(state, id, automatic = false) {
-  if (!ACTIONS[id] || (automatic && (!state.autonomy.enabled || state.minutes < state.autonomy.nextAt))) return false;
+  if (!ACTIONS[id] || state.action ||
+    (automatic && (!state.autonomy.enabled || state.minutes < state.autonomy.nextAt))) return false;
   state.action = { id, phase: 'walking', elapsed: 0, automatic };
   state.event = automatic ? 'Алекс решил: ' + ACTIONS[id].label.toLowerCase() : ACTIONS[id].label;
   return true;
