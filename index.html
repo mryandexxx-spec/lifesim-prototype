@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.0w" />
+  <link rel="stylesheet" href="./styles.css?v=1.0x" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.0w</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.0x</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -153,13 +153,31 @@
         <div class="need" data-need="social"><span class="need-icon" aria-hidden="true">♧</span><div class="need-copy"><span>Общение</span><div class="meter"><i id="bar-social"></i></div></div><output id="value-social">78</output></div>
       </div>
       <div class="footer-actions"><button id="save-btn" type="button">Сохранить</button><button id="reset-btn" type="button">Новая игра</button></div>
-      <div id="mood-overview" class="mood-overview" role="meter" aria-label="Настроение выбранного персонажа" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70">
-        <div class="mood-overview-head"><span>НАСТРОЕНИЕ</span><strong id="mood-overview-title">Спокоен</strong><small id="mood-overview-value">70/100</small></div>
-        <div class="mood-overview-track"><i id="mood-overview-bar"></i></div>
-        <div id="mood-overview-reason" class="mood-overview-reason">Основные потребности удовлетворены</div>
+      <div class="mood-overview">
+        <div id="mood-overview" role="meter" aria-label="Настроение выбранного персонажа" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70">
+          <div class="mood-overview-head"><span>НАСТРОЕНИЕ</span><strong id="mood-overview-title">Спокоен</strong><small id="mood-overview-value">70/100</small></div>
+          <div class="mood-overview-track"><i id="mood-overview-bar"></i></div>
+          <div id="mood-overview-reason" class="mood-overview-reason">Основные потребности удовлетворены</div>
+        </div>
+        <button id="insight-toggle" type="button" class="insight-toggle" aria-controls="insight-panel" aria-expanded="false">Почему?</button>
       </div>
     </footer>
 
+    <section id="insight-panel" class="insight-panel" hidden aria-labelledby="insight-title">
+      <div class="insight-panel-head">
+        <div><span class="eyebrow">ВНУТРЕННИЙ МИР</span><h2 id="insight-title">Почему так чувствует?</h2></div>
+        <button id="insight-close" type="button" aria-label="Закрыть объяснение настроения">×</button>
+      </div>
+      <p id="insight-summary" class="insight-summary">Сейчас нет сильных переживаний</p>
+      <div id="insight-causes" class="insight-causes"></div>
+      <div id="insight-feeling" class="insight-feeling" hidden></div>
+      <div id="insight-relationship" class="insight-relationship" hidden></div>
+      <p id="insight-guidance" class="insight-guidance"></p>
+    </section>
+    <div id="social-result" class="social-result" role="status" aria-live="polite" aria-atomic="true" hidden>
+      <span class="social-result-symbol" aria-hidden="true">✦</span>
+      <span><strong id="social-result-title"></strong><small id="social-result-detail">Реакция на завершённое взаимодействие</small></span>
+    </div>
     <div class="toast" role="status" id="toast" aria-live="polite"></div>
     <div class="loading" id="loading" role="status" aria-live="polite">
       <div class="loading-mark" aria-hidden="true">✦</div>
@@ -170,7 +188,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.0w"></script>
+  <script type="module" src="./src/game.js?v=1.0x"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');
