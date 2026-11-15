@@ -1904,6 +1904,8 @@ function boot() {
       bedProgress:bedStates.mira.progress,
       showerBusy:showerStates.mira.active,
       showerFrame:miraShower,
+      toiletBusy:toiletStates.mira.active,
+      toiletFrame:miraToilet,
       fridgeBusy:fridgeLeaving.mira,
       fridgeFrame:miraFridge
     });
@@ -1936,6 +1938,8 @@ function boot() {
       bedFrame:bedPose,
       showerBusy:showerStates.alex.active,
       showerFrame:alexShower,
+      toiletBusy:toiletStates.alex.active,
+      toiletFrame:alexToilet,
       fridgeBusy:fridgeLeaving.alex,
       fridgeFrame:alexFridge
     });

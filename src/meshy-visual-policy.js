@@ -125,14 +125,14 @@ export function canShowMeshy({
   preferred = false, ready = false, actionId = null,
   sofaBusy = false, bedBusy = false, showerBusy = false,
   fridgeBusy = false, fridgeReady = false, bedReady = false,
-  showerReady = false
+  showerReady = false, toiletBusy = false, toiletReady = false
 } = {}) {
   const eligible=actionId===null||actionId==='sofa'||
     (actionId==='fridge'&&fridgeReady)||(actionId==='bed'&&bedReady)||
-    (actionId==='shower'&&showerReady);
+    (actionId==='shower'&&showerReady)||(actionId==='toilet'&&toiletReady);
   return Boolean(preferred&&ready&&eligible&&
     (!bedBusy||bedReady)&&(!showerBusy||showerReady)&&
-    (!fridgeBusy||fridgeReady));
+    (!fridgeBusy||fridgeReady)&&(!toiletBusy||toiletReady));
 }
 
 export function availableMeshClips(names) {
