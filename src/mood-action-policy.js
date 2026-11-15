@@ -6,8 +6,8 @@ import {calculateMood} from './psychology.js';
 import {deriveAxes} from './trait-catalog.js';
 
 const clamp=(value,lo,hi)=>Math.max(lo,Math.min(hi,value));
-const safeNeeds=needs=>Object.fromEntries(['hunger','energy','hygiene','fun']
-  .map(key=>[key,clamp(Number.isFinite(needs?.[key])?needs[key]:50,0,100)]));
+const safeNeeds=needs=>Object.fromEntries(['hunger','energy','hygiene','fun','social']
+  .map(key=>[key,clamp(Number.isFinite(needs?.[key])?needs[key]:key==='social'?75:50,0,100)]));
 const record=value=>Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
 const important=new Set(['fridge','bed','shower','toilet']);
 const direct=new Set(['talk','argue']);
