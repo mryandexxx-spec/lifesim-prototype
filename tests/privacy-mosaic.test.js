@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {runInNewContext} from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {MOSAIC_SIZE,MOSAIC_COLUMNS,MOSAIC_ROWS,privacyMosaicPixels,
@@ -92,4 +93,44 @@ test('mosaic visual change never changes mask choreography, cancellation or save
   assert.equal(state.frame.water,false);
   assert.equal(state.frame.bathing,false);
   assert.equal(state.frame.privacy,true);
+});
+
+test('F1b builds shower and toilet with one in-scope shared mosaic material at boot',()=>{
+  // Execute the actual two grouped scene blocks with inexpensive PlayCanvas stubs.
+  // Source-string inclusion alone missed the previously uncaught ReferenceError.
+  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const start=game.indexOf('  const mosaicMaterial=createPrivacyMosaicMaterial(pc,app.graphicsDevice);');
+  const end=game.indexOf('  // Potted plant, decorations',start);
+  assert.ok(start>0&&end>start,'both privacy groups must follow the shared declaration');
+  const scene=game.slice(start,end);
+  const shared={kind:'shared opaque texture'};
+  let constructions=0,drawing=null;
+  const calls=[];
+  class Entity {
+    constructor(name){this.name=name;this.enabled=true;}
+    addChild(){}
+    setLocalPosition(){}
+  }
+  const capture=(...args)=>calls.push(args);
+  const context={
+    pc:{Entity},app:{graphicsDevice:{id:'fake WebGL device'}},
+    SHOWER_LAYOUT,TOILET_LAYOUT,
+    M:new Proxy({}, {get:(_target,key)=>String(key)}),
+    createPrivacyMosaicMaterial:(_pc,device)=>{
+      assert.equal(device,context.app.graphicsDevice);
+      constructions++;return shared;
+    },
+    get decorDrawing(){return drawing;},
+    withDecor:(id,render)=>{
+      const previous=drawing;
+      drawing={origin:{x:0,z:0},node:new Entity(id)};
+      try{render();}finally{drawing=previous;}
+    },
+    touchBox:()=>{},box:()=>{},ball:capture,cylinder:capture
+  };
+  assert.doesNotThrow(()=>runInNewContext(scene,context,{timeout:1000}));
+  assert.equal(constructions,1,'material must be created once and reused');
+  const shells=calls.filter(args=>/^(shower mosaic|toilet privacy)/.test(args[0]));
+  assert.equal(shells.length,6,'three shower and three toilet cover primitives');
+  for(const args of shells)assert.equal(args[7],shared, 'privacy cover must share one material');
 });

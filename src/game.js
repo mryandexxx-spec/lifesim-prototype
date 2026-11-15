@@ -1276,6 +1276,8 @@ function boot() {
     box('tv stand',3.67,.80,.37,.35,.12,.28,M.black);
   });
 
+  // Share one opaque mosaic material between shower and toilet privacy shells.
+  const mosaicMaterial=createPrivacyMosaicMaterial(pc,app.graphicsDevice);
   // All shower pieces and the opaque privacy group follow ONE instance.
   let showerPrivacy;
   withDecor('shower',()=>{
@@ -1295,7 +1297,6 @@ function boot() {
   decorDrawing.node.addChild(showerPrivacy);
   showerPrivacy.setLocalPosition(SHOWER_LAYOUT.interior.x-decorDrawing.origin.x,
     0,SHOWER_LAYOUT.interior.z-decorDrawing.origin.z);
-  const mosaicMaterial=createPrivacyMosaicMaterial(pc,app.graphicsDevice);
   const veilWidth=SHOWER_LAYOUT.privacyWidth*.89;
   const veilDepth=SHOWER_LAYOUT.privacyDepth*.89;
   cylinder('shower mosaic cloud',0,1.25,0,veilWidth,1.95,veilDepth,
