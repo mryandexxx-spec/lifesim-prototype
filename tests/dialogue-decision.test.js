@@ -162,7 +162,10 @@ test('1.0s: actual browser panel is compact, modal, unclosable and has end actio
     conversationButton:(label,handler,secondary=false)=>({label,handler,secondary}),
     document:{createElement:()=>({textContent:'',className:''})},
     endPlayerConversation:()=>{},CONVERSATION_MAX_TURNS:3,
-    requiredChoiceFocus:{activate:required=>{if(required)$('conversation-panel').focus();},focusChoice:()=>{}}
+    requiredChoiceFocus:{activate:required=>{if(required)$('conversation-panel').focus();},focusChoice:()=>{}},
+    setViewOpen:()=>{},renderSocialContext:()=>{},renderSocialMenu:()=>{},
+    renderSharedPanel:()=>{},renderBranchPanel:()=>{},
+    socialContextVisible:false,socialAnchor:null,sharedPicker:false,branchPicker:false
   };
   runInNewContext(extract('function renderConversationPanel(force=true){',
     'renderConversationPanel();\nrenderSharedPanel();'),scope);
