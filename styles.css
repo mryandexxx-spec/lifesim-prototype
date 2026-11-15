@@ -521,3 +521,12 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .view-panel button:focus-visible,.context-popover button:focus-visible{
  outline:3px solid #347554;outline-offset:2px;}
 @media(max-height:560px){.view-panel{max-height:calc(100dvh - 24px);overflow-y:auto;}}
+
+
+/* In landscape six tall controls no longer run below the Home indicator. */
+@media(max-height:560px){
+ .control-tray{display:grid;grid-template-columns:repeat(2,46px);gap:7px;
+  right:max(12px,env(safe-area-inset-right));top:calc(env(safe-area-inset-top) + 74px);}
+ .control-tray button{height:46px;min-width:46px;}
+ .view-panel{width:min(240px,calc(100vw - 120px));}
+}
