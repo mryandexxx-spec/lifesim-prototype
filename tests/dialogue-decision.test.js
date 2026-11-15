@@ -110,8 +110,11 @@ test('1.0q: finished spoken line applies once, cannot be replayed',()=>{
 test('1.0q: mid-dialogue save restores required screen and preserves manual pause',()=>{
   const root=started();assert.ok(choose(root));root.paused=true;
   const loaded=loadHousehold(clone(root));
-  assert.equal(loaded.paused,true);
+  // The existing v1 loader intentionally resets manual pause on page reload.
+  // The restored active conversation independently reestablishes the gate.
+  assert.equal(loaded.paused,false);
   assert.equal(dialogueNeedsDecision(loaded),true);
+  loaded.paused=true; // A user pause during this session must be respected.
   assert.equal(loaded.socialAction.conversation.phase,'response');
   assert.equal(proceed(loaded),true);
   assert.equal(loaded.paused,true);

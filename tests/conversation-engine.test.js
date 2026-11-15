@@ -215,5 +215,5 @@ test('iPhone dialogue panel is wired to cached touch controls and the Pages bund
   assert.ok(html.includes('id="talk-btn"')&&html.includes('id="argue-btn"'));
   assert.ok(css.includes('.conversation-panel[hidden]'));
   assert.ok(workflow.includes('node --check src/conversation-engine.js'));
-  assert.ok(workflow.includes('src/conversation-engine.js src/gifts-leisure.js src/household.js'));
+  assert.ok(workflow.includes('src/conversation-engine.js src/dialogue-decision.js src/gifts-leisure.js src/household.js'));
 });
