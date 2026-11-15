@@ -1056,7 +1056,7 @@ function boot() {
         }
         const sentiments=latestSentiments(perspective,2);
         $('mind-sentiments').textContent=sentiments.length
-          ?sentiments.map(item=>'• '+item.label+' · '+readableTime(item.at).day).join('\\n')
+          ?sentiments.map(item=>'• '+item.label+' · '+readableTime(item.at).day).join('\n')
           :'Общих событий пока мало';
         const list=$('mind-memories');
         list.replaceChildren();

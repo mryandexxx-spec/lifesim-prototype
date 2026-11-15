@@ -196,3 +196,20 @@ test('all relationship metrics stay within 0..100 even after repeated talk/argue
   assert.equal(s.relationship.affinity,0);
   assert.equal(relationshipLabel(0),'Напряжённо');
 });
+
+test('selected-perspective HUD is wired to DOM and bundled into GitHub Pages',async()=>{
+  const {readFileSync}=await import('node:fs');
+  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
+  for(const axis of ['friendship','trust','tension']){
+    assert.ok(html.includes('id="mind-relation-'+axis+'"'));
+    assert.ok(html.includes('id="mind-relation-'+axis+'-bar"'));
+  }
+  assert.ok(html.includes('id="mind-sentiments"'));
+  assert.ok(html.includes('id="mind-relation-name"'));
+  assert.ok(game.includes('getPerspective(game,game.selectedSim)'));
+  assert.ok(game.includes("join('\\n')"),'UI separates two sentiments using an actual newline');
+  assert.ok(workflow.includes('src/social-perspective.js src/household.js'));
+  assert.ok(workflow.includes('node --check src/social-perspective.js'));
+});
