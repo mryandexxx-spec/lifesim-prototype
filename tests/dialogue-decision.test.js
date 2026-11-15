@@ -147,7 +147,7 @@ test('1.0q: three-turn limit remains completable, not infinite',()=>{
   assert.ok(end(root));
   assert.equal(root.socialAction,null);
 });
-test('1.0q: actual browser panel is fullscreen, modal, unclosable and has end action',()=>{
+test('1.0s: actual browser panel is compact, modal, unclosable and has end action',()=>{
   const $=fakeDom();
   const scope={
     $,game:{selectedSim:'alex',paused:false,socialAction:{
@@ -167,6 +167,7 @@ test('1.0q: actual browser panel is fullscreen, modal, unclosable and has end ac
   scope.renderConversationPanel(true);
   assert.equal($('conversation-panel').hidden,false);
   assert.equal($('conversation-close').hidden,true);
+  assert.equal($('dialogue-backdrop').hidden,false);
   assert.equal($('conversation-panel').classList.contains('dialogue-required'),true);
   assert.equal($('conversation-panel').attrs.get('aria-modal'),'true');
   assert.equal($('conversation-panel').focused,true);
@@ -185,17 +186,20 @@ test('1.0q: even a synthetic click on hidden X cannot dismiss a required prompt'
   assert.equal(rerender,0);
   assert.ok(dialogueNeedsDecision(root));
 });
-test('1.0q: Safari safe-area, unclosable fullscreen, Pages copy, mood M1 still present',()=>{
-  assert.match(html,/сборка \/ 1\.0r/);
-  assert.match(html,/styles\.css\?v=1\.0r/);
-  assert.match(html,/src\/game\.js\?v=1\.0r/);
+test('1.0s: Safari safe-area, compact modal, Pages copy, mood M1 still present',()=>{
+  assert.match(html,/сборка \/ 1\.0s/);
+  assert.match(html,/styles\.css\?v=1\.0s/);
+  assert.match(html,/src\/game\.js\?v=1\.0s/);
   assert.match(html,/id="conversation-panel"[^>]+tabindex="-1"/);
   assert.match(css,/#conversation-panel\.dialogue-required\{/);
-  assert.match(css,/height:100dvh/);
+  assert.match(css,/width:min\(440px,calc\(100vw - 28px\)\)/);
+  assert.match(css,/\.dialogue-backdrop\{position:fixed/);
+  assert.ok(!css.includes('width:100vw;height:100vh;height:100dvh'),'required choice must not become a fullscreen sheet');
   assert.match(css,/env\(safe-area-inset-bottom\)/);
   assert.match(css,/#conversation-panel\.dialogue-required #conversation-close\{display:none!important;\}/);
   assert.match(workflow,/node --check src\/dialogue-decision\.js/);
-  assert.match(workflow,/src\/conversation-engine\.js src\/dialogue-decision\.js/);
+  assert.match(workflow,/node --check src\/world-interactions\.js/);
+  assert.match(workflow,/src\/conversation-engine\.js src\/dialogue-decision\.js src\/world-interactions\.js/);
   assert.ok(gameSource.includes("options.append(conversationButton('Завершить разговор',endPlayerConversation,true));"));
   assert.ok(gameSource.includes("import {needPresentation,moodPresentation,moodOrbitPoint}"));
   assert.match(html,/id="mood-overview"/);
