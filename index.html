@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.0s" />
+  <link rel="stylesheet" href="./styles.css?v=1.0t" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.0s</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.0t</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -49,7 +49,10 @@
       <button id="mesh-model-btn" class="mesh-model-control" type="button" aria-pressed="true" aria-label="Алекс и Мира: 3D-модели Meshy. Нажмите, чтобы вернуть старые модели."><span aria-hidden="true">3D</span><small id="mesh-model-state" aria-hidden="true">MESHY</small></button>
     </aside>
 
-    <div class="scene-badge"><span class="status-dot"></span><span id="status-text">Свободное время</span></div>
+    <button id="plan-peek" class="scene-badge plan-peek" type="button" aria-controls="queue-panel" aria-expanded="false" aria-label="Открыть очередь действий">
+      <span class="plan-current"><span class="status-dot" aria-hidden="true"></span><span id="status-text">Свободное время</span><span class="plan-chevron" aria-hidden="true">›</span></span>
+      <span id="plan-upcoming" class="plan-upcoming" aria-hidden="true" hidden></span>
+    </button>
     <div class="hint" id="hint">Один палец — перемещение · два — поворот/масштаб</div>
 
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
@@ -161,7 +164,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.0s"></script>
+  <script type="module" src="./src/game.js?v=1.0t"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');
