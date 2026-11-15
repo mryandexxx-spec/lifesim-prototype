@@ -6,7 +6,7 @@ const html=read('../index.html'),css=read('../styles.css'),src=read('../src/game
 test('1.0r: social controls are not permanently visible on the 3D scene',()=>{
   assert.match(html,/<section class="social-bar" id="social-context" hidden /);
   assert.match(html,/id="social-context-close"/);
-  assert.match(css,/#social-context\[hidden\]\{display:none!important;\}/);
+  assert.match(css,/#social-context\[hidden\],\.dialogue-backdrop\[hidden\]\{display:none!important;\}/);
 });
 test('1.0r: tapping ONLY the inactive resident opens social categories',()=>{
   assert.match(src,/const peer=game.selectedSim==='alex'\?'mira':'alex';\s*return pickWorldTarget/);
