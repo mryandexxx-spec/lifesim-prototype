@@ -150,6 +150,11 @@ test('iPhone code wires a visible turn control and unlocks music only on direct 
   assert.match(ui,/person\.action\.musicSpot/);
   assert.match(ui,/musicAudio\.enable\(\)\.then/);
   assert.match(ui,/!musicMutedByPlayer/);
+  assert.match(ui,/const lockedFurnitureIds=\(includePending=true\)/);
+  assert.match(ui,/lockedInstanceIds:lockedFurnitureIds\(!allowQueuedReposition\)/);
+  assert.match(ui,/editSession\.commit\(instanceId,pose,editorContext\(true\)\)/);
+  assert.match(ui,/storeMarketItem\(game\.world\.furniture,game\.shop,[\s\S]*?editSelectedId,editorContext\(\)\)/);
+
   assert.match(css,/\.furnish-room-tools\[hidden\]\{display:none!important;/);
   assert.match(pages,/node --check src\/music-listening\.js/);
   assert.match(pages,/cp src\/music-listening\.js site\/src\//);
