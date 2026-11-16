@@ -8,7 +8,15 @@ export const MUSIC_ACTION_IDS=Object.freeze([MUSIC_LISTEN_ACTIVITY_ID,MUSIC_DANC
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
 export function musicMovementFrame(frame=null){
   if(!frame||frame.phase!=='using'||!finite(frame.elapsed)||frame.elapsed<0||
-    !MUSIC_ACTION_IDS.includes(frame.activityId))return null;
+    !(MUSIC_ACTION_IDS.includes(frame.activityId)||frame.activityId==='dining.meal'))return null;
+  if(frame.activityId==='dining.meal'){
+    // F4F: skinned bite-to-mouth motion over the existing real sofa/chair sit.
+    const phase=frame.elapsed*2*Math.PI/3.1;
+    const bite=(1+Math.sin(phase))*.5;
+    return {kind:'meal',arms:[-18-35*bite,7],elbows:[-25-39*bite,5],
+      legs:[0,0],knees:[0,0],torsoRoll:1.2*Math.sin(phase),pelvisRoll:0,
+      spineLean:2,spineTwist:0,spineRoll:0,headPitch:4+3*bite,headRoll:0};
+  }
   const dance=frame.activityId===MUSIC_DANCE_ACTIVITY_ID;
   const style=frame.contentId;
   const tempo=style==='music.rhythmic'?1.23:style==='music.dreamy'?.91:1;
