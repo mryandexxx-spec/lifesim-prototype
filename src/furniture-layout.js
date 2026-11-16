@@ -36,6 +36,12 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
   for(const person of residents){
     if(!person||!Number.isFinite(person.x)||!Number.isFinite(person.z))continue;
     if(!isWalkable(person.x,person.z,candidate))return {ok:false,reason:'resident-blocked'};
+    // A moved television must retain a real approach to its own screen.
+    if(target.prefabId==='tv'){
+      const watching=furnitureActionApproach(candidate,'tv',instanceId);
+      if(!watching||!findPath(person,watching,candidate))
+        return {ok:false,reason:'unreachable-tv'};
+    }
     // Either sleeping side must remain reachable for essential self-care.
     if(!Object.values(BED_SLOTS).some(slot=>
       findPath(person,furniturePoint(candidate,'bed',slot.approach),candidate)))

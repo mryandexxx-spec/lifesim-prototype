@@ -78,7 +78,7 @@ test('shop-only mode preserves existing furniture long hold and two-step unpaid 
  assert.match(game,/moveShopPreviewToCamera\(true\)/);
  assert.match(game,/Веди предмет пальцем по полу/);
  assert.match(game,/armFurnitureHold\(event,now\)/);
- assert.match(html,/сборка \/ 1\.2b/);
+ assert.match(html,/сборка \/ 1\.2c/);
 });
 
 test('shop overlay describes the correct swipe and orbit switch updates guidance',()=>{

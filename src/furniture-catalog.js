@@ -5,6 +5,7 @@
 import {FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT} from './shower-interaction.js';
 import {TOILET_LAYOUT} from './toilet-interaction.js';
+import {TV_APPROACH} from './tv-interaction.js';
 
 export const FURNITURE_SCHEMA=1;
 const finite=(n)=>typeof n==='number'&&Number.isFinite(n);
@@ -29,7 +30,8 @@ const original=[
   {prefabId:'table',instanceId:'home-table-1',name:'Журнальный столик',
     category:'Гостиная',capabilities:['surface'],x:1.34,z:-.26,rect:[.59,2.09,-.65,.13]},
   {prefabId:'tv',instanceId:'home-tv-1',name:'Телевизор',category:'Гостиная',
-    capabilities:['tv.watch.future'],x:3.865,z:.345,rect:[3.43,4.30,-.49,1.18]},
+    actionId:'tv',capabilities:['tv.watch'],x:3.865,z:.345,rect:[3.43,4.30,-.49,1.18],
+    approach:[TV_APPROACH.x,TV_APPROACH.z]},
   {prefabId:'shower',instanceId:'home-shower-1',name:'Душевая',category:'Ванная',
     actionId:'shower',capabilities:['hygiene.shower'],x:-3.695,z:2.515,
     rect:[-4.65,-2.74,1.54,3.49],

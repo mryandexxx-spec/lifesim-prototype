@@ -9,6 +9,7 @@ import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interact
 import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-interaction.js';
 import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
+import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','bladder']);
 export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
@@ -16,6 +17,8 @@ export const ACTIONS = Object.freeze({
   fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
+  tv: { label: 'Смотреть телевизор', need: 'fun', duration: TV_WATCH_DURATION,
+    benefitPerMinute: 1.08, location: [TV_APPROACH.x,TV_APPROACH.z] },
   toilet: { label: 'Сходить в туалет', need: 'bladder', duration: 26,
     benefitPerMinute: 2.7, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] }
 });
@@ -150,8 +153,8 @@ export function tick(state, minutes,world=state?.world??null) {
     }
     // M2 affects enjoyment of optional rest, not animation time, eating,
     // sleep, shower privacy, or promises of physical self-care.
-    if(state.action.id==='sofa')gained*=voluntaryMoodEfficiency(state,
-      {type:'object',actionId:'sofa'});
+    if(['sofa','tv'].includes(state.action.id))gained*=voluntaryMoodEfficiency(state,
+      {type:'object',actionId:state.action.id});
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
     refreshMind(state,world);
     state.action.elapsed += amount;
