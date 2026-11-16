@@ -83,7 +83,7 @@ test('fridge door hinge, hand targets, water, quilt and Meshy seat are instance-
     "fridgeOpen>.001",
     "fridgeHinge.setLocalEulerAngles(0,FRIDGE_LAYOUT.doorAngle*fridgeOpen,0)",
     "drop.setLocalPosition(-4.28+(i%5)*.22-showerOrigin.x",
-    "quilts[slot].body.setLocalPosition",
+    "body.setLocalPosition(bx+2.62,quilt.y",
     "const makeSofaSeat=(instanceId=null)=>",
     "refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId);}"
   ])assert.ok(scene.includes(phrase),phrase);
@@ -103,7 +103,7 @@ test('F1b busy fixture blocks editor relocation and game state retains queue/old
   }
   const state=newHousehold();
   assert.deepEqual(loadHousehold(copy(state)).world.furniture,state.world.furniture);
-  assert.match(scene,/if\(Object\.values\(bedStates\)\.some\(s=>s\.progress>0\)\)/);
+  assert.match(scene,/if\(bedStates\[id\]\.progress>0\)/);
   assert.match(scene,/if\(Object\.values\(showerStates\)\.some\(s=>s\.active\)\)/);
   assert.match(scene,/if\(Object\.values\(toiletStates\)\.some\(s=>s\.active\)\)/);
   assert.match(scene,/if\(fridgeOpen>\.001\|\|Object\.values\(fridgeLeaving\)\.some\(Boolean\)\)/);
@@ -114,14 +114,14 @@ test('F1b active visual timelines use transformed resident contact not mutable h
   for(const phrase of [
     "sofaTransitionPose(sofaStates.alex),sofaVisualTargets.alex",
     "sofaTransitionPose(sofaStates.mira),sofaVisualTargets.mira",
-    "furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex))",
-    "furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira))",
+    "furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex),bedVisualTargets.alex)",
+    "furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira),bedVisualTargets.mira)",
     "furniturePose(game.world,'shower',showerStates.alex.frame.pose)",
     "furniturePose(game.world,'shower',showerStates.mira.frame.pose)",
     "furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)",
     "furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)",
-    "inverseFurniturePose(game.world,'bed',display)",
-    "inverseFurniturePose(game.world,'bed',miraDisplay)"
+    "inverseFurniturePose(game.world,'bed',display,bedVisualTargets.alex)",
+    "inverseFurniturePose(game.world,'bed',miraDisplay,bedVisualTargets.mira)"
   ])assert.ok(scene.includes(phrase),phrase);
 });
 
