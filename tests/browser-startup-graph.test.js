@@ -37,5 +37,5 @@ test('Safari startup has bounded SW registration and optional model loading',()=
  assert.match(game,/loadingProgress\.failUnresolved\(\)/);
  assert.match(game,/18000/);
  assert.match(html,/Повторить загрузку/);
- assert.match(html,/game\.js\?v=1\.1t/);
+ assert.match(html,/game\.js\?v=1\.1u/);
 });
