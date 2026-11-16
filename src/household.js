@@ -25,6 +25,7 @@ import {createActivitySession,restoreActivitySession,arriveActivitySession,
   advanceActivitySession} from './activity-session.js';
 import {newSkillProgress,restoreSkillProgress,creditActivityPractice} from './skills-engine.js';
 import {getObjectItem} from './object-definition-registry.js';
+import {newObjectOnceLedger,restoreObjectOnceLedger} from './object-once-ledger.js';
 import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
 
@@ -40,6 +41,7 @@ function newMira(minutes=480) {
   mira.autonomy.nextAt=minutes;
   mira.event='Свободное время';
   mira.skills=newSkillProgress();
+  mira.objectOnceLedger=newObjectOnceLedger();
   refreshMind(mira);
   return mira;
 }
@@ -48,6 +50,7 @@ export function newHousehold() {
   const state=newGame(DEMO_PROFILES.first);
   state.otherSim=newMira(state.minutes);
   state.skills=newSkillProgress();
+  state.objectOnceLedger=newObjectOnceLedger();
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);
   state.socialGraph=newSocialGraph(HOUSEHOLD_IDS);
@@ -73,6 +76,7 @@ export function loadHousehold(raw) {
   const root=loadGame(raw,DEMO_PROFILES.first);
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture)};
   root.shop=restoreFurnitureShop(raw.shop);
+  root.objectOnceLedger=restoreObjectOnceLedger(raw.objectOnceLedger);
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
     raw.otherSim.version===1 && raw.otherSim.needs && raw.otherSim.position;
   // Ignore saved clock/speed/pause for Mira; the household has one shared clock.
@@ -87,6 +91,7 @@ export function loadHousehold(raw) {
   mira.autonomy.enabled=root.autonomy.enabled;
   if (!root.autonomy.enabled && mira.action?.automatic) mira.action=null;
   root.otherSim=mira;
+  mira.objectOnceLedger=restoreObjectOnceLedger(raw.otherSim?.objectOnceLedger);
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
   root.inventory=restoreInventory(raw.inventory);
   root.actionQueues=restoreActionQueues(raw.actionQueues,HOUSEHOLD_IDS);
