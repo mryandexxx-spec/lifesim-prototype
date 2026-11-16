@@ -71,5 +71,10 @@ export function pickWorldRayTarget(near,far,targets){
     if(other.target.kind==='resident'&&best.target.kind!=='resident')
       return {kind:'resident',id:other.target.id};
   }
-  return best.target.kind==='blocker'?null:{kind:best.target.kind,id:best.target.id};
+  // A copied functional object must retain its exact saved instance ID
+  // through 3D ray selection → action queue → route → animation.
+  return best.target.kind==='blocker'?null:
+    {kind:best.target.kind,id:best.target.id,
+      ...(typeof best.target.instanceId==='string'
+        ?{instanceId:best.target.instanceId}:{})};
 }

@@ -814,7 +814,7 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .app-shell[data-furnish-mode="true"] #reset-camera-btn{display:flex;align-items:center;justify-content:center;}
 .app-shell[data-furnish-mode="true"] #rotate-camera-btn{flex-direction:column;}
 .furniture-editor[data-editor-view="shop"]{
-  /* Four products, preview and buy button fit without inner scrolling
+  /* Five products in two rows, preview and buy button without nested scrolling
      on regular portrait iPhones; short landscape may scroll the sheet. */
   max-height:min(70dvh,570px);
 }
@@ -831,7 +831,7 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .furnish-shop{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;width:100%;min-width:0;
   background:transparent;border:0;padding:0;max-height:none;overflow:visible;}
 .furnish-shop[hidden],.furnish-warehouse[hidden],.furnish-commands[hidden]{display:none!important;}
-.furnish-stock{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;overflow:visible;}
+.furnish-stock{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;overflow:visible;}
 .furnish-stock button{display:flex;min-width:0;min-height:50px;flex-direction:column;
   align-items:flex-start;justify-content:center;gap:2px;padding:8px 11px;border:1px solid #c8dfcf;
   border-radius:12px;background:#f4f8f0;color:#325c46;text-align:left;}
