@@ -1060,3 +1060,10 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .furnish-room-rotate:disabled{opacity:.4;}
 @media(max-width:380px){.furnish-room-tools{gap:5px;}
   .furnish-room-rotate{min-width:108px;padding:6px;font-size:11px;}}
+
+/* H2b — second explicit musical activity in the same Safari touch sheet. */
+.music-dance-button{width:100%;min-height:46px;margin-top:8px;padding:12px 15px;
+  border:1px solid #b5d7c0;border-radius:15px;background:#e7f3e8;color:#2b694f;
+  font:inherit;font-weight:850;font-size:14px;display:flex;align-items:center;
+  justify-content:space-between;gap:10px;touch-action:manipulation;}
+.music-dance-button[hidden]{display:none!important;}
