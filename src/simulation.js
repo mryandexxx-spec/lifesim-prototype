@@ -66,7 +66,7 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
   // M4 is an optional v1 field; don't reset old progress or invent accidents.
   if (!Number.isFinite(data.needs.bladder)) next.needs.bladder=BLADDER_LEGACY_DEFAULT;
   if (Number.isFinite(data.position.x) && Number.isFinite(data.position.z)) {
-    next.position.x = Math.max(-4.5, Math.min(4.5, data.position.x));
+    next.position.x = Math.max(-4.5, Math.min(13.7, data.position.x));
     next.position.z = Math.max(-3.7, Math.min(3.7, data.position.z));
   }
   if (Number.isFinite(data.autonomy?.nextAt)) next.autonomy.nextAt = Math.max(0, Math.min(data.autonomy.nextAt, 10000000));

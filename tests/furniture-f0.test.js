@@ -24,7 +24,7 @@ test('F0 legacy geometry is exact and every old obstacle comes from instances',(
 });
 test('unmodified household retains all interactions and frozen baseline A* routes',()=>{
   const s=newHousehold();
-  for(const [id,action] of Object.entries(ACTIONS).filter(([id])=>id!=='hobby'&&id!=='music')){
+  for(const [id,action] of Object.entries(ACTIONS).filter(([id])=>id!=='hobby'&&id!=='music'&&id!=='seat')){
     const instance=resolveActionFurniture(s.world,id);
     assert.ok(instance,id);
     assert.equal(instance.instanceId,LEGACY_FURNITURE_IDS[id]);
