@@ -27,34 +27,70 @@ export function proposeObjectEffectDeltas(registry,context={}){
       eventId:effect.mode==='once'?eventId:null
     }));
 }
-/** One aggregation boundary for overlapping furniture effects.
- * 'sum' adds independent sources, 'highest' selects strongest by magnitude,
- * 'unique' takes at most one effect per named group.
- * The returned values are proposals; the caller alone commits canonical state.
+/** Deterministic aggregation boundary for overlapping furniture effects.
+ * 'sum' adds independent sources. 'highest' selects greatest magnitude.
+ * 'unique' chooses ONE source in a group. Tie-breaks MUST be stable across
+ * scene traversal order, save/restore and two-resident update order.
+ *
+ * Source identity uses nested maps rather than concatenated delimiters:
+ * arbitrary IDs containing "|" cannot collide or gain an extra grant.
+ * The caller still owns authorization and committing canonical state.
  */
 export function calculateObjectEffectChanges(registry,contributions,values={}){
   if(!Array.isArray(contributions)||contributions.length>4096)return [];
-  const buckets=new Map(),seen=new Set();
+  const buckets=new Map();
+  // A source is one (instance, effect, event) for ONE stat/group/policy.
+  // A duplicate should never be credited even if values differ. Authoring
+  // IDs are stable, but external events must not alias across group strings.
+  const seen=new Map();
+  const validId=x=>typeof x==='string'&&x.length>0&&x.length<=256;
+  function slot(map,key){if(!map.has(key))map.set(key,new Map());return map.get(key);}
   for(const row of contributions){
     if(!row||!Object.hasOwn(registry?.stats||{},row.statId)||
       !['sum','highest','unique'].includes(row.stacking)||
       !finite(row.delta)||Math.abs(row.delta)>1e6||
-      typeof row.group!=='string'||!row.group)continue;
-    const key=[row.statId,row.group,row.stacking].join('|');
-    const identity=[row.instanceId,row.effectId,row.eventId||'tick',key].join('|');
-    if(seen.has(identity))continue;
-    seen.add(identity);
-    if(!buckets.has(key))buckets.set(key,{statId:row.statId,stacking:row.stacking,rows:[]});
-    buckets.get(key).rows.push(row.delta);
+      !validId(row.group)||!validId(row.instanceId)||!validId(row.effectId)||
+      (row.eventId!==null&&row.eventId!==undefined&&!validId(row.eventId)))
+      continue;
+    const groupBucket=slot(slot(buckets,row.statId),row.group);
+    if(!groupBucket.has(row.stacking))groupBucket.set(row.stacking,[]);
+    const groupSeen=slot(slot(slot(seen,row.statId),row.group),row.stacking);
+    const instanceSeen=slot(groupSeen,row.instanceId);
+    const effectSeen=slot(instanceSeen,row.effectId);
+    const eventKey=row.eventId??null;
+    if(effectSeen.has(eventKey))continue;
+    effectSeen.set(eventKey,true);
+    groupBucket.get(row.stacking).push({
+      delta:row.delta,instanceId:row.instanceId,effectId:row.effectId,
+      eventId:eventKey
+    });
   }
   const totals=new Map();
-  for(const bucket of buckets.values()){
-    let gained;
-    if(bucket.stacking==='sum')gained=bucket.rows.reduce((n,v)=>n+v,0);
-    else if(bucket.stacking==='highest')
-      gained=bucket.rows.reduce((v,n)=>Math.abs(n)>Math.abs(v)?n:v,0);
-    else gained=bucket.rows[0];
-    totals.set(bucket.statId,(totals.get(bucket.statId)||0)+gained);
+  const sourceOrder=(a,b)=>{
+    // Stable tie-break: source instance -> effect -> receipt ID.
+    const fields=['instanceId','effectId','eventId'];
+    for(const field of fields){
+      const x=a[field]??'',y=b[field]??'';
+      if(x<y)return -1;
+      if(x>y)return 1;
+    }
+    return 0;
+  };
+  for(const [statId,groups] of buckets){
+    let sum=0;
+    for(const policies of groups.values())for(const [policy,rows] of policies){
+      let gained;
+      if(policy==='sum')gained=rows.reduce((n,row)=>n+row.delta,0);
+      else if(policy==='highest'){
+        const best=rows.slice().sort((a,b)=>
+          Math.abs(b.delta)-Math.abs(a.delta)||sourceOrder(a,b))[0];
+        gained=best.delta;
+      }else{
+        gained=rows.slice().sort(sourceOrder)[0].delta;
+      }
+      sum+=gained;
+    }
+    totals.set(statId,sum);
   }
   return [...totals].sort(([a],[b])=>a.localeCompare(b)).map(([statId,delta])=>{
     const stat=registry.stats[statId];
