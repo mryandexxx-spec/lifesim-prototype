@@ -96,3 +96,72 @@ test('F4b9: Safari markup has real variant buttons, filter guard, no purchase on
   assert.match(pages,/node --check src\/object-quality-comparison\.js/);
   assert.match(pages,/src\/object-quality-comparison\.js site\/src\//);
 });
+
+
+test('F4b9: actual browser renderMarket button selects real visible SKU without spending credits',async()=>{
+  const {runInNewContext}=await import('node:vm');
+  const {newFurnitureShop}=await import('../src/furniture-shop.js');
+  const {newFurnitureWorld}=await import('../src/furniture-catalog.js');
+  const gameCode=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const start=gameCode.indexOf('  const renderMarket=()=>{'),stop=gameCode.indexOf('  const renderWarehouse=()=>{',start);
+  assert.ok(start>0&&stop>start);
+  const makeEl=()=>({
+    hidden:false,dataset:{},attrs:{},children:[],textContent:'',disabled:false,
+    setAttribute(k,v){this.attrs[k]=v;},
+    replaceChildren(...nodes){this.children=[...nodes];},
+    append(...nodes){this.children.push(...nodes);},
+    addEventListener(k,fn){this['on'+k]=fn;},
+    focus(){this.focused=true;}
+  });
+  const elements=new Map();
+  for(const id of ['hint','furnish-shop','furnish-warehouse','furnish-shop-toggle',
+    'furnish-warehouse-toggle','furnish-edit-toggle','furniture-editor',
+    'furnish-placement-guide','furnish-place-cancel','furnish-placement-controls',
+    'furnish-stock','furnish-variant-compare','furnish-variant-rows',
+    'furnish-placing-name','furnish-placing-status','furnish-preview','furnish-buy',
+    'furnish-preview-turn'])elements.set(id,makeEl());
+  const buttons=offers.filter(x=>x.prefabId==='sofa').map(item=>{
+    const button=makeEl();button.dataset.itemId=item.itemId;
+    const mark=makeEl();
+    button.classList={toggle(){}};
+    button.querySelector=()=>mark;
+    return button;
+  });
+  elements.get('furnish-stock').querySelectorAll=()=>buttons;
+  const state={
+    $:id=>elements.get(id),document:{createElement:()=>makeEl()},
+    shopOpen:true,warehouseOpen:false,shopPlacing:false,furnishMode:true,
+    shopSelected:'sofa',shopSelectedItemId:'legacy.sofa',
+    shopRoomCategory:null,shopFunctionCategory:null,
+    oneFingerMode:'pan',showCameraMode(){},shopPose:null,
+    marketGhost:{enabled:false},shopListings:offers,shopQualityRegistry:registry,
+    selectShopCatalog,compareShopVariants,formatShopVariantComparison,chooseComparableVariant,
+    game:{shop:newFurnitureShop(),world:{furniture:newFurnitureWorld()}},
+    editorMessage:r=>r,syncShopPreviewEntity(){},clearShopPreviewEntity(){},
+    chooseShopProduct(id){this.shopSelectedItemId=id;this.shopSelected='sofa';},
+    // The actual code calls chooseShopProduct as a bare function.
+    instanceRect(){},FURNITURE_CATALOG:{},ghostValid:{},ghostInvalid:{}
+  };
+  const selected=[];
+  state.chooseShopProduct=id=>{selected.push(id);state.shopSelectedItemId=id;state.shopSelected='sofa';};
+  runInNewContext('(()=>{'+gameCode.slice(start,stop)+'\nrenderMarket();})()',state,{timeout:1500});
+  const panel=elements.get('furnish-variant-compare');
+  const rows=elements.get('furnish-variant-rows');
+  assert.equal(panel.hidden,false);
+  assert.equal(rows.children.length,1);
+  const pick=rows.children[0].children[1];
+  assert.equal(pick.textContent,'Выбрать вариант');
+  assert.match(pick.attrs['aria-label'],/Комфорт/);
+  const initialCredits=state.game.shop.credits;
+  state.shopPlacing=true;pick.onclick();assert.deepEqual(selected,[]);
+  state.shopPlacing=false;
+  state.selectShopCatalog=()=>offers.filter(x=>x.itemId==='legacy.sofa');
+  pick.onclick();assert.deepEqual(selected,[],'stale button cannot select filtered-out SKU');
+  state.selectShopCatalog=selectShopCatalog;
+  pick.onclick();
+  assert.deepEqual(selected,['sofa.comfort']);
+  assert.equal(state.shopSelectedItemId,'sofa.comfort');
+  assert.equal(state.game.shop.credits,initialCredits);
+  assert.equal(state.shopPlacing,false);
+  assert.equal(buttons.find(b=>b.dataset.itemId==='sofa.comfort').focused,true);
+});
