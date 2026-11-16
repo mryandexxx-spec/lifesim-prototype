@@ -86,6 +86,8 @@ test('R5b pause and restore derive frame from v1 session with no extra saved pro
  assert.equal(restored.version,1);
  const current=frame(restored.socialAction);
  assert.equal(current.active,true);
+ assert.equal(romanticEveningVignette(restored.socialAction,restored.world,coords,12,
+   {eligible:false}).active,false);
  assert.equal(restored.socialAction.branchAction.eveningConsent,true);
  restored.paused=true;
  assert.equal(tickSocial(restored,8),false);
