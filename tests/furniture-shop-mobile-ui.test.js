@@ -41,12 +41,12 @@ test('F2.1 camera orbit/pan switch stays visible and entering shop defaults to p
   assert.match(game,/oneFinger:oneFingerMode/);
 });
 test('F2.1 purchase preview is a real validatable 3D tap with red blocked place, never a charge',()=>{
-  assert.match(game,/if\(shopOpen&&shopSelected\)\{\s*const floor=editorFloorAt\(pos\)/);
+  assert.match(game,/if\(shopOpen&&shopPlacing&&shopSelected\)\{\s*const floor=editorFloorAt\(pos\)/);
   assert.match(game,/shopPose=\{x:snapFurnitureCoordinate\(floor\.x\),z:snapFurnitureCoordinate\(floor\.z\)/);
   assert.match(game,/shopManualPose=true;renderMarket\(\)/);
   assert.match(game,/const preview=listing&&shopPose\s*\?buyMarketItem/);
   assert.match(game,/marketGhost\.render\.material=suitable\?ghostValid:ghostInvalid/);
-  assert.match(game,/\$\('furnish-buy'\)\.disabled=!suitable/);
+  assert.match(game,/\$\('furnish-buy'\)\.disabled=shopPlacing\?!suitable/);
   assert.match(game,/shopPose=\{\.\.\.shopPose,yaw:\(shopPose\.yaw\+90\)%360\}/);
   const w=newFurnitureWorld(),s=newFurnitureShop();
   const preview=buyMarketItem(w,s,'plant',{x:100,z:100,yaw:0},people);
