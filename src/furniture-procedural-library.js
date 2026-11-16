@@ -174,6 +174,20 @@ const schemes={
       [p.sage,p.coral,p.blue][i])),
     ...[.70,1.13].map((y,i)=>b('folded basket '+i,.34,y,.0,.59,.24,.51,
       i?p.terracotta:p.cream))]}
+, 'easel.starter':{parts:[
+    b('left angled leg',-.42,.82,.06,.11,1.64,.12,p.walnut,[0,0,-8]),
+    b('right angled leg',.42,.82,.06,.11,1.64,.12,p.walnut,[0,0,8]),
+    b('rear brace',0,.68,.25,.12,1.31,.12,p.oak,[15,0,0]),
+    b('top crown',0,1.93,.01,.92,.11,.13,p.walnut),
+    b('canvas backboard',0,1.37,-.08,.86,1.10,.085,p.cream),
+    b('blank canvas',0,1.37,-.14,.78,.99,.026,p.chalk),
+    b('frame top',0,1.90,-.15,.89,.07,.07,p.oak),
+    b('frame bottom',0,.84,-.15,.89,.08,.08,p.oak),
+    ...[-.42,.42].map(x=>b('frame edge '+x,x,1.37,-.15,.055,1.06,.07,p.oak)),
+    b('paint tray',0,.81,-.32,1.06,.09,.38,p.walnut),
+    c('paint jar',.33,.90,-.36,.16,.20,.16,p.terracotta),
+    b('brush handle',-.20,.93,-.38,.40,.023,.025,p.brass,[0,0,16])
+  ]}
 };
 const ALLOWED=new Set(['box','sphere','cylinder']);
 const freeze=Object.fromEntries(Object.entries(schemes).map(([id,entry])=>{

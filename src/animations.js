@@ -133,6 +133,12 @@ export function stepAnimation(previous,signals,dt) {
     // These motions never translate the simulation root or bypass A*.
     legTarget=[...music.legs];kneeTarget=[...music.knees];
     armTarget=[...music.arms];elbowTarget=[...music.elbows];
+  }else if(action==='paint'){
+    // H5: a clear brush stroke from the wrist, always at a real easel.
+    // The visual wave is cosmetic; the authoritative session earns XP.
+    const stroke=Math.sin(t*5.2),breath=Math.sin(t*2.1);
+    armTarget=[-28-5*breath,-67+14*stroke];
+    elbowTarget=[-18,-38-7*stroke];
   }else if(['lamp','mirror','dresser','wardrobe'].includes(action)){
     // F4E: the authored procedural rig performs a physical hand gesture
     // toward the utility object while staying at the verified A* approach.

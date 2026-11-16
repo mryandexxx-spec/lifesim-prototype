@@ -21,6 +21,7 @@ import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js'
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
+import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID} from './painting.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -272,6 +273,7 @@ const META = {
   hobby: { title: 'Книжный шкаф', category: 'Гостиная',
     description: 'Подойти к шкафу, выбрать историю и почитать. Досуг растёт во время чтения, а навык — от практики.',
     icon: '📖', anchor: [0,1.5,0] },
+  paint: {title:'Мольберт',category:'Творчество',description:'Рисовать настоящую картину · выбрать тему и пополнить личную коллекцию.',icon:'🎨',anchor:[0,1.4,0]},
   music: {title:'Музыкальный центр',category:'Гостиная',
     description:'Выбери музыкальный стиль: слушай спокойно или танцуй. Оба занятия сопровождаются движениями и звуком.',
     icon:'♫',anchor:[0,1.1,0]}
@@ -332,7 +334,8 @@ function scheduleCommand(command,residentId=game.selectedSim){
     const definition=command.type==='activity'
       ?getActivityDefinition(HOBBY_ACTIVITIES,command.activityId):null;
     const actionId=command.type==='activity'
-      ?(definition?.requiredCapabilities.includes('music.playback')?'music':'hobby')
+      ?(definition?.requiredCapabilities.includes('music.playback')?'music':
+        definition?.requiredCapabilities.includes('art.paint')?'paint':'hobby')
       :command.actionId;
     const target=resolveActionFurniture(game.world,actionId,command.targetInstanceId);
     if(!target){toast('Этот предмет недоступен');return false;}
@@ -472,7 +475,7 @@ let mindTab='overview',skillProfileKey='';
 function renderSkillsTab(force=false){
   if(mindTab!=='skills'||$('mind-panel').hidden)return;
   const actor=selectedActor(),rows=skillProfileRows(actor.skills,HOBBY_SKILLS);
-  const key=JSON.stringify([game.selectedSim,rows,actor.action?.phase,game.socialAction?.phase]);
+  const key=JSON.stringify([game.selectedSim,rows,actor.action?.phase,game.socialAction?.phase,actor.createdWorks]);
   if(!force&&skillProfileKey===key)return;
   skillProfileKey=key;
   const list=$('mind-skills-list');list.replaceChildren();
@@ -508,6 +511,21 @@ function renderSkillsTab(force=false){
       unlocks.append(line);
     }
     card.append(unlocks);list.append(card);
+  }
+  const portfolio=$('mind-painting-works');
+  const works=Array.isArray(actor.createdWorks)?actor.createdWorks:[];
+  portfolio.replaceChildren();
+  const heading=document.createElement('strong');
+  heading.textContent='Картины · '+works.length+'/24';
+  portfolio.append(heading);
+  if(!works.length){const empty=document.createElement('p');
+    empty.textContent='Пока пусто. Купи мольберт и закончи рисунок.';
+    portfolio.append(empty);
+  }
+  for(const work of [...works].reverse().slice(0,8)){
+    const item=document.createElement('div');item.className='skill-work';
+    item.textContent=(PAINT_SUBJECTS[work.contentId]?.label||'Картина')+
+      ' · качество '+work.quality+'/100';portfolio.append(item);
   }
 }
 function setMindTab(tab){
@@ -556,7 +574,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=['sofa','seat','bed','tv','hobby','music',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','seat','bed','tv','hobby','music','paint',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -567,11 +585,13 @@ function select(id,instanceId=null) {
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
       id==='tv'?'Просмотр этого телевизора · с дивана, если он свободен и экран виден':
-      id==='hobby'||id==='music'||id==='seat'||UTILITY_ACTION_IDS.includes(id)?META[id].description:
+      id==='hobby'||id==='music'||id==='paint'||id==='seat'||UTILITY_ACTION_IDS.includes(id)?META[id].description:
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('music-style-field').hidden=id!=='music';
   $('reading-content-field').hidden=id!=='hobby';
+  $('painting-theme-field').hidden=id!=='paint';
+  if(id==='paint')$('painting-theme-select').value=PAINT_CONTENT_IDS[0];
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
   const lampLabel=id==='lamp'
@@ -620,6 +640,11 @@ $('action-button').addEventListener('click', () => {
         contentId:MUSIC_CONTENT_IDS.includes($('music-style-select').value)
           ?$('music-style-select').value:MUSIC_CONTENT_IDS[0],
         ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
+      :selected==='paint'
+        ?{type:'activity',activityId:PAINT_ACTIVITY_ID,
+          contentId:PAINT_CONTENT_IDS.includes($('painting-theme-select').value)
+            ?$('painting-theme-select').value:PAINT_CONTENT_IDS[0],
+          ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
       :{type:'object',actionId:selected,
         ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
   // A tap on the explicit "Listen to music" action is itself an iOS user
@@ -1907,7 +1932,8 @@ function boot() {
     lamp: {x:0,y:0,z:-.90,pitch:0,yaw:0},
     mirror: {x:0,y:0,z:-.88,pitch:0,yaw:0},
     dresser: {x:0,y:0,z:-1.06,pitch:0,yaw:0},
-    wardrobe: {x:0,y:0,z:-1.20,pitch:0,yaw:0}
+    wardrobe: {x:0,y:0,z:-1.20,pitch:0,yaw:0},
+    paint: {x:0,y:0,z:-1.00,pitch:0,yaw:0}
   };
   if(game.action?.phase==='using') {
     const dest=game.action.id==='bed'
@@ -2137,7 +2163,8 @@ function boot() {
           return (!command.inventoryItemId||inventoryFor(game,residentId).some(item=>
             item.type==='book'&&item.id===command.inventoryItemId))&&
             furnitureAvailable(game,
-              activity?.requiredCapabilities.includes('music.playback')?'music':'hobby',
+              activity?.requiredCapabilities.includes('music.playback')?'music':
+              activity?.requiredCapabilities.includes('art.paint')?'paint':'hobby',
               residentId,command.targetInstanceId);
         }
         if(command.type==='object')
@@ -2186,7 +2213,8 @@ function boot() {
           started=beginAction(command.actionId,false,residentId,true,command.targetInstanceId);
         else if(command.type==='activity'){
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
-          const actionId=activity?.requiredCapabilities.includes('music.playback')?'music':'hobby';
+          const actionId=activity?.requiredCapabilities.includes('music.playback')?'music':
+            activity?.requiredCapabilities.includes('art.paint')?'paint':'hobby';
           started=beginAction(actionId,false,residentId,true,command.targetInstanceId,
             command.activityId,command.contentId,command.inventoryItemId||null);
         }
@@ -3049,7 +3077,7 @@ function boot() {
         const height={armchair:1.85,chair:1.65,diningtable:.95,floorlamp:2.1,
           rug:.09,dresser:1.17,mirror:2.17,sculpture:1.95,wardrobe:2.62,
           table:.63,nightstand:1.49,tv:2.0,plant:1.87,
-          bed:1.40,counter:2.50,fridge:2.2,sofa:1.3,shower:2.75,toilet:1.45,
+          bed:1.40,counter:2.50,fridge:2.2,sofa:1.3,shower:2.75,toilet:1.45,easel:2.02,
         bookcase:2.05,music:1.2}[item.prefabId]||2;
         return {kind:'object',id:item.instanceId,bounds:{
           min:{x:rect.minX,y:0,z:rect.minZ},
@@ -3306,8 +3334,15 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:1.3,z:r.maxZ}}};
       });
+    const easels=game.world.furniture.instances
+      .filter(item=>item.prefabId==='easel'&&item.location==='home')
+      .map(item=>{
+        const r=instanceRect(item,FURNITURE_CATALOG.easel.footprint);
+        return {kind:'object',id:'paint',instanceId:item.instanceId,
+          bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:2.02,z:r.maxZ}}};
+      });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...chairSeats,...musicStations,...movedVolumes,...blockers]);
+      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...chairSeats,...musicStations,...easels,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
