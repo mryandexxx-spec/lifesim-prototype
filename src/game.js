@@ -776,6 +776,18 @@ function renderQueuePanel(force=true){
   const label=document.createElement('div');
   label.textContent=active?'Сейчас: '+active:'Сейчас: свободен';
   activeEl.append(label);
+  const evening=game.socialAction?.branchAction?.id==='romance.evening'&&
+    game.socialAction?.eveningStage;
+  if(evening&&active){
+    const detail=document.createElement('div');
+    detail.className='shared-progress-text';
+    detail.textContent=game.socialAction.phase==='walking'
+      ?'Оба жителя идут к столику · ждём встречи'
+      :game.socialAction.branchAction.eveningConsent===true
+        ?'Вечер у столика · '+Math.round(Math.min(1,
+          game.socialAction.elapsed/30)*100)+'%':'Приглашение не принято';
+    activeEl.append(detail);
+  }
   if(active){
     const stop=document.createElement('button');stop.type='button';
     stop.textContent='Прервать текущее действие';
@@ -1349,6 +1361,19 @@ function boot() {
     box('coffee table top',1.34,.40,-.26,1.47,.12,.73,M.paleWood);
     for(let x of [.74,1.94]) for(let z of [-.53,.01])
       cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
+    // R5b: instance-local original low-poly candle and tea setting.
+    // Never visible until BOTH participants arrive and the partner agrees.
+    const setting=new pc.Entity('romantic table setting');
+    decorDrawing.node.addChild(setting);
+    const flameMaterial=mat('#ffcf77',{emissive:1.15});
+    cylinder('date candle',0,.55,0,.12,.17,.12,M.cream,setting);
+    cylinder('date holder',0,.475,0,.19,.025,.19,M.wood,setting);
+    ball('date flame',0,.68,0,.065,.10,.065,flameMaterial,setting);
+    for(const x of [-.38,.38]){
+      cylinder('date tea',x,.51,0,.17,.105,.17,M.cream,setting);
+      cylinder('date tea surface',x,.566,0,.13,.009,.13,M.rust,setting);
+    }
+    setting.enabled=false;
   });
   withDecor('tv',()=>{
     touchBox('tv','tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
@@ -2779,6 +2804,9 @@ function boot() {
       }
     }
     const socialUsing=game.socialAction?.phase==='using';
+    const tableEvening=romanticEveningTableFrame(game.socialAction,game.world);
+    const eveningWeight=tableEvening.active
+      ?Math.min(1,tableEvening.progress*8,(1-tableEvening.progress)*8):0;
     // Both visible avatars follow the same consented hug timeline.
     // Simulation coordinates stay authoritative for movement and saves.
     const hugCandidate=hugMotion(game.socialAction);
@@ -2890,6 +2918,7 @@ function boot() {
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
       social:socialUsing&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      eveningWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
       fridgeReach:alexFridge?.reach||0,fridgeEat:alexFridge?.eat||0,
@@ -2994,6 +3023,7 @@ function boot() {
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
       social:socialUsing&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      eveningWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
       fridgeReach:miraFridge?.reach||0,fridgeEat:miraFridge?.eat||0,
@@ -3076,6 +3106,18 @@ function boot() {
     if(meshyShown&&useId==='sofa')book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
+    // Set dressing belongs to ONE real table and exists only after consent.
+    for(const item of game.world.furniture.instances){
+      if(item.prefabId!=='table'||item.location!=='home')continue;
+      const setting=decorNodes.get(item.instanceId)?.findByName('romantic table setting');
+      if(!setting)continue;
+      setting.enabled=tableEvening.active&&tableEvening.instanceId===item.instanceId;
+      if(setting.enabled){
+        const flame=setting.findByName('date flame');
+        const pulse=1+.09*Math.sin(effectTime*4.6);
+        if(flame)flame.setLocalScale(.065*pulse,.10*pulse,.065*pulse);
+      }
+    }
     // A TV only plays while one of its OWN watchers is actually using it.
     // Each instance keeps its own small procedural screen and no video files.
     for(const item of game.world.furniture.instances){
