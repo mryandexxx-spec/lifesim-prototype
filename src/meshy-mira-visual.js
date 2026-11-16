@@ -8,6 +8,7 @@ import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
 import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
   from './meshy-shower-runtime.js';
 import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
+import {createMeshyHugController} from './meshy-hug-runtime.js';
 
 /** Read undeformed geometry AABBs, never pose-dependent meshInstance.aabb.
  * The validated female GLB has one original skinned mesh.
@@ -34,7 +35,7 @@ export function miraStaticSourceBounds(renderRoot){
  * The existing avatar controls motion and sofa seat root; the authored
  * female sitting clip drives ONLY the skinned pose with X/Z motion removed.
  */
-export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,onStatus=()=>{}}){
+export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvatar=null,onStatus=()=>{}}){
   const preserved=new Set([rig.selected,rig.snack,rig.book,rig.showerWrap]);
   const legacyRenderers=rig.avatar.findComponents('render')
     .filter(component=>!preserved.has(component.entity));
@@ -42,7 +43,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,onStatus=()=
     root:null,model:null,clip:null,visible:false,base:null,
     sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null,
     bedReady:false,bedRuntime:null,fridgeRuntime:null,
-    showerRuntime:null,walkDuration:0,toiletReady:false};
+    showerRuntime:null,hugRuntime:null,walkDuration:0,toiletReady:false};
   function attach(asset){
     const model=asset.resource.instantiateRenderEntity();
     const root=new pc.Entity('Meshy Mira visual');
@@ -139,6 +140,25 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,onStatus=()=
         state.showerRuntime=null;
         console.warn('Mira shower skin unavailable',error);
       }
+      // Independent pair-contact pose overlay, post-Anim and visual-only.
+      try{
+        if(pc.Script&&model.findByName&&partnerAvatar){
+          const hug=createMeshyHugController({pc,model,
+            avatar:rig.avatar,partnerAvatar});
+          if(hug.ready){
+            if(!model.script)model.addComponent('script');
+            class MiraHugPostUpdate extends pc.Script{
+              static scriptName='blinsMiraHugPostUpdate';
+              postUpdate(){hug.apply();}
+            }
+            model.script.create(MiraHugPostUpdate);
+            state.hugRuntime=hug;
+          }
+        }
+      }catch(error){
+        state.hugRuntime=null;
+        console.warn('Mira hug rig unavailable',error);
+      }
       root.enabled=false;
       Object.assign(state,{ready:true,status:'ready',root,model,clip:'Idle_7',base});
       onStatus('ready');
@@ -164,13 +184,13 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,onStatus=()=
     get status(){return state.status;},
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
-      sofaBusy=false,sofaWeight=0,dt=0,
+      sofaBusy=false,sofaWeight=0,dt=0,hugFrame=null,
       bedBusy=false,bedFrame=null,bedProgress=0,
       showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,
       fridgeBusy=false,fridgeFrame=null}={}){
       const show=canShowMiraMeshy({
-        preferred,ready:state.ready,actionId,
+        preferred:preferred&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready)),ready:state.ready,actionId,
         sofaBusy,sofaReady:state.sofaReady,
         bedBusy,bedReady:state.bedReady,showerBusy,
         showerReady:Boolean(state.showerRuntime?.ready),
@@ -184,10 +204,12 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,onStatus=()=
       }
       if(!show||!state.model){
         state.bedRuntime?.setFrame(null);
+        state.hugRuntime?.setFrame(null);
         state.fridgeRuntime?.setFrame(null);
         state.showerRuntime?.setFrame(null);
         return show;
       }
+      state.hugRuntime?.setFrame(hugFrame);
       const shower=actionId==='shower'||showerBusy;
       state.showerRuntime?.setFrame(shower?showerFrame:null,paused);
       const fridge=actionId==='fridge'||fridgeBusy;
@@ -308,7 +330,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,onStatus=()=
         anim.playing=!paused;
         return true;
       }
-      const clip=miraClipFor({walking,social});
+      const clip=miraClipFor({walking,social:hugFrame?.active?null:social});
       if(state.clip===MIRA_SOFA_CLIP){
         state.sofaRelease={remaining:.2,offset:{...state.sofaOffset}};
       }
@@ -341,6 +363,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,onStatus=()=
       state.bedRuntime?.setFrame(null);
       state.fridgeRuntime?.setFrame(null);
       state.showerRuntime?.setFrame(null);
+      state.hugRuntime?.setFrame(null);
       state.model.anim.speed=1;
       const {base}=state;
       state.model.setLocalPosition(base.x,base.y,base.z);

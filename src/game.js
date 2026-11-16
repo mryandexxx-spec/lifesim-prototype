@@ -45,6 +45,7 @@ import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js';
+import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {meshVisualPreference,MESHY_VISUAL_KEY,meshSeatRuntimeSettings} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
@@ -1399,12 +1400,14 @@ function boot() {
   // controller remain authoritative; any GLB error falls back immediately.
   const liveFridgeLayout=()=>fixtureContactLayout(game.world,'fridge',FRIDGE_LAYOUT);
   const meshyAlex=createMeshyVisual({pc,app,rig:alexRig,
+    partnerAvatar:miraRig.avatar,
     footIK:seatIKEnabled,footPlant:seatFootPlantEnabled,
     fridgeLayout:liveFridgeLayout,onStatus:(status,error)=>{
     if(status==='ready'||status==='error')loadingProgress.finish('alex',status==='ready');
     if(error)console.warn('Meshy visual unavailable',error);
   }});
   const meshyMira=createMiraMeshyVisual({pc,app,rig:miraRig,
+    partnerAvatar:alexRig.avatar,
     fridgeLayout:liveFridgeLayout,onStatus:(status,error)=>{
     if(status==='ready'||status==='error')loadingProgress.finish('mira',status==='ready');
     if(error)console.warn('Meshy Mira visual unavailable',error);
@@ -2447,6 +2450,12 @@ function boot() {
       }
     }
     const socialUsing=game.socialAction?.phase==='using';
+    // Both visible avatars follow the same consented hug timeline.
+    // Simulation coordinates stay authoritative for movement and saves.
+    const hugCandidate=hugMotion(game.socialAction);
+    const hugTargets=hugCandidate.active
+      ?hugPairTarget(game.position,game.otherSim.position,hugCandidate.weight):null;
+    const hugFrame=hugTargets?hugCandidate:{weight:0,progress:0};
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
@@ -2475,9 +2484,9 @@ function boot() {
       ?furniturePose(game.world,useId,ACTOR_POSES[useId]):null;
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
-      x:pose?pose.x:game.position.x,
+      x:pose?pose.x:hugTargets?.a.x??game.position.x,
       y:pose?pose.y:animationStates.alex.walkBob,
-      z:pose?pose.z:game.position.z,
+      z:pose?pose.z:hugTargets?.a.z??game.position.z,
       pitch:pose?pose.pitch:0,
       yaw:pose?pose.yaw:socialUsing
         ? Math.atan2(game.otherSim.position.x-game.position.x,
@@ -2521,7 +2530,8 @@ function boot() {
       bedReclineWeight:bedPose?.bedReclineWeight||0,
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
-      social:socialUsing?game.socialAction.kind:null,
+      social:socialUsing&&!hugFrame.active?game.socialAction.kind:null,
+      hugWeight:hugFrame.weight,
       fridgeReach:alexFridge?.reach||0,fridgeEat:alexFridge?.eat||0,
       fridgeChew:alexFridge?.chew||0,
       gait:alexShower?alexShower.gaitMeters*WALK_PHASE_PER_METER:gait,
@@ -2569,9 +2579,9 @@ function boot() {
       ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId]):null;
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
-      x:miraPose?miraPose.x:game.otherSim.position.x,
+      x:miraPose?miraPose.x:hugTargets?.b.x??game.otherSim.position.x,
       y:miraPose?miraPose.y:animationStates.mira.walkBob,
-      z:miraPose?miraPose.z:game.otherSim.position.z,
+      z:miraPose?miraPose.z:hugTargets?.b.z??game.otherSim.position.z,
       pitch:miraPose?miraPose.pitch:0,
       yaw:miraPose?miraPose.yaw:socialUsing
         ? Math.atan2(game.position.x-game.otherSim.position.x,
@@ -2611,7 +2621,8 @@ function boot() {
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
-      social:socialUsing?game.socialAction.kind:null,
+      social:socialUsing&&!hugFrame.active?game.socialAction.kind:null,
+      hugWeight:hugFrame.weight,
       fridgeReach:miraFridge?.reach||0,fridgeEat:miraFridge?.eat||0,
       fridgeChew:miraFridge?.chew||0,
       gait:miraShower?miraShower.gaitMeters*WALK_PHASE_PER_METER:miraGait,
@@ -2635,6 +2646,7 @@ function boot() {
         (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'))&&
         !miraSeating&&!miraBedding&&!miraShower,
       social:socialUsing?game.socialAction.kind:null,
+      hugFrame,
       actionId:miraUseId,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
@@ -2668,6 +2680,7 @@ function boot() {
       social:socialUsing?game.socialAction.kind:null,
       socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
+      hugFrame,
       actionId:useId,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,

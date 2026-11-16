@@ -9,6 +9,7 @@ import {createMeshyBedController} from './meshy-bed-runtime.js';
 import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
   from './meshy-shower-runtime.js';
 import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
+import {createMeshyHugController} from './meshy-hug-runtime.js';
 
 /**
  * Meshy visual adapter for the EXISTING LifeSim procedural character root.
@@ -21,14 +22,14 @@ import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
  * behind the existing opaque privacy enclosure for washing.
  */
 export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
-  fridgeLayout=null,onStatus=()=>{}}) {
+  fridgeLayout=null,partnerAvatar=null,onStatus=()=>{}}) {
   const hiddenFromReplacement=new Set([rig.selected,rig.snack,rig.book,rig.showerWrap]);
   const legacyRenderers=rig.avatar.findComponents('render')
     .filter(component=>!hiddenFromReplacement.has(component.entity));
   const state={status:'loading',ready:false,root:null,model:null,clip:null,visible:false,error:null,
     scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null,
     seatRuntime:null,seatWarning:false,greetingDuration:0,fridgeRuntime:null,
-    bedRuntime:null,showerRuntime:null,walkDuration:0,toiletReady:false,
+    bedRuntime:null,showerRuntime:null,hugRuntime:null,walkDuration:0,toiletReady:false,
     alternateIdleAvailable:false};
   let requested=false;
 
@@ -129,6 +130,25 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         console.warn('Meshy shower arm unavailable',error);
         state.showerRuntime=null;
       }
+      // Independent pair-contact pose overlay, post-Anim and visual-only.
+      try{
+        if(pc.Script&&model.findByName&&partnerAvatar){
+          const hug=createMeshyHugController({pc,model,
+            avatar:rig.avatar,partnerAvatar});
+          if(hug.ready){
+            if(!model.script)model.addComponent('script');
+            class AlexHugPostUpdate extends pc.Script{
+              static scriptName='blinsAlexHugPostUpdate';
+              postUpdate(){hug.apply();}
+            }
+            model.script.create(AlexHugPostUpdate);
+            state.hugRuntime=hug;
+          }
+        }
+      }catch(error){
+        state.hugRuntime=null;
+        console.warn('Alex hug rig unavailable',error);
+      }
       root.enabled=false;
       state.root=root;state.model=model;state.clip='Idle_3';
       state.ready=true;state.status='ready';
@@ -158,11 +178,11 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       sofaBusy=false,sofaWeight=0,seat=null,seatMode='vertical',dt=0,
       bedBusy=false,bedFrame=null,showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,fridgeBusy=false,
-      socialInitiator=false,socialElapsed=null,fridgeFrame=null,
+      socialInitiator=false,socialElapsed=null,hugFrame=null,fridgeFrame=null,
       worldMinutes=null,mood=null,energy=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
-        preferred:requested,ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
+        preferred:requested&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready)),ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
         fridgeBusy,fridgeReady:Boolean(state.fridgeRuntime?.ready),
         bedReady:Boolean(state.bedRuntime?.ready),
         showerReady:Boolean(state.showerRuntime?.ready),
@@ -175,10 +195,12 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       }
       if(!useMeshy||!state.model){
         state.fridgeRuntime?.setFrame(null);
+        state.hugRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
         state.showerRuntime?.setFrame(null);
         return useMeshy;
       }
+      state.hugRuntime?.setFrame(hugFrame);
       // Game updates the pose; postUpdate applies joint rotations after Anim.
       const fridge=actionId==='fridge'||fridgeBusy;
       state.fridgeRuntime?.setFrame(fridge&&actionId==='fridge'?fridgeFrame:null);
@@ -312,7 +334,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         // the seat. The scrub was applied before the contact/foot pass.
         return true;
       }
-      const greetingTime=alexGreetingClipTime({
+      const greetingTime=hugFrame?.active?null:alexGreetingClipTime({
         social,initiator:socialInitiator,elapsed:socialElapsed,
         duration:state.greetingDuration
       });
@@ -329,7 +351,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         return true;
       }
       const target=walking||social
-        ? meshClipFor({walking,social})
+        ? meshClipFor({walking,social:hugFrame?.active?null:social})
         : alexIdleClipFor({minutes:worldMinutes,mood,energy,walking,social,
           actionId,sofaBusy,bedBusy,showerBusy,fridgeBusy,
           available:state.alternateIdleAvailable});
@@ -370,6 +392,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         state.fridgeRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
         state.showerRuntime?.setFrame(null);
+        state.hugRuntime?.setFrame(null);
         state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
       }
     }

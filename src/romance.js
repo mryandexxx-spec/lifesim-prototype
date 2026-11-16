@@ -7,7 +7,7 @@ export const FAMILY_KINDS=Object.freeze(['parent','sibling']);
 export const ROMANCE_ACTION_IDS=Object.freeze([
   'romance.flirt','romance.confess','romance.date','romance.breakup',
   'romance.tender','romance.propose','romance.marry','romance.divorce',
-  'romance.checkin','romance.repair'
+  'romance.checkin','romance.repair','romance.hug'
 ]);
 export const ROMANCE_COOLDOWN_MINUTES=1440;
 const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -243,8 +243,12 @@ export function romanceAvailability(graph,a,b,actionId,now=0){
     return {enabled:false,reason:'Для отношений нужно узнать чувства друг друга'};
   if(actionId==='romance.tender'&&!bondActive(bond))
     return {enabled:false,reason:'Сначала нужно стать парой'};
+  if(actionId==='romance.hug'&&!bondActive(bond)&&
+    (feelings[a].attraction<42||feelings[b].attraction<42||
+      !reciprocalFlirt(pair,a,b,now)))
+    return {enabled:false,reason:'Для объятия нужна взаимная романтическая симпатия'};
   if(climate.state==='strained'&&
-    ['romance.tender','romance.propose','romance.marry'].includes(actionId))
+    ['romance.tender','romance.hug','romance.propose','romance.marry'].includes(actionId))
     return {enabled:false,reason:'Сначала стоит обсудить разногласия'};
   if(climate.state==='distant'&&
     ['romance.propose','romance.marry'].includes(actionId))
@@ -300,6 +304,8 @@ export function recordRomanceReceipt(graph,pair,receipt){
     if(Array.isArray(days)&&!days.includes(day)){
       days.push(day);bond.careDays[receipt.actorId]=days.slice(-8);
     }
+  }else if(receipt.type==='romance.hug'&&bondActive(bond)){
+    bond.lastConnectionAt=receipt.at;
   }else if(['romance.checkin','romance.repair'].includes(receipt.type)&&
     bondActive(bond)){
     // Successful response restores emotional connection. Declined offers
@@ -314,17 +320,23 @@ export function recordRomanceReceipt(graph,pair,receipt){
     target.attraction=clamp(target.attraction-9,0,100);
     return true;
   }
+  if(receipt.type==='romance.hug.refused'){
+    // Declining a physical gesture must not penalize either person's feelings.
+    target.lastRefusedAt=receipt.at;
+    return true;
+  }
   const accepted=!receipt.type.endsWith('.refused');
   const confession=receipt.type.startsWith('romance.confess');
   const dating=receipt.type.startsWith('romance.date');
   const tender=receipt.type==='romance.tender';
+  const hug=receipt.type==='romance.hug';
   const checkin=receipt.type==='romance.checkin';
   const repair=receipt.type==='romance.repair';
   const proposal=['romance.propose','romance.marry'].includes(receipt.type);
   actor.attraction=clamp(actor.attraction+(accepted?
-    proposal?4:repair?5:checkin?3:tender?9:dating?7:confession?16:10:-5),0,100);
+    proposal?4:repair?5:checkin?3:hug?6:tender?9:dating?7:confession?16:10:-5),0,100);
   target.attraction=clamp(target.attraction+(accepted?
-    proposal?4:repair?5:checkin?3:tender?8:dating?7:confession?14:7:-1),0,100);
+    proposal?4:repair?5:checkin?3:hug?6:tender?8:dating?7:confession?14:7:-1),0,100);
   if(!accepted)target.lastRefusedAt=receipt.at;
   return true;
 }
