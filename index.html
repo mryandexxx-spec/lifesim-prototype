@@ -10,10 +10,17 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h2fix1-f4c" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h2b-f4c" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
-      "./src/household.js":"./src/household.js?v=1.2u-h2fix1",
+      "./src/household.js":"./src/household.js?v=1.2w-h2b",
+      "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2w-h2b",
+      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b",
+      "./src/animations.js":"./src/animations.js?v=1.2w-h2b",
+      "./src/music-movement.js":"./src/music-movement.js?v=1.2w-h2b",
+      "./src/meshy-music-runtime.js":"./src/meshy-music-runtime.js?v=1.2w-h2b",
+      "./src/meshy-visual.js":"./src/meshy-visual.js?v=1.2w-h2b",
+      "./src/meshy-mira-visual.js":"./src/meshy-mira-visual.js?v=1.2w-h2b",
       "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2u-h2fix1",
       "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1-f4c",
       "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2u-h2fix1",
@@ -41,7 +48,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.1 · F4C</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.2 · F4C / H2b</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -182,13 +189,14 @@
       <p id="action-description">Восстановить энергию</p>
       <label id="music-style-field" class="music-style-field" for="music-style-select" hidden>
         Музыкальный стиль
-        <select id="music-style-select" aria-label="Стиль прослушивания">
+        <select id="music-style-select" aria-label="Музыкальный стиль для слушания или танца">
           <option value="music.calm">Тихий вечер</option>
           <option value="music.rhythmic">Тёплый ритм</option>
           <option value="music.dreamy">Звёздный свет</option>
         </select>
       </label>
       <button type="button" class="primary-button" id="action-button">Использовать <span>↗</span></button>
+      <button type="button" class="music-dance-button" id="music-dance-button" hidden>💃 Танцевать <span>↗</span></button>
     </section>
 
     <section class="mind-panel" id="mind-panel" hidden aria-label="Внутренний мир Алекса">
@@ -317,7 +325,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

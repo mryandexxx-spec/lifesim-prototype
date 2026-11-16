@@ -7,6 +7,8 @@ export const READING_ACTIVITY_ID='hobby.read.fiction';
 export const READING_CONTENT_ID='book.first.stories';
 export const READING_SKILL_ID='literature';
 export const MUSIC_ACTIVITY_ID='hobby.listen.music';
+export const MUSIC_DANCE_ACTIVITY_ID='hobby.dance.music';
+export const MUSIC_ACTIVITY_IDS=Object.freeze([MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID]);
 export const MUSIC_CONTENT_IDS=Object.freeze(['music.calm','music.rhythmic','music.dreamy']);
 export const HOBBY_SKILLS=createSkillRegistry({skills:[{
   id:READING_SKILL_ID,label:'Литературная эрудиция',group:'knowledge',
@@ -38,5 +40,11 @@ export const HOBBY_ACTIVITIES=createActivityRegistry({
     contentKind:'musicstyle',timeBudget:{minMinutes:8,targetMinutes:35},
     needEffects:[{statId:'needs.fun',perMinute:0.94}],
     skillPractice:[],poseKey:'music.listen',audioCue:'music.original'
+  },{
+    id:MUSIC_DANCE_ACTIVITY_ID,label:'Танцевать',kind:'leisure',
+    source:'item',participation:'solo',requiredCapabilities:['music.playback'],
+    contentKind:'musicstyle',timeBudget:{minMinutes:8,targetMinutes:30},
+    needEffects:[{statId:'needs.fun',perMinute:1.23},{statId:'needs.energy',perMinute:-0.12}],
+    skillPractice:[],poseKey:'music.dance',audioCue:'music.original'
   }]
 });

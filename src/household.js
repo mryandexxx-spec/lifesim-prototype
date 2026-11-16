@@ -23,7 +23,7 @@ import {captureObjectUse,settleObjectUseStep} from './object-use-runtime.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 import {HOBBY_ACTIVITIES,HOBBY_CONTENT,HOBBY_SKILLS,READING_ACTIVITY_ID,READING_CONTENT_ID,
-  MUSIC_ACTIVITY_ID,MUSIC_CONTENT_IDS} from './hobby-reading.js';
+  MUSIC_ACTIVITY_ID,MUSIC_ACTIVITY_IDS,MUSIC_CONTENT_IDS} from './hobby-reading.js';
 import {getActivityDefinition,activityFitsItem} from './activity-registry.js';
 import {createActivitySession,restoreActivitySession,arriveActivitySession,
   advanceActivitySession} from './activity-session.js';
@@ -131,7 +131,8 @@ export function loadHousehold(raw) {
         ?storedSpot
         :chooseMusicListeningSpot(root.world,actor.position,actor.action.targetInstanceId)?.point;
       if(point)actor.action.musicSpot={x:point.x,z:point.z};
-      if(!point||!listening||listening.actorId!==id||listening.activityId!==MUSIC_ACTIVITY_ID||
+      if(!point||!listening||listening.actorId!==id||!MUSIC_ACTIVITY_IDS.includes(listening.activityId)||
+        listening.activityId!==actor.action.activityId||
         listening.targetInstanceId!==actor.action.targetInstanceId||
         listening.contentId!==actor.action.contentId||
         !validMusicSource(root,actor)||
@@ -334,7 +335,7 @@ function validMusicSource(root,actor){
   const item=action?.id==='music'
     ?resolveActionFurniture(root.world,'music',action.targetInstanceId):null;
   const activity=getActivityDefinition(HOBBY_ACTIVITIES,action?.activityId);
-  return Boolean(item&&activity?.id===MUSIC_ACTIVITY_ID&&
+  return Boolean(item&&MUSIC_ACTIVITY_IDS.includes(activity?.id)&&
     MUSIC_CONTENT_IDS.includes(action.contentId)&&
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
@@ -354,7 +355,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   }
   if(itemId==='music'){
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
-    if(activity?.id!==MUSIC_ACTIVITY_ID||
+    if(!MUSIC_ACTIVITY_IDS.includes(activity?.id)||
       !MUSIC_CONTENT_IDS.includes(contentId)||
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))
       return false;
@@ -496,7 +497,8 @@ function advanceMusic(root,id,minutes){
   if(!validMusicSource(root,actor)||
     !validMusicListeningSpot(root.world,action.targetInstanceId,point)||
     !furnitureAvailable(root,'music',id,action.targetInstanceId)||
-    !session||session.actorId!==id||session.activityId!==MUSIC_ACTIVITY_ID||
+    !session||session.actorId!==id||!MUSIC_ACTIVITY_IDS.includes(session.activityId)||
+    session.activityId!==action.activityId||
     session.contentId!==action.contentId||
     session.targetInstanceId!==action.targetInstanceId){
     actor.action=null;actor.activitySession=null;
