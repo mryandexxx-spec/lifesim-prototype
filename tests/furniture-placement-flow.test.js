@@ -16,9 +16,9 @@ function harness(){
   const placement=findMarketPlacement(world,shop,'plant',people);
   assert.ok(placement,'need available fixture-free slot for purchase');
   const state={
-    furnishMode:true,shopOpen:true,shopSelected:'plant',shopPlacing:false,
+    furnishMode:true,shopOpen:true,shopSelected:'plant',shopSelectedItemId:'legacy.plant',shopPlacing:false,
     shopPose:null,shopManualPose:false,
-    shopListings:[{prefabId:'plant',price:130}],game:{world:{furniture:world},shop},
+    shopListings:[{itemId:'legacy.plant',prefabId:'plant',price:130}],game:{world:{furniture:world},shop},
     editorContext:()=>people,
     moveShopPreviewToCamera:()=>{state.shopPose={...placement};state.moved++},
     moved:0,renders:0,cleared:0,committed:0,feedback:[],

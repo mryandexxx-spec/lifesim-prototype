@@ -258,7 +258,7 @@ test('H0 does not change existing household saves, catalog, inventory or runtime
   const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
   assert.doesNotMatch(game,/from ['"]\.\/(skill-registry|skills-engine|activity-registry|activity-session|hobby-content)\.js['"]/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
-  assert.match(html,/src\/game\.js\?v=1\.2l/);
+  assert.match(html,/src\/game\.js\?v=1\.2m/);
 });
 test('H0 is checked and packaged by Pages but never masquerades as a live interaction',()=>{
   const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');

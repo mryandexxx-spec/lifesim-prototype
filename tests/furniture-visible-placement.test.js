@@ -32,10 +32,10 @@ test('actual PlayCanvas prefab staging fragment enables a real clone at known no
     destroy(){destroyCalls++;}
   });
   const template={clone(){cloneCalls++;return obj();}};
-  const context={shopOpen:true,shopPlacing:true,shopSelected:'plant',
+  const context={shopOpen:true,shopPlacing:true,shopSelected:'plant',shopSelectedItemId:'legacy.plant',
     shopPose:cameraPlacementPose({centerX:0,centerZ:0}),
     shopPreviewEntity:null,shopPreviewType:null,marketGhost:{enabled:false},
-    decorTemplates:new Map([['plant',template]]),app:{root:{addChild(){added++;}}}};
+    decorTemplates:new Map([['plant',template]]),app:{root:{addChild(){added++;}}},applyItemAppearance(){}};
   const block=game.slice(begin,end);
   runInNewContext('(()=>{'+block+'\nsyncShopPreviewEntity();})()',context,{timeout:1000});
   assert.equal(cloneCalls,1);
@@ -66,7 +66,7 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
   const selectedMark={hidden:true},otherMark={hidden:false};
   function card(type,mark){
     const c=makeEl(),classes=new Set();
-    c.dataset.prefabId=type;
+    c.dataset.prefabId=type;c.dataset.itemId='legacy.'+type;
     c.classList={toggle(key,active){if(active)classes.add(key);else classes.delete(key);},
       contains(key){return classes.has(key);}};
     c.querySelector=()=>mark;
@@ -85,8 +85,8 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
   const visual={enabled:false,render:{material:null},setPosition(){},setLocalScale(){}};
   const state={
     $:key=>elements.get(key),shopOpen:true,warehouseOpen:false,oneFingerMode:'pan',
-    shopSelected:'plant',shopPlacing:true,shopPose:pos,
-    shopListings:[{name:'Растение',prefabId:'plant',price:130}],
+    shopSelected:'plant',shopSelectedItemId:'legacy.plant',shopPlacing:true,shopPose:pos,
+    shopListings:[{itemId:'legacy.plant',name:'Растение',prefabId:'plant',price:130}],
     game:{world:{furniture:newFurnitureWorld()},shop:newFurnitureShop()},
     buyMarketItem,editorContext:()=>({residents:[]}),editorMessage:r=>r,
     shopPreviewEntity:{enabled:true},syncShopPreviewEntity(){},

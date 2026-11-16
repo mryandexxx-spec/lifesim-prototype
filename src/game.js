@@ -21,6 +21,7 @@ import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js'
 import {SHOP_ITEMS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
 import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
+import {furnitureProduct,FURNITURE_APPEARANCES} from './furniture-products.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -1205,6 +1206,24 @@ function boot() {
     white: mat('#fffdf7'), black: mat('#303c3a'), tan: mat('#be9d86'), blue: mat('#c5dbdd'), yellow: mat('#f7d68d'),
     skin: mat('#c88d6e'), hair: mat('#47382f'), shirt: mat('#4b967d'), trousers: mat('#566675'), rug: mat('#d6b8a5')
   };
+  // Data-only SKU colorways reuse the original prefab, navmesh and animation.
+  // Only copied mesh instances are tinted; the authored original is unchanged.
+  const variantMaterials=new Map();
+  const applyItemAppearance=(node,itemDefinitionId)=>{
+    const style=FURNITURE_APPEARANCES[furnitureProduct(itemDefinitionId)?.appearanceId];
+    if(!style||!node)return;
+    const visit=part=>{
+      const color=style[part.name];
+      if(color&&part.render){
+        if(!variantMaterials.has(color))variantMaterials.set(color,mat(color));
+        const material=variantMaterials.get(color);
+        part.render.material=material;
+        for(const mesh of part.render.meshInstances||[])mesh.material=material;
+      }
+      for(const child of part.children||[])visit(child);
+    };
+    visit(node);
+  };
   const decorNodes=new Map();
   const decorTemplates=new Map();
   let decorDrawing=null;
@@ -1231,6 +1250,7 @@ function boot() {
       if(!template||!SHOP_ITEMS.some(s=>s.prefabId===item.prefabId))continue;
       const node=template.clone();
       node.name='F2 purchased / '+item.instanceId;
+      if(item.itemDefinitionId)applyItemAppearance(node,item.itemDefinitionId);
       app.root.addChild(node);
       decorNodes.set(item.instanceId,node);
     }
@@ -1951,6 +1971,7 @@ function boot() {
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
+  let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
   let shopPlacing=false,shopPreviewEntity=null,shopPreviewType=null;
   let shopSwipeRawPose=null; // transient, unsnapped, never stored
@@ -2017,7 +2038,8 @@ function boot() {
     residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)});
   const editorLabel=instanceId=>{
     const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
-    return item?FURNITURE_CATALOG[item.prefabId].name:'Предмет';
+    return item?(furnitureProduct(item.itemDefinitionId)?.name||
+      FURNITURE_CATALOG[item.prefabId].name):'Предмет';
   };
   const editorMessage=(reason)=>{
     const messages={
@@ -2095,8 +2117,7 @@ function boot() {
       editorFeedback(editorLabel(id)+': удерживай 0,5 секунды для переноса или поверни кнопкой');
     else editorFeedback('Коснись предмета на 3D-сцене или открой каталог');
   };
-  // F4b1: shop cards and category facets come from validated item definitions.
-  // Transactions below intentionally remain legacy prefab+price until F4b2.
+  // F4b2: store UI selects SKU identity; renderer/footprint still use prefab.
   const shopListings=selectShopCatalog();
   let shopRoomCategory=null,shopFunctionCategory=null;
   // Separate visual staging entity is never a purchased item and never enters
@@ -2116,6 +2137,7 @@ function boot() {
       if(template){
         shopPreviewEntity=template.clone();
         shopPreviewEntity.name='Unsaved furniture placement preview';
+        if(shopSelectedItemId)applyItemAppearance(shopPreviewEntity,shopSelectedItemId);
         app.root.addChild(shopPreviewEntity);
         shopPreviewType=shopSelected;
       }
@@ -2148,18 +2170,18 @@ function boot() {
     marketGhost.enabled=false;
     if(!shopOpen){clearShopPreviewEntity();return;}
     for(const button of $('furnish-stock').querySelectorAll('button')){
-      const active=button.dataset.prefabId===shopSelected;
+      const active=button.dataset.itemId===shopSelectedItemId;
       button.setAttribute('aria-pressed',String(active));
       button.classList.toggle('selected-product',active);
       button.querySelector('.furnish-selected-mark').hidden=!active;
     }
-    const listing=shopListings.find(i=>i.prefabId===shopSelected);
+    const listing=shopListings.find(i=>i.itemId===shopSelectedItemId);
     $('furnish-placement-guide').hidden=!shopPlacing;
     $('furnish-placing-name').textContent=listing?.name||'Предмет';
     $('furnish-placing-status').textContent=shopPlacing
       ?'Веди предмет пальцем по полу. Два пальца — камера.':'';
     const preview=shopPlacing&&listing&&shopPose
-      ?buyMarketItem(game.world.furniture,game.shop,shopSelected,shopPose,editorContext())
+      ?buyMarketItem(game.world.furniture,game.shop,shopSelectedItemId,shopPose,editorContext())
       :null;
     const suitable=preview?.ok===true;
     const previewLabel=!listing?'Выбери товар в каталоге':
@@ -2196,7 +2218,8 @@ function boot() {
       const card=document.createElement('div');
       card.className='furnish-storage-card';
       const title=document.createElement('strong');
-      title.textContent=FURNITURE_CATALOG[item.prefabId].name;
+      title.textContent=furnitureProduct(item.itemDefinitionId)?.name||
+        FURNITURE_CATALOG[item.prefabId].name;
       const restore=document.createElement('button');restore.type='button';
       restore.textContent='↩ Вернуть';
       restore.addEventListener('click',()=>{
@@ -2228,8 +2251,11 @@ function boot() {
     else renderMarket();
     renderWarehouse();renderFurnitureSelection();
   };
-  const chooseShopProduct=prefabId=>{
-    shopPlacing=false;shopSelected=prefabId;shopManualPose=false;shopPose=null;shopSwipeRawPose=null;
+  const chooseShopProduct=itemId=>{
+    const offer=shopListings.find(x=>x.itemId===itemId);
+    shopPlacing=false;shopSelectedItemId=offer?.itemId||null;
+    shopSelected=offer?.prefabId||null;
+    shopManualPose=false;shopPose=null;shopSwipeRawPose=null;
     clearShopPreviewEntity();
     renderMarket();renderFurnitureSelection();
   };
@@ -2257,7 +2283,8 @@ function boot() {
     $('furnish-stock').setAttribute('aria-label',
       'Товары для покупки · '+visible.length+' из '+shopListings.length);
     // A filtered-out card cannot remain silently selected for a purchase.
-    if(!shopPlacing&&!visible.some(item=>item.prefabId===shopSelected)){
+    if(!shopPlacing&&!visible.some(item=>item.itemId===shopSelectedItemId)){
+      shopSelectedItemId=visible[0]?.itemId||null;
       shopSelected=visible[0]?.prefabId||null;
       shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
       clearShopPreviewEntity();
@@ -2288,7 +2315,7 @@ function boot() {
     mark.hidden=true;
     button.append(name,cost,effect,mark);
     button.setAttribute('aria-pressed','false');
-    button.addEventListener('click',()=>chooseShopProduct(item.prefabId));
+    button.addEventListener('click',()=>chooseShopProduct(item.itemId));
     $('furnish-stock').append(button);
   }
   renderShopFilteredItems();
@@ -2302,7 +2329,7 @@ function boot() {
   });
   $('furnish-preview-auto').addEventListener('click',()=>{
     if(!shopOpen||!shopPlacing||!shopSelected)return;
-    shopPose=findMarketPlacement(game.world.furniture,game.shop,shopSelected,editorContext());
+    shopPose=findMarketPlacement(game.world.furniture,game.shop,shopSelectedItemId,editorContext());
     shopSwipeRawPose=null;shopManualPose=false;renderMarket();
   });
   const applyMarketTransaction=(transaction,success)=>{
@@ -2321,7 +2348,7 @@ function boot() {
   $('furnish-buy').addEventListener('click',()=>{
     if(!furnishMode||!shopOpen||!shopSelected)return;
     if(!shopPlacing){
-      const listing=shopListings.find(i=>i.prefabId===shopSelected);
+      const listing=shopListings.find(i=>i.itemId===shopSelectedItemId);
       if(!listing||game.shop.credits<listing.price){
         editorFeedback('Недостаточно пробных кредитов',true);return;
       }
@@ -2335,7 +2362,7 @@ function boot() {
     if(!shopPose)return;
     // Only this second, explicit confirmation commits money and furniture.
     const ok=applyMarketTransaction(buyMarketItem(game.world.furniture,game.shop,
-      shopSelected,{...shopPose},editorContext()),
+      shopSelectedItemId,{...shopPose},editorContext()),
       'Куплено и установлено · можно выбрать следующий предмет');
     if(ok){
       shopPlacing=false;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
@@ -2362,10 +2389,13 @@ function boot() {
   });
   const sellFurniture=instanceId=>{
     const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
-    const product=item&&shopListings.find(i=>i.prefabId===item.prefabId);
-    if(!furnishMode||!product)return;
-    const resale=Math.floor(product.price*70/100);
-    if(!window.confirm('Продать «'+product.name+'» за '+resale+
+    if(!furnishMode||!item)return;
+    const quote=sellMarketItem(game.world.furniture,game.shop,item.instanceId,editorContext());
+    if(!quote.ok){editorFeedback(editorMessage(quote.reason),true);return;}
+    const name=furnitureProduct(item.itemDefinitionId)?.name||
+      FURNITURE_CATALOG[item.prefabId].name;
+    const resale=quote.amount; // uses price paid for SKU, or legacy fallback
+    if(!window.confirm('Продать «'+name+'» за '+resale+
       ' пробных кредитов? Для отмены есть кнопка ↶.'))return;
     applyMarketTransaction(sellMarketItem(game.world.furniture,game.shop,
       item.instanceId,editorContext()),'Продано · +'+resale+' кредитов');

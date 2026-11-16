@@ -94,9 +94,11 @@ export function createObjectRegistry({categories=[],stats=[],attributes=[],trigg
     const normalized=[...uniqueEffects.values()].map(x=>normalizedEffect(x,statMap,triggerMap));
     const rendererKey=nonempty(item.rendererKey??item.prefabId,'renderer key');
     const prefabId=nonempty(item.prefabId,'prefab id');
+    const appearanceId=item.appearanceId===null||item.appearanceId===undefined
+      ?null:nonempty(item.appearanceId,'appearance id');
     const price=item.price===null||item.price===undefined?null:numeric(item.price,'item price',0,1000000);
     if(price!==null&&!Number.isSafeInteger(price))fail('price must be integer credits');
-    itemMap.set(id,Object.freeze({id,prefabId,rendererKey,
+    itemMap.set(id,Object.freeze({id,prefabId,rendererKey,appearanceId,
       name:typeof item.name==='string'&&item.name.trim()?item.name:fail('item name'),
       categoryIds:Object.freeze(categoryIds),
       capabilities:Object.freeze(capabilities),
