@@ -54,9 +54,9 @@ import {needPresentation,moodPresentation,moodOrbitPoint} from './mood-presentat
 import {moodActionPolicy} from './mood-action-policy.js';
 import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
-import {createMeshyVisual} from './meshy-visual.js?v=1.2s';
+import {createMeshyVisual} from './meshy-visual.js?v=1.2t';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
-import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2s';
+import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2t';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
 import {intimacyFrame,intimacyBedPlan} from './romantic-intimacy.js';
