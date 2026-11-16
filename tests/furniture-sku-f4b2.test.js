@@ -200,7 +200,7 @@ test('F4b2 iPhone UI retains two independent SKU selections even with same prefa
   assert.match(game,/const listing=shopListings\.find\(i=>i\.itemId===shopSelectedItemId\)/);
   assert.match(game,/buyMarketItem\(game\.world\.furniture,game\.shop,shopSelectedItemId/);
   assert.match(game,/shopPose=findMarketPlacement\(game\.world\.furniture,game\.shop,shopSelectedItemId/);
-  assert.match(game,/purchasePriceCredits/);
+  assert.match(src('../src/furniture-shop.js'),/purchasePriceCredits/);
 });
 test('F4b2 Pages packages product source; visible bundle/lock bump without schema change',()=>{
   const pages=src('../.github/workflows/pages.yml');
@@ -208,7 +208,7 @@ test('F4b2 Pages packages product source; visible bundle/lock bump without schem
   const pkg=JSON.parse(src('../package.json'));
   const lock=JSON.parse(src('../package-lock.json'));
   assert.match(pages,/node --check src\/furniture-products\.js/);
-  assert.match(pages,/cp src\/furniture-products\.js src\/furniture-shop\.js src\/furniture-value\.js site\/src\//);
+  assert.match(pages,/cp src\/furniture-products\.js site\/src\//);
   assert.match(html,/src\/game\.js\?v=1\.2m/);
   assert.match(html,/styles\.css\?v=1\.2m/);
   assert.equal(pkg.version,'1.0.0-alpha.65');

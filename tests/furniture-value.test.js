@@ -9,7 +9,7 @@ import {describeFurnitureValue} from '../src/furniture-value.js';
 
 test('F4a shop shows one honest use description for each of the six items',()=>{
   const listing=marketListing();
-  assert.equal(listing.length,SHOP_ITEMS.length);
+  assert.equal(listing.length,SHOP_ITEMS.length+1);
   for(const item of listing){
     assert.equal(typeof item.effectText,'string');
     assert.ok(item.effectText.length>6);
@@ -45,7 +45,7 @@ test('F4a value metadata leaves trial economy and saved shop schema unaltered',(
   const wallet=newFurnitureShop(),world=newFurnitureWorld();
   assert.deepEqual(wallet,{schema:1,credits:5000,nextId:1});
   const listing=marketListing();
-  assert.deepEqual(listing.map(x=>x.price),[130,250,170,650,550,850]);
+  assert.deepEqual(listing.map(x=>x.price),[130,250,170,650,550,850,130]);
   const bad=buyMarketItem(world,wallet,'plant',{x:900,z:900,yaw:0});
   assert.equal(bad.ok,false);
   assert.equal(wallet.credits,5000);
