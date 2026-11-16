@@ -20,6 +20,7 @@ import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_SKILL_ID} from './hobby-reading.js';
+import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
 import {currentSkillLevel} from './skills-engine.js';
@@ -1636,7 +1637,9 @@ function boot() {
     const dest=game.action.id==='bed'
       ?bedDestinationFor(game,'alex',game.action.targetInstanceId):
       game.action.id==='tv'&&game.action.watchSeatInstanceId
-        ?furnitureActionApproach(game.world,'sofa',game.action.watchSeatInstanceId):null;
+        ?furnitureActionApproach(game.world,'sofa',game.action.watchSeatInstanceId):
+      game.action.id==='hobby'&&game.action.readingSeatInstanceId
+        ?furnitureActionApproach(game.world,'sofa',game.action.readingSeatInstanceId):null;
     const actual=dest||furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
@@ -1646,7 +1649,9 @@ function boot() {
     const dest=game.otherSim.action.id==='bed'
       ?bedDestinationFor(game,'mira',game.otherSim.action.targetInstanceId):
       game.otherSim.action.id==='tv'&&game.otherSim.action.watchSeatInstanceId
-        ?furnitureActionApproach(game.world,'sofa',game.otherSim.action.watchSeatInstanceId):null;
+        ?furnitureActionApproach(game.world,'sofa',game.otherSim.action.watchSeatInstanceId):
+      game.otherSim.action.id==='hobby'&&game.otherSim.action.readingSeatInstanceId
+        ?furnitureActionApproach(game.world,'sofa',game.otherSim.action.readingSeatInstanceId):null;
     const actual=dest||furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
@@ -1688,11 +1693,20 @@ function boot() {
   // head, including up to eight A* social approaches. On mobile this can
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
-  const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>id==='bed'
-    ?bedDestinationFor(game,residentId,targetInstanceId)
-    :id==='tv'&&watchSeatInstanceId
-      ?furnitureActionApproach(game.world,'sofa',watchSeatInstanceId)
-      :furnitureActionApproach(game.world,id,targetInstanceId);
+  const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>{
+    if(id==='hobby:toSeat'){
+      const reader=getActor(game,residentId);
+      return reader?.action?.id==='hobby'
+        ?furnitureActionApproach(game.world,'sofa',reader.action.readingSeatInstanceId):null;
+    }
+    if(id==='hobby:toShelf'||id==='hobby:returnShelf')
+      return furnitureActionApproach(game.world,'hobby',targetInstanceId);
+    return id==='bed'
+      ?bedDestinationFor(game,residentId,targetInstanceId)
+      :id==='tv'&&watchSeatInstanceId
+        ?furnitureActionApproach(game.world,'sofa',watchSeatInstanceId)
+        :furnitureActionApproach(game.world,id,targetInstanceId);
+  };
   function buildRoute(id,actorId='alex',targetInstanceId=null,watchSeatInstanceId=null) {
     const actor=getActor(game,actorId);
     const goal=destination(id,actorId,targetInstanceId,watchSeatInstanceId);
@@ -2073,6 +2087,8 @@ function boot() {
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
+      if(actor?.action?.id==='hobby'&&actor.action.readingSeatInstanceId)
+        busy.add(actor.action.readingSeatInstanceId);
       if(actor?.action?.id==='tv'&&actor.action.watchSeatInstanceId)
         busy.add(actor.action.watchSeatInstanceId);
       for(const pending of pendingActions(game.actionQueues,id))
@@ -2935,7 +2951,9 @@ function boot() {
           Math.hypot(resident.position.x-socialGoal.x,
             resident.position.z-socialGoal.z)<.075;
         const jobId=socialWalking&&!atStage?'social:'+game.socialAction.kind:
-          resident.action?.phase==='walking'?resident.action.id:null;
+          resident.action?.phase==='walking'
+            ?(resident.action.id==='hobby'?readingRouteId(resident.action):resident.action.id)
+            :null;
         if(jobId){
           let p=paths[residentId];
           if(p.id!==jobId || !p.points){
@@ -3000,7 +3018,9 @@ function boot() {
                   continue;
                 }
                 arriveSocial(game);
-              }else arrive(resident);
+              }else if(resident.action?.id==='hobby'&&
+                readingRouteId(resident.action))arriveReadingJourney(resident.action);
+              else arrive(resident);
               paths[residentId]={points:null,index:0,id:null};
             }
           }
@@ -3110,7 +3130,10 @@ function boot() {
       inverseFurniturePose(game.world,'toilet',display).yaw);
     const alexToilet=toiletStates.alex.frame?{...toiletStates.alex.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
-    const walking=active&&(game.action?.phase==='walking'||
+    const alexReadingStage=readingStage(game.action);
+    const alexReadingSeated=readingIsSeated(game.action);
+    const walking=active&&((game.action?.phase==='walking'&&
+      (game.action.id!=='hobby'||Boolean(readingRouteId(game.action))))||
       socialWalkingFor('alex'));
     const alexWatchSeat=useId==='tv'
       ?(pairedTv?.places?.alex?.seatId||game.action?.watchSeatInstanceId):null;
@@ -3118,18 +3141,21 @@ function boot() {
     if(alexDateSofa){
       sofaVisualTargets.alex=romanticSofa.sofaId;
       romanticSofaSlots.alex=sofaDateFor('alex');
-    }else if(useId==='sofa'||alexWatchSeat)
-      sofaVisualTargets.alex=(alexWatchSeat||game.action?.targetInstanceId)||null;
+    }else if(useId==='sofa'||alexWatchSeat||alexReadingSeated)
+      sofaVisualTargets.alex=alexReadingSeated
+        ?game.action.readingSeatInstanceId
+        :(alexWatchSeat||game.action?.targetInstanceId)||null;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
-      (useId==='sofa'||Boolean(alexWatchSeat)||alexDateSofa)&&
-        bedStates.alex.progress===0&&!showerStates.alex.active,animDt);
+      (useId==='sofa'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated)&&
+        bedStates.alex.progress===0&&!showerStates.alex.active,
+      alexReadingStage?animDt*game.speed:animDt);
     const alexSeatBase=sofaTransitionPose(sofaStates.alex);
     const seatPose=furniturePose(game.world,'sofa',
       romanticSofaSlots.alex===null?alexSeatBase:
         {...alexSeatBase,x:alexSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.alex)},
       sofaVisualTargets.alex)||
       {...display,sofaWeight:0};
-    const seating=useId==='sofa'||Boolean(alexWatchSeat)||
+    const seating=useId==='sofa'||Boolean(alexWatchSeat)||alexReadingSeated||
       sofaStates.alex.progress>0||alexDateSofa;
     if(!seating){sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;}
     if(alexSeatInstanceId!==sofaVisualTargets.alex||
@@ -3224,7 +3250,9 @@ function boot() {
     applyShowerAppearance(alexRig,Boolean(alexShower?.privacy||alexToilet?.privacy),Boolean(alexShower?.bathing));
     snack.enabled=Boolean(alexFridge&&alexFridge.handFood>.012);
     if(snack.enabled)snack.setLocalScale(.20*alexFridge.handFood,.17*alexFridge.handFood,.20*alexFridge.handFood);
-    book.enabled=using&&(useId==='sofa'||useId==='hobby');
+    book.enabled=(using&&useId==='sofa')||
+      (game.action?.id==='hobby'&&
+       (readingHasBook(game.action)||alexReadingStage==='taking'));
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
     const miraUseId=miraUsing?game.otherSim.action.id:pairedTv?'tv':null;
@@ -3239,7 +3267,10 @@ function boot() {
       inverseFurniturePose(game.world,'toilet',miraDisplay).yaw);
     const miraToilet=toiletStates.mira.frame?{...toiletStates.mira.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
-    const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
+    const miraReadingStage=readingStage(game.otherSim.action);
+    const miraReadingSeated=readingIsSeated(game.otherSim.action);
+    const miraWalking=active&&((game.otherSim.action?.phase==='walking'&&
+      (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
       socialWalkingFor('mira'));
     const miraWatchSeat=miraUseId==='tv'
       ?(pairedTv?.places?.mira?.seatId||game.otherSim.action?.watchSeatInstanceId):null;
@@ -3247,18 +3278,21 @@ function boot() {
     if(miraDateSofa){
       sofaVisualTargets.mira=romanticSofa.sofaId;
       romanticSofaSlots.mira=sofaDateFor('mira');
-    }else if(miraUseId==='sofa'||miraWatchSeat)
-      sofaVisualTargets.mira=(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
+    }else if(miraUseId==='sofa'||miraWatchSeat||miraReadingSeated)
+      sofaVisualTargets.mira=miraReadingSeated
+        ?game.otherSim.action.readingSeatInstanceId
+        :(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
-      (miraUseId==='sofa'||Boolean(miraWatchSeat)||miraDateSofa)&&
-        bedStates.mira.progress===0&&!showerStates.mira.active,animDt);
+      (miraUseId==='sofa'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated)&&
+        bedStates.mira.progress===0&&!showerStates.mira.active,
+      miraReadingStage?animDt*game.speed:animDt);
     const miraSeatBase=sofaTransitionPose(sofaStates.mira);
     const miraSeatPose=furniturePose(game.world,'sofa',
       romanticSofaSlots.mira===null?miraSeatBase:
         {...miraSeatBase,x:miraSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.mira)},
       sofaVisualTargets.mira)||
       {...miraDisplay,sofaWeight:0};
-    const miraSeating=miraUseId==='sofa'||Boolean(miraWatchSeat)||
+    const miraSeating=miraUseId==='sofa'||Boolean(miraWatchSeat)||miraReadingSeated||
       sofaStates.mira.progress>0||miraDateSofa;
     if(!miraSeating){sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;}
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
@@ -3340,19 +3374,24 @@ function boot() {
     applyShowerAppearance(miraRig,Boolean(miraShower?.privacy||miraToilet?.privacy),Boolean(miraShower?.bathing));
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
-    miraBook.enabled=miraUsing&&(miraUseId==='sofa'||miraUseId==='hobby');
+    miraBook.enabled=(miraUsing&&miraUseId==='sofa')||
+      (game.otherSim.action?.id==='hobby'&&
+        (readingHasBook(game.otherSim.action)||miraReadingStage==='taking'));
     // Mira retains one 3D skin for sofa, bed, fridge and clothed shower
     // entry/exit. The original game owns shower water, cover, full avatar
     // privacy and all simulation/save state; no private body is visible.
     const miraMeshShown=meshyMira.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
-      walking:(game.otherSim.action?.phase==='walking'||
+      walking:((game.otherSim.action?.phase==='walking'&&
+        (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
         socialWalkingFor('mira'))&&
         !miraSeating&&!miraBedding&&!miraShower,
       social:socialUsing&&!pairedTv?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
       actionId:miraUseId,
-      readingElapsed:miraUsing&&miraUseId==='hobby'?game.otherSim.action.elapsed:null,
+      readingStage:miraReadingStage,
+      readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
+      readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
@@ -3366,7 +3405,8 @@ function boot() {
       fridgeFrame:miraFridge
     });
     // The procedural book belongs to a hidden elbow; never show it floating.
-    if(miraMeshShown&&(miraUseId==='sofa'||miraUseId==='hobby'))miraBook.enabled=false;
+    if(miraMeshShown&&(miraUseId==='sofa'||game.otherSim.action?.id==='hobby'))
+      miraBook.enabled=false;
     // The old snack is on the hidden procedural elbow, not the Meshy hand.
     if(miraMeshShown&&miraUseId==='fridge')miraSnack.enabled=false;
     // Alex stays on the same 3D rig for bed and fridge when their verified
@@ -3376,7 +3416,8 @@ function boot() {
       preferred:meshyPreferred,paused:!active,dt:animDt,
       // Preserve the Walking clip on pause: playback freezes but the
       // resident has not arrived at the destination.
-      walking:(game.action?.phase==='walking'||
+      walking:((game.action?.phase==='walking'&&
+        (game.action.id!=='hobby'||Boolean(readingRouteId(game.action))))||
         socialWalkingFor('alex'))&&
         !seating&&!bedding&&!alexShower,
       worldMinutes:game.minutes,
@@ -3387,7 +3428,9 @@ function boot() {
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
       actionId:useId,
-      readingElapsed:using&&useId==='hobby'?game.action.elapsed:null,
+      readingStage:alexReadingStage,
+      readingStepElapsed:game.action?.readingStepElapsed??0,
+      readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
       seat:seatContactEnabled?livingSofaSeat:null,
@@ -3406,7 +3449,8 @@ function boot() {
     if(meshyShown&&useId==='fridge')snack.enabled=false;
     // The existing procedural book is attached to the old right elbow.
     // Never let it float beside the Meshy hand until a real socket exists.
-    if(meshyShown&&(useId==='sofa'||useId==='hobby'))book.enabled=false;
+    if(meshyShown&&(useId==='sofa'||game.action?.id==='hobby'))
+      book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
     // R5b never writes to the simulator. Tableware only follows existing
