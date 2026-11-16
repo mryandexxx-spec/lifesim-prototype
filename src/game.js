@@ -763,7 +763,9 @@ function renderQueuePanel(force=true){
   const pending=pendingActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
   const key=JSON.stringify([queueVisible,residentId,pending,active,game.socialAction?.phase,
-    getActor(game,residentId).action?.phase]);
+    getActor(game,residentId).action?.phase,
+    game.socialAction?.eveningStage&&game.socialAction.phase==='using'
+      ?Math.floor(game.socialAction.elapsed/3):null]);
   $('queue-toggle').textContent='Очередь · '+pending.length;
   if(!force&&key===queueDisplayKey)return;
   queueDisplayKey=key;
