@@ -238,7 +238,6 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       if(!useMeshy||!state.model){
         state.readingRuntime?.setFrame(null);
         state.fridgeRuntime?.setFrame(null);
-        state.readingRuntime?.setFrame(null);
         state.hugRuntime?.setFrame(null);
         state.kissRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
