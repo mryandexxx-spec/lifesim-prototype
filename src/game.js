@@ -25,6 +25,7 @@ import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {createMusicAudio,audibleMusicStyle} from './music-audio.js';
+import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
 import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
 import {describeObjectQualities,shopQualitySummary} from './object-quality-presentation.js';
 import {compareShopVariants,formatShopVariantComparison,chooseComparableVariant} from './object-quality-comparison.js';
@@ -98,6 +99,7 @@ let game;
 try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
 catch { game = newHousehold(); }
 const musicAudio=createMusicAudio();
+let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
 const audioButton=$('music-audio-toggle');
 function refreshMusicAudioButton(){
   const state=musicAudio.status();
@@ -110,8 +112,11 @@ function refreshMusicAudioButton(){
 }
 audioButton.addEventListener('click',async()=>{
   const state=musicAudio.status();
-  if(state.enabled&&!state.muted&&state.running)musicAudio.setMuted(true);
-  else await musicAudio.enable();
+  if(state.enabled&&!state.muted&&state.running){
+    musicMutedByPlayer=true;musicAudio.setMuted(true);
+  }else{
+    musicMutedByPlayer=false;await musicAudio.enable();
+  }
   refreshMusicAudioButton();
 });
 refreshMusicAudioButton();
@@ -523,6 +528,16 @@ $('action-button').addEventListener('click', () => {
         ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
       :{type:'object',actionId:selected,
         ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
+  // A tap on the explicit "Listen to music" action is itself an iOS user
+  // gesture: unlock audio HERE rather than requiring an unrelated View menu.
+  // Never re-enable after the player has deliberately selected Mute.
+  if(selected==='music'&&!musicMutedByPlayer&&
+    (!musicAudio.status().enabled||!musicAudio.status().running)){
+    void musicAudio.enable().then(ok=>{
+      refreshMusicAudioButton();
+      if(!ok)toast('Звук Safari недоступен. Действие выполняется без аудио.');
+    });
+  }
   if (scheduleCommand(command)) {
     select(null);
   }
@@ -1748,16 +1763,25 @@ function boot() {
     }
     if(id==='hobby:toShelf'||id==='hobby:returnShelf')
       return furnitureActionApproach(game.world,'hobby',targetInstanceId);
+    if(id==='music'){
+      const person=getActor(game,residentId);
+      if(person?.action?.id==='music'&&
+        validMusicListeningSpot(game.world,
+          person.action.targetInstanceId,person.action.musicSpot))
+        return person.action.musicSpot;
+      return chooseMusicListeningSpot(game.world,person.position,targetInstanceId)?.point||null;
+    }
     return id==='bed'
       ?bedDestinationFor(game,residentId,targetInstanceId)
       :id==='tv'&&watchSeatInstanceId
         ?furnitureActionApproach(game.world,'sofa',watchSeatInstanceId)
         :furnitureActionApproach(game.world,id,targetInstanceId);
   };
-  function buildRoute(id,actorId='alex',targetInstanceId=null,watchSeatInstanceId=null) {
+  function buildRoute(id,actorId='alex',targetInstanceId=null,watchSeatInstanceId=null,
+    musicPlan=null) {
     const actor=getActor(game,actorId);
-    const goal=destination(id,actorId,targetInstanceId,watchSeatInstanceId);
-    const points=goal&&findPath(actor.position,goal,game.world);
+    const goal=musicPlan?.point||destination(id,actorId,targetInstanceId,watchSeatInstanceId);
+    const points=musicPlan?.path||(goal&&findPath(actor.position,goal,game.world));
     if(!points) return false;
     paths[actorId]={points,index:0,id};
     return true;
@@ -1782,13 +1806,18 @@ function boot() {
     }
     const watchSeat=id==='tv'?chooseTvSofa(game,actorId,
       resolveActionFurniture(game.world,'tv',targetInstanceId)?.instanceId||'home-tv-1'):null;
-    if(!buildRoute(id,actorId,targetInstanceId,watchSeat?.sofaId||null)){
+    // Music is not a fixed front-facing appliance. Pick a clear A* approach
+    // around the player's actual rotated station, and persist the SAME goal.
+    const musicPlan=id==='music'
+      ?chooseMusicListeningSpot(game.world,actor.position,targetInstanceId):null;
+    if((id==='music'&&!musicPlan)||
+      !buildRoute(id,actorId,targetInstanceId,watchSeat?.sofaId||null,musicPlan)){
       if(!automatic&&!fromQueue) toast(getActorName(actorId)+' не может добраться до предмета');
       else actor.autonomy.nextAt=game.minutes+15;
       return false;
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
-      activityId,contentId);
+      activityId,contentId,musicPlan);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
