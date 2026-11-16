@@ -16,6 +16,7 @@ import {availableSocialActions,resolveBranchResponse,observePairViews,
 import {romanceAvailability} from './romance.js';
 import {HUG_REFUSAL_DURATION_MINUTES} from './romantic-hug.js';
 import {KISS_DURATION_MINUTES} from './romantic-kiss.js';
+import {intimacyBedPlan,INTIMACY_DURATION_MINUTES,INTIMACY_REFUSAL_DURATION_MINUTES} from './romantic-intimacy.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -136,7 +137,8 @@ export function startSharedSocial(root,initiator,target,mode,choiceId,automatic=
 }
 /** The adapter remains two-resident only; social-graph.js works with N stable IDs. */
 export function startBranchSocial(root,initiator,target,actionId,automatic=false){
-  if(!root?.socialGraph||!availableSocialActions(root.socialGraph,initiator,otherId(initiator),root.minutes)
+  if((actionId==='romance.intimacy'&&!intimacyBedPlan(root,initiator))||
+    !root?.socialGraph||!availableSocialActions(root.socialGraph,initiator,otherId(initiator),root.minutes)
     .some(action=>action.id===actionId&&action.enabled))return false;
   if(automatic&&(!AUTONOMOUS_FRIEND_BRANCHES.includes(actionId)||
     resolveBranchResponse(root.socialGraph,initiator,otherId(initiator),actionId,{
@@ -171,15 +173,27 @@ export function arriveSocial(root) {
   const social=root.socialAction;
   if(social?.phase!=='walking')return false;
   // No physical contact until the recipient has answered this invitation.
-  if(['romance.hug','romance.kiss'].includes(social.branchAction?.id)){
+  if(['romance.hug','romance.kiss','romance.intimacy'].includes(social.branchAction?.id)){
     const a=social.initiator,b=social.partner;
     const response=resolveBranchResponse(root.socialGraph,a,b,social.branchAction.id,{
       recipient:get(root,b),minutes:root.minutes,
       compatibilityBias:socialCompatibility(
         get(root,b)?.personality,get(root,a)?.personality).bias
     });
-    social.branchAction[social.branchAction.id==='romance.hug'?'hugConsent':'kissConsent']=
-      response?.accepted===true;
+    if(social.branchAction.id==='romance.intimacy'){
+      // Only after both adults' current consent: two distinct reachable
+      // bed approaches, blackout in the renderer, no explicit animation.
+      const plan=intimacyBedPlan(root,a);
+      const yes=response?.accepted===true&&Boolean(plan);
+      social.branchAction.intimacyConsent=yes;
+      if(yes){
+        get(root,a).position={...plan.actor};
+        get(root,b).position={...plan.partner};
+      }
+    }else{
+      social.branchAction[social.branchAction.id==='romance.hug'?'hugConsent':'kissConsent']=
+        response?.accepted===true;
+    }
   }
   social.phase='using';social.elapsed=0;return true;
 }
@@ -255,14 +269,18 @@ export function tickSocial(root,minutes){
     s.elapsed+=minutes;
     const hugging=s.branchAction.id==='romance.hug';
     const kissing=s.branchAction.id==='romance.kiss';
-    const physical=hugging||kissing;
-    const consent=hugging?s.branchAction.hugConsent:s.branchAction.kissConsent;
+    const intimacy=s.branchAction.id==='romance.intimacy';
+    const physical=hugging||kissing||intimacy;
+    const consent=hugging?s.branchAction.hugConsent:
+      kissing?s.branchAction.kissConsent:s.branchAction.intimacyConsent;
     const length=physical&&consent!==true
-      ?HUG_REFUSAL_DURATION_MINUTES:kissing?KISS_DURATION_MINUTES:18;
+      ?intimacy?INTIMACY_REFUSAL_DURATION_MINUTES:HUG_REFUSAL_DURATION_MINUTES
+      :intimacy?INTIMACY_DURATION_MINUTES:kissing?KISS_DURATION_MINUTES:18;
     if(s.elapsed<length)return false;
     const physicalAccepted=physical&&consent===true&&
       romanceAvailability(root.socialGraph,s.initiator,s.partner,
-        s.branchAction.id,root.minutes).enabled;
+        s.branchAction.id,root.minutes).enabled&&
+      (!intimacy||Boolean(intimacyBedPlan(root,s.initiator)));
     const response=physical
       ?{accepted:physicalAccepted,
         type:physicalAccepted?s.branchAction.id:s.branchAction.id+'.refused',
@@ -275,7 +293,8 @@ export function tickSocial(root,minutes){
     s.branchAction.resultType=response.type;
     if(['romance.date','romance.breakup','romance.tender',
       'romance.propose','romance.marry','romance.divorce',
-      'romance.checkin','romance.repair','romance.hug','romance.kiss'].includes(s.branchAction.id)){
+      'romance.checkin','romance.repair','romance.hug','romance.kiss',
+      'romance.intimacy'].includes(s.branchAction.id)){
       // A commitment or loving gesture is a verified canonical milestone,
       // never a fake generic talk, quarrel or automatic affinity reward.
       const completed=recordPairCompletion(root,s,response.type);
@@ -289,6 +308,7 @@ export function tickSocial(root,minutes){
         'romance.tender':'Проявил(а) нежность',
         'romance.hug':'Нежно обнялись',
         'romance.kiss':'Поцеловались',
+        'romance.intimacy':'Побыли наедине',
         'romance.checkin':'Уделил(а) внимание',
         'romance.repair':'Поговорил(а) об обиде',
         'romance.propose':'Обручились',
@@ -372,7 +392,10 @@ export function tickSocial(root,minutes){
 }
 export function loadSocialAction(data,root) {
   const shared=data?.shared===undefined?null:restoreSharedSession(data.shared,root,data.initiator);
-  const duration=shared?sharedDuration(shared):SOCIAL_ACTIONS[data?.kind]?.duration;
+  const duration=shared?sharedDuration(shared):
+    data?.branchAction?.id==='romance.intimacy'&&
+    data?.branchAction?.intimacyConsent===true
+      ?INTIMACY_DURATION_MINUTES:SOCIAL_ACTIONS[data?.kind]?.duration;
   if(!data||typeof data!=='object'||Array.isArray(data)||
     !Object.hasOwn(SOCIAL_ACTIONS,data.kind)||!validId(data.initiator)||
     data.partner!==otherId(data.initiator)||!['walking','using'].includes(data.phase)||
@@ -391,11 +414,13 @@ export function loadSocialAction(data,root) {
     !branch||typeof branch!=='object'||Array.isArray(branch)||
     !Object.hasOwn(branch,'id')||
     !(Object.keys(branch).length===1||
-      (['romance.hug','romance.kiss'].includes(branch.id)&&
+      (['romance.hug','romance.kiss','romance.intimacy'].includes(branch.id)&&
         Object.keys(branch).length===2&&
-        typeof branch[branch.id==='romance.hug'?'hugConsent':'kissConsent']==='boolean'))||
+        typeof branch[branch.id==='romance.hug'?'hugConsent':
+          branch.id==='romance.kiss'?'kissConsent':'intimacyConsent']==='boolean'))||
     !availableSocialActions(root.socialGraph,data.initiator,data.partner,root.minutes)
       .some(action=>action.id===branch.id&&action.enabled)||
+    (branch?.id==='romance.intimacy'&&!intimacyBedPlan(root,data.initiator))||
     session||shared||data.kind!=='talk'||
     (data.automatic===true&&!AUTONOMOUS_FRIEND_BRANCHES.includes(branch.id))))return null;
   return {kind:data.kind,initiator:data.initiator,partner:data.partner,
@@ -404,9 +429,12 @@ export function loadSocialAction(data,root) {
     ...(session?{conversation:session}:{}),
     ...(shared?{shared}:{}),
     ...(branch?{branchAction:{id:branch.id,
-      ...(['romance.hug','romance.kiss'].includes(branch.id)&&data.phase==='using'
-        ?{[branch.id==='romance.hug'?'hugConsent':'kissConsent']:
-          branch[branch.id==='romance.hug'?'hugConsent':'kissConsent']===true&&
+      ...(['romance.hug','romance.kiss','romance.intimacy'].includes(branch.id)&&
+          data.phase==='using'
+        ?{[branch.id==='romance.hug'?'hugConsent':
+            branch.id==='romance.kiss'?'kissConsent':'intimacyConsent']:
+          branch[branch.id==='romance.hug'?'hugConsent':
+            branch.id==='romance.kiss'?'kissConsent':'intimacyConsent']===true&&
           resolveBranchResponse(root.socialGraph,data.initiator,data.partner,
             branch.id,{recipient:get(root,data.partner),
               minutes:root.minutes,
