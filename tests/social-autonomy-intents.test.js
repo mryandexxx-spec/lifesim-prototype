@@ -62,7 +62,7 @@ function recordLeisure(g,from,to,mode,at){
 }
 
 test('1.0i offered spontaneous leisure uses only existing typed catalog',()=>{
-  assert.deepEqual(AUTONOMOUS_LEISURE,Object.keys(LEISURE_CATALOG));
+  assert.deepEqual(AUTONOMOUS_LEISURE,Object.keys(LEISURE_CATALOG).filter(id=>id!=='tv')); // TV needs a real screen and explicit invitation
   assert.deepEqual(AUTONOMOUS_FRIEND_BRANCHES,
     ['acquaint.chat','friend.tease','friend.confide']);
   const c=generic(['music'],['music']);
