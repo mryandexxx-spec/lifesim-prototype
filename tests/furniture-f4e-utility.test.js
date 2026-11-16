@@ -38,7 +38,7 @@ test('F4E: every object has physical A* target including 90-degree rotation',()=
     bought(root,'floorlamp.arc',6.5,-2,90),
     bought(root,'mirror.oval',8.5,-2,180),
     bought(root,'dresser.reed',10.5,2,90),
-    bought(root,'wardrobe.classic',12.2,2,180)
+    bought(root,'wardrobe.classic',12.2,-1,180)
   ];
   for(const id of ids){
     const item=root.world.furniture.instances.find(x=>x.instanceId===id);
