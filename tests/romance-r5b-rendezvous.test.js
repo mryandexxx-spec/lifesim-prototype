@@ -82,7 +82,7 @@ test('R5b gameplay routes, table lock, candle, new module and F3b TV kept',()=>{
   const g=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
   const p=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
   for(const pattern of [
-    /planRomanticEveningTable\(game\.world/,/tablePlan\.partnerRoute/,
+    /planRomanticEveningTable\(game\.world/,/pairPlan\.partnerRoute/,
     /socialWalkingFor\(residentId\)/,/const otherHere=!otherGoal/,
     /busy\.add\(game\.socialAction\.eveningStage\.instanceId\)/,
     /romanticEveningVignette\(furnishMode\?null:game\.socialAction/,

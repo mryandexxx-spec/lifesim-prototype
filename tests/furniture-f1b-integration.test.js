@@ -84,8 +84,8 @@ test('fridge door hinge, hand targets, water, quilt and Meshy seat are instance-
     "fridgeHinge.setLocalEulerAngles(0,FRIDGE_LAYOUT.doorAngle*fridgeOpen,0)",
     "drop.setLocalPosition(-4.28+(i%5)*.22-showerOrigin.x",
     "body.setLocalPosition(bx+2.62,quilt.y",
-    "const makeSofaSeat=(instanceId=null)=>",
-    "refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId);}"
+    "const makeSofaSeat=(instanceId=null,romanticSlot=null)=>",
+    "refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId,alexSeatSlot);}"
   ])assert.ok(scene.includes(phrase),phrase);
   assert.match(mesh,/const layoutNow=\(\)=>typeof layout==='function'\?layout\(\):layout/);
   assert.match(male,/layout:fridgeLayout\|\|undefined/);
@@ -112,8 +112,8 @@ test('F1b busy fixture blocks editor relocation and game state retains queue/old
 });
 test('F1b active visual timelines use transformed resident contact not mutable hardcoded constants',()=>{
   for(const phrase of [
-    "sofaTransitionPose(sofaStates.alex),sofaVisualTargets.alex",
-    "sofaTransitionPose(sofaStates.mira),sofaVisualTargets.mira",
+    "const alexSeatBase=sofaTransitionPose(sofaStates.alex)",
+    "const miraSeatBase=sofaTransitionPose(sofaStates.mira)",
     "furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex),bedVisualTargets.alex)",
     "furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira),bedVisualTargets.mira)",
     "furniturePose(game.world,'shower',showerStates.alex.frame.pose)",
