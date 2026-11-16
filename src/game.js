@@ -51,6 +51,7 @@ import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
 import {intimacyFrame,intimacyBedPlan} from './romantic-intimacy.js';
 import {romanticEveningVignette} from './romantic-evening-scene.js';
+import {planRomanticEveningTable} from './romantic-evening-stage.js';
 import {meshVisualPreference,MESHY_VISUAL_KEY,meshSeatRuntimeSettings} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
@@ -763,7 +764,9 @@ function renderQueuePanel(force=true){
   const pending=pendingActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
   const key=JSON.stringify([queueVisible,residentId,pending,active,game.socialAction?.phase,
-    getActor(game,residentId).action?.phase]);
+    getActor(game,residentId).action?.phase,
+    game.socialAction?.eveningStage&&game.socialAction.phase==='using'
+      ?Math.floor(game.socialAction.elapsed/3):null]);
   $('queue-toggle').textContent='Очередь · '+pending.length;
   if(!force&&key===queueDisplayKey)return;
   queueDisplayKey=key;
@@ -776,6 +779,18 @@ function renderQueuePanel(force=true){
   const label=document.createElement('div');
   label.textContent=active?'Сейчас: '+active:'Сейчас: свободен';
   activeEl.append(label);
+  const evening=game.socialAction?.branchAction?.id==='romance.evening'&&
+    game.socialAction?.eveningStage;
+  if(evening&&active){
+    const detail=document.createElement('div');
+    detail.className='shared-progress-text';
+    detail.textContent=game.socialAction.phase==='walking'
+      ?'Оба жителя идут к столику · ждём встречи'
+      :game.socialAction.branchAction.eveningConsent===true
+        ?'Вечер у столика · '+Math.round(Math.min(1,
+          game.socialAction.elapsed/30)*100)+'%':'Приглашение не принято';
+    activeEl.append(detail);
+  }
   if(active){
     const stop=document.createElement('button');stop.type='button';
     stop.textContent='Прервать текущее действие';
@@ -1634,7 +1649,12 @@ function boot() {
       if(!automatic&&!fromQueue)toast('Собеседник занят или разговор уже идёт');
       return false;
     }
-    const self=getActor(game,actorId), partner=getActor(game,actorId==='alex'?'mira':'alex');
+    const self=getActor(game,actorId),partnerId=actorId==='alex'?'mira':'alex',
+      partner=getActor(game,partnerId);
+    // Optional: only the romantic evening can claim TWO walkable spots on an
+    // actual table. Other social actions preserve their accepted navigation.
+    const tablePlan=branchId==='romance.evening'
+      ?planRomanticEveningTable(game.world,self.position,partner.position,findPath):null;
     const offsets=[[.84,0],[-.84,0],[0,.84],[0,-.84],[.62,.62],[-.62,.62],[.62,-.62],[-.62,-.62]];
     const candidates=offsets.map(([dx,dz])=>{
       const goal={x:partner.position.x+dx,z:partner.position.z+dz};
@@ -1651,6 +1671,7 @@ function boot() {
       for(const point of points){len+=Math.hypot(point.x-previous.x,point.z-previous.z);previous=point;}
       if(len<bestLength){best={goal,points};bestLength=len;}
     }
+    if(tablePlan)best={goal:tablePlan.stage.actor,points:tablePlan.actorRoute};
     if(!best){if(!automatic&&!fromQueue)toast('Сейчас не получается подойти к собеседнику');return false;}
     if(!(branchId?startBranchSocial(game,actorId,best.goal,branchId,automatic)
       :shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId,automatic)
@@ -1658,8 +1679,20 @@ function boot() {
       :startSocial(game,kind,actorId,best.goal,automatic)))return false;
     // Both residents are idle. Do not clear either existing action or path.
     paths[actorId]={points:best.points,index:0,id:'social:'+kind};
+    if(tablePlan){
+      game.socialAction.eveningStage=tablePlan.stage; // validated optional v1
+      paths[partnerId]={points:tablePlan.partnerRoute,index:0,id:'social:'+kind};
+      partner.event='Идёт на вечер вдвоём';
+    }
     restartAutonomyWait();
     return true;
+  };
+  const socialWalkingFor=residentId=>{
+    const session=game.socialAction;
+    return session?.phase==='walking'&&
+      (session.initiator===residentId||
+        (session.branchAction?.id==='romance.evening'&&
+          session.eveningStage&&session.partner===residentId));
   };
   dispatchPlannedActions=()=>{
     if(game.paused||dialogueNeedsDecision(game))return [];
@@ -1870,6 +1903,8 @@ function boot() {
   marketGhost.enabled=false;
   const lockedFurnitureIds=()=>{
     const busy=new Set();
+    if(game.socialAction?.eveningStage?.instanceId)
+      busy.add(game.socialAction.eveningStage.instanceId);
     const lockPrefab=prefabId=>{
       // Conservative transient lock over all instances of this prefab:
       // future F2 can add duplicates without original home-*-1 hardcodes.
@@ -2673,15 +2708,21 @@ function boot() {
         if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0||
           showerStates[residentId].active||toiletStates[residentId].active||
           fridgeLeaving[residentId])continue;
-        const socialWalking=game.socialAction?.phase==='walking' &&
-          game.socialAction.initiator===residentId;
-        const jobId=socialWalking?'social:'+game.socialAction.kind:
+        const socialWalking=Boolean(socialWalkingFor(residentId));
+        const eveningStage=socialWalking?game.socialAction?.eveningStage:null;
+        const socialGoal=eveningStage&&game.socialAction.partner===residentId
+          ?eveningStage.partner:game.socialAction?.target;
+        // A stage guest already at their destination waits for their partner.
+        const atStage=socialWalking&&eveningStage&&
+          Math.hypot(resident.position.x-socialGoal.x,
+            resident.position.z-socialGoal.z)<.075;
+        const jobId=socialWalking&&!atStage?'social:'+game.socialAction.kind:
           resident.action?.phase==='walking'?resident.action.id:null;
         if(jobId){
           let p=paths[residentId];
           if(p.id!==jobId || !p.points){
             const available=socialWalking
-              ? findPath(resident.position,game.socialAction.target,game.world)
+              ? findPath(resident.position,socialGoal,game.world)
               : (buildRoute(jobId,residentId,resident.action?.targetInstanceId,
                   resident.action?.watchSeatInstanceId)?paths[residentId].points:null);
             if(!available){
@@ -2708,7 +2749,7 @@ function boot() {
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
             }
             if(p.index>=p.points.length){
-              resident.position=socialWalking?{...game.socialAction.target}:
+              resident.position=socialWalking?{...socialGoal}:
                 destination(jobId,residentId,resident.action?.targetInstanceId,
                    resident.action?.watchSeatInstanceId);
               if(socialWalking){
@@ -2717,11 +2758,17 @@ function boot() {
                   bedStates[partnerId].progress>0||
                   showerStates[partnerId].active||toiletStates[partnerId].active||
                   fridgeLeaving[partnerId];
-                if(partnerExiting){
-                  // Do not start conversation while partner is still
-                  // physically standing up / exiting shower / closing door.
-                  paths[residentId]={points:[{...game.socialAction.target}],
-                    index:0,id:jobId};
+                // Consent is requested once, only after both partners have
+                // actually arrived at their opposite table staging positions.
+                const staged=game.socialAction?.eveningStage;
+                const otherGoal=staged
+                  ?game.socialAction.initiator===partnerId?staged.actor:staged.partner
+                  :null;
+                const otherHere=!otherGoal||
+                  Math.hypot(getActor(game,partnerId).position.x-otherGoal.x,
+                    getActor(game,partnerId).position.z-otherGoal.z)<.075;
+                if(partnerExiting||!otherHere){
+                  paths[residentId]={points:[{...socialGoal}],index:0,id:jobId};
                   continue;
                 }
                 arriveSocial(game);
@@ -2815,7 +2862,7 @@ function boot() {
     const alexToilet=toiletStates.alex.frame?{...toiletStates.alex.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
     const walking=active&&(game.action?.phase==='walking'||
-      (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'));
+      socialWalkingFor('alex'));
     const alexWatchSeat=useId==='tv'?game.action?.watchSeatInstanceId:null;
     if(useId==='sofa'||alexWatchSeat)
       sofaVisualTargets.alex=(alexWatchSeat||game.action?.targetInstanceId)||null;
@@ -2928,7 +2975,7 @@ function boot() {
     const miraToilet=toiletStates.mira.frame?{...toiletStates.mira.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
-      (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'));
+      socialWalkingFor('mira'));
     const miraWatchSeat=miraUseId==='tv'?game.otherSim.action?.watchSeatInstanceId:null;
     if(miraUseId==='sofa'||miraWatchSeat)
       sofaVisualTargets.mira=(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
@@ -3021,7 +3068,7 @@ function boot() {
     const miraMeshShown=meshyMira.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:(game.otherSim.action?.phase==='walking'||
-        (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'))&&
+        socialWalkingFor('mira'))&&
         !miraSeating&&!miraBedding&&!miraShower,
       social:socialUsing?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
@@ -3050,7 +3097,7 @@ function boot() {
       // Preserve the Walking clip on pause: playback freezes but the
       // resident has not arrived at the destination.
       walking:(game.action?.phase==='walking'||
-        (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'))&&
+        socialWalkingFor('alex'))&&
         !seating&&!bedding&&!alexShower,
       worldMinutes:game.minutes,
       mood:game.mind?.mood?.value,

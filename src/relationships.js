@@ -14,6 +14,7 @@ import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSe
 import {availableSocialActions,resolveBranchResponse,observePairViews,
   applySocialEvent,learnSocialPreference,learnSocialCue} from './social-graph.js';
 import {romanceAvailability} from './romance.js';
+import {validRomanticEveningStage} from './romantic-evening-stage.js';
 import {HUG_REFUSAL_DURATION_MINUTES} from './romantic-hug.js';
 import {KISS_DURATION_MINUTES} from './romantic-kiss.js';
 import {intimacyBedPlan,INTIMACY_DURATION_MINUTES,INTIMACY_REFUSAL_DURATION_MINUTES} from './romantic-intimacy.js';
@@ -175,6 +176,10 @@ export function arriveSocial(root) {
   const social=root.socialAction;
   if(social?.phase!=='walking')return false;
   // No physical contact until the recipient has answered this invitation.
+  if(social?.eveningStage&&
+    !validRomanticEveningStage(root.world,social.eveningStage)){
+    root.socialAction=null;return false;
+  }
   if(['romance.hug','romance.kiss','romance.intimacy','romance.evening'].includes(social.branchAction?.id)){
     const a=social.initiator,b=social.partner;
     if(social.branchAction.id==='romance.intimacy'&&!intimacyBedPlan(root,a)){
@@ -279,6 +284,10 @@ export function tickSocial(root,minutes){
     const kissing=s.branchAction.id==='romance.kiss';
     const intimacy=s.branchAction.id==='romance.intimacy';
     const evening=s.branchAction.id==='romance.evening';
+    if(evening&&s.eveningStage&&
+      !validRomanticEveningStage(root.world,s.eveningStage)){
+      root.socialAction=null;return false;
+    }
     const physical=hugging||kissing||intimacy;
     const consent=evening?s.branchAction.eveningConsent:
       hugging?s.branchAction.hugConsent:
@@ -440,6 +449,11 @@ export function loadSocialAction(data,root) {
   if(data.shared!==undefined&&(!shared||session||data.kind!=='talk'||
     (data.automatic===true&&shared.mode!=='leisure')))return null;
   const branch=data.branchAction;
+  // Optional v1 R5b table stage must reference the actual unmoved table and
+  // predeclared opposite-side foot anchors; forged/corrupt stages fail closed.
+  if(data.eveningStage!==undefined&&
+    (branch?.id!=='romance.evening'||
+      !validRomanticEveningStage(root.world,data.eveningStage)))return null;
   if(branch!==undefined&&(
     !branch||typeof branch!=='object'||Array.isArray(branch)||
     !Object.hasOwn(branch,'id')||
@@ -463,6 +477,11 @@ export function loadSocialAction(data,root) {
     elapsed:data.elapsed,automatic:data.automatic===true,
     ...(session?{conversation:session}:{}),
     ...(shared?{shared}:{}),
+    ...(data.eveningStage?{eveningStage:{instanceId:data.eveningStage.instanceId,
+      tableX:data.eveningStage.tableX,tableZ:data.eveningStage.tableZ,
+      tableYaw:data.eveningStage.tableYaw,
+      actor:{x:data.eveningStage.actor.x,z:data.eveningStage.actor.z},
+      partner:{x:data.eveningStage.partner.x,z:data.eveningStage.partner.z}}}:{}),
     ...(branch?{branchAction:{id:branch.id,
       ...(['romance.hug','romance.kiss','romance.intimacy','romance.evening'].includes(branch.id)&&
           data.phase==='using'
