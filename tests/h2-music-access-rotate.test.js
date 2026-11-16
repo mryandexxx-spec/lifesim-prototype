@@ -170,7 +170,7 @@ test('Safari import map busts every modified H2 dependency, not only the game en
   for(const name of ['household','furniture-layout','furniture-editor','furniture-shop']){
     const key='./src/'+name+'.js';
     assert.ok(imports[key],key+' must be independently cache-busted');
-    const expected={'household':'?v=1.2w-h2b-f4d-h3-f4e-h4',
+    const expected={'household':'?v=1.2w-h2b-f4d-h3-f4e-h4-f4f',
       'furniture-layout':'?v=1.2v-f4d-f4e',
       'furniture-editor':'?v=1.2u-h2fix1-f4c',
       'furniture-shop':'?v=1.2v-f4d-f4e'};
@@ -194,7 +194,7 @@ test('F4C iPhone import map refreshes every changed furniture core ES module',()
       'furniture-thumbnails']){
     const key='./src/'+name+'.js';
     const version=['furniture-products','furniture-catalog','object-legacy-adapter'].includes(name)
-      ?'1.2v-f4d-f4e':'1.2u-f4c';
+      ?(['furniture-products','furniture-catalog'].includes(name)?'1.2v-f4d-f4e-f4f':'1.2v-f4d-f4e'):'1.2u-f4c';
     assert.equal(imports[key],key+'?v='+version);
   }
   assert.match(html,/src\/game\.js\?v=1\.2u-h2-music-fix1-cache-f4c/);
