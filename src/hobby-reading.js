@@ -11,6 +11,7 @@ export const READING_ADVANCED_CONTENT_ID='book.classic.pathways';
 export const READING_ADVANCED_UNLOCK_ID='books.read.classics';
 export const READING_CONTENT_IDS=Object.freeze([READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID]);
 export const READING_SKILL_ID='literature';
+import {PAINT_ACTIVITY_ID,PAINT_SKILL_ID,PAINT_CONTENT_IDS} from './painting.js';
 export const MUSIC_ACTIVITY_ID='hobby.listen.music';
 export const MUSIC_DANCE_ACTIVITY_ID='hobby.dance.music';
 export const MUSIC_ACTIVITY_IDS=Object.freeze([MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID]);
@@ -20,6 +21,10 @@ export const HOBBY_SKILLS=createSkillRegistry({skills:[{
   maxLevel:10,xpThresholds:[30,75,135,215,320,455,625,830,1080,1380],
   practiceTags:['book.fiction'],
   unlocks:[{id:READING_ADVANCED_UNLOCK_ID,minLevel:3}]
+},{
+  id:PAINT_SKILL_ID,label:'Живопись',group:'creative',maxLevel:10,
+  xpThresholds:[35,85,155,245,360,500,675,890,1150,1460],
+  practiceTags:['art.paint'],unlocks:[]
 }]});
 export const HOBBY_CONTENT=createHobbyContentCatalog({entries:[{
   id:READING_CONTENT_ID,kind:'book',label:'Истории дальних дорог',
@@ -28,6 +33,9 @@ export const HOBBY_CONTENT=createHobbyContentCatalog({entries:[{
   id:READING_ADVANCED_CONTENT_ID,kind:'book',label:'Пути старых городов',
   difficulty:3,tags:['book.fiction','books','books.classics'],skillTags:[READING_SKILL_ID]
 },
+  {id:'painting.hills',kind:'painting',label:'Долина ветров',difficulty:1,tags:['art.paint','landscape'],skillTags:[PAINT_SKILL_ID]},
+  {id:'painting.garden',kind:'painting',label:'Летний сад',difficulty:1,tags:['art.paint','garden'],skillTags:[PAINT_SKILL_ID]},
+  {id:'painting.city',kind:'painting',label:'Городские крыши',difficulty:2,tags:['art.paint','city'],skillTags:[PAINT_SKILL_ID]},
   {id:'music.calm',kind:'musicstyle',label:'Тихий вечер',difficulty:1,tags:['music','calm_leisure'],skillTags:[]},
   {id:'music.rhythmic',kind:'musicstyle',label:'Тёплый ритм',difficulty:1,tags:['music','rhythm'],skillTags:[]},
   {id:'music.dreamy',kind:'musicstyle',label:'Звёздный свет',difficulty:1,tags:['music','dreamy'],skillTags:[]}
@@ -54,6 +62,13 @@ export const HOBBY_ACTIVITIES=createActivityRegistry({
     contentKind:'musicstyle',timeBudget:{minMinutes:8,targetMinutes:30},
     needEffects:[{statId:'needs.fun',perMinute:1.23},{statId:'needs.energy',perMinute:-0.12}],
     skillPractice:[],poseKey:'music.dance',audioCue:'music.original'
+  },{
+    id:PAINT_ACTIVITY_ID,label:'Рисовать картину',kind:'creative',
+    source:'item',participation:'solo',requiredCapabilities:['art.paint'],
+    contentKind:'painting',timeBudget:{minMinutes:10,targetMinutes:45},
+    needEffects:[{statId:'needs.fun',perMinute:0.82}],
+    skillPractice:[{skillId:PAINT_SKILL_ID,xpPerMinute:1.2}],
+    poseKey:'painting.easel'
   }]
 });
 

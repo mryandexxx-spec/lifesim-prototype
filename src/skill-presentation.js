@@ -2,7 +2,8 @@
 import {deriveSkillLevel,getSkillDefinition} from './skill-registry.js';
 
 const SKILL_GUIDANCE=Object.freeze({
-  literature:'Читай книги у купленного книжного шкафа. Совместное чтение тоже развивает эрудицию.'
+  literature:'Читай книги у купленного книжного шкафа. Совместное чтение тоже развивает эрудицию.',
+  painting:'Рисуй у купленного мольберта: каждая законченная картина остаётся в коллекции.'
 });
 const UNLOCK_LABELS=Object.freeze({'books.read.classics':'Книга «Пути старых городов»'});
 
