@@ -10,6 +10,7 @@ import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLif
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
 import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './furniture-catalog.js';
+import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {furniturePoint} from './furniture-transform.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
@@ -44,6 +45,8 @@ export function newHousehold() {
   state.actionQueues=newActionQueues(HOUSEHOLD_IDS);
   // F0 optional v1 extension; each piece has its own immutable instanceId.
   state.world={furniture:newFurnitureWorld()};
+  // F2.1 optional root-v1 extension. Old households get test credits only once.
+  state.shop=newFurnitureShop();
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
   return state;
@@ -54,6 +57,7 @@ export function loadHousehold(raw) {
   if (!raw || raw.version!==1) return newHousehold();
   const root=loadGame(raw,DEMO_PROFILES.first);
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture)};
+  root.shop=restoreFurnitureShop(raw.shop);
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
     raw.otherSim.version===1 && raw.otherSim.needs && raw.otherSim.position;
   // Ignore saved clock/speed/pause for Mira; the household has one shared clock.
