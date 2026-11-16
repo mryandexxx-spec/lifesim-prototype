@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {newHousehold,loadHousehold} from '../src/household.js';
-import {createIntimacyQAHousehold,INTIMACY_QA_DEBUG_QUERY} from '../src/romance-intimacy-qa.js';
+import {newHousehold,loadHousehold,setHouseholdAutonomy} from '../src/household.js';
+import {observePairViews,applySocialEvent} from '../src/social-graph.js';
 import {intimacyBedPlan,intimacyFrame,INTIMACY_DURATION_MINUTES,
   INTIMACY_REFUSAL_DURATION_MINUTES} from '../src/romantic-intimacy.js';
 import {romanceAvailability,setRomanceBoundary} from '../src/romance.js';
@@ -11,13 +11,47 @@ import {startBranchSocial,arriveSocial,tickSocial,cancelSocial}
   from '../src/relationships.js';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const target={x:-.2,z:1.85};
+// Test-only builder: the accepted release no longer exposes ?debug=intimacy.
+function createIntimacyQAHousehold(){
+  const root=newHousehold();
+  root.minutes=8000;
+  root.otherSim.minutes=root.minutes;
+  root.mind.mood.value=88;
+  root.otherSim.mind.mood.value=88;
+  for(const id of ['alex','mira']){
+    Object.assign(root.relationship.views[id],{friendship:88,trust:90,tension:0});
+    const resident=id==='alex'?root:root.otherSim;
+    Object.assign(resident.needs,{hunger:95,energy:95,hygiene:95,fun:95,social:95,bladder:95});
+  }
+  setHouseholdAutonomy(root,false);
+  if(!observePairViews(root.socialGraph,'alex','mira',root.relationship.views))
+    throw Error('Intimacy QA: perspectives unavailable');
+  // Genuine canonical romance receipts ONLY in a new throwaway graph.
+  for(const [actorId,targetId,type,at] of [
+    ['alex','mira','romance.flirt',900],
+    ['mira','alex','romance.flirt',2400],
+    ['alex','mira','romance.flirt',3900],
+    ['alex','mira','romance.confess',4200],
+    ['alex','mira','romance.date',4500],
+    ['alex','mira','romance.tender',5000],
+    ['mira','alex','romance.tender',5400]
+  ]){
+    if(!applySocialEvent(root.socialGraph,{actorId,targetId,type,at}))
+      throw Error('Intimacy QA: invalid milestone '+type);
+  }
+  for(const [a,b] of [['alex','mira'],['mira','alex']]){
+    if(!romanceAvailability(root.socialGraph,a,b,'romance.intimacy',root.minutes).enabled||
+      !intimacyBedPlan(root,a))throw Error('Intimacy QA: unable to offer '+a);
+  }
+  return root;
+}
+
 const receipts=s=>getPair(s.socialGraph,'alex','mira').events
   .filter(e=>e.type.startsWith('romance.intimacy'));
 test('R2 only a voluntary adult, unrelated committed couple can offer',()=>{
   const ordinary=newHousehold();
   assert.equal(romanceAvailability(ordinary.socialGraph,'alex','mira','romance.intimacy',ordinary.minutes).enabled,false);
   assert.equal(startBranchSocial(ordinary,'alex',target,'romance.intimacy'),false);
-  assert.equal(INTIMACY_QA_DEBUG_QUERY,'intimacy');
   const qa=createIntimacyQAHousehold();
   assert.equal(qa.autonomy.enabled,false);
   assert.equal(qa.otherSim.autonomy.enabled,false);
@@ -118,17 +152,19 @@ test('R2 UI fades only on consent, keeps ordinary save and game controls intact'
   const html=read('../index.html');
   const css=read('../styles.css');
   const pages=read('../.github/workflows/pages.yml');
-  assert.ok(game.includes("get('debug')===INTIMACY_QA_DEBUG_QUERY"));
-  assert.ok(game.includes('if(intimacyQAMode)game=createIntimacyQAHousehold()'));
-  assert.ok(game.includes("if(intimacyQAMode)$('reset-btn').disabled=true"));
-  assert.ok(game.includes('if(intimacyQAMode){\n    if(!silent)toast'));
-  assert.ok(game.includes("beginSocial('talk',false,initiatorId,null,null,'romance.intimacy')"));
+  assert.doesNotMatch(game,/intimacyQAMode|createIntimacyQAHousehold|INTIMACY_QA_DEBUG_QUERY|intimacy-qa-controls/);
+  assert.doesNotMatch(game,/get\\('debug'\\)/);
+  assert.match(game,/localStorage\\.getItem\\(SAVE_KEY\\)/);
+  assert.match(game,/localStorage\\.setItem\\(SAVE_KEY,/);
+  assert.ok(game.includes("beginSocial('talk',false"));
   assert.ok(game.includes("intimacyVeil.classList.toggle('visible',privateFrame.active)"));
   assert.ok(game.includes("if(intimacyFrame(game.socialAction).active)"));
   assert.ok(html.includes('id="intimacy-veil"'));
   assert.ok(html.includes('id="intimacy-progress"'));
   assert.ok(css.includes('.intimacy-veil.visible'));
-  assert.ok(pages.includes('cp src/romantic-intimacy.js src/romance-intimacy-qa.js site/src/'));
+  assert.ok(pages.includes('cp src/romantic-intimacy.js site/src/'));
+  assert.ok(!pages.includes('romance-intimacy-qa.js'));
+  assert.ok(!css.includes('.intimacy-qa-controls'));
   assert.doesNotMatch(game,/kissQAMode|createKissQAHousehold|kiss-qa-controls/);
   assert.equal(INTIMACY_DURATION_MINUTES,30);
 });

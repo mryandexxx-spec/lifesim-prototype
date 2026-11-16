@@ -1,7 +1,7 @@
 name: R2 intimacy preflight with R1 hug/kiss and F2 regression
 on:
   push:
-    branches: [feature/romance-r2-intimacy-20261116]
+    branches: [chore/r2-accepted-remove-qa-20261116]
 permissions:
   contents: read
 jobs:
@@ -16,7 +16,7 @@ jobs:
         run: |
           npm ci
           npm test
-          for f in src/game.js src/romance.js src/relationships.js src/social-graph.js src/social-reactions.js src/romantic-intimacy.js src/romance-intimacy-qa.js; do node --check "$f"; done
+          for f in src/game.js src/romance.js src/relationships.js src/social-graph.js src/social-reactions.js src/romantic-intimacy.js; do node --check "$f"; done
       - name: Validate unchanged original Meshy models
         run: |
           echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -

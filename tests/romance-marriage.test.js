@@ -294,7 +294,7 @@ test('1.0m: Safari category, status and labels are wired without numeric scores'
   const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
   const html=read('../index.html'),js=read('../src/game.js'),
     romance=read('../src/romance.js'),graph=read('../src/social-graph.js');
-  assert.ok(html.includes('сборка / 1.1z'));
+  assert.ok(html.includes('сборка / 1.2a'));
   assert.ok(html.includes('id="romance-depth"'));
   assert.ok(js.includes('romanceLoveDescription(game.socialGraph'));
   assert.ok(graph.includes('Предложить помолвку'));
