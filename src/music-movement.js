@@ -12,7 +12,9 @@ export function musicMovementFrame(frame=null){
   const dance=frame.activityId===MUSIC_DANCE_ACTIVITY_ID;
   const style=frame.contentId;
   const tempo=style==='music.rhythmic'?1.23:style==='music.dreamy'?.91:1;
-  const phase=2*Math.PI*(frame.elapsed%(dance?4.2:10))/(dance?4.2:10)*tempo;
+  // Do not modulo before applying the style tempo: an off-beat style would
+  // otherwise snap its joints every base-cycle boundary.
+  const phase=2*Math.PI*frame.elapsed/(dance?4.2:10)*tempo;
   const sin=Math.sin(phase),cos=Math.cos(phase),counter=Math.sin(phase+Math.PI);
   // Subtle, relaxed nods and shoulders; standing feet stay close to planted.
   if(!dance)return {
