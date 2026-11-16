@@ -102,7 +102,7 @@ test('actual visual bridge applies overlays only after the base Anim evaluation'
   assert.match(visual,/postUpdate\(\)\{fridge\.apply\(\);\}/);
   assert.match(visual,/fridgeReady:Boolean\(state\.fridgeRuntime\?\.ready\)/);
   assert.match(game,/fridgeFrame:alexFridge/);
-  assert.match(game,/mesh[y]?Shown&&useId==='fridge'\)snack\.enabled=false/);
+  assert.match(game,/mesh[y]?Shown&&\(useId==='fridge'\|\|alexCarryMeal\)\)snack\.enabled=false/);
   assert.match(pages,/src\/meshy-fridge-runtime\.js/);
   assert.match(pages,/node --check src\/meshy-fridge-runtime\.js/);
 });
