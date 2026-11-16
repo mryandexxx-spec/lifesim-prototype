@@ -37,6 +37,8 @@ test('female source asset has its own clips and separate 2.05 game-height placem
 test('female visuals use a guarded authored sofa, but retain fallback elsewhere',()=>{
   const ready={preferred:true,ready:true};
   assert.equal(canShowMiraMeshy(ready),true);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'hobby'}),false);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'hobby',readingReady:true}),true);
   assert.equal(canShowMiraMeshy({...ready,ready:false}),false);
   for(const name of ['sofa','bed','fridge','shower'])
     assert.equal(canShowMiraMeshy({...ready,actionId:name}),false);
@@ -277,7 +279,7 @@ test('game feeds female sofa bend and conceals old elbow book',()=>{
   const source=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
   const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
   assert.match(source,/sofaWeight:miraSeatPose\.sofaWeight/);
-  assert.match(source,/if\(miraMeshShown&&miraUseId==='sofa'\)miraBook\.enabled=false/);
+  assert.match(source,/if\(miraMeshShown&&\(miraUseId==='sofa'\|\|miraUseId==='hobby'\)\)miraBook\.enabled=false/);
   assert.ok(workflow.includes('node --check src/meshy-mira-sofa.js'));
   assert.ok(workflow.includes('src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js'));
 });

@@ -1,7 +1,7 @@
 import {canShowMeshy, meshClipFor, availableMeshClips,
   MESHY_ASSET_URL, meshPlacement,MESHY_SEAT_RIG_PROFILE,
   ALEX_GREETING_CLIP,alexGreetingClipTime,ALEX_ALTERNATE_IDLE_CLIP,
-  alexIdleClipFor} from './meshy-visual-policy.js';
+  alexIdleClipFor} from './meshy-visual-policy.js?v=1.2p';
 import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} from './meshy-sofa-pose.js';
 import {createSkinnedSeatController} from './meshy-seat-runtime.js';
 import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
@@ -11,6 +11,7 @@ import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
 import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
 import {createMeshyHugController} from './meshy-hug-runtime.js';
 import {createMeshyKissController} from './meshy-kiss-runtime.js';
+import {createMeshyReadingController} from './meshy-reading-runtime.js';
 
 /**
  * Meshy visual adapter for the EXISTING LifeSim procedural character root.
@@ -30,7 +31,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
   const state={status:'loading',ready:false,root:null,model:null,clip:null,visible:false,error:null,
     scale:1,base:{x:0,y:0,z:0},sofaOffset:{x:0,y:0,z:0},sofaRelease:null,
     seatRuntime:null,seatWarning:false,greetingDuration:0,fridgeRuntime:null,
-    bedRuntime:null,showerRuntime:null,hugRuntime:null,walkDuration:0,toiletReady:false,
+    bedRuntime:null,showerRuntime:null,hugRuntime:null,readingRuntime:null,walkDuration:0,toiletReady:false,
     alternateIdleAvailable:false};
   let requested=false;
 
@@ -164,6 +165,22 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
           }
         }
       }catch(error){state.kissRuntime=null;console.warn('Alex kiss rig unavailable',error);}
+      // H1: rigged book + two-hand post-Anim motion, without changing gameplay.
+      // A missing joint or Script support retains the procedural H1 fallback.
+      try{
+        const reading=createMeshyReadingController({
+          pc,model,avatar:rig.avatar,resident:'Alex'
+        });
+        if(reading.ready&&pc.Script){
+          if(!model.script)model.addComponent('script');
+          class AlexReadingPostUpdate extends pc.Script{
+            static scriptName='blinsAlexReadingPostUpdate';
+            postUpdate(){reading.apply();}
+          }
+          model.script.create(AlexReadingPostUpdate);
+          state.readingRuntime=reading;
+        }
+      }catch(error){console.warn('Alex reading rig unavailable',error);}
       root.enabled=false;
       state.root=root;state.model=model;state.clip='Idle_3';
       state.ready=true;state.status='ready';
@@ -202,12 +219,13 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       bedBusy=false,bedFrame=null,showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,fridgeBusy=false,
       socialInitiator=false,socialElapsed=null,hugFrame=null,kissFrame=null,fridgeFrame=null,
-      worldMinutes=null,mood=null,energy=null}={}){
+      worldMinutes=null,mood=null,energy=null,readingElapsed=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
         preferred:requested&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready))&&
           (!kissFrame?.active||Boolean(state.kissRuntime?.ready)),ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
         fridgeBusy,fridgeReady:Boolean(state.fridgeRuntime?.ready),
+        readingReady:Boolean(state.readingRuntime?.ready),
         bedReady:Boolean(state.bedRuntime?.ready),
         showerReady:Boolean(state.showerRuntime?.ready),
         toiletBusy,toiletReady:state.toiletReady
@@ -218,13 +236,17 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         state.visible=useMeshy;
       }
       if(!useMeshy||!state.model){
+        state.readingRuntime?.setFrame(null);
         state.fridgeRuntime?.setFrame(null);
+        state.readingRuntime?.setFrame(null);
         state.hugRuntime?.setFrame(null);
         state.kissRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
         state.showerRuntime?.setFrame(null);
         return useMeshy;
       }
+      state.readingRuntime?.setFrame(actionId==='hobby'
+        ?{active:true,elapsed:readingElapsed}:null,paused);
       state.hugRuntime?.setFrame(hugFrame,paused);
       state.kissRuntime?.setFrame(kissFrame,paused);
       // Game updates the pose; postUpdate applies joint rotations after Anim.
@@ -358,6 +380,19 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         }
         // The game's timeline, not independent GLB time/root motion, owns
         // the seat. The scrub was applied before the contact/foot pass.
+        return true;
+      }
+      if(actionId==='hobby'){
+        // Audited original Meshy idle plus skeletal book pose; do not invent
+        // an imported reading clip or apply unrelated sofa root compensation.
+        if(state.clip!=='Idle_3'){
+          anim.baseLayer.transition('Idle_3',.20);
+          state.clip='Idle_3';
+        }
+        state.sofaRelease=null;
+        state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
+        anim.speed=1;
+        anim.playing=!paused;
         return true;
       }
       const greetingTime=hugFrame?.active?null:alexGreetingClipTime({

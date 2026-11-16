@@ -128,9 +128,9 @@ test('F4b1 Pages packages registry selector, mobile build version and leaves sav
   const pkg=JSON.parse(read('../package.json'));
   assert.match(workflow,/node --check src\/shop-catalog-selector\.js/);
   assert.match(workflow,/cp src\/object-definition-registry\.js src\/object-effect-engine\.js src\/object-legacy-adapter\.js src\/shop-catalog-selector\.js site\/src\//);
-  assert.match(html,/src\/game\.js\?v=1\.2o/);
-  assert.match(html,/styles\.css\?v=1\.2o/);
-  assert.equal(pkg.version,'1.0.0-alpha.67');
+  assert.match(html,/src\/game\.js\?v=1\.2p/);
+  assert.match(html,/styles\.css\?v=1\.2p/);
+  assert.equal(pkg.version,'1.0.0-alpha.68');
   assert.deepEqual(newFurnitureShop(),{schema:1,credits:5000,nextId:1});
   assert.equal(newFurnitureWorld().schema,1);
 });

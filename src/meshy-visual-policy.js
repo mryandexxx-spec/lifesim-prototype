@@ -124,10 +124,11 @@ export function alexGreetingClipTime({social=null,initiator=false,elapsed=null,d
 export function canShowMeshy({
   preferred = false, ready = false, actionId = null,
   sofaBusy = false, bedBusy = false, showerBusy = false,
-  fridgeBusy = false, fridgeReady = false, bedReady = false,
+  fridgeBusy = false, fridgeReady = false, readingReady = false, bedReady = false,
   showerReady = false, toiletBusy = false, toiletReady = false
 } = {}) {
   const eligible=actionId===null||actionId==='sofa'||
+    (actionId==='hobby'&&readingReady)||
     (actionId==='fridge'&&fridgeReady)||(actionId==='bed'&&bedReady)||
     (actionId==='shower'&&showerReady)||(actionId==='toilet'&&toiletReady);
   return Boolean(preferred&&ready&&eligible&&

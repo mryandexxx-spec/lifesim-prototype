@@ -50,9 +50,9 @@ import {needPresentation,moodPresentation,moodOrbitPoint} from './mood-presentat
 import {moodActionPolicy} from './mood-action-policy.js';
 import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
-import {createMeshyVisual} from './meshy-visual.js';
+import {createMeshyVisual} from './meshy-visual.js?v=1.2p';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
-import {createMiraMeshyVisual} from './meshy-mira-visual.js';
+import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2p';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
 import {intimacyFrame,intimacyBedPlan} from './romantic-intimacy.js';
@@ -3343,6 +3343,7 @@ function boot() {
       social:socialUsing&&!pairedTv?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
       actionId:miraUseId,
+      readingElapsed:miraUsing&&miraUseId==='hobby'?game.otherSim.action.elapsed:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
@@ -3356,7 +3357,7 @@ function boot() {
       fridgeFrame:miraFridge
     });
     // The procedural book belongs to a hidden elbow; never show it floating.
-    if(miraMeshShown&&miraUseId==='sofa')miraBook.enabled=false;
+    if(miraMeshShown&&(miraUseId==='sofa'||miraUseId==='hobby'))miraBook.enabled=false;
     // The old snack is on the hidden procedural elbow, not the Meshy hand.
     if(miraMeshShown&&miraUseId==='fridge')miraSnack.enabled=false;
     // Alex stays on the same 3D rig for bed and fridge when their verified
@@ -3377,6 +3378,7 @@ function boot() {
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
       actionId:useId,
+      readingElapsed:using&&useId==='hobby'?game.action.elapsed:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
       seat:seatContactEnabled?livingSofaSeat:null,
@@ -3395,7 +3397,7 @@ function boot() {
     if(meshyShown&&useId==='fridge')snack.enabled=false;
     // The existing procedural book is attached to the old right elbow.
     // Never let it float beside the Meshy hand until a real socket exists.
-    if(meshyShown&&useId==='sofa')book.enabled=false;
+    if(meshyShown&&(useId==='sofa'||useId==='hobby'))book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
     // R5b never writes to the simulator. Tableware only follows existing

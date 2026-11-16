@@ -14,6 +14,12 @@ on:
       - 'src/game.js'
       - 'src/animations.js'
       - 'tests/hobbies-h1.test.js'
+      - 'src/meshy-reading-runtime.js'
+      - 'src/meshy-visual.js'
+      - 'src/meshy-mira-visual.js'
+      - 'src/meshy-visual-policy.js'
+      - 'src/meshy-mira-policy.js'
+      - 'tests/meshy-reading.test.js'
       - '.github/workflows/hobby-h1-checks.yml'
 permissions:
   contents: read
