@@ -454,7 +454,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=id==='sofa'&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','bed'].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -463,7 +463,8 @@ function select(id,instanceId=null) {
   $('action-category').textContent = META[id].category;
   $('action-title').textContent = META[id].title;
   $('action-description').textContent = selectedFurnitureInstanceId
-    ?'Отдых на выбранном диване · собственный маршрут и место посадки'
+    ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
+      'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('action-button').innerHTML = `${ACTIONS[id].label} <span>↗</span>`;
 }
@@ -1472,6 +1473,8 @@ function boot() {
   // The last used sofa remains the visual target while standing up.
   const sofaVisualTargets={alex:null,mira:null};
   const bedStates={alex:createBedTransition(),mira:createBedTransition()};
+  // Retain the selected mattress through the physical climb-down animation.
+  const bedVisualTargets={alex:null,mira:null};
   const showerStates={alex:createShowerTransition(),mira:createShowerTransition()};
   const toiletStates={alex:createToiletTransition(),mira:createToiletTransition()};
   const {avatar,torso,leftEye,rightEye,legPivot,armPivot,snack,book,selected:alexSelected}=alexRig;
@@ -1835,8 +1838,12 @@ function boot() {
     // A finished need action may still have a physical stand-up, dressing,
     // masking or fridge-door-close animation. F1b forbids relocating those
     // assemblies until all residents are visually clear of the fixture.
-    if(Object.values(bedStates).some(s=>s.progress>0))
-      lockPrefab('bed');
+    for(const id of HOUSEHOLD_IDS){
+      if(bedStates[id].progress>0){
+        if(bedVisualTargets[id])busy.add(bedVisualTargets[id]);
+        else lockPrefab('bed'); // legacy transition: fail closed
+      }
+    }
     for(const id of HOUSEHOLD_IDS){
       if(sofaStates[id].progress>0){
         if(sofaVisualTargets[id])busy.add(sofaVisualTargets[id]);
@@ -2487,8 +2494,17 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:1.08,z:r.maxZ}}};
       });
+    const bedCopies=game.world.furniture.instances
+      .filter(item=>item.prefabId==='bed'&&item.location==='home'&&
+        item.instanceId!=='home-bed-1')
+      .map(item=>{
+        const r=instanceRect(item,FURNITURE_CATALOG.bed.footprint);
+        return {kind:'object',id:'bed',instanceId:item.instanceId,
+          bounds:{min:{x:r.minX,y:0,z:r.minZ},
+            max:{x:r.maxX,y:1.42,z:r.maxZ}}};
+      });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...movedVolumes,...blockers]);
+      [...residents,...sofaCopies,...bedCopies,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -2765,11 +2781,14 @@ function boot() {
       alexSeatInstanceId=sofaVisualTargets.alex;
       refreshSofaSeat();
     }
+    if(useId==='bed')bedVisualTargets.alex=game.action?.targetInstanceId??'home-bed-1';
     bedStates.alex=advanceBedTransition(bedStates.alex,
       useId==='bed'&&sofaStates.alex.progress===0&&!showerStates.alex.active,
-      game.action?.bedSlot,animDt,inverseFurniturePose(game.world,'bed',display));
+      game.action?.bedSlot,animDt,
+      inverseFurniturePose(game.world,'bed',display,bedVisualTargets.alex));
     const bedPose=bedStates.alex.progress>0
-      ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex)):null;
+      ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex),bedVisualTargets.alex):null;
+    if(bedStates.alex.progress===0)bedVisualTargets.alex=null;
     const bedding=Boolean(bedPose);
     const pose=useId&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
       ?furniturePose(game.world,useId,ACTOR_POSES[useId]):null;
@@ -2866,11 +2885,14 @@ function boot() {
       {...miraDisplay,sofaWeight:0};
     const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
     if(!miraSeating)sofaVisualTargets.mira=null;
+    if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
     bedStates.mira=advanceBedTransition(bedStates.mira,
       miraUseId==='bed'&&sofaStates.mira.progress===0&&!showerStates.mira.active,
-      game.otherSim.action?.bedSlot,animDt,inverseFurniturePose(game.world,'bed',miraDisplay));
+      game.otherSim.action?.bedSlot,animDt,
+      inverseFurniturePose(game.world,'bed',miraDisplay,bedVisualTargets.mira));
     const miraBedPose=bedStates.mira.progress>0
-      ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira)):null;
+      ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira),bedVisualTargets.mira):null;
+    if(bedStates.mira.progress===0)bedVisualTargets.mira=null;
     const miraBedding=Boolean(miraBedPose);
     const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
       ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId]):null;
@@ -3001,14 +3023,25 @@ function boot() {
     if(meshyShown&&useId==='sofa')book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
-    for(const slot of ['left','right']){
-      const progress=Math.max(...Object.values(bedStates).map(s=>s.slot===slot?s.progress:0));
-      const quilt=bedBeddingPose(progress),bx=BED_SLOTS[slot].x;
-      quilts[slot].body.setLocalPosition(bx+2.62,quilt.y,
-        quilt.z+1.425);
-      quilts[slot].body.setLocalScale(1.02,.15,quilt.depth);
-      quilts[slot].trim.setLocalPosition(bx+2.62,quilt.y+.09,
-        quilt.trimZ+1.425);
+    // Independently animate blankets on the actual sleeping bed, not the original.
+    for(const item of game.world.furniture.instances){
+      if(item.prefabId!=='bed'||item.location!=='home')continue;
+      const node=decorNodes.get(item.instanceId);
+      if(!node)continue;
+      for(const slot of ['left','right']){
+        const progress=Math.max(...HOUSEHOLD_IDS.map(id=>
+          bedVisualTargets[id]===item.instanceId&&bedStates[id].slot===slot
+            ?bedStates[id].progress:0));
+        const quilt=bedBeddingPose(progress),bx=BED_SLOTS[slot].x;
+        const body=item.instanceId==='home-bed-1'
+          ?quilts[slot].body:node.findByName('duvet '+slot);
+        const trim=item.instanceId==='home-bed-1'
+          ?quilts[slot].trim:node.findByName('duvet trim '+slot);
+        if(!body||!trim)continue;
+        body.setLocalPosition(bx+2.62,quilt.y,quilt.z+1.425);
+        body.setLocalScale(1.02,.15,quilt.depth);
+        trim.setLocalPosition(bx+2.62,quilt.y+.09,quilt.trimZ+1.425);
+      }
     }
     const activeFridge=alexFridge||miraFridge;
     fridgeOpen=activeFridge?activeFridge.doorOpen:closeFridgeDoor(fridgeOpen,animDt);
