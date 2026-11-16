@@ -29,7 +29,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes,socialCommunicationNotes} from './social-graph.js';
 import {latestEpisodes} from './social-episodes.js';
 import {pairDynamic} from './social-dynamics.js';
-import {romanceStatus,romanceLoveDescription,romanceClimate,
+import {romanceStatus,romanceLoveDescription,romanceClimate,romanceAvailability,
   setRomancePreference,romancePreferenceSummary} from './romance.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
@@ -50,6 +50,7 @@ import {createMiraMeshyVisual} from './meshy-mira-visual.js';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
 import {intimacyFrame,intimacyBedPlan} from './romantic-intimacy.js';
+import {romanticEveningVignette} from './romantic-evening-scene.js';
 import {meshVisualPreference,MESHY_VISUAL_KEY,meshSeatRuntimeSettings} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
@@ -1348,6 +1349,34 @@ function boot() {
     box('coffee table top',1.34,.40,-.26,1.47,.12,.73,M.paleWood);
     for(let x of [.74,1.94]) for(let z of [-.53,.01])
       cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
+    // R5b original tiny tabletop arrangement, parented to the real table.
+    // Template clones follow purchased furniture, rotations, storage and sales.
+    const dateSet=new pc.Entity('R5b romantic tableware');
+    decorDrawing.node.addChild(dateSet);
+    dateSet.enabled=false;
+    const candleGlow=mat('#ffd39c',{emissive:.65});
+    const bouquet=mat('#d17f93');
+    cylinder('R5b candle plate',0,.482,0,.25,.025,.25,M.yellow,dateSet);
+    cylinder('R5b candle wax',0,.563,0,.10,.14,.10,M.cream,dateSet);
+    ball('R5b candle flame',0,.68,0,.078,.12,.078,candleGlow,dateSet);
+    cylinder('R5b cup left',-.35,.526,.09,.16,.13,.16,M.peach,dateSet);
+    cylinder('R5b cup right',.35,.526,.09,.16,.13,.16,M.mint,dateSet);
+    cylinder('R5b flower vase',0,.522,-.19,.13,.12,.13,M.white,dateSet);
+    cylinder('R5b flower stem',0,.635,-.19,.026,.16,.026,M.darkGreen,dateSet);
+    ball('R5b flower petal 1',-.065,.721,-.19,.14,.095,.11,bouquet,dateSet);
+    ball('R5b flower petal 2',.062,.706,-.20,.13,.085,.11,M.pink,dateSet);
+  });
+  // One shadowless warm light plus five tiny accents, all opt-in during the
+  // ACTUAL consented shared evening; no extra saved or collided entities.
+  const dateLight=new pc.Entity('R5b warm date light');
+  dateLight.addComponent('light',{type:'omni',color:new pc.Color(.98,.79,.62),
+    intensity:.28,range:2.6,castShadows:false});
+  app.root.addChild(dateLight);dateLight.enabled=false;
+  const dateSparkMaterials=[mat('#ffd0a1',{emissive:.7}),
+    mat('#eeb3b4',{emissive:.55})];
+  const dateAccents=Array.from({length:5},(_,i)=>{
+    const glow=ball('R5b evening sparkle '+i,0,0,0,.08,.08,.08,dateSparkMaterials[i%2]);
+    glow.enabled=false;return glow;
   });
   withDecor('tv',()=>{
     touchBox('tv','tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
@@ -2746,6 +2775,13 @@ function boot() {
       }
     }
     const socialUsing=game.socialAction?.phase==='using';
+    const dateSocial=game.socialAction;
+    const dateAllowed=dateSocial?.branchAction?.id==='romance.evening'&&
+      romanceAvailability(game.socialGraph,dateSocial.initiator,
+        dateSocial.partner,'romance.evening',game.minutes).enabled;
+    const eveningFrame=romanticEveningVignette(furnishMode?null:game.socialAction,
+      game.world,{alex:game.position,mira:game.otherSim.position},effectTime,
+      {eligible:Boolean(dateAllowed)});
     // Both visible avatars follow the same consented hug timeline.
     // Simulation coordinates stay authoritative for movement and saves.
     const hugCandidate=hugMotion(game.socialAction);
@@ -2857,6 +2893,7 @@ function boot() {
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
       social:socialUsing&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
       fridgeReach:alexFridge?.reach||0,fridgeEat:alexFridge?.eat||0,
@@ -2961,6 +2998,7 @@ function boot() {
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
       social:socialUsing&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
       fridgeReach:miraFridge?.reach||0,fridgeEat:miraFridge?.eat||0,
@@ -3043,6 +3081,25 @@ function boot() {
     if(meshyShown&&useId==='sofa')book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
+    // R5b never writes to the simulator. Tableware only follows existing
+    // home furniture and vanishes instantly on refusal, exit or furnishing.
+    for(const item of game.world.furniture.instances){
+      if(item.prefabId!=='table')continue;
+      const decor=decorNodes.get(item.instanceId)?.findByName('R5b romantic tableware');
+      if(decor)decor.enabled=item.location==='home'&&
+        eveningFrame.tableInstanceId===item.instanceId;
+    }
+    dateLight.enabled=eveningFrame.active&&eveningFrame.weight>.001;
+    if(dateLight.enabled&&eveningFrame.center){
+      dateLight.setPosition(eveningFrame.center.x,1.42,eveningFrame.center.z);
+      dateLight.light.intensity=.28*eveningFrame.weight;
+    }
+    for(let i=0;i<dateAccents.length;i++){
+      const point=eveningFrame.accents[i],accent=dateAccents[i];
+      accent.enabled=Boolean(point);
+      if(point){accent.setPosition(point.x,point.y,point.z);
+        accent.setLocalScale(point.size,point.size,point.size);}
+    }
     // A TV only plays while one of its OWN watchers is actually using it.
     // Each instance keeps its own small procedural screen and no video files.
     for(const item of game.world.furniture.instances){

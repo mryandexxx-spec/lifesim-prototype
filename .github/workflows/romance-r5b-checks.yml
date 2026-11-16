@@ -1,0 +1,28 @@
+name: R5b romantic evening visual preflight
+on:
+  push:
+    branches: [feature/r5b-visual-evening-vignette-20261116]
+  pull_request:
+    paths:
+      - 'src/romantic-evening-scene.js'
+      - 'src/game.js'
+      - 'src/animations.js'
+      - 'tests/romance-r5b.test.js'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Full regression, browser syntax and original model hashes
+        run: |
+          npm ci
+          npm test
+          for file in src/romantic-evening-scene.js src/animations.js src/game.js src/relationships.js src/tv-seating.js; do node --check "$file"; done
+          echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -
+          echo "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a  assets/characters/meshy-mira-mobile-v1.glb" | sha256sum -c -
