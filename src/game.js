@@ -2780,10 +2780,12 @@ function boot() {
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
     const walking=active&&(game.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'));
-    if(useId==='sofa')
-      sofaVisualTargets.alex=game.action?.targetInstanceId??null;
+    const alexWatchSeat=useId==='tv'?game.action?.watchSeatInstanceId:null;
+    if(useId==='sofa'||alexWatchSeat)
+      sofaVisualTargets.alex=(alexWatchSeat||game.action?.targetInstanceId)||null;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
-      useId==='sofa'&&bedStates.alex.progress===0&&!showerStates.alex.active,animDt);
+      (useId==='sofa'||Boolean(alexWatchSeat))&&
+        bedStates.alex.progress===0&&!showerStates.alex.active,animDt);
     const seatPose=furniturePose(game.world,'sofa',
       sofaTransitionPose(sofaStates.alex),sofaVisualTargets.alex)||
       {...display,sofaWeight:0}; // deleted/stale target never teleports to original
@@ -2802,8 +2804,8 @@ function boot() {
       ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex),bedVisualTargets.alex):null;
     if(bedStates.alex.progress===0)bedVisualTargets.alex=null;
     const bedding=Boolean(bedPose);
-    const pose=useId&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
-      ?furniturePose(game.world,useId,ACTOR_POSES[useId]):null;
+    const pose=useId&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
+      ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null;
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
@@ -2888,10 +2890,12 @@ function boot() {
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
       (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'));
-    if(miraUseId==='sofa')
-      sofaVisualTargets.mira=game.otherSim.action?.targetInstanceId??null;
+    const miraWatchSeat=miraUseId==='tv'?game.otherSim.action?.watchSeatInstanceId:null;
+    if(miraUseId==='sofa'||miraWatchSeat)
+      sofaVisualTargets.mira=(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
-      miraUseId==='sofa'&&bedStates.mira.progress===0&&!showerStates.mira.active,animDt);
+      (miraUseId==='sofa'||Boolean(miraWatchSeat))&&
+        bedStates.mira.progress===0&&!showerStates.mira.active,animDt);
     const miraSeatPose=furniturePose(game.world,'sofa',
       sofaTransitionPose(sofaStates.mira),sofaVisualTargets.mira)||
       {...miraDisplay,sofaWeight:0};
@@ -2906,8 +2910,8 @@ function boot() {
       ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira),bedVisualTargets.mira):null;
     if(bedStates.mira.progress===0)bedVisualTargets.mira=null;
     const miraBedding=Boolean(miraBedPose);
-    const miraPose=miraUseId&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
-      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId]):null;
+    const miraPose=miraUseId&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
+      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null;
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
