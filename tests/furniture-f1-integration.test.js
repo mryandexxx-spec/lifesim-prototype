@@ -6,9 +6,9 @@ const game=read('../src/game.js');
 const html=read('../index.html');
 const css=read('../styles.css');
 const workflow=read('../.github/workflows/pages.yml');
-test('F1 mobile UI has real mode enter/exit, four actual movable objects and accessible touch controls',()=>{
-  for(const id of ['furnish-toggle','furnish-exit','furniture-editor','furnish-items',
-    'furnish-left','furnish-right','furnish-up','furnish-down','furnish-rotate',
+test('F1/F2 mobile UI has real mode enter/exit, 3D picking and accessible shop controls',()=>{
+  for(const id of ['furnish-toggle','furnish-exit','furniture-editor','furnish-edit-toggle',
+    'furnish-shop-toggle','furnish-warehouse-toggle','furnish-stock','furnish-rotate',
     'furnish-undo','furnish-redo','furnish-feedback'])
     assert.ok(html.includes('id="'+id+'"'),id);
   assert.match(html,/id="furnish-toggle"[^>]+aria-pressed="false"/);
@@ -19,7 +19,8 @@ test('F1 mobile UI has real mode enter/exit, four actual movable objects and acc
   assert.match(css,/\.furniture-editor\[hidden\]\{display:none!important;/);
   assert.match(css,/\.app-shell\[data-furnish-mode="true"\] #dashboard/);
   assert.match(css,/\.furnish-commands button\{min-width:44px;min-height:44px/);
-  assert.match(game,/game\.world\.furniture\.instances\.filter\(i=>F1_MOVEABLE_PREFABS\.includes\(i\.prefabId\)\)/);
+  assert.match(game,/const editorFurnitureAt=pos=>/);
+  assert.doesNotMatch(html,/id="furnish-items"/);
 });
 test('F1 edit mode freezes sim without overwriting persisted manual pause or queuing actions',()=>{
   assert.match(game,/let furnishMode=false/);
