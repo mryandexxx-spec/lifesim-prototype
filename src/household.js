@@ -37,6 +37,7 @@ import {furnitureActionApproach} from './furniture-catalog.js';
 import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
 import {switchLampAtArrival} from './furniture-interactions.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,restoreCreatedWorks,finishPainting} from './painting.js';
+import {chooseDiningSeat,diningSeatApproach} from './dining.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
 export const RESIDENT_NAMES = Object.freeze({ alex: 'Алекс', mira: 'Мира' });
