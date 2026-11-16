@@ -9,6 +9,7 @@ import {getPerspective,applySocialPerspective} from './social-perspective.js';
 import {refreshMind} from './psychology.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {validSharedTvPlan} from './tv-together.js';
+import {validPairedHobbyPlan} from './paired-hobby.js';
 
 export const GIFT_CATALOG=Object.freeze({
   book:Object.freeze({label:'Книга историй',symbol:'📖',tag:'books'}),
@@ -57,7 +58,7 @@ export function restoreInventory(raw){
 export function inventoryFor(root,id){
   return resident(id)&&Array.isArray(root?.inventory?.[id])?root.inventory[id]:[];
 }
-export function createSharedSession(root,initiator,mode,choiceId,tvPlan=null){
+export function createSharedSession(root,initiator,mode,choiceId,physicalPlan=null){
   if(!resident(initiator)||!root?.otherSim)return null;
   if(mode==='gift'){
     if(!inventoryFor(root,initiator).some(item=>item.id===choiceId))return null;
@@ -65,15 +66,25 @@ export function createSharedSession(root,initiator,mode,choiceId,tvPlan=null){
   }
   if(mode==='leisure'&&has(LEISURE_CATALOG,choiceId)){
     if(choiceId==='tv'){
-      if(!validSharedTvPlan(root,tvPlan,initiator))return null;
+      if(!validSharedTvPlan(root,physicalPlan,initiator))return null;
       const places={};
       for(const id of ['alex','mira']){
-        const p=tvPlan.places[id];
+        const p=physicalPlan.places[id];
         places[id]={x:p.x,z:p.z,seatId:p.seatId};
       }
-      return {mode:'leisure',choiceId,tvPlan:{tvId:tvPlan.tvId,places}};
+      return {mode:'leisure',choiceId,tvPlan:{tvId:physicalPlan.tvId,places}};
     }
-    return {mode:'leisure',choiceId};
+    if(choiceId==='books'||choiceId==='music'){
+      if(!validPairedHobbyPlan(root,physicalPlan,initiator)||
+        physicalPlan.choiceId!==choiceId)return null;
+      const places={};
+      for(const id of ['alex','mira']){
+        const p=physicalPlan.places[id];places[id]={x:p.x,z:p.z};
+      }
+      return {mode:'leisure',choiceId,pairPlan:{choiceId,
+        instanceId:physicalPlan.instanceId,places},creditedMinutes:0};
+    }
+    return {mode:'leisure',choiceId}; // H6 games remain legacy.
   }
   return null;
 }
@@ -87,13 +98,21 @@ export function sharedDuration(session){
 export function restoreSharedSession(raw,root,initiator){
   if(!isRecord(raw))return null;
   const tv=raw.mode==='leisure'&&raw.choiceId==='tv';
-  const allowed=tv?['mode','choiceId','tvPlan','tvConsent']:['mode','choiceId'];
+  const pair=raw.mode==='leisure'&&['books','music'].includes(raw.choiceId);
+  const allowed=tv?['mode','choiceId','tvPlan','tvConsent']:
+    pair?['mode','choiceId','pairPlan','pairConsent','creditedMinutes']:
+      ['mode','choiceId'];
   if(Object.keys(raw).some(key=>!allowed.includes(key)))return null;
   if(tv&&raw.tvConsent!==undefined&&typeof raw.tvConsent!=='boolean')return null;
+  if(pair&&((raw.pairConsent!==undefined&&typeof raw.pairConsent!=='boolean')||
+    !Number.isFinite(raw.creditedMinutes)||raw.creditedMinutes<0||
+    raw.creditedMinutes>LEISURE_CATALOG[raw.choiceId].duration))return null;
   const session=createSharedSession(root,initiator,raw.mode,raw.choiceId,
-    tv?raw.tvPlan:null);
+    tv?raw.tvPlan:pair?raw.pairPlan:null);
   if(!session)return null;
   if(tv&&raw.tvConsent!==undefined)session.tvConsent=raw.tvConsent;
+  if(pair){session.creditedMinutes=raw.creditedMinutes;
+    if(raw.pairConsent!==undefined)session.pairConsent=raw.pairConsent;}
   return session;
 }
 /** After the item was offered, the recipient decides deterministically.
@@ -169,7 +188,10 @@ export function completeSharedSession(root){
     const evaluation=session.choiceId==='tv'
       ?{accepted:session.tvConsent===true&&
         validSharedTvPlan(root,session.tvPlan,from)}
-      :evaluateLeisure(root,from,session.choiceId);
+      :['books','music'].includes(session.choiceId)
+        ?{accepted:session.pairConsent===true&&
+          validPairedHobbyPlan(root,session.pairPlan,from,{requireRoutes:false})}
+        :evaluateLeisure(root,from,session.choiceId);
     if(!evaluation)return null;
     if(evaluation.accepted){
       kind='completed';
@@ -178,7 +200,7 @@ export function completeSharedSession(root){
       const pastime={type:'shared',mode:'leisure'};
       // TV pleasure was gained gradually while physically watching, not
       // fabricated again at the final canonical completion receipt.
-      const finalFun=session.choiceId==='tv'?0:12;
+      const finalFun=['tv','books','music'].includes(session.choiceId)?0:12;
       const giverGain=finalFun*voluntaryMoodEfficiency(giver,pastime);
       const receiverGain=finalFun*voluntaryMoodEfficiency(receiver,pastime);
       const mem='leisure.'+session.choiceId;

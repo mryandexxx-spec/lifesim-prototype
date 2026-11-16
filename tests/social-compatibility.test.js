@@ -1,3 +1,5 @@
+import {findMarketPlacement,buyMarketItem} from '../src/furniture-shop.js';
+import {planPairedHobby} from '../src/paired-hobby.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -180,7 +182,15 @@ test('completed accepted gift and leisure can teach initiator about the actual r
     .map(x=>x.text),['Любит музыку']);
   assert.deepEqual(socialKnowledgeNotes(gift.socialGraph,'mira','alex'),[]);
   const leisure=newHousehold();
-  assert.equal(startSharedSocial(leisure,'mira',spot,'leisure','books'),true);
+  const pose=findMarketPlacement(leisure.world.furniture,leisure.shop,'bookcase.starter');
+  assert.ok(pose);
+  const bought=buyMarketItem(leisure.world.furniture,leisure.shop,'bookcase.starter',pose);
+  assert.equal(bought.ok,true);
+  leisure.world.furniture=bought.world;leisure.shop=bought.shop;
+  const plan=planPairedHobby(leisure,'mira','books',bought.instanceId);
+  assert.ok(plan);
+  assert.equal(startSharedSocial(leisure,'mira',plan.places.mira,'leisure','books',false,plan),true);
+  leisure.position={...plan.places.alex};leisure.otherSim.position={...plan.places.mira};
   arriveSocial(leisure);tickHousehold(leisure,sharedDuration({mode:'leisure',choiceId:'books'})+1);
   assert.deepEqual(socialKnowledgeNotes(leisure.socialGraph,'mira','alex')
     .map(x=>x.text),['Любит книги']);

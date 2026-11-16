@@ -12,6 +12,7 @@ import {newPerspective,restorePerspective,applySocialPerspective,getPerspective}
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
 import {validSharedTvPlan} from './tv-together.js';
+import {validPairedHobbyPlan,livePairedHobby} from './paired-hobby.js';
 import {availableSocialActions,resolveBranchResponse,observePairViews,
   applySocialEvent,learnSocialPreference,learnSocialCue} from './social-graph.js';
 import {romanceAvailability} from './romance.js';
@@ -130,9 +131,9 @@ export function finishSocialConversation(root){
 /** Existing walk/animation/social reservation also supports gift/leisure.
  * Nothing changes until this shared action finishes its fixed game time.
  */
-export function startSharedSocial(root,initiator,target,mode,choiceId,automatic=false,tvPlan=null){
+export function startSharedSocial(root,initiator,target,mode,choiceId,automatic=false,physicalPlan=null){
   if(automatic&&mode==='leisure'&&choiceId==='tv')return false;
-  const session=createSharedSession(root,initiator,mode,choiceId,tvPlan);
+  const session=createSharedSession(root,initiator,mode,choiceId,physicalPlan);
   // A spontaneous gift could consume player-owned items without permission;
   // only voluntary leisure is allowed, and must appear welcome in preflight.
   if(automatic&&(mode!=='leisure'||
@@ -188,6 +189,22 @@ export function arriveSocial(root) {
       root.socialAction=null;return false;
     }
     social.shared.tvConsent=true;
+  }
+  if(social.shared?.mode==='leisure'&&['books','music'].includes(social.shared.choiceId)){
+    const session=social.shared;
+    const agreed=validPairedHobbyPlan(root,session.pairPlan,social.initiator)&&
+      evaluateLeisure(root,social.initiator,session.choiceId)?.accepted===true&&
+      ['alex','mira'].every(id=>{
+        const p=id==='alex'?root.position:root.otherSim?.position;
+        const goal=session.pairPlan.places[id];
+        return p&&Math.hypot(p.x-goal.x,p.z-goal.z)<.35;
+      });
+    if(!agreed){
+      get(root,social.initiator).event='Совместный досуг не состоялся';
+      get(root,social.partner).event='Не удалось начать занятие вместе';
+      root.socialAction=null;return false;
+    }
+    session.pairConsent=true;
   }
   // No physical contact until the recipient has answered this invitation.
   if((social?.eveningStage&&!validRomanticEveningStage(root.world,social.eveningStage))||
@@ -409,6 +426,10 @@ export function tickSocial(root,minutes){
        !validSharedTvPlan(root,s.shared.tvPlan,s.initiator))){
       root.socialAction=null;return false;
     }
+    if(['books','music'].includes(s.shared.choiceId)&&
+      !livePairedHobby(root)){
+      root.socialAction=null;return false;
+    }
     const duration=sharedDuration(s.shared);
     if(!duration){root.socialAction=null;return false;}
     s.elapsed+=minutes;
@@ -468,6 +489,10 @@ export function loadSocialAction(data,root) {
   if(data.conversation!==undefined&&(!session||data.kind!=='talk'||data.automatic===true))
     return null;
   if(data.shared!==undefined&&(!shared||session||data.kind!=='talk'||
+    (['books','music'].includes(shared.choiceId)&&(
+      (data.phase==='using'&&shared.pairConsent!==true)||
+      (data.phase==='walking'&&shared.pairConsent!==undefined)||
+      shared.creditedMinutes>data.elapsed))||
     (data.automatic===true&&shared.mode!=='leisure')||
     (shared.choiceId==='tv'&&(data.automatic===true||
       (data.phase==='using'&&shared.tvConsent!==true)||

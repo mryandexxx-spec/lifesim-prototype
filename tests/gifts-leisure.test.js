@@ -186,24 +186,24 @@ test('saved walking leisure and long leisure >18 game minutes reload safely',()=
   finish(r,15);
   assert.equal(r.relationship.affinity,54);
 });
-test('music and leisure improve BOTH fun meters and record individual impressions',()=>{
+test('legacy board games improve BOTH fun meters and record individual impressions',()=>{
   const s=newHousehold();
   const a=s.needs.fun,b=s.otherSim.needs.fun;
-  start(s,'leisure','music');finish(s,29);
+  start(s,'leisure','games');finish(s,37);
   assert.equal(s.needs.fun>a,true);
   assert.equal(s.otherSim.needs.fun>b,true);
-  assert.equal(s.mind.memories.at(-1).id,'leisure.music');
-  assert.equal(s.otherSim.mind.memories.at(-1).id,'leisure.music');
-  assert.equal(s.relationship.views.alex.sentiments.at(-1).id,'leisure.music');
+  assert.equal(s.mind.memories.at(-1).id,'leisure.games');
+  assert.equal(s.otherSim.mind.memories.at(-1).id,'leisure.games');
+  assert.equal(s.relationship.views.alex.sentiments.at(-1).id,'leisure.games');
   assert.equal(s.relationship.affinity,54);
 });
 test('high personal tension can make recipient decline shared leisure without need bonuses',()=>{
   const s=newHousehold();s.relationship.views.mira.trust=0;
   s.relationship.views.mira.tension=100;
-  const effect=evaluateLeisure(s,'alex','music');
+  const effect=evaluateLeisure(s,'alex','games');
   assert.equal(effect.accepted,false);
   const before=copy(s.needs),beforeOther=copy(s.otherSim.needs);
-  start(s,'leisure','music');finish(s,29);
+  start(s,'leisure','games');finish(s,37);
   assert.equal(s.relationship.affinity,49);
   assert.equal(s.mind.memories.at(-1).id,'leisure.refused');
   assert.equal(s.otherSim.mind.memories.at(-1).id,'leisure.refused');
@@ -235,7 +235,7 @@ test('corrupt shared sessions never become free one-click talk on restore',()=>{
 });
 test('a long-running leisure task does not block later original manual social interactions',()=>{
   const s=newHousehold();
-  start(s,'leisure','books');finish(s,31);
+  start(s,'leisure','games');finish(s,37);
   assert.equal(startSocial(s,'talk','alex',point),true);
   arriveSocial(s);tickSocial(s,SOCIAL_ACTIONS.talk.duration+1);
   assert.equal(s.mind.memories.at(-1).id,'talk');

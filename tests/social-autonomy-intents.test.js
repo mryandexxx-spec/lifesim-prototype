@@ -175,9 +175,9 @@ test('physiology, pending FIFO, pause or busy target block every advanced propos
 test('automatic leisure uses real session and saves/restores midway without rewards',()=>{
   const s=legacy();
   assert.equal(evaluateLeisure(s,'alex','books').accepted,true);
-  assert.equal(startSharedSocial(s,'alex',place,'leisure','books',true),true);
+  assert.equal(startSharedSocial(s,'alex',place,'leisure','games',true),true);
   assert.equal(s.socialAction.automatic,true);
-  assert.equal(s.socialAction.shared.choiceId,'books');
+  assert.equal(s.socialAction.shared.choiceId,'games');
   const start=copy(s),affinity=s.relationship.affinity,fun=s.needs.fun;
   let restored=loadHousehold(start);
   assert.equal(restored.socialAction.automatic,true);
@@ -192,7 +192,7 @@ test('automatic leisure uses real session and saves/restores midway without rewa
   assert.equal(restored.socialAction,null);
   assert.equal(restored.relationship.affinity,affinity+4);
   assert.equal(getPair(restored.socialGraph,'alex','mira').events.at(-1).token,
-    'auto.leisure.books:'+String(restored.socialGraph.nextSeq-1));
+    'auto.leisure.games:'+String(restored.socialGraph.nextSeq-1));
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
   assert.equal(restored.version,1);
 });
@@ -200,7 +200,7 @@ test('automatic leisure uses real session and saves/restores midway without rewa
 test('auto leisure cancellation while walking emits zero rewards or completed event',()=>{
   const s=legacy();
   const initial=copy(s);
-  assert.equal(startSharedSocial(s,'alex',place,'leisure','books',true),true);
+  assert.equal(startSharedSocial(s,'alex',place,'leisure','games',true),true);
   assert.equal(cancelSocial(s),true);
   assert.equal(s.relationship.affinity,initial.relationship.affinity);
   assert.equal(s.socialGraph.nextSeq,initial.socialGraph.nextSeq);
@@ -261,7 +261,7 @@ test('autonomous adapter returns structured leisure plan without changing legacy
 
 test('autonomy switch off drops only existing automatic shared session, not queued work',()=>{
   const s=legacy();
-  startSharedSocial(s,'alex',place,'leisure','books',true);
+  startSharedSocial(s,'alex',place,'leisure','games',true);
   const task=enqueueAction(s.actionQueues,'alex',
     {type:'object',actionId:'fridge'});
   assert.ok(s.socialAction?.automatic);

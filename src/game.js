@@ -79,6 +79,7 @@ import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {TV_WATCH_POSE,tvScreenFrame} from './tv-interaction.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {planSharedTv,liveSharedTv} from './tv-together.js';
+import {planPairedHobby,livePairedHobby} from './paired-hobby.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
 import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
@@ -308,7 +309,8 @@ function save(silent = false) {
 function taskLabel(task){
   if(!task)return 'Неизвестное действие';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
-  if(task.type==='activity')return getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
+  if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
+    getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
   if(task.type==='social')return SOCIAL_ACTIONS[task.actionId]?.label||'Общение';
   if(task.type==='conversation')return 'Беседа: '+(CONVERSATION_TOPICS[task.topicId]?.label||'Разговор');
   if(task.type==='branch')return BRANCH_ACTIONS[task.actionId]?.label||'Общение';
@@ -329,6 +331,17 @@ function scheduleCommand(command,residentId=game.selectedSim){
     const target=resolveActionFurniture(game.world,actionId,command.targetInstanceId);
     if(!target){toast('Этот предмет недоступен');return false;}
     command={...command,targetInstanceId:target.instanceId};
+    if(command.inventoryItemId&&!inventoryFor(game,residentId).some(item=>
+      item.type==='book'&&item.id===command.inventoryItemId)){
+      toast('Книга больше не принадлежит персонажу');return false;
+    }
+  }
+  if(command.type==='shared'&&command.mode==='leisure'&&
+    ['music','books'].includes(command.choiceId)){
+    const station=resolveActionFurniture(game.world,
+      command.choiceId==='music'?'music':'hobby',command.targetInstanceId);
+    if(!station){toast('Нужен установленный предмет для совместного досуга');return false;}
+    command={...command,targetInstanceId:station.instanceId};
   }
   // A physical gift has one ID and cannot be handed over twice.
   if(command.type==='shared'&&command.mode==='gift'&&(
@@ -1026,11 +1039,25 @@ function renderSharedPanel(force=true){
   }
   for(const item of inventory){
     const def=GIFT_CATALOG[item.type];
-    options.append(conversationButton(def.symbol+' '+def.label,()=>{
+    options.append(conversationButton(def.symbol+' Подарить: '+def.label,()=>{
       if(queuedSocial('shared',{mode:'gift',choiceId:item.id})){
         sharedPicker=false;renderSharedPanel();
       }
     }));
+    if(item.type==='book'){
+      const shelf=game.world.furniture.instances.find(candidate=>
+        resolveActionFurniture(game.world,'hobby',candidate.instanceId));
+      const read=conversationButton('📖 Читать свою книгу · подарок сохраняется',()=>{
+        if(shelf&&scheduleCommand({type:'activity',activityId:READING_ACTIVITY_ID,
+          contentId:READING_CONTENT_ID,targetInstanceId:shelf.instanceId,
+          inventoryItemId:item.id})){
+          sharedPicker=false;renderSharedPanel();
+        }
+      },true);
+      read.disabled=!shelf;options.append(read);
+      if(!shelf){const hint=document.createElement('p');hint.className='shared-progress-text';
+        hint.textContent='Для чтения своей книги сначала установи книжную полку';options.append(hint);}
+    }
   }
   const activities=document.createElement('h3');activities.textContent='Провести время вместе';
   options.append(activities);
@@ -1043,6 +1070,26 @@ function renderSharedPanel(force=true){
         options.append(conversationButton(def.symbol+' '+def.label+
           (item.instanceId==='home-tv-1'?' · Домашний ТВ':' · Купленный ТВ'),()=>{
           if(queuedSocial('shared',{mode:'leisure',choiceId:'tv',
+            targetInstanceId:item.instanceId})){
+            sharedPicker=false;renderSharedPanel();
+          }
+        }));
+      }
+      continue;
+    }
+    if(id==='books'||id==='music'){
+      const stations=game.world.furniture.instances.filter(item=>
+        resolveActionFurniture(game.world,id==='books'?'hobby':'music',item.instanceId));
+      if(!stations.length){const hint=document.createElement('p');hint.className='shared-progress-text';
+        hint.textContent=def.symbol+' '+def.label+' · нужен установленный '+
+          (id==='books'?'книжный шкаф':'музыкальный центр');options.append(hint);}
+      for(const item of stations){
+        options.append(conversationButton(def.symbol+' '+def.label+
+          (stations.length>1?' · '+item.instanceId:''),()=>{
+          if(id==='music'&&!musicMutedByPlayer&&
+            (!musicAudio.status().enabled||!musicAudio.status().running))
+            void musicAudio.enable().then(()=>refreshMusicAudioButton());
+          if(queuedSocial('shared',{mode:'leisure',choiceId:id,
             targetInstanceId:item.instanceId})){
             sharedPicker=false;renderSharedPanel();
           }
@@ -1849,7 +1896,7 @@ function boot() {
     return true;
   }
   beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null,
-    activityId=null,contentId=null)=>{
+    activityId=null,contentId=null,inventoryItemId=null)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
@@ -1879,7 +1926,7 @@ function boot() {
       return false;
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
-      activityId,contentId,musicPlan);
+      activityId,contentId,musicPlan,inventoryItemId);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
@@ -1892,14 +1939,17 @@ function boot() {
     }
     const self=getActor(game,actorId),partnerId=actorId==='alex'?'mira':'alex',
       partner=getActor(game,partnerId);
-    if(shared?.mode==='leisure'&&shared.choiceId==='tv'){
-      const plan=planSharedTv(game,actorId,shared.targetInstanceId||'home-tv-1');
+    if(shared?.mode==='leisure'&&['tv','books','music'].includes(shared.choiceId)){
+      const plan=shared.choiceId==='tv'
+        ?planSharedTv(game,actorId,shared.targetInstanceId||'home-tv-1')
+        :planPairedHobby(game,actorId,shared.choiceId,shared.targetInstanceId||null);
       if(!plan)return false;
       const first=plan.places[actorId],second=plan.places[partnerId];
       const a=findPath(self.position,first,game.world);
       const b=findPath(partner.position,second,game.world);
-      if(!a||!b||!startSharedSocial(game,actorId,first,
-        'leisure','tv',false,plan))return false;
+      if(!a||!b||!(shared.choiceId==='tv'
+        ?startSharedSocial(game,actorId,first,'leisure','tv',false,plan)
+        :startSharedSocial(game,actorId,first,'leisure',shared.choiceId,automatic,plan)))return false;
       paths[actorId]={points:a,index:0,id:'social:'+kind};
       paths[partnerId]={points:b,index:0,id:'social:'+kind};
       restartAutonomyWait();return true;
@@ -1961,8 +2011,8 @@ function boot() {
     const session=game.socialAction;
     return session?.phase==='walking'&&
       (session.initiator===residentId||
-        (session.shared?.choiceId==='tv'&&
-          Boolean(session.shared.tvPlan?.places?.[residentId]))||
+        (session.shared?.mode==='leisure'&&
+          Boolean((session.shared.tvPlan||session.shared.pairPlan)?.places?.[residentId]))||
         (session.branchAction?.id==='romance.evening'&&
           (session.eveningStage||session.eveningSofa)&&session.partner===residentId));
   };
@@ -1979,9 +2029,11 @@ function boot() {
           toiletStates[residentId].active||fridgeLeaving[residentId])return false;
         if(command.type==='activity'){
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
-          return furnitureAvailable(game,
-            activity?.requiredCapabilities.includes('music.playback')?'music':'hobby',
-            residentId,command.targetInstanceId);
+          return (!command.inventoryItemId||inventoryFor(game,residentId).some(item=>
+            item.type==='book'&&item.id===command.inventoryItemId))&&
+            furnitureAvailable(game,
+              activity?.requiredCapabilities.includes('music.playback')?'music':'hobby',
+              residentId,command.targetInstanceId);
         }
         if(command.type==='object')
           return furnitureAvailable(game,command.actionId,residentId,command.targetInstanceId)&&
@@ -2031,7 +2083,7 @@ function boot() {
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
           const actionId=activity?.requiredCapabilities.includes('music.playback')?'music':'hobby';
           started=beginAction(actionId,false,residentId,true,command.targetInstanceId,
-            command.activityId,command.contentId);
+            command.activityId,command.contentId,command.inventoryItemId||null);
         }
         else if(command.type==='social')
           started=beginSocial(command.actionId,false,residentId,null,null,null,true);
@@ -3216,8 +3268,10 @@ function boot() {
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
     const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&!document.hidden;
+    const sharedSound=active&&game.socialAction?.phase==='using'&&
+      livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
     musicAudio.update(audibleMusicStyle([game,game.otherSim],{
-      paused:!active,hidden:document.hidden,editing:furnishMode}));
+      paused:!active,hidden:document.hidden,editing:furnishMode})||sharedSound);
     const animDt=active?dt:0;
     if(active){
       accumulator+=dt;
@@ -3262,7 +3316,8 @@ function boot() {
           showerStates[residentId].active||toiletStates[residentId].active||
           fridgeLeaving[residentId])continue;
         const socialWalking=Boolean(socialWalkingFor(residentId));
-        const pairedPlan=socialWalking?game.socialAction?.shared?.tvPlan:null;
+        const pairedPlan=socialWalking
+          ?game.socialAction?.shared?.tvPlan||game.socialAction?.shared?.pairPlan:null;
         const eveningStage=socialWalking
           ?game.socialAction?.eveningSofa||game.socialAction?.eveningStage:null;
         const socialGoal=pairedPlan?.places?.[residentId]||
@@ -3362,6 +3417,14 @@ function boot() {
           !showerStates[id].active&&!toiletStates[id].active&&
           !fridgeLeaving[id];
       }))arriveSocial(game);
+      const pairedWaiting=game.socialAction?.phase==='walking'
+        ?game.socialAction.shared?.tvPlan||game.socialAction.shared?.pairPlan:null;
+      if(pairedWaiting&&HOUSEHOLD_IDS.every(id=>{
+        const pos=getActor(game,id).position,goal=pairedWaiting.places[id];
+        return Math.hypot(pos.x-goal.x,pos.z-goal.z)<.075&&
+          sofaStates[id].progress===0&&bedStates[id].progress===0&&
+          !showerStates[id].active&&!toiletStates[id].active&&!fridgeLeaving[id];
+      }))arriveSocial(game);
       // Real active-time wait is independent for each sim and unaffected by game speed.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
@@ -3438,9 +3501,11 @@ function boot() {
     const kissAlexFrame={...kissFrame,initiator:game.socialAction?.initiator==='alex'};
     const kissMiraFrame={...kissFrame,initiator:game.socialAction?.initiator==='mira'};
     const pairTargets=hugTargets||kissTargets;
-    const pairedTv=liveSharedTv(game);
+    const pairedTv=liveSharedTv(game),pairedHobby=livePairedHobby(game);
+    const pairedBooks=pairedHobby?.choiceId==='books';
+    const pairedMusic=pairedHobby?.choiceId==='music';
     const using=game.action?.phase==='using',
-      useId=using?game.action.id:pairedTv?'tv':null;
+      useId=using?game.action.id:pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
@@ -3500,7 +3565,7 @@ function boot() {
     const pairedTvStand=pairedTv&&!alexWatchSeat
       ?{...pairedTv.places.alex,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
-    const pose=pairedTvStand||(useId&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
+    const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
       ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
@@ -3540,9 +3605,12 @@ function boot() {
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
-      musicActivityId:game.action?.id==='music'?game.action.activityId:null,
-      musicStyleId:game.action?.id==='music'?game.action.contentId:null,
-      musicElapsed:game.action?.id==='music'?game.action.elapsed:null,
+      musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
+        game.action?.id==='music'?game.action.activityId:null,
+      musicStyleId:pairedMusic?'music.calm':
+        game.action?.id==='music'?game.action.contentId:null,
+      musicElapsed:pairedMusic?game.socialAction.elapsed:
+        game.action?.id==='music'?game.action.elapsed:null,
       showerStep:alexShower?.stepWeight||0,showerWater:Boolean(alexShower?.water),
       showerExiting:Boolean(alexShower&&useId!=='shower'),
       toiletSitWeight:alexToilet?.seated||0,
@@ -3557,7 +3625,7 @@ function boot() {
       bedReclineWeight:bedPose?.bedReclineWeight||0,
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
-      social:socialUsing&&!pairedTv&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!pairedHobby&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
       eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
@@ -3577,12 +3645,13 @@ function boot() {
     applyShowerAppearance(alexRig,Boolean(alexShower?.privacy||alexToilet?.privacy),Boolean(alexShower?.bathing));
     snack.enabled=Boolean(alexFridge&&alexFridge.handFood>.012);
     if(snack.enabled)snack.setLocalScale(.20*alexFridge.handFood,.17*alexFridge.handFood,.20*alexFridge.handFood);
-    book.enabled=(using&&useId==='sofa')||
+    book.enabled=pairedBooks||(using&&useId==='sofa')||
       (game.action?.id==='hobby'&&
        (readingHasBook(game.action)||alexReadingStage==='taking'));
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
-    const miraUseId=miraUsing?game.otherSim.action.id:pairedTv?'tv':null;
+    const miraUseId=miraUsing?game.otherSim.action.id:
+      pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
       game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
@@ -3636,7 +3705,7 @@ function boot() {
     const pairedTvMiraStand=pairedTv&&!miraWatchSeat
       ?{...pairedTv.places.mira,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
-    const miraPose=pairedTvMiraStand||(miraUseId&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
+    const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
       ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
@@ -3672,9 +3741,12 @@ function boot() {
     animationStates.mira=stepAnimation(animationStates.mira,{
       id:'mira',walking:(miraWalking||Boolean(miraShower?.stepWeight>.015))&&!miraSeating&&!miraBedding,
       using:miraToilet?'toilet':miraShower?'shower':miraUseId,
-      musicActivityId:game.otherSim.action?.id==='music'?game.otherSim.action.activityId:null,
-      musicStyleId:game.otherSim.action?.id==='music'?game.otherSim.action.contentId:null,
-      musicElapsed:game.otherSim.action?.id==='music'?game.otherSim.action.elapsed:null,
+      musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
+        game.otherSim.action?.id==='music'?game.otherSim.action.activityId:null,
+      musicStyleId:pairedMusic?'music.calm':
+        game.otherSim.action?.id==='music'?game.otherSim.action.contentId:null,
+      musicElapsed:pairedMusic?game.socialAction.elapsed:
+        game.otherSim.action?.id==='music'?game.otherSim.action.elapsed:null,
       showerStep:miraShower?.stepWeight||0,showerWater:Boolean(miraShower?.water),
       showerExiting:Boolean(miraShower&&miraUseId!=='shower'),
       toiletSitWeight:miraToilet?.seated||0,
@@ -3689,7 +3761,7 @@ function boot() {
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
-      social:socialUsing&&!pairedTv&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!pairedHobby&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
       eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
@@ -3706,7 +3778,7 @@ function boot() {
     applyShowerAppearance(miraRig,Boolean(miraShower?.privacy||miraToilet?.privacy),Boolean(miraShower?.bathing));
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
-    miraBook.enabled=(miraUsing&&miraUseId==='sofa')||
+    miraBook.enabled=pairedBooks||(miraUsing&&miraUseId==='sofa')||
       (game.otherSim.action?.id==='hobby'&&
         (readingHasBook(game.otherSim.action)||miraReadingStage==='taking'));
     // Mira retains one 3D skin for sofa, bed, fridge and clothed shower
@@ -3718,10 +3790,10 @@ function boot() {
         (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
         socialWalkingFor('mira'))&&
         !miraSeating&&!miraBedding&&!miraShower,
-      social:socialUsing&&!pairedTv?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!pairedHobby?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
       actionId:miraUseId==='seat'?'sofa':miraUseId,
-      readingStage:miraReadingStage,
+      readingStage:pairedBooks?'reading':miraReadingStage,
       readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
       readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
       musicFrame:game.otherSim.action?.id==='music'?{
@@ -3729,7 +3801,8 @@ function boot() {
         activityId:game.otherSim.action.activityId,
         contentId:game.otherSim.action.contentId,
         elapsed:game.otherSim.action.elapsed
-      }:null,
+      }:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
+        contentId:'music.calm',elapsed:game.socialAction.elapsed}:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
@@ -3745,6 +3818,7 @@ function boot() {
     // The procedural book belongs to a hidden elbow; never show it floating.
     if(miraMeshShown&&(miraUseId==='sofa'||game.otherSim.action?.id==='hobby'))
       miraBook.enabled=false;
+    if(miraMeshShown&&pairedBooks)miraBook.enabled=false;
     // The old snack is on the hidden procedural elbow, not the Meshy hand.
     if(miraMeshShown&&miraUseId==='fridge')miraSnack.enabled=false;
     // Alex stays on the same 3D rig for bed and fridge when their verified
@@ -3761,18 +3835,19 @@ function boot() {
       worldMinutes:game.minutes,
       mood:game.mind?.mood?.value,
       energy:game.needs.energy,
-      social:socialUsing&&!pairedTv?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!pairedHobby?game.socialAction.kind:null,
       socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
       actionId:useId==='seat'?'sofa':useId,
-      readingStage:alexReadingStage,
+      readingStage:pairedBooks?'reading':alexReadingStage,
       readingStepElapsed:game.action?.readingStepElapsed??0,
       readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
       musicFrame:game.action?.id==='music'?{
         phase:game.action.phase,activityId:game.action.activityId,
         contentId:game.action.contentId,elapsed:game.action.elapsed
-      }:null,
+      }:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
+        contentId:'music.calm',elapsed:game.socialAction.elapsed}:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
       seat:seatContactEnabled?livingSofaSeat:null,
@@ -3793,6 +3868,7 @@ function boot() {
     // Never let it float beside the Meshy hand until a real socket exists.
     if(meshyShown&&(useId==='sofa'||game.action?.id==='hobby'))
       book.enabled=false;
+    if(meshyShown&&pairedBooks)book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
     // R5b never writes to the simulator. Tableware only follows existing

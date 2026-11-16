@@ -56,6 +56,7 @@ jobs:
           node --check src/hobby-reading.js
           node --check src/music-audio.js
           node --check src/music-listening.js
+          node --check src/paired-hobby.js
           node --check src/music-movement.js
           node --check src/meshy-music-runtime.js
           node --check src/reading-journey.js
@@ -163,6 +164,7 @@ jobs:
           cp src/hobby-reading.js site/src/
           cp src/music-audio.js site/src/
           cp src/music-listening.js site/src/
+          cp src/paired-hobby.js site/src/
           cp src/music-movement.js src/meshy-music-runtime.js site/src/
           cp src/reading-journey.js site/src/
           cp src/skills-engine.js site/src/
