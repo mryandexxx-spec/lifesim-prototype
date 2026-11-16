@@ -413,7 +413,7 @@ test('Mira fridge post-Anim script uses shared prefab contact and hides procedur
   assert.match(visual,/fridgeReady:Boolean\(state\.fridgeRuntime\?\.ready\)/);
   assert.match(visual,/resident:'Mira'/);
   assert.match(game,/fridgeFrame:miraFridge/);
-  assert.match(game,/if\(miraMeshShown&&miraUseId==='fridge'\)miraSnack\.enabled=false/);
+  assert.match(game,/if\(miraMeshShown&&\(miraUseId==='fridge'\|\|miraCarryMeal\)\)miraSnack\.enabled=false/);
   assert.match(male,/layout=FRIDGE_LAYOUT,resident='Alex'/);
 });
  
