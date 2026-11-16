@@ -16,7 +16,7 @@ function registry(){
   return createObjectRegistry({stats:[
     {id:'needs.hygiene',min:0,max:100},{id:'needs.fun',min:0,max:100}
   ],triggers:[{id:'item.use.tick'},{id:'item.use.complete'}],
-  items:[{id:'test.sofa',prefabId:'sofa',name:'Synthetic test sofa',effects:[
+  items:[{id:'sofa.comfort',prefabId:'sofa',name:'Synthetic test sofa',effects:[
     {id:'once',trigger:'item.use.complete',mode:'once',actionId:'sofa',
       statId:'needs.hygiene',amount:5},
     {id:'tick',trigger:'item.use.tick',mode:'perMinute',actionId:'sofa',
@@ -24,7 +24,7 @@ function registry(){
   ]}]});
 }
 function completed(actor,sofa){
-  sofa.itemDefinitionId='test.sofa';
+  sofa.itemDefinitionId='sofa.comfort';
   actor.action={id:'sofa',phase:'using',elapsed:ACTIONS.sofa.duration-1,
     automatic:false,targetInstanceId:sofa.instanceId};
   actor.needs.hygiene=40;
