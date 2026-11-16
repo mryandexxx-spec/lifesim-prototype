@@ -2225,7 +2225,8 @@ function boot() {
       button.querySelector('.furnish-selected-mark').hidden=!active;
     }
     const listing=shopListings.find(i=>i.itemId===shopSelectedItemId);
-    const comparable=listing?compareShopVariants(shopQualityRegistry,shopListings,listing.itemId):[];
+    const comparable=listing&&!shopPlacing
+      ?compareShopVariants(shopQualityRegistry,shopListings,listing.itemId):[];
     const comparePanel=$('furnish-variant-compare');
     comparePanel.hidden=!shopOpen||shopPlacing||comparable.length===0;
     // Data is produced by the canonical SKU registry, never from 3D/UI state.
