@@ -129,11 +129,11 @@ test('F4D: runtime contract and Pages delivery expose the new action',()=>{
   const game=text('../src/game.js'),html=text('../index.html'),workflow=text('../.github/workflows/pages.yml');
   assert.match(game,/purchasedSeatPose\(game\.world/);
   assert.match(game,/chairSeats=game\.world\.furniture\.instances/);
-  assert.match(game,/actionId:useId==='seat'\?'sofa':useId/);
-  assert.match(game,/actionId:miraUseId==='seat'\?'sofa':miraUseId/);
+  assert.match(game,/actionId:\(useId==='seat'\|\|alexDining\)\?'sofa':useId/);
+  assert.match(game,/actionId:\(miraUseId==='seat'\|\|miraDining\)\?'sofa':miraUseId/);
   assert.match(game,/box\('floor',4\.625,-0\.032,0,19\.25/);
-  assert.match(html,/1\.2u\.\d+ · F4D/);
+  assert.match(html,/1\.2u\.\d+ · F4E \/ H4 \/ F4F/);
   assert.match(html,/seat-furniture\.js\?v=1\.2v-f4d/);
   assert.match(workflow,/node --check src\/seat-furniture\.js/);
-  assert.match(workflow,/src\/seat-furniture\.js src\/furniture-interactions\.js site\/src\//);
+  assert.match(workflow,/src\/seat-furniture\.js src\/dining\.js src\/furniture-interactions\.js site\/src\//);
 });
