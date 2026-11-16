@@ -13,6 +13,8 @@ import {createConversation,restoreConversation,chooseConversationTurn,continueCo
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
 import {availableSocialActions,resolveBranchResponse,observePairViews,
   applySocialEvent,learnSocialPreference,learnSocialCue} from './social-graph.js';
+import {romanceAvailability} from './romance.js';
+import {HUG_REFUSAL_DURATION_MINUTES} from './romantic-hug.js';
 export const SOCIAL_ACTIONS=Object.freeze({
   talk:{label:'Поговорить',duration:18,affinity:8,fun:6},
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
@@ -165,8 +167,19 @@ function recordPairCompletion(root,session,type,token=null){
   return committed;
 }
 export function arriveSocial(root) {
-  if(root.socialAction?.phase!=='walking')return false;
-  root.socialAction.phase='using';root.socialAction.elapsed=0;return true;
+  const social=root.socialAction;
+  if(social?.phase!=='walking')return false;
+  // No physical contact until the recipient has answered this invitation.
+  if(social.branchAction?.id==='romance.hug'){
+    const a=social.initiator,b=social.partner;
+    const response=resolveBranchResponse(root.socialGraph,a,b,'romance.hug',{
+      recipient:get(root,b),minutes:root.minutes,
+      compatibilityBias:socialCompatibility(
+        get(root,b)?.personality,get(root,a)?.personality).bias
+    });
+    social.branchAction.hugConsent=response?.accepted===true;
+  }
+  social.phase='using';social.elapsed=0;return true;
 }
 export function cancelSocial(root) {
   if(!root.socialAction)return false;
@@ -238,16 +251,25 @@ export function tickSocial(root,minutes){
   if(s.conversation)return false; // explicit multi-turn choices decide the finish
   if(s.branchAction){
     s.elapsed+=minutes;
-    if(s.elapsed<18)return false;
-    const response=resolveBranchResponse(root.socialGraph,s.initiator,s.partner,
-      s.branchAction.id,{recipient:get(root,s.partner),minutes:root.minutes,
-        compatibilityBias:socialCompatibility(get(root,s.partner)?.personality,
-          get(root,s.initiator)?.personality).bias});
+    const hugging=s.branchAction.id==='romance.hug';
+    const length=hugging&&s.branchAction.hugConsent!==true
+      ?HUG_REFUSAL_DURATION_MINUTES:18;
+    if(s.elapsed<length)return false;
+    const hugAccepted=hugging&&s.branchAction.hugConsent===true&&
+      romanceAvailability(root.socialGraph,s.initiator,s.partner,
+        'romance.hug',root.minutes).enabled;
+    const response=hugging
+      ?{accepted:hugAccepted,type:hugAccepted?'romance.hug':'romance.hug.refused',
+        outcome:hugAccepted?'warm':'refused',intensity:1}
+      :resolveBranchResponse(root.socialGraph,s.initiator,s.partner,
+        s.branchAction.id,{recipient:get(root,s.partner),minutes:root.minutes,
+          compatibilityBias:socialCompatibility(get(root,s.partner)?.personality,
+            get(root,s.initiator)?.personality).bias});
     if(!response){root.socialAction=null;return false;}
     s.branchAction.resultType=response.type;
     if(['romance.date','romance.breakup','romance.tender',
       'romance.propose','romance.marry','romance.divorce',
-      'romance.checkin','romance.repair'].includes(s.branchAction.id)){
+      'romance.checkin','romance.repair','romance.hug'].includes(s.branchAction.id)){
       // A commitment or loving gesture is a verified canonical milestone,
       // never a fake generic talk, quarrel or automatic affinity reward.
       const completed=recordPairCompletion(root,s,response.type);
@@ -259,6 +281,7 @@ export function tickSocial(root,minutes){
       const notices={
         'romance.date':'Теперь встречаются',
         'romance.tender':'Проявил(а) нежность',
+        'romance.hug':'Нежно обнялись',
         'romance.checkin':'Уделил(а) внимание',
         'romance.repair':'Поговорил(а) об обиде',
         'romance.propose':'Обручились',
@@ -359,7 +382,10 @@ export function loadSocialAction(data,root) {
   const branch=data.branchAction;
   if(branch!==undefined&&(
     !branch||typeof branch!=='object'||Array.isArray(branch)||
-    !Object.hasOwn(branch,'id')||Object.keys(branch).length!==1||
+    !Object.hasOwn(branch,'id')||
+    !(Object.keys(branch).length===1||
+      (branch.id==='romance.hug'&&Object.keys(branch).length===2&&
+        typeof branch.hugConsent==='boolean'))||
     !availableSocialActions(root.socialGraph,data.initiator,data.partner,root.minutes)
       .some(action=>action.id===branch.id&&action.enabled)||
     session||shared||data.kind!=='talk'||
@@ -369,7 +395,16 @@ export function loadSocialAction(data,root) {
     elapsed:data.elapsed,automatic:data.automatic===true,
     ...(session?{conversation:session}:{}),
     ...(shared?{shared}:{}),
-    ...(branch?{branchAction:{id:branch.id}}:{})};
+    ...(branch?{branchAction:{id:branch.id,
+      ...(branch.id==='romance.hug'&&data.phase==='using'
+        ?{hugConsent:branch.hugConsent===true&&
+          resolveBranchResponse(root.socialGraph,data.initiator,data.partner,
+            'romance.hug',{recipient:get(root,data.partner),
+              minutes:root.minutes,
+              compatibilityBias:socialCompatibility(
+                get(root,data.partner)?.personality,
+                get(root,data.initiator)?.personality).bias})?.accepted===true}
+        :{})}}:{})};
 }
 /** Current scene adapter stays two-person; policy core handles N IDs.
  * No automatic invitation reserves or deletes a player's FIFO action here.
