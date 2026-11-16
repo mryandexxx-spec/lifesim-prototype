@@ -201,6 +201,14 @@ export function tick(state, minutes,world=state?.world??null) {
     if(hobby)gained*=1+preferenceAffinity(state.personality,
       state.action.id==='music'?'music':'books')*.12;
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
+    // All registry-defined additional need deltas apply only in the verified
+    // using window. Dancing consumes a little extra energy; passive listening
+    // has no extra cost. Walking never runs this branch.
+    if(hobby)for(const effect of hobby.needEffects){
+      const key=effect.statId.slice('needs.'.length);
+      if(key!==definition.need&&Object.hasOwn(state.needs,key))
+        state.needs[key]=clamp(state.needs[key]+effect.perMinute*amount);
+    }
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
@@ -209,7 +217,7 @@ export function tick(state, minutes,world=state?.world??null) {
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
         validReadingJourneyAction(state.action)&&finishReadingMinutes(state.action);
-      state.event=returning?'Закрывает книгу':definition.label+' — готово';
+      state.event=returning?'Закрывает книгу':(hobby?.label||definition.label)+' — готово';
       rememberAction(state, state.action.id);
       state.autonomy.nextAt = state.minutes + 7;
       if(!returning)state.action=null;
