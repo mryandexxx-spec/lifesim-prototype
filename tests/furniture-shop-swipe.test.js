@@ -26,7 +26,7 @@ test('sub-grid touch movement accumulates without snapping loss; room limits app
  assert.ok(raw.x>.2);
  assert.ok(snapFurnitureCoordinate(raw.x)>=.25);
  assert.deepEqual(dragShopPlacement(view,{x:4.25,z:3.75,yaw:180},30000,30000,750),
-   {x:4.25,z:3.75,yaw:180});
+   {x:13.25,z:3.75,yaw:180});
  assert.equal(dragShopPlacement(view,null,4,3,750),null);
 });
 test('real game pointermove moves shop preview only, not camera; 2-finger orbit retains world pose',()=>{

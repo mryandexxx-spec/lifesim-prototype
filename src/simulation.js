@@ -21,6 +21,8 @@ export const ACTIONS = Object.freeze({
   fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
+  // F4D: sitting is a real physical activity, not an unearned skill or need bonus.
+  seat: { label: 'Посидеть', need: 'fun', duration: 42, benefitPerMinute: 0, location: [0,-1.03] },
   tv: { label: 'Смотреть телевизор', need: 'fun', duration: TV_WATCH_DURATION,
     benefitPerMinute: 1.08, location: [TV_APPROACH.x,TV_APPROACH.z] },
   toilet: { label: 'Сходить в туалет', need: 'bladder', duration: 26,
@@ -64,7 +66,7 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
   // M4 is an optional v1 field; don't reset old progress or invent accidents.
   if (!Number.isFinite(data.needs.bladder)) next.needs.bladder=BLADDER_LEGACY_DEFAULT;
   if (Number.isFinite(data.position.x) && Number.isFinite(data.position.z)) {
-    next.position.x = Math.max(-4.5, Math.min(4.5, data.position.x));
+    next.position.x = Math.max(-4.5, Math.min(13.7, data.position.x));
     next.position.z = Math.max(-3.7, Math.min(3.7, data.position.z));
   }
   if (Number.isFinite(data.autonomy?.nextAt)) next.autonomy.nextAt = Math.max(0, Math.min(data.autonomy.nextAt, 10000000));
@@ -216,7 +218,7 @@ export function tick(state, minutes,world=state?.world??null) {
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
-        (!['fridge','shower','toilet','hobby','music'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['seat','fridge','shower','toilet','hobby','music'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&

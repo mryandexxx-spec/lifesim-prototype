@@ -8,8 +8,8 @@ export const CAMERA_INITIAL=Object.freeze({
   centerX:0,centerY:.62,centerZ:0
 });
 export const CAMERA_BOUNDS=Object.freeze({
-  minPitch:24,maxPitch:68,minDistance:11,maxDistance:24,
-  minX:-3.4,maxX:3.4,minZ:-2.9,maxZ:2.9
+  minPitch:24,maxPitch:68,minDistance:11,maxDistance:32,
+  minX:-3.4,maxX:12.6,minZ:-2.9,maxZ:2.9
 });
 const valid=Number.isFinite;
 const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));

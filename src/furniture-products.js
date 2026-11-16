@@ -57,20 +57,20 @@ const offered=[
     typeCategoryId:'type.storage.dressers',modelKey:'nightstand.open',
     description:'Открытая ниша и стройные ножки · декор'},
   // Nine new independent geometry types (two actually different forms each).
-  // Non-interactive seating is labelled honestly; real rig/seat interactions
-  // will only be enabled after contact anchors and poses are implemented.
+  // F4D: all four new seating variants share real seat anchors and an
+  // instance-based sit/stand action. Pure decoration remains non-interactive.
   {itemId:'armchair.wing',prefabId:'armchair',price:400,name:'Кресло «Крыло»',
     typeCategoryId:'type.seating.armchairs',modelKey:'armchair.wing',
-    description:'Высокая крылатая спинка · пока предмет обстановки'},
+    description:'Высокая крылатая спинка · можно сесть'},
   {itemId:'armchair.shell',prefabId:'armchair',price:430,name:'Кресло «Ракушка»',
     typeCategoryId:'type.seating.armchairs',modelKey:'armchair.shell',
-    description:'Округлая спинка и чашеобразная посадка · пока декор'},
+    description:'Округлая спинка и чашеобразная посадка · можно сесть'},
   {itemId:'chair.loft',prefabId:'chair',price:110,name:'Стул «Лофт»',
     typeCategoryId:'type.seating.chairs',modelKey:'chair.loft',
-    description:'Тонкие опоры и прямая спинка · пока предмет обстановки'},
+    description:'Тонкие опоры и прямая спинка · можно сесть'},
   {itemId:'chair.cross',prefabId:'chair',price:125,name:'Стул «Перекрестье»',
     typeCategoryId:'type.seating.chairs',modelKey:'chair.cross',
-    description:'Перекрещённые рейки спинки · пока предмет обстановки'},
+    description:'Перекрещённые рейки спинки · можно сесть'},
   {itemId:'diningtable.farm',prefabId:'diningtable',price:420,name:'Стол «Ферма»',
     typeCategoryId:'type.tables.dining',modelKey:'diningtable.farm',
     description:'Прямоугольный стол на массивных опорах · поверхность'},
