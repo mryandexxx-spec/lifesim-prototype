@@ -15,6 +15,9 @@ import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './
 import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {furniturePoint} from './furniture-transform.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
+import {chooseReadingSeat,readingSeatId,readingStage,readingRouteId,
+  beginReadingJourney,arriveReadingJourney,advanceReadingJourney,
+  validReadingJourneyAction} from './reading-journey.js';
 import {liveSharedTv} from './tv-together.js';
 import {captureObjectUse,settleObjectUseStep} from './object-use-runtime.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
@@ -118,12 +121,23 @@ export function loadHousehold(raw) {
        restored.activityId!==actor.action.activityId||
        restored.targetInstanceId!==actor.action.targetInstanceId||
        restored.contentId!==actor.action.contentId||
-       !((restored.phase==='walking'&&actor.action.phase==='walking')||
+       !((restored.phase==='walking'&&actor.action.phase==='walking'&&
+            (!readingStage(actor.action)||!['closing','standing','returnShelf','returning']
+              .includes(readingStage(actor.action))))||
           (restored.phase==='using'&&actor.action.phase==='using')||
+          (restored.phase==='ready'&&
+            ['closing','standing','returnShelf','returning'].includes(readingStage(actor.action))&&
+            actor.action.phase==='walking')||
           (restored.phase==='walking'&&actor.action.phase==='using'&&
-            (()=>{const point=furnitureActionApproach(root.world,'hobby',
-              actor.action.targetInstanceId);return Boolean(point&&
+            (()=>{const point=readingStage(actor.action)
+              ?furnitureActionApproach(root.world,'sofa',actor.action.readingSeatInstanceId)
+              :furnitureActionApproach(root.world,'hobby',actor.action.targetInstanceId);
+              return Boolean(point&&
               Math.hypot(actor.position.x-point.x,actor.position.z-point.z)<=.35);})()))||
+       (readingStage(actor.action)&&
+         (!validReadingJourneyAction(actor.action)||
+           !chooseReadingSeat(root,id,actor.action.targetInstanceId,
+             actor.action.readingSeatInstanceId)))||
        Math.abs(restored.elapsed-actor.action.elapsed)>.00001||
        !validReadingSource(root,actor)){
       actor.action=null;continue;
@@ -268,6 +282,12 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
   const other=getActor(root,residentId==='alex'?'mira':'alex');
   if(itemId==='sofa'&&other?.action?.id==='tv'&&
      other.action.watchSeatInstanceId===item.instanceId)return false;
+  if(itemId==='sofa'&&readingSeatId(other?.action)===item.instanceId)return false;
+  if(itemId==='tv'&&other?.action?.id==='hobby'&&readingSeatId(other.action))
+    return true; // TV itself remains usable; seating selection excludes readers.
+  // A queued reading action may start only when a physically reachable
+  // supported sitting place is actually free.
+  if(itemId==='hobby'&&!chooseReadingSeat(root,residentId,item.instanceId))return false;
   return other?.action?.targetInstanceId!==item.instanceId &&
     !(other?.action?.id===itemId&&!other.action.targetInstanceId);
 }
@@ -286,10 +306,13 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
     !furnitureAvailable(root,itemId,residentId,item.instanceId))return false;
   const resident=getActor(root,residentId);
+  let readingSeat=null;
   if(itemId==='hobby'){
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
     if(!activity||contentId!==READING_CONTENT_ID||
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;
+    readingSeat=chooseReadingSeat(root,residentId,item.instanceId);
+    if(!readingSeat)return false;
   }
   // Explicit actions never supersede an ongoing action or interrupt a social.
   // Future manual commands are stored by action-queue.js and dispatched later.
@@ -306,6 +329,9 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     if(!session){resident.action=null;return false;}
     resident.action.activityId=activityId;
     resident.action.contentId=contentId;
+    if(!beginReadingJourney(resident.action,readingSeat)){
+      resident.action=null;return false;
+    }
     resident.activitySession=session;
   }
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
@@ -366,20 +392,36 @@ export function setHouseholdAutonomy(root,enabled) {
 function advanceReading(root,id,minutes){
   const actor=getActor(root,id),action=actor?.action;
   if(action?.id!=='hobby'){if(actor)actor.activitySession=null;return;}
-  if(!validReadingSource(root,actor)||!furnitureAvailable(root,'hobby',id,action.targetInstanceId)){
-    actor.action=null;actor.activitySession=null;actor.event='Книжный шкаф недоступен';return;
+  const stage=readingStage(action);
+  const seat=stage?chooseReadingSeat(root,id,action.targetInstanceId,
+    action.readingSeatInstanceId):null;
+  if(!validReadingSource(root,actor)||
+    !furnitureAvailable(root,'hobby',id,action.targetInstanceId)||
+    (stage&&!seat)){
+    actor.action=null;actor.activitySession=null;actor.event='Книжный шкаф или место чтения недоступны';return;
   }
   let session=actor.activitySession;
   if(!session||session.actorId!==id||session.activityId!==action.activityId||
     session.targetInstanceId!==action.targetInstanceId){
     actor.action=null;actor.activitySession=null;return;
   }
+  if(stage&&action.phase==='walking'){
+    const progress=advanceReadingJourney(action,minutes);
+    if(progress.done){
+      actor.action=null;actor.activitySession=null;
+      actor.event='Книга возвращена в шкаф';
+      return;
+    }
+  }
   if(action.phase!=='using')return;
-  const target=furnitureActionApproach(root.world,'hobby',action.targetInstanceId);
-  // The action phase alone cannot forge arrival; the actor must actually
-  // stand by the exact purchased instance's rotated interaction anchor.
+  if(stage&&readingStage(action)!=='reading')return;
+  const target=stage
+    ?furnitureActionApproach(root.world,'sofa',action.readingSeatInstanceId)
+    :furnitureActionApproach(root.world,'hobby',action.targetInstanceId);
+  // Only the real seated arrival (or an old pre-H1n shelf save) grants
+  // skill XP. Walking with a borrowed book has no credited time.
   if(!target||Math.hypot(actor.position.x-target.x,actor.position.z-target.z)>.35){
-    actor.action=null;actor.activitySession=null;actor.event='Не удалось подойти к книге';return;
+    actor.action=null;actor.activitySession=null;actor.event='Не удалось добраться до места чтения';return;
   }
   if(session.phase==='walking')
     session=arriveActivitySession(session,{authorized:true,resourceAvailable:true});
