@@ -2,6 +2,8 @@ name: F2c feature preflight
 on:
   push:
     branches: [feature/f2c-functional-bed-20261116]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
