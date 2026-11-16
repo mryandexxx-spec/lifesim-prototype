@@ -84,6 +84,10 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       else{
         next.action.activityId=activity.id;
         if(typeof data.action.contentId==='string')next.action.contentId=data.action.contentId;
+        if(data.action.id==='hobby'&&
+          typeof data.action.inventoryItemId==='string'&&
+          /^[am][0-9]{1,8}$/.test(data.action.inventoryItemId))
+          next.action.inventoryItemId=data.action.inventoryItemId;
       }
     }
     // H1n is additive to the old household-v1 activity. Legacy H1 saves

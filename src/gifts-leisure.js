@@ -188,7 +188,10 @@ export function completeSharedSession(root){
     const evaluation=session.choiceId==='tv'
       ?{accepted:session.tvConsent===true&&
         validSharedTvPlan(root,session.tvPlan,from)}
-      :evaluateLeisure(root,from,session.choiceId);
+      :['books','music'].includes(session.choiceId)
+        ?{accepted:session.pairConsent===true&&
+          validPairedHobbyPlan(root,session.pairPlan,from,{requireRoutes:false})}
+        :evaluateLeisure(root,from,session.choiceId);
     if(!evaluation)return null;
     if(evaluation.accepted){
       kind='completed';

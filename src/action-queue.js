@@ -37,8 +37,13 @@ export function sanitizeQueueCommand(id,raw,persons){
     if(!definition||definition.source!=='item'||definition.participation!=='solo'||
       !validFurnitureInstanceId(raw.targetInstanceId)||
       (definition.contentKind&&(content?.kind!==definition.contentKind)))return null;
+    if(raw.inventoryItemId!==undefined&&(
+      definition.id!=='hobby.read.fiction'||
+      typeof raw.inventoryItemId!=='string'||
+      !/^[am][0-9]{1,8}$/.test(raw.inventoryItemId)))return null;
     return {type,activityId:definition.id,targetInstanceId:raw.targetInstanceId,
-      contentId:content?.id||null};
+      contentId:content?.id||null,
+      ...(raw.inventoryItemId?{inventoryItemId:raw.inventoryItemId}:{})};
   }
   if(type==='object'||!pair(id,raw.targetId)||!persons.includes(raw.targetId))return null;
   const targetId=raw.targetId;

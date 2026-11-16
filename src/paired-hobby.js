@@ -48,7 +48,7 @@ export function planPairedHobby(root,initiator,choiceId,instanceId=null){
     [other]:{x:best.b.x,z:best.b.z}
   }};
 }
-export function validPairedHobbyPlan(root,plan,initiator){
+export function validPairedHobbyPlan(root,plan,initiator,{requireRoutes=true}={}){
   if(!IDS.includes(initiator)||!plan||typeof plan!=='object'||Array.isArray(plan)||
     !actionFor(plan.choiceId)||typeof plan.instanceId!=='string')return false;
   const spots=pairedHobbySpots(root?.world,plan.choiceId,plan.instanceId);
@@ -59,7 +59,7 @@ export function validPairedHobbyPlan(root,plan,initiator){
   return IDS.every(id=>{
     const p=plan.places[id];
     return spots.some(spot=>distance(spot,p)<.025)&&
-      Number.isFinite(routeCost(root.world,starts[id],p));
+      (!requireRoutes||Number.isFinite(routeCost(root.world,starts[id],p)));
   });
 }
 export function livePairedHobby(root){
@@ -67,7 +67,7 @@ export function livePairedHobby(root){
   if(social?.phase!=='using'||shared?.mode!=='leisure'||
     !['books','music'].includes(shared.choiceId)||
     shared.pairConsent!==true||
-    !validPairedHobbyPlan(root,shared.pairPlan,social.initiator)||
+    !validPairedHobbyPlan(root,shared.pairPlan,social.initiator,{requireRoutes:false})||
     shared.pairPlan.choiceId!==shared.choiceId)return null;
   const current=positions(root);
   return IDS.every(id=>distance(current[id],shared.pairPlan.places[id])<.35)

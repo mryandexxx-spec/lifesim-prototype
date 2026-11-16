@@ -4,7 +4,7 @@
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS } from './simulation.js';
 import { refreshMind } from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
-import {starterInventory,restoreInventory,sharedDuration} from './gifts-leisure.js';
+import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
@@ -328,7 +328,10 @@ function validReadingSource(root,actor){
   const item=action?.id==='hobby'
     ?resolveActionFurniture(root.world,'hobby',action.targetInstanceId):null;
   const activity=getActivityDefinition(HOBBY_ACTIVITIES,action?.activityId);
-  return Boolean(item&&activity&&action.contentId===READING_CONTENT_ID&&
+  const id=actor===root?'alex':'mira';
+  const owned=action?.inventoryItemId===undefined||inventoryFor(root,id)
+    .some(gift=>gift.type==='book'&&gift.id===action.inventoryItemId);
+  return Boolean(owned&&item&&activity&&action.contentId===READING_CONTENT_ID&&
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
 function validMusicSource(root,actor){
@@ -341,12 +344,16 @@ function validMusicSource(root,actor){
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
-  activityId=null,contentId=null,musicPlan=null) {
+  activityId=null,contentId=null,musicPlan=null,inventoryItemId=null) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
     !furnitureAvailable(root,itemId,residentId,item.instanceId))return false;
   const resident=getActor(root,residentId);
   let readingSeat=null,plannedMusic=null;
+  if(inventoryItemId!==null&&(
+    itemId!=='hobby'||activityId!==READING_ACTIVITY_ID||
+    !inventoryFor(root,residentId).some(gift=>gift.type==='book'&&
+      gift.id===inventoryItemId)))return false;
   if(itemId==='hobby'){
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
     if(!activity||contentId!==READING_CONTENT_ID||
@@ -379,6 +386,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     if(!session){resident.action=null;return false;}
     resident.action.activityId=activityId;
     resident.action.contentId=contentId;
+    if(inventoryItemId)resident.action.inventoryItemId=inventoryItemId;
     if(!beginReadingJourney(resident.action,readingSeat)){
       resident.action=null;return false;
     }
