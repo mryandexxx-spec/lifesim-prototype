@@ -15,11 +15,11 @@ const copy=value=>JSON.parse(JSON.stringify(value));
 const src=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 test('F4b2 canonical products preserve six old SKU prices plus a same-price plant colorway',()=>{
-  assert.equal(FURNITURE_PRODUCTS.length,8);
+  assert.equal(FURNITURE_PRODUCTS.length,9);
   assert.deepEqual(FURNITURE_LEGACY_OFFERS.map(x=>x.prefabId),
     ['plant','table','nightstand','tv','sofa','bed']);
   assert.deepEqual(SHOP_ITEMS.map(x=>x.price),[130,250,170,650,550,850]);
-  assert.equal(MARKET_OFFERS.length,8);
+  assert.equal(MARKET_OFFERS.length,9);
   const amber=furnitureProduct('plant.amber');
   assert.equal(amber.prefabId,'plant');
   assert.equal(amber.price,130);
@@ -39,16 +39,16 @@ test('F4b2 registry and UI expose two distinct plant SKU with shared renderer/ne
   assert.deepEqual(amber.effects,[]);
   assert.equal(amber.appearanceId,'foliage.amber');
   const offers=selectShopCatalog();
-  assert.equal(offers.length,8);
+  assert.equal(offers.length,9);
   assert.equal(offers.filter(x=>x.prefabId==='plant').length,2);
   assert.deepEqual(offers.filter(x=>x.prefabId==='plant').map(x=>x.itemId),
     ['legacy.plant','plant.amber']);
-  assert.equal(offers.at(-1).effectText.includes('дополнительного бонуса'),true);
+  assert.equal(offers.find(x=>x.itemId==='plant.amber').effectText.includes('дополнительного бонуса'),true);
   assert.equal(offers.find(x=>x.itemId==='bookcase.starter').prefabId,'bookcase');
   assert.deepEqual(selectShopCatalog({roomCategoryId:'room.decor'}).map(x=>x.itemId),
     ['legacy.plant','plant.amber']);
   assert.equal(shopCategoryOptions('room').filter(x=>x.id==='room.decor').length,1);
-  assert.deepEqual(marketListing().map(x=>x.price),[130,250,170,650,550,850,320,130]);
+  assert.deepEqual(marketListing().map(x=>x.price),[130,250,170,650,550,850,320,130,700]);
 });
 test('F4b2 two plant SKUs both buy via one prefab without clone ID conflicts or hidden charge',()=>{
   const w=newFurnitureWorld(),shop=newFurnitureShop();
