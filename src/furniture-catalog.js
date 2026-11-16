@@ -54,7 +54,7 @@ const original=[
     category:'Столовая',actionId:'seat',capabilities:['seat'],templateOnly:true,
     x:0,z:0,rect:[-.46,.46,-.48,.48],approach:[0,-1.03]},
   {prefabId:'diningtable',instanceId:'template-diningtable-1',name:'Обеденный стол',
-    category:'Столовая',capabilities:['surface'],templateOnly:true,
+    category:'Столовая',actionId:'dining',capabilities:['surface','food.dine'],templateOnly:true,
     x:0,z:0,rect:[-1.13,1.13,-.72,.72]},
   {prefabId:'floorlamp',instanceId:'template-floorlamp-1',name:'Торшер',
     category:'Гостиная',actionId:'lamp',capabilities:['light.switch'],templateOnly:true,
