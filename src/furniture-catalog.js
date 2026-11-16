@@ -26,7 +26,7 @@ const original=[
     extras:[{name:'fridge-door-sweep',rect:[FRIDGE_LAYOUT.sweep.minX,FRIDGE_LAYOUT.sweep.maxX,
       FRIDGE_LAYOUT.sweep.minZ,FRIDGE_LAYOUT.sweep.maxZ]}]},
   {prefabId:'sofa',instanceId:'home-sofa-1',name:'Диван',category:'Гостиная',
-    actionId:'sofa',capabilities:['relax','seat.read'],x:1.355,z:1.59,
+    actionId:'sofa',capabilities:['relax'],x:1.355,z:1.59,
     rect:[-.07,2.78,.89,2.29],approach:[1.35,.52]},
   {prefabId:'table',instanceId:'home-table-1',name:'Журнальный столик',
     category:'Гостиная',capabilities:['surface'],x:1.34,z:-.26,rect:[.59,2.09,-.65,.13]},
@@ -63,6 +63,9 @@ export const FURNITURE_CATALOG=Object.freeze(Object.fromEntries(original.map(ite
   return [item.prefabId,Object.freeze({
     prefabId:item.prefabId,name:item.name,category:item.category,
     actionId:item.actionId||null,capabilities:Object.freeze(item.capabilities),
+    // Physical interaction affordances are NOT shopper function facets.
+    // Later chairs can opt in without exposing fabricated retail categories.
+    seating:Object.freeze(item.prefabId==='sofa'?['reading']:[]),
     footprint,extras,approach,rendererKey:item.prefabId,version:1,
     templateOnly:item.templateOnly===true,
     maxOccupants:item.prefabId==='bed'?2:1,
