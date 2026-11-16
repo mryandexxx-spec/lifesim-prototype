@@ -11,7 +11,7 @@ import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
 import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
 import {createMeshyHugController} from './meshy-hug-runtime.js';
 import {createMeshyKissController} from './meshy-kiss-runtime.js';
-import {createMeshyReadingController} from './meshy-reading-runtime.js?v=1.2s';
+import {createMeshyReadingController} from './meshy-reading-runtime.js?v=1.2t';
 
 /**
  * Meshy visual adapter for the EXISTING LifeSim procedural character root.
