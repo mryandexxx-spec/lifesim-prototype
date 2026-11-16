@@ -1,8 +1,10 @@
 /** F2.1a: provisional furniture shop domain, no PlayCanvas/DOM dependencies.
  * Prices are deliberately labelled playtest-only until owner approves balance.
- * Only independent decor is tradeable; physical action fixtures remain protected.
+ * Decor and independently targetable purchased sofas are tradeable; original
+ * essential fixtures remain protected until visual/interaction adapters exist.
  */
-import {FURNITURE_CATALOG,restoreFurnitureWorld} from './furniture-catalog.js';
+import {FURNITURE_CATALOG,restoreFurnitureWorld,furnitureActionApproach} from './furniture-catalog.js';
+import {findPath} from './navigation.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
 
 export const SHOP_SCHEMA=1;
@@ -12,7 +14,8 @@ export const SHOP_ITEMS=Object.freeze([
   Object.freeze({prefabId:'plant',price:130}),
   Object.freeze({prefabId:'table',price:250}),
   Object.freeze({prefabId:'nightstand',price:170}),
-  Object.freeze({prefabId:'tv',price:650})
+  Object.freeze({prefabId:'tv',price:650}),
+  Object.freeze({prefabId:'sofa',price:550}) // playtest price, not approved economy
 ]);
 const stock=new Map(SHOP_ITEMS.map(item=>[item.prefabId,item]));
 const safeInt=n=>Number.isSafeInteger(n)&&n>=0;
@@ -55,13 +58,32 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
   const candidate={...current.world,instances:[...current.world.instances,added]};
   const valid=placement(candidate,id,pose,opts);
   if(!valid.ok)return valid;
+  if(prefabId==='sofa'&&!sofaReachable(valid.world,id,opts))
+    return reject('unreachable-sofa');
   return {ok:true,world:valid.world,
     shop:{...current.shop,credits:current.shop.credits-item.price,nextId:current.shop.nextId+1},
     instanceId:id,amount:-item.price};
 }
+/** Keep the original sofa protected. Only instances created by our shop may
+ * be stored or sold, and all unrelated built-in functional fixtures stay fixed.
+ */
+export function canTradeMarketInstance(item){
+  return !!item&&stock.has(item.prefabId)&&(
+    item.prefabId!=='sofa'||/^shop-sofa-[1-9][0-9]*$/.test(item.instanceId));
+}
 function tradeable(world,instanceId){
   const item=world.instances.find(x=>x.instanceId===instanceId);
-  return item&&stock.has(item.prefabId)?item:null;
+  return canTradeMarketInstance(item)?item:null;
+}
+/** A paid sofa must be reachable at its OWN rotated approach point.
+ * Avoid green previews that would leave characters with an unusable couch.
+ */
+function sofaReachable(world,instanceId,opts={}){
+  const at=furnitureActionApproach(world,'sofa',instanceId);
+  if(!at)return false;
+  return (opts.residents||[]).every(pos=>!pos||
+    !Number.isFinite(pos.x)||!Number.isFinite(pos.z)||
+    Boolean(findPath(pos,at,world)));
 }
 export function storeMarketItem(world,shop,instanceId,opts={}){
   const current=normalized(world,shop),item=tradeable(current.world,instanceId);
@@ -82,6 +104,8 @@ export function restoreMarketItem(world,shop,instanceId,pose,opts={}){
       ?{...x,location:'home'}:x)};
   const valid=placement(candidate,instanceId,pose,opts);
   if(!valid.ok)return valid;
+  if(item.prefabId==='sofa'&&!sofaReachable(valid.world,instanceId,opts))
+    return reject('unreachable-sofa');
   return {...valid,shop:current.shop,instanceId,amount:0};
 }
 export function sellMarketItem(world,shop,instanceId,opts={}){
