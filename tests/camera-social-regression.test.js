@@ -122,5 +122,6 @@ test('renderer social controls remain enabled when partner busy or meter full',(
  assert.ok(src.includes('const partnerExiting=sofaStates[partnerId].progress>0'));
  assert.ok(!src.includes("paths[partnerId]={points:null,index:0,id:null};"),
    'no new invitation can delete the other resident route');
- assert.ok(src.includes('if(partnerExiting){'));
+ assert.ok(src.includes('if(partnerExiting||!otherHere){'),
+   'date scene waits for both real arrivals and existing sofa/bed exit');
 });
