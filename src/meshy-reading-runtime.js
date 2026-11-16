@@ -52,8 +52,8 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
   }
   // Stable original prop, separate from the hidden procedural elbow.
   piece('green reading cover',0,-.028,0,.47,.022,.29,cover);
-  piece('left story pages',-.115,-.010,0,.22,.020,.267,paper);
-  piece('right story pages',.115,-.010,0,.22,.020,.267,paper);
+  const leftPage=piece('left story pages',-.115,-.010,0,.22,.020,.267,paper);
+  const rightPage=piece('right story pages',.115,-.010,0,.22,.020,.267,paper);
   piece('book spine',0,0,0,.018,.027,.274,ink);
   book.enabled=false;
   const from=new pc.Vec3(),to=new pc.Vec3(),swing=new pc.Quat(),
@@ -62,6 +62,24 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     neckTilt=new pc.Quat(),neckPose=new pc.Quat();
   const xyz=v=>({x:v.x,y:v.y,z:v.z});
   let current=null,paused=false;
+  const heldStages=new Set(['taking','toSeat','sitting','opening','reading',
+    'closing','standing','returnShelf','returning']);
+  const readingStages=new Set(['opening','reading','closing']);
+  const atHand=new pc.Vec3();
+  // A closed volume stays attached to the REAL animated right wrist while
+  // walking; an opened spread rests above the thighs when seated.
+  function bookPose(stage,stepElapsed=0){
+    if(!heldStages.has(stage))return false;
+    const opening=readingStages.has(stage);
+    leftPage.enabled=opening;
+    rightPage.enabled=opening;
+    if(stage==='taking'||stage==='returning'){
+      const progress=Math.min(1,Math.max(0,stepElapsed/2.4));
+      book.setLocalScale(stage==='taking'?Math.max(.01,progress):Math.max(.01,1-progress),
+        1,1);
+    }else book.setLocalScale(1,1,1);
+    return opening;
+  }
   function rotateToward(bone,oldEnd,newEnd,weight,maxDegrees){
     const origin=bone.getPosition();
     from.set(oldEnd.x-origin.x,oldEnd.y-origin.y,oldEnd.z-origin.z);
@@ -81,7 +99,20 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
   function apply(){
     const intent=readingMotion(current);
     // Frozen Anim does not reset bones. Never compound rotation during pause.
-    if(paused||!intent||intent.weight<.005)return false;
+    if(paused||!intent||!book.enabled)return false;
+    const stage=current?.stage||'reading';
+    const open=bookPose(stage,current?.stepElapsed||0);
+    if(!open){
+      // PlayCanvas child book node uses world placement so it follows the
+      // animated Mixamo hand without needing a second skeleton attachment.
+      const wrist=arms[1].hand.getPosition();
+      atHand.set(wrist.x,wrist.y-.06,wrist.z+.035);
+      book.setPosition(atHand.x,atHand.y,atHand.z);
+      book.setEulerAngles(0,0,0);
+      return true;
+    }
+    book.setLocalPosition(0,.84,.38);
+    book.setLocalEulerAngles(-19,0,0);
     let moved=false;
     for(let index=0;index<arms.length;index++){
       const arm=arms[index],shoulder=xyz(arm.upper.getPosition()),
@@ -102,12 +133,12 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
             z:shoulder.z+poleWorld.z},maxStretch:.98
         });
       }catch{continue;}
-      moved=rotateToward(arm.upper,elbow,solved.knee,intent.weight*.88,75)||moved;
+      moved=rotateToward(arm.upper,elbow,solved.knee,Math.max(.35,intent.weight)*.88,75)||moved;
       moved=rotateToward(arm.fore,xyz(arm.hand.getPosition()),
-        solved.ankle,intent.weight*.88,105)||moved;
+        solved.ankle,Math.max(.35,intent.weight)*.88,105)||moved;
     }
     if(neck?.getLocalRotation&&neck?.setLocalRotation){
-      neckTilt.setFromEulerAngles(7*intent.weight,0,0);
+      neckTilt.setFromEulerAngles(7*Math.max(.35,intent.weight),0,0);
       neckPose.mul2(neck.getLocalRotation(),neckTilt);
       neck.setLocalRotation(neckPose);
       moved=true;
@@ -119,7 +150,10 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     setFrame(frame,freeze=false){
       current=readingMotion(frame)?frame:null;
       paused=Boolean(freeze);
-      book.enabled=Boolean(current);
+      const stage=current?.stage||'reading';
+      book.enabled=Boolean(current&&heldStages.has(stage));
+      if(book.enabled)bookPose(stage,current?.stepElapsed||0);
+      else {leftPage.enabled=false;rightPage.enabled=false;}
     },
     apply
   };
