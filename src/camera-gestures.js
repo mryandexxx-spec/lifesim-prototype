@@ -48,6 +48,9 @@ export function createCameraGestureSession(){
       // once on the first actual gesture; after that use per-event deltas.
       const dx=old.travel<TAP_SLOP_PX?p.x-old.originX:p.x-old.x;
       const dy=old.travel<TAP_SLOP_PX?p.y-old.originY:p.y-old.y;
+      // Shop placement owns the swipe. Do not pan the camera.
+      if(oneFinger==='placement')
+        return {view,changed:false,placementDelta:{dx,dy}};
       const next=oneFinger==='orbit'
         ?orbitCamera(view,dx,dy,2)
         :panCamera(view,dx,dy,height);

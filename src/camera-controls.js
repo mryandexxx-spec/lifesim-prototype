@@ -14,18 +14,27 @@ export const CAMERA_BOUNDS=Object.freeze({
 const valid=Number.isFinite;
 const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
 
+/** Convert finger movement in CSS pixels into camera-oriented ground movement.
+ * Ordinary camera panning uses the negative of this vector.
+ */
+export function screenFloorDragDelta(view,dx,dy,height,fov=41){
+  if(!valid(dx)||!valid(dy)||!valid(height)||height<=0||
+    !valid(view?.yaw)||!valid(view?.pitch)||!valid(view?.distance))
+    return {x:0,z:0};
+  const yaw=view.yaw*Math.PI/180,pitch=view.pitch*Math.PI/180;
+  const scale=2*view.distance*Math.tan(fov*Math.PI/360)/height;
+  const h=scale*.92,v=scale*.75/Math.max(.55,Math.sin(pitch));
+  return {x:dx*h*Math.cos(yaw)+dy*v*Math.sin(yaw),
+    z:-dx*h*Math.sin(yaw)+dy*v*Math.cos(yaw)};
+}
 /** Dragging screen-right/down moves the scene right/down.
  * Camera target moves opposite the finger in the world XZ plane.
  */
 export function panCamera(view,dx,dy,height,fov=41){
   if(!valid(dx)||!valid(dy)||!valid(height)||height<=0)return {...view};
-  const yaw=view.yaw*Math.PI/180,pitch=view.pitch*Math.PI/180;
-  const scale=2*view.distance*Math.tan(fov*Math.PI/360)/height;
-  const h=scale*.92,v=scale*.75/Math.max(.55,Math.sin(pitch));
-  const x=view.centerX-dx*h*Math.cos(yaw)-dy*v*Math.sin(yaw);
-  const z=view.centerZ+dx*h*Math.sin(yaw)-dy*v*Math.cos(yaw);
-  return {...view,centerX:clamp(x,CAMERA_BOUNDS.minX,CAMERA_BOUNDS.maxX),
-    centerZ:clamp(z,CAMERA_BOUNDS.minZ,CAMERA_BOUNDS.maxZ)};
+  const delta=screenFloorDragDelta(view,dx,dy,height,fov);
+  return {...view,centerX:clamp(view.centerX-delta.x,CAMERA_BOUNDS.minX,CAMERA_BOUNDS.maxX),
+    centerZ:clamp(view.centerZ-delta.z,CAMERA_BOUNDS.minZ,CAMERA_BOUNDS.maxZ)};
 }
 export function orbitCamera(view,dx,dy,gain=1){
   if(!valid(dx)||!valid(dy)||!valid(gain)||gain<=0)return {...view};

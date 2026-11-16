@@ -19,7 +19,7 @@ import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {SHOP_ITEMS,marketListing,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem} from './furniture-shop.js';
-import {cameraPlacementPose} from './furniture-placement-preview.js';
+import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -1754,7 +1754,7 @@ function boot() {
   cameraUpdate();
   $('reset-camera-btn').addEventListener('click',()=>{
     setView(CAMERA_INITIAL);
-    if(furnishMode&&shopPlacing)moveShopPreviewToCamera(true);
+    // Camera reset must not teleport a pending shop object.
     toast('Камера сброшена');
   });
   // One finger pans by default; two fingers orbit and pinch.
@@ -1793,6 +1793,7 @@ function boot() {
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopManualPose=false,shopPreviousCameraMode=null;
   let shopPlacing=false,shopPreviewEntity=null,shopPreviewType=null;
+  let shopSwipeRawPose=null; // transient, unsnapped, never stored
   let lastShopCameraPreviewAt=0;
   const ghostValid=mat('#3b9c73',{opacity:.23});
   const ghostInvalid=mat('#b84d55',{opacity:.26});
@@ -1963,7 +1964,7 @@ function boot() {
     $('furnish-placement-guide').hidden=!shopPlacing;
     $('furnish-placing-name').textContent=listing?.name||'Предмет';
     $('furnish-placing-status').textContent=shopPlacing
-      ?'Свайпни, чтобы переместить. Тапни пол, чтобы уточнить место.':'';
+      ?'Веди предмет пальцем по полу. Два пальца — камера.':'';
     const preview=shopPlacing&&listing&&shopPose
       ?buyMarketItem(game.world.furniture,game.shop,shopSelected,shopPose,editorContext())
       :null;
@@ -1971,7 +1972,7 @@ function boot() {
     const previewLabel=!listing?'Выбери товар в каталоге':
       !shopPlacing?'Выбран: '+listing.name+'. Нажми «Купить» — увидишь его в комнате.':
       !shopPose?'Предмет готов. Сдвигай камеру или выбери место тапом по полу':
-      suitable?'✓ Место подходит · свайп для перемещения камеры, «Поставить» для покупки':
+      suitable?'✓ Место подходит · веди предмет пальцем, «Установить» для покупки':
       '✕ '+editorMessage(preview.reason)+' · подбери другое место свайпом';
     $('furnish-preview').textContent=previewLabel;
     $('furnish-preview').dataset.invalid=String(shopPlacing&&!!listing&&!suitable);
@@ -2026,13 +2027,13 @@ function boot() {
     }
     shopOpen=mode==='shop';
     warehouseOpen=mode==='warehouse';
-    if(!shopOpen){shopPlacing=false;shopPose=null;shopManualPose=false;}
+    if(!shopOpen){shopPlacing=false;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;}
     $('furniture-editor').dataset.editorView=mode;
     if(shopOpen&&!shopSelected)shopSelected='plant';
     renderMarket();renderWarehouse();renderFurnitureSelection();
   };
   const chooseShopProduct=prefabId=>{
-    shopPlacing=false;shopSelected=prefabId;shopManualPose=false;shopPose=null;
+    shopPlacing=false;shopSelected=prefabId;shopManualPose=false;shopPose=null;shopSwipeRawPose=null;
     clearShopPreviewEntity();
     renderMarket();renderFurnitureSelection();
   };
@@ -2055,12 +2056,12 @@ function boot() {
   $('furnish-preview-turn').addEventListener('click',()=>{
     if(!shopOpen||!shopPlacing||!shopPose)return;
     shopPose={...shopPose,yaw:(shopPose.yaw+90)%360};
-    shopManualPose=true;renderMarket();
+    shopSwipeRawPose=null;shopManualPose=true;renderMarket();
   });
   $('furnish-preview-auto').addEventListener('click',()=>{
     if(!shopOpen||!shopPlacing||!shopSelected)return;
     shopPose=findMarketPlacement(game.world.furniture,game.shop,shopSelected,editorContext());
-    shopManualPose=false;renderMarket();
+    shopSwipeRawPose=null;shopManualPose=false;renderMarket();
   });
   const applyMarketTransaction=(transaction,success)=>{
     if(!transaction.ok){editorFeedback(editorMessage(transaction.reason),true);return false;}
@@ -2083,10 +2084,10 @@ function boot() {
         editorFeedback('Недостаточно пробных кредитов',true);return;
       }
       // Buy enters a NON-persistent 3D placement session, not an instant sale.
-      shopPlacing=true;shopPose=null;shopManualPose=false;
+      shopPlacing=true;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
       // Let the edit sheet collapse BEFORE choosing the visible room anchor.
       renderMarket();moveShopPreviewToCamera(true);
-      editorFeedback('Размещение: предмет перед тобой. Свайп — камера, тап — точное место, затем «Установить».');
+      editorFeedback('Размещение: веди предмет по полу одним пальцем, двумя поворачивай камеру, затем «Установить».');
       return;
     }
     if(!shopPose)return;
@@ -2095,13 +2096,13 @@ function boot() {
       shopSelected,{...shopPose},editorContext()),
       'Куплено и установлено · можно выбрать следующий предмет');
     if(ok){
-      shopPlacing=false;shopPose=null;shopManualPose=false;
+      shopPlacing=false;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
       clearShopPreviewEntity();renderMarket();
     }
   });
   $('furnish-place-cancel').addEventListener('click',()=>{
     if(!shopPlacing)return;
-    shopPlacing=false;shopPose=null;shopManualPose=false;
+    shopPlacing=false;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
     clearShopPreviewEntity();renderMarket();
     editorFeedback('Расстановка отменена · деньги и дом без изменений');
   });
@@ -2360,6 +2361,7 @@ function boot() {
       if(first&&first.id!==point.id)cameraGesture.begin(first,now);
     }
     if(furnishMode)cancelPendingGrab();
+    if(furnishMode&&shopPlacing)shopSwipeRawPose=null;
     cameraGesture.begin(point,now);
     armFurnitureHold(event,now);
   });
@@ -2381,11 +2383,26 @@ function boot() {
       cancelPendingGrab();cameraGesture.clear();return;
     }
     const result=cameraGesture.move(gesturePoint(event),view,
-      canvas.clientHeight,{oneFinger:oneFingerMode});
+      canvas.clientHeight,{oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'
+        ?'placement':oneFingerMode});
+    if(result.placementDelta&&furnishMode&&shopPlacing&&shopPose){
+      if(event.cancelable)event.preventDefault();
+      const {dx,dy}=result.placementDelta;
+      // Accumulate sub-grid deltas: slow swipes must not get swallowed by snap.
+      shopSwipeRawPose=dragShopPlacement(view,shopSwipeRawPose||shopPose,
+        dx,dy,canvas.clientHeight);
+      if(shopSwipeRawPose){
+        const pose={x:snapFurnitureCoordinate(shopSwipeRawPose.x),
+          z:snapFurnitureCoordinate(shopSwipeRawPose.z),yaw:shopPose.yaw};
+        if(pose.x!==shopPose.x||pose.z!==shopPose.z){
+          shopPose=pose;shopManualPose=true;renderMarket();
+        }
+      }
+    }
     if(result.changed){
       if(event.cancelable)event.preventDefault();
+      // Two-finger orbit/pinch never teleports a shop item.
       setView(result.view);
-      if(furnishMode&&shopPlacing)moveShopPreviewToCamera();
     }
   });
   // CSS-pixel tap -> PlayCanvas camera ray -> nearest ACTUAL registered 3D
@@ -2439,9 +2456,7 @@ function boot() {
     if(furnishMode&&holdGesture.pointerId===event.pointerId)
       cancelPendingGrab();
     const pos=cameraGesture.end(gesturePoint(event),performance.now());
-    // A quick swipe may end before the 100ms preview throttle fires.
-    // Snap the preview to the final camera pose on release.
-    if(furnishMode&&shopPlacing&&!pos)moveShopPreviewToCamera(true);
+    shopSwipeRawPose=null; // next gesture starts from last snapped object pose
     if(!pos||dialogueNeedsDecision(game))return;
     if(furnishMode){
       if(shopOpen&&shopPlacing&&shopSelected){
@@ -2449,7 +2464,7 @@ function boot() {
         if(floor){
           shopPose={x:snapFurnitureCoordinate(floor.x),z:snapFurnitureCoordinate(floor.z),
             yaw:shopPose?.yaw??0};
-          shopManualPose=true;renderMarket();
+          shopSwipeRawPose=null;shopManualPose=true;renderMarket();
         }else editorFeedback('Коснись поверхности пола для размещения',true);
         return;
       }
@@ -2469,14 +2484,15 @@ function boot() {
       cancelEditorDrag();holdGesture.cancel();
     }
     cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true});
+    shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
-    cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();
+    cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
   // Safari may suspend a background tab without a matching pointerup/blur.
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
-      cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();
+      cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
     }
   });
   canvas.addEventListener('lostpointercapture',event=>{
@@ -2485,6 +2501,7 @@ function boot() {
       cancelEditorDrag();holdGesture.cancel();
     }
     cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true});
+    shopSwipeRawPose=null;
   });
   canvas.addEventListener('wheel',event=>{
     event.preventDefault();

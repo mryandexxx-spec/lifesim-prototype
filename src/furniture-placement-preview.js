@@ -5,6 +5,7 @@
  * preview visible even for invalid furniture placements (shown in red).
  */
 import {snapFurnitureCoordinate} from './furniture-editor.js';
+import {screenFloorDragDelta} from './camera-controls.js';
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 export function cameraPlacementPose(view,previous=null){
   const cx=Number.isFinite(view?.centerX)?view.centerX:0;
@@ -15,4 +16,16 @@ export function cameraPlacementPose(view,previous=null){
   const z=snapFurnitureCoordinate(clamp(cz,-3.75,3.75));
   const yaw=[0,90,180,270].includes(previous?.yaw)?previous.yaw:0;
   return {x,z,yaw};
+}
+
+/** Unpaid preview moves with the finger. Keep raw coordinates unsnapped
+ * between events; game.js snaps visible/committed positions only.
+ */
+export function dragShopPlacement(view,rawPose,dx,dy,height){
+  if(!rawPose||!Number.isFinite(rawPose.x)||!Number.isFinite(rawPose.z))
+    return null;
+  const delta=screenFloorDragDelta(view,dx,dy,height);
+  return {x:clamp(rawPose.x+delta.x,-4.25,4.25),
+    z:clamp(rawPose.z+delta.z,-3.75,3.75),
+    yaw:[0,90,180,270].includes(rawPose.yaw)?rawPose.yaw:0};
 }
