@@ -339,9 +339,9 @@ test('1.0u release bundles M3 and preserves 1.0s contextual UX and 1.0t live pla
   assert.match(yml,/cp src\/plan-preview\.js src\/ui-layout\.js src\/required-choice-focus\.js site\/src\//);
   assert.match(yml,/node --check src\/plan-preview\.js/);
   assert.match(yml,/src\/world-interactions\.js/);
-  assert.match(html,/сборка \/ 1\.1q/);
-  assert.match(html,/styles\.css\?v=1\.1q/);
-  assert.match(html,/src\/game\.js\?v=1\.1q/);
+  assert.match(html,/сборка \/ 1\.1r/);
+  assert.match(html,/styles\.css\?v=1\.1r/);
+  assert.match(html,/src\/game\.js\?v=1\.1r/);
   assert.match(html,/id="bar-social"/);
   assert.match(html,/id="plan-peek"/);
   assert.match(html,/id="plan-upcoming"/);
@@ -351,7 +351,7 @@ test('1.0u release bundles M3 and preserves 1.0s contextual UX and 1.0t live pla
   assert.match(game,/dialogueNeedsDecision\(game\)/);
   assert.match(game,/pickWorldRayTarget\(/);
   assert.match(game,/planPreview\(/);
-  assert.equal(pkg.version,'1.0.0-alpha.43');
+  assert.equal(pkg.version,'1.0.0-alpha.44');
   assert.equal(lock.version,pkg.version);
   assert.equal(lock.packages[''].version,pkg.version);
 });
