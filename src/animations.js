@@ -30,6 +30,7 @@ export function stepAnimation(previous,signals,dt) {
   const social=signals?.social==='talk'?'talk':signals?.social==='argue'?'argue':null;
   const hugWeight=clamp(safe(signals?.hugWeight,0),0,1);
   const kissWeight=clamp(safe(signals?.kissWeight,0),0,1);
+  const eveningWeight=clamp(safe(signals?.eveningWeight,0),0,1);
   // A stop command may send gait=0 even though the last planted foot is
   // still mid-stride. Freeze that stance phase during deceleration to avoid
   // an abrupt leg flip before the walk weight reaches zero.
@@ -132,6 +133,13 @@ export function stepAnimation(previous,signals,dt) {
     armTarget=angry
       ?[38+Math.sin(t*6.3)*15*side,40-Math.sin(t*5.5)*16*side]
       :[21+Math.sin(t*3.8)*12*side,24-Math.sin(t*3.4)*11*side];
+    if(!angry&&eveningWeight>.001){
+      // Small, open-handed conversation gestures: no involuntary touch.
+      const ask=Math.sin(t*1.65+side*.6);
+      armTarget=[armTarget[0]+(18+8*ask)*eveningWeight,
+        armTarget[1]+(10-7*ask)*eveningWeight];
+      elbowTarget=[14*eveningWeight,11*eveningWeight];
+    }
   }else if(moving||walkWeight>.003){
     legTarget=walkPose.hips;
     kneeTarget=walkPose.knees;
@@ -174,7 +182,9 @@ export function stepAnimation(previous,signals,dt) {
   // upper-body volume. Head-to-hips lean is now visible from the isometric view.
   const spineLean=blend(safe(previous.spineLean,0),
     bedSitWeight>0?-11*bedSitWeight:hugWeight>.005?6*hugWeight:
-      kissWeight>.005?8*kissWeight:inGait?walkPose.spineLean:0,12,step);
+      kissWeight>.005?8*kissWeight:
+        social==='talk'&&eveningWeight>.001?5.5*eveningWeight:
+        inGait?walkPose.spineLean:0,12,step);
   // A seated viewer may glance toward an off-axis screen without turning
   // the whole avatar and sliding its hips away from the sofa cushion.
   const tvGaze=action==='tv'&&sofaWeight>.5
