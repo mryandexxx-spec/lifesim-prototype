@@ -38,8 +38,16 @@ export function sanitizeQueueCommand(id,raw,persons){
   if(type==='shared'&&raw.mode==='gift'&&
     typeof raw.choiceId==='string'&&/^[a-z][0-9]{1,8}$/.test(raw.choiceId))
     return {type,targetId,mode:'gift',choiceId:raw.choiceId};
-  if(type==='shared'&&raw.mode==='leisure'&&known(LEISURE_CATALOG,raw.choiceId))
+  if(type==='shared'&&raw.mode==='leisure'&&known(LEISURE_CATALOG,raw.choiceId)){
+    if(raw.choiceId==='tv'){
+      if(raw.targetInstanceId!==undefined&&!validFurnitureInstanceId(raw.targetInstanceId))
+        return null;
+      return {type,targetId,mode:'leisure',choiceId:'tv',
+        targetInstanceId:raw.targetInstanceId||'home-tv-1'};
+    }
+    if(raw.targetInstanceId!==undefined)return null;
     return {type,targetId,mode:'leisure',choiceId:raw.choiceId};
+  }
   return null;
 }
 export function newActionQueues(personIds=[]){

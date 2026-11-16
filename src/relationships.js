@@ -11,6 +11,7 @@ import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,evaluateLeisure} from './gifts
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
 import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSession} from './gifts-leisure.js';
+import {validSharedTvPlan} from './tv-together.js';
 import {availableSocialActions,resolveBranchResponse,observePairViews,
   applySocialEvent,learnSocialPreference,learnSocialCue} from './social-graph.js';
 import {romanceAvailability} from './romance.js';
@@ -128,8 +129,9 @@ export function finishSocialConversation(root){
 /** Existing walk/animation/social reservation also supports gift/leisure.
  * Nothing changes until this shared action finishes its fixed game time.
  */
-export function startSharedSocial(root,initiator,target,mode,choiceId,automatic=false){
-  const session=createSharedSession(root,initiator,mode,choiceId);
+export function startSharedSocial(root,initiator,target,mode,choiceId,automatic=false,tvPlan=null){
+  if(automatic&&mode==='leisure'&&choiceId==='tv')return false;
+  const session=createSharedSession(root,initiator,mode,choiceId,tvPlan);
   // A spontaneous gift could consume player-owned items without permission;
   // only voluntary leisure is allowed, and must appear welcome in preflight.
   if(automatic&&(mode!=='leisure'||
@@ -175,6 +177,17 @@ function recordPairCompletion(root,session,type,token=null){
 export function arriveSocial(root) {
   const social=root.socialAction;
   if(social?.phase!=='walking')return false;
+  if(social.shared?.mode==='leisure'&&social.shared.choiceId==='tv'){
+    // Partner is consulted after both people actually reach their own places.
+    const agreed=validSharedTvPlan(root,social.shared.tvPlan,social.initiator)&&
+      evaluateLeisure(root,social.initiator,'tv')?.accepted===true;
+    if(!agreed){
+      get(root,social.initiator).event='Предложение посмотреть ТВ не принято';
+      get(root,social.partner).event='Сегодня не хочется смотреть вместе';
+      root.socialAction=null;return false;
+    }
+    social.shared.tvConsent=true;
+  }
   // No physical contact until the recipient has answered this invitation.
   if(social?.eveningStage&&
     !validRomanticEveningStage(root.world,social.eveningStage)){
@@ -388,6 +401,12 @@ export function tickSocial(root,minutes){
     return true;
   }
   if(s.shared){
+    // A cancelled/removed TV or seat never produces canonical Social/Fun.
+    if(s.shared.choiceId==='tv'&&
+      (s.shared.tvConsent!==true||
+       !validSharedTvPlan(root,s.shared.tvPlan,s.initiator))){
+      root.socialAction=null;return false;
+    }
     const duration=sharedDuration(s.shared);
     if(!duration){root.socialAction=null;return false;}
     s.elapsed+=minutes;
@@ -447,7 +466,10 @@ export function loadSocialAction(data,root) {
   if(data.conversation!==undefined&&(!session||data.kind!=='talk'||data.automatic===true))
     return null;
   if(data.shared!==undefined&&(!shared||session||data.kind!=='talk'||
-    (data.automatic===true&&shared.mode!=='leisure')))return null;
+    (data.automatic===true&&shared.mode!=='leisure')||
+    (shared.choiceId==='tv'&&(data.automatic===true||
+      (data.phase==='using'&&shared.tvConsent!==true)||
+      (data.phase==='walking'&&shared.tvConsent!==undefined)))))return null;
   const branch=data.branchAction;
   // Optional v1 R5b table stage must reference the actual unmoved table and
   // predeclared opposite-side foot anchors; forged/corrupt stages fail closed.

@@ -60,6 +60,7 @@ import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './s
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {TV_WATCH_POSE,tvScreenFrame} from './tv-interaction.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
+import {planSharedTv,liveSharedTv} from './tv-together.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
 import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
@@ -697,7 +698,8 @@ function activeTaskLabel(id){
   if(s&&(s.initiator===id||s.partner===id)){
     if(s.conversation)return 'Беседа с '+getActorName(s.partner===id?s.initiator:s.partner);
     if(s.branchAction)return BRANCH_ACTIONS[s.branchAction.id]?.label||'Общение';
-    if(s.shared)return s.shared.mode==='gift'?'Вручает или принимает подарок':'Проводит время вместе';
+    if(s.shared)return s.shared.choiceId==='tv'?'Смотрит телевизор вместе':
+      s.shared.mode==='gift'?'Вручает или принимает подарок':'Проводит время вместе';
     return SOCIAL_ACTIONS[s.kind]?.label||'Общается';
   }
   const actor=getActor(game,id);
@@ -931,12 +933,28 @@ function renderSharedPanel(force=true){
   }
   const activities=document.createElement('h3');activities.textContent='Провести время вместе';
   options.append(activities);
-  for(const [id,def] of Object.entries(LEISURE_CATALOG))
+  for(const [id,def] of Object.entries(LEISURE_CATALOG)){
+    if(id==='tv'){
+      // Keep a physical screen ID in the FIFO; the TV may later be moved,
+      // sold or occupied, but the command must never silently change TVs.
+      for(const item of game.world.furniture.instances.filter(i=>
+        i.prefabId==='tv'&&i.location==='home')){
+        options.append(conversationButton(def.symbol+' '+def.label+
+          (item.instanceId==='home-tv-1'?' · Домашний ТВ':' · Купленный ТВ'),()=>{
+          if(queuedSocial('shared',{mode:'leisure',choiceId:'tv',
+            targetInstanceId:item.instanceId})){
+            sharedPicker=false;renderSharedPanel();
+          }
+        }));
+      }
+      continue;
+    }
     options.append(conversationButton(def.symbol+' '+def.label,()=>{
       if(queuedSocial('shared',{mode:'leisure',choiceId:id})){
         sharedPicker=false;renderSharedPanel();
       }
     }));
+  }
 }
 function conversationButton(label,callback,secondary=false){
   const button=document.createElement('button');
@@ -1651,6 +1669,18 @@ function boot() {
     }
     const self=getActor(game,actorId),partnerId=actorId==='alex'?'mira':'alex',
       partner=getActor(game,partnerId);
+    if(shared?.mode==='leisure'&&shared.choiceId==='tv'){
+      const plan=planSharedTv(game,actorId,shared.targetInstanceId||'home-tv-1');
+      if(!plan)return false;
+      const first=plan.places[actorId],second=plan.places[partnerId];
+      const a=findPath(self.position,first,game.world);
+      const b=findPath(partner.position,second,game.world);
+      if(!a||!b||!startSharedSocial(game,actorId,first,
+        'leisure','tv',false,plan))return false;
+      paths[actorId]={points:a,index:0,id:'social:'+kind};
+      paths[partnerId]={points:b,index:0,id:'social:'+kind};
+      restartAutonomyWait();return true;
+    }
     // Optional: only the romantic evening can claim TWO walkable spots on an
     // actual table. Other social actions preserve their accepted navigation.
     const tablePlan=branchId==='romance.evening'
@@ -1691,6 +1721,8 @@ function boot() {
     const session=game.socialAction;
     return session?.phase==='walking'&&
       (session.initiator===residentId||
+        (session.shared?.choiceId==='tv'&&
+          Boolean(session.shared.tvPlan?.places?.[residentId]))||
         (session.branchAction?.id==='romance.evening'&&
           session.eveningStage&&session.partner===residentId));
   };
@@ -1757,7 +1789,8 @@ function boot() {
           started=beginSocial('talk',false,residentId,null,null,command.actionId,true);
         else if(command.type==='shared')
           started=beginSocial('talk',false,residentId,null,
-            {mode:command.mode,choiceId:command.choiceId},null,true);
+            {mode:command.mode,choiceId:command.choiceId,
+              targetInstanceId:command.targetInstanceId},null,true);
         if(started){
           routeRetryAt.delete(command.seq);
           routeFailures.delete(command.seq);
@@ -1932,6 +1965,14 @@ function boot() {
       lockPrefab('toilet');
     if(fridgeOpen>.001||Object.values(fridgeLeaving).some(Boolean))
       lockPrefab('fridge');
+    const jointTv=game.socialAction?.shared?.tvPlan;
+    if(jointTv){
+      busy.add(jointTv.tvId);
+      for(const id of HOUSEHOLD_IDS){
+        const seat=jointTv.places?.[id]?.seatId;
+        if(seat)busy.add(seat);
+      }
+    }
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
@@ -2709,11 +2750,13 @@ function boot() {
           showerStates[residentId].active||toiletStates[residentId].active||
           fridgeLeaving[residentId])continue;
         const socialWalking=Boolean(socialWalkingFor(residentId));
+        const pairedPlan=socialWalking?game.socialAction?.shared?.tvPlan:null;
         const eveningStage=socialWalking?game.socialAction?.eveningStage:null;
-        const socialGoal=eveningStage&&game.socialAction.partner===residentId
-          ?eveningStage.partner:game.socialAction?.target;
-        // A stage guest already at their destination waits for their partner.
-        const atStage=socialWalking&&eveningStage&&
+        const socialGoal=pairedPlan?.places?.[residentId]||
+          (eveningStage&&game.socialAction.partner===residentId
+          ?eveningStage.partner:game.socialAction?.target);
+        // A stage guest or TV viewer at their spot waits for their partner.
+        const atStage=socialWalking&&(eveningStage||pairedPlan)&&
           Math.hypot(resident.position.x-socialGoal.x,
             resident.position.z-socialGoal.z)<.075;
         const jobId=socialWalking&&!atStage?'social:'+game.socialAction.kind:
@@ -2753,6 +2796,15 @@ function boot() {
                 destination(jobId,residentId,resident.action?.targetInstanceId,
                    resident.action?.watchSeatInstanceId);
               if(socialWalking){
+                if(pairedPlan){
+                  const ready=HOUSEHOLD_IDS.every(id=>{
+                    const goal=pairedPlan.places[id],pos=getActor(game,id).position;
+                    return Math.hypot(pos.x-goal.x,pos.z-goal.z)<.06;
+                  });
+                  if(ready)arriveSocial(game); // partner decides only after both arrive
+                  paths[residentId]={points:null,index:0,id:null};
+                  continue;
+                }
                 const partnerId=residentId==='alex'?'mira':'alex';
                 const partnerExiting=sofaStates[partnerId].progress>0||
                   bedStates[partnerId].progress>0||
@@ -2849,7 +2901,9 @@ function boot() {
     const kissAlexFrame={...kissFrame,initiator:game.socialAction?.initiator==='alex'};
     const kissMiraFrame={...kissFrame,initiator:game.socialAction?.initiator==='mira'};
     const pairTargets=hugTargets||kissTargets;
-    const using=game.action?.phase==='using', useId=using?game.action.id:null;
+    const pairedTv=liveSharedTv(game);
+    const using=game.action?.phase==='using',
+      useId=using?game.action.id:pairedTv?'tv':null;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
@@ -2863,7 +2917,8 @@ function boot() {
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
     const walking=active&&(game.action?.phase==='walking'||
       socialWalkingFor('alex'));
-    const alexWatchSeat=useId==='tv'?game.action?.watchSeatInstanceId:null;
+    const alexWatchSeat=useId==='tv'
+      ?(pairedTv?.places?.alex?.seatId||game.action?.watchSeatInstanceId):null;
     if(useId==='sofa'||alexWatchSeat)
       sofaVisualTargets.alex=(alexWatchSeat||game.action?.targetInstanceId)||null;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
@@ -2872,7 +2927,7 @@ function boot() {
     const seatPose=furniturePose(game.world,'sofa',
       sofaTransitionPose(sofaStates.alex),sofaVisualTargets.alex)||
       {...display,sofaWeight:0}; // deleted/stale target never teleports to original
-    const seating=useId==='sofa'||sofaStates.alex.progress>0;
+    const seating=useId==='sofa'||Boolean(alexWatchSeat)||sofaStates.alex.progress>0;
     if(!seating)sofaVisualTargets.alex=null;
     if(alexSeatInstanceId!==sofaVisualTargets.alex){
       alexSeatInstanceId=sofaVisualTargets.alex;
@@ -2887,8 +2942,11 @@ function boot() {
       ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex),bedVisualTargets.alex):null;
     if(bedStates.alex.progress===0)bedVisualTargets.alex=null;
     const bedding=Boolean(bedPose);
-    const pose=useId&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
-      ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null;
+    const pairedTvStand=pairedTv&&!alexWatchSeat
+      ?{...pairedTv.places.alex,y:0,pitch:0,
+        yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
+    const pose=pairedTvStand||(useId&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
+      ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
@@ -2933,13 +2991,13 @@ function boot() {
       toiletStep:alexToilet?.walkWeight||0,
       sofaWeight:seatPose.sofaWeight,
       tvGazeYaw:alexWatchSeat?tvSofaView(game.world,alexWatchSeat,
-        game.action?.targetInstanceId)?.torsoYaw||0:0,
+        pairedTv?.tvId||game.action?.targetInstanceId)?.torsoYaw||0:0,
       bedStepWeight:bedPose?.bedStepWeight||0,
       bedSitWeight:bedPose?.bedSitWeight||0,
       bedReclineWeight:bedPose?.bedReclineWeight||0,
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
-      social:socialUsing&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
       eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
@@ -2962,7 +3020,7 @@ function boot() {
     book.enabled=using&&useId==='sofa';
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
-    const miraUseId=miraUsing?game.otherSim.action.id:null;
+    const miraUseId=miraUsing?game.otherSim.action.id:pairedTv?'tv':null;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
       game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
@@ -2976,7 +3034,8 @@ function boot() {
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
       socialWalkingFor('mira'));
-    const miraWatchSeat=miraUseId==='tv'?game.otherSim.action?.watchSeatInstanceId:null;
+    const miraWatchSeat=miraUseId==='tv'
+      ?(pairedTv?.places?.mira?.seatId||game.otherSim.action?.watchSeatInstanceId):null;
     if(miraUseId==='sofa'||miraWatchSeat)
       sofaVisualTargets.mira=(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
@@ -2985,7 +3044,7 @@ function boot() {
     const miraSeatPose=furniturePose(game.world,'sofa',
       sofaTransitionPose(sofaStates.mira),sofaVisualTargets.mira)||
       {...miraDisplay,sofaWeight:0};
-    const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
+    const miraSeating=miraUseId==='sofa'||Boolean(miraWatchSeat)||sofaStates.mira.progress>0;
     if(!miraSeating)sofaVisualTargets.mira=null;
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
     bedStates.mira=advanceBedTransition(bedStates.mira,
@@ -2996,8 +3055,11 @@ function boot() {
       ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira),bedVisualTargets.mira):null;
     if(bedStates.mira.progress===0)bedVisualTargets.mira=null;
     const miraBedding=Boolean(miraBedPose);
-    const miraPose=miraUseId&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
-      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null;
+    const pairedTvMiraStand=pairedTv&&!miraWatchSeat
+      ?{...pairedTv.places.mira,y:0,pitch:0,
+        yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
+    const miraPose=pairedTvMiraStand||(miraUseId&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
+      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
@@ -3038,13 +3100,13 @@ function boot() {
       toiletStep:miraToilet?.walkWeight||0,
       sofaWeight:miraSeatPose.sofaWeight,
       tvGazeYaw:miraWatchSeat?tvSofaView(game.world,miraWatchSeat,
-        game.otherSim.action?.targetInstanceId)?.torsoYaw||0:0,
+        pairedTv?.tvId||game.otherSim.action?.targetInstanceId)?.torsoYaw||0:0,
       bedStepWeight:miraBedPose?.bedStepWeight||0,
       bedSitWeight:miraBedPose?.bedSitWeight||0,
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
-      social:socialUsing&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
       eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
@@ -3070,7 +3132,7 @@ function boot() {
       walking:(game.otherSim.action?.phase==='walking'||
         socialWalkingFor('mira'))&&
         !miraSeating&&!miraBedding&&!miraShower,
-      social:socialUsing?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
       actionId:miraUseId,
       sofaBusy:sofaStates.mira.progress>0,
@@ -3102,7 +3164,7 @@ function boot() {
       worldMinutes:game.minutes,
       mood:game.mind?.mood?.value,
       energy:game.needs.energy,
-      social:socialUsing?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv?game.socialAction.kind:null,
       socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
@@ -3153,7 +3215,8 @@ function boot() {
       if(item.prefabId!=='tv'||item.location!=='home')continue;
       const program=decorNodes.get(item.instanceId)?.findByName('tv program');
       if(!program)continue;
-      const frame=tvScreenFrame([game,game.otherSim],item.instanceId,effectTime);
+      const frame=tvScreenFrame([game,game.otherSim],item.instanceId,effectTime,
+        game.socialAction);
       program.enabled=frame.on;
       if(frame.on)program.render.material=[M.mint,M.blue,M.peach][frame.frame];
     }
