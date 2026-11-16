@@ -76,6 +76,9 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
     return reject('unreachable-tv');
   if(productPrefabId==='bookcase'&&!sofaReachable(valid.world,id,opts,'hobby'))
     return reject('unreachable-bookcase');
+  if(['chair','armchair'].includes(productPrefabId)&&
+    !sofaReachable(valid.world,id,opts,'seat'))
+    return reject('unreachable-seat');
   return {ok:true,world:valid.world,
     shop:{...current.shop,credits:current.shop.credits-item.price,nextId:current.shop.nextId+1},
     instanceId:id,amount:-item.price};
