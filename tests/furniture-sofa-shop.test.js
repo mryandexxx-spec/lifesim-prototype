@@ -21,7 +21,7 @@ const newSofa=({x=-2,z=0,yaw=90,instanceId='shop-sofa-11'}={})=>
 test('six trial products preserve independently functional sofa and its price',()=>{
  assert.deepEqual(SHOP_ITEMS.map(x=>x.prefabId),
    ['plant','table','nightstand','tv','sofa','bed']);
- assert.equal(marketListing().length,7);
+ assert.equal(marketListing().length,8);
  assert.equal(SHOP_ITEMS.find(x=>x.prefabId==='plant').price,130);
  assert.equal(SHOP_ITEMS.find(x=>x.prefabId==='sofa').price,550);
  assert.equal(newFurnitureShop().credits,5000);
