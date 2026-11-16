@@ -11,7 +11,8 @@ import {compatibleFurnitureProduct} from './furniture-products.js';
 export const FURNITURE_SCHEMA=1;
 const finite=(n)=>typeof n==='number'&&Number.isFinite(n);
 export const validFurnitureInstanceId=id=>typeof id==='string'&&/^[a-z][a-z0-9-]{2,63}$/.test(id);
-const limits=Object.freeze({minX:-4.8,maxX:4.8,minZ:-4.2,maxZ:4.2});
+// Sanitize saved object centers across the doubled eastward room without changing v1.
+const limits=Object.freeze({minX:-4.8,maxX:14.05,minZ:-4.2,maxZ:4.2});
 const original=[
   {prefabId:'bed',instanceId:'home-bed-1',name:'Уютная кровать',category:'Спальня',
     actionId:'bed',capabilities:['sleep'],x:-2.62,z:-1.425,rect:[-3.83,-1.41,-2.69,-.16]},
