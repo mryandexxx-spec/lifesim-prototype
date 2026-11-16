@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2t-f4b9" />
+  <link rel="stylesheet" href="./styles.css?v=1.2t-f4c-library" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}
   </script>
@@ -94,6 +94,14 @@
         <output id="furnish-balance" aria-live="polite">Пробные кредиты: 5000</output>
       </div>
       <div id="furnish-shop" class="furnish-shop" hidden aria-label="Каталог новых предметов">
+        <div id="furnish-type-tabs" class="furnish-type-tabs" role="group"
+          aria-label="Категории мебели"></div>
+        <label class="furnish-search-label" for="furnish-search">
+          <span>⌕</span>
+          <input id="furnish-search" type="search" enterkeyhint="search"
+            aria-label="Поиск товаров по названию и назначению"
+            autocomplete="off" placeholder="Поиск мебели и декора…" />
+        </label>
         <div id="furnish-catalog-filters" class="furnish-catalog-filters" role="group" aria-label="Фильтры каталога">
           <label for="furnish-room-filter">КОМНАТА
             <select id="furnish-room-filter" aria-label="Фильтр товаров по комнате">
@@ -106,7 +114,7 @@
             </select>
           </label>
         </div>
-        <small id="furnish-filter-count" class="furnish-filter-count" role="status" aria-live="polite">Показано 6 из 6</small>
+        <small id="furnish-filter-count" class="furnish-filter-count" role="status" aria-live="polite">Показаны товары каталога</small>
         <div id="furnish-stock" class="furnish-stock" role="group" aria-label="Товары для покупки"></div>
         <section id="furnish-variant-compare" class="furnish-variant-compare" aria-label="Сравнение вариантов выбранного предмета" hidden>
           <strong>Сравнение вариантов · фактические свойства и цена</strong>
@@ -276,7 +284,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2t-closed-book-f4b9"></script>
+  <script type="module" src="./src/game.js?v=1.2t-closed-book-f4b9-f4c"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

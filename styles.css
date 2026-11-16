@@ -992,3 +992,31 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .intimacy-veil-message strong{font-size:22px;font-weight:800;}
 .intimacy-veil-message p{margin:0;font-size:13px;line-height:1.6;color:#dbe5e7;}
 .intimacy-veil-message small{font-size:13px;color:#b8d9d8;}
+
+/* F4C full furnished collection: one native scroll container is the whole
+   editor sheet. Only the category CHIPS scroll horizontally, not the 3D area.
+   No extra nested vertical scroll on mobile Safari. */
+.furnish-type-tabs{display:flex;gap:6px;min-width:0;overflow-x:auto;overflow-y:hidden;
+  padding:2px 1px 5px;flex-shrink:0;scrollbar-width:thin;-webkit-overflow-scrolling:touch;}
+.furnish-type-tabs button{flex:none;min-height:42px;border:1px solid #bbd3c3;
+  padding:7px 13px;border-radius:11px;color:#355c48;background:#f4f8f0;
+  font-size:12px;font-weight:800;white-space:nowrap;touch-action:manipulation;}
+.furnish-type-tabs button[aria-pressed="true"]{background:#267452;color:white;
+  border-color:#267452;box-shadow:0 1px 0 #235239;}
+.furnish-search-label{display:flex;align-items:center;gap:8px;padding:0 11px;
+  min-height:43px;border:1px solid #bbd3c3;border-radius:12px;
+  background:#fff;color:#367653;}
+.furnish-search-label>span{font-size:19px;line-height:1;}
+.furnish-search-label input{flex:1;min-width:0;width:100%;border:0;outline:0;
+  background:transparent;color:#254936;font:inherit;font-size:14px;}
+.furnish-search-label:focus-within{outline:2px solid #367653;outline-offset:2px;}
+.furnish-stock{grid-template-columns:repeat(2,minmax(0,1fr));}
+.furnish-stock button{min-height:83px;align-items:flex-start;justify-content:flex-start;}
+.furniture-editor[data-editor-view="shop"]{max-height:min(78dvh,660px);}
+.furnish-shop[data-placing="true"] .furnish-type-tabs,
+.furnish-shop[data-placing="true"] .furnish-search-label{display:none!important;}
+@media(min-width:480px){.furnish-stock{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-height:560px) and (orientation:landscape){
+  .furnish-stock{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .furniture-editor[data-editor-view="shop"]{max-height:75dvh;}
+}
