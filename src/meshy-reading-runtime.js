@@ -1,6 +1,8 @@
 import {solveTwoBoneTargets} from './interaction-anchors.js';
 
-/** H1 visual-only: an open book held in both Meshy hands. No action/XP/save writes. */
+/** H1 visual-only: closed book while carried, open spread while seated.
+ * No action/XP/save writes.
+ */
 const clamp01=n=>Math.min(1,Math.max(0,n));
 export function readingMotion(frame=null){
   // Inactive residents, pause/reset and first-frame startup pass null.
@@ -31,7 +33,7 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     return unavailable;
   const neck=model.findByName('mixamorig:Neck');
   const hips=model.findByName('mixamorig:Hips');
-  const book=new pc.Entity('Meshy '+resident+' open reading book');
+  const book=new pc.Entity('Meshy '+resident+' reading book');
   model.addChild(book);
   book.setLocalPosition(0,1.12,.36);
   book.setLocalEulerAngles(-14,0,0);
@@ -51,11 +53,27 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     e.setLocalScale(w,h,d);
     return e;
   }
-  // Stable original prop, separate from the hidden procedural elbow.
-  piece('green reading cover',0,-.028,0,.47,.022,.29,cover);
+  // Two genuinely different book meshes. Merely hiding the pages of the
+  // wide, flat spread leaves a green OPEN cover in the carrier's hand.
+  // The smaller closed hardcover has a single front, spine and page block.
+  const openCover=piece('open green cover',0,-.028,0,.47,.022,.29,cover);
   const leftPage=piece('left story pages',-.115,-.010,0,.22,.020,.267,paper);
   const rightPage=piece('right story pages',.115,-.010,0,.22,.020,.267,paper);
-  piece('book spine',0,0,0,.018,.027,.274,ink);
+  const openSpine=piece('open book spine',0,0,0,.018,.027,.274,ink);
+  const closedBook=new pc.Entity('closed hardcover');
+  book.addChild(closedBook);
+  function closedPiece(name,x,y,z,w,h,d,mat){
+    const e=new pc.Entity(name);
+    closedBook.addChild(e);
+    e.addComponent('render',{type:'box',material:mat});
+    e.setLocalPosition(x,y,z);
+    e.setLocalScale(w,h,d);
+    return e;
+  }
+  closedPiece('back green cover',0,-.038,0,.264,.012,.304,cover);
+  closedPiece('closed cream pages',.009,0,.004,.238,.059,.276,paper);
+  closedPiece('front green cover',0,.038,0,.264,.012,.304,cover);
+  closedPiece('bound green spine',-.127,0,0,.017,.082,.304,cover);
   book.enabled=false;
   const from=new pc.Vec3(),to=new pc.Vec3(),swing=new pc.Quat(),
     desired=new pc.Quat(),blended=new pc.Quat(),point=new pc.Vec3(),
@@ -78,10 +96,19 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
       :stage==='closing'
         ?1-Math.min(1,Math.max(0,stepElapsed/2.4))
         :opening?1:0;
-    leftPage.enabled=open>.015;
-    rightPage.enabled=open>.015;
-    leftPage.setLocalEulerAngles(0,(1-open)*60,0);
-    rightPage.setLocalEulerAngles(0,(open-1)*60,0);
+    const spreadVisible=open>.015;
+    // Keep the single closed hardcover visible during ALL travel phases
+    // (taking/toSeat/standing/returnShelf/returning). Only the seated
+    // opening/reading/closing sequence may display the wide two-page spread.
+    closedBook.enabled=!spreadVisible;
+    openCover.enabled=spreadVisible;
+    openSpine.enabled=spreadVisible;
+    leftPage.enabled=spreadVisible;
+    rightPage.enabled=spreadVisible;
+    if(spreadVisible){
+      leftPage.setLocalEulerAngles(0,(1-open)*60,0);
+      rightPage.setLocalEulerAngles(0,(open-1)*60,0);
+    }
     if(stage==='taking'||stage==='returning'){
       const progress=Math.min(1,Math.max(0,stepElapsed/2.4));
       book.setLocalScale(stage==='taking'?Math.max(.01,progress):Math.max(.01,1-progress),
@@ -116,9 +143,11 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
       // PlayCanvas child book node uses world placement so it follows the
       // animated Mixamo hand without needing a second skeleton attachment.
       const wrist=arms[1].hand.getPosition();
-      atHand.set(wrist.x,wrist.y-.06,wrist.z+.035);
+      atHand.set(wrist.x,wrist.y-.085,wrist.z+.025);
       book.setPosition(atHand.x,atHand.y,atHand.z);
-      book.setEulerAngles(0,0,0);
+      // Rotate the compact closed volume like a book held by its spine,
+      // rather than the flat double-width spread visible in the screenshot.
+      book.setEulerAngles(67,-12,18);
       return true;
     }
     if(hips?.getPosition){
@@ -174,7 +203,13 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
       const stage=current?.stage||'reading';
       book.enabled=Boolean(current&&heldStages.has(stage));
       if(book.enabled)bookPose(stage,current?.stepElapsed||0);
-      else {leftPage.enabled=false;rightPage.enabled=false;}
+      else {
+        closedBook.enabled=false;
+        openCover.enabled=false;
+        openSpine.enabled=false;
+        leftPage.enabled=false;
+        rightPage.enabled=false;
+      }
     },
     apply
   };
