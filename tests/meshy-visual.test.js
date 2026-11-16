@@ -25,6 +25,8 @@ test('Meshy sofa and guarded fridge/bed/shower gates preserve fallback',()=>{
   assert.equal(canShowMeshy({...standard,ready:false}),false);
   assert.equal(canShowMeshy({...standard,preferred:false}),false);
   assert.equal(canShowMeshy({...standard,actionId:'sofa'}),true);
+  assert.equal(canShowMeshy({...standard,actionId:'hobby'}),false);
+  assert.equal(canShowMeshy({...standard,actionId:'hobby',readingReady:true}),true);
   for(const actionId of ['bed','fridge','shower'])
     assert.equal(canShowMeshy({...standard,actionId}),false,actionId);
   assert.equal(canShowMeshy({...standard,actionId:'fridge',fridgeReady:true}),true);
