@@ -13,7 +13,7 @@ import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.j
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
-import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect} from './furniture-catalog.js';
+import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
@@ -1245,15 +1245,19 @@ function boot() {
   let decorDrawing=null;
   let refreshSofaSeat=()=>{};
   const withDecor=(prefabId,render)=>{
-    const origin=ORIGINAL_FURNITURE.find(i=>i.prefabId===prefabId);
-    const current=game.world.furniture.instances.find(i=>i.instanceId===origin.instanceId)||origin;
+    const origin=furnitureRenderOrigin(prefabId);
+    if(!origin)throw new Error('Unknown furniture renderer origin: '+prefabId);
+    const templateOnly=origin.location==='template';
+    const current=templateOnly?origin:
+      game.world.furniture.instances.find(i=>i.instanceId===origin.instanceId)||origin;
     const node=new pc.Entity('F1 furniture / '+origin.instanceId);
     app.root.addChild(node);
     node.setPosition(current.x,0,current.z);
     node.setEulerAngles(0,-current.yaw,0);
-    decorNodes.set(origin.instanceId,node);
+    // Hidden purchased-item templates must never become owned world fixtures.
+    if(!templateOnly)decorNodes.set(origin.instanceId,node);
     decorTemplates.set(prefabId,node);
-    node.enabled=current.location==='home';
+    node.enabled=!templateOnly&&current.location==='home';
     const previous=decorDrawing;
     decorDrawing={origin,node};
     try{render();}finally{decorDrawing=previous;}
