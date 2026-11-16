@@ -20,17 +20,17 @@ function harness(){
     shopPose:null,shopManualPose:false,
     shopListings:[{prefabId:'plant',price:130}],game:{world:{furniture:world},shop},
     editorContext:()=>people,
-    moveShopPreviewToCamera(){this.shopPose={...placement};this.moved++},
+    moveShopPreviewToCamera:()=>{state.shopPose={...placement};state.moved++},
     moved:0,renders:0,cleared:0,committed:0,feedback:[],
-    renderMarket(){this.renders++},
-    clearShopPreviewEntity(){this.cleared++},
-    editorFeedback(message){this.feedback.push(message)},
+    renderMarket:()=>{state.renders++},
+    clearShopPreviewEntity:()=>{state.cleared++},
+    editorFeedback:(message)=>{state.feedback.push(message)},
     buyMarketItem,
-    applyMarketTransaction(transaction){
+    applyMarketTransaction:(transaction)=>{
       if(!transaction.ok)return false;
-      this.committed++;
-      this.game.world.furniture=transaction.world;
-      this.game.shop=transaction.shop;
+      state.committed++;
+      state.game.world.furniture=transaction.world;
+      state.game.shop=transaction.shop;
       return true;
     },
     $(name){return {addEventListener(type,fn){handlers[name+':'+type]=fn}}}
