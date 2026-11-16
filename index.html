@@ -75,13 +75,26 @@
         <button id="furnish-exit" type="button">✓ В жизнь</button>
       </div>
       <p id="furnish-tip">Коснись мебели, чтобы выбрать. Для переноса удерживай палец 0,5 секунды, затем двигай. Обычный свайп — камера; два пальца — сдвиг и масштаб.</p>
-      <div id="furnish-items" class="furnish-items" role="group" aria-label="Предметы для перемещения"></div>
+      <div class="furnish-market-bar">
+        <button id="furnish-shop-toggle" type="button" aria-controls="furnish-shop" aria-expanded="false">🛍 Магазин</button>
+        <output id="furnish-balance" aria-live="polite">Пробные кредиты: 5000</output>
+      </div>
+      <div id="furnish-shop" class="furnish-shop" hidden>
+        <div id="furnish-stock" class="furnish-stock" role="group" aria-label="Каталог предметов"></div>
+        <p id="furnish-preview">Выбери предмет для покупки.</p>
+        <button id="furnish-buy" type="button">Купить и поставить</button>
+        <small>Пробная экономика — цены и бюджет уточняем после тестирования. Пока только декор.</small>
+      </div>
+      <div id="furnish-items" class="furnish-items" role="group" aria-label="Домашняя мебель и склад"></div>
       <div class="furnish-commands" role="group" aria-label="Перемещение, поворот и история">
         <button type="button" id="furnish-left" aria-label="Сдвинуть предмет влево по комнате">←</button>
         <button type="button" id="furnish-right" aria-label="Сдвинуть предмет вправо по комнате">→</button>
         <button type="button" id="furnish-up" aria-label="Сдвинуть предмет к дальней стене">↑</button>
         <button type="button" id="furnish-down" aria-label="Сдвинуть предмет к ближней стене">↓</button>
         <button type="button" id="furnish-rotate" class="furnish-main">⟳ Поворот</button>
+        <button type="button" id="furnish-store">📦 В склад</button>
+        <button type="button" id="furnish-restore">↩ Из склада</button>
+        <button type="button" id="furnish-sell">Продать</button>
         <button type="button" id="furnish-undo">↶ Отмена</button>
         <button type="button" id="furnish-redo">↷ Вернуть</button>
       </div>
