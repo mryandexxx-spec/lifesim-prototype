@@ -11,6 +11,7 @@ import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
 import {createMeshyHugController} from './meshy-hug-runtime.js';
 import {createMeshyKissController} from './meshy-kiss-runtime.js';
 import {createMeshyReadingController} from './meshy-reading-runtime.js?v=1.2t';
+import {createMeshyMusicController} from './meshy-music-runtime.js';
 
 /** Read undeformed geometry AABBs, never pose-dependent meshInstance.aabb.
  * The validated female GLB has one original skinned mesh.
@@ -44,7 +45,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
   const state={ready:false,status:'loading',error:null,
     root:null,model:null,clip:null,visible:false,base:null,
     sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null,
-    bedReady:false,bedRuntime:null,fridgeRuntime:null,readingRuntime:null,
+    bedReady:false,bedRuntime:null,fridgeRuntime:null,readingRuntime:null,musicRuntime:null,
     showerRuntime:null,hugRuntime:null,walkDuration:0,toiletReady:false};
   function attach(asset){
     const model=asset.resource.instantiateRenderEntity();
@@ -191,6 +192,18 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
           state.readingRuntime=reading;
         }
       }catch(error){console.warn('Mira reading rig unavailable',error);}
+      try{
+        const music=createMeshyMusicController({pc,model});
+        if(music.ready&&pc.Script){
+          if(!model.script)model.addComponent('script');
+          class MiraMusicPostUpdate extends pc.Script{
+            static scriptName='blinsMiraMusicPostUpdate';
+            postUpdate(){music.apply();}
+          }
+          model.script.create(MiraMusicPostUpdate);
+          state.musicRuntime=music;
+        }
+      }catch(error){console.warn('Mira music pose unavailable',error);}
       root.enabled=false;
       Object.assign(state,{ready:true,status:'ready',root,model,clip:'Idle_7',base});
       onStatus('ready');
@@ -229,7 +242,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,
       fridgeBusy=false,fridgeFrame=null,readingElapsed=null,
-      readingStage=null,readingStepElapsed=0}={}){
+      readingStage=null,readingStepElapsed=0,musicFrame=null}={}){
       const show=canShowMiraMeshy({
         preferred:preferred&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready))&&
           (!kissFrame?.active||Boolean(state.kissRuntime?.ready)),ready:state.ready,actionId,
@@ -238,6 +251,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         showerReady:Boolean(state.showerRuntime?.ready),
         fridgeBusy,fridgeReady:Boolean(state.fridgeRuntime?.ready),
         readingReady:Boolean(state.readingRuntime?.ready),
+        musicBusy:musicFrame?.phase==='using',musicReady:Boolean(state.musicRuntime?.ready),
         toiletBusy,toiletReady:state.toiletReady
       });
       if(state.visible!==show){
@@ -247,6 +261,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       }
       if(!show||!state.model){
         state.readingRuntime?.setFrame(null);
+        state.musicRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
         state.hugRuntime?.setFrame(null);
         state.kissRuntime?.setFrame(null);
@@ -260,6 +275,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         ?{active:true,stage:readingStage||'reading',
           elapsed:Number.isFinite(readingElapsed)?readingElapsed:0,
           stepElapsed:readingStepElapsed}:null,paused);
+      state.musicRuntime?.setFrame(actionId==='music'?musicFrame:null,paused);
       state.hugRuntime?.setFrame(hugFrame,paused);
       state.kissRuntime?.setFrame(kissFrame,paused);
       const shower=actionId==='shower'||showerBusy;
@@ -395,7 +411,16 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         anim.playing=!paused;
         return true;
       }
-      const clip=miraClipFor({walking,social:hugFrame?.active?null:social});
+      if(actionId==='music'&&musicFrame?.phase==='using'){
+         if(state.clip!=='Idle_7'){
+           anim.baseLayer.transition('Idle_7',.18);state.clip='Idle_7';
+         }
+         state.sofaRelease=null;
+         state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
+         anim.speed=1;anim.playing=!paused;
+         return true;
+       }
+       const clip=miraClipFor({walking,social:hugFrame?.active?null:social});
       if(state.clip===MIRA_SOFA_CLIP){
         state.sofaRelease={remaining:.2,offset:{...state.sofaOffset}};
       }
@@ -426,6 +451,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       state.sofaOffset={x:0,z:0};
       state.sofaRelease=null;
       state.bedRuntime?.setFrame(null);
+      state.musicRuntime?.setFrame(null);
       state.fridgeRuntime?.setFrame(null);
       state.showerRuntime?.setFrame(null);
       state.hugRuntime?.setFrame(null);

@@ -1,12 +1,18 @@
 name: H2 music and physical skills regression
 on:
   push:
-    branches: ['feature/h2-*', 'fix/h2-*']
+    branches: ['feature/h2*', 'fix/h2-*']
   pull_request:
     paths:
       - 'src/hobby-reading.js'
       - 'src/music-audio.js'
       - 'src/music-listening.js'
+      - 'src/music-movement.js'
+      - 'src/meshy-music-runtime.js'
+      - 'src/meshy-visual.js'
+      - 'src/meshy-mira-visual.js'
+      - 'src/animations.js'
+      - 'tests/h2b-music-dance.test.js'
       - 'src/furniture-*.js'
       - 'src/object-legacy-adapter.js'
       - 'src/household.js'
@@ -34,6 +40,8 @@ jobs:
         run: |
           node --check src/music-audio.js
           node --check src/music-listening.js
+          node --check src/music-movement.js
+          node --check src/meshy-music-runtime.js
           node --check src/hobby-reading.js
           node --check src/game.js
           node --check src/simulation.js

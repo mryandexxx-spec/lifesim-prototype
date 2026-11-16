@@ -171,7 +171,8 @@ test('Safari import map busts every modified H2 dependency, not only the game en
     const key='./src/'+name+'.js';
     assert.ok(imports[key],key+' must be independently cache-busted');
     assert.equal(new URL(imports[key],base).search,
-      name==='furniture-editor'?'?v=1.2u-h2fix1-f4c':'?v=1.2u-h2fix1');
+      name==='household'?'?v=1.2w-h2b':
+         name==='furniture-editor'?'?v=1.2u-h2fix1-f4c':'?v=1.2u-h2fix1');
     // A nested ./foo.js import in an ES module beneath src/ resolves to
     // precisely this import-map key, irrespective of the parent module URL.
     assert.equal(new URL(key,base).href,

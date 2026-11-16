@@ -19,7 +19,7 @@ import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
-import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_CONTENT_IDS} from './hobby-reading.js';
+import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS} from './hobby-reading.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -266,7 +266,7 @@ const META = {
     description: 'Подойти к шкафу, выбрать историю и почитать. Досуг растёт во время чтения, а навык — от практики.',
     icon: '📖', anchor: [0,1.5,0] },
   music: {title:'Музыкальный центр',category:'Гостиная',
-    description:'Выбери стиль и подойди к центру. Звук включается отдельно в меню «Вид».',
+    description:'Выбери музыкальный стиль: слушай спокойно или танцуй. Оба занятия сопровождаются движениями и звуком.',
     icon:'♫',anchor:[0,1.1,0]}
 };
 
@@ -490,6 +490,7 @@ function select(id,instanceId=null) {
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('music-style-field').hidden=id!=='music';
+  $('music-dance-button').hidden=id!=='music';
   $('action-button').innerHTML = `${ACTIONS[id].label} <span>↗</span>`;
 }
 const markers = {};
@@ -546,6 +547,23 @@ $('action-button').addEventListener('click', () => {
   if (scheduleCommand(command)) {
     select(null);
   }
+});
+// Dance is an independent activity queued against the same physical stereo.
+// This click also provides the genuine Safari gesture for Web Audio unlock.
+$('music-dance-button').addEventListener('click',()=>{
+  if(selected!=='music')return;
+  const command={type:'activity',activityId:MUSIC_DANCE_ACTIVITY_ID,
+    contentId:MUSIC_CONTENT_IDS.includes($('music-style-select').value)
+      ?$('music-style-select').value:MUSIC_CONTENT_IDS[0],
+    ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
+  if(!musicMutedByPlayer&&
+    (!musicAudio.status().enabled||!musicAudio.status().running)){
+    void musicAudio.enable().then(ok=>{
+      refreshMusicAudioButton();
+      if(!ok)toast('Звук Safari недоступен. Танец выполняется без аудио.');
+    });
+  }
+  if(scheduleCommand(command))select(null);
 });
 // Legacy buttons remain hidden for old UI references; queue rather than interrupt.
 for(const kind of Object.keys(SOCIAL_ACTIONS))
@@ -777,7 +795,11 @@ function activeTaskLabel(id){
     return SOCIAL_ACTIONS[s.kind]?.label||'Общается';
   }
   const actor=getActor(game,id);
-  return actor.action?ACTIONS[actor.action.id]?.label||'Занятие':null;
+  return actor.action
+    ?(actor.action.id==='music'
+      ?getActivityDefinition(HOBBY_ACTIVITIES,actor.action.activityId)?.label
+      :null)||ACTIONS[actor.action.id]?.label||'Занятие'
+    :null;
 }
 // A single, read-only status area opens the EXISTING full queue. It never
 // dispatches/removes commands and never mutates serialized simulation state.
@@ -790,7 +812,7 @@ function renderPlanPeek(){
   const phase=involved?social.phase:actor.action?.phase;
   if(active&&phase==='walking')active='Идёт · '+active;
   else if(active&&phase==='using'&&!involved&&actor.action){
-    const duration=ACTIONS[actor.action.id]?.duration;
+    const duration=getActivityDefinition(HOBBY_ACTIVITIES,actor.action.activityId)?.timeBudget.targetMinutes??ACTIONS[actor.action.id]?.duration;
     if(Number.isFinite(duration)&&duration>0)
       active+=' · '+Math.min(100,Math.round(100*(actor.action.elapsed||0)/duration))+'%';
   }
@@ -2032,7 +2054,7 @@ function boot() {
           const count=(routeFailures.get(command.seq)||0)+1;
           routeFailures.set(command.seq,count);
           if(count===3){
-            const musicBlocked=command.type==='activity'&&command.activityId===MUSIC_ACTIVITY_ID;
+            const musicBlocked=command.type==='activity'&&[MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID].includes(command.activityId);
             const message=getActorName(residentId)+
               (musicBlocked
                 ? ': нет свободного подхода к музыкальному центру. В «Дом → Комната» поверни или перенеси его.'
@@ -3202,6 +3224,10 @@ function boot() {
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
+        const prevAlexLabel=game.action?.activityId
+          ?getActivityDefinition(HOBBY_ACTIVITIES,game.action.activityId)?.label:null;
+        const prevMiraLabel=game.otherSim.action?.activityId
+          ?getActivityDefinition(HOBBY_ACTIVITIES,game.otherSim.action.activityId)?.label:null;
         const sharedBefore=game.socialAction?.shared?game.socialAction.initiator:null;
         const branchBefore=game.socialAction?.branchAction?.id||null;
         const socialBefore=game.socialAction?.conversation||
@@ -3211,8 +3237,8 @@ function boot() {
         // A completed job frees its own resident; planned commands start only
         // after both participant states and render transition guards allow it.
         dispatchPlannedActions();
-        if(prevAlex && !game.action) toast('Алекс закончил: '+ACTIONS[prevAlex].label.toLowerCase());
-        if(prevMira && !game.otherSim.action) toast('Мира закончила: '+ACTIONS[prevMira].label.toLowerCase());
+        if(prevAlex && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex].label).toLowerCase());
+        if(prevMira && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira].label).toLowerCase());
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
       if(sharedBefore&&!game.socialAction)
         toast(getActor(game,sharedBefore).event);
@@ -3514,6 +3540,9 @@ function boot() {
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
+      musicActivityId:game.action?.id==='music'?game.action.activityId:null,
+      musicStyleId:game.action?.id==='music'?game.action.contentId:null,
+      musicElapsed:game.action?.id==='music'?game.action.elapsed:null,
       showerStep:alexShower?.stepWeight||0,showerWater:Boolean(alexShower?.water),
       showerExiting:Boolean(alexShower&&useId!=='shower'),
       toiletSitWeight:alexToilet?.seated||0,
@@ -3643,6 +3672,9 @@ function boot() {
     animationStates.mira=stepAnimation(animationStates.mira,{
       id:'mira',walking:(miraWalking||Boolean(miraShower?.stepWeight>.015))&&!miraSeating&&!miraBedding,
       using:miraToilet?'toilet':miraShower?'shower':miraUseId,
+      musicActivityId:game.otherSim.action?.id==='music'?game.otherSim.action.activityId:null,
+      musicStyleId:game.otherSim.action?.id==='music'?game.otherSim.action.contentId:null,
+      musicElapsed:game.otherSim.action?.id==='music'?game.otherSim.action.elapsed:null,
       showerStep:miraShower?.stepWeight||0,showerWater:Boolean(miraShower?.water),
       showerExiting:Boolean(miraShower&&miraUseId!=='shower'),
       toiletSitWeight:miraToilet?.seated||0,
@@ -3692,6 +3724,12 @@ function boot() {
       readingStage:miraReadingStage,
       readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
       readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
+      musicFrame:game.otherSim.action?.id==='music'?{
+        phase:game.otherSim.action.phase,
+        activityId:game.otherSim.action.activityId,
+        contentId:game.otherSim.action.contentId,
+        elapsed:game.otherSim.action.elapsed
+      }:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
@@ -3731,6 +3769,10 @@ function boot() {
       readingStage:alexReadingStage,
       readingStepElapsed:game.action?.readingStepElapsed??0,
       readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
+      musicFrame:game.action?.id==='music'?{
+        phase:game.action.phase,activityId:game.action.activityId,
+        contentId:game.action.contentId,elapsed:game.action.elapsed
+      }:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
       seat:seatContactEnabled?livingSofaSeat:null,
