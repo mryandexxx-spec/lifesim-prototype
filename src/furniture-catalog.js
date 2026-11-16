@@ -64,6 +64,7 @@ export const FURNITURE_CATALOG=Object.freeze(Object.fromEntries(original.map(ite
     prefabId:item.prefabId,name:item.name,category:item.category,
     actionId:item.actionId||null,capabilities:Object.freeze(item.capabilities),
     footprint,extras,approach,rendererKey:item.prefabId,version:1,
+    templateOnly:item.templateOnly===true,
     maxOccupants:item.prefabId==='bed'?2:1,
     sellable:!['shower','toilet'].includes(item.prefabId),
     price:null, // F2 will set player-facing prices before enabling transactions.
@@ -78,6 +79,15 @@ export const ACTION_PREFABS=Object.freeze(Object.fromEntries(original.filter(x=>
 export const ORIGINAL_FURNITURE=Object.freeze(original.filter(item=>!item.templateOnly).map(item=>Object.freeze({
   instanceId:item.instanceId,prefabId:item.prefabId,x:item.x,z:item.z,yaw:0,location:'home'
 })));
+/** Renderer origin for installed authored fixtures OR a hidden, unowned prefab.
+ * Template-only products are intentionally absent from saved/new worlds. */
+export function furnitureRenderOrigin(prefabId){
+  const installed=ORIGINAL_FURNITURE.find(item=>item.prefabId===prefabId);
+  if(installed)return installed;
+  if(!FURNITURE_CATALOG[prefabId]?.templateOnly)return null;
+  return {instanceId:LEGACY_FURNITURE_IDS[prefabId],prefabId,
+    x:0,z:0,yaw:0,location:'template'};
+}
 export function newFurnitureWorld(){
   return {schema:FURNITURE_SCHEMA,revision:0,instances:ORIGINAL_FURNITURE.map(i=>({...i}))};
 }

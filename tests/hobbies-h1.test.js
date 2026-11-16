@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,
   READING_ACTIVITY_ID,READING_CONTENT_ID,READING_SKILL_ID} from '../src/hobby-reading.js';
 import {getActivityDefinition,activitiesForItem} from '../src/activity-registry.js';
@@ -10,7 +11,7 @@ import {getHobbyContent} from '../src/hobby-content.js';
 import {FURNITURE_PRODUCTS} from '../src/furniture-products.js';
 import {legacyObjectRegistry} from '../src/object-legacy-adapter.js';
 import {selectShopCatalog,shopCategoryOptions} from '../src/shop-catalog-selector.js';
-import {FURNITURE_CATALOG,newFurnitureWorld,restoreFurnitureWorld,
+import {FURNITURE_CATALOG,newFurnitureWorld,restoreFurnitureWorld,furnitureRenderOrigin,
   furnitureActionApproach,resolveActionFurniture} from '../src/furniture-catalog.js';
 import {findPath} from '../src/navigation.js';
 import {newFurnitureShop,findMarketPlacement,buyMarketItem,
@@ -277,4 +278,42 @@ test('H1 Safari integration exposes real touch, store, session, personal XP and 
   assert.match(html,/styles\.css\?v=1\.2n/);
   const pkg=JSON.parse(source('../package.json'));
   assert.equal(pkg.version,'1.0.0-alpha.66');
+});
+
+test('H1 browser boot builds hidden bookcase prefab without an installed origin.instanceId',()=>{
+  const world=newFurnitureWorld();
+  assert.equal(world.instances.some(item=>item.prefabId==='bookcase'),false);
+  assert.equal(FURNITURE_CATALOG.bookcase.templateOnly,true);
+  const authored=furnitureRenderOrigin('bookcase');
+  assert.deepEqual(authored,{instanceId:'template-bookcase-1',prefabId:'bookcase',
+    x:0,z:0,yaw:0,location:'template'});
+  assert.equal(furnitureRenderOrigin('plant').location,'home');
+  assert.equal(furnitureRenderOrigin('missing.prefab'),null);
+
+  // Run the actual renderer factory from game.js, not a duplicate test helper.
+  // H1 previously crashed here before Safari could render a single frame.
+  const gameSource=source('../src/game.js');
+  const start=gameSource.indexOf('  const decorNodes=new Map();');
+  const end=gameSource.indexOf('  const updateDecorNodes=',start);
+  assert.ok(start>=0&&end>start,'renderer factory remains available');
+  const added=[];
+  class Entity {
+    constructor(name){this.name=name;this.enabled=true;}
+    setPosition(x,y,z){this.position={x,y,z};}
+    setEulerAngles(x,y,z){this.rotation={x,y,z};}
+  }
+  const factory=runInNewContext(gameSource.slice(start,end)+
+    '\n({withDecor,decorNodes,decorTemplates})',{
+      pc:{Entity},app:{root:{addChild:node=>added.push(node)}},
+      game:{world:{furniture:world}},furnitureRenderOrigin
+    });
+  assert.doesNotThrow(()=>factory.withDecor('bookcase',()=>{}));
+  assert.equal(factory.decorNodes.has(authored.instanceId),false);
+  assert.equal(factory.decorTemplates.get('bookcase').enabled,false);
+  assert.equal(factory.decorTemplates.get('bookcase').position.x,0);
+  assert.doesNotThrow(()=>factory.withDecor('plant',()=>{}));
+  assert.equal(factory.decorNodes.has('home-plant-1'),true);
+  assert.equal(factory.decorTemplates.get('plant').enabled,true);
+  assert.equal(added.length,2);
+  assert.equal(world.instances.length,10,'template cannot add free furniture');
 });
