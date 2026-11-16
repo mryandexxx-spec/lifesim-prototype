@@ -219,18 +219,18 @@ test('M2: accepted leisure rewards two individual needs using mood BEFORE new po
   Object.assign(s.needs,{hunger:12,energy:13,hygiene:18,fun:35});
   Object.assign(s.otherSim.needs,{hunger:94,energy:93,hygiene:94,fun:35});
   refreshMind(s);refreshMind(s.otherSim);
-  assert.equal(startSharedSocial(s,'alex',point,'leisure','music'),true);
+  assert.equal(startSharedSocial(s,'alex',point,'leisure','games'),true);
   assert.equal(arriveSocial(s),true);
   const affinity=s.relationship.affinity;
-  tickHousehold(s,LEISURE_CATALOG.music.duration+1);
+  tickHousehold(s,LEISURE_CATALOG.games.duration+1);
   assert.equal(s.socialAction,null);
   assert.equal(s.relationship.affinity,affinity+4);
-  assert.equal(s.mind.memories.filter(x=>x.id==='leisure.music').length,1);
-  assert.equal(s.otherSim.mind.memories.filter(x=>x.id==='leisure.music').length,1);
+  assert.equal(s.mind.memories.filter(x=>x.id==='leisure.games').length,1);
+  assert.equal(s.otherSim.mind.memories.filter(x=>x.id==='leisure.games').length,1);
   const after=clone(s);
   tickHousehold(s,1);
   assert.equal(s.relationship.affinity,after.relationship.affinity);
-  assert.equal(s.mind.memories.filter(x=>x.id==='leisure.music').length,1);
+  assert.equal(s.mind.memories.filter(x=>x.id==='leisure.games').length,1);
 });
 
 test('M2: user pause freezes new action effectiveness and shared queues',()=>{
