@@ -18,6 +18,7 @@ import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
+import {SHOP_ITEMS,marketListing,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem} from './furniture-shop.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -1111,6 +1112,7 @@ function boot() {
     skin: mat('#c88d6e'), hair: mat('#47382f'), shirt: mat('#4b967d'), trousers: mat('#566675'), rug: mat('#d6b8a5')
   };
   const decorNodes=new Map();
+  const decorTemplates=new Map();
   let decorDrawing=null;
   let refreshSofaSeat=()=>{};
   const withDecor=(prefabId,render)=>{
@@ -1121,17 +1123,34 @@ function boot() {
     node.setPosition(current.x,0,current.z);
     node.setEulerAngles(0,-current.yaw,0);
     decorNodes.set(origin.instanceId,node);
+    decorTemplates.set(prefabId,node);
+    node.enabled=current.location==='home';
     const previous=decorDrawing;
     decorDrawing={origin,node};
     try{render();}finally{decorDrawing=previous;}
   };
   const updateDecorNodes=(previewId=null,previewPose=null)=>{
+    const items=game.world.furniture.instances;
+    for(const item of items){
+      if(decorNodes.has(item.instanceId))continue;
+      const template=decorTemplates.get(item.prefabId);
+      if(!template||!SHOP_ITEMS.some(s=>s.prefabId===item.prefabId))continue;
+      const node=template.clone();
+      node.name='F2 purchased / '+item.instanceId;
+      app.root.addChild(node);
+      decorNodes.set(item.instanceId,node);
+    }
     for(const [instanceId,node] of decorNodes){
-      const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
-      if(!item)continue;
+      const item=items.find(i=>i.instanceId===instanceId);
+      if(!item){
+        if(instanceId.startsWith('shop-')){node.destroy();decorNodes.delete(instanceId);}
+        else node.enabled=false;
+        continue;
+      }
+      node.enabled=item.location==='home';
+      if(!node.enabled)continue;
       const pose=instanceId===previewId&&previewPose?previewPose:item;
       node.setPosition(pose.x,0,pose.z);
-      // PlayCanvas Y rotation has opposite XZ convention to rotateLocal.
       node.setEulerAngles(0,-pose.yaw,0);
     }
     refreshSofaSeat();
@@ -1353,6 +1372,8 @@ function boot() {
     ball('plant leaf',4.45,1.38,3.42,.65,.74,.51,M.green);
   });
   box('entry mat',-.65,.042,3.45,1.45,.012,.60,M.mint);
+  // Instantiate extra purchased decor from saved v1 furniture instances.
+  updateDecorNodes();
 
   // Original reusable 0.5a rigs. Keep all existing motion/interaction pivot references.
   const rigContext={pc,root:app.root,ball,box,cylinder,mat,materials:M};
