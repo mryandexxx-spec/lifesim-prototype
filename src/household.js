@@ -222,6 +222,20 @@ export function loadHousehold(raw) {
     }
     occupiedChairs.add(seat.instanceId);
   }
+  // F4F: restore the exact chair/table reservation. Invalid, relocated or
+  // duplicate seating never grants a meal or takes another saved chair.
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),a=actor?.action;
+    if(a?.id!=='dining')continue;
+    const seat=diningSeatApproach(root.world,a.targetInstanceId,a.diningSeatInstanceId);
+    const fridge=furnitureActionApproach(root.world,'fridge');
+    const spot=a.diningStage==='eating'?seat:fridge;
+    if(!seat||!spot||occupiedChairs.has(a.diningSeatInstanceId)||
+      (a.phase==='using'&&Math.hypot(actor.position.x-spot.x,actor.position.z-spot.z)>.36)){
+      actor.action=null;continue;
+    }
+    occupiedChairs.add(a.diningSeatInstanceId);
+  }
   // Restore F3b sofa reservations from optional v1 action data. A removed,
   // relocated or doubly booked seat cannot silently seize another sofa.
   const occupiedSofas=new Set();
@@ -348,6 +362,20 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
   if(itemId==='sofa'&&other?.action?.id==='tv'&&
      other.action.watchSeatInstanceId===item.instanceId)return false;
   if(itemId==='sofa'&&readingSeatId(other?.action)===item.instanceId)return false;
+  if(itemId==='seat'&&other?.action?.id==='dining'&&
+    other.action.diningSeatInstanceId===item.instanceId)return false;
+  if(itemId==='fridge'&&other?.action?.id==='dining'&&
+    ['toFridge','taking'].includes(other.action.diningStage))return false;
+  if(itemId==='dining'){
+    // Two residents can dine at the same table, but must have different
+    // real chairs; collection at the single fridge happens one at a time.
+    if(other?.action?.id==='fridge'||(other?.action?.id==='dining'&&
+      ['toFridge','taking'].includes(other.action.diningStage)))return false;
+    const occupied=[other?.action?.id==='seat'?other.action.targetInstanceId:null,
+      other?.action?.id==='dining'?other.action.diningSeatInstanceId:null].filter(Boolean);
+    return Boolean(chooseDiningSeat(root.world,getActor(root,residentId)?.position,
+      item.instanceId,occupied));
+  }
   if(itemId==='tv'&&other?.action?.id==='hobby'&&readingSeatId(other.action))
     return true; // TV itself remains usable; seating selection excludes readers.
   // A queued reading action may start only when a physically reachable
@@ -392,7 +420,14 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
     !furnitureAvailable(root,itemId,residentId,item.instanceId))return false;
   const resident=getActor(root,residentId);
-  let readingSeat=null,plannedMusic=null;
+  let readingSeat=null,plannedMusic=null,diningSeat=null;
+  if(itemId==='dining'){
+    const other=getActor(root,residentId==='alex'?'mira':'alex');
+    const taken=[other?.action?.id==='seat'?other.action.targetInstanceId:null,
+      other?.action?.id==='dining'?other.action.diningSeatInstanceId:null].filter(Boolean);
+    diningSeat=chooseDiningSeat(root.world,resident.position,item.instanceId,taken);
+    if(!diningSeat)return false;
+  }
   if(inventoryItemId!==null&&(
     itemId!=='hobby'||activityId!==READING_ACTIVITY_ID||
     !inventoryFor(root,residentId).some(gift=>gift.type==='book'&&
@@ -462,6 +497,10 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     resident.activitySession=session;
   }
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
+  if(chosen&&itemId==='dining'){
+    resident.action.diningSeatInstanceId=diningSeat.instanceId;
+    resident.action.diningStage='toFridge';
+  }
   // Book the same physical sofa before walking, so an ordinary rest or a
   // second television viewer cannot sit in the occupied spot.
   if(chosen&&itemId==='tv'){
@@ -621,6 +660,22 @@ export function tickHousehold(root,minutes) {
   other.paused=root.paused;
   other.speed=root.speed;
   other.autonomy.enabled=root.autonomy.enabled;
+  // Dining validates the real table, exact chair and serving spot before
+  // any hunger reward. Invalid geometry stops the meal without a benefit.
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),a=actor?.action;
+    if(a?.id!=='dining')continue;
+    const point=diningSeatApproach(root.world,a.targetInstanceId,a.diningSeatInstanceId);
+    const other=getActor(root,id==='alex'?'mira':'alex');
+    if(!point||(other?.action?.id==='seat'&&
+        other.action.targetInstanceId===a.diningSeatInstanceId)||
+       (other?.action?.id==='dining'&&
+        other.action.diningSeatInstanceId===a.diningSeatInstanceId)||
+       (a.diningStage==='eating'&&a.phase==='using'&&
+        Math.hypot(actor.position.x-point.x,actor.position.z-point.z)>.36)){
+      actor.action=null;actor.event='Стол или обеденный стул недоступен';
+    }
+  }
   // Refuse stale/removed/stored/occupied reading sources before simulation
   // can grant Fun, and account only physically performed game minutes.
   advanceReading(root,'alex',minutes);
