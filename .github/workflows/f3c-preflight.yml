@@ -1,0 +1,19 @@
+name: F3c together-TV preflight
+on:
+  push:
+    branches: [feature/f3c-shared-tv-20261116]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify-paired-tv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: node --check src/tv-together.js && node --check src/game.js && node --check src/relationships.js && node --check src/household.js
