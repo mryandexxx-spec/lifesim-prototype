@@ -2033,7 +2033,8 @@ function boot() {
       }
       // Buy enters a NON-persistent 3D placement session, not an instant sale.
       shopPlacing=true;shopPose=null;shopManualPose=false;
-      moveShopPreviewToCamera(true);renderMarket();
+      // Let the edit sheet collapse BEFORE choosing the visible room anchor.
+      renderMarket();moveShopPreviewToCamera(true);
       editorFeedback('Предмет в руках · двигай камеру свайпом, затем «Поставить здесь»');
       return;
     }
