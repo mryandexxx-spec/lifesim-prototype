@@ -90,7 +90,7 @@ test('F2.1 PlayCanvas runtime creates, stores and removes real independent prefa
   const start=gameSource.indexOf('  const updateDecorNodes=(previewId=null,previewPose=null)=>{');
   const end=gameSource.indexOf('  const primitive =',start);
   assert.ok(start>0&&end>start);
-  const updateCode=gameSource.slice(start,end)+'\nupdateDecorNodes();';
+  const updateCode='(()=>{\n'+gameSource.slice(start,end)+'\nupdateDecorNodes();\n})()';
   const plant='home-plant-1',duplicate='shop-plant-100';
   const game={world:{furniture:{instances:[
     {instanceId:plant,prefabId:'plant',x:4.175,z:3.22,yaw:0,location:'home'},
