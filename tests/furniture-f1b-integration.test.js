@@ -23,7 +23,7 @@ const female=read('../src/meshy-mira-visual.js');
 const copy=o=>JSON.parse(JSON.stringify(o));
 test('F1b all five physical appliances are scene grouped and registered for touch picking',()=>{
   assert.deepEqual(F1_MOVEABLE_PREFABS,
-    ['nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet','bookcase']);
+    ['nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet','bookcase','music']);
   for(const key of ['bed','sofa','fridge','shower','toilet']){
     assert.ok(scene.includes("withDecor('"+key+"',()=>{"),key);
     assert.ok(scene.includes("touchBox('"+key+"'"),key);
