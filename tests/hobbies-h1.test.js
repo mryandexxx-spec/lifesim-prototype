@@ -10,8 +10,9 @@ import {getHobbyContent} from '../src/hobby-content.js';
 import {FURNITURE_PRODUCTS} from '../src/furniture-products.js';
 import {legacyObjectRegistry} from '../src/object-legacy-adapter.js';
 import {selectShopCatalog,shopCategoryOptions} from '../src/shop-catalog-selector.js';
-import {FURNITURE_CATALOG,newFurnitureWorld,restoreFurnitureWorld,
+import {FURNITURE_CATALOG,FURNITURE_TEMPLATES,newFurnitureWorld,restoreFurnitureWorld,
   furnitureActionApproach,resolveActionFurniture} from '../src/furniture-catalog.js';
+import {fixtureOrigin,furniturePoint,furniturePose,furnitureInstance} from '../src/furniture-transform.js';
 import {findPath} from '../src/navigation.js';
 import {newFurnitureShop,findMarketPlacement,buyMarketItem,
   storeMarketItem,sellMarketItem} from '../src/furniture-shop.js';
@@ -60,6 +61,10 @@ test('H1 new bookcase SKU is in shop and room/function filters without changing 
   assert.equal(newFurnitureWorld().instances.some(x=>x.prefabId==='bookcase'),false);
   assert.equal(FURNITURE_CATALOG.bookcase.capabilities[0],'books.borrow');
   assert.equal(FURNITURE_CATALOG.bookcase.actionId,'hobby');
+  assert.equal(FURNITURE_TEMPLATES.length,1);
+  assert.equal(FURNITURE_TEMPLATES[0].location,'storage');
+  assert.equal(fixtureOrigin('bookcase').instanceId,'template-bookcase-1');
+  assert.equal(furnitureInstance(newFurnitureWorld(),'bookcase'),null);
   const product=FURNITURE_PRODUCTS.find(x=>x.itemId==='bookcase.starter');
   assert.equal(product.price,320);
   assert.deepEqual(selectShopCatalog({functionCategoryId:'function.books.borrow'}).map(x=>x.itemId),
@@ -76,6 +81,12 @@ test('H1 buys one physical bookcase via atomic F4b2 transaction and preserves pr
   assert.ok(physical);
   assert.equal(physical.itemDefinitionId,'bookcase.starter');
   assert.equal(physical.purchasePriceCredits,320);
+  assert.ok(furnitureInstance(r.world,'bookcase',id));
+  const approach=furnitureActionApproach(r.world,'hobby',id);
+  const visible=furniturePoint(r.world,'bookcase',{x:0,z:.92},id);
+  assert.ok(Math.hypot(approach.x-visible.x,approach.z-visible.z)<.00001);
+  const pose=furniturePose(r.world,'bookcase',{x:0,z:.92,yaw:180},id);
+  assert.equal(pose.yaw,180-physical.yaw);
   assert.equal(r.shop.credits,5000-320);
   assert.equal(r.world.furniture.instances.length,11);
   const restored=restoreFurnitureWorld(copy(r.world.furniture));
@@ -265,6 +276,7 @@ test('H1 procedural arms support active reading without altering romance pose pa
 test('H1 Safari integration exposes real touch, store, session, personal XP and Pages',()=>{
   const game=source('../src/game.js'),html=source('../index.html'),workflow=source('../.github/workflows/pages.yml');
   assert.match(game,/withDecor\('bookcase'/);
+  assert.match(game,/const origin=fixtureOrigin\(prefabId\)/);
   assert.match(game,/item\.prefabId==='bookcase'/);
   assert.match(game,/type:'activity',activityId:READING_ACTIVITY_ID/);
   assert.match(game,/beginAction\('hobby',false,residentId,true,command\.targetInstanceId/);

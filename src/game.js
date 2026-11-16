@@ -27,7 +27,7 @@ import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js'
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
 import {furnitureProduct,FURNITURE_APPEARANCES} from './furniture-products.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
-  fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
+  fixtureContactLayout,furnitureInstance,fixtureOrigin} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
@@ -1245,7 +1245,8 @@ function boot() {
   let decorDrawing=null;
   let refreshSofaSeat=()=>{};
   const withDecor=(prefabId,render)=>{
-    const origin=ORIGINAL_FURNITURE.find(i=>i.prefabId===prefabId);
+    const origin=fixtureOrigin(prefabId);
+    if(!origin)throw new Error('Unknown 3D furniture template: '+prefabId);
     const current=game.world.furniture.instances.find(i=>i.instanceId===origin.instanceId)||origin;
     const node=new pc.Entity('F1 furniture / '+origin.instanceId);
     app.root.addChild(node);
@@ -3138,7 +3139,8 @@ function boot() {
       ?{...pairedTv.places.alex,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const pose=pairedTvStand||(useId&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
-      ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null);
+      ?furniturePose(game.world,useId==='hobby'?'bookcase':useId,
+        ACTOR_POSES[useId],game.action?.targetInstanceId):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
@@ -3261,7 +3263,8 @@ function boot() {
       ?{...pairedTv.places.mira,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const miraPose=pairedTvMiraStand||(miraUseId&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
-      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
+      ?furniturePose(game.world,miraUseId==='hobby'?'bookcase':miraUseId,
+        ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
@@ -3653,7 +3656,7 @@ function boot() {
       renderPlanPeek();
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.
       for(const [id,meta] of Object.entries(META)){
-        const placed=furniturePoint(game.world,id,
+        const placed=furniturePoint(game.world,id==='hobby'?'bookcase':id,
           {x:meta.anchor[0],z:meta.anchor[2]});
         const el=markers[id];
         if(!placed){el.hidden=true;continue;}

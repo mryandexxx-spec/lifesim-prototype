@@ -3,8 +3,9 @@
  * pose" data. This adapter applies instance translation/quarter-turn exactly
  * once at the boundary shared by renderer, nav, contact targets and picking.
  */
-import {ORIGINAL_FURNITURE,rotateLocal} from './furniture-catalog.js';
-const origins=new Map(ORIGINAL_FURNITURE.map(i=>[i.prefabId,i]));
+import {ORIGINAL_FURNITURE,FURNITURE_TEMPLATES,rotateLocal} from './furniture-catalog.js';
+const origins=new Map([...ORIGINAL_FURNITURE,...FURNITURE_TEMPLATES]
+  .map(i=>[i.prefabId,i]));
 function data(world){return world?.furniture?.instances?world.furniture:world;}
 export function furnitureInstance(world,prefabId,instanceId=null){
   const origin=origins.get(prefabId);

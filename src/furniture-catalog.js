@@ -75,6 +75,11 @@ export const LEGACY_FURNITURE_IDS=Object.freeze(Object.fromEntries(original.map(
   [item.prefabId,item.instanceId])));
 export const ACTION_PREFABS=Object.freeze(Object.fromEntries(original.filter(x=>x.actionId).map(x=>
   [x.actionId,x.prefabId])));
+// Authored geometry origins are different from household's initial inventory.
+// A template can be cloned when purchased without gifting a free item to old saves.
+export const FURNITURE_TEMPLATES=Object.freeze(original.filter(item=>item.templateOnly)
+  .map(item=>Object.freeze({instanceId:item.instanceId,prefabId:item.prefabId,
+    x:item.x,z:item.z,yaw:0,location:'storage'})));
 export const ORIGINAL_FURNITURE=Object.freeze(original.filter(item=>!item.templateOnly).map(item=>Object.freeze({
   instanceId:item.instanceId,prefabId:item.prefabId,x:item.x,z:item.z,yaw:0,location:'home'
 })));
