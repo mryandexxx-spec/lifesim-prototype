@@ -838,6 +838,10 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .furnish-stock button strong{font-size:12px;line-height:1.25;white-space:normal;}
 .furnish-stock button small{font-size:11px;line-height:1.2;color:#648371;}
 .furnish-stock button .furnish-product-effect{font-size:10px;line-height:1.25;overflow-wrap:anywhere;}
+.furnish-stock button .furnish-product-quality{font-size:10px;line-height:1.3;
+  overflow-wrap:anywhere;background:#e1f0e5;border-radius:6px;padding:3px 5px;
+  color:#245d40;font-weight:750;}
+.furnish-stock button[aria-pressed="true"] .furnish-product-quality{background:#235e48;color:#e4f6eb;}
 .furnish-stock button[aria-pressed="true"]{background:#317b60;border-color:#317b60;color:white;}
 .furnish-stock button[aria-pressed="true"] small{color:#d6eee0;}
 .furnish-map-tip{font-size:11px!important;line-height:1.35!important;}
