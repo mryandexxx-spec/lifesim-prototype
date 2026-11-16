@@ -62,7 +62,7 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
   const end=game.indexOf('  const renderWarehouse=()=>{',begin);
   assert.ok(begin>0&&end>begin);
   const makeEl=()=>({hidden:false,dataset:{},attrs:{},textContent:'',disabled:false,
-    setAttribute(k,v){this.attrs[k]=v;}});
+    setAttribute(k,v){this.attrs[k]=v;},replaceChildren(){}});
   const selectedMark={hidden:true},otherMark={hidden:false};
   function card(type,mark){
     const c=makeEl(),classes=new Set();
@@ -78,7 +78,8 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
     'furnish-warehouse-toggle','furnish-edit-toggle','furniture-editor',
     'furnish-placement-guide','furnish-placing-name','furnish-placing-status',
     'furnish-place-cancel','furnish-placement-controls','furnish-preview',
-    'furnish-buy','furnish-preview-turn','furnish-stock','hint'])
+    'furnish-buy','furnish-preview-turn','furnish-stock','hint',
+    'furnish-variant-compare','furnish-variant-rows'])
     elements.set(id,makeEl());
   elements.get('furnish-stock').querySelectorAll=()=>[plant,table];
   const pos=cameraPlacementPose({centerX:0,centerZ:0});

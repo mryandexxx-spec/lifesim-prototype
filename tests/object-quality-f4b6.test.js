@@ -74,7 +74,7 @@ test('F4b6: no new per-item conditions or unshipped Safari quality dependency',(
   assert.match(code,/quality\.textContent=qualitySummary/);
   assert.match(code,/if\(qualitySummary\)button\.append\(quality\)/);
   assert.match(pages,/node --check src\/object-quality-presentation\.js/);
-  assert.match(pages,/cp src\/object-use-runtime\.js src\/object-quality-presentation\.js site\/src\//);
+  assert.match(pages,/cp src\/object-use-runtime\.js src\/object-quality-presentation\.js src\/object-quality-comparison\.js site\/src\//);
   assert.match(css,/\.furnish-product-quality\{/);
   assert.doesNotMatch(code,/if\(item\.itemId==='sofa\.comfort'\)/);
 });
