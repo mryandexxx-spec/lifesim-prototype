@@ -821,7 +821,7 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .furniture-editor[data-editor-view="warehouse"]{
   max-height:min(60dvh,480px);
 }
-.furniture-editor[data-editor-view="edit"]{max-height:min(35dvh,245px);}
+.furniture-editor[data-editor-view="edit"]{max-height:min(43dvh,320px);}
 .furnish-market-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-height:43px;}
 .furnish-market-bar > button{min-height:42px;padding:8px 10px;border:1px solid #c5dfca;
   background:#edf5eb;color:#2a5b43;border-radius:12px;font-size:12px;font-weight:850;white-space:nowrap;}
@@ -1003,3 +1003,21 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .music-style-field[hidden]{display:none;}
 .music-style-field select{height:43px;border:1px solid #b9d9c5;
   background:white;border-radius:12px;padding:0 10px;color:#354d3f;font:inherit;}
+
+/* 1.2v: room-mode furniture rotation stays visible even before a 3D tap.
+ * Native select is accessible to iPhone VoiceOver and works behind a sofa.
+ */
+.furnish-room-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;
+  align-items:end;gap:8px;width:100%;min-width:0;}
+.furnish-room-tools[hidden]{display:none!important;}
+.furnish-room-picker{display:flex;flex-direction:column;min-width:0;gap:3px;
+  color:#416c54;font-size:10px;font-weight:800;letter-spacing:.3px;}
+.furnish-room-picker select{display:block;width:100%;min-width:0;max-width:100%;
+  height:44px;border:1px solid #bbd8c4;border-radius:11px;background:#fff;
+  padding:0 9px;color:#31573f;font:inherit;font-size:13px;letter-spacing:0;}
+.furnish-room-rotate{height:44px;min-width:124px;padding:7px 10px;
+  border:1px solid #a7cdb2;border-radius:11px;background:#ddefdf;
+  color:#296346;font-size:12px;font-weight:850;white-space:nowrap;}
+.furnish-room-rotate:disabled{opacity:.4;}
+@media(max-width:380px){.furnish-room-tools{gap:5px;}
+  .furnish-room-rotate{min-width:108px;padding:6px;font-size:11px;}}
