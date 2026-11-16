@@ -8,6 +8,7 @@ import {feelMemory} from './emotion-engine.js';
 import {getPerspective,applySocialPerspective} from './social-perspective.js';
 import {refreshMind} from './psychology.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
+import {validSharedTvPlan} from './tv-together.js';
 
 export const GIFT_CATALOG=Object.freeze({
   book:Object.freeze({label:'Книга историй',symbol:'📖',tag:'books'}),
@@ -18,7 +19,8 @@ export const GIFT_CATALOG=Object.freeze({
 export const LEISURE_CATALOG=Object.freeze({
   music:Object.freeze({label:'Вместе слушать музыку',symbol:'♫',tag:'music',duration:28}),
   books:Object.freeze({label:'Читать и обсуждать истории',symbol:'📖',tag:'books',duration:30}),
-  games:Object.freeze({label:'Играть вместе',symbol:'♟',tag:'games',duration:36})
+  games:Object.freeze({label:'Играть вместе',symbol:'♟',tag:'games',duration:36}),
+  tv:Object.freeze({label:'Смотреть телевизор вместе',symbol:'▣',tag:'television',duration:32})
 });
 export const GIFT_DURATION=12;
 export const INVENTORY_LIMIT=12;
@@ -55,14 +57,24 @@ export function restoreInventory(raw){
 export function inventoryFor(root,id){
   return resident(id)&&Array.isArray(root?.inventory?.[id])?root.inventory[id]:[];
 }
-export function createSharedSession(root,initiator,mode,choiceId){
+export function createSharedSession(root,initiator,mode,choiceId,tvPlan=null){
   if(!resident(initiator)||!root?.otherSim)return null;
   if(mode==='gift'){
     if(!inventoryFor(root,initiator).some(item=>item.id===choiceId))return null;
     return {mode:'gift',choiceId};
   }
-  if(mode==='leisure'&&has(LEISURE_CATALOG,choiceId))
+  if(mode==='leisure'&&has(LEISURE_CATALOG,choiceId)){
+    if(choiceId==='tv'){
+      if(!validSharedTvPlan(root,tvPlan,initiator))return null;
+      const places={};
+      for(const id of ['alex','mira']){
+        const p=tvPlan.places[id];
+        places[id]={x:p.x,z:p.z,seatId:p.seatId};
+      }
+      return {mode:'leisure',choiceId,tvPlan:{tvId:tvPlan.tvId,places}};
+    }
     return {mode:'leisure',choiceId};
+  }
   return null;
 }
 export function sharedDuration(session){
@@ -73,8 +85,16 @@ export function sharedDuration(session){
   return null;
 }
 export function restoreSharedSession(raw,root,initiator){
-  if(!isRecord(raw)||Object.keys(raw).some(key=>!['mode','choiceId'].includes(key)))return null;
-  return createSharedSession(root,initiator,raw.mode,raw.choiceId);
+  if(!isRecord(raw))return null;
+  const tv=raw.mode==='leisure'&&raw.choiceId==='tv';
+  const allowed=tv?['mode','choiceId','tvPlan','tvConsent']:['mode','choiceId'];
+  if(Object.keys(raw).some(key=>!allowed.includes(key)))return null;
+  if(tv&&raw.tvConsent!==undefined&&typeof raw.tvConsent!=='boolean')return null;
+  const session=createSharedSession(root,initiator,raw.mode,raw.choiceId,
+    tv?raw.tvPlan:null);
+  if(!session)return null;
+  if(tv&&raw.tvConsent!==undefined)session.tvConsent=raw.tvConsent;
+  return session;
 }
 /** After the item was offered, the recipient decides deterministically.
  * A dislike can lead to refusal; a neutral gift can be accepted politely.
@@ -146,7 +166,10 @@ export function completeSharedSession(root){
       delta=-2;message='От подарка отказались';
     }
   }else if(session.mode==='leisure'){
-    const evaluation=evaluateLeisure(root,from,session.choiceId);
+    const evaluation=session.choiceId==='tv'
+      ?{accepted:session.tvConsent===true&&
+        validSharedTvPlan(root,session.tvPlan,from)}
+      :evaluateLeisure(root,from,session.choiceId);
     if(!evaluation)return null;
     if(evaluation.accepted){
       kind='completed';
