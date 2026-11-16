@@ -78,7 +78,7 @@ test('H4 physical bookcase queues can retain a future classic, but execution can
     targetInstanceId:id,contentId:READING_ADVANCED_CONTENT_ID};
   assert.equal(chooseResidentAction(root,'hobby',false,'alex',id,
     READING_ACTIVITY_ID,READING_ADVANCED_CONTENT_ID),false);
-  assert.equal(enqueueAction(root.actionQueues,'alex',advanced).ok,true);
+  assert.equal(enqueueAction(root.actionQueues,'alex',advanced)?.type,'activity');
   assert.equal(root.actionQueues.byResident.alex.length,1);
   root.skills.xpById.literature=135;
   assert.equal(chooseResidentAction(root,'hobby',false,'alex',id,
@@ -123,9 +123,9 @@ test('H4 Safari presentation, owned unlock, voice-over semantics and static depl
   assert.match(html,/id="mind-skills-list"/);
   assert.match(html,/id="reading-content-select"/);
   assert.match(html,/book.classic.pathways/);
-  assert.match(html,/1\\.2u\\.5 · F4D \\/ H4/);
+  assert.ok(html.includes('1.2u.5 · F4D / H4'));
   assert.match(game,/skillProfileRows/);
   assert.match(game,/canReadHobbyContent/);
-  assert.match(css,/\\.skill-card-progress/);
-  assert.match(yml,/cp src\\/skill-registry\\.js src\\/skill-presentation\\.js site\\/src\\//);
+  assert.ok(css.includes('.skill-card-progress'));
+  assert.ok(yml.includes('cp src/skill-registry.js src/skill-presentation.js site/src/'));
 });

@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h2b-f4c" />
+  <link rel="stylesheet" href="./styles.css?v=1.2y-h4" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3",
@@ -18,7 +18,8 @@
       "./src/gifts-leisure.js":"./src/gifts-leisure.js?v=1.2x-h3",
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
       "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3",
-      "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2w-h2b",
+      "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2y-h4",
+      "./src/skill-presentation.js":"./src/skill-presentation.js?v=1.2y-h4",
       "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b-f4d-h3",
       "./src/animations.js":"./src/animations.js?v=1.2w-h2b",
       "./src/music-movement.js":"./src/music-movement.js?v=1.2w-h2b",
@@ -57,7 +58,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.4 · F4D / H3</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.5 · F4D / H4</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -196,6 +197,13 @@
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
       <div class="action-header"><div><span id="action-category">Предмет</span><h2 id="action-title">Кровать</h2></div><button type="button" id="close-action" aria-label="Закрыть">×</button></div>
       <p id="action-description">Восстановить энергию</p>
+      <label id="reading-content-field" class="music-style-field" for="reading-content-select" hidden>
+        Какую книгу читать
+        <select id="reading-content-select" aria-label="Книга для чтения">
+          <option value="book.first.stories">Истории дальних дорог · доступно всем</option>
+          <option value="book.classic.pathways" disabled>Пути старых городов · откроется на уровне 3</option>
+        </select>
+      </label>
       <label id="music-style-field" class="music-style-field" for="music-style-select" hidden>
         Музыкальный стиль
         <select id="music-style-select" aria-label="Музыкальный стиль для слушания или танца">
@@ -210,6 +218,11 @@
 
     <section class="mind-panel" id="mind-panel" hidden aria-label="Внутренний мир Алекса">
       <div class="mind-panel-head"><div><span class="eyebrow" id="mind-person">АЛЕКС / ВНУТРЕННИЙ МИР</span><h2>Внутренний мир</h2></div><button id="mind-close" aria-label="Закрыть панель" type="button">×</button></div>
+      <div class="mind-tabs" role="tablist" aria-label="Разделы внутреннего мира">
+        <button id="mind-tab-overview" role="tab" type="button" aria-selected="true" aria-controls="mind-overview">Обзор</button>
+        <button id="mind-tab-skills" role="tab" type="button" aria-selected="false" aria-controls="mind-skills-tab" tabindex="-1">Навыки</button>
+      </div>
+      <div id="mind-overview" role="tabpanel" aria-labelledby="mind-tab-overview">
       <div class="mind-mood"><span>Настроение</span><strong id="mind-mood-label">Спокоен</strong><div class="mind-meter"><i id="mind-mood-bar"></i></div><div id="mind-mood-reasons" class="mind-mood-reasons">Основные потребности удовлетворены</div></div>
       <div class="mind-emotion-section"><span class="eyebrow">ЧТО ЧУВСТВУЕТ И ПОЧЕМУ</span><div id="mind-emotions" class="mind-emotions" aria-live="off">Сейчас нет сильных переживаний</div></div>
       <div class="mind-relationship-section" aria-label="Личное отношение к другому персонажу">
@@ -234,6 +247,12 @@
       <div class="mind-traits"><span class="eyebrow">ЧЕРТЫ ХАРАКТЕРА</span><div class="mind-tags"><span id="mind-traits-label">Черты характера</span></div><div id="mind-preferences-label" class="mind-preferences">Интересы</div></div>
       <div class="mind-skills"><span class="eyebrow">НАВЫКИ · ХОББИ</span><div id="mind-reading-skill" class="mind-sentiments">Литературная эрудиция · уровень 0</div></div>
       <div class="mind-history"><span class="eyebrow">ПОСЛЕДНИЕ ВОСПОМИНАНИЯ</span><ul id="mind-memories"><li>Пока всё впереди</li></ul></div>
+      </div>
+      <div id="mind-skills-tab" role="tabpanel" aria-labelledby="mind-tab-skills" hidden>
+        <p class="skills-intro">Навыки каждого жителя растут только от реальной практики. Досуг — не то же самое, что мастерство.</p>
+        <div id="mind-skills-list" class="skills-list" aria-label="Личные навыки выбранного жителя"></div>
+        <p class="skills-future">Позже: живопись, логика и игра на музыкальных инструментах. Прослушивание музыки не даёт опыта исполнения.</p>
+      </div>
     </section>
 
     <section class="social-bar" id="social-context" hidden aria-label="Взаимодействие с другим жителем">
@@ -334,7 +353,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b-f4d-h3"></script>
+  <script type="module" src="./src/game.js?v=1.2y-h4"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

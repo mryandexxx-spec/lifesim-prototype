@@ -51,6 +51,7 @@ jobs:
           node --check src/object-quality-comparison.js
           node --check src/shop-catalog-selector.js
           node --check src/skill-registry.js
+          node --check src/skill-presentation.js
           node --check src/skills-engine.js
           node --check src/activity-registry.js
           node --check src/hobby-reading.js
@@ -168,7 +169,7 @@ jobs:
           cp src/music-movement.js src/meshy-music-runtime.js site/src/
           cp src/reading-journey.js site/src/
           cp src/skills-engine.js site/src/
-          cp src/skill-registry.js site/src/
+          cp src/skill-registry.js src/skill-presentation.js site/src/
           cp src/tv-interaction.js site/src/
           cp src/tv-seating.js site/src/
           cp src/tv-together.js site/src/
