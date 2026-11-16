@@ -91,7 +91,9 @@ test('F4C: interiors have functional category hierarchy without inventing action
   for(const p of ['armchair.wing','armchair.shell','chair.loft','chair.cross']){
     assert.deepEqual(R.items[p].effects,[]);
     assert.equal(R.items[p].capabilities.includes('relax'),false,
-      'No fake seat mechanics before rig anchors are authored');
+      'Sitting does not invent a sofa-style recovery reward');
+    assert.equal(R.items[p].capabilities.includes('seat'),true,
+      'F4D provides real physical seat interactions');
   }
   assert.equal(R.items['sofa.comfort'].effects[0].amount,0.2);
 });
