@@ -24,6 +24,8 @@ import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
+import {describeObjectQualities,shopQualitySummary} from './object-quality-presentation.js';
+import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
 import {furnitureProduct,FURNITURE_APPEARANCES} from './furniture-products.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
@@ -2164,6 +2166,7 @@ function boot() {
   };
   // F4b2: store UI selects SKU identity; renderer/footprint still use prefab.
   const shopListings=selectShopCatalog();
+  const shopQualityRegistry=legacyObjectRegistry();
   let shopRoomCategory=null,shopFunctionCategory=null;
   // Separate visual staging entity is never a purchased item and never enters
   // world.furniture or household saves. The floor outline shows validation.
@@ -2355,10 +2358,16 @@ function boot() {
     const effect=document.createElement('small');
     effect.className='furnish-product-effect';
     effect.textContent=item.effectText;
+    const qualitySummary=shopQualitySummary(describeObjectQualities(shopQualityRegistry,item.itemId));
+    const quality=document.createElement('small');
+    quality.className='furnish-product-quality';
+    quality.textContent=qualitySummary;
+    quality.hidden=!qualitySummary;
     const mark=document.createElement('span');
     mark.className='furnish-selected-mark';mark.textContent='✓ ВЫБРАНО';
     mark.hidden=true;
     button.append(name,cost,effect,mark);
+    if(qualitySummary)button.append(quality);
     button.setAttribute('aria-pressed','false');
     button.addEventListener('click',()=>chooseShopProduct(item.itemId));
     $('furnish-stock').append(button);
