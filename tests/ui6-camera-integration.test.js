@@ -37,7 +37,7 @@ test('UI6 preserves fallback, strict dialogue, camera reset and iPhone pointer c
 test('UI6 static pages includes all new runtime dependencies',()=>{
  assert.match(workflow,/node --check src\/camera-gestures\.js/);
  assert.match(workflow,/cp src\/camera-gestures\.js site\/src\//);
- assert.match(html,/сборка \/ 1\.1q/);
- assert.match(html,/styles\.css\?v=1\.1q/);
- assert.match(html,/src\/game\.js\?v=1\.1q/);
+ assert.match(html,/сборка \/ 1\.1r/);
+ assert.match(html,/styles\.css\?v=1\.1r/);
+ assert.match(html,/src\/game\.js\?v=1\.1r/);
 });
