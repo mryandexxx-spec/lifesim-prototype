@@ -50,6 +50,7 @@ function newMira(minutes=480) {
   mira.autonomy.nextAt=minutes;
   mira.event='Свободное время';
   mira.skills=newSkillProgress();
+  mira.createdWorks=[];
   mira.objectOnceLedger=newObjectOnceLedger();
   refreshMind(mira);
   return mira;
@@ -59,6 +60,7 @@ export function newHousehold() {
   const state=newGame(DEMO_PROFILES.first);
   state.otherSim=newMira(state.minutes);
   state.skills=newSkillProgress();
+  state.createdWorks=[];
   state.objectOnceLedger=newObjectOnceLedger();
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);

@@ -47,7 +47,7 @@ test('H4 skill selector derives 0–10, thresholds, progress and unlocks without
   assert.equal(skillProfileRows(null,null).length,0);
 });
 
-test('H4 invalid XP/old saves create no imaginary progress, never a second skill',()=>{
+test('H4 invalid XP/old saves create no imaginary progress, no imaginary skill',()=>{
   const root=newHousehold();
   delete root.skills;delete root.otherSim.skills;
   const loaded=loadHousehold(copy(root));
@@ -57,7 +57,8 @@ test('H4 invalid XP/old saves create no imaginary progress, never a second skill
   assert.equal(skillProfileRows(broken,HOBBY_SKILLS)[0].xp,0);
   assert.equal(skillProfileRows({schema:1,xpById:{literature:-100}},HOBBY_SKILLS)[0].level,0);
   assert.equal(skillProfileRows({schema:1,xpById:{literature:'135'}},HOBBY_SKILLS)[0].level,0);
-  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS).length,1);
+  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS).length,2);
+  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS)[1].id,'painting');
 });
 
 test('H4 advanced authored literature is a real threshold-gated item content, not just a badge',()=>{
