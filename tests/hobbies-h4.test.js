@@ -127,5 +127,5 @@ test('H4 Safari presentation, owned unlock, voice-over semantics and static depl
   assert.match(game,/skillProfileRows/);
   assert.match(game,/canReadHobbyContent/);
   assert.ok(css.includes('.skill-card-progress'));
-  assert.ok(yml.includes('cp src/skill-registry.js src/skill-presentation.js site/src/'));
+  assert.ok(yml.includes('cp src/skill-presentation.js site/src/'));
 });
