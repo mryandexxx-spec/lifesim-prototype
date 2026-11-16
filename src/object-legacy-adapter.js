@@ -50,7 +50,7 @@ for(const offer of FURNITURE_PRODUCTS){
     categoryIds:[historicalRooms[prefab.category],
       ...prefab.capabilities.map(x=>'function.'+x)],
     capabilities:[...prefab.capabilities],price:offer.price,
-    appearanceId:offer.appearanceId||null,ratings:{},effects:[]
+    appearanceId:offer.appearanceId||null,ratings:{},effects:offer.effects||[]
   });
 }
 const registry=createObjectRegistry({categories,stats,attributes:[],triggers,items});
