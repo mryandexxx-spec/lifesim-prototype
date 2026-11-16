@@ -5,7 +5,7 @@ import {newHousehold,loadHousehold,setHouseholdAutonomy} from '../src/household.
 import {applySocialEvent,observePairViews} from '../src/social-graph.js';
 import {startBranchSocial,arriveSocial,tickSocial,cancelSocial} from '../src/relationships.js';
 import {readFileSync} from 'node:fs';
-const coords={alex:{x:1.2,z:.5},mira:{x:1.4,z:.7}};
+const coords={alex:{x:1.2,z:.5},mira:{x:1.7,z:.7}};
 function s(elapsed=10,consent=true){
  return {phase:'using',elapsed,branchAction:{id:'romance.evening',eveningConsent:consent}};
 }
