@@ -12,7 +12,7 @@ const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 
 test('F4b7 compare two sofas: only real extra energy, 150 credits and appearance',()=>{
   const base=compareShopVariants(registry,offers,'legacy.sofa');
-  assert.equal(base.length,1);
+  assert.equal(base.length,3);
   const comfort=base[0];
   assert.equal(comfort.itemId,'sofa.comfort');
   assert.equal(comfort.price,700);
@@ -43,13 +43,13 @@ test('F4b7 plant comparison: cosmetic change has same price and no benefit',()=>
   assert.equal(amber.appearanceDifferent,true);
   assert.match(formatShopVariantComparison(amber),/та же цена/);
   assert.match(formatShopVariantComparison(amber),/отличается оформление/);
-  assert.equal(compareShopVariants(registry,offers,'legacy.bed').length,0);
+  assert.equal(compareShopVariants(registry,offers,'legacy.bed').length,2);
 });
 test('F4b7 only compares real offered SKU of exactly the same prefab',()=>{
   assert.deepEqual(compareShopVariants(registry,offers,'made-up'),[]);
-  assert.deepEqual(compareShopVariants(registry,offers,'legacy.sofa').map(x=>x.itemId),['sofa.comfort']);
-  assert.deepEqual(compareShopVariants(registry,offers.filter(x=>x.itemId!=='sofa.comfort'),'legacy.sofa'),[]);
-  assert.deepEqual(compareShopVariants(registry,[...offers,{itemId:'fake.sofa',prefabId:'sofa',price:10}],'legacy.sofa').map(x=>x.itemId),['sofa.comfort']);
+  assert.deepEqual(compareShopVariants(registry,offers,'legacy.sofa').map(x=>x.itemId),['sofa.comfort','sofa.loft','sofa.classic']);
+  assert.deepEqual(compareShopVariants(registry,offers.filter(x=>x.itemId!=='sofa.comfort'),'legacy.sofa').map(x=>x.itemId),['sofa.loft','sofa.classic']);
+  assert.deepEqual(compareShopVariants(registry,[...offers,{itemId:'fake.sofa',prefabId:'sofa',price:10}],'legacy.sofa').map(x=>x.itemId),['sofa.comfort','sofa.loft','sofa.classic']);
   assert.deepEqual(compareShopVariants(registry,Array(1025).fill(offers[0]),'legacy.plant'),[]);
 });
 test('F4b7 optional numeric quality ratings compare only authored dimensions',()=>{

@@ -35,7 +35,7 @@ test('actual PlayCanvas prefab staging fragment enables a real clone at known no
   const context={shopOpen:true,shopPlacing:true,shopSelected:'plant',shopSelectedItemId:'legacy.plant',
     shopPose:cameraPlacementPose({centerX:0,centerZ:0}),
     shopPreviewEntity:null,shopPreviewType:null,marketGhost:{enabled:false},
-    decorTemplates:new Map([['plant',template]]),app:{root:{addChild(){added++;}}},applyItemAppearance(){}};
+    decorTemplates:new Map([['plant',template]]),app:{root:{addChild(){added++;}}},applySkuModel(){}};
   const block=game.slice(begin,end);
   runInNewContext('(()=>{'+block+'\nsyncShopPreviewEntity();})()',context,{timeout:1000});
   assert.equal(cloneCalls,1);
@@ -94,6 +94,7 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
     marketGhost:visual,instanceRect,FURNITURE_CATALOG,
     ghostValid:{kind:'valid'},ghostInvalid:{kind:'invalid'},furnishMode:true,
     shopRoomCategory:null,shopFunctionCategory:null,
+    shopTypeCategory:null,shopSearchText:'',
     selectShopCatalog:()=>[] // placement hides variants but still computes visible filters
   };
   runInNewContext('(()=>{'+game.slice(begin,end)+'\nrenderMarket();})()',state,{timeout:1500});
