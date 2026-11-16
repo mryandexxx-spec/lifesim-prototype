@@ -68,7 +68,7 @@ test('H0 skill authoring rejects duplicate IDs, nonmonotonic curves and impossib
   assert.throws(()=>createSkillRegistry({skills:[...skillDefs,skillDefs[0]]}),/duplicate skill/);
   assert.throws(()=>createSkillRegistry({skills:[{...skillDefs[0],xpThresholds:[10,10,60,100]}]}),/XP threshold/);
   assert.throws(()=>createSkillRegistry({skills:[{...skillDefs[0],maxLevel:5}]}),/threshold count/);
-  assert.throws(()=>createSkillRegistry({skills:[{...skillDefs[0],unlocks:[{id:'n',minLevel:5}]}]}),/unlock level/);
+  assert.throws(()=>createSkillRegistry({skills:[{...skillDefs[0],unlocks:[{id:'new.technique',minLevel:5}]}]}),/unlock level/);
   assert.throws(()=>createSkillRegistry({skills:[{...skillDefs[0],practiceTags:['book.fiction','book.fiction']}]}),/duplicate practice/);
 });
 test('H0 content is authored independently of object definitions and gift inventory',()=>{
