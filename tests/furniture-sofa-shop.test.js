@@ -88,14 +88,14 @@ test('visual sit and exit stay bound to action target; Meshy seat contact is per
  assert.match(game,/sofaVisualTargets=\{alex:null,mira:null\}/);
  assert.match(game,/sofaVisualTargets.alex=\(alexWatchSeat\|\|game.action\?\.targetInstanceId\)\|\|null/);
  assert.match(game,/sofaVisualTargets.mira=\(miraWatchSeat\|\|game.otherSim.action\?\.targetInstanceId\)\|\|null/);
- assert.match(game,/sofaTransitionPose\(sofaStates.alex\),sofaVisualTargets.alex/);
- assert.match(game,/sofaTransitionPose\(sofaStates.mira\),sofaVisualTargets.mira/);
- assert.match(game,/makeSofaSeat=\(instanceId=null\)=>/);
+ assert.match(game,/const alexSeatBase=sofaTransitionPose\(sofaStates.alex\)/);
+ assert.match(game,/const miraSeatBase=sofaTransitionPose\(sofaStates.mira\)/);
+ assert.match(game,/makeSofaSeat=\(instanceId=null,romanticSlot=null\)=>/);
  assert.match(game,/furnitureInstance\(game.world,'sofa',instanceId\)/);
  assert.match(game,/alexSeatInstanceId=sofaVisualTargets.alex/);
  assert.match(game,/seat:seatContactEnabled\?livingSofaSeat:null/);
- assert.match(game,/if\(!seating\)sofaVisualTargets.alex=null/);
- assert.match(game,/if\(!miraSeating\)sofaVisualTargets.mira=null/);
+ assert.match(game,/if\(!seating\)\{sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;\}/);
+ assert.match(game,/if\(!miraSeating\)\{sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;\}/);
  assert.match(game,/if\(sofaVisualTargets\[id\]\)busy.add\(sofaVisualTargets\[id\]\)/);
 });
 test('functional sofa has a 3D prefab clone and real shop transaction, not fake mood bonus',()=>{
