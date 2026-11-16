@@ -179,7 +179,8 @@ const ALLOWED=new Set(['box','sphere','cylinder']);
 const freeze=Object.fromEntries(Object.entries(schemes).map(([id,entry])=>{
   if(!/^[a-z][a-z0-9.-]+$/.test(id)||!Array.isArray(entry.parts)||entry.parts.length>48)
     throw new Error('Invalid procedural model '+id);
-  const parts=entry.parts.map(part=>{
+  const parts=entry.parts.map((part,index)=>{
+    if(!part)throw new Error('Missing geometry part '+id+' #'+index);
     if(!ALLOWED.has(part.kind)||typeof part.name!=='string'||
       ![part.x,part.y,part.z,part.sx,part.sy,part.sz].every(Number.isFinite)||
       Math.min(part.sx,part.sy,part.sz)<=0||Math.max(part.sx,part.sy,part.sz)>4||
