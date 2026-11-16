@@ -5,7 +5,7 @@
  * Every piece is local to its saved object instance. No DOM/PlayCanvas here.
  */
 const piece=(kind,name,x,y,z,sx,sy,sz,color,rotation=null)=>
-  {kind,name,x,y,z,sx,sy,sz,color,rotation};
+  ({kind,name,x,y,z,sx,sy,sz,color,rotation});
 const b=(...args)=>piece('box',...args);
 const c=(...args)=>piece('cylinder',...args);
 const s=(...args)=>piece('sphere',...args);
