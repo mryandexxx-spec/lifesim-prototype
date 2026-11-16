@@ -16,7 +16,9 @@ const valid=id=>typeof id==='string'&&/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id);
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const time=at=>Number.isFinite(at)&&at>=0&&at<=1e7;
 const adult=stage=>stage==='adult'||stage==='elder';
-const view=()=>({attraction:0,boundary:'open',lastRefusedAt:null});
+// Older v1 saves have only `boundary`; new preferences are optional.
+const view=()=>({attraction:0,boundary:'open',touchBoundary:'open',
+  exclusivity:'exclusive',jealousy:0,lastRefusedAt:null});
 const emptyBond=()=>({status:'none',since:null,ex:false,lastEndedAt:null});
 const COMMITTED=new Set(['dating','engaged','married']);
 const DAY=1440;
@@ -43,7 +45,7 @@ export function romanceClimate(graph,a,b,now=0){
   const history=Array.isArray(pair.events)?pair.events.filter(e=>
     time(e?.at)&&e.at>=bond.since&&e.at<=now):[];
   const conflicts=history.filter(e=>
-    ['argue','conversation.argue','rival.taunt'].includes(e.type)&&
+    ['argue','conversation.argue','rival.taunt','romance.jealousy'].includes(e.type)&&
     now-e.at<=CONFLICT_WINDOW);
   const repairs=history.filter(e=>e.type==='romance.repair');
   const conflict=conflicts.at(-1),repair=repairs.at(-1);
@@ -74,6 +76,10 @@ export function restoreRomanceState(raw,ids,lastAt=null){
     fresh.views[id]={
       attraction:Number.isFinite(source.attraction)?clamp(Math.round(source.attraction),0,100):0,
       boundary:source.boundary==='closed'?'closed':'open',
+      touchBoundary:source.touchBoundary==='closed'?'closed':'open',
+      exclusivity:source.exclusivity==='open'?'open':'exclusive',
+      jealousy:Number.isFinite(source.jealousy)
+        ?clamp(Math.round(source.jealousy),0,100):0,
       lastRefusedAt:time(source.lastRefusedAt)?source.lastRefusedAt:null
     };
   }
@@ -204,10 +210,22 @@ export function romanceAvailability(graph,a,b,actionId,now=0){
   if(bondActive(bond)&&actionId==='romance.date')
     return {enabled:false,reason:'Вы уже состоите в отношениях'};
   const thirdA=currentDatingPartner(graph,a),thirdB=currentDatingPartner(graph,b);
-  if((thirdA&&thirdA!==b)||(thirdB&&thirdB!==a))
-    return {enabled:false,reason:'Сначала нужно завершить другие отношения'};
+  if((thirdA&&thirdA!==b)||(thirdB&&thirdB!==a)){
+    // R3: only a non-committal flirt is possible outside an existing
+    // commitment, and only when the person sets their OWN expectation open.
+    // The partner's expectation cannot revoke personal agency.
+    const actorOpen=!thirdA||thirdA===b||
+      pairFor(graph,a,thirdA)?.romance?.views?.[a]?.exclusivity==='open';
+    const recipientOpen=!thirdB||thirdB===a||
+      pairFor(graph,b,thirdB)?.romance?.views?.[b]?.exclusivity==='open';
+    if(actionId!=='romance.flirt'||!actorOpen||!recipientOpen)
+      return {enabled:false,reason:'Сначала нужно завершить другие отношения'};
+  }
   if(feelings[a].boundary==='closed'||feelings[b].boundary==='closed')
     return {enabled:false,reason:'Важно уважать личные границы'};
+  if(['romance.hug','romance.kiss','romance.intimacy'].includes(actionId)&&
+    (feelings[a].touchBoundary==='closed'||feelings[b].touchBoundary==='closed'))
+    return {enabled:false,reason:'Сейчас прикосновения не подходят обоим'};
   if(time(feelings[b].lastRefusedAt)&&
     now-feelings[b].lastRefusedAt<ROMANCE_COOLDOWN_MINUTES)
     return {enabled:false,reason:'После отказа нужно время'};
@@ -287,6 +305,27 @@ export function setRomanceBoundary(graph,viewerId,otherId,boundary){
   pair.romance.views[viewerId].boundary=boundary;
   pair.revision++;return true;
 }
+/** Player chooses only this resident's perspective, not their partner's.
+ * A settings click creates no consent, love, or history receipt.
+ */
+export function setRomancePreference(graph,personId,otherId,kind,value){
+  const pair=pairFor(graph,personId,otherId),v=pair?.romance?.views?.[personId];
+  if(!record(v)||!graph?.persons?.includes(personId)||personId===otherId)return false;
+  const permitted=kind==='boundary'||kind==='touchBoundary'
+    ?['open','closed']:kind==='exclusivity'?['open','exclusive']:null;
+  if(!permitted?.includes(value)||v[kind]===value)return false;
+  v[kind]=value;pair.revision++;return true;
+}
+export function romancePreferenceSummary(graph,personId,otherId){
+  const v=pairFor(graph,personId,otherId)?.romance?.views?.[personId];
+  if(!record(v))return null;
+  return {
+    boundary:v.boundary==='closed'?'closed':'open',
+    touchBoundary:v.touchBoundary==='closed'?'closed':'open',
+    exclusivity:v.exclusivity==='open'?'open':'exclusive',
+    jealousy:Number.isFinite(v.jealousy)?clamp(v.jealousy,0,100):0
+  };
+}
 export function recordRomanceReceipt(graph,pair,receipt){
   if(!ROMANCE_ACTION_IDS.some(id=>receipt?.type===id||
     receipt?.type===id+'.refused')||
@@ -337,6 +376,13 @@ export function recordRomanceReceipt(graph,pair,receipt){
     // Declining a physical gesture must not penalize either person's feelings.
     target.lastRefusedAt=receipt.at;
     return true;
+  }
+  if(receipt.type==='romance.repair'){
+    // Only a welcomed, completed repair reduces a witnessed grievance.
+    for(const id of pair.ids){
+      const v=pair.romance.views[id];
+      if(Number.isFinite(v?.jealousy))v.jealousy=clamp(v.jealousy-15,0,100);
+    }
   }
   const accepted=!receipt.type.endsWith('.refused');
   const confession=receipt.type.startsWith('romance.confess');
