@@ -11,8 +11,7 @@ const B1='home-bed-1',B2='shop-bed-2',S1='home-sofa-1',S2='shop-sofa-3';
 function twoBeds(){
   const root=newHousehold();
   const bed=root.world.furniture.instances.find(v=>v.instanceId===B1);
-  // Isolated synthetic two-bed layout: the store does NOT expose functional
-  // fixtures until their visual rigs, collisions and animations are ready.
+  // Two-bed layout exercises instance-specific sleep slots independently of rendering.
   root.world.furniture={schema:1,revision:1,instances:[
     {...bed},{instanceId:B2,prefabId:'bed',x:1.6,z:1.6,yaw:90,location:'home'}
   ]};

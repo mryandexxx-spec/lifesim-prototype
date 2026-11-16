@@ -1,0 +1,19 @@
+name: F2c bed preflight on integrated R2 main
+on:
+  push:
+    branches: [feature/f2c-bed-integrate-r2-20261116]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: node --check src/game.js && node --check src/furniture-shop.js

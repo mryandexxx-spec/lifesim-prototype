@@ -18,10 +18,10 @@ const close=(a,b)=>Math.abs(a-b)<1e-7;
 const newSofa=({x=-2,z=0,yaw=90,instanceId='shop-sofa-11'}={})=>
   ({instanceId,prefabId:'sofa',location:'home',x,z,yaw});
 
-test('five trial products include independent functional sofa without touching approved prices',()=>{
+test('six trial products preserve independently functional sofa and its price',()=>{
  assert.deepEqual(SHOP_ITEMS.map(x=>x.prefabId),
-   ['plant','table','nightstand','tv','sofa']);
- assert.equal(marketListing().length,5);
+   ['plant','table','nightstand','tv','sofa','bed']);
+ assert.equal(marketListing().length,6);
  assert.equal(SHOP_ITEMS.find(x=>x.prefabId==='plant').price,130);
  assert.equal(SHOP_ITEMS.find(x=>x.prefabId==='sofa').price,550);
  assert.equal(newFurnitureShop().credits,5000);

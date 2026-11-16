@@ -8,9 +8,9 @@ import {SHOP_SCHEMA,SHOP_START_CREDITS,SHOP_ITEMS,SHOP_SELL_PERCENT,
 const copy=v=>JSON.parse(JSON.stringify(v));
 const setup=()=>({world:newFurnitureWorld(),shop:newFurnitureShop()});
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
-test('F2.1 shop catalog has four decor prefabs plus first functional sofa and provisional credits',()=>{
-  assert.deepEqual(SHOP_ITEMS.map(x=>x.prefabId),['plant','table','nightstand','tv','sofa']);
-  assert.equal(marketListing().length,5);
+test('F2.1 shop catalog has decor and two functional goods, still provisional',()=>{
+  assert.deepEqual(SHOP_ITEMS.map(x=>x.prefabId),['plant','table','nightstand','tv','sofa','bed']);
+  assert.equal(marketListing().length,6);
   assert.equal(SHOP_START_CREDITS,5000);
   assert.equal(newFurnitureShop().schema,SHOP_SCHEMA);
 });
