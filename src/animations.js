@@ -5,6 +5,7 @@
  */
 import {SOFA_HIP_PITCH,SOFA_KNEE_PITCH} from './pose-config.js';
 import {gaitTargets} from './locomotion.js';
+import {musicMovementFrame} from './music-movement.js';
 
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const blend=(a,b,rate,dt)=>a+(b-a)*(1-Math.exp(-rate*dt));
@@ -27,6 +28,10 @@ export function stepAnimation(previous,signals,dt) {
   const mood=clamp(safe(signals?.mood,65),0,100);
   const moving=Boolean(signals?.walking);
   const action=signals?.using||null;
+  const music=action==='music'?musicMovementFrame({
+    activityId:signals?.musicActivityId,phase:'using',
+    contentId:signals?.musicStyleId,elapsed:signals?.musicElapsed
+  }):null;
   const social=signals?.social==='talk'?'talk':signals?.social==='argue'?'argue':null;
   const hugWeight=clamp(safe(signals?.hugWeight,0),0,1);
   const kissWeight=clamp(safe(signals?.kissWeight,0),0,1);
@@ -123,6 +128,11 @@ export function stepAnimation(previous,signals,dt) {
     }else{
       armTarget=[5,8];
     }
+  }else if(music){
+    // The procedural fallback must visibly match Meshy listen vs dance.
+    // These motions never translate the simulation root or bypass A*.
+    legTarget=[...music.legs];kneeTarget=[...music.knees];
+    armTarget=[...music.arms];elbowTarget=[...music.elbows];
   }else if(action==='hobby'){
     // A readable open book in front of the body, both arms gently supporting it.
     armTarget=[-40,-47];elbowTarget=[-52,-47];
@@ -179,7 +189,7 @@ export function stepAnimation(previous,signals,dt) {
   const bedHipRoll=(previous.bedHipRoll||[0,0]).map((v,i)=>blend(v,bedRollTarget[i],12,step));
   // Light breathing and conversational emphasis, independent of gameplay logic.
   const inGait=(moving||walkWeight>.003)&&!sofaWeight&&!bedStepWeight&&!bedSitWeight&&!bedReclineWeight;
-  const torsoTarget=action==='bed'?0:hugWeight>.005?2.3*hugWeight:
+  const torsoTarget=music?music.torsoRoll:action==='bed'?0:hugWeight>.005?2.3*hugWeight:
     kissWeight>.005?2.6*kissWeight:social
     ?Math.sin(t*(social==='argue'?4:2.5))*2.1
     :inGait?walkPose.torsoRoll:Math.sin(t*1.4)*.9;
@@ -187,27 +197,27 @@ export function stepAnimation(previous,signals,dt) {
   // Opposite weight transfer through pelvis + chest; sole remains close to
   // floor at stance without moving any collision or gameplay position.
   const pelvisRoll=blend(safe(previous.pelvisRoll,0),
-    inGait?walkPose.pelvisRoll:0,9,step);
+    music?music.pelvisRoll:inGait?walkPose.pelvisRoll:0,9,step);
   // Waist pivot brings head, shoulders, eyes and arms along as a coherent
   // upper-body volume. Head-to-hips lean is now visible from the isometric view.
   const spineLean=blend(safe(previous.spineLean,0),
     bedSitWeight>0?-11*bedSitWeight:hugWeight>.005?6*hugWeight:
       kissWeight>.005?8*kissWeight:
         social==='talk'&&eveningWeight>.001?5.5*eveningWeight:
-        inGait?walkPose.spineLean:0,12,step);
+        music?music.spineLean:inGait?walkPose.spineLean:0,12,step);
   // A seated viewer may glance toward an off-axis screen without turning
   // the whole avatar and sliding its hips away from the sofa cushion.
   const tvGaze=action==='tv'&&sofaWeight>.5
     ?clamp(safe(signals?.tvGazeYaw,0),-30,30)*sofaWeight:0;
   const spineTwist=blend(safe(previous.spineTwist,0),
     bedSign*16*bedSwing+(inGait?walkPose.spineTwist:0)+tvGaze+
-      romanticSeatTurn,14,step);
+      romanticSeatTurn+(music?music.spineTwist:0),14,step);
   const spineRoll=blend(safe(previous.spineRoll,0),
-    bedSign*8*bedSwing+(inGait?walkPose.spineRoll:0),14,step);
+    bedSign*8*bedSwing+(music?music.spineRoll:inGait?walkPose.spineRoll:0),14,step);
   const hipShift=blend(safe(previous.hipShift,0),
-    inGait?walkPose.hipShift:0,14,step);
+    music?music.hipShift:inGait?walkPose.hipShift:0,14,step);
   const bodyLift=blend(safe(previous.bodyLift,0),
-    inGait?walkPose.bodyLift:0,14,step);
+    music?music.bodyLift:inGait?walkPose.bodyLift:0,14,step);
   // The root dip and planted ankle geometry are analytically paired. Using
   // a second smoothing pass on one but not the other breaks ground contact.
   const walkBob=contactWalk?walkPose.rootOffset:
