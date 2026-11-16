@@ -44,7 +44,7 @@ test('H2 content is authored independently of music performance skill',()=>{
   assert.deepEqual(def.skillPractice,[]);
   assert.equal(def.audioCue,'music.original');
   for(const id of MUSIC_CONTENT_IDS)
-    assert.equal(getHobbyContent(HOBBY_CONTENT,id)?.kind,'musicStyle');
+    assert.equal(getHobbyContent(HOBBY_CONTENT,id)?.kind,'musicstyle');
 });
 test('H2 console is not preowned and has a template renderer and real shop SKU',()=>{
   assert.equal(FURNITURE_CATALOG.music.templateOnly,true);
