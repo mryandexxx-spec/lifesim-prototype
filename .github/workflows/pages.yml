@@ -42,6 +42,11 @@ jobs:
           node --check src/object-effect-engine.js
           node --check src/object-legacy-adapter.js
           node --check src/shop-catalog-selector.js
+          node --check src/skill-registry.js
+          node --check src/skills-engine.js
+          node --check src/activity-registry.js
+          node --check src/activity-session.js
+          node --check src/hobby-content.js
           node --check src/tv-interaction.js
           node --check src/tv-seating.js
           node --check src/tv-together.js
@@ -134,6 +139,11 @@ jobs:
           cp src/furniture-catalog.js src/furniture-layout.js src/furniture-editor.js src/furniture-transform.js src/furniture-hold.js site/src/
           cp src/furniture-shop.js src/furniture-value.js site/src/
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
+          cp src/hobby-content.js site/src/
+          cp src/activity-session.js site/src/
+          cp src/activity-registry.js site/src/
+          cp src/skills-engine.js site/src/
+          cp src/skill-registry.js site/src/
           cp src/tv-interaction.js site/src/
           cp src/tv-seating.js site/src/
           cp src/tv-together.js site/src/
