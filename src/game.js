@@ -3483,9 +3483,11 @@ function boot() {
     const kissAlexFrame={...kissFrame,initiator:game.socialAction?.initiator==='alex'};
     const kissMiraFrame={...kissFrame,initiator:game.socialAction?.initiator==='mira'};
     const pairTargets=hugTargets||kissTargets;
-    const pairedTv=liveSharedTv(game);
+    const pairedTv=liveSharedTv(game),pairedHobby=livePairedHobby(game);
+    const pairedBooks=pairedHobby?.choiceId==='books';
+    const pairedMusic=pairedHobby?.choiceId==='music';
     const using=game.action?.phase==='using',
-      useId=using?game.action.id:pairedTv?'tv':null;
+      useId=using?game.action.id:pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
@@ -3543,7 +3545,7 @@ function boot() {
     const pairedTvStand=pairedTv&&!alexWatchSeat
       ?{...pairedTv.places.alex,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
-    const pose=pairedTvStand||(useId&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
+    const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
       ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
@@ -3583,9 +3585,12 @@ function boot() {
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
-      musicActivityId:game.action?.id==='music'?game.action.activityId:null,
-      musicStyleId:game.action?.id==='music'?game.action.contentId:null,
-      musicElapsed:game.action?.id==='music'?game.action.elapsed:null,
+      musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
+        game.action?.id==='music'?game.action.activityId:null,
+      musicStyleId:pairedMusic?'music.calm':
+        game.action?.id==='music'?game.action.contentId:null,
+      musicElapsed:pairedMusic?game.socialAction.elapsed:
+        game.action?.id==='music'?game.action.elapsed:null,
       showerStep:alexShower?.stepWeight||0,showerWater:Boolean(alexShower?.water),
       showerExiting:Boolean(alexShower&&useId!=='shower'),
       toiletSitWeight:alexToilet?.seated||0,
@@ -3600,7 +3605,7 @@ function boot() {
       bedReclineWeight:bedPose?.bedReclineWeight||0,
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
-      social:socialUsing&&!pairedTv&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!pairedHobby&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
       eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
@@ -3620,12 +3625,13 @@ function boot() {
     applyShowerAppearance(alexRig,Boolean(alexShower?.privacy||alexToilet?.privacy),Boolean(alexShower?.bathing));
     snack.enabled=Boolean(alexFridge&&alexFridge.handFood>.012);
     if(snack.enabled)snack.setLocalScale(.20*alexFridge.handFood,.17*alexFridge.handFood,.20*alexFridge.handFood);
-    book.enabled=(using&&useId==='sofa')||
+    book.enabled=pairedBooks||(using&&useId==='sofa')||
       (game.action?.id==='hobby'&&
        (readingHasBook(game.action)||alexReadingStage==='taking'));
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
-    const miraUseId=miraUsing?game.otherSim.action.id:pairedTv?'tv':null;
+    const miraUseId=miraUsing?game.otherSim.action.id:
+      pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
       game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
@@ -3677,7 +3683,7 @@ function boot() {
     const pairedTvMiraStand=pairedTv&&!miraWatchSeat
       ?{...pairedTv.places.mira,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
-    const miraPose=pairedTvMiraStand||(miraUseId&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
+    const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
       ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
@@ -3713,9 +3719,12 @@ function boot() {
     animationStates.mira=stepAnimation(animationStates.mira,{
       id:'mira',walking:(miraWalking||Boolean(miraShower?.stepWeight>.015))&&!miraSeating&&!miraBedding,
       using:miraToilet?'toilet':miraShower?'shower':miraUseId,
-      musicActivityId:game.otherSim.action?.id==='music'?game.otherSim.action.activityId:null,
-      musicStyleId:game.otherSim.action?.id==='music'?game.otherSim.action.contentId:null,
-      musicElapsed:game.otherSim.action?.id==='music'?game.otherSim.action.elapsed:null,
+      musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
+        game.otherSim.action?.id==='music'?game.otherSim.action.activityId:null,
+      musicStyleId:pairedMusic?'music.calm':
+        game.otherSim.action?.id==='music'?game.otherSim.action.contentId:null,
+      musicElapsed:pairedMusic?game.socialAction.elapsed:
+        game.otherSim.action?.id==='music'?game.otherSim.action.elapsed:null,
       showerStep:miraShower?.stepWeight||0,showerWater:Boolean(miraShower?.water),
       showerExiting:Boolean(miraShower&&miraUseId!=='shower'),
       toiletSitWeight:miraToilet?.seated||0,
@@ -3730,7 +3739,7 @@ function boot() {
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
-      social:socialUsing&&!pairedTv&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!pairedHobby&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
       eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
@@ -3747,7 +3756,7 @@ function boot() {
     applyShowerAppearance(miraRig,Boolean(miraShower?.privacy||miraToilet?.privacy),Boolean(miraShower?.bathing));
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
-    miraBook.enabled=(miraUsing&&miraUseId==='sofa')||
+    miraBook.enabled=pairedBooks||(miraUsing&&miraUseId==='sofa')||
       (game.otherSim.action?.id==='hobby'&&
         (readingHasBook(game.otherSim.action)||miraReadingStage==='taking'));
     // Mira retains one 3D skin for sofa, bed, fridge and clothed shower
@@ -3759,13 +3768,15 @@ function boot() {
         (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
         socialWalkingFor('mira'))&&
         !miraSeating&&!miraBedding&&!miraShower,
-      social:socialUsing&&!pairedTv?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!pairedHobby?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
       actionId:miraUseId,
-      readingStage:miraReadingStage,
+      readingStage:pairedBooks?'reading':miraReadingStage,
       readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
       readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
-      musicFrame:game.otherSim.action?.id==='music'?{
+      musicFrame:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
+        contentId:'music.calm',elapsed:game.socialAction.elapsed}:
+        game.otherSim.action?.id==='music'?{
         phase:game.otherSim.action.phase,
         activityId:game.otherSim.action.activityId,
         contentId:game.otherSim.action.contentId,
@@ -3784,7 +3795,7 @@ function boot() {
       fridgeFrame:miraFridge
     });
     // The procedural book belongs to a hidden elbow; never show it floating.
-    if(miraMeshShown&&(miraUseId==='sofa'||game.otherSim.action?.id==='hobby'))
+    if(miraMeshShown&&(miraUseId==='sofa'||miraUseId==='hobby'||game.otherSim.action?.id==='hobby'))
       miraBook.enabled=false;
     // The old snack is on the hidden procedural elbow, not the Meshy hand.
     if(miraMeshShown&&miraUseId==='fridge')miraSnack.enabled=false;
@@ -3807,10 +3818,12 @@ function boot() {
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
       actionId:useId,
-      readingStage:alexReadingStage,
+      readingStage:pairedBooks?'reading':alexReadingStage,
       readingStepElapsed:game.action?.readingStepElapsed??0,
       readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
-      musicFrame:game.action?.id==='music'?{
+      musicFrame:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
+        contentId:'music.calm',elapsed:game.socialAction.elapsed}:
+        game.action?.id==='music'?{
         phase:game.action.phase,activityId:game.action.activityId,
         contentId:game.action.contentId,elapsed:game.action.elapsed
       }:null,
@@ -3832,7 +3845,7 @@ function boot() {
     if(meshyShown&&useId==='fridge')snack.enabled=false;
     // The existing procedural book is attached to the old right elbow.
     // Never let it float beside the Meshy hand until a real socket exists.
-    if(meshyShown&&(useId==='sofa'||game.action?.id==='hobby'))
+    if(meshyShown&&(useId==='sofa'||useId==='hobby'||game.action?.id==='hobby'))
       book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
