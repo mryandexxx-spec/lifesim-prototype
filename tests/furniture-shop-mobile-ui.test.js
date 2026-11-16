@@ -10,7 +10,7 @@ const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 test('F2.1 UX all four items are purchasable via one catalog, not only plants',()=>{
   assert.deepEqual(SHOP_ITEMS.map(p=>p.prefabId),['plant','table','nightstand','tv']);
   assert.match(game,/for\(const item of shopListings\)\{/);
-  assert.match(game,/button\.append\(name,cost\)/);
+  assert.match(game,/button\.append\(name,cost,mark\)/);
   for(const item of SHOP_ITEMS){
     assert.ok(item.price>0);
     const free=findMarketPlacement(newFurnitureWorld(),newFurnitureShop(),item.prefabId,people);
