@@ -11,6 +11,7 @@ import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
+import {validReadingJourneyAction,finishReadingMinutes} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {preferenceAffinity} from './trait-catalog.js';
 export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','bladder']);
@@ -82,6 +83,16 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
         if(typeof data.action.contentId==='string')next.action.contentId=data.action.contentId;
       }
     }
+    // H1n is additive to the old household-v1 activity. Legacy H1 saves
+    // without these optional fields still finish their original standing read.
+    if(next.action?.id==='hobby'&&(
+      Object.hasOwn(data.action,'readingStage')||
+      Object.hasOwn(data.action,'readingSeatInstanceId'))){
+      next.action.readingStage=data.action.readingStage;
+      next.action.readingSeatInstanceId=data.action.readingSeatInstanceId;
+      next.action.readingStepElapsed=data.action.readingStepElapsed;
+      if(!validReadingJourneyAction(next.action))next.action=null;
+    }
     // Optional F3b reservation. Older v1 TV saves remain standing.
     if(data.action.id==='tv'&&validFurnitureInstanceId(data.action.watchSeatInstanceId))
       next.action.watchSeatInstanceId=data.action.watchSeatInstanceId;
@@ -134,7 +145,9 @@ export function tick(state, minutes,world=state?.world??null) {
   // Sitting at an actual occupied sofa (resting or watching television)
   // suspends Energy decay while using it; standing TV viewing does NOT.
   const sitting=state.action?.id==='sofa'||
-    (state.action?.id==='tv'&&Boolean(state.action.watchSeatInstanceId));
+    (state.action?.id==='tv'&&Boolean(state.action.watchSeatInstanceId))||
+    (state.action?.id==='hobby'&&state.action.readingStage==='reading'&&
+      Boolean(state.action.readingSeatInstanceId));
   const sofaRestMinutes=sitting&&state.action?.phase==='using'
     ?Math.min(minutes,Math.max(0,ACTIONS[state.action.id].duration-state.action.elapsed))
     :0;
@@ -188,10 +201,14 @@ export function tick(state, minutes,world=state?.world??null) {
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
         (!['fridge','shower','toilet','hobby'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
-      state.event = definition.label + ' — готово';
+      // H1n does not complete at the final earned page: the reader still
+      // closes the book, rises and returns it to the original shelf.
+      const returning=state.action.id==='hobby'&&
+        validReadingJourneyAction(state.action)&&finishReadingMinutes(state.action);
+      state.event=returning?'Закрывает книгу':definition.label+' — готово';
       rememberAction(state, state.action.id);
-      state.autonomy.nextAt = state.minutes + 7; // short break between autonomous tasks
-      state.action = null;
+      state.autonomy.nextAt = state.minutes + 7;
+      if(!returning)state.action=null;
     }
   }
 }
