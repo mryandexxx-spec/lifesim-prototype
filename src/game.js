@@ -30,7 +30,10 @@ import {describeObjectQualities,shopQualitySummary} from './object-quality-prese
 import {compareShopVariants,formatShopVariantComparison,chooseComparableVariant} from './object-quality-comparison.js';
 import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
-import {furnitureProduct,FURNITURE_APPEARANCES} from './furniture-products.js';
+import {furnitureProduct,FURNITURE_APPEARANCES,FURNITURE_SHOP_TYPES,
+  PROCEDURAL_NEW_PREFABS,PROCEDURAL_DEFAULT_SKU} from './furniture-products.js';
+import {proceduralFurnitureModel} from './furniture-procedural-library.js';
+import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -1277,6 +1280,31 @@ function boot() {
     };
     visit(node);
   };
+  // Only actual purchased instances get meshes. A hidden template for a
+  // new prefab is EMPTY: the recipe is attached on demand after clone.
+  // Each product's modelKey may be mapped to an optimized Meshy GLB later.
+  const applySkuModel=(node,itemDefinitionId)=>{
+    if(!node)return;
+    const product=furnitureProduct(itemDefinitionId);
+    const recipe=proceduralFurnitureModel(product?.modelKey);
+    if(recipe){
+      const hide=new Set(recipe.hideBase);
+      const hideNamed=nodePart=>{
+        if(hide.has(nodePart.name))nodePart.enabled=false;
+        for(const child of nodePart.children||[])hideNamed(child);
+      };
+      if(hide.size)hideNamed(node);
+      for(const part of recipe.parts){
+        if(!variantMaterials.has(part.color))
+          variantMaterials.set(part.color,mat(part.color));
+        const mesh=primitive(part.kind,'SKU '+recipe.modelKey+' '+part.name,
+          part.x,part.y,part.z,part.sx,part.sy,part.sz,
+          variantMaterials.get(part.color),node);
+        if(part.rotation)mesh.setLocalEulerAngles(...part.rotation);
+      }
+    }
+    applyItemAppearance(node,itemDefinitionId);
+  };
   const decorNodes=new Map();
   const decorTemplates=new Map();
   let decorDrawing=null;
@@ -1307,7 +1335,8 @@ function boot() {
       if(!template||!MARKET_OFFERS.some(s=>s.prefabId===item.prefabId))continue;
       const node=template.clone();
       node.name='F2 purchased / '+item.instanceId;
-      if(item.itemDefinitionId)applyItemAppearance(node,item.itemDefinitionId);
+      applySkuModel(node,item.itemDefinitionId||
+        PROCEDURAL_DEFAULT_SKU[item.prefabId]);
       app.root.addChild(node);
       decorNodes.set(item.instanceId,node);
     }
@@ -1603,6 +1632,10 @@ function boot() {
     ball('plant leaf',3.93,1.10,3.08,.62,.63,.6,M.leaf2);
     ball('plant leaf',4.45,1.38,3.42,.65,.74,.51,M.green);
   });
+  // New prefab templates remain empty; modelKey builds the geometry only
+  // for a purchased or staged object and never for existing save fixtures.
+  for(const prefabId of PROCEDURAL_NEW_PREFABS)
+    withDecor(prefabId,()=>{});
   box('entry mat',-.65,.042,3.45,1.45,.012,.60,M.mint);
   // Instantiate extra purchased decor from saved v1 furniture instances.
   updateDecorNodes();
@@ -2237,7 +2270,30 @@ function boot() {
   // F4b2: store UI selects SKU identity; renderer/footprint still use prefab.
   const shopListings=selectShopCatalog();
   const shopQualityRegistry=legacyObjectRegistry();
+  // Sculptural SVG previews reuse modelKey geometry; no image downloads and
+  // no PlayCanvas instances are created while scrolling the store.
+  const svgNS='http://www.w3.org/2000/svg';
+  const buildProductThumbnail=offer=>{
+    const svg=document.createElementNS(svgNS,'svg');
+    svg.setAttribute('viewBox','0 0 92 76');
+    svg.setAttribute('aria-hidden','true');
+    svg.classList.add('furnish-sku-sketch');
+    const recipe=furnitureThumbnailFaces(offer.prefabId,offer.modelKey);
+    for(const face of recipe){
+      const part=document.createElementNS(svgNS,face.kind==='ellipse'?'ellipse':'polygon');
+      part.setAttribute('fill',face.fill);
+      if(face.kind==='ellipse'){
+        for(const attribute of ['x','y','rx','ry'])
+          part.setAttribute(attribute==='x'?'cx':attribute==='y'?'cy':attribute,String(face[attribute]));
+      }else{
+        part.setAttribute('points',face.points.map(p=>p.join(',')).join(' '));
+      }
+      svg.append(part);
+    }
+    return svg;
+  };
   let shopRoomCategory=null,shopFunctionCategory=null;
+  let shopTypeCategory=null,shopSearchText='';
   // Separate visual staging entity is never a purchased item and never enters
   // world.furniture or household saves. The floor outline shows validation.
   const clearShopPreviewEntity=()=>{
@@ -2255,7 +2311,7 @@ function boot() {
       if(template){
         shopPreviewEntity=template.clone();
         shopPreviewEntity.name='Unsaved furniture placement preview';
-        if(shopSelectedItemId)applyItemAppearance(shopPreviewEntity,shopSelectedItemId);
+        if(shopSelectedItemId)applySkuModel(shopPreviewEntity,shopSelectedItemId);
         app.root.addChild(shopPreviewEntity);
         shopPreviewType=shopSelected;
       }
@@ -2295,7 +2351,8 @@ function boot() {
     }
     const listing=shopListings.find(i=>i.itemId===shopSelectedItemId);
     const visibleShopListings=selectShopCatalog({
-      roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory
+      roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory,
+      typeCategoryId:shopTypeCategory,searchText:shopSearchText
     });
     const comparable=listing&&!shopPlacing
       ?compareShopVariants(shopQualityRegistry,visibleShopListings,listing.itemId):[];
@@ -2319,7 +2376,8 @@ function boot() {
         // A stale comparison row can never select a hidden SKU or buy it.
         if(!furnishMode||!shopOpen||shopPlacing)return;
         const currentVisible=selectShopCatalog({
-          roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory
+          roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory,
+      typeCategoryId:shopTypeCategory,searchText:shopSearchText
         });
         const id=chooseComparableVariant(shopQualityRegistry,currentVisible,
           shopSelectedItemId,other.itemId);
@@ -2427,11 +2485,62 @@ function boot() {
   };
   addShopFacetOptions('room','furnish-room-filter');
   addShopFacetOptions('function','furnish-function-filter');
+  // Touch-friendly category rail, independent from room/function facets.
+  // Category IDs are registered data; no product-specific UI switches.
+  const typeTabs=$('furnish-type-tabs');
+  const subtypeTabs=$('furnish-subtype-tabs');
+  const buildTypeTab=(category)=>{
+    const button=document.createElement('button');
+    button.type='button';button.dataset.categoryId=category?.id||'';
+    button.textContent=category?((category.icon||'▦')+' '+category.label):'Все';
+    button.setAttribute('aria-pressed','false');
+    button.addEventListener('click',()=>{
+      if(!shopOpen||shopPlacing)return;
+      shopTypeCategory=category?.id||null;
+      renderShopFilteredItems();renderFurnitureSelection();
+    });
+    typeTabs.append(button);
+  };
+  buildTypeTab(null);
+  const availableTypeIds=new Set(shopCategoryOptions('type').map(cat=>cat.id));
+  for(const category of FURNITURE_SHOP_TYPES)
+    if(!category.parentId&&availableTypeIds.has(category.id))
+      buildTypeTab(category);
+  const syncSubtypes=()=>{
+    const selected=FURNITURE_SHOP_TYPES.find(cat=>cat.id===shopTypeCategory);
+    const root=selected?.parentId||selected?.id||null;
+    for(const tab of typeTabs.querySelectorAll('button'))
+      tab.setAttribute('aria-pressed',String(tab.dataset.categoryId===(root||'')));
+    subtypeTabs.replaceChildren();
+    subtypeTabs.hidden=!root;
+    if(!root)return;
+    const entries=[{id:root,label:'Все'}].concat(
+      FURNITURE_SHOP_TYPES.filter(cat=>cat.parentId===root&&availableTypeIds.has(cat.id)));
+    for(const entry of entries){
+      const button=document.createElement('button');
+      button.type='button';button.textContent=entry.label;
+      button.dataset.categoryId=entry.id;
+      button.setAttribute('aria-pressed',String(shopTypeCategory===entry.id));
+      button.addEventListener('click',()=>{
+        if(!shopOpen||shopPlacing)return;
+        shopTypeCategory=entry.id;
+        renderShopFilteredItems();renderFurnitureSelection();
+      });
+      subtypeTabs.append(button);
+    }
+  };
+  $('furnish-search').addEventListener('input',event=>{
+    if(!shopOpen||shopPlacing)return;
+    shopSearchText=event.currentTarget.value||'';
+    renderShopFilteredItems();renderFurnitureSelection();
+  });
   const renderShopFilteredItems=()=>{
     const visible=selectShopCatalog({
-      roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory
+      roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory,
+      typeCategoryId:shopTypeCategory,searchText:shopSearchText
     });
     const ids=new Set(visible.map(item=>item.itemId));
+    syncSubtypes();
     for(const button of $('furnish-stock').querySelectorAll('button'))
       button.hidden=!ids.has(button.dataset.itemId);
     $('furnish-filter-count').textContent='Показано '+visible.length+' из '+shopListings.length;
@@ -2462,6 +2571,7 @@ function boot() {
     button.type='button';button.dataset.prefabId=item.prefabId;
     button.dataset.itemId=item.itemId;
     const name=document.createElement('strong');name.textContent=item.name;
+    const skuSketch=buildProductThumbnail(item);
     const cost=document.createElement('small');cost.textContent=item.price+' проб. кр.';
     const effect=document.createElement('small');
     effect.className='furnish-product-effect';
@@ -2475,6 +2585,7 @@ function boot() {
     mark.className='furnish-selected-mark';mark.textContent='✓ ВЫБРАНО';
     mark.hidden=true;
     button.append(name,cost,effect,mark);
+    button.prepend(skuSketch);
     if(qualitySummary)button.append(quality);
     button.setAttribute('aria-pressed','false');
     button.addEventListener('click',()=>chooseShopProduct(item.itemId));
@@ -2683,7 +2794,9 @@ function boot() {
     const boxes=game.world.furniture.instances.filter(item=>item.location==='home')
       .map(item=>{
         const rect=instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint);
-        const height={table:.63,nightstand:1.49,tv:2.0,plant:1.87,
+        const height={armchair:1.85,chair:1.65,diningtable:.95,floorlamp:2.1,
+          rug:.09,dresser:1.17,mirror:2.17,sculpture:1.95,wardrobe:2.62,
+          table:.63,nightstand:1.49,tv:2.0,plant:1.87,
           bed:1.40,counter:2.50,fridge:2.2,sofa:1.3,shower:2.75,toilet:1.45,
         bookcase:2.05,music:1.2}[item.prefabId]||2;
         return {kind:'object',id:item.instanceId,bounds:{
