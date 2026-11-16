@@ -420,7 +420,9 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
          anim.speed=1;anim.playing=!paused;
          return true;
        }
-       const clip=miraClipFor({walking,social:hugFrame?.active?null:social});
+       const clip=['lamp','mirror','dresser','wardrobe'].includes(actionId)&&!walking
+        ?'Listening_Gesture'
+        :miraClipFor({walking,social:hugFrame?.active?null:social});
       if(state.clip===MIRA_SOFA_CLIP){
         state.sofaRelease={remaining:.2,offset:{...state.sofaOffset}};
       }
