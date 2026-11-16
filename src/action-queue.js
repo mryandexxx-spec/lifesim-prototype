@@ -8,10 +8,13 @@ import {CONVERSATION_TOPICS} from './conversation-engine.js';
 import {GIFT_CATALOG,LEISURE_CATALOG} from './gifts-leisure.js';
 import {BRANCH_ACTIONS} from './social-graph.js';
 import {validFurnitureInstanceId} from './furniture-catalog.js';
+import {getActivityDefinition} from './activity-registry.js';
+import {getHobbyContent} from './hobby-content.js';
+import {HOBBY_ACTIVITIES,HOBBY_CONTENT} from './hobby-reading.js';
 
 export const ACTION_QUEUE_SCHEMA=1;
 export const MAX_ACTION_QUEUE=12;
-export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared']);
+export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity']);
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const count=n=>Number.isSafeInteger(n)&&n>=1&&n<=1000000000;
 const known=(o,k)=>typeof k==='string'&&Object.hasOwn(o,k);
@@ -26,6 +29,16 @@ export function sanitizeQueueCommand(id,raw,persons){
     return raw.targetInstanceId
       ?{type,actionId:raw.actionId,targetInstanceId:raw.targetInstanceId}
       :{type,actionId:raw.actionId};
+  }
+  // Solo physical hobby queue commands do not have a social target.
+  if(type==='activity'){
+    const definition=getActivityDefinition(HOBBY_ACTIVITIES,raw.activityId);
+    const content=getHobbyContent(HOBBY_CONTENT,raw.contentId);
+    if(!definition||definition.source!=='item'||definition.participation!=='solo'||
+      !validFurnitureInstanceId(raw.targetInstanceId)||
+      (definition.contentKind&&(content?.kind!==definition.contentKind)))return null;
+    return {type,activityId:definition.id,targetInstanceId:raw.targetInstanceId,
+      contentId:content?.id||null};
   }
   if(type==='object'||!pair(id,raw.targetId)||!persons.includes(raw.targetId))return null;
   const targetId=raw.targetId;
