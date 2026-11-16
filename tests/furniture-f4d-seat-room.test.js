@@ -135,5 +135,5 @@ test('F4D: runtime contract and Pages delivery expose the new action',()=>{
   assert.match(html,/1\.2u\.\d+ · F4D/);
   assert.match(html,/seat-furniture\.js\?v=1\.2v-f4d/);
   assert.match(workflow,/node --check src\/seat-furniture\.js/);
-  assert.match(workflow,/src\/seat-furniture\.js site\/src\//);
+  assert.match(workflow,/src\/seat-furniture\.js src\/furniture-interactions\.js site\/src\//);
 });
