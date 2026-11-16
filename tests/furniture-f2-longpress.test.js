@@ -87,12 +87,12 @@ test('Game input: iPhone cancelled/second touches never commit layout or suppres
   assert.match(game,/canvas\.addEventListener\('contextmenu',event=>event\.preventDefault\(\)\)/);
   assert.match(game,/if\(event\.cancelable\)event\.preventDefault\(\)/);
 });
-test('Old v1 household, queued actions, M4 and M5 are not part of this transient gesture',()=>{
+test('Old v1 save and M4/M5 remain intact; queued idle items can be repositioned',()=>{
   const src=read('../src/furniture-hold.js');
   assert.doesNotMatch(src,/localStorage|world\.furniture|save\(|document|window|playcanvas/);
   assert.match(game,/commitFurniture\(instanceId,pose\)/);
   assert.match(game,/refreshMind\(game\.otherSim,game\.world\)/);
-  assert.match(game,/proposeFurnitureMove\(game\.world\.furniture,editDrag\.instanceId,pose,editorContext\(\)\)/);
+  assert.match(game,/proposeFurnitureMove\(game\.world\.furniture,editDrag\.instanceId,pose,editorContext\(true\)\)/);
   assert.match(game,/if\(furnishMode&&endEditorDrag\(event\)\)return/);
   assert.match(read('../src/simulation.js'),/lifesim\.room01\.v1/);
 });

@@ -32,6 +32,7 @@ import {getObjectItem} from './object-definition-registry.js';
 import {newObjectOnceLedger,restoreObjectOnceLedger} from './object-once-ledger.js';
 import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
+import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
 export const RESIDENT_NAMES = Object.freeze({ alex: 'Алекс', mira: 'Мира' });
@@ -123,8 +124,14 @@ export function loadHousehold(raw) {
     actor.activitySession=null;
     if(actor.action?.id==='music'){
       const listening=restoreActivitySession(HOBBY_ACTIVITIES,saved?.activitySession,HOBBY_CONTENT);
-      const point=furnitureActionApproach(root.world,'music',actor.action.targetInstanceId);
-      if(!listening||listening.actorId!==id||listening.activityId!==MUSIC_ACTIVITY_ID||
+      // Older 1.2u saves did not persist a listening-side anchor. Upgrade
+      // only this optional action field; never erase the apartment or queue.
+      const storedSpot=actor.action.musicSpot;
+      const point=validMusicListeningSpot(root.world,actor.action.targetInstanceId,storedSpot)
+        ?storedSpot
+        :chooseMusicListeningSpot(root.world,actor.position,actor.action.targetInstanceId)?.point;
+      if(point)actor.action.musicSpot={x:point.x,z:point.z};
+      if(!point||!listening||listening.actorId!==id||listening.activityId!==MUSIC_ACTIVITY_ID||
         listening.targetInstanceId!==actor.action.targetInstanceId||
         listening.contentId!==actor.action.contentId||
         !validMusicSource(root,actor)||
@@ -332,12 +339,12 @@ function validMusicSource(root,actor){
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
-  activityId=null,contentId=null) {
+  activityId=null,contentId=null,musicPlan=null) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
     !furnitureAvailable(root,itemId,residentId,item.instanceId))return false;
   const resident=getActor(root,residentId);
-  let readingSeat=null;
+  let readingSeat=null,plannedMusic=null;
   if(itemId==='hobby'){
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
     if(!activity||contentId!==READING_CONTENT_ID||
@@ -350,6 +357,9 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     if(activity?.id!==MUSIC_ACTIVITY_ID||
       !MUSIC_CONTENT_IDS.includes(contentId)||
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))
+      return false;
+    plannedMusic=musicPlan||chooseMusicListeningSpot(root.world,resident.position,item.instanceId);
+    if(!plannedMusic||!validMusicListeningSpot(root.world,item.instanceId,plannedMusic.point))
       return false;
   }
   // Explicit actions never supersede an ongoing action or interrupt a social.
@@ -380,6 +390,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     if(!session){resident.action=null;return false;}
     resident.action.activityId=activityId;
     resident.action.contentId=contentId;
+    resident.action.musicSpot={x:plannedMusic.point.x,z:plannedMusic.point.z};
     resident.activitySession=session;
   }
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
@@ -480,9 +491,10 @@ function advanceReading(root,id,minutes){
 function advanceMusic(root,id,minutes){
   const actor=getActor(root,id),action=actor?.action;
   if(action?.id!=='music')return;
-  const point=furnitureActionApproach(root.world,'music',action.targetInstanceId);
+  const point=action.musicSpot;
   let session=actor.activitySession;
   if(!validMusicSource(root,actor)||
+    !validMusicListeningSpot(root.world,action.targetInstanceId,point)||
     !furnitureAvailable(root,'music',id,action.targetInstanceId)||
     !session||session.actorId!==id||session.activityId!==MUSIC_ACTIVITY_ID||
     session.contentId!==action.contentId||
