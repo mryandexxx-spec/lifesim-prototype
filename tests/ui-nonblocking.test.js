@@ -156,9 +156,9 @@ test('1.0o: a toast is compact, tap-through and cannot occlude lower mobile conv
   assert.ok(!game.includes("toast(getActorName(residentId)+': запланировано"));
 });
 test('1.0o: closure semantics and browser cache-busting are discoverable on iPhone',()=>{
-  assert.match(html,/сборка \/ 1\.2k/);
-  assert.match(html,/styles\.css\?v=1\.2k/);
-  assert.match(html,/src\/game\.js\?v=1\.2k/);
+  assert.match(html,/сборка \/ 1\.2l/);
+  assert.match(html,/styles\.css\?v=1\.2l/);
+  assert.match(html,/src\/game\.js\?v=1\.2l/);
   assert.match(html,/id="queue-feedback"[^>]+aria-live="polite"/);
   assert.match(html,/id="branch-close"[^>]+aria-label="Закрыть окно, не прерывая действие"/);
   assert.match(html,/id="conversation-close"[^>]+aria-label="Свернуть беседу, не прерывая действие"/);

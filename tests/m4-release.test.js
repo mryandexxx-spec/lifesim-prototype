@@ -14,9 +14,9 @@ test('M4 production Pages includes the physical toilet code and keeps existing U
 });
 test('M4 Safari release cache bust is consistent with package and lock',()=>{
   const html=read('../index.html');
-  assert.ok(html.includes('сборка / 1.2k'));
-  assert.ok(html.includes('styles.css?v=1.2k'));
-  assert.ok(html.includes('src/game.js?v=1.2k'));
+  assert.ok(html.includes('сборка / 1.2l'));
+  assert.ok(html.includes('styles.css?v=1.2l'));
+  assert.ok(html.includes('src/game.js?v=1.2l'));
   const pkg=JSON.parse(read('../package.json'));
   const lock=JSON.parse(read('../package-lock.json'));
   assert.equal(pkg.version,'1.0.0-alpha.63');

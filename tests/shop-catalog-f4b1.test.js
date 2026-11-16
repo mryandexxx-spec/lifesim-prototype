@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {createObjectRegistry} from '../src/object-definition-registry.js';
 import {legacyObjectRegistry} from '../src/object-legacy-adapter.js';
@@ -127,4 +128,49 @@ test('F4b1 Pages packages registry selector, mobile build version and leaves sav
   assert.equal(pkg.version,'1.0.0-alpha.64');
   assert.deepEqual(newFurnitureShop(),{schema:1,credits:5000,nextId:1});
   assert.equal(newFurnitureWorld().schema,1);
+});
+
+test('F4b1 DOM filtering hides wrong cards and reselects an offered item',()=>{
+  const game=read('../src/game.js');
+  const start=game.indexOf('  const renderShopFilteredItems=()=>{');
+  const end=game.indexOf("  $('furnish-room-filter').addEventListener",start);
+  assert.ok(start>0&&end>start);
+  const fragment=game.slice(start,end);
+  const buttons=selectShopCatalog().map(item=>({
+    dataset:{itemId:item.itemId},hidden:false
+  }));
+  const elements=new Map([
+    ['furnish-stock',{querySelectorAll:()=>buttons,setAttribute(k,v){this[k]=v;}}],
+    ['furnish-filter-count',{textContent:''}],
+    ['furnish-filter-empty',{hidden:true}]
+  ]);
+  let redraws=0,clears=0;
+  const ctx={
+    $:id=>elements.get(id),selectShopCatalog,shopListings:selectShopCatalog(),
+    shopRoomCategory:'room.bedroom',shopFunctionCategory:null,
+    shopPlacing:false,shopSelected:'plant',shopPose:{x:1,z:2,yaw:0},
+    shopManualPose:true,shopSwipeRawPose:{x:1,z:2},
+    clearShopPreviewEntity:()=>{clears++;},
+    renderMarket:()=>{redraws++;}
+  };
+  const run=()=>runInNewContext('(()=>{'+fragment+'\nrenderShopFilteredItems();})()',ctx,{timeout:1000});
+  run();
+  assert.equal(ctx.shopSelected,'nightstand');
+  assert.equal(buttons.filter(b=>!b.hidden).length,2);
+  assert.equal(elements.get('furnish-filter-count').textContent,'Показано 2 из 6');
+  assert.equal(elements.get('furnish-filter-empty').hidden,true);
+  assert.equal(ctx.shopPose,null);
+  assert.equal(ctx.shopManualPose,false);
+  assert.equal(clears,1);
+  ctx.shopFunctionCategory='function.tv.watch';
+  run();
+  assert.ok(buttons.every(b=>b.hidden));
+  assert.equal(ctx.shopSelected,null);
+  assert.equal(elements.get('furnish-filter-empty').hidden,false);
+  assert.equal(elements.get('furnish-filter-count').textContent,'Показано 0 из 6');
+  ctx.shopRoomCategory=null;ctx.shopFunctionCategory=null;
+  run();
+  assert.equal(ctx.shopSelected,'plant');
+  assert.ok(buttons.every(b=>!b.hidden));
+  assert.equal(redraws,3);
 });
