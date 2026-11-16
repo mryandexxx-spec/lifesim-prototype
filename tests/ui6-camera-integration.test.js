@@ -18,7 +18,7 @@ test('UI6 accepts only a deliberate pointerup tap for world commands',()=>{
  assert.match(src,/if\(!pos\|\|dialogueNeedsDecision\(game\)\)return/);
  assert.match(src,/const target=worldTargetAt\(pos\)/);
  assert.match(src,/if\(target\?\.kind==='resident'\)openSocialContext\(pos\)/);
- assert.match(src,/else if\(target\?\.kind==='object'\)select\(target\.id\)/);
+ assert.match(src,/else if\(target\?\.kind==='object'\)select\(target\.id,target\.instanceId\)/);
  assert.match(src,/pointercancel'[\s\S]*?\{cancel:true\}/);
  assert.match(src,/window\.addEventListener\('blur',\(\)=>\{/);
  assert.match(src,/cancelEditorDrag\(\);cameraGesture\.clear\(\)/);
