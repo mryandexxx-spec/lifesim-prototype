@@ -186,6 +186,18 @@ export function loadHousehold(raw) {
   if(!raw.socialGraph||!Object.hasOwn(raw.socialGraph,'lifeStages'))
     for(const id of HOUSEHOLD_IDS)setLifeStage(root.socialGraph,id,'adult');
   root.socialAction=loadSocialAction(raw.socialAction,root);
+  // F4D: reject ambiguous/corrupt saved double-seat reservations before
+  // either sim can resume the physical sitting action.
+  const occupiedChairs=new Set();
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),action=actor?.action;
+    if(action?.id!=='seat')continue;
+    const seat=resolveActionFurniture(root.world,'seat',action.targetInstanceId);
+    if(!seat||occupiedChairs.has(seat.instanceId)){
+      actor.action=null;continue;
+    }
+    occupiedChairs.add(seat.instanceId);
+  }
   // Restore F3b sofa reservations from optional v1 action data. A removed,
   // relocated or doubly booked seat cannot silently seize another sofa.
   const occupiedSofas=new Set();
