@@ -10,7 +10,7 @@ const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 test('F2.1 UX six products including bed share a single catalog',()=>{
   assert.deepEqual(SHOP_ITEMS.map(p=>p.prefabId),['plant','table','nightstand','tv','sofa','bed']);
   assert.match(game,/for\(const item of shopListings\)\{/);
-  assert.match(game,/button\.append\(name,cost,mark\)/);
+  assert.match(game,/button\.append\(name,cost,effect,mark\)/);
   for(const item of SHOP_ITEMS){
     assert.ok(item.price>0);
     const free=findMarketPlacement(newFurnitureWorld(),newFurnitureShop(),item.prefabId,people);

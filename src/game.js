@@ -2159,7 +2159,7 @@ function boot() {
       :null;
     const suitable=preview?.ok===true;
     const previewLabel=!listing?'Выбери товар в каталоге':
-      !shopPlacing?'Выбран: '+listing.name+'. Нажми «Купить» — увидишь его в комнате.':
+      !shopPlacing?'Выбран: '+listing.name+' · '+listing.effectText+'. Нажми «Купить» — увидишь его в комнате.':
       !shopPose?'Место не выбрано. Коснись пола или нажми «Найти место»':
       suitable?'✓ Место подходит · веди предмет пальцем, «Установить» для покупки':
       '✕ '+editorMessage(preview.reason)+' · подбери другое место свайпом';
@@ -2231,10 +2231,13 @@ function boot() {
     button.type='button';button.dataset.prefabId=item.prefabId;
     const name=document.createElement('strong');name.textContent=item.name;
     const cost=document.createElement('small');cost.textContent=item.price+' проб. кр.';
+    const effect=document.createElement('small');
+    effect.className='furnish-product-effect';
+    effect.textContent=item.effectText;
     const mark=document.createElement('span');
     mark.className='furnish-selected-mark';mark.textContent='✓ ВЫБРАНО';
     mark.hidden=true;
-    button.append(name,cost,mark);
+    button.append(name,cost,effect,mark);
     button.setAttribute('aria-pressed','false');
     button.addEventListener('click',()=>chooseShopProduct(item.prefabId));
     $('furnish-stock').append(button);

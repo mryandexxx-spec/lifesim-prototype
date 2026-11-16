@@ -37,6 +37,7 @@ jobs:
           node --check src/furniture-editor.js
           node --check src/furniture-hold.js
           node --check src/furniture-shop.js
+          node --check src/furniture-value.js
           node --check src/tv-interaction.js
           node --check src/tv-seating.js
           node --check src/tv-together.js
@@ -127,7 +128,7 @@ jobs:
           cp src/ui-onboarding.js site/src/
           cp src/hud-panel.js site/src/
           cp src/furniture-catalog.js src/furniture-layout.js src/furniture-editor.js src/furniture-transform.js src/furniture-hold.js site/src/
-          cp src/furniture-shop.js site/src/
+          cp src/furniture-shop.js src/furniture-value.js site/src/
           cp src/tv-interaction.js site/src/
           cp src/tv-seating.js site/src/
           cp src/tv-together.js site/src/
