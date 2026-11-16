@@ -118,6 +118,6 @@ export function liveSharedTv(root){
   const social=root?.socialAction,shared=social?.shared;
   return social?.phase==='using'&&shared?.mode==='leisure'&&
     shared.choiceId==='tv'&&shared.tvConsent===true&&
-    validSharedTvPlan(root,shared.tvPlan,social.initiator)
+    shared.tvPlan?.places?.alex&&shared.tvPlan?.places?.mira
       ?shared.tvPlan:null;
 }
