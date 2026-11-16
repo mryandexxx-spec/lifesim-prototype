@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.1t" />
+  <link rel="stylesheet" href="./styles.css?v=1.1u" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}
   </script>
@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.1t</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.1u</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -88,7 +88,7 @@
       <div id="furnish-shop" class="furnish-shop" hidden aria-label="Каталог новых предметов">
         <div id="furnish-stock" class="furnish-stock" role="group" aria-label="Четыре товара для покупки"></div>
         <p class="furnish-map-tip"><strong>1. Выбери товар → 2. Нажми «Купить» → 3. Найди место → 4. Установи.</strong> До установки деньги не списываются.</p>
-        <div class="furnish-placement-controls">
+        <div id="furnish-placement-controls" class="furnish-placement-controls">
           <button id="furnish-preview-turn" type="button" aria-label="Повернуть покупаемый предмет на 90 градусов">⟳ Предмет</button>
           <button id="furnish-preview-auto" type="button" aria-label="Найти свободное место для покупки">⌖ Найти место</button>
         </div>
@@ -249,7 +249,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.1t"></script>
+  <script type="module" src="./src/game.js?v=1.1u"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

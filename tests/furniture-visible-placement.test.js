@@ -115,3 +115,13 @@ test('shop selection and placement guidance is clear even when card list collaps
   assert.match(css,/\.furnish-placement-guide\[hidden\]\{display:none!important;/);
   assert.match(css,/\.furnish-selected-mark\[hidden\]\{display:none!important;/);
 });
+
+// Regression for the real Safari crash: a fake test DOM once contained an ID
+// that the shipped HTML lacked. renderMarket() threw before selection or cloning.
+test('all literal DOM selectors in live game code resolve to real HTML IDs',()=>{
+  const ids=[...new Set([...game.matchAll(/\\$\\('([^']+)'\\)/g)].map(match=>match[1]))];
+  assert.ok(ids.length>80,'guard must cover the full running UI, not just shop stubs');
+  for(const id of ids)assert.ok(html.includes('id="'+id+'"'),
+    'Missing live DOM target #'+id+' (JavaScript would throw and abort the editor)');
+  assert.match(html,/id="furnish-placement-controls" class="furnish-placement-controls"/);
+});
