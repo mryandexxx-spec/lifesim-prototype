@@ -66,6 +66,9 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       next.action.bedSlot=data.action.bedSlot;
     if(validFurnitureInstanceId(data.action.targetInstanceId))
       next.action.targetInstanceId=data.action.targetInstanceId;
+    // Optional F3b reservation. Older v1 TV saves remain standing.
+    if(data.action.id==='tv'&&validFurnitureInstanceId(data.action.watchSeatInstanceId))
+      next.action.watchSeatInstanceId=data.action.watchSeatInstanceId;
   }
   return next;
 }
@@ -112,10 +115,12 @@ export function arrive(state) {
 export function tick(state, minutes,world=state?.world??null) {
   if (state.paused || !Number.isFinite(minutes) || minutes <= 0) return;
   state.minutes += minutes;
-  // Actual sofa rest suspends Energy consumption, but walking to the sofa
-  // and time after standing up still cost Energy. No imaginary bonus.
-  const sofaRestMinutes=state.action?.id==='sofa'&&state.action.phase==='using'
-    ?Math.min(minutes,Math.max(0,ACTIONS.sofa.duration-state.action.elapsed))
+  // Sitting at an actual occupied sofa (resting or watching television)
+  // suspends Energy decay while using it; standing TV viewing does NOT.
+  const sitting=state.action?.id==='sofa'||
+    (state.action?.id==='tv'&&Boolean(state.action.watchSeatInstanceId));
+  const sofaRestMinutes=sitting&&state.action?.phase==='using'
+    ?Math.min(minutes,Math.max(0,ACTIONS[state.action.id].duration-state.action.elapsed))
     :0;
   for(const need of PHYSICAL_NEEDS){
     const elapsed=need==='energy'?minutes-sofaRestMinutes:minutes;
