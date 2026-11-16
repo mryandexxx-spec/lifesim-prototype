@@ -28,7 +28,9 @@ const categories=[
   ...caps.map(id=>({id:'function.'+id,
     label:capabilityLabels[id]||id,facet:'function'}))
 ];
-const stats=[...NEEDS.map(n=>({id:'needs.'+n,min:0,max:100,label:n})),
+const statLabels=Object.freeze({energy:'Энергия',fun:'Досуг',hunger:'Сытость',
+  hygiene:'Гигиена',social:'Общение',bladder:'Туалет'});
+const stats=[...NEEDS.map(n=>({id:'needs.'+n,min:0,max:100,label:statLabels[n]||n})),
   {id:'mood.environment',min:-5,max:5,label:'Окружение'}];
 const triggers=['item.use.tick','item.use.complete','item.presence.tick',
   'item.placed','item.repaired'].map(id=>({id}));
