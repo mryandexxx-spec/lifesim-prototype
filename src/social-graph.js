@@ -3,7 +3,8 @@ import {newSocialKnowledge,discoverPreference,restoreSocialKnowledge,discoveryNo
 import {newSocialCues,observeSocialCue,restoreSocialCues,socialCueNotes,cueConversationBias} from './social-boundaries.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {ROMANCE_ACTION_IDS,newRomanceState,restoreRomanceState,romanceClimate,setLifeStage,
-  addFamilyLink,romanceSafety,romanceAvailability,recordRomanceReceipt} from './romance.js';
+  addFamilyLink,romanceSafety,romanceAvailability,recordRomanceReceipt,
+  currentDatingPartner} from './romance.js';
 export {setLifeStage,addFamilyLink,romanceSafety,romanceAvailability} from './romance.js';
 /** Блин’С social graph V1: N residents, N sparse links. No renderer/household imports.
  * Legacy two-resident values are observational inputs from an external adapter.
@@ -148,7 +149,8 @@ const NEGATIVE=new Set(['argue','conversation.argue','gift.refused','leisure.ref
   'romance.date.refused','romance.breakup','romance.divorce',
   'romance.tender.refused','romance.propose.refused','romance.marry.refused',
   'romance.checkin.refused','romance.repair.refused',
-  'romance.hug.refused','romance.kiss.refused','romance.intimacy.refused']);
+  'romance.hug.refused','romance.kiss.refused','romance.intimacy.refused',
+  'romance.jealousy']);
 const TYPES=new Set([...POSITIVE,...NEGATIVE,'introduced']);
 const positive=type=>POSITIVE.has(type);
 const weights={
@@ -192,7 +194,8 @@ const weights={
   'romance.repair.refused':{friendship:0,trust:0,tension:0},
   'romance.hug.refused':{friendship:0,trust:0,tension:0},
   'romance.kiss.refused':{friendship:0,trust:0,tension:0},
-  'romance.intimacy.refused':{friendship:0,trust:0,tension:0}
+  'romance.intimacy.refused':{friendship:0,trust:0,tension:0},
+  'romance.jealousy':{friendship:0,trust:0,tension:0}
 };
 function recompute(pair){
   const [a,b]=pair.ids,v=pair.views;
@@ -220,7 +223,31 @@ function recompute(pair){
       pair.rivalry='oneSided';
   }
 }
+/** Only an explicitly witnessed completed incident creates a jealousy
+ * memory. This does NOT infer what other residents know from omniscient
+ * graph state; the 2-person 3D scene does not currently send witnesses.
+ */
+function recordWitnessedJealousy(graph,source,partnerId,witnessId){
+  const pair=getPair(graph,partnerId,witnessId);
+  const bond=pair?.romance?.bond;
+  const expectation=pair?.romance?.views?.[witnessId];
+  if(!pair||!['dating','engaged','married'].includes(bond?.status)||
+    expectation?.exclusivity!=='exclusive'||!safeAt(bond.since)||
+    source.at<bond.since||pair.events.some(e=>
+      e.type==='romance.jealousy'&&e.causeSeq===source.seq))return null;
+  const receipt={seq:graph.nextSeq++,type:'romance.jealousy',at:source.at,
+    actorId:witnessId,targetId:partnerId,causeSeq:source.seq};
+  pair.events.push(receipt);pair.events=pair.events.slice(-EVENT_LIMIT);
+  pair.lastAt=Math.max(pair.lastAt??0,source.at);
+  expectation.jealousy=clamp((expectation.jealousy??0)+24,0,100);
+  pair.views[witnessId].trust=clamp(pair.views[witnessId].trust-8,0,100);
+  pair.views[witnessId].tension=clamp(pair.views[witnessId].tension+10,0,100);
+  pair.revision++;
+  return receipt;
+}
 export function applySocialEvent(graph,event,{observedViews=null}={}){
+  // Jealousy is derived, never directly issued or queue-spawned.
+  if(event?.type==='romance.jealousy')return null;
   if(!record(event)||!TYPES.has(event.type)||!safeAt(event.at)||
     !validPersonId(event.actorId)||!validPersonId(event.targetId)||
     event.actorId===event.targetId||!Number.isSafeInteger(graph?.nextSeq))return null;
@@ -228,6 +255,15 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
     event.type===id||event.type===id+'.refused');
   if(romanceEvent&&!['romance.breakup','romance.divorce'].includes(event.type)&&
     !romanceSafety(graph,event.actorId,event.targetId).allowed)return null;
+  // Direct graph callers must not bypass the same third-party restriction as
+  // the UI. Otherwise an invalid flirt could fabricate a jealousy incident.
+  if(event.type==='romance.flirt'&&
+    ((currentDatingPartner(graph,event.actorId)&&
+      currentDatingPartner(graph,event.actorId)!==event.targetId)||
+     (currentDatingPartner(graph,event.targetId)&&
+      currentDatingPartner(graph,event.targetId)!==event.actorId))&&
+    !romanceAvailability(graph,event.actorId,event.targetId,event.type,event.at).enabled)
+    return null;
   // A canonical relationship milestone must be eligible even when written by
   // a headless client directly; otherwise an event could bypass consent gates.
   if(['romance.date','romance.tender','romance.propose','romance.marry',
@@ -275,6 +311,17 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
   pair.lastAt=event.at;
   pair.revision++;
   recompute(pair);
+  if(['romance.flirt','romance.tender','romance.kiss','romance.intimacy']
+    .includes(receipt.type)&&Array.isArray(event.witnessIds)){
+    const witnesses=new Set(event.witnessIds.filter(id=>
+      validPersonId(id)&&graph.persons.includes(id)));
+    for(const involvedId of [receipt.actorId,receipt.targetId]){
+      const partnerId=currentDatingPartner(graph,involvedId);
+      if(partnerId&&partnerId!==receipt.actorId&&
+        partnerId!==receipt.targetId&&witnesses.has(partnerId))
+        recordWitnessedJealousy(graph,receipt,involvedId,partnerId);
+    }
+  }
   return receipt;
 }
 export function relationSummary(graph,sourceId,targetId){
@@ -438,7 +485,10 @@ export function restoreSocialGraph(raw,personIds=[],legacyPair=null){
         e.actorId!==e.targetId&&
         pairIds.includes(e.actorId)&&pairIds.includes(e.targetId)).slice(-EVENT_LIMIT)
         .map(e=>({seq:e.seq,type:e.type,at:e.at,actorId:e.actorId,
-          targetId:e.targetId,...(typeof e.token==='string'&&e.token.length<=80?{token:e.token}:{})})):[];
+          targetId:e.targetId,
+          ...(e.type==='romance.jealousy'&&Number.isSafeInteger(e.causeSeq)&&
+            e.causeSeq>0&&e.causeSeq<graph.nextSeq?{causeSeq:e.causeSeq}:{}),
+          ...(typeof e.token==='string'&&e.token.length<=80?{token:e.token}:{})})):[];
       p.lastAt=safeAt(entry.lastAt)?entry.lastAt:null;
       p.episodes=restorePairEpisodes(entry.episodes,pairIds,graph.nextSeq,
         p.lastAt===null?1e7:p.lastAt);
