@@ -1777,6 +1777,7 @@ function boot() {
   rotateButton.addEventListener('click',()=>{
     oneFingerMode=oneFingerMode==='orbit'?'pan':'orbit';
     showCameraMode();
+    if(furnishMode&&shopPlacing)renderMarket();
     toast(oneFingerMode==='orbit'
       ?'Поворот включён: вращай одним пальцем'
       :'Перемещай одним пальцем · вращай двумя');
@@ -1942,6 +1943,12 @@ function boot() {
     }
   };
   const renderMarket=()=>{
+    // In buy-to-place the one-finger gesture moves the object, not the camera.
+    if(furnishMode&&shopPlacing)
+      $('hint').textContent=oneFingerMode==='orbit'
+        ?'Один палец — вращение камеры · два — вращение и масштаб'
+        :'Один палец — перемещение предмета · два — камера и масштаб';
+    else showCameraMode();
     $('furnish-shop').hidden=!shopOpen;
     $('furnish-warehouse').hidden=!warehouseOpen;
     $('furnish-shop-toggle').setAttribute('aria-expanded',String(shopOpen));
@@ -1971,7 +1978,7 @@ function boot() {
     const suitable=preview?.ok===true;
     const previewLabel=!listing?'Выбери товар в каталоге':
       !shopPlacing?'Выбран: '+listing.name+'. Нажми «Купить» — увидишь его в комнате.':
-      !shopPose?'Предмет готов. Сдвигай камеру или выбери место тапом по полу':
+      !shopPose?'Место не выбрано. Коснись пола или нажми «Найти место»':
       suitable?'✓ Место подходит · веди предмет пальцем, «Установить» для покупки':
       '✕ '+editorMessage(preview.reason)+' · подбери другое место свайпом';
     $('furnish-preview').textContent=previewLabel;
