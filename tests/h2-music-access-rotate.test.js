@@ -159,3 +159,22 @@ test('iPhone code wires a visible turn control and unlocks music only on direct 
   assert.match(pages,/node --check src\/music-listening\.js/);
   assert.match(pages,/cp src\/music-listening\.js site\/src\//);
 });
+
+test('Safari import map busts every modified H2 dependency, not only the game entry',()=>{
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const match=html.match(/<script type="importmap">\s*([\s\S]*?)\s*<\/script>/);
+  assert.ok(match,'browser must receive import map before JS entry');
+  const imports=JSON.parse(match[1]).imports;
+  assert.equal(imports.playcanvas,'./vendor/playcanvas.mjs');
+  const base='https://example.org/lifesim-prototype/';
+  for(const name of ['household','furniture-layout','furniture-editor','furniture-shop']){
+    const key='./src/'+name+'.js';
+    assert.ok(imports[key],key+' must be independently cache-busted');
+    assert.equal(new URL(imports[key],base).search,'?v=1.2u-h2fix1');
+    // A nested ./foo.js import in an ES module beneath src/ resolves to
+    // precisely this import-map key, irrespective of the parent module URL.
+    assert.equal(new URL(key,base).href,
+      new URL('./'+name+'.js',new URL('./src/game.js',base)).href);
+  }
+  assert.match(html,/src\/game\.js\?v=1\.2u-h2-music-fix1-cache/);
+});
