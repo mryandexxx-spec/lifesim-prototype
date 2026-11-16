@@ -57,6 +57,8 @@ test('both Meshy visuals mount post-Anim controller and hide obsolete elbow book
   const workflow=source('../.github/workflows/pages.yml');
   assert.match(workflow,/node --check src\/meshy-reading-runtime\.js/);
   assert.match(workflow,/cp src\/meshy-reading-runtime\.js site\/src\//);
+  assert.match(source('../index.html'),/src\/game\.js\?v=1\.2q-h1m-p0/);
+  for(const code of [alex,mira])assert.match(code,/meshy-reading-runtime\.js\?v=1\.2q/);
 });
 
 test('P0 Safari boot: loaded Meshy reading controller accepts idle, reset and reload frames',()=>{
