@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ACTIONS, newGame } from '../src/simulation.js';
 import { findPath, isClearLine, isWalkable, nearestWalkable, FURNITURE } from '../src/navigation.js';
 
-const destinations = Object.fromEntries(Object.entries(ACTIONS).map(([id, a]) => [id, {x:a.location[0],z:a.location[1]}]));
+const destinations = Object.fromEntries(Object.entries(ACTIONS).filter(([id])=>id!=='hobby').map(([id, a]) => [id, {x:a.location[0],z:a.location[1]}]));
 
 test('each interaction has a reachable stand point from initial position', () => {
   const from = newGame().position;

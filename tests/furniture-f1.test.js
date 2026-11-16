@@ -10,7 +10,7 @@ const copy=x=>JSON.parse(JSON.stringify(x));
 const item=(w,type)=>w.instances.find(x=>x.prefabId===type);
 test('F1b functional prefab groups are selectable, while built-in counter stays fixed',()=>{
   assert.deepEqual(F1_MOVEABLE_PREFABS,
-    ['nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet']);
+    ['nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet','bookcase']);
   const w=newFurnitureWorld();
   for(const x of w.instances)
     assert.equal(canMoveFurniture(x),F1_MOVEABLE_PREFABS.includes(x.prefabId),x.prefabId);

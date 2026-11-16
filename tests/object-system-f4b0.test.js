@@ -116,7 +116,7 @@ test('F4b0 a completely new bonus/trigger needs authoring data only',()=>{
 });
 test('F4b0 legacy bridge maps all ten original prefabs, with no newly minted gameplay buffs',()=>{
   const r=legacyObjectRegistry();
-  assert.equal(Object.values(r.items).length,Object.keys(FURNITURE_CATALOG).length+1);
+  assert.equal(Object.values(r.items).length,Object.keys(FURNITURE_CATALOG).length+2);
   for(const original of Object.values(FURNITURE_CATALOG)){
     const item=getObjectItem(r,legacyItemIdForPrefab(original.prefabId));
     assert.equal(item.prefabId,original.prefabId);
@@ -147,5 +147,5 @@ test('F4b0 Pages packaging checks future modules; no new runtime on scene import
   assert.match(pages,/node --check src\/object-effect-engine\.js/);
   assert.match(pages,/cp src\/object-definition-registry\.js src\/object-effect-engine\.js src\/object-legacy-adapter\.js src\/shop-catalog-selector\.js site\/src\//);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
-  assert.match(html,/src\/game\.js\?v=1\.2m/);
+  assert.match(html,/src\/game\.js\?v=1\.2n/);
 });

@@ -17,7 +17,8 @@ const passiveLabels=Object.freeze({
   plant:'Украшение комнаты',
   table:'Столик для встреч',
   nightstand:'Прикроватный декор',
-  counter:'Рабочая поверхность'
+  counter:'Рабочая поверхность',
+  bookcase:'Чтение → досуг и литературная эрудиция'
 });
 
 /** Returns actual action need or an honest non-numeric utility description.

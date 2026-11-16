@@ -74,6 +74,8 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
     return reject('unreachable-bed');
   if(productPrefabId==='tv'&&!sofaReachable(valid.world,id,opts,'tv'))
     return reject('unreachable-tv');
+  if(productPrefabId==='bookcase'&&!sofaReachable(valid.world,id,opts,'hobby'))
+    return reject('unreachable-bookcase');
   return {ok:true,world:valid.world,
     shop:{...current.shop,credits:current.shop.credits-item.price,nextId:current.shop.nextId+1},
     instanceId:id,amount:-item.price};
@@ -134,6 +136,8 @@ export function restoreMarketItem(world,shop,instanceId,pose,opts={}){
     return reject('unreachable-bed');
   if(item.prefabId==='tv'&&!sofaReachable(valid.world,instanceId,opts,'tv'))
     return reject('unreachable-tv');
+  if(item.prefabId==='bookcase'&&!sofaReachable(valid.world,instanceId,opts,'hobby'))
+    return reject('unreachable-bookcase');
   return {...valid,shop:current.shop,instanceId,amount:0};
 }
 export function sellMarketItem(world,shop,instanceId,opts={}){

@@ -10,6 +10,9 @@ import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-inte
 import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
+import {HOBBY_ACTIVITIES} from './hobby-reading.js';
+import {getActivityDefinition} from './activity-registry.js';
+import {preferenceAffinity} from './trait-catalog.js';
 export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','bladder']);
 export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
@@ -20,7 +23,11 @@ export const ACTIONS = Object.freeze({
   tv: { label: 'Смотреть телевизор', need: 'fun', duration: TV_WATCH_DURATION,
     benefitPerMinute: 1.08, location: [TV_APPROACH.x,TV_APPROACH.z] },
   toilet: { label: 'Сходить в туалет', need: 'bladder', duration: 26,
-    benefitPerMinute: 2.7, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] }
+    benefitPerMinute: 2.7, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] },
+  // One compatibility bridge for every future item-driven hobby: the true
+  // activity, timing and effects are authored in the H0 activity registry.
+  hobby: { label: 'Читать книгу', need: 'fun', duration: 36, benefitPerMinute: 1.05,
+    location: [0,.92] }
 });
 // Keep consumption rates in one independent balance contract, not duplicated
 // across simulation, social personality logic, the HUD or action handlers.
@@ -66,6 +73,15 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       next.action.bedSlot=data.action.bedSlot;
     if(validFurnitureInstanceId(data.action.targetInstanceId))
       next.action.targetInstanceId=data.action.targetInstanceId;
+    // Optional H1 activity metadata. Unknown activities are not restorable.
+    if(data.action.id==='hobby'){
+      const activity=getActivityDefinition(HOBBY_ACTIVITIES,data.action.activityId);
+      if(!activity||activity.source!=='item')next.action=null;
+      else{
+        next.action.activityId=activity.id;
+        if(typeof data.action.contentId==='string')next.action.contentId=data.action.contentId;
+      }
+    }
     // Optional F3b reservation. Older v1 TV saves remain standing.
     if(data.action.id==='tv'&&validFurnitureInstanceId(data.action.watchSeatInstanceId))
       next.action.watchSeatInstanceId=data.action.watchSeatInstanceId;
@@ -132,10 +148,15 @@ export function tick(state, minutes,world=state?.world??null) {
   refreshMind(state,world);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
-    const amount = Math.min(minutes, Math.max(0, definition.duration - state.action.elapsed));
+    const hobby=state.action.id==='hobby'
+      ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
+    if(state.action.id==='hobby'&&!hobby){state.action=null;return;}
+    const duration=hobby?.timeBudget.targetMinutes??definition.duration;
+    const amount = Math.min(minutes, Math.max(0, duration - state.action.elapsed));
     // Hunger rises only when eating, not before taking food from the shelf.
     // Preserve the previous total benefit by concentrating it in the bite phase.
-    let gained=definition.benefitPerMinute*amount;
+    let gained=(hobby?.needEffects.find(effect=>effect.statId==='needs.fun')?.perMinute
+      ??definition.benefitPerMinute)*amount;
     if(state.action.id==='fridge'){
       const eatFrom=definition.duration*FRIDGE_EAT_START;
       const before=Math.max(0,state.action.elapsed-eatFrom);
@@ -158,13 +179,15 @@ export function tick(state, minutes,world=state?.world??null) {
     }
     // M2 affects enjoyment of optional rest, not animation time, eating,
     // sleep, shower privacy, or promises of physical self-care.
-    if(['sofa','tv'].includes(state.action.id))gained*=voluntaryMoodEfficiency(state,
+    if(['sofa','tv','hobby'].includes(state.action.id))gained*=voluntaryMoodEfficiency(state,
       {type:'object',actionId:state.action.id});
+    // Enjoying books is a taste; literature XP is earned separately by work.
+    if(hobby)gained*=1+preferenceAffinity(state.personality,'books')*.12;
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
     refreshMind(state,world);
     state.action.elapsed += amount;
-    if (state.action.elapsed >= definition.duration ||
-        (!['fridge','shower','toilet'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+    if (state.action.elapsed >= duration ||
+        (!['fridge','shower','toilet','hobby'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       state.event = definition.label + ' — готово';
       rememberAction(state, state.action.id);
       state.autonomy.nextAt = state.minutes + 7; // short break between autonomous tasks

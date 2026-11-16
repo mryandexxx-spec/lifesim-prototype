@@ -36,6 +36,12 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
   for(const person of residents){
     if(!person||!Number.isFinite(person.x)||!Number.isFinite(person.z))continue;
     if(!isWalkable(person.x,person.z,candidate))return {ok:false,reason:'resident-blocked'};
+    // A purchased hobby station must keep a reachable real interaction slot.
+    if(target.prefabId==='bookcase'){
+      const reading=furnitureActionApproach(candidate,'hobby',instanceId);
+      if(!reading||!findPath(person,reading,candidate))
+        return {ok:false,reason:'unreachable-bookcase'};
+    }
     // A moved television must retain a real approach to its own screen.
     if(target.prefabId==='tv'){
       const watching=furnitureActionApproach(candidate,'tv',instanceId);

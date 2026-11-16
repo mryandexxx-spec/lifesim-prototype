@@ -19,6 +19,14 @@ import {liveSharedTv} from './tv-together.js';
 import {captureObjectUse,settleObjectUseStep} from './object-use-runtime.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
+import {HOBBY_ACTIVITIES,HOBBY_CONTENT,HOBBY_SKILLS,READING_ACTIVITY_ID,READING_CONTENT_ID} from './hobby-reading.js';
+import {getActivityDefinition,activityFitsItem} from './activity-registry.js';
+import {createActivitySession,restoreActivitySession,arriveActivitySession,
+  advanceActivitySession} from './activity-session.js';
+import {newSkillProgress,restoreSkillProgress,creditActivityPractice} from './skills-engine.js';
+import {getObjectItem} from './object-definition-registry.js';
+import {legacyObjectRegistry} from './object-legacy-adapter.js';
+import {furnitureActionApproach} from './furniture-catalog.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
 export const RESIDENT_NAMES = Object.freeze({ alex: 'Алекс', mira: 'Мира' });
@@ -31,6 +39,7 @@ function newMira(minutes=480) {
   mira.minutes=minutes;
   mira.autonomy.nextAt=minutes;
   mira.event='Свободное время';
+  mira.skills=newSkillProgress();
   refreshMind(mira);
   return mira;
 }
@@ -38,6 +47,7 @@ function newMira(minutes=480) {
 export function newHousehold() {
   const state=newGame(DEMO_PROFILES.first);
   state.otherSim=newMira(state.minutes);
+  state.skills=newSkillProgress();
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);
   state.socialGraph=newSocialGraph(HOUSEHOLD_IDS);
@@ -94,6 +104,31 @@ export function loadHousehold(raw) {
       const object=resolveActionFurniture(root.world,task.actionId);
       if(object)task.targetInstanceId=object.instanceId;
     }
+  }
+  // H1 optional per-resident skill progress in the existing v1 root;
+  // malformed or absent fields never reset old household/furniture.
+  for(const id of HOUSEHOLD_IDS){
+    const actor=id==='alex'?root:mira;
+    const saved=id==='alex'?raw:raw.otherSim;
+    actor.skills=restoreSkillProgress(saved?.skills,HOBBY_SKILLS);
+    actor.activitySession=null;
+    if(actor.action?.id!=='hobby')continue;
+    const restored=restoreActivitySession(HOBBY_ACTIVITIES,saved?.activitySession,HOBBY_CONTENT);
+    if(!restored||restored.actorId!==id||
+       restored.activityId!==actor.action.activityId||
+       restored.targetInstanceId!==actor.action.targetInstanceId||
+       restored.contentId!==actor.action.contentId||
+       !((restored.phase==='walking'&&actor.action.phase==='walking')||
+          (restored.phase==='using'&&actor.action.phase==='using')||
+          (restored.phase==='walking'&&actor.action.phase==='using'&&
+            (()=>{const point=furnitureActionApproach(root.world,'hobby',
+              actor.action.targetInstanceId);return Boolean(point&&
+              Math.hypot(actor.position.x-point.x,actor.position.z-point.z)<=.35);})()))||
+       Math.abs(restored.elapsed-actor.action.elapsed)>.00001||
+       !validReadingSource(root,actor)){
+      actor.action=null;continue;
+    }
+    actor.activitySession=restored;
   }
   root.relationship=loadRelationship(raw.relationship,root.minutes,{
     alex:root.mind.memories,mira:mira.mind.memories
@@ -236,11 +271,26 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
   return other?.action?.targetInstanceId!==item.instanceId &&
     !(other?.action?.id===itemId&&!other.action.targetInstanceId);
 }
-export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null) {
+const objectRegistry=legacyObjectRegistry();
+function validReadingSource(root,actor){
+  const action=actor?.action;
+  const item=action?.id==='hobby'
+    ?resolveActionFurniture(root.world,'hobby',action.targetInstanceId):null;
+  const activity=getActivityDefinition(HOBBY_ACTIVITIES,action?.activityId);
+  return Boolean(item&&activity&&action.contentId===READING_CONTENT_ID&&
+    activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
+}
+export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
+  activityId=null,contentId=null) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
     !furnitureAvailable(root,itemId,residentId,item.instanceId))return false;
   const resident=getActor(root,residentId);
+  if(itemId==='hobby'){
+    const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
+    if(!activity||contentId!==READING_CONTENT_ID||
+      !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;
+  }
   // Explicit actions never supersede an ongoing action or interrupt a social.
   // Future manual commands are stored by action-queue.js and dispatched later.
   if (!resident || resident.action || root.socialAction ||
@@ -248,6 +298,16 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   const slot=itemId==='bed'?bedSlotFor(root,residentId,item.instanceId):null;
   const chosen=chooseAction(resident,itemId,automatic);
   if(chosen)resident.action.targetInstanceId=item.instanceId;
+  if(chosen&&itemId==='hobby'){
+    const session=createActivitySession(HOBBY_ACTIVITIES,{
+      sessionId:'reading:'+residentId+':'+root.actionQueues.nextSeq+':'+Math.round(root.minutes*1000),
+      activityId,actorId:residentId,targetInstanceId:item.instanceId,contentId
+    },HOBBY_CONTENT);
+    if(!session){resident.action=null;return false;}
+    resident.action.activityId=activityId;
+    resident.action.contentId=contentId;
+    resident.activitySession=session;
+  }
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
   // Book the same physical sofa before walking, so an ordinary rest or a
   // second television viewer cannot sit in the occupied spot.
@@ -273,6 +333,7 @@ export function preemptAutomaticForManual(root,residentId){
     removed.objectId=resident.action.id;
     removed.objectPhase=resident.action.phase;
     resident.action=null;
+    resident.activitySession=null;
     resident.event='Выполняет поручение игрока';
   }
   const social=root.socialAction;
@@ -298,6 +359,39 @@ export function setHouseholdAutonomy(root,enabled) {
   return root.autonomy.enabled;
 }
 
+/** H1 real-time book practice: source/geometry/occupancy validated by household.
+ * The H0 kernel returns session+XP together, both committed in one actor update.
+ * Never awards during walking, after cancellation, or to the wrong resident.
+ */
+function advanceReading(root,id,minutes){
+  const actor=getActor(root,id),action=actor?.action;
+  if(action?.id!=='hobby'){if(actor)actor.activitySession=null;return;}
+  if(!validReadingSource(root,actor)||!furnitureAvailable(root,'hobby',id,action.targetInstanceId)){
+    actor.action=null;actor.activitySession=null;actor.event='Книжный шкаф недоступен';return;
+  }
+  let session=actor.activitySession;
+  if(!session||session.actorId!==id||session.activityId!==action.activityId||
+    session.targetInstanceId!==action.targetInstanceId){
+    actor.action=null;actor.activitySession=null;return;
+  }
+  if(action.phase!=='using')return;
+  const target=furnitureActionApproach(root.world,'hobby',action.targetInstanceId);
+  // The action phase alone cannot forge arrival; the actor must actually
+  // stand by the exact purchased instance's rotated interaction anchor.
+  if(!target||Math.hypot(actor.position.x-target.x,actor.position.z-target.z)>.35){
+    actor.action=null;actor.activitySession=null;actor.event='Не удалось подойти к книге';return;
+  }
+  if(session.phase==='walking')
+    session=arriveActivitySession(session,{authorized:true,resourceAvailable:true});
+  if(!session){actor.action=null;actor.activitySession=null;return;}
+  const advanced=advanceActivitySession(HOBBY_ACTIVITIES,session,minutes,
+    {authorized:true,resourceAvailable:true,paused:root.paused});
+  session=advanced.session;
+  const xp=creditActivityPractice(actor.skills,HOBBY_SKILLS,HOBBY_ACTIVITIES,session,
+    {authorized:true,resourceAvailable:true,content:HOBBY_CONTENT});
+  if(xp){actor.skills=xp.progress;session=xp.session;}
+  actor.activitySession=session;
+}
 /** A single time step, applied to both actors without doubling the household clock. */
 export function tickHousehold(root,minutes) {
   // A paused or invalid tick must be completely side-effect free, including Mira's fields.
@@ -308,16 +402,23 @@ export function tickHousehold(root,minutes) {
   other.paused=root.paused;
   other.speed=root.speed;
   other.autonomy.enabled=root.autonomy.enabled;
+  // Refuse stale/removed/stored/occupied reading sources before simulation
+  // can grant Fun, and account only physically performed game minutes.
+  advanceReading(root,'alex',minutes);
+  advanceReading(root,'mira',minutes);
   const shared=liveSharedTv(root);
   const watchMinutes=shared?Math.min(minutes,Math.max(0,
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
   const alexUse=captureObjectUse(root),miraUse=captureObjectUse(other);
   tick(root,minutes,root.world);
   tick(other,minutes,root.world);
-  // Canonical receipts are built from the same real simulation step, not
-  // from rendering, catalog selections, or self-reported action completions.
+  // Canonical F4b3 item-use receipts and H1 reading XP coexist.
   settleObjectUseStep({world:root.world,actor:root,before:alexUse});
   settleObjectUseStep({world:root.world,actor:other,before:miraUse});
+  for(const id of HOUSEHOLD_IDS){
+    const person=getActor(root,id);
+    if(person.action?.id!=='hobby')person.activitySession=null;
+  }
   if(watchMinutes>0){
     // Fun reflects REAL time in front of a running screen. Only the final
     // canonically accepted leisure receipt later grants the SOCIAL benefit.

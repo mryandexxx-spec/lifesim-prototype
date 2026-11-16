@@ -123,6 +123,9 @@ export function stepAnimation(previous,signals,dt) {
     }else{
       armTarget=[5,8];
     }
+  }else if(action==='hobby'){
+    // A readable open book in front of the body, both arms gently supporting it.
+    armTarget=[-40,-47];elbowTarget=[-52,-47];
   }else if(action==='fridge'){
     const reach=clamp(safe(signals?.fridgeReach,1),0,1);
     const eat=clamp(safe(signals?.fridgeEat,0),0,1);

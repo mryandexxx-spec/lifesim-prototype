@@ -20,10 +20,11 @@ test('F0 legacy geometry is exact and every old obstacle comes from instances',(
   assert.equal(FURNITURE_CATALOG.tv.actionId,'tv'); // F3a real TV action, legacy geometry unchanged
   assert.deepEqual(ORIGINAL_FURNITURE.map(x=>x.instanceId),world.instances.map(x=>x.instanceId));
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
+  assert.equal(newFurnitureWorld().instances.some(x=>x.prefabId==='bookcase'),false);
 });
 test('unmodified household retains all interactions and frozen baseline A* routes',()=>{
   const s=newHousehold();
-  for(const [id,action] of Object.entries(ACTIONS)){
+  for(const [id,action] of Object.entries(ACTIONS).filter(([id])=>id!=='hobby')){
     const instance=resolveActionFurniture(s.world,id);
     assert.ok(instance,id);
     assert.equal(instance.instanceId,LEGACY_FURNITURE_IDS[id]);
