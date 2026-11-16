@@ -1669,6 +1669,18 @@ function boot() {
     }
     const self=getActor(game,actorId),partnerId=actorId==='alex'?'mira':'alex',
       partner=getActor(game,partnerId);
+    if(shared?.mode==='leisure'&&shared.choiceId==='tv'){
+      const plan=planSharedTv(game,actorId,shared.targetInstanceId||'home-tv-1');
+      if(!plan)return false;
+      const first=plan.places[actorId],second=plan.places[partnerId];
+      const a=findPath(self.position,first,game.world);
+      const b=findPath(partner.position,second,game.world);
+      if(!a||!b||!startSharedSocial(game,actorId,first,
+        'leisure','tv',false,plan))return false;
+      paths[actorId]={points:a,index:0,id:'social:'+kind};
+      paths[partnerId]={points:b,index:0,id:'social:'+kind};
+      restartAutonomyWait();return true;
+    }
     // Optional: only the romantic evening can claim TWO walkable spots on an
     // actual table. Other social actions preserve their accepted navigation.
     const tablePlan=branchId==='romance.evening'
@@ -1709,6 +1721,8 @@ function boot() {
     const session=game.socialAction;
     return session?.phase==='walking'&&
       (session.initiator===residentId||
+        (session.shared?.choiceId==='tv'&&
+          Boolean(session.shared.tvPlan?.places?.[residentId]))||
         (session.branchAction?.id==='romance.evening'&&
           session.eveningStage&&session.partner===residentId));
   };
@@ -2736,11 +2750,13 @@ function boot() {
           showerStates[residentId].active||toiletStates[residentId].active||
           fridgeLeaving[residentId])continue;
         const socialWalking=Boolean(socialWalkingFor(residentId));
+        const pairedPlan=socialWalking?game.socialAction?.shared?.tvPlan:null;
         const eveningStage=socialWalking?game.socialAction?.eveningStage:null;
-        const socialGoal=eveningStage&&game.socialAction.partner===residentId
-          ?eveningStage.partner:game.socialAction?.target;
-        // A stage guest already at their destination waits for their partner.
-        const atStage=socialWalking&&eveningStage&&
+        const socialGoal=pairedPlan?.places?.[residentId]||
+          (eveningStage&&game.socialAction.partner===residentId
+          ?eveningStage.partner:game.socialAction?.target);
+        // A stage guest or TV viewer at their spot waits for their partner.
+        const atStage=socialWalking&&(eveningStage||pairedPlan)&&
           Math.hypot(resident.position.x-socialGoal.x,
             resident.position.z-socialGoal.z)<.075;
         const jobId=socialWalking&&!atStage?'social:'+game.socialAction.kind:
@@ -2901,7 +2917,8 @@ function boot() {
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
     const walking=active&&(game.action?.phase==='walking'||
       socialWalkingFor('alex'));
-    const alexWatchSeat=useId==='tv'?game.action?.watchSeatInstanceId:null;
+    const alexWatchSeat=useId==='tv'
+      ?(pairedTv?.places?.alex?.seatId||game.action?.watchSeatInstanceId):null;
     if(useId==='sofa'||alexWatchSeat)
       sofaVisualTargets.alex=(alexWatchSeat||game.action?.targetInstanceId)||null;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
@@ -3017,7 +3034,8 @@ function boot() {
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
       socialWalkingFor('mira'));
-    const miraWatchSeat=miraUseId==='tv'?game.otherSim.action?.watchSeatInstanceId:null;
+    const miraWatchSeat=miraUseId==='tv'
+      ?(pairedTv?.places?.mira?.seatId||game.otherSim.action?.watchSeatInstanceId):null;
     if(miraUseId==='sofa'||miraWatchSeat)
       sofaVisualTargets.mira=(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
