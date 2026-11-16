@@ -7,8 +7,8 @@ const source=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const html=source('../index.html'),game=source('../src/game.js'),css=source('../styles.css');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 
-test('F2.1 UX all four items are purchasable via one catalog, not only plants',()=>{
-  assert.deepEqual(SHOP_ITEMS.map(p=>p.prefabId),['plant','table','nightstand','tv']);
+test('F2.1 UX five products including first functional sofa share a single catalog',()=>{
+  assert.deepEqual(SHOP_ITEMS.map(p=>p.prefabId),['plant','table','nightstand','tv','sofa']);
   assert.match(game,/for\(const item of shopListings\)\{/);
   assert.match(game,/button\.append\(name,cost,mark\)/);
   for(const item of SHOP_ITEMS){
@@ -26,7 +26,7 @@ test('F2.1 mobile shop occupies the existing editor surface, not an inner scroll
   assert.doesNotMatch(html,/id="furnish-items"/);
   for(const old of ['furnish-left','furnish-right','furnish-up','furnish-down'])
     assert.ok(!html.includes('id="'+old+'"'),old);
-  assert.match(css,/\.furnish-stock\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.furnish-stock\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(css,/\.furnish-shop\{display:grid;[\s\S]*?overflow:visible;/);
   assert.match(css,/\.furnish-shop\[hidden\],\.furnish-warehouse\[hidden\],\.furnish-commands\[hidden\]\{display:none!important;/);
 });

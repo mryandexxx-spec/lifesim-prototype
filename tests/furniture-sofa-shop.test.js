@@ -15,7 +15,7 @@ const game=source('../src/game.js'),css=source('../styles.css');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 const json=x=>JSON.parse(JSON.stringify(x));
 const close=(a,b)=>Math.abs(a-b)<1e-7;
-const newSofa=({x=-2,z:0,yaw=90,instanceId='shop-sofa-11'}={})=>
+const newSofa=({x=-2,z=0,yaw=90,instanceId='shop-sofa-11'}={})=>
   ({instanceId,prefabId:'sofa',location:'home',x,z,yaw});
 
 test('five trial products include independent functional sofa without touching approved prices',()=>{
