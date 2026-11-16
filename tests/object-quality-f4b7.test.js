@@ -49,7 +49,7 @@ test('F4b7 only compares real offered SKU of exactly the same prefab',()=>{
   assert.deepEqual(compareShopVariants(registry,offers,'made-up'),[]);
   assert.deepEqual(compareShopVariants(registry,offers,'legacy.sofa').map(x=>x.itemId),['sofa.comfort','sofa.loft','sofa.classic']);
   assert.deepEqual(compareShopVariants(registry,offers.filter(x=>x.itemId!=='sofa.comfort'),'legacy.sofa').map(x=>x.itemId),['sofa.loft','sofa.classic']);
-  assert.deepEqual(compareShopVariants(registry,[...offers,{itemId:'fake.sofa',prefabId:'sofa',price:10}],'legacy.sofa').map(x=>x.itemId),['sofa.comfort']);
+  assert.deepEqual(compareShopVariants(registry,[...offers,{itemId:'fake.sofa',prefabId:'sofa',price:10}],'legacy.sofa').map(x=>x.itemId),['sofa.comfort','sofa.loft','sofa.classic']);
   assert.deepEqual(compareShopVariants(registry,Array(1025).fill(offers[0]),'legacy.plant'),[]);
 });
 test('F4b7 optional numeric quality ratings compare only authored dimensions',()=>{

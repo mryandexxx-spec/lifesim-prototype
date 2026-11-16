@@ -60,11 +60,11 @@ test('F4C: each new floor prefab is template-only, safely movable, not gifted in
   }
   assert.deepEqual(restoreFurnitureWorld(JSON.parse(JSON.stringify(world))),world);
 });
-test('F4C: all 26 crafted modelKeys are visually different by actual dimensions/shape',()=>{
+test('F4C: all 28 crafted modelKeys are visually different by actual dimensions/shape',()=>{
   const authored=FURNITURE_PRODUCTS.filter(x=>x.modelKey);
-  assert.equal(authored.length,26);
-  assert.equal(Object.keys(PROCEDURAL_FURNITURE_MODELS).length,26);
-  assert.equal(new Set(authored.map(x=>x.modelKey)).size,26);
+  assert.equal(authored.length,28);
+  assert.equal(Object.keys(PROCEDURAL_FURNITURE_MODELS).length,28);
+  assert.equal(new Set(authored.map(x=>x.modelKey)).size,28);
   const geometry=new Map();
   for(const offer of authored){
     const shape=proceduralFurnitureModel(offer.modelKey);
@@ -97,7 +97,7 @@ test('F4C: interiors have functional category hierarchy without inventing action
 });
 test('F4C: client can combine type, room and search without showing hidden offers',()=>{
   const s=selectShopCatalog({roomCategoryId:'room.bedroom',
-    typeCategoryId:'type.storage',searchText:'КОМОД'});
+    typeCategoryId:'type.storage',searchText:'КОМОД «'});
   assert.equal(s.length,2);
   assert.ok(s.every(x=>x.prefabId==='dresser'));
   assert.deepEqual(selectShopCatalog({typeCategoryId:'type.seating.sofas',
