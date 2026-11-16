@@ -1391,7 +1391,7 @@ function boot() {
       if(item.prefabId==='floorlamp'){
         const light=new pc.Entity('F4E lamp light');
         const arc=furnitureProduct(item.itemDefinitionId)?.modelKey==='floorlamp.arc';
-        light.setLocalPosition(arc?.48:0,arc?1.23:1.48,0);
+        light.setLocalPosition(arc ? .48 : 0,arc ? 1.23 : 1.48,0);
         light.addComponent('light',{type:'omni',
           color:new pc.Color(1,.80,.54),intensity:.75,range:4.6,
           castShadows:false});
@@ -3901,21 +3901,21 @@ function boot() {
           reposition(node.findByName('SKU dresser.reed drawer pull '+i),0,-.31*weight);
         }
         if(sku==='dresser.arch')for(const sign of [-1,1]){
-          const side=sign===-1?'-.41':'.41';
+          const side=sign===-1?'-0.41':'0.41';
           for(const name of ['arched door ','arched door arch '])
             reposition(node.findByName('SKU dresser.arch '+name+side),
               sign*.17*weight,-.15*weight);
-          const handle=sign===-1?'-.12':'.12';
+          const handle=sign===-1?'-0.12':'0.12';
           reposition(node.findByName('SKU dresser.arch arched brass knob '+handle),
             sign*.17*weight,-.15*weight);
         }
       }else if(item.prefabId==='wardrobe'){
         const sku=furnitureProduct(item.itemDefinitionId)?.modelKey;
         if(sku==='wardrobe.classic')for(const sign of [-1,1]){
-          const side=sign===-1?'-.41':'.41';
+          const side=sign===-1?'-0.41':'0.41';
           reposition(node.findByName('SKU wardrobe.classic carved wardrobe door '+side),
             sign*.36*weight,-.13*weight);
-          const handle=sign===-1?'-.11':'.11';
+          const handle=sign===-1?'-0.11':'0.11';
           reposition(node.findByName('SKU wardrobe.classic long brass handle '+handle),
             sign*.36*weight,-.13*weight);
         }
