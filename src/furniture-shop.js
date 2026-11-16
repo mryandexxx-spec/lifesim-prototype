@@ -65,6 +65,8 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
     return reject('unreachable-sofa');
   if(prefabId==='bed'&&!bedReachable(valid.world,id,opts))
     return reject('unreachable-bed');
+  if(prefabId==='tv'&&!sofaReachable(valid.world,id,opts,'tv'))
+    return reject('unreachable-tv');
   return {ok:true,world:valid.world,
     shop:{...current.shop,credits:current.shop.credits-item.price,nextId:current.shop.nextId+1},
     instanceId:id,amount:-item.price};
@@ -84,8 +86,8 @@ function tradeable(world,instanceId){
 /** A paid sofa must be reachable at its OWN rotated approach point.
  * Avoid green previews that would leave characters with an unusable couch.
  */
-function sofaReachable(world,instanceId,opts={}){
-  const at=furnitureActionApproach(world,'sofa',instanceId);
+function sofaReachable(world,instanceId,opts={},actionId='sofa'){
+  const at=furnitureActionApproach(world,actionId,instanceId);
   if(!at)return false;
   return (opts.residents||[]).every(pos=>!pos||
     !Number.isFinite(pos.x)||!Number.isFinite(pos.z)||
@@ -123,6 +125,8 @@ export function restoreMarketItem(world,shop,instanceId,pose,opts={}){
     return reject('unreachable-sofa');
   if(item.prefabId==='bed'&&!bedReachable(valid.world,instanceId,opts))
     return reject('unreachable-bed');
+  if(item.prefabId==='tv'&&!sofaReachable(valid.world,instanceId,opts,'tv'))
+    return reject('unreachable-tv');
   return {...valid,shop:current.shop,instanceId,amount:0};
 }
 export function sellMarketItem(world,shop,instanceId,opts={}){
