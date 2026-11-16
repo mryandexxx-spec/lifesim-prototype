@@ -22,7 +22,7 @@ const segmentCrosses=(a,b,r)=>{
   let from=0,to=1;
   const vx=b.x-a.x,vz=b.z-a.z;
   for(const [start,delta,min,max] of [[a.x,vx,r.minX,r.maxX],[a.z,vz,r.minZ,r.maxZ]]){
-    if(Math.abs(delta)<1e-8){if(start>=min&&start<=max)return true;continue;}
+    if(Math.abs(delta)<1e-8){if(start<min||start>max)return false;continue;}
     const t1=(min-start)/delta,t2=(max-start)/delta;
     from=Math.max(from,Math.min(t1,t2));
     to=Math.min(to,Math.max(t1,t2));
