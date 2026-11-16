@@ -8,6 +8,7 @@ import {findPath} from './navigation.js';
 import {BED_SLOTS} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
+import {describeFurnitureValue} from './furniture-value.js';
 
 export const SHOP_SCHEMA=1;
 export const SHOP_START_CREDITS=5000; // Provisional, NOT a signed-off economy.
@@ -32,7 +33,8 @@ export function restoreFurnitureShop(raw){
 export function marketListing(){
   return SHOP_ITEMS.map(item=>({...item,...{
     name:FURNITURE_CATALOG[item.prefabId].name,
-    category:FURNITURE_CATALOG[item.prefabId].category
+    category:FURNITURE_CATALOG[item.prefabId].category,
+    ...describeFurnitureValue(item.prefabId)
   }}));
 }
 function reject(reason){return {ok:false,reason};}
