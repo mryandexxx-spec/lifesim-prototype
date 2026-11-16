@@ -55,6 +55,7 @@ jobs:
           node --check src/skill-presentation.js
           node --check src/skills-engine.js
           node --check src/activity-registry.js
+          node --check src/painting.js
           node --check src/hobby-reading.js
           node --check src/music-audio.js
           node --check src/music-listening.js
@@ -163,6 +164,7 @@ jobs:
           cp src/hobby-content.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/
+          cp src/painting.js site/src/
           cp src/hobby-reading.js site/src/
           cp src/music-audio.js site/src/
           cp src/music-listening.js site/src/

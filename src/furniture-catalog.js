@@ -79,6 +79,9 @@ const original=[
   {prefabId:'bookcase',instanceId:'template-bookcase-1',name:'Книжный шкаф',
     category:'Гостиная',actionId:'hobby',capabilities:['books.borrow'],
     templateOnly:true,x:0,z:0,rect:[-.53,.53,-.27,.27],approach:[0,.92]},
+  {prefabId:'easel',instanceId:'template-easel-1',name:'Мольберт',
+    category:'Гостиная',actionId:'paint',capabilities:['art.paint'],templateOnly:true,
+    x:0,z:0,rect:[-.60,.60,-.43,.43],approach:[0,-1.00]},
   {prefabId:'music',instanceId:'template-music-1',name:'Музыкальный центр',
     category:'Гостиная',actionId:'music',capabilities:['music.playback'],
     templateOnly:true,x:0,z:0,rect:[-.46,.46,-.26,.26],approach:[0,.84]}

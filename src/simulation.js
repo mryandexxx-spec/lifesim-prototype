@@ -36,6 +36,8 @@ export const ACTIONS = Object.freeze({
   // activity, timing and effects are authored in the H0 activity registry.
   hobby: { label: 'Читать книгу', need: 'fun', duration: 36, benefitPerMinute: 1.05,
     location: [0,.92] },
+  paint: { label:'Рисовать картину',need:'fun',duration:45,benefitPerMinute:.82,
+    location:[0,-1.00] },
   music: { label: 'Слушать музыку', need: 'fun', duration: 35,
     benefitPerMinute: .94, location: [0,.84] }
 });
@@ -86,10 +88,11 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     if(validFurnitureInstanceId(data.action.targetInstanceId))
       next.action.targetInstanceId=data.action.targetInstanceId;
     // Optional H1 activity metadata. Unknown activities are not restorable.
-    if(['hobby','music'].includes(data.action.id)){
+    if(['hobby','music','paint'].includes(data.action.id)){
       const activity=getActivityDefinition(HOBBY_ACTIVITIES,data.action.activityId);
       if(!activity||activity.source!=='item'||
-         (data.action.id==='music')!==activity.requiredCapabilities.includes('music.playback'))next.action=null;
+         (data.action.id==='music')!==activity.requiredCapabilities.includes('music.playback')||
+         (data.action.id==='paint')!==activity.requiredCapabilities.includes('art.paint'))next.action=null;
       else{
         next.action.activityId=activity.id;
         if(typeof data.action.contentId==='string')next.action.contentId=data.action.contentId;
@@ -177,7 +180,7 @@ export function tick(state, minutes,world=state?.world??null) {
   refreshMind(state,world);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
-    const hobby=['hobby','music'].includes(state.action.id)
+    const hobby=['hobby','music','paint'].includes(state.action.id)
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
     const duration=hobby?.timeBudget.targetMinutes??definition.duration;
@@ -212,7 +215,7 @@ export function tick(state, minutes,world=state?.world??null) {
       {type:'object',actionId:state.action.id});
     // Enjoying books is a taste; literature XP is earned separately by work.
     if(hobby)gained*=1+preferenceAffinity(state.personality,
-      state.action.id==='music'?'music':'books')*.12;
+      state.action.id==='music'?'music':state.action.id==='paint'?'art':'books')*.12;
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
     // All registry-defined additional need deltas apply only in the verified
     // using window. Dancing consumes a little extra energy; passive listening
@@ -225,7 +228,7 @@ export function tick(state, minutes,world=state?.world??null) {
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
-        (!['seat','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['seat','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&

@@ -1,0 +1,39 @@
+name: H5 physical painting and save compatibility regression
+on:
+  push:
+    branches: ['feature/h5-*', 'fix/h5-*']
+  pull_request:
+    paths:
+      - 'src/painting.js'
+      - 'src/hobby-reading.js'
+      - 'src/household.js'
+      - 'src/simulation.js'
+      - 'src/action-queue.js'
+      - 'src/game.js'
+      - 'src/furniture-catalog.js'
+      - 'src/furniture-products.js'
+      - 'src/furniture-procedural-library.js'
+      - 'index.html'
+      - 'tests/hobbies-h5.test.js'
+      - '.github/workflows/hobby-h5-checks.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: H5 source syntax
+        run: |
+          node --check src/painting.js
+          node --check src/hobby-reading.js
+          node --check src/household.js
+          node --check src/game.js
+          node --check src/furniture-procedural-library.js
+          node --check tests/hobbies-h5.test.js
+      - name: Install pinned test dependencies
+        run: npm ci --ignore-scripts
+      - name: Full compatibility suite
+        run: npm test

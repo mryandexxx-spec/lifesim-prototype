@@ -36,6 +36,7 @@ import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
 import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
 import {switchLampAtArrival} from './furniture-interactions.js';
+import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,restoreCreatedWorks,finishPainting} from './painting.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
 export const RESIDENT_NAMES = Object.freeze({ alex: 'Алекс', mira: 'Мира' });
@@ -49,6 +50,7 @@ function newMira(minutes=480) {
   mira.autonomy.nextAt=minutes;
   mira.event='Свободное время';
   mira.skills=newSkillProgress();
+  mira.createdWorks=[];
   mira.objectOnceLedger=newObjectOnceLedger();
   refreshMind(mira);
   return mira;
@@ -58,6 +60,7 @@ export function newHousehold() {
   const state=newGame(DEMO_PROFILES.first);
   state.otherSim=newMira(state.minutes);
   state.skills=newSkillProgress();
+  state.createdWorks=[];
   state.objectOnceLedger=newObjectOnceLedger();
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);
@@ -124,7 +127,24 @@ export function loadHousehold(raw) {
     const actor=id==='alex'?root:mira;
     const saved=id==='alex'?raw:raw.otherSim;
     actor.skills=restoreSkillProgress(saved?.skills,HOBBY_SKILLS);
+    actor.createdWorks=restoreCreatedWorks(saved?.createdWorks,id);
     actor.activitySession=null;
+    if(actor.action?.id==='paint'){
+      const session=restoreActivitySession(HOBBY_ACTIVITIES,saved?.activitySession,HOBBY_CONTENT);
+      const target=furnitureActionApproach(root.world,'paint',actor.action.targetInstanceId);
+      if(!session||session.actorId!==id||session.activityId!==PAINT_ACTIVITY_ID||
+        session.targetInstanceId!==actor.action.targetInstanceId||
+        session.contentId!==actor.action.contentId||
+        !validPaintingSource(root,actor)||
+        Math.abs(session.elapsed-actor.action.elapsed)>.00001||
+        !((session.phase==='walking'&&actor.action.phase==='walking')||
+          (session.phase==='using'&&actor.action.phase==='using'))||
+        (actor.action.phase==='using'&&(!target||
+          Math.hypot(actor.position.x-target.x,actor.position.z-target.z)>.35)))
+        actor.action=null;
+      else actor.activitySession=session;
+      continue;
+    }
     if(actor.action?.id==='music'){
       const listening=restoreActivitySession(HOBBY_ACTIVITIES,saved?.activitySession,HOBBY_CONTENT);
       // Older 1.2u saves did not persist a listening-side anchor. Upgrade
@@ -348,6 +368,15 @@ function validReadingSource(root,actor){
   return Boolean(owned&&item&&activity&&canReadHobbyContent(actor.skills,action.contentId)&&
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
+function validPaintingSource(root,actor){
+  const action=actor?.action;
+  const item=action?.id==='paint'
+    ?resolveActionFurniture(root.world,'paint',action.targetInstanceId):null;
+  const activity=getActivityDefinition(HOBBY_ACTIVITIES,action?.activityId);
+  return Boolean(item&&activity?.id===PAINT_ACTIVITY_ID&&
+    PAINT_CONTENT_IDS.includes(action.contentId)&&
+    activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
+}
 function validMusicSource(root,actor){
   const action=actor?.action;
   const item=action?.id==='music'
@@ -374,6 +403,11 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;
     readingSeat=chooseReadingSeat(root,residentId,item.instanceId);
     if(!readingSeat)return false;
+  }
+  if(itemId==='paint'){
+    const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
+    if(activity?.id!==PAINT_ACTIVITY_ID||!PAINT_CONTENT_IDS.includes(contentId)||
+      !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;
   }
   if(itemId==='music'){
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
@@ -404,6 +438,16 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     if(!beginReadingJourney(resident.action,readingSeat)){
       resident.action=null;return false;
     }
+    resident.activitySession=session;
+  }
+  if(chosen&&itemId==='paint'){
+    const session=createActivitySession(HOBBY_ACTIVITIES,{
+      sessionId:'painting:'+residentId+':'+root.actionQueues.nextSeq+':'+Math.round(root.minutes*1000),
+      activityId,actorId:residentId,targetInstanceId:item.instanceId,contentId
+    },HOBBY_CONTENT);
+    if(!session){resident.action=null;return false;}
+    resident.action.activityId=activityId;
+    resident.action.contentId=contentId;
     resident.activitySession=session;
   }
   if(chosen&&itemId==='music'){
@@ -474,7 +518,7 @@ export function setHouseholdAutonomy(root,enabled) {
  */
 function advanceReading(root,id,minutes){
   const actor=getActor(root,id),action=actor?.action;
-  if(action?.id!=='hobby'){if(actor&&action?.id!=='music')actor.activitySession=null;return;}
+  if(action?.id!=='hobby'){if(actor&&!['music','paint'].includes(action?.id))actor.activitySession=null;return;}
   const stage=readingStage(action);
   const seat=stage?chooseReadingSeat(root,id,action.targetInstanceId,
     action.readingSeatInstanceId):null;
@@ -539,6 +583,34 @@ function advanceMusic(root,id,minutes){
     {authorized:true,resourceAvailable:true,paused:root.paused});
   actor.activitySession=advanced.session;
 }
+/** H5: verified physical practice is the only source of painting XP. */
+function advancePainting(root,id,minutes){
+  const actor=getActor(root,id),action=actor?.action;
+  if(action?.id!=='paint')return;
+  const target=furnitureActionApproach(root.world,'paint',action.targetInstanceId);
+  let session=actor.activitySession;
+  if(!validPaintingSource(root,actor)||
+    !furnitureAvailable(root,'paint',id,action.targetInstanceId)||
+    !session||session.actorId!==id||session.activityId!==PAINT_ACTIVITY_ID||
+    session.contentId!==action.contentId||
+    session.targetInstanceId!==action.targetInstanceId){
+    actor.action=null;actor.activitySession=null;actor.event='Мольберт недоступен';return;
+  }
+  if(action.phase!=='using')return;
+  if(!target||Math.hypot(actor.position.x-target.x,actor.position.z-target.z)>.35){
+    actor.action=null;actor.activitySession=null;actor.event='Нет подхода к мольберту';return;
+  }
+  if(session.phase==='walking')
+    session=arriveActivitySession(session,{authorized:true,resourceAvailable:true});
+  if(!session){actor.action=null;actor.activitySession=null;return;}
+  const advanced=advanceActivitySession(HOBBY_ACTIVITIES,session,minutes,
+    {authorized:true,resourceAvailable:true,paused:root.paused});
+  session=advanced.session;
+  const xp=creditActivityPractice(actor.skills,HOBBY_SKILLS,HOBBY_ACTIVITIES,session,
+    {authorized:true,resourceAvailable:true,content:HOBBY_CONTENT});
+  if(xp){actor.skills=xp.progress;session=xp.session;}
+  actor.activitySession=session;
+}
 /** A single time step, applied to both actors without doubling the household clock. */
 export function tickHousehold(root,minutes) {
   // A paused or invalid tick must be completely side-effect free, including Mira's fields.
@@ -555,6 +627,15 @@ export function tickHousehold(root,minutes) {
   advanceReading(root,'mira',minutes);
   advanceMusic(root,'alex',minutes);
   advanceMusic(root,'mira',minutes);
+  advancePainting(root,'alex',minutes);
+  advancePainting(root,'mira',minutes);
+  // Capture only genuinely finished sessions: a canceled/removed station
+  // never yields a work, even if the saved timer was nearly complete.
+  const readyPaint=Object.fromEntries(HOUSEHOLD_IDS.map(id=>{
+    const actor=getActor(root,id);
+    return [id,actor.action?.id==='paint'&&actor.activitySession?.phase==='ready'
+      ?{action:actor.action,session:actor.activitySession}:null];
+  }));
   // Capture stages BEFORE the simulation. The completion tick may switch
   // reading→closing; it must not also consume a full closing interval.
   const stageBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>
@@ -573,6 +654,16 @@ export function tickHousehold(root,minutes) {
   tick(root,minutes,root.world);
   tick(other,minutes,root.world);
   for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),completed=readyPaint[id];
+    if(completed&&!actor.action&&actor.activitySession===completed.session){
+      const result=finishPainting({session:completed.session,actor,actorId:id,
+        world:root.world,at:root.minutes,registry:HOBBY_ACTIVITIES,skills:HOBBY_SKILLS});
+      if(result){actor.createdWorks=result.works;
+        actor.event='Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»';}
+      actor.activitySession=null;
+    }
+  }
+  for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),action=actor?.action;
     if(action?.id==='hobby'&&action.phase==='walking'&&
       readingStage(action)===stageBefore[id]){
@@ -588,7 +679,7 @@ export function tickHousehold(root,minutes) {
   settleObjectUseStep({world:root.world,actor:other,before:miraUse});
   for(const id of HOUSEHOLD_IDS){
     const person=getActor(root,id);
-    if(!['hobby','music'].includes(person.action?.id))person.activitySession=null;
+    if(!['hobby','music','paint'].includes(person.action?.id))person.activitySession=null;
   }
   if(watchMinutes>0){
     // Fun reflects REAL time in front of a running screen. Only the final

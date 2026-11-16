@@ -112,7 +112,12 @@ const offered=[
     description:'Двухдверный шкаф · можно разобрать гардероб'},
   {itemId:'wardrobe.open',prefabId:'wardrobe',price:540,name:'Гардероб «Открытый»',
     typeCategoryId:'type.storage.wardrobes',modelKey:'wardrobe.open',
-    description:'Открытые полки с одеждой · можно разобрать гардероб'}
+    description:'Открытые полки с одеждой · можно разобрать гардероб'},
+  // H5: real creative station, distinct from decorative art; no sales or wages.
+  {itemId:'easel.starter',prefabId:'easel',price:460,
+    name:'Мольберт «Мастерская»',modelKey:'easel.starter',
+    typeCategoryId:'type.creative.painting',
+    description:'Рисование · личный навык живописи и сохранённые картины'},
 ];
 export const FURNITURE_PRODUCTS=Object.freeze(offered.map(x=>Object.freeze({...x,
   ...(x.effects?{effects:Object.freeze(x.effects.map(e=>Object.freeze({...e})))}:{})})));
@@ -174,6 +179,8 @@ export const FURNITURE_SHOP_TYPES=Object.freeze([
   {id:'type.decor.rugs',label:'Ковры',parentId:'type.decor'},
   {id:'type.decor.mirrors',label:'Зеркала',parentId:'type.decor'},
   {id:'type.decor.art',label:'Скульптуры',parentId:'type.decor'},
+  {id:'type.creative',label:'Творчество',icon:'🎨'},
+  {id:'type.creative.painting',label:'Живопись',parentId:'type.creative'},
   {id:'type.electronics',label:'Техника',icon:'▣'},
   {id:'type.electronics.tv',label:'Телевизоры',parentId:'type.electronics'},
   {id:'type.electronics.music',label:'Музыкальные центры',parentId:'type.electronics'}
@@ -186,11 +193,12 @@ export const FURNITURE_TYPE_BY_PREFAB=Object.freeze({
   bookcase:'type.storage.books',plant:'type.decor.plants',
   rug:'type.decor.rugs',mirror:'type.decor.mirrors',
   sculpture:'type.decor.art',floorlamp:'type.lighting.floor',
-  tv:'type.electronics.tv',music:'type.electronics.music'
+  tv:'type.electronics.tv',music:'type.electronics.music',
+  easel:'type.creative.painting'
 });
 export const PROCEDURAL_NEW_PREFABS=Object.freeze([
   'armchair','chair','diningtable','floorlamp','rug',
-  'dresser','mirror','sculpture','wardrobe'
+  'dresser','mirror','sculpture','wardrobe','easel'
 ]);
 export const PROCEDURAL_DEFAULT_SKU=Object.freeze(Object.fromEntries(
   PROCEDURAL_NEW_PREFABS.map(prefabId=>[

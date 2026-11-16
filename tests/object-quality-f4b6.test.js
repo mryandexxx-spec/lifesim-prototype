@@ -49,7 +49,7 @@ test('F4b6: future quality dimensions/ratings are defined by registry, not produ
 });
 test('F4b6: all nine live offers have safe descriptions and only true sofa perk',()=>{
   const r=legacyObjectRegistry(),offers=selectShopCatalog();
-  assert.equal(offers.length,36);
+  assert.equal(offers.length,37);
   for(const offer of offers){
     const quality=describeObjectQualities(r,offer.itemId);
     assert.equal(quality.itemId,offer.itemId);
