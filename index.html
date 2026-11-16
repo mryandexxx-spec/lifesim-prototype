@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h2" />
+  <link rel="stylesheet" href="./styles.css?v=1.2v-h2fix" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}
   </script>
@@ -30,7 +30,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2v</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -87,12 +87,23 @@
         <div><small>ДОМ · РЕЖИМ РЕДАКТИРОВАНИЯ</small><h2 id="furnish-title">Обстановка</h2></div>
         <button id="furnish-exit" type="button">✓ В жизнь</button>
       </div>
-      <p id="furnish-tip">Выбери мебель касанием в 3D. Удерживай палец 0,5 с для перемещения; переключатель камеры справа доступен всегда.</p>
+      <p id="furnish-tip">Выбери мебель в списке или касанием в 3D. Удерживай палец 0,5 с для перемещения; для поворота используй кнопку «Повернуть 90°».</p>
       <div class="furnish-market-bar" role="group" aria-label="Разделы обстановки">
         <button id="furnish-edit-toggle" type="button" aria-pressed="true">▦ Комната</button>
         <button id="furnish-shop-toggle" type="button" aria-controls="furnish-shop" aria-expanded="false">🛍 Каталог</button>
         <button id="furnish-warehouse-toggle" type="button" aria-controls="furnish-warehouse" aria-expanded="false">📦 Склад <span id="furnish-storage-count">0</span></button>
         <output id="furnish-balance" aria-live="polite">Пробные кредиты: 5000</output>
+      </div>
+      <div id="furnish-room-tools" class="furnish-room-tools" role="group"
+        aria-label="Выбор и поворот существующей мебели" hidden>
+        <label for="furnish-item-select" class="furnish-room-picker">
+          <span>ПРЕДМЕТ В КОМНАТЕ</span>
+          <select id="furnish-item-select" aria-label="Выбрать мебель для поворота">
+            <option value="">Выбери мебель…</option>
+          </select>
+        </label>
+        <button type="button" id="furnish-rotate" class="furnish-room-rotate"
+          aria-label="Повернуть выбранную мебель на 90 градусов" disabled>⟳ Повернуть 90°</button>
       </div>
       <div id="furnish-shop" class="furnish-shop" hidden aria-label="Каталог новых предметов">
         <div id="furnish-catalog-filters" class="furnish-catalog-filters" role="group" aria-label="Фильтры каталога">
@@ -131,7 +142,6 @@
         <div id="furnish-storage-list" class="furnish-storage-list" role="group" aria-label="Предметы на складе"></div>
       </div>
       <div id="furnish-commands" class="furnish-commands" role="group" aria-label="Действия с мебелью, выбранной в 3D" hidden>
-        <button type="button" id="furnish-rotate" class="furnish-main">⟳ Предмет</button>
         <button type="button" id="furnish-store">📦 В склад</button>
         <button type="button" id="furnish-restore">↩ Из склада</button>
         <button type="button" id="furnish-sell">Продать</button>
@@ -285,7 +295,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music"></script>
+  <script type="module" src="./src/game.js?v=1.2v-h2-music-rotate"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
