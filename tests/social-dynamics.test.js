@@ -306,7 +306,7 @@ test('Pages, text-only UI and save contract include the read-only pair dynamics'
   const module=file('../src/social-dynamics.js');
   const relation=file('../src/relationships.js');
   const flow=file('../.github/workflows/pages.yml');
-  assert.ok(html.includes('сборка / 1.1'));
+  assert.ok(html.includes('сборка / 1.2'));
   assert.ok(html.includes('id="mind-dynamic"'));
   assert.ok(js.includes('pairDynamic(memoryPair,game.selectedSim,game.minutes)'));
   assert.ok(js.includes('const socialIdea=autonomousSocialChoice(game,residentId)'));
