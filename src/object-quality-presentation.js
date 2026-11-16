@@ -28,10 +28,9 @@ export function describeObjectQualities(registry,itemId){
   })));
   const effects=Object.freeze(item.effects.map(effect=>{
     const perMinute=effect.mode==='perMinute';
-    const action=effect.actionId?' · '+effect.actionId:'';
     const when=triggerLabel[effect.trigger]||effect.trigger;
     const label=statisticLabel(registry,effect.statId)+' '+signed(effect.amount)+
-      (perMinute?'/мин':'')+' · '+when+action;
+      (perMinute?'/мин':'')+' · '+when;
     return Object.freeze({id:effect.id,label,statId:effect.statId,
       trigger:effect.trigger,mode:effect.mode,amount:effect.amount});
   }));
