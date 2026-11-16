@@ -46,6 +46,7 @@ import {createMeshyVisual} from './meshy-visual.js';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
+import {createHugQAHousehold,HUG_QA_DEBUG_QUERY} from './romance-hug-qa.js';
 import {meshVisualPreference,MESHY_VISUAL_KEY,meshSeatRuntimeSettings} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
@@ -71,8 +72,11 @@ const loadingProgress=createLoadingProgress(['scene','alex','mira'],({completed,
     ? 'Не все модели доступны — используем резервные облики'
     : completed===total?'Готово!':'Загружаем сцену и 3D-модели';
 });
+const hugQAMode=new URLSearchParams(window.location.search).get('debug')===HUG_QA_DEBUG_QUERY;
 let game;
-try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
+// A separate ephemeral household. The existing player's saved game is not read.
+if(hugQAMode)game=createHugQAHousehold();
+else try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
 catch { game = newHousehold(); }
 const selectedActor = () => getActor(game,game.selectedSim);
 const selectedName = () => getActorName(game.selectedSim);
@@ -216,6 +220,32 @@ let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is
 let selected = null;
 let beginAction = () => false;
 let beginSocial = () => false;
+// The opt-in QA link uses real romance.hug and real paired 3D rendering,
+// but ONLY in its own fresh, never-saved household. Both residents are adults.
+if(hugQAMode){
+  const qaPanel=document.createElement('section');
+  qaPanel.id='hug-qa-controls';
+  qaPanel.className='hug-qa-controls';
+  qaPanel.setAttribute('aria-label','Режим проверки объятий');
+  qaPanel.innerHTML='<strong>🎬 Проверка объятий</strong>'+
+    '<span>Тестовая пара · сохранение не меняется</span>'+
+    '<div class="hug-qa-buttons">'+
+      '<button type="button" data-initiator="alex">Алекс → Мира</button>'+
+      '<button type="button" data-initiator="mira">Мира → Алекс</button>'+
+    '</div>'+
+    '<a href="./">↩ Вернуться к своей игре</a>';
+  document.querySelector('.app-shell').append(qaPanel);
+  qaPanel.querySelectorAll('button[data-initiator]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      if(furnishMode){toast('Выйди из режима ДОМ для проверки объятия');return;}
+      if(game.socialAction)cancelSocial(game);
+      const initiatorId=button.dataset.initiator;
+      if(beginSocial('talk',false,initiatorId,null,null,'romance.hug')){
+        toast('Демонстрация: '+getActorName(initiatorId)+' предлагает объятие');
+      }else toast('Не удалось начать — проверь паузу и свободный путь');
+    });
+  });
+}
 let conversationTopicPicker=false;
 let conversationDisplayKey='';
 let sharedPicker=false;
@@ -243,6 +273,10 @@ function toast(message) {
   clearTimeout(toastTimeout); toastTimeout = setTimeout(() => el.classList.remove('show'), 2600);
 }
 function save(silent = false) {
+  if(hugQAMode){
+    if(!silent)toast('Тестовая пара: обычное сохранение не меняется');
+    return;
+  }
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); if (!silent) toast('Игра сохранена на этом устройстве'); }
   catch { if (!silent) toast('Не удалось сохранить: браузер запретил хранилище'); }
 }
@@ -1073,6 +1107,7 @@ createHudPanel({
   }
 });
 $('save-btn').addEventListener('click', () => save());
+if(hugQAMode)$('reset-btn').disabled=true; // demo never overwrites a live household
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
   const enabled = game.autonomy.enabled;
