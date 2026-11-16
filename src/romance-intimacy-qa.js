@@ -1,11 +1,12 @@
-/** Disposable, isolated QA household for REAL R1b kiss animation.
- * Never import storage, DOM or renderer here; do not mutate a live save.
+/** R2a disposable adult couple for a REAL intimacy invitation.
+ * Test-only, memory-only, no user save, DOM or renderer dependencies.
  */
 import {newHousehold,setHouseholdAutonomy} from './household.js';
 import {observePairViews,applySocialEvent} from './social-graph.js';
 import {romanceAvailability} from './romance.js';
-export const KISS_QA_DEBUG_QUERY='kiss';
-export function createKissQAHousehold(){
+import {intimacyBedPlan} from './romantic-intimacy.js';
+export const INTIMACY_QA_DEBUG_QUERY='intimacy';
+export function createIntimacyQAHousehold(){
   const root=newHousehold();
   root.minutes=8000;
   root.otherSim.minutes=root.minutes;
@@ -18,21 +19,23 @@ export function createKissQAHousehold(){
   }
   setHouseholdAutonomy(root,false);
   if(!observePairViews(root.socialGraph,'alex','mira',root.relationship.views))
-    throw Error('Kiss QA: perspectives unavailable');
-  // Only on this disposable graph; canonical romance gates remain unchanged.
+    throw Error('Intimacy QA: perspectives unavailable');
+  // Genuine canonical romance receipts ONLY in a new throwaway graph.
   for(const [actorId,targetId,type,at] of [
     ['alex','mira','romance.flirt',900],
     ['mira','alex','romance.flirt',2400],
     ['alex','mira','romance.flirt',3900],
     ['alex','mira','romance.confess',4200],
-    ['alex','mira','romance.date',4500]
+    ['alex','mira','romance.date',4500],
+    ['alex','mira','romance.tender',5000],
+    ['mira','alex','romance.tender',5400]
   ]){
     if(!applySocialEvent(root.socialGraph,{actorId,targetId,type,at}))
-      throw Error('Kiss QA: romantic receipt rejected '+type);
+      throw Error('Intimacy QA: invalid milestone '+type);
   }
   for(const [a,b] of [['alex','mira'],['mira','alex']]){
-    if(!romanceAvailability(root.socialGraph,a,b,'romance.kiss',root.minutes).enabled)
-      throw Error('Kiss QA: romantic kiss unavailable for '+a);
+    if(!romanceAvailability(root.socialGraph,a,b,'romance.intimacy',root.minutes).enabled||
+      !intimacyBedPlan(root,a))throw Error('Intimacy QA: unable to offer '+a);
   }
   return root;
 }

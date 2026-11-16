@@ -48,7 +48,8 @@ import {createSeatSurface,seatSlot} from './interaction-anchors.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
-import {createKissQAHousehold,KISS_QA_DEBUG_QUERY} from './romance-kiss-qa.js';
+import {intimacyFrame,intimacyBedPlan} from './romantic-intimacy.js';
+import {createIntimacyQAHousehold,INTIMACY_QA_DEBUG_QUERY} from './romance-intimacy-qa.js';
 import {meshVisualPreference,MESHY_VISUAL_KEY,meshSeatRuntimeSettings} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
@@ -67,6 +68,7 @@ import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, g
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
 const canvas = $('game-canvas');
+const intimacyVeil=$('intimacy-veil');
 const loadingProgress=createLoadingProgress(['scene','alex','mira'],({completed,total,failed})=>{
   $('loading-count').textContent=completed+' / '+total;
   $('loading-bar').style.width=(completed/total*100)+'%';
@@ -74,10 +76,10 @@ const loadingProgress=createLoadingProgress(['scene','alex','mira'],({completed,
     ? 'Не все модели доступны — используем резервные облики'
     : completed===total?'Готово!':'Загружаем сцену и 3D-модели';
 });
-const kissQAMode=new URLSearchParams(window.location.search).get('debug')===KISS_QA_DEBUG_QUERY;
+const intimacyQAMode=new URLSearchParams(window.location.search).get('debug')===INTIMACY_QA_DEBUG_QUERY;
 let game;
 // QA is a fresh in-memory pair. Never read or restore the player's save.
-if(kissQAMode)game=createKissQAHousehold();
+if(intimacyQAMode)game=createIntimacyQAHousehold();
 else try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
 catch { game = newHousehold(); }
 const selectedActor = () => getActor(game,game.selectedSim);
@@ -222,16 +224,16 @@ let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is
 let selected = null;
 let beginAction = () => false;
 let beginSocial = () => false;
-// Opt-in real R1b action on a disposable adult couple; no entitlement bypass.
-if(kissQAMode){
+// Opt-in R2a scenario only. No shortcut in the normal saved household.
+if(intimacyQAMode){
   const panel=document.createElement('section');
-  panel.id='kiss-qa-controls';
-  panel.className='kiss-qa-controls';
-  panel.setAttribute('aria-label','Режим проверки поцелуя');
-  panel.innerHTML='<strong>🎬 Проверка поцелуя</strong>'+
-    '<span>Тестовая пара · сохранение не меняется</span>'+
-    '<span id="kiss-qa-status" role="status">Готово к проверке</span>'+
-    '<div class="kiss-qa-buttons">'+
+  panel.id='intimacy-qa-controls';
+  panel.className='intimacy-qa-controls';
+  panel.setAttribute('aria-label','Проверка взрослой близости');
+  panel.innerHTML='<strong>🎬 Проверка близости</strong>'+
+    '<span>Взрослая тестовая пара · твой сейв не меняется</span>'+
+    '<span id="intimacy-qa-status" role="status">Готово к проверке</span>'+
+    '<div class="intimacy-qa-buttons">'+
       '<button type="button" data-initiator="alex">Алекс → Мира</button>'+
       '<button type="button" data-initiator="mira">Мира → Алекс</button>'+
     '</div>'+
@@ -239,13 +241,17 @@ if(kissQAMode){
   document.querySelector('.app-shell').append(panel);
   panel.querySelectorAll('button[data-initiator]').forEach(button=>{
     button.addEventListener('click',()=>{
-      if(furnishMode){toast('Выйди из режима ДОМ для проверки поцелуя');return;}
+      if(furnishMode){toast('Выйди из режима ДОМ');return;}
       if(game.paused){toast('Сними игру с паузы');return;}
       if(game.socialAction)cancelSocial(game);
+      // Reset ONLY the disposable QA pair for each direction. This makes
+      // repeats possible without bypassing the real 12-hour cooldown.
+      game=createIntimacyQAHousehold();
+      resetRuntime();restartAutonomyWait();updateAutoButton();updateResidentPicker();
       const initiatorId=button.dataset.initiator;
-      if(beginSocial('talk',false,initiatorId,null,null,'romance.kiss'))
-        toast('Демонстрация: '+getActorName(initiatorId)+' предлагает поцелуй');
-      else toast('Не удалось начать · проверь свободный путь');
+      if(beginSocial('talk',false,initiatorId,null,null,'romance.intimacy'))
+        toast(getActorName(initiatorId)+' предлагает побыть наедине');
+      else toast('Не удалось начать · проверь отношения и кровать');
     });
   });
 }
@@ -276,7 +282,7 @@ function toast(message) {
   clearTimeout(toastTimeout); toastTimeout = setTimeout(() => el.classList.remove('show'), 2600);
 }
 function save(silent = false) {
-  if(kissQAMode){
+  if(intimacyQAMode){
     if(!silent)toast('Проверка: твоё обычное сохранение не меняется');
     return;
   }
@@ -656,7 +662,9 @@ function renderSocialMenu(force=true){
     addBranch('friend.confide');
   }else if(category==='romance'){
     const options=availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
-      .filter(action=>action.category==='romance');
+      .filter(action=>action.category==='romance')
+      .map(action=>action.id==='romance.intimacy'&&!intimacyBedPlan(game,game.selectedSim)
+        ?{...action,enabled:false,reason:'Нужна свободная двуспальная кровать'}:action);
     for(const action of options){
       if(action.enabled)add(action.label,{type:'branch',actionId:action.id});
     }
@@ -1110,9 +1118,9 @@ createHudPanel({
   }
 });
 $('save-btn').addEventListener('click', () => save());
-if(kissQAMode)$('reset-btn').disabled=true;
+if(intimacyQAMode)$('reset-btn').disabled=true;
 $('reset-btn').addEventListener('click', () => {
-  if(kissQAMode)return;
+  if(intimacyQAMode)return;
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
   const enabled = game.autonomy.enabled;
   game = newHousehold();
@@ -2204,6 +2212,9 @@ function boot() {
   };
   const enterFurniture=()=>{
     if(furnishMode)return;
+    if(intimacyFrame(game.socialAction).active){
+      toast('Сначала завершите личное время вдвоём');return;
+    }
     if(dialogueNeedsDecision(game)){
       toast('Сначала выбери ответ или заверши разговор');return;
     }
@@ -2675,25 +2686,24 @@ function boot() {
     const kissTargets=kissCandidate.active
       ?kissPairTarget(game.position,game.otherSim.position,kissCandidate.weight):null;
     const kissFrame=kissTargets?kissCandidate:{weight:0,progress:0,active:false};
-    if(kissQAMode){
-      const status=document.getElementById('kiss-qa-status');
+    // Only the consented adult R2 action can activate this opaque
+    // fade-to-black. No explicit characters or anatomy are displayed.
+    const privateFrame=intimacyFrame(game.socialAction);
+    intimacyVeil.classList.toggle('visible',privateFrame.active);
+    intimacyVeil.setAttribute('aria-hidden',String(!privateFrame.active));
+    $('intimacy-progress').textContent=privateFrame.active
+      ?Math.round(privateFrame.progress*100)+'%':''; 
+    if(intimacyQAMode){
+      const status=document.getElementById('intimacy-qa-status');
       if(status){
-        const s=game.socialAction;
-        if(s?.branchAction?.id!=='romance.kiss')
-          status.textContent='Готово · нажми кнопку для повтора';
-        else if(s.phase==='walking')
-          status.textContent='Персонажи идут друг к другу';
-        else if(s.branchAction.kissConsent!==true)
-          status.textContent='Адресат отказал · контакта нет';
-        else if(!meshyPreferred)
-          status.textContent='Поцелуй '+Math.round(kissFrame.progress*100)+'% · старые 3D-облики';
-        else{
-          const neck=visual=>visual?.controllerReady
-            ?visual?.lastApplied?'двигается ✓':(visual?.lastReason||'ожидание')
-            :'контроллер недоступен';
-          status.textContent='Поцелуй '+Math.round(kissFrame.progress*100)+'% · Голова Алекса: '+
-            neck(meshyAlex.kissStatus)+' · Миры: '+neck(meshyMira.kissStatus);
-        }
+        const social=game.socialAction;
+        status.textContent=social?.branchAction?.id!=='romance.intimacy'
+          ?'Готово · можно запустить снова'
+          :social.phase==='walking'
+            ?'Персонажи идут друг к другу'
+            :social.branchAction.intimacyConsent!==true
+              ?'Уважительный отказ · затемнения нет'
+              :'Согласие получено · приватная сцена '+Math.round(privateFrame.progress*100)+'%';
       }
     }
     const kissAlexFrame={...kissFrame,initiator:game.socialAction?.initiator==='alex'};

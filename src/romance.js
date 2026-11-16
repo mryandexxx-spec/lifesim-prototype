@@ -7,7 +7,8 @@ export const FAMILY_KINDS=Object.freeze(['parent','sibling']);
 export const ROMANCE_ACTION_IDS=Object.freeze([
   'romance.flirt','romance.confess','romance.date','romance.breakup',
   'romance.tender','romance.propose','romance.marry','romance.divorce',
-  'romance.checkin','romance.repair','romance.hug','romance.kiss'
+  'romance.checkin','romance.repair','romance.hug','romance.kiss',
+  'romance.intimacy'
 ]);
 export const ROMANCE_COOLDOWN_MINUTES=1440;
 const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -250,8 +251,17 @@ export function romanceAvailability(graph,a,b,actionId,now=0){
   if(actionId==='romance.kiss'&&(!bondActive(bond)||
     feelings[a].attraction<44||feelings[b].attraction<44))
     return {enabled:false,reason:'Поцелуй возможен при взаимных чувствах в паре'};
+  if(actionId==='romance.intimacy'&&(
+    !bondActive(bond)||feelings[a].attraction<58||feelings[b].attraction<58||
+    src.trust<70||target.trust<70||src.tension>=28||target.tension>=28||
+    // A private scene is an occasional shared decision, not a repeatable
+    // score-farming action; a prior completed act means wait 12 game hours.
+    (Array.isArray(pair.events)&&pair.events.some(e=>e.type==='romance.intimacy'&&
+      Number.isFinite(e.at)&&e.at<=now&&now-e.at<720))))
+    return {enabled:false,reason:'Для близости нужны доверие, взаимность и время'};
   if(climate.state==='strained'&&
-    ['romance.tender','romance.hug','romance.kiss','romance.propose','romance.marry'].includes(actionId))
+    ['romance.tender','romance.hug','romance.kiss','romance.intimacy',
+      'romance.propose','romance.marry'].includes(actionId))
     return {enabled:false,reason:'Сначала стоит обсудить разногласия'};
   if(climate.state==='distant'&&
     ['romance.propose','romance.marry'].includes(actionId))
@@ -307,7 +317,7 @@ export function recordRomanceReceipt(graph,pair,receipt){
     if(Array.isArray(days)&&!days.includes(day)){
       days.push(day);bond.careDays[receipt.actorId]=days.slice(-8);
     }
-  }else if(['romance.hug','romance.kiss'].includes(receipt.type)&&bondActive(bond)){
+  }else if(['romance.hug','romance.kiss','romance.intimacy'].includes(receipt.type)&&bondActive(bond)){
     bond.lastConnectionAt=receipt.at;
   }else if(['romance.checkin','romance.repair'].includes(receipt.type)&&
     bondActive(bond)){
@@ -323,7 +333,7 @@ export function recordRomanceReceipt(graph,pair,receipt){
     target.attraction=clamp(target.attraction-9,0,100);
     return true;
   }
-  if(['romance.hug.refused','romance.kiss.refused'].includes(receipt.type)){
+  if(['romance.hug.refused','romance.kiss.refused','romance.intimacy.refused'].includes(receipt.type)){
     // Declining a physical gesture must not penalize either person's feelings.
     target.lastRefusedAt=receipt.at;
     return true;
@@ -334,13 +344,14 @@ export function recordRomanceReceipt(graph,pair,receipt){
   const tender=receipt.type==='romance.tender';
   const hug=receipt.type==='romance.hug';
   const kiss=receipt.type==='romance.kiss';
+  const intimacy=receipt.type==='romance.intimacy';
   const checkin=receipt.type==='romance.checkin';
   const repair=receipt.type==='romance.repair';
   const proposal=['romance.propose','romance.marry'].includes(receipt.type);
   actor.attraction=clamp(actor.attraction+(accepted?
-    proposal?4:repair?5:checkin?3:kiss?5:hug?6:tender?9:dating?7:confession?16:10:-5),0,100);
+    proposal?4:repair?5:checkin?3:intimacy?6:kiss?5:hug?6:tender?9:dating?7:confession?16:10:-5),0,100);
   target.attraction=clamp(target.attraction+(accepted?
-    proposal?4:repair?5:checkin?3:kiss?5:hug?6:tender?8:dating?7:confession?14:7:-1),0,100);
+    proposal?4:repair?5:checkin?3:intimacy?6:kiss?5:hug?6:tender?8:dating?7:confession?14:7:-1),0,100);
   if(!accepted)target.lastRefusedAt=receipt.at;
   return true;
 }
