@@ -1940,8 +1940,9 @@ function boot() {
       const first=plan.places[actorId],second=plan.places[partnerId];
       const a=findPath(self.position,first,game.world);
       const b=findPath(partner.position,second,game.world);
-      if(!a||!b||!startSharedSocial(game,actorId,first,
-        'leisure',shared.choiceId,automatic,plan))return false;
+      if(!a||!b||!(shared.choiceId==='tv'
+        ?startSharedSocial(game,actorId,first,'leisure','tv',false,plan)
+        :startSharedSocial(game,actorId,first,'leisure',shared.choiceId,automatic,plan)))return false;
       paths[actorId]={points:a,index:0,id:'social:'+kind};
       paths[partnerId]={points:b,index:0,id:'social:'+kind};
       restartAutonomyWait();return true;
@@ -3774,14 +3775,13 @@ function boot() {
       readingStage:pairedBooks?'reading':miraReadingStage,
       readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
       readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
-      musicFrame:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
-        contentId:'music.calm',elapsed:game.socialAction.elapsed}:
-        game.otherSim.action?.id==='music'?{
+      musicFrame:game.otherSim.action?.id==='music'?{
         phase:game.otherSim.action.phase,
         activityId:game.otherSim.action.activityId,
         contentId:game.otherSim.action.contentId,
         elapsed:game.otherSim.action.elapsed
-      }:null,
+      }:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
+        contentId:'music.calm',elapsed:game.socialAction.elapsed}:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
@@ -3795,8 +3795,9 @@ function boot() {
       fridgeFrame:miraFridge
     });
     // The procedural book belongs to a hidden elbow; never show it floating.
-    if(miraMeshShown&&(miraUseId==='sofa'||miraUseId==='hobby'||game.otherSim.action?.id==='hobby'))
+    if(miraMeshShown&&(miraUseId==='sofa'||game.otherSim.action?.id==='hobby'))
       miraBook.enabled=false;
+    if(miraMeshShown&&pairedBooks)miraBook.enabled=false;
     // The old snack is on the hidden procedural elbow, not the Meshy hand.
     if(miraMeshShown&&miraUseId==='fridge')miraSnack.enabled=false;
     // Alex stays on the same 3D rig for bed and fridge when their verified
@@ -3821,12 +3822,11 @@ function boot() {
       readingStage:pairedBooks?'reading':alexReadingStage,
       readingStepElapsed:game.action?.readingStepElapsed??0,
       readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
-      musicFrame:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
-        contentId:'music.calm',elapsed:game.socialAction.elapsed}:
-        game.action?.id==='music'?{
+      musicFrame:game.action?.id==='music'?{
         phase:game.action.phase,activityId:game.action.activityId,
         contentId:game.action.contentId,elapsed:game.action.elapsed
-      }:null,
+      }:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
+        contentId:'music.calm',elapsed:game.socialAction.elapsed}:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
       seat:seatContactEnabled?livingSofaSeat:null,
@@ -3845,8 +3845,9 @@ function boot() {
     if(meshyShown&&useId==='fridge')snack.enabled=false;
     // The existing procedural book is attached to the old right elbow.
     // Never let it float beside the Meshy hand until a real socket exists.
-    if(meshyShown&&(useId==='sofa'||useId==='hobby'||game.action?.id==='hobby'))
+    if(meshyShown&&(useId==='sofa'||game.action?.id==='hobby'))
       book.enabled=false;
+    if(meshyShown&&pairedBooks)book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
     // R5b never writes to the simulator. Tableware only follows existing
