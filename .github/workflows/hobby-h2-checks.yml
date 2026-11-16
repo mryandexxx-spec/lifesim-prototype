@@ -1,0 +1,42 @@
+name: H2 music and physical skills regression
+on:
+  push:
+    branches: ['feature/h2-*']
+  pull_request:
+    paths:
+      - 'src/hobby-reading.js'
+      - 'src/music-audio.js'
+      - 'src/furniture-*.js'
+      - 'src/object-legacy-adapter.js'
+      - 'src/household.js'
+      - 'src/simulation.js'
+      - 'src/game.js'
+      - 'src/meshy-visual-policy.js'
+      - 'src/meshy-mira-policy.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'tests/hobbies-h2.test.js'
+      - '.github/workflows/hobby-h2-checks.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Validate music and regress entire game
+        run: |
+          node --check src/music-audio.js
+          node --check src/hobby-reading.js
+          node --check src/game.js
+          node --check src/simulation.js
+          node --check src/household.js
+          npm test
+      - name: Verify original Meshy models were not modified
+        run: |
+          echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -
+          echo "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a  assets/characters/meshy-mira-mobile-v1.glb" | sha256sum -c -
