@@ -58,6 +58,12 @@ export function sanitizeQueueCommand(id,raw,persons){
       return {type,targetId,mode:'leisure',choiceId:'tv',
         targetInstanceId:raw.targetInstanceId||'home-tv-1'};
     }
+    if(['books','music'].includes(raw.choiceId)){
+      if(raw.targetInstanceId!==undefined&&
+        !validFurnitureInstanceId(raw.targetInstanceId))return null;
+      return {type,targetId,mode:'leisure',choiceId:raw.choiceId,
+        ...(raw.targetInstanceId?{targetInstanceId:raw.targetInstanceId}:{})};
+    }
     if(raw.targetInstanceId!==undefined)return null;
     return {type,targetId,mode:'leisure',choiceId:raw.choiceId};
   }

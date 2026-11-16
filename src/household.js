@@ -19,11 +19,12 @@ import {chooseReadingSeat,readingSeatId,readingStage,readingRouteId,
   beginReadingJourney,arriveReadingJourney,advanceReadingJourney,
   validReadingJourneyAction} from './reading-journey.js';
 import {liveSharedTv} from './tv-together.js';
+import {livePairedHobby} from './paired-hobby.js';
 import {captureObjectUse,settleObjectUseStep} from './object-use-runtime.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 import {HOBBY_ACTIVITIES,HOBBY_CONTENT,HOBBY_SKILLS,READING_ACTIVITY_ID,READING_CONTENT_ID,
-  MUSIC_ACTIVITY_ID,MUSIC_ACTIVITY_IDS,MUSIC_CONTENT_IDS} from './hobby-reading.js';
+  MUSIC_ACTIVITY_ID,MUSIC_ACTIVITY_IDS,MUSIC_CONTENT_IDS,READING_SKILL_ID} from './hobby-reading.js';
 import {getActivityDefinition,activityFitsItem} from './activity-registry.js';
 import {createActivitySession,restoreActivitySession,arriveActivitySession,
   advanceActivitySession} from './activity-session.js';
@@ -537,7 +538,10 @@ export function tickHousehold(root,minutes) {
   const stageBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>
     [id,readingStage(getActor(root,id)?.action)]));
   const shared=liveSharedTv(root);
+  const paired=livePairedHobby(root);
   const watchMinutes=shared?Math.min(minutes,Math.max(0,
+    sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
+  const pairMinutes=paired?Math.min(minutes,Math.max(0,
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
   const alexUse=captureObjectUse(root),miraUse=captureObjectUse(other);
   tick(root,minutes,root.world);
@@ -571,6 +575,28 @@ export function tickHousehold(root,minutes) {
       if(seat)actor.needs.energy=Math.min(100,actor.needs.energy+
         NEED_DECAY_PER_MINUTE.energy*watchMinutes);
       refreshMind(actor,root.world);
+    }
+  }
+  if(pairMinutes>0&&livePairedHobby(root)){
+    const session=root.socialAction.shared;
+    const credited=Math.min(pairMinutes,Math.max(0,
+      sharedDuration(session)-Math.max(session.creditedMinutes,root.socialAction.elapsed)));
+    if(credited>0){
+      for(const id of HOUSEHOLD_IDS){
+        const actor=getActor(root,id);
+        const efficiency=voluntaryMoodEfficiency(actor,{type:'shared',mode:'leisure'});
+        const perMinute=session.choiceId==='books'?1.05:.94;
+        actor.needs.fun=Math.min(100,actor.needs.fun+credited*perMinute*efficiency);
+        if(session.choiceId==='books'){
+          // Genuine synchronized reading, not XP for discussion alone.
+          const max=HOBBY_SKILLS.skills?.[READING_SKILL_ID]?.xpThresholds?.at(-1)??1380;
+          actor.skills.xpById[READING_SKILL_ID]=Math.min(max,
+            Math.round(((actor.skills.xpById[READING_SKILL_ID]||0)+credited)*1e6)/1e6);
+        }
+        refreshMind(actor,root.world);
+      }
+      session.creditedMinutes=Math.min(sharedDuration(session),
+        session.creditedMinutes+credited);
     }
   }
   // Both clocks remain identical (including when paused).
