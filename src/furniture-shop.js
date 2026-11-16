@@ -166,7 +166,12 @@ export function sellMarketItem(world,shop,instanceId,opts={}){
 const CANDIDATES=Object.freeze([
   [0,-2.1],[-.7,-2.0],[.1,-1.45],[-1.0,-.8],[3.2,2.95],
   [-.8,3.65],[.3,3.5],[3.4,-1.4],[.5,2.6],[-1.5,1.1],
-  [2.8,-1.5],[0,1.5],[-2.0,.2],[2.5,3.5]
+  [2.8,-1.5],[0,1.5],[-2.0,.2],[2.5,3.5],
+  // F4D: when the starter wing is full, find real places in the new half.
+  // Keep old preferences first so legacy previews remain familiar.
+  [6.4,-2.3],[8.4,-2.3],[10.5,-2.3],[12.2,-2.3],
+  [6.4,0],[8.4,0],[10.5,0],[12.2,0],
+  [6.4,2.3],[8.4,2.3],[10.5,2.3],[12.2,2.3]
 ]);
 export function findMarketPlacement(world,shop,prefabId,opts={}){
   for(const [x,z] of CANDIDATES){
