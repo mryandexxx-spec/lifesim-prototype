@@ -74,31 +74,41 @@
         <div><small>ДОМ · РЕЖИМ РЕДАКТИРОВАНИЯ</small><h2 id="furnish-title">Обстановка</h2></div>
         <button id="furnish-exit" type="button">✓ В жизнь</button>
       </div>
-      <p id="furnish-tip">Коснись мебели, чтобы выбрать. Для переноса удерживай палец 0,5 секунды, затем двигай. Обычный свайп — камера; два пальца — сдвиг и масштаб.</p>
-      <div class="furnish-market-bar">
-        <button id="furnish-shop-toggle" type="button" aria-controls="furnish-shop" aria-expanded="false">🛍 Магазин</button>
+      <p id="furnish-tip">Выбери мебель касанием в 3D. Удерживай палец 0,5 с для перемещения; переключатель камеры справа доступен всегда.</p>
+      <div class="furnish-market-bar" role="group" aria-label="Разделы обстановки">
+        <button id="furnish-edit-toggle" type="button" aria-pressed="true">▦ Комната</button>
+        <button id="furnish-shop-toggle" type="button" aria-controls="furnish-shop" aria-expanded="false">🛍 Каталог</button>
+        <button id="furnish-warehouse-toggle" type="button" aria-controls="furnish-warehouse" aria-expanded="false">📦 Склад <span id="furnish-storage-count">0</span></button>
         <output id="furnish-balance" aria-live="polite">Пробные кредиты: 5000</output>
       </div>
-      <div id="furnish-shop" class="furnish-shop" hidden>
-        <div id="furnish-stock" class="furnish-stock" role="group" aria-label="Каталог предметов"></div>
-        <p id="furnish-preview">Выбери предмет для покупки.</p>
+      <div id="furnish-shop" class="furnish-shop" hidden aria-label="Каталог новых предметов">
+        <div id="furnish-stock" class="furnish-stock" role="group" aria-label="Четыре товара для покупки"></div>
+        <p class="furnish-map-tip">Коснись пола в 3D, чтобы выбрать место. Свайп — сдвиг камеры. Кнопка справа переключает вращение.</p>
+        <div class="furnish-placement-controls">
+          <button id="furnish-preview-turn" type="button" aria-label="Повернуть покупаемый предмет на 90 градусов">⟳ Предмет</button>
+          <button id="furnish-preview-auto" type="button" aria-label="Найти свободное место для покупки">⌖ Найти место</button>
+        </div>
+        <p id="furnish-preview" role="status" aria-live="polite">Выбери товар и место в комнате.</p>
         <button id="furnish-buy" type="button">Купить и поставить</button>
-        <small>Пробная экономика — цены и бюджет уточняем после тестирования. Пока только декор.</small>
+        <small>Тестовые цены и кредиты, не окончательная экономика.</small>
       </div>
-      <div id="furnish-items" class="furnish-items" role="group" aria-label="Домашняя мебель и склад"></div>
-      <div class="furnish-commands" role="group" aria-label="Перемещение, поворот и история">
-        <button type="button" id="furnish-left" aria-label="Сдвинуть предмет влево по комнате">←</button>
-        <button type="button" id="furnish-right" aria-label="Сдвинуть предмет вправо по комнате">→</button>
-        <button type="button" id="furnish-up" aria-label="Сдвинуть предмет к дальней стене">↑</button>
-        <button type="button" id="furnish-down" aria-label="Сдвинуть предмет к ближней стене">↓</button>
-        <button type="button" id="furnish-rotate" class="furnish-main">⟳ Поворот</button>
+      <div id="furnish-warehouse" class="furnish-warehouse" hidden aria-label="Склад купленной и убранной мебели">
+        <p id="furnish-storage-empty">На складе пока пусто. Выбери предмет в комнате и нажми «В склад».</p>
+        <div id="furnish-storage-list" class="furnish-storage-list" role="group" aria-label="Предметы на складе"></div>
+      </div>
+      <div id="furnish-commands" class="furnish-commands" role="group" aria-label="Действия с мебелью, выбранной в 3D" hidden>
+        <button type="button" id="furnish-rotate" class="furnish-main">⟳ Предмет</button>
         <button type="button" id="furnish-store">📦 В склад</button>
         <button type="button" id="furnish-restore">↩ Из склада</button>
         <button type="button" id="furnish-sell">Продать</button>
-        <button type="button" id="furnish-undo">↶ Отмена</button>
-        <button type="button" id="furnish-redo">↷ Вернуть</button>
       </div>
-      <p id="furnish-feedback" class="furnish-feedback" role="status" aria-live="polite">Время остановлено. Удерживай предмет 0,5 секунды для захвата.</p>
+      <div class="furnish-editor-footer">
+        <p id="furnish-feedback" class="furnish-feedback" role="status" aria-live="polite">Выбери предмет в 3D или открой каталог.</p>
+        <div class="furnish-history" role="group" aria-label="История изменений">
+          <button type="button" id="furnish-undo">↶ Отменить</button>
+          <button type="button" id="furnish-redo">↷ Вернуть</button>
+        </div>
+      </div>
     </section>
 
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
