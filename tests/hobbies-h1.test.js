@@ -273,8 +273,8 @@ test('H1 Safari integration exposes real touch, store, session, personal XP and 
   assert.match(game,/currentSkillLevel\(current\.skills,HOBBY_SKILLS,READING_SKILL_ID\)/);
   assert.match(workflow,/node --check src\/hobby-reading\.js/);
   assert.match(workflow,/cp src\/hobby-reading\.js site\/src\//);
-  assert.match(html,/src\/game\.js\?v=1\.2n/);
-  assert.match(html,/styles\.css\?v=1\.2n/);
+  assert.match(html,/src\/game\.js\?v=1\.2o/);
+  assert.match(html,/styles\.css\?v=1\.2o/);
   const pkg=JSON.parse(source('../package.json'));
-  assert.equal(pkg.version,'1.0.0-alpha.66');
+  assert.equal(pkg.version,'1.0.0-alpha.67');
 });
