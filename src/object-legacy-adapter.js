@@ -4,14 +4,16 @@
  */
 import {FURNITURE_CATALOG} from './furniture-catalog.js';
 import {SHOP_ITEMS} from './furniture-shop.js';
-import {FURNITURE_PRODUCTS} from './furniture-products.js';
+import {FURNITURE_PRODUCTS,FURNITURE_SHOP_TYPES,FURNITURE_TYPE_BY_PREFAB}
+  from './furniture-products.js';
 import {NEEDS} from './simulation.js';
 import {createObjectRegistry} from './object-definition-registry.js';
 
 /** Historical room labels only; all NEW categories are data in registries. */
 const historicalRooms=Object.freeze({
   'Спальня':'room.bedroom','Гостиная':'room.living',
-  'Кухня':'room.kitchen','Ванная':'room.bathroom','Декор':'room.decor'
+  'Кухня':'room.kitchen','Ванная':'room.bathroom','Декор':'room.decor',
+  'Столовая':'room.dining','Кабинет':'room.study'
 });
 const shop=new Map(SHOP_ITEMS.map(({prefabId,price})=>[prefabId,price]));
 const defs=Object.values(FURNITURE_CATALOG);
@@ -26,7 +28,8 @@ const capabilityLabels=Object.freeze({
 const categories=[
   ...Object.entries(historicalRooms).map(([label,id])=>({id,label,facet:'room'})),
   ...caps.map(id=>({id:'function.'+id,
-    label:capabilityLabels[id]||id,facet:'function'}))
+    label:capabilityLabels[id]||id,facet:'function'})),
+  ...FURNITURE_SHOP_TYPES.map(cat=>({...cat,facet:'type'}))
 ];
 const statLabels=Object.freeze({energy:'Энергия',fun:'Досуг',hunger:'Сытость',
   hygiene:'Гигиена',social:'Общение',bladder:'Туалет'});
@@ -36,7 +39,9 @@ const triggers=['item.use.tick','item.use.complete','item.presence.tick',
   'item.placed','item.repaired'].map(id=>({id}));
 const items=defs.map(d=>({
   id:'legacy.'+d.prefabId,prefabId:d.prefabId,rendererKey:d.rendererKey,
-  name:d.name,categoryIds:[historicalRooms[d.category],...d.capabilities.map(c=>'function.'+c)],
+  name:d.name,categoryIds:[historicalRooms[d.category],
+    ...d.capabilities.map(c=>'function.'+c),
+    ...(FURNITURE_TYPE_BY_PREFAB[d.prefabId]?[FURNITURE_TYPE_BY_PREFAB[d.prefabId]]:[])],
   capabilities:[...d.capabilities],price:shop.get(d.prefabId)??null,
   ratings:{},effects:[] // Existing gameplay already owns rewards; no duplicates.
 }));
@@ -47,10 +52,13 @@ for(const offer of FURNITURE_PRODUCTS){
   const prefab=FURNITURE_CATALOG[offer.prefabId];
   if(!prefab)throw new Error('Unknown prefab in furniture SKU '+offer.itemId);
   items.push({
-    id:offer.itemId,prefabId:offer.prefabId,rendererKey:prefab.rendererKey,
+    id:offer.itemId,prefabId:offer.prefabId,
+    rendererKey:offer.modelKey||prefab.rendererKey,
     name:offer.name||prefab.name,
     categoryIds:[historicalRooms[prefab.category],
-      ...prefab.capabilities.map(x=>'function.'+x)],
+      ...prefab.capabilities.map(x=>'function.'+x),
+      ...(offer.typeCategoryId||FURNITURE_TYPE_BY_PREFAB[offer.prefabId]
+        ?[offer.typeCategoryId||FURNITURE_TYPE_BY_PREFAB[offer.prefabId]]:[])],
     capabilities:[...prefab.capabilities],price:offer.price,
     appearanceId:offer.appearanceId||null,ratings:{},effects:offer.effects||[]
   });

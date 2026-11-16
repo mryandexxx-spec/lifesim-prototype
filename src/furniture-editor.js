@@ -7,7 +7,8 @@ import {proposeFurnitureMove} from './furniture-layout.js';
 import {restoreFurnitureShop} from './furniture-shop.js';
 
 export const F1_MOVEABLE_PREFABS=Object.freeze([
-  'nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet','bookcase'
+  'nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet','bookcase',
+  'armchair','chair','diningtable','floorlamp','rug','dresser','mirror','sculpture','wardrobe'
 ]);
 export const F1_GRID_STEP=.25;
 export function canMoveFurniture(instance){

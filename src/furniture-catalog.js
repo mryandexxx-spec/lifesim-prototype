@@ -44,6 +44,35 @@ const original=[
     approach:[TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z]},
   {prefabId:'plant',instanceId:'home-plant-1',name:'Растение',category:'Декор',
     capabilities:['decor'],x:4.175,z:3.22,rect:[3.83,4.52,2.78,3.66]},
+  // F4C: independent procedural 3D types. None spawn in old homes; every
+  // instance is bought and saved with stable SKU identity.
+  {prefabId:'armchair',instanceId:'template-armchair-1',name:'Кресло',
+    category:'Гостиная',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.62,.62,-.65,.65]},
+  {prefabId:'chair',instanceId:'template-chair-1',name:'Стул',
+    category:'Столовая',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.46,.46,-.48,.48]},
+  {prefabId:'diningtable',instanceId:'template-diningtable-1',name:'Обеденный стол',
+    category:'Столовая',capabilities:['surface'],templateOnly:true,
+    x:0,z:0,rect:[-1.13,1.13,-.72,.72]},
+  {prefabId:'floorlamp',instanceId:'template-floorlamp-1',name:'Торшер',
+    category:'Гостиная',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.36,.36,-.36,.36]},
+  {prefabId:'rug',instanceId:'template-rug-1',name:'Ковёр',
+    category:'Декор',capabilities:['decor'],templateOnly:true,walkThrough:true,
+    x:0,z:0,rect:[-1.22,1.22,-.90,.90]},
+  {prefabId:'dresser',instanceId:'template-dresser-1',name:'Комод',
+    category:'Спальня',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.94,.94,-.43,.43]},
+  {prefabId:'mirror',instanceId:'template-mirror-1',name:'Зеркало',
+    category:'Спальня',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.48,.48,-.31,.31]},
+  {prefabId:'sculpture',instanceId:'template-sculpture-1',name:'Скульптура',
+    category:'Декор',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.46,.46,-.46,.46]},
+  {prefabId:'wardrobe',instanceId:'template-wardrobe-1',name:'Гардероб',
+    category:'Спальня',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.91,.91,-.51,.51]},
   // Template-only procedural 3D model: not gifted to existing saves and
   // never in initial world. Purchased copies have real individual instance IDs.
   {prefabId:'bookcase',instanceId:'template-bookcase-1',name:'Книжный шкаф',
@@ -68,6 +97,7 @@ export const FURNITURE_CATALOG=Object.freeze(Object.fromEntries(original.map(ite
     seating:Object.freeze(item.prefabId==='sofa'?['reading']:[]),
     footprint,extras,approach,rendererKey:item.prefabId,version:1,
     templateOnly:item.templateOnly===true,
+    walkThrough:item.walkThrough===true,
     maxOccupants:item.prefabId==='bed'?2:1,
     sellable:!['shower','toilet'].includes(item.prefabId),
     price:null, // F2 will set player-facing prices before enabling transactions.
@@ -149,7 +179,7 @@ export function furnitureObstacles(world){
   for(const item of data.instances){
     if(item.location!=='home')continue;
     const definition=FURNITURE_CATALOG[item.prefabId];
-    if(!definition)continue;
+    if(!definition||definition.walkThrough)continue;
     result.push({id:item.prefabId,instanceId:item.instanceId,
       ...instanceRect(item,definition.footprint)});
     for(const extra of definition.extras)
