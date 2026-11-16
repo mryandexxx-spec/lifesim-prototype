@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.1j" />
+  <link rel="stylesheet" href="./styles.css?v=1.1k" />
   <script type="importmap">
     {"imports":{"playcanvas":"https://cdn.jsdelivr.net/npm/playcanvas@2.24.1/build/playcanvas.mjs"}}
   </script>
@@ -22,7 +22,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.1j</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.1k</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -74,7 +74,7 @@
         <div><small>ДОМ · РЕЖИМ РЕДАКТИРОВАНИЯ</small><h2 id="furnish-title">Обстановка</h2></div>
         <button id="furnish-exit" type="button">✓ В жизнь</button>
       </div>
-      <p id="furnish-tip">Выбери предмет на сцене или ниже. Один палец по предмету — перетащить; двумя — камера.</p>
+      <p id="furnish-tip">Коснись мебели, чтобы выбрать. Для переноса удерживай палец 0,5 секунды, затем двигай. Обычный свайп — камера; два пальца — сдвиг и масштаб.</p>
       <div id="furnish-items" class="furnish-items" role="group" aria-label="Предметы для перемещения"></div>
       <div class="furnish-commands" role="group" aria-label="Перемещение, поворот и история">
         <button type="button" id="furnish-left" aria-label="Сдвинуть предмет влево по комнате">←</button>
@@ -85,7 +85,7 @@
         <button type="button" id="furnish-undo">↶ Отмена</button>
         <button type="button" id="furnish-redo">↷ Вернуть</button>
       </div>
-      <p id="furnish-feedback" class="furnish-feedback" role="status" aria-live="polite">Мир остановлен. Встроенная мебель пока закреплена для сохранности анимаций.</p>
+      <p id="furnish-feedback" class="furnish-feedback" role="status" aria-live="polite">Время остановлено. Удерживай предмет 0,5 секунды для захвата.</p>
     </section>
 
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
@@ -219,7 +219,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.1j"></script>
+  <script type="module" src="./src/game.js?v=1.1k"></script>
   <script>
     window.addEventListener('error', function () {
       const el = document.getElementById('loading');
