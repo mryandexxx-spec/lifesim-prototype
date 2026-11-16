@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {createFurnitureEditor} from '../src/furniture-editor.js';
 import {newFurnitureShop,buyMarketItem,storeMarketItem,sellMarketItem,
@@ -81,4 +82,40 @@ test('F2.1 frontend owns one compatible shop for world furniture and safeguards'
   assert.ok(!game.includes('game.paused=true;'));
   assert.ok(FURNITURE_CATALOG.plant.price===null,
     'provisional pricing must not be presented as final prefab balance');
+});
+
+test('F2.1 PlayCanvas runtime creates, stores and removes real independent prefab copies',()=>{
+  const gameSource=source('../src/game.js');
+  assert.match(gameSource,/decorTemplates\.set\(prefabId,node\)/);
+  const start=gameSource.indexOf('  const updateDecorNodes=(previewId=null,previewPose=null)=>{');
+  const end=gameSource.indexOf('  const primitive =',start);
+  assert.ok(start>0&&end>start);
+  const updateCode=gameSource.slice(start,end)+'\nupdateDecorNodes();';
+  const plant='home-plant-1',duplicate='shop-plant-100';
+  const game={world:{furniture:{instances:[
+    {instanceId:plant,prefabId:'plant',x:4.175,z:3.22,yaw:0,location:'home'},
+    {instanceId:duplicate,prefabId:'plant',x:0,z:-2,yaw:90,location:'home'}
+  ]}}};
+  let clones=0,destroyed=0,refreshes=0;
+  const fakeNode=()=>({enabled:true,setPosition(x,y,z){this.at={x,y,z};},
+    setEulerAngles(x,y,z){this.yaw=y;},destroy(){destroyed++;}});
+  const original=fakeNode();
+  const nodes=new Map([[plant,original]]);
+  const template={clone(){clones++;return fakeNode();}};
+  const ctx={game,decorNodes:nodes,decorTemplates:new Map([['plant',template]]),
+    SHOP_ITEMS:[{prefabId:'plant'}],app:{root:{addChild(){}}},
+    refreshSofaSeat(){refreshes++;}};
+  assert.doesNotThrow(()=>runInNewContext(updateCode,ctx,{timeout:1000}));
+  assert.equal(clones,1);
+  assert.equal(nodes.get(duplicate).at.x,0);
+  assert.equal(nodes.get(duplicate).yaw,-90);
+  game.world.furniture.instances[1].location='storage';
+  runInNewContext(updateCode,ctx,{timeout:1000});
+  assert.equal(nodes.get(duplicate).enabled,false);
+  assert.equal(nodes.get(plant).enabled,true);
+  game.world.furniture.instances.pop();
+  runInNewContext(updateCode,ctx,{timeout:1000});
+  assert.equal(nodes.has(duplicate),false);
+  assert.equal(destroyed,1);
+  assert.equal(refreshes,3);
 });

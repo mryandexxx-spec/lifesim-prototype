@@ -1971,6 +1971,7 @@ function boot() {
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     updateDecorNodes();
     renderFurnitureSelection();
+    renderMarket();
     editorFeedback(editorLabel(instanceId)+' переставлен · изменения сохранены');
     save(true);
     return true;
