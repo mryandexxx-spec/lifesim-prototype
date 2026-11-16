@@ -1,7 +1,8 @@
 /** Headless navigation: room geometry in world X/Z coordinates, no PlayCanvas dependency. */
 import {FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {newFurnitureWorld,furnitureObstacles} from './furniture-catalog.js';
-export const ROOM = Object.freeze({ minX: -4.62, maxX: 4.62, minZ: -3.96, maxZ: 3.98 });
+// F4D: eastward extension exactly doubles navigable floor area; old positions stay fixed.
+export const ROOM = Object.freeze({ minX: -4.62, maxX: 13.86, minZ: -3.96, maxZ: 3.98 });
 export const ACTOR_RADIUS = 0.26;
 // Legacy export is generated from the same catalogue as the serializable layout.
 export const FURNITURE = Object.freeze(furnitureObstacles(newFurnitureWorld()));
