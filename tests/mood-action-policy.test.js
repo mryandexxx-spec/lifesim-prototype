@@ -280,7 +280,7 @@ test('1.0s release retains M2 in Pages, preserves 1.0q dialogue, M1 and Safari c
   assert.match(html,/id="mood-orbit"/);
   assert.match(html,/id="mood-overview"/);
   assert.match(html,/id="conversation-panel"/);
-  assert.equal(pkg.version,'1.0.0-alpha.63');
+  assert.equal(pkg.version,'1.0.0-alpha.64');
   assert.equal(lock.version,pkg.version);
   assert.equal(lock.packages[''].version,pkg.version);
 });
