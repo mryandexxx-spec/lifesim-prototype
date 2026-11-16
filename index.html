@@ -83,13 +83,16 @@
       </div>
       <div id="furnish-shop" class="furnish-shop" hidden aria-label="Каталог новых предметов">
         <div id="furnish-stock" class="furnish-stock" role="group" aria-label="Четыре товара для покупки"></div>
-        <p class="furnish-map-tip">Коснись пола в 3D, чтобы выбрать место. Свайп — сдвиг камеры. Кнопка справа переключает вращение.</p>
+        <p class="furnish-map-tip">Выбери товар и нажми «Купить». Затем перемещай камеру свайпом, подбери место и подтверди расстановку.</p>
         <div class="furnish-placement-controls">
           <button id="furnish-preview-turn" type="button" aria-label="Повернуть покупаемый предмет на 90 градусов">⟳ Предмет</button>
           <button id="furnish-preview-auto" type="button" aria-label="Найти свободное место для покупки">⌖ Найти место</button>
         </div>
-        <p id="furnish-preview" role="status" aria-live="polite">Выбери товар и место в комнате.</p>
-        <button id="furnish-buy" type="button">Купить и поставить</button>
+        <p id="furnish-preview" role="status" aria-live="polite">Выбери товар и нажми «Купить».</p>
+        <div class="furnish-purchase-actions">
+          <button id="furnish-buy" type="button">Купить</button>
+          <button id="furnish-place-cancel" type="button" hidden>✕ Отменить</button>
+        </div>
         <small>Тестовые цены и кредиты, не окончательная экономика.</small>
       </div>
       <div id="furnish-warehouse" class="furnish-warehouse" hidden aria-label="Склад купленной и убранной мебели">
