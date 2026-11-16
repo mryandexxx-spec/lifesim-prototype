@@ -17,6 +17,7 @@ import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect} from './furniture-cat
 import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
+import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -1820,7 +1821,7 @@ function boot() {
     if(item&&!canMoveFurniture(item))
       editorFeedback(editorMessage('fixed-or-missing'),true);
     else if(item)
-      editorFeedback(editorLabel(id)+': перетащи по полу или используй стрелки и поворот');
+      editorFeedback(editorLabel(id)+': удерживай палец полсекунды для захвата или используй стрелки');
     else editorFeedback('Выбери мебель в комнате или из списка');
   };
   for(const type of F1_MOVEABLE_PREFABS){
@@ -1884,7 +1885,10 @@ function boot() {
   $('furnish-rotate').addEventListener('click',()=>editorStep(0,0,90));
   const exitFurniture=()=>{
     if(!furnishMode)return;
-    editDrag=null;furnishMode=false;editSelectedId=null;editSession=null;
+    cancelPendingGrab();
+    editDrag=null;canvas.dataset.furnitureGrab='false';
+    cameraGesture.clear();
+    furnishMode=false;editSelectedId=null;editSession=null;
     furnitureGhost.enabled=false;
     updateDecorNodes();
     document.querySelector('.app-shell').dataset.furnishMode='false';
@@ -1915,7 +1919,7 @@ function boot() {
     renderSharedPanel();renderBranchPanel();
     chooseFurniture(null);
     renderPauseButton();
-    editorFeedback('Время остановлено. Выбери мебель: кровать, диван, холодильник, душ и WC теперь тоже можно переставлять, но не во время использования.');
+    editorFeedback('Коснись предмета, чтобы выбрать. Для перемещения удерживай палец 0,5 секунды. Свайп по мебели поворачивает камеру.');
   };
   $('furnish-toggle').addEventListener('click',()=>furnishMode?exitFurniture():enterFurniture());
   $('furnish-exit').addEventListener('click',exitFurniture);
@@ -1946,27 +1950,42 @@ function boot() {
       });
     return pickWorldRayTarget(near,far,boxes)?.id||null;
   };
+  // A furniture ray hit only arms a deliberate hold; the camera owns all
+  // pointer movements until a stationary, single-pointer 500ms hold fires.
+  const holdGesture=createFurnitureHoldGesture();
+  let furnitureHoldTimer=null;
+  const cancelPendingGrab=()=>{
+    if(furnitureHoldTimer!==null){
+      clearTimeout(furnitureHoldTimer);
+      furnitureHoldTimer=null;
+    }
+    holdGesture.cancel();
+  };
   const cancelEditorDrag=()=>{
     if(!editDrag)return;
-    editDrag=null;updateDecorNodes();renderFurnitureSelection();
+    editDrag=null;canvas.dataset.furnitureGrab='false';
+    updateDecorNodes();renderFurnitureSelection();
   };
   const startEditorDrag=event=>{
-    if(!furnishMode)return false;
-    if(editDrag){cancelEditorDrag();return true;}
-    const id=editorFurnitureAt(gesturePoint(event));
-    if(!id)return false; // Unoccupied floor continues to orbit/pan as usual.
-    chooseFurniture(id);
+    if(!furnishMode||editDrag)return false;
+    const id=event.grabInstanceId;
     const item=editorItem(id);
-    if(!canMoveFurniture(item))return true;
+    if(!canMoveFurniture(item))return false;
     const floor=editorFloorAt(gesturePoint(event));
-    if(!floor)return true;
+    if(!floor)return false;
+    chooseFurniture(id);
     editDrag={pointerId:event.pointerId,instanceId:id,
+      lastPoint:gesturePoint(event),
       offsetX:item.x-floor.x,offsetZ:item.z-floor.z,
       pose:{x:item.x,z:item.z,yaw:item.yaw},lastCheck:0,valid:true};
+    canvas.dataset.furnitureGrab='true';
+    showGhost(id);
+    editorFeedback('Предмет захвачен · веди пальцем, чтобы переместить');
     return true;
   };
   const moveEditorDrag=event=>{
     if(!editDrag||editDrag.pointerId!==event.pointerId)return false;
+    editDrag.lastPoint=gesturePoint(event);
     const pt=editorFloorAt(gesturePoint(event));
     if(!pt)return true;
     const pose={x:snapFurnitureCoordinate(pt.x+editDrag.offsetX),
@@ -1992,29 +2011,71 @@ function boot() {
   const endEditorDrag=event=>{
     if(!editDrag||editDrag.pointerId!==event.pointerId)return false;
     const {instanceId,pose}=editDrag;
-    editDrag=null;
+    editDrag=null;holdGesture.end(gesturePoint(event));
+    canvas.dataset.furnitureGrab='false';
     const item=editorItem(instanceId);
     if(item&&(item.x!==pose.x||item.z!==pose.z))
       commitFurniture(instanceId,pose);
     else{updateDecorNodes();renderFurnitureSelection();}
     return true;
   };
+  const armFurnitureHold=(event,now)=>{
+    if(!furnishMode||cameraGesture.count()!==1)return;
+    const point=gesturePoint(event);
+    const instanceId=editorFurnitureAt(point);
+    const item=editorItem(instanceId);
+    if(!canMoveFurniture(item)||!editorFloorAt(point))return;
+    if(!holdGesture.begin(point,instanceId,now))return;
+    furnitureHoldTimer=setTimeout(()=>{
+      furnitureHoldTimer=null;
+      if(!furnishMode||dialogueNeedsDecision(game)||cameraGesture.count()!==1){
+        holdGesture.cancel();return;
+      }
+      const held=holdGesture.activate(performance.now());
+      if(!held)return;
+      // The camera has processed no drag while this finger stayed still.
+      // Once picked up it must not receive a late click on pointerup.
+      cameraGesture.clear();
+      const grabEvent={pointerId:held.pointerId,clientX:held.x,
+        clientY:held.y,grabInstanceId:held.instanceId};
+      if(!startEditorDrag(grabEvent))holdGesture.cancel();
+    },FURNITURE_HOLD_MS);
+  };
   canvas.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse'&&event.button!==0)return;
     if(dialogueNeedsDecision(game))return;
     if(event.cancelable)event.preventDefault();
     try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
-    if(furnishMode&&startEditorDrag(event))return;
-    cameraGesture.begin(gesturePoint(event),performance.now());
+    const point=gesturePoint(event),now=performance.now();
+    if(furnishMode&&editDrag){
+      // Two fingers always win over furniture. Re-seed the original
+      // captured touch before adding the second for seamless pinch/pan.
+      const first=editDrag.lastPoint;
+      cancelEditorDrag();
+      cameraGesture.clear();
+      if(first&&first.id!==point.id)cameraGesture.begin(first,now);
+    }
+    if(furnishMode)cancelPendingGrab();
+    cameraGesture.begin(point,now);
+    armFurnitureHold(event,now);
   });
   // Global listeners survive canvas leaving the viewport on iOS Safari.
   window.addEventListener('pointermove',event=>{
-    if(furnishMode&&editDrag){
+    if(furnishMode&&editDrag?.pointerId===event.pointerId){
       if(event.cancelable)event.preventDefault();
       moveEditorDrag(event);return;
     }
+    if(furnishMode&&holdGesture.pending){
+      if(holdGesture.move(gesturePoint(event))==='camera'){
+        // The same pointer motion continues into cameraGesture.move below:
+        // no dead zone, no camera jump and no transient furniture move.
+        cancelPendingGrab();
+      }
+    }
     if(!cameraGesture.count())return;
-    if(dialogueNeedsDecision(game)){cameraGesture.clear();return;}
+    if(dialogueNeedsDecision(game)){
+      cancelPendingGrab();cameraGesture.clear();return;
+    }
     const result=cameraGesture.move(gesturePoint(event),view,
       canvas.clientHeight,{oneFinger:oneFingerMode});
     if(result.changed){
@@ -2070,6 +2131,8 @@ function boot() {
   };
   const endPointer=event=>{
     if(furnishMode&&endEditorDrag(event))return;
+    if(furnishMode&&holdGesture.pointerId===event.pointerId)
+      cancelPendingGrab();
     const pos=cameraGesture.end(gesturePoint(event),performance.now());
     if(!pos||dialogueNeedsDecision(game))return;
     if(furnishMode){chooseFurniture(editorFurnitureAt(pos));return;}
@@ -2081,11 +2144,14 @@ function boot() {
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
-    if(editDrag?.pointerId===event.pointerId)cancelEditorDrag();
+    if(holdGesture.pointerId===event.pointerId)cancelPendingGrab();
+    if(editDrag?.pointerId===event.pointerId){
+      cancelEditorDrag();holdGesture.cancel();
+    }
     cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true});
   });
   window.addEventListener('blur',()=>{
-    cancelEditorDrag();cameraGesture.clear();
+    cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();
   });
   canvas.addEventListener('wheel',event=>{
     event.preventDefault();
