@@ -228,7 +228,8 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       bedBusy=false,bedFrame=null,bedProgress=0,
       showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,
-      fridgeBusy=false,fridgeFrame=null,readingElapsed=null}={}){
+      fridgeBusy=false,fridgeFrame=null,readingElapsed=null,
+      readingStage=null,readingStepElapsed=0}={}){
       const show=canShowMiraMeshy({
         preferred:preferred&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready))&&
           (!kissFrame?.active||Boolean(state.kissRuntime?.ready)),ready:state.ready,actionId,
@@ -253,8 +254,12 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         state.showerRuntime?.setFrame(null);
         return show;
       }
-      state.readingRuntime?.setFrame(actionId==='hobby'
-        ?{active:true,elapsed:readingElapsed}:null,paused);
+      // The book is present in travel/take/return frames too. Only the
+      // actual seated reading stage may earn XP; this is pure cosmetics.
+      state.readingRuntime?.setFrame(readingStage||actionId==='hobby'
+        ?{active:true,stage:readingStage||'reading',
+          elapsed:Number.isFinite(readingElapsed)?readingElapsed:0,
+          stepElapsed:readingStepElapsed}:null,paused);
       state.hugRuntime?.setFrame(hugFrame,paused);
       state.kissRuntime?.setFrame(kissFrame,paused);
       const shower=actionId==='shower'||showerBusy;
