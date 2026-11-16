@@ -2,9 +2,14 @@
 import {createSkillRegistry} from './skill-registry.js';
 import {createHobbyContentCatalog} from './hobby-content.js';
 import {createActivityRegistry} from './activity-registry.js';
+import {skillUnlocksAtLevel} from './skill-registry.js';
+import {currentSkillLevel} from './skills-engine.js';
 
 export const READING_ACTIVITY_ID='hobby.read.fiction';
 export const READING_CONTENT_ID='book.first.stories';
+export const READING_ADVANCED_CONTENT_ID='book.classic.pathways';
+export const READING_ADVANCED_UNLOCK_ID='books.read.classics';
+export const READING_CONTENT_IDS=Object.freeze([READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID]);
 export const READING_SKILL_ID='literature';
 export const MUSIC_ACTIVITY_ID='hobby.listen.music';
 export const MUSIC_DANCE_ACTIVITY_ID='hobby.dance.music';
@@ -14,11 +19,14 @@ export const HOBBY_SKILLS=createSkillRegistry({skills:[{
   id:READING_SKILL_ID,label:'Литературная эрудиция',group:'knowledge',
   maxLevel:10,xpThresholds:[30,75,135,215,320,455,625,830,1080,1380],
   practiceTags:['book.fiction'],
-  unlocks:[{id:'books.discuss.classics',minLevel:3}]
+  unlocks:[{id:READING_ADVANCED_UNLOCK_ID,minLevel:3}]
 }]});
 export const HOBBY_CONTENT=createHobbyContentCatalog({entries:[{
   id:READING_CONTENT_ID,kind:'book',label:'Истории дальних дорог',
   difficulty:1,tags:['book.fiction','books'],skillTags:[READING_SKILL_ID]
+}, {
+  id:READING_ADVANCED_CONTENT_ID,kind:'book',label:'Пути старых городов',
+  difficulty:3,tags:['book.fiction','books','books.classics'],skillTags:[READING_SKILL_ID]
 },
   {id:'music.calm',kind:'musicstyle',label:'Тихий вечер',difficulty:1,tags:['music','calm_leisure'],skillTags:[]},
   {id:'music.rhythmic',kind:'musicstyle',label:'Тёплый ритм',difficulty:1,tags:['music','rhythm'],skillTags:[]},
@@ -48,3 +56,12 @@ export const HOBBY_ACTIVITIES=createActivityRegistry({
     skillPractice:[],poseKey:'music.dance',audioCue:'music.original'
   }]
 });
+
+/** H4: real level-gated book content; no XP from choosing/buying a book. */
+export function canReadHobbyContent(progress,contentId){
+  if(contentId===READING_CONTENT_ID)return true;
+  if(contentId!==READING_ADVANCED_CONTENT_ID)return false;
+  const level=currentSkillLevel(progress,HOBBY_SKILLS,READING_SKILL_ID);
+  return skillUnlocksAtLevel(HOBBY_SKILLS,READING_SKILL_ID,level)
+    .some(unlock=>unlock.id===READING_ADVANCED_UNLOCK_ID);
+}
