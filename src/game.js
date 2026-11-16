@@ -19,7 +19,8 @@ import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
-import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS} from './hobby-reading.js';
+import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
+import {skillProfileRows} from './skill-presentation.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -461,6 +462,68 @@ document.addEventListener('keydown',event=>{
   }
 },true);
 
+// H4 — read-only projection of saved personal XP into an accessible tab.
+let mindTab='overview',skillProfileKey='';
+function renderSkillsTab(force=false){
+  if(mindTab!=='skills'||$('mind-panel').hidden)return;
+  const actor=selectedActor(),rows=skillProfileRows(actor.skills,HOBBY_SKILLS);
+  const key=JSON.stringify([game.selectedSim,rows,actor.action?.phase,game.socialAction?.phase]);
+  if(!force&&skillProfileKey===key)return;
+  skillProfileKey=key;
+  const list=$('mind-skills-list');list.replaceChildren();
+  for(const skill of rows){
+    const card=document.createElement('article');card.className='skill-card';
+    const header=document.createElement('div');header.className='skill-card-head';
+    const title=document.createElement('strong');title.textContent=skill.label;
+    const level=document.createElement('span');level.className='skill-card-level';
+    level.textContent='Уровень '+skill.level+'/'+skill.maxLevel;
+    header.append(title,level);
+    const track=document.createElement('div');track.className='skill-card-progress';
+    track.setAttribute('role','progressbar');track.setAttribute('aria-label','Прогресс: '+skill.label);
+    track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');
+    track.setAttribute('aria-valuenow',String(skill.percentage));
+    track.setAttribute('aria-valuetext',skill.mastered?'Максимальный уровень':
+      'Уровень '+skill.level+', '+Math.floor(skill.xp)+' из '+skill.next+' опыта');
+    const fill=document.createElement('i');fill.style.width=skill.percentage+'%';track.append(fill);
+    const status=document.createElement('div');status.className='skill-card-detail';
+    status.textContent=skill.mastered?'Мастерство освоено · '+Math.floor(skill.xp)+' опыта':
+      Math.floor(skill.xp)+' / '+skill.next+' опыта · осталось '+Math.ceil(skill.next-skill.xp);
+    const reading=skill.id===READING_SKILL_ID&&(
+      (actor.action?.id==='hobby'&&actor.action.phase==='using')||
+      (game.socialAction?.shared?.choiceId==='books'&&game.socialAction.phase==='using'));
+    const hint=document.createElement('p');hint.className='skill-card-hint';
+    hint.textContent=(reading?'📖 Сейчас практикуется. ':'')+skill.hint;
+    card.append(header,track,status,hint);
+    const unlocks=document.createElement('div');unlocks.className='skill-unlocks';
+    for(const item of skill.unlocks){
+      const line=document.createElement('div');line.className='skill-unlock';
+      line.dataset.unlocked=String(item.unlocked);
+      line.textContent=item.unlocked?'✓ Освоено: '+item.label:
+        '🔒 На уровне '+item.minLevel+' откроется: '+item.label;
+      unlocks.append(line);
+    }
+    card.append(unlocks);list.append(card);
+  }
+}
+function setMindTab(tab){
+  mindTab=tab==='skills'?'skills':'overview';
+  for(const name of ['overview','skills']){
+    const chosen=mindTab===name,b=$('mind-tab-'+name);
+    b.setAttribute('aria-selected',String(chosen));b.tabIndex=chosen?0:-1;
+    $(name==='overview'?'mind-overview':'mind-skills-tab').hidden=!chosen;
+  }
+  renderSkillsTab(true);
+}
+for(const tab of ['overview','skills'])
+  $('mind-tab-'+tab).addEventListener('click',()=>setMindTab(tab));
+function updateReadingContentChoice(){
+  const select=$('reading-content-select');
+  const option=select.querySelector('option[value="'+READING_ADVANCED_CONTENT_ID+'"]');
+  const unlocked=canReadHobbyContent(selectedActor().skills,READING_ADVANCED_CONTENT_ID);
+  option.disabled=!unlocked;
+  option.textContent='Пути старых городов · '+(unlocked?'освоено':'откроется на уровне 3');
+  if(!canReadHobbyContent(selectedActor().skills,select.value))select.value=READING_CONTENT_ID;
+}
 function closeMindPanel() {
   $('mind-panel').hidden = true;
   $('mind-toggle').setAttribute('aria-expanded', 'false');
@@ -503,6 +566,8 @@ function select(id,instanceId=null) {
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('music-style-field').hidden=id!=='music';
+  $('reading-content-field').hidden=id!=='hobby';
+  if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
   $('action-button').innerHTML = `${ACTIONS[id].label} <span>↗</span>`;
 }
@@ -538,7 +603,9 @@ $('close-action').addEventListener('click', () => select(null));
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
   const command=selected==='hobby'
-    ?{type:'activity',activityId:READING_ACTIVITY_ID,contentId:READING_CONTENT_ID,
+    ?{type:'activity',activityId:READING_ACTIVITY_ID,
+      contentId:canReadHobbyContent(selectedActor().skills,$('reading-content-select').value)
+        ?$('reading-content-select').value:READING_CONTENT_ID,
       ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
     :selected==='music'
       ?{type:'activity',activityId:MUSIC_ACTIVITY_ID,
@@ -4004,6 +4071,8 @@ function boot() {
       $('mind-reading-skill').textContent='Литературная эрудиция · уровень '+level+
         '/'+skill.maxLevel+' · '+Math.floor(currentXP)+' / '+nextXP+' опыта'+
         (current.action?.id==='hobby'&&current.action.phase==='using'?' · 📖 читает':'');
+       if(!$('reading-content-field').hidden)updateReadingContentChoice();
+       renderSkillsTab(false);
       const relation=game.relationship;
       $('relationship-value').textContent=Math.round(relation.affinity)+'/100';
       $('relationship-label').textContent=relationshipLabel(relation.affinity);
