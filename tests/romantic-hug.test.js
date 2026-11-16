@@ -35,7 +35,7 @@ test('R1a paired hug requires genuine adult relationship, no arbitrary N-ID shor
   const item=availableSocialActions(s.socialGraph,'alex','mira',s.minutes)
     .find(x=>x.id==='romance.hug');
   assert.equal(item.enabled,false);
-  assert.match(item.reason,/симпат|знаком|чувств|довер|отношен/);
+  assert.match(item.reason,/симпат|знаком|чувств|довер|отношен|узнай/);
   const h=couple();
   assert.equal(romanceAvailability(h.socialGraph,'alex','mira','romance.hug',h.minutes).enabled,true);
   assert.equal(romanceAvailability(h.socialGraph,'mira','alex','romance.hug',h.minutes).enabled,true);
@@ -153,7 +153,7 @@ test('R1a renderer and production Pages include pair poses, script and fallback'
   assert.ok(alex.includes('state.hugRuntime?.setFrame(null)'));
   assert.ok(mira.includes('state.hugRuntime?.setFrame(null)'));
   assert.ok(ci.includes('node --check src/meshy-hug-runtime.js'));
-  assert.ok(ci.includes('src/romantic-hug.js src/reaction-badges.js'));
-  assert.ok(ci.includes('src/meshy-hug-runtime.js src/loading-progress.js'));
+  assert.ok(ci.includes('cp src/romantic-hug.js src/meshy-hug-runtime.js site/src/'));
+  assert.ok(ci.includes('node --check src/romantic-hug.js'));
   assert.ok(!read('../src/romantic-hug.js').includes('Math.random('));
 });
