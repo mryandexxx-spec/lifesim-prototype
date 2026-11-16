@@ -23,6 +23,9 @@ export const ACTIONS = Object.freeze({
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
   // F4D: sitting is a real physical activity, not an unearned skill or need bonus.
   seat: { label: 'Посидеть', need: 'fun', duration: 42, benefitPerMinute: 0, location: [0,-1.03] },
+  // F4F: a real fridge-to-purchased-chair dining journey; hunger only during bites.
+  dining: { label:'Пообедать за столом',need:'hunger',duration:31,
+    benefitPerMinute:1.55,location:[0,-1.5] },
   // F4E: actual nearby utility interactions, no fictional need/XP boosts.
   lamp: { label:'Переключить свет',need:'fun',duration:5,benefitPerMinute:0,location:[0,-.90] },
   mirror: { label:'Причесаться у зеркала',need:'fun',duration:17,benefitPerMinute:0,location:[0,-.88] },
@@ -81,7 +84,16 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
   restoreMind(data.mind, next);
   if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase) && (next.autonomy.enabled || !data.action.automatic)) {
     next.action = { id: data.action.id, phase: data.action.phase, elapsed: Math.max(0, Math.min(1000, Number(data.action.elapsed) || 0)), automatic: Boolean(data.action.automatic) };
-    if(data.action.id==='lamp'&&data.action.lampSwitched===true)
+    if(data.action.id==='dining'){
+      if(validFurnitureInstanceId(data.action.diningSeatInstanceId)&&
+        ['toFridge','taking','toSeat','eating'].includes(data.action.diningStage)){
+        next.action.diningSeatInstanceId=data.action.diningSeatInstanceId;
+        next.action.diningStage=data.action.diningStage;
+        if((next.action.phase==='using')!==['taking','eating'].includes(data.action.diningStage))
+          next.action=null;
+      }else next.action=null;
+    }
+    if(next.action&&data.action.id==='lamp'&&data.action.lampSwitched===true)
       next.action.lampSwitched=true;
     if(data.action.id==='bed'&&validBedSlot(data.action.bedSlot))
       next.action.bedSlot=data.action.bedSlot;
@@ -164,6 +176,7 @@ export function tick(state, minutes,world=state?.world??null) {
   // Sitting at an actual occupied sofa (resting or watching television)
   // suspends Energy decay while using it; standing TV viewing does NOT.
   const sitting=state.action?.id==='sofa'||
+    (state.action?.id==='dining'&&state.action.phase==='using'&&state.action.diningStage==='eating')||
     (state.action?.id==='tv'&&Boolean(state.action.watchSeatInstanceId))||
     (state.action?.id==='hobby'&&state.action.readingStage==='reading'&&
       Boolean(state.action.readingSeatInstanceId));
