@@ -57,23 +57,23 @@ const original=[
     category:'Столовая',capabilities:['surface'],templateOnly:true,
     x:0,z:0,rect:[-1.13,1.13,-.72,.72]},
   {prefabId:'floorlamp',instanceId:'template-floorlamp-1',name:'Торшер',
-    category:'Гостиная',capabilities:['decor'],templateOnly:true,
-    x:0,z:0,rect:[-.36,.36,-.36,.36]},
+    category:'Гостиная',actionId:'lamp',capabilities:['light.switch'],templateOnly:true,
+    x:0,z:0,rect:[-.36,.36,-.36,.36],approach:[0,-.90]},
   {prefabId:'rug',instanceId:'template-rug-1',name:'Ковёр',
     category:'Декор',capabilities:['decor'],templateOnly:true,walkThrough:true,
     x:0,z:0,rect:[-1.22,1.22,-.90,.90]},
   {prefabId:'dresser',instanceId:'template-dresser-1',name:'Комод',
-    category:'Спальня',capabilities:['decor'],templateOnly:true,
-    x:0,z:0,rect:[-.94,.94,-.43,.43]},
+    category:'Спальня',actionId:'dresser',capabilities:['storage.inspect'],templateOnly:true,
+    x:0,z:0,rect:[-.94,.94,-.43,.43],approach:[0,-1.06]},
   {prefabId:'mirror',instanceId:'template-mirror-1',name:'Зеркало',
-    category:'Спальня',capabilities:['decor'],templateOnly:true,
-    x:0,z:0,rect:[-.48,.48,-.31,.31]},
+    category:'Спальня',actionId:'mirror',capabilities:['appearance.groom'],templateOnly:true,
+    x:0,z:0,rect:[-.48,.48,-.31,.31],approach:[0,-.88]},
   {prefabId:'sculpture',instanceId:'template-sculpture-1',name:'Скульптура',
     category:'Декор',capabilities:['decor'],templateOnly:true,
     x:0,z:0,rect:[-.46,.46,-.46,.46]},
   {prefabId:'wardrobe',instanceId:'template-wardrobe-1',name:'Гардероб',
-    category:'Спальня',capabilities:['decor'],templateOnly:true,
-    x:0,z:0,rect:[-.91,.91,-.51,.51]},
+    category:'Спальня',actionId:'wardrobe',capabilities:['clothing.organize'],templateOnly:true,
+    x:0,z:0,rect:[-.91,.91,-.51,.51],approach:[0,-1.20]},
   // Template-only procedural 3D model: not gifted to existing saves and
   // never in initial world. Purchased copies have real individual instance IDs.
   {prefabId:'bookcase',instanceId:'template-bookcase-1',name:'Книжный шкаф',
@@ -154,6 +154,9 @@ export function restoreFurnitureWorld(raw){
         item.purchasePriceCredits>=0&&item.purchasePriceCredits<=1_000_000)
         restored.purchasePriceCredits=item.purchasePriceCredits;
     }
+    // F4E: validated optional lamp state; the v1 schema stays unchanged.
+    if(item.prefabId==='floorlamp'&&typeof item.lampOn==='boolean')
+      restored.lampOn=item.lampOn;
     instances.push(restored);
   }
   return {schema:FURNITURE_SCHEMA,

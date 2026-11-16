@@ -1,0 +1,35 @@
+name: F4E functional furniture regression
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'index.html'
+      - '.github/workflows/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  furniture-utility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify utility and consumer syntax
+        run: |
+          node --check src/furniture-interactions.js
+          node --check src/furniture-catalog.js
+          node --check src/furniture-shop.js
+          node --check src/furniture-layout.js
+          node --check src/simulation.js
+          node --check src/household.js
+          node --check src/animations.js
+          node --check src/meshy-visual.js
+          node --check src/meshy-mira-visual.js
+          node --check src/game.js
+      - name: Run all regressions, not just F4E
+        run: npm test

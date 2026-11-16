@@ -127,7 +127,9 @@ export function canShowMeshy({
   fridgeBusy = false, fridgeReady = false, readingReady = false, musicBusy = false, musicReady = false, bedReady = false,
   showerReady = false, toiletBusy = false, toiletReady = false
 } = {}) {
-  const eligible=actionId===null||actionId==='sofa'||(actionId==='music'&&(!musicBusy||musicReady))||
+  const eligible=actionId===null||actionId==='sofa'||
+    ['lamp','mirror','dresser','wardrobe'].includes(actionId)||
+    (actionId==='music'&&(!musicBusy||musicReady))||
     (actionId==='hobby'&&readingReady)||
     (actionId==='fridge'&&fridgeReady)||(actionId==='bed'&&bedReady)||
     (actionId==='shower'&&showerReady)||(actionId==='toilet'&&toiletReady);
