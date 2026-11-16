@@ -252,16 +252,16 @@ test('M3: accepted gift credits genuine completion, rejected gift yields zero',(
 
 test('M3: completed shared leisure credits both, partner refusal grants nothing',()=>{
   const s=newHousehold();setSocial(s,33);
-  assert.equal(startSharedSocial(s,'alex',spot,'leisure','music'),true);
-  arriveSocial(s);tickHousehold(s,28);
+  assert.equal(startSharedSocial(s,'alex',spot,'leisure','games'),true);
+  arriveSocial(s);tickHousehold(s,37);
   assert.equal(getPair(s.socialGraph,'alex','mira').events.at(-1).type,'leisure.accepted');
-  near(s.needs.social,33-socialNeedDecayRate(s.personality)*28+SOCIAL_NEED_REWARDS['leisure.accepted']);
-  near(s.otherSim.needs.social,33-socialNeedDecayRate(s.otherSim.personality)*28+SOCIAL_NEED_REWARDS['leisure.accepted']);
+  near(s.needs.social,33-socialNeedDecayRate(s.personality)*37+SOCIAL_NEED_REWARDS['leisure.accepted']);
+  near(s.otherSim.needs.social,33-socialNeedDecayRate(s.otherSim.personality)*37+SOCIAL_NEED_REWARDS['leisure.accepted']);
   const refused=newHousehold();setSocial(refused,33);
   refused.relationship.views.mira.trust=0;
   refused.relationship.views.mira.tension=100;
-  assert.equal(startSharedSocial(refused,'alex',spot,'leisure','music'),true);
-  arriveSocial(refused);tickHousehold(refused,28);
+  assert.equal(startSharedSocial(refused,'alex',spot,'leisure','games'),true);
+  arriveSocial(refused);tickHousehold(refused,37);
   assert.equal(getPair(refused.socialGraph,'alex','mira').events.at(-1).type,'leisure.refused');
   assert.ok(refused.needs.social<33);
 });

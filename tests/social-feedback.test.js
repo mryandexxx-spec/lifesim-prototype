@@ -167,7 +167,7 @@ test('completed gifts & leisure have target-specific responses and do not re-emi
   assert.ok(['warm','neutral'].includes(events[0].outcome));
   tickHousehold(gift,20);assert.deepEqual(consumeSocialReactions(gift),[]);
   const leisure=newHousehold();
-  assert.equal(startSharedSocial(leisure,'mira',spot,'leisure','music'),true);
+  assert.equal(startSharedSocial(leisure,'mira',spot,'leisure','games'),true);
   arriveSocial(leisure);tickHousehold(leisure,70);
   const both=consumeSocialReactions(leisure);
   assert.deepEqual(both.map(x=>x.responderId),['alex','mira']);

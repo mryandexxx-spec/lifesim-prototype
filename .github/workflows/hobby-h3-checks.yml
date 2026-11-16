@@ -1,0 +1,38 @@
+name: H3 physical shared hobbies and gift-book regression
+on:
+  push:
+    branches: ['feature/h3-*', 'fix/h3-*']
+  pull_request:
+    paths:
+      - 'src/paired-hobby.js'
+      - 'src/gifts-leisure.js'
+      - 'src/relationships.js'
+      - 'src/household.js'
+      - 'src/game.js'
+      - 'src/action-queue.js'
+      - 'src/simulation.js'
+      - 'tests/hobbies-h3.test.js'
+      - '.github/workflows/hobby-h3-checks.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check H3 module syntax
+        run: |
+          node --check src/paired-hobby.js
+          node --check src/gifts-leisure.js
+          node --check src/relationships.js
+          node --check src/household.js
+          node --check src/game.js
+          node --check src/action-queue.js
+          node --check src/simulation.js
+          node --check tests/hobbies-h3.test.js
+      - name: Install pinned browser test dependencies
+        run: npm ci --ignore-scripts
+      - name: Full regression suite
+        run: npm test
