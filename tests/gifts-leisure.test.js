@@ -21,7 +21,7 @@ function finish(s,minutes){
 }
 test('small original catalog contains gifts and three shared activities with valid durations',()=>{
   assert.deepEqual(Object.keys(GIFT_CATALOG),['book','postcard','sketch','boardgame']);
-  assert.deepEqual(Object.keys(LEISURE_CATALOG),['music','books','games']);
+  assert.deepEqual(Object.keys(LEISURE_CATALOG),['music','books','games','tv']);
   assert.equal(GIFT_DURATION,12);
   assert.equal(sharedDuration({mode:'gift',choiceId:'a1'}),12);
   assert.equal(sharedDuration({mode:'leisure',choiceId:'games'}),36);
