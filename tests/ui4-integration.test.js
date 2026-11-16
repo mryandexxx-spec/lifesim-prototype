@@ -66,7 +66,7 @@ test('UI4: save schema untouched and Pages packages both new modules',()=>{
  assert.match(pages,/node --check src\/required-choice-focus\.js/);
  assert.match(pages,/cp src\/plan-preview\.js src\/ui-layout\.js src\/required-choice-focus\.js site\/src\//);
  assert.match(src,/localStorage.getItem\(SAVE_KEY\)/);
- assert.match(html,/сборка \/ 1\.1u/);
- assert.match(html,/styles\.css\?v=1\.1u/);
- assert.match(html,/src\/game\.js\?v=1\.1u/);
+ assert.match(html,/сборка \/ 1\.1v/);
+ assert.match(html,/styles\.css\?v=1\.1v/);
+ assert.match(html,/src\/game\.js\?v=1\.1v/);
 });
