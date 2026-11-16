@@ -18,9 +18,9 @@ export const HOBBY_CONTENT=createHobbyContentCatalog({entries:[{
   id:READING_CONTENT_ID,kind:'book',label:'Истории дальних дорог',
   difficulty:1,tags:['book.fiction','books'],skillTags:[READING_SKILL_ID]
 },
-  {id:'music.calm',kind:'musicStyle',label:'Тихий вечер',difficulty:1,tags:['music','calm_leisure'],skillTags:[]},
-  {id:'music.rhythmic',kind:'musicStyle',label:'Тёплый ритм',difficulty:1,tags:['music','rhythm'],skillTags:[]},
-  {id:'music.dreamy',kind:'musicStyle',label:'Звёздный свет',difficulty:1,tags:['music','dreamy'],skillTags:[]}
+  {id:'music.calm',kind:'musicstyle',label:'Тихий вечер',difficulty:1,tags:['music','calm_leisure'],skillTags:[]},
+  {id:'music.rhythmic',kind:'musicstyle',label:'Тёплый ритм',difficulty:1,tags:['music','rhythm'],skillTags:[]},
+  {id:'music.dreamy',kind:'musicstyle',label:'Звёздный свет',difficulty:1,tags:['music','dreamy'],skillTags:[]}
 ]});
 export const HOBBY_ACTIVITIES=createActivityRegistry({
   skills:HOBBY_SKILLS,content:HOBBY_CONTENT,
@@ -35,7 +35,7 @@ export const HOBBY_ACTIVITIES=createActivityRegistry({
   },{
     id:MUSIC_ACTIVITY_ID,label:'Слушать музыку',kind:'leisure',
     source:'item',participation:'solo',requiredCapabilities:['music.playback'],
-    contentKind:'musicStyle',timeBudget:{minMinutes:8,targetMinutes:35},
+    contentKind:'musicstyle',timeBudget:{minMinutes:8,targetMinutes:35},
     needEffects:[{statId:'needs.fun',perMinute:0.94}],
     skillPractice:[],poseKey:'music.listen',audioCue:'music.original'
   }]
