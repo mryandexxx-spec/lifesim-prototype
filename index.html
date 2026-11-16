@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2t-f4b9" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h2" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}
   </script>
@@ -30,7 +30,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2t</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -61,6 +61,7 @@
       <div class="view-panel-head"><strong>Вид комнаты</strong><button id="view-close" type="button" aria-label="Закрыть настройки вида">×</button></div>
       <button id="item-labels-btn" class="item-labels-control" type="button" aria-pressed="false" aria-label="Показать подписи предметов"><span aria-hidden="true">⌗</span><span>Подписи предметов</span><small aria-hidden="true">МЕТКИ</small></button>
       <button id="tour-replay" class="tour-replay" type="button" aria-controls="tour-panel">? <span>Как играть</span></button>
+      <button id="music-audio-toggle" class="music-audio-toggle" type="button" aria-pressed="false">🔇 Включить звук</button>
       <button id="mesh-model-btn" class="mesh-model-control" type="button" aria-pressed="true" aria-label="Алекс и Мира: 3D-модели Meshy. Нажмите, чтобы вернуть старые модели."><span aria-hidden="true">3D</span><span>Облики жителей</span><small id="mesh-model-state" aria-hidden="true">MESHY</small></button>
     </section>
 
@@ -147,6 +148,14 @@
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
       <div class="action-header"><div><span id="action-category">Предмет</span><h2 id="action-title">Кровать</h2></div><button type="button" id="close-action" aria-label="Закрыть">×</button></div>
       <p id="action-description">Восстановить энергию</p>
+      <label id="music-style-field" class="music-style-field" for="music-style-select" hidden>
+        Музыкальный стиль
+        <select id="music-style-select" aria-label="Стиль прослушивания">
+          <option value="music.calm">Тихий вечер</option>
+          <option value="music.rhythmic">Тёплый ритм</option>
+          <option value="music.dreamy">Звёздный свет</option>
+        </select>
+      </label>
       <button type="button" class="primary-button" id="action-button">Использовать <span>↗</span></button>
     </section>
 
@@ -276,7 +285,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2t-closed-book-f4b9"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
