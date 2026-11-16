@@ -18,15 +18,15 @@ import {newHousehold,loadHousehold} from '../src/household.js';
 
 const R=legacyObjectRegistry(),offers=selectShopCatalog();
 const text=p=>readFileSync(new URL(p,import.meta.url),'utf8');
-const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
-test('F4C: real catalog has 35 authentic offers in ten old + nine new geometry classes',()=>{
-  assert.equal(FURNITURE_PRODUCTS.length,35);
-  assert.equal(offers.length,35);
+const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.36}]};
+test('F4C: real catalog has 36 authentic offers in ten old + nine new geometry classes',()=>{
+  assert.equal(FURNITURE_PRODUCTS.length,36);
+  assert.equal(offers.length,36);
   assert.equal(FURNITURE_LEGACY_OFFERS.length,6);
   assert.equal(PROCEDURAL_NEW_PREFABS.length,9);
   assert.equal(ORIGINAL_FURNITURE.length,10);
-  assert.equal(marketListing().length,35);
-  assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,35);
+  assert.equal(marketListing().length,36);
+  assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,36);
   assert.equal(SHOP_START_CREDITS,5000);
   assert.equal(SHOP_SELL_PERCENT,70);
 });
@@ -165,7 +165,7 @@ test('F4C: full catalogue is generated only from authored data; generic script r
   assert.match(game,/shopSearchText/);
   assert.match(html,/id="furnish-type-tabs"/);
   assert.match(html,/id="furnish-search"/);
-  assert.match(html,/1\.2t-closed-book-f4b9-f4c/);
+  assert.match(html,/1\.2u-h2-music-f4c/);
   assert.match(pages,/node --check src\/furniture-procedural-library\.js/);
   assert.match(pages,/src\/furniture-procedural-library\.js src\/furniture-thumbnails\.js site\/src\//);
   assert.doesNotMatch(game,/if\(item\.itemId==='armchair\.wing'\)/);

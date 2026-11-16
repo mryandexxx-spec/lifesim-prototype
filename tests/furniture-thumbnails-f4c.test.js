@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {FURNITURE_PRODUCTS} from '../src/furniture-products.js';
 import {furnitureThumbnailFaces,sketchFurnitureParts} from '../src/furniture-thumbnails.js';
 import {proceduralGeometrySignature} from '../src/furniture-procedural-library.js';
-test('F4C user can visually distinguish all 35 SKUs in the thumbnail gallery',()=>{
+test('F4C user can visually distinguish all 36 SKUs in the thumbnail gallery',()=>{
   for(const product of FURNITURE_PRODUCTS){
     const faces=furnitureThumbnailFaces(product.prefabId,product.modelKey);
     assert.ok(faces.length>=3,'Missing sketch '+product.itemId);
