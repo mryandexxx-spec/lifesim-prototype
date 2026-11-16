@@ -175,8 +175,12 @@ export function stepAnimation(previous,signals,dt) {
   const spineLean=blend(safe(previous.spineLean,0),
     bedSitWeight>0?-11*bedSitWeight:hugWeight>.005?6*hugWeight:
       kissWeight>.005?8*kissWeight:inGait?walkPose.spineLean:0,12,step);
+  // A seated viewer may glance toward an off-axis screen without turning
+  // the whole avatar and sliding its hips away from the sofa cushion.
+  const tvGaze=action==='tv'&&sofaWeight>.5
+    ?clamp(safe(signals?.tvGazeYaw,0),-30,30)*sofaWeight:0;
   const spineTwist=blend(safe(previous.spineTwist,0),
-    bedSign*16*bedSwing+(inGait?walkPose.spineTwist:0),14,step);
+    bedSign*16*bedSwing+(inGait?walkPose.spineTwist:0)+tvGaze,14,step);
   const spineRoll=blend(safe(previous.spineRoll,0),
     bedSign*8*bedSwing+(inGait?walkPose.spineRoll:0),14,step);
   const hipShift=blend(safe(previous.hipShift,0),
