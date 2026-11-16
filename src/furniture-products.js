@@ -12,6 +12,10 @@ const offered=[
   // H1: first functional leisure station. Pilot price only; economy TBD.
   {itemId:'bookcase.starter',prefabId:'bookcase',price:320,
     name:'Шкаф с историями',description:'Чтение повышает досуг и литературную эрудицию'},
+  // H2: physical listening station; sound always requires a direct user gesture.
+  {itemId:'music.starter',prefabId:'music',price:390,
+    name:'Музыкальный центр «Волна»',
+    description:'Три стиля музыки · досуг без опыта игры на инструментах'},
   // Pilot of physical appearance only. No quality/buff, price differential or XP.
   {itemId:'plant.amber',prefabId:'plant',price:130,
     name:'Растение «Янтарные листья»',appearanceId:'foliage.amber',

@@ -28,7 +28,9 @@ export const ACTIONS = Object.freeze({
   // One compatibility bridge for every future item-driven hobby: the true
   // activity, timing and effects are authored in the H0 activity registry.
   hobby: { label: 'Читать книгу', need: 'fun', duration: 36, benefitPerMinute: 1.05,
-    location: [0,.92] }
+    location: [0,.92] },
+  music: { label: 'Слушать музыку', need: 'fun', duration: 35,
+    benefitPerMinute: .94, location: [0,.84] }
 });
 // Keep consumption rates in one independent balance contract, not duplicated
 // across simulation, social personality logic, the HUD or action handlers.
@@ -75,9 +77,10 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     if(validFurnitureInstanceId(data.action.targetInstanceId))
       next.action.targetInstanceId=data.action.targetInstanceId;
     // Optional H1 activity metadata. Unknown activities are not restorable.
-    if(data.action.id==='hobby'){
+    if(['hobby','music'].includes(data.action.id)){
       const activity=getActivityDefinition(HOBBY_ACTIVITIES,data.action.activityId);
-      if(!activity||activity.source!=='item')next.action=null;
+      if(!activity||activity.source!=='item'||
+         (data.action.id==='music')!==activity.requiredCapabilities.includes('music.playback'))next.action=null;
       else{
         next.action.activityId=activity.id;
         if(typeof data.action.contentId==='string')next.action.contentId=data.action.contentId;
@@ -161,9 +164,9 @@ export function tick(state, minutes,world=state?.world??null) {
   refreshMind(state,world);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
-    const hobby=state.action.id==='hobby'
+    const hobby=['hobby','music'].includes(state.action.id)
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
-    if(state.action.id==='hobby'&&!hobby){state.action=null;return;}
+    if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
     const duration=hobby?.timeBudget.targetMinutes??definition.duration;
     const amount = Math.min(minutes, Math.max(0, duration - state.action.elapsed));
     // Hunger rises only when eating, not before taking food from the shelf.
@@ -195,12 +198,13 @@ export function tick(state, minutes,world=state?.world??null) {
     if(['sofa','tv','hobby'].includes(state.action.id))gained*=voluntaryMoodEfficiency(state,
       {type:'object',actionId:state.action.id});
     // Enjoying books is a taste; literature XP is earned separately by work.
-    if(hobby)gained*=1+preferenceAffinity(state.personality,'books')*.12;
+    if(hobby)gained*=1+preferenceAffinity(state.personality,
+      state.action.id==='music'?'music':'books')*.12;
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
-        (!['fridge','shower','toilet','hobby'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['fridge','shower','toilet','hobby','music'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
