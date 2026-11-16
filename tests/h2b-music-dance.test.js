@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {HOBBY_ACTIVITIES,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,
+import {HOBBY_ACTIVITIES,HOBBY_CONTENT,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,
   MUSIC_ACTIVITY_IDS,MUSIC_CONTENT_IDS,READING_SKILL_ID} from '../src/hobby-reading.js';
 import {getActivityDefinition} from '../src/activity-registry.js';
 import {createActivitySession} from '../src/activity-session.js';
@@ -58,7 +58,7 @@ test('H2b registry declares two activities on the same physical source, distinct
       assert.ok(createActivitySession(HOBBY_ACTIVITIES,{
         sessionId:'h2b:test:1',actorId:'alex',activityId,
         contentId,targetInstanceId:'shop-music-1'
-      }));
+      },HOBBY_CONTENT));
 });
 test('both listen and dance dispatch from typed queue through real A* and keep style',()=>{
   for(const activityId of MUSIC_ACTIVITY_IDS){
