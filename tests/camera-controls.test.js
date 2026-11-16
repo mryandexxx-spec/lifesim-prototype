@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CAMERA_INITIAL,CAMERA_BOUNDS,panCamera,orbitCamera,pinchCamera,wheelCamera} from '../src/camera-controls.js';
+import {CAMERA_INITIAL,CAMERA_BOUNDS,panCamera,orbitCamera,pinchCamera,wheelCamera,screenFloorDragDelta} from '../src/camera-controls.js';
 const near=(x,y,eps=.00001)=>Math.abs(x-y)<=eps;
 test('one finger drags camera target without rotating or zooming',()=>{
  const a={...CAMERA_INITIAL},b=panCamera(a,80,35,800);
@@ -50,4 +50,17 @@ test('invalid inputs are harmless; complete reset restores target and angles',()
  const moved=orbitCamera(pinchCamera(panCamera(CAMERA_INITIAL,80,85,800),100,130),70,15);
  assert.notDeepEqual(moved,CAMERA_INITIAL);
  assert.deepEqual({...CAMERA_INITIAL},CAMERA_INITIAL);
+});
+
+test('screen-floor item movement exactly opposes unchanged camera grab direction',()=>{
+  for(const yaw of [0,42,90,180,270]){
+    for(const [dx,dy] of [[80,0],[0,60],[-25,45]]){
+      const v={...CAMERA_INITIAL,yaw},d=screenFloorDragDelta(v,dx,dy,800);
+      const p=panCamera(v,dx,dy,800);
+      assert.ok(near(d.x,-(p.centerX-v.centerX),.000001));
+      assert.ok(near(d.z,-(p.centerZ-v.centerZ),.000001));
+    }
+  }
+  assert.ok(screenFloorDragDelta({...CAMERA_INITIAL,yaw:0},80,0,800).x>0);
+  assert.ok(screenFloorDragDelta({...CAMERA_INITIAL,yaw:90},80,0,800).z<0);
 });

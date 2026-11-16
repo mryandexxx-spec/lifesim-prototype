@@ -79,3 +79,20 @@ test('pinch and orbit remain bounded across aggressive moves',()=>{
  assert.ok(r.view.distance>=CAMERA_BOUNDS.minDistance);
  assert.ok(r.view.distance<=CAMERA_BOUNDS.maxDistance);
 });
+
+test('one-finger shop mode emits drag deltas, camera stays fixed, two fingers still orbit',()=>{
+ const g=createCameraGestureSession(),v=initial();
+ g.begin(pt(3,100,200),0);
+ const a=g.move(pt(3,140,225),v,740,{oneFinger:'placement'});
+ assert.equal(a.changed,false);assert.equal(a.view,v);
+ assert.deepEqual(a.placementDelta,{dx:40,dy:25});
+ const b=g.move(pt(3,147,230),v,740,{oneFinger:'placement'});
+ assert.deepEqual(b.placementDelta,{dx:7,dy:5});
+ g.begin(pt(4,240,190),65);
+ const orb=g.move(pt(4,260,210),v,740,{oneFinger:'placement'});
+ assert.equal(orb.changed,true);assert.equal(orb.placementDelta,undefined);
+ assert.notEqual(orb.view.yaw,v.yaw);
+ g.end(pt(4,260,210),140);
+ const rest=g.move(pt(3,180,260),orb.view,740,{oneFinger:'placement'});
+ assert.equal(rest.changed,false);assert.equal(rest.placementDelta,undefined);
+});

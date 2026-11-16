@@ -78,13 +78,14 @@ test('Blocked placement cannot charge and remains pending so user can continue m
   assert.equal(state.shopPlacing,true);
   assert.equal(state.game.world.furniture.instances.length,10);
 });
-test('Placement remains a real 3D prefab + floor outline, follows camera as player swipes',()=>{
+test('Placement retains 3D prefab and floor outline; swipe moves object without panning camera',()=>{
   assert.match(game,/shopPreviewEntity=template.clone\(\)/);
   assert.match(game,/shopPreviewEntity.name='Unsaved furniture placement preview'/);
   assert.match(game,/shopPreviewEntity.setPosition\(shopPose.x,0,shopPose.z\)/);
   assert.match(game,/shopPreviewEntity.setEulerAngles\(0,-shopPose.yaw,0\)/);
-  assert.match(game,/if\(furnishMode&&shopPlacing\)moveShopPreviewToCamera\(\)/);
-  assert.match(game,/if\(furnishMode&&shopPlacing&&!pos\)moveShopPreviewToCamera\(true\)/);
+  assert.match(game,/oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'/);
+  assert.match(game,/shopSwipeRawPose=dragShopPlacement\(view,shopSwipeRawPose\|\|shopPose/);
+  assert.doesNotMatch(game,/if\(furnishMode&&shopPlacing&&!pos\)moveShopPreviewToCamera/);
   assert.match(game,/const candidate=cameraPlacementPose\(view,shopPose\)/);
   assert.doesNotMatch(game,/const shopCameraAnchor=/);
   assert.match(game,/const moveShopPreviewToCamera=\(force=false\)=>\{/);
