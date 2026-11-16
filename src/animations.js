@@ -67,6 +67,12 @@ export function stepAnimation(previous,signals,dt) {
     legTarget=[SOFA_HIP_PITCH*sofaWeight,SOFA_HIP_PITCH*sofaWeight];
     kneeTarget=[SOFA_KNEE_PITCH*sofaWeight,SOFA_KNEE_PITCH*sofaWeight];
     armTarget=[26*sofaWeight,35*sofaWeight];
+    if(action==='dining'){
+      // A seated bite-to-mouth loop: the legs stay in the real chair pose.
+      const bite=(1+Math.sin(t*4.7))*.5;
+      armTarget=[(-42-25*bite)*sofaWeight,14*sofaWeight];
+      elbowTarget=[(-55-24*bite)*sofaWeight,-8*sofaWeight];
+    }
     if(romanticSeatTurn!==0){
       const gesture=Math.sin(t*1.55)*eveningWeight;
       armTarget=[armTarget[0]+gesture*5,armTarget[1]-gesture*4];
