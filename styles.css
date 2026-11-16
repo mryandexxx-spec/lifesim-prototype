@@ -943,6 +943,24 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   .furnish-placement-guide small{display:none;}
 }
 
+/* F4b1: compact native iPhone filters, category-driven (no extra scroll area). */
+.furnish-catalog-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;min-width:0;}
+.furnish-catalog-filters label{display:flex;flex-direction:column;gap:3px;min-width:0;
+  color:#54715d;font-size:9px;letter-spacing:.5px;font-weight:850;}
+.furnish-catalog-filters select{display:block;min-width:0;width:100%;min-height:43px;
+  padding:8px 22px 8px 9px;border:1px solid #bfd9c7;border-radius:11px;
+  background:#f5faf3;color:#305e46;font:inherit;font-size:12px;font-weight:750;
+  touch-action:manipulation;text-overflow:ellipsis;}
+.furnish-catalog-filters select:focus-visible{outline:3px solid #237851;outline-offset:2px;}
+.furnish-filter-count{color:#5b8068;font-size:10px;line-height:1.2;}
+.furnish-filter-empty{padding:12px 10px;border:1px dashed #b3cfbe;border-radius:11px;
+  color:#5b8068!important;background:#f5faf3;font-size:12px!important;}
+.furnish-filter-empty[hidden],.furnish-stock button[hidden]{display:none!important;}
+.furnish-shop[data-placing="true"] .furnish-catalog-filters,
+.furnish-shop[data-placing="true"] .furnish-filter-count,
+.furnish-shop[data-placing="true"] .furnish-filter-empty{display:none!important;}
+@media(max-width:370px){.furnish-catalog-filters select{font-size:11px;padding-left:7px;}}
+
 /* R2 adult privacy: scene blackout only; topbar/HUD retain pause and queue. */
 .intimacy-veil{position:absolute;inset:0;z-index:4;display:flex;align-items:center;
   justify-content:center;pointer-events:none;visibility:hidden;opacity:0;

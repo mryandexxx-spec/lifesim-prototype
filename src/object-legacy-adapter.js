@@ -15,9 +15,16 @@ const historicalRooms=Object.freeze({
 const shop=new Map(SHOP_ITEMS.map(({prefabId,price})=>[prefabId,price]));
 const defs=Object.values(FURNITURE_CATALOG);
 const caps=[...new Set(defs.flatMap(d=>d.capabilities))];
+// Labels are presentation data, not an item-type condition in gameplay.
+const capabilityLabels=Object.freeze({
+  sleep:'Сон',relax:'Отдых',decor:'Украшения',surface:'Поверхности',
+  'tv.watch':'Телевизоры','food.take':'Приём пищи',
+  'hygiene.shower':'Гигиена','bladder.toilet':'Туалет'
+});
 const categories=[
   ...Object.entries(historicalRooms).map(([label,id])=>({id,label,facet:'room'})),
-  ...caps.map(id=>({id:'function.'+id,label:id,facet:'function'}))
+  ...caps.map(id=>({id:'function.'+id,
+    label:capabilityLabels[id]||id,facet:'function'}))
 ];
 const stats=[...NEEDS.map(n=>({id:'needs.'+n,min:0,max:100,label:n})),
   {id:'mood.environment',min:-5,max:5,label:'Окружение'}];
