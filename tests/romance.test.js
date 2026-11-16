@@ -52,7 +52,8 @@ test('1.0k romantic category is separate from friendship, and no hidden numeric 
   assert.equal(action(g).enabled,true);
   assert.equal(action(g,'romance.confess').enabled,false);
   assert.equal(romanceStatus(g,'nova','ember'),'Пока нет романтической истории');
-  assert.deepEqual(pair.romance.views.nova,{attraction:0,boundary:'open',lastRefusedAt:null});
+  assert.deepEqual(pair.romance.views.nova,{attraction:0,boundary:'open',
+    touchBoundary:'open',exclusivity:'exclusive',jealousy:0,lastRefusedAt:null});
   assert.notStrictEqual(pair.romance.views.nova,pair.romance.views.ember);
 });
 test('unknown ages, minors and unspecified identities fail closed',()=>{
