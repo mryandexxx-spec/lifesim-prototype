@@ -109,8 +109,10 @@ test('F4b8: actual two-resident runtime and comfort continuous effects do not ne
   h.action={id:'sofa',phase:'using',elapsed:0,targetInstanceId:sofa.instanceId,automatic:false};
   h.otherSim.action=null;
   h.needs.energy=50;
+  const ledger=h.objectOnceLedger;
   tickHousehold(h,5);
   assert.equal(h.needs.energy,51);
+  assert.strictEqual(h.objectOnceLedger,ledger,'continuous effects never copy persistent receipts per frame');
   assert.equal(h.objectOnceLedger.entries.length,0);
   assert.equal(h.otherSim.objectOnceLedger.entries.length,0);
   assert.equal(h.version,1);
