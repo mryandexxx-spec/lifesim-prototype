@@ -846,7 +846,15 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   color:#325c46;padding:8px 10px;display:grid;gap:5px;}
 .furnish-variant-compare[hidden]{display:none!important;}
 .furnish-variant-compare>strong{font-size:11px;line-height:1.2;}
-.furnish-variant-row{font-size:11px;line-height:1.4;margin:0;overflow-wrap:anywhere;}
+.furnish-variant-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;
+  align-items:center;font-size:11px;line-height:1.4;overflow-wrap:anywhere;}
+.furnish-variant-row p{margin:0;min-width:0;}
+.furnish-variant-select{min-height:40px;border:1px solid #a9cbb5;border-radius:10px;
+  color:#225a41;background:#fff;padding:7px 10px;font-size:11px;font-weight:800;
+  cursor:pointer;touch-action:manipulation;}
+.furnish-variant-select:focus-visible{outline:2px solid #225a41;outline-offset:2px;}
+@media(max-width:375px){.furnish-variant-row{grid-template-columns:1fr;}
+  .furnish-variant-select{justify-self:start;}}
 .furnish-stock button[aria-pressed="true"]{background:#317b60;border-color:#317b60;color:white;}
 .furnish-stock button[aria-pressed="true"] small{color:#d6eee0;}
 .furnish-map-tip{font-size:11px!important;line-height:1.35!important;}

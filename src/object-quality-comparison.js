@@ -5,50 +5,64 @@
 import {getObjectItem} from './object-definition-registry.js';
 import {describeObjectQualities} from './object-quality-presentation.js';
 
-const measureKey=e=>[e.statId,e.trigger,e.mode,e.actionId??''].join(':');
+// Only comparable gameplay facts can be subtracted: stat, timing and action.
+// Effect stacking/group are independent policy, NEVER silently equate them.
+const measureKey=e=>JSON.stringify([e.statId,e.trigger,e.mode,e.actionId??null]);
+const policyKey=e=>JSON.stringify([e.stacking,e.group]);
 const formatNumber=n=>String(Number(n.toFixed(3))).replace('.',',');
 const comparablePrice=n=>Number.isSafeInteger(n)&&n>=0;
 
+/** An effect is comparable iff each SKU has at most one declaration for
+ * the same stat/trigger/mode/action, and (when both exist) their stacking and
+ * group policy match. Otherwise a numeric subtraction would be invented.
+ */
 function difference(registry,other,selected){
-  const otherMeasures=new Map(other.effects.map(e=>[measureKey(e),e]));
-  const selectedMeasures=new Map(selected.effects.map(e=>[measureKey(e),e]));
-  const deltas=[];
-  for(const [key,e] of otherMeasures){
-    const old=selectedMeasures.get(key);
-    const shift=e.amount-(old?.amount??0);
-    if(Math.abs(shift)>1e-9){
-      const label=registry.stats[e.statId]?.label||e.statId;
-      const period=e.mode==='perMinute'?'/мин':'';
-      const when=e.trigger==='item.use.tick'?' при использовании':'';
-      deltas.push(Object.freeze({
-        statId:e.statId,delta:Number(shift.toFixed(6)),
-        label:label+' '+(shift>0?'+':'')+formatNumber(shift)+period+when
-      }));
+  const group=effects=>{
+    const by=new Map();
+    for(const effect of effects){
+      const key=measureKey(effect);
+      if(!by.has(key))by.set(key,[]);
+      by.get(key).push(effect);
     }
-  }
-  for(const [key,e] of selectedMeasures){
-    if(otherMeasures.has(key))continue;
-    const shift=-e.amount;
-    if(!shift)continue;
-    const label=registry.stats[e.statId]?.label||e.statId;
-    const period=e.mode==='perMinute'?'/мин':'';
-    const when=e.trigger==='item.use.tick'?' при использовании':'';
+    return by;
+  };
+  const otherMeasures=group(other.effects),selectedMeasures=group(selected.effects);
+  const keys=[...new Set([...otherMeasures.keys(),...selectedMeasures.keys()])].sort();
+  const deltas=[];
+  let effectConditionsDifferent=false;
+  for(const key of keys){
+    const theirs=otherMeasures.get(key)||[],ours=selectedMeasures.get(key)||[];
+    // Two potential contributions need their own stacking resolver, not a
+    // last-write-wins Map or a fictional 'gain' from a different rule.
+    if(theirs.length>1||ours.length>1||
+      (theirs.length&&ours.length&&policyKey(theirs[0])!==policyKey(ours[0]))){
+      effectConditionsDifferent=true;continue;
+    }
+    const otherEffect=theirs[0],selectedEffect=ours[0];
+    if(!otherEffect&&!selectedEffect)continue;
+    const shift=(otherEffect?.amount??0)-(selectedEffect?.amount??0);
+    if(Math.abs(shift)<=1e-9)continue;
+    const effect=otherEffect||selectedEffect;
+    const label=registry.stats[effect.statId]?.label||effect.statId;
+    const period=effect.mode==='perMinute'?'/мин':'';
+    const when=effect.trigger==='item.use.tick'?' при использовании':
+      effect.trigger==='item.use.complete'?' после завершения':'';
     deltas.push(Object.freeze({
-      statId:e.statId,delta:Number(shift.toFixed(6)),
+      statId:effect.statId,delta:Number(shift.toFixed(6)),
       label:label+' '+(shift>0?'+':'')+formatNumber(shift)+period+when
     }));
   }
-  // Compare only authored numeric quality dimensions; no implicit zeros.
   const ratingDeltas=[];
-  for(const [id,otherValue] of Object.entries(other.ratings)){
+  for(const [id,value] of Object.entries(other.ratings)){
     if(!Object.hasOwn(selected.ratings,id))continue;
-    const shift=otherValue-selected.ratings[id];
+    const shift=value-selected.ratings[id];
     if(shift)ratingDeltas.push(Object.freeze({
       id,delta:shift,label:(registry.attributes[id]?.label||id)+
         ': '+(shift>0?'+':'')+formatNumber(shift)
     }));
   }
-  return {deltas:Object.freeze(deltas),ratingDeltas:Object.freeze(ratingDeltas)};
+  return {deltas:Object.freeze(deltas),ratingDeltas:Object.freeze(ratingDeltas),
+    effectConditionsDifferent};
 }
 
 /** Alternatives for a currently offered selected SKU; never cross prefab IDs.
@@ -68,14 +82,14 @@ export function compareShopVariants(registry,offers,selectedItemId){
     const item=getObjectItem(registry,offer.itemId);
     if(!item||item.prefabId!==chosen.prefabId)continue;
     seen.add(item.id);
-    const {deltas,ratingDeltas}=difference(registry,item,chosen);
+    const {deltas,ratingDeltas,effectConditionsDifferent}=difference(registry,item,chosen);
     const priceDifference=offer.price-chosenOffer.price;
     const appearanceDifferent=item.appearanceId!==chosen.appearanceId;
     const view=describeObjectQualities(registry,item.id);
     result.push(Object.freeze({
       itemId:item.id,name:item.name,price:offer.price,
       priceDifference,appearanceDifferent,
-      effectDeltas:deltas,ratingDeltas,
+      effectDeltas:deltas,ratingDeltas,effectConditionsDifferent,
       hasMeasuredQuality:view?.hasMeasuredQuality===true
     }));
   }
@@ -91,7 +105,19 @@ export function formatShopVariantComparison(row){
     ...row.ratingDeltas.map(x=>x.label)];
   const pieces=[row.name+' · '+price];
   if(measures.length)pieces.push(measures.join(' · '));
+  if(row.effectConditionsDifferent)pieces.push('условия бонусов различаются — смотри свойства');
   if(row.appearanceDifferent)pieces.push('отличается оформление');
-  if(measures.length===0&&!row.appearanceDifferent)pieces.push('характеристики не отличаются');
+  if(measures.length===0&&!row.appearanceDifferent&&!row.effectConditionsDifferent)
+    pieces.push('характеристики не отличаются');
   return pieces.join(' · ');
+}
+
+/** Safe UI selection helper. It MUST receive the currently visible/filtered
+ * offers; no hidden or unrelated SKU may be selected by a comparison tap.
+ * This only chooses a SKU, never purchases, moves or grants anything.
+ */
+export function chooseComparableVariant(registry,visibleOffers,selectedId,targetId){
+  if(typeof targetId!=='string'||!targetId)return null;
+  return compareShopVariants(registry,visibleOffers,selectedId)
+    .some(row=>row.itemId===targetId)?targetId:null;
 }

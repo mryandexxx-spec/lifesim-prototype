@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2s" />
+  <link rel="stylesheet" href="./styles.css?v=1.2s-f4b9" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}
   </script>
@@ -109,7 +109,7 @@
         <small id="furnish-filter-count" class="furnish-filter-count" role="status" aria-live="polite">Показано 6 из 6</small>
         <div id="furnish-stock" class="furnish-stock" role="group" aria-label="Товары для покупки"></div>
         <section id="furnish-variant-compare" class="furnish-variant-compare" aria-label="Сравнение вариантов выбранного предмета" hidden>
-          <strong>Сравнение вариантов</strong>
+          <strong>Сравнение вариантов · фактические свойства и цена</strong>
           <div id="furnish-variant-rows"></div>
         </section>
         <p id="furnish-filter-empty" class="furnish-filter-empty" hidden>Таких товаров пока нет. Попробуй изменить фильтры.</p>
@@ -276,7 +276,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2s-seated-reader"></script>
+  <script type="module" src="./src/game.js?v=1.2s-f4b9-seated-reader"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

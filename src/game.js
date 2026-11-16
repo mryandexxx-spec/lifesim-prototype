@@ -26,7 +26,7 @@ import {getSkillDefinition} from './skill-registry.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
 import {describeObjectQualities,shopQualitySummary} from './object-quality-presentation.js';
-import {compareShopVariants,formatShopVariantComparison} from './object-quality-comparison.js';
+import {compareShopVariants,formatShopVariantComparison,chooseComparableVariant} from './object-quality-comparison.js';
 import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
 import {furnitureProduct,FURNITURE_APPEARANCES} from './furniture-products.js';
@@ -2241,18 +2241,43 @@ function boot() {
       button.querySelector('.furnish-selected-mark').hidden=!active;
     }
     const listing=shopListings.find(i=>i.itemId===shopSelectedItemId);
+    const visibleShopListings=selectShopCatalog({
+      roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory
+    });
     const comparable=listing&&!shopPlacing
-      ?compareShopVariants(shopQualityRegistry,shopListings,listing.itemId):[];
+      ?compareShopVariants(shopQualityRegistry,visibleShopListings,listing.itemId):[];
     const comparePanel=$('furnish-variant-compare');
     comparePanel.hidden=!shopOpen||shopPlacing||comparable.length===0;
     // Data is produced by the canonical SKU registry, never from 3D/UI state.
     const compareRows=$('furnish-variant-rows');
     compareRows.replaceChildren();
     if(!comparePanel.hidden)for(const other of comparable){
-      const line=document.createElement('p');
+      const line=document.createElement('div');
       line.className='furnish-variant-row';
-      line.textContent=formatShopVariantComparison(other);
-      compareRows.append(line);
+      const description=document.createElement('p');
+      description.textContent=formatShopVariantComparison(other);
+      const selectVariant=document.createElement('button');
+      selectVariant.type='button';
+      selectVariant.className='furnish-variant-select';
+      selectVariant.textContent='Выбрать вариант';
+      selectVariant.setAttribute('aria-label','Выбрать в каталоге: '+other.name);
+      selectVariant.addEventListener('click',()=>{
+        // Recheck the CURRENT catalog filters and placement status.
+        // A stale comparison row can never select a hidden SKU or buy it.
+        if(!furnishMode||!shopOpen||shopPlacing)return;
+        const currentVisible=selectShopCatalog({
+          roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory
+        });
+        const id=chooseComparableVariant(shopQualityRegistry,currentVisible,
+          shopSelectedItemId,other.itemId);
+        if(!id)return;
+        chooseShopProduct(id);
+        const selectedButton=[...$('furnish-stock').querySelectorAll('button')]
+          .find(button=>button.dataset.itemId===id);
+        if(selectedButton&&!selectedButton.hidden)
+          selectedButton.focus({preventScroll:true});
+      });
+      line.append(description,selectVariant);compareRows.append(line);
     }
     $('furnish-placement-guide').hidden=!shopPlacing;
     $('furnish-placing-name').textContent=listing?.name||'Предмет';
