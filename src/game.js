@@ -19,6 +19,7 @@ import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {SHOP_ITEMS,marketListing,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem} from './furniture-shop.js';
+import {cameraPlacementPose} from './furniture-placement-preview.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -1888,8 +1889,9 @@ function boot() {
     const history=editSession?.state();
     $('furnish-undo').disabled=!furnishMode||!history?.canUndo;
     $('furnish-redo').disabled=!furnishMode||!history?.canRedo;
-    $('furnish-title').textContent=shopOpen?'Магазин':warehouseOpen?'Склад':
-      item&&selectable?'Обстановка · '+editorLabel(item.instanceId):'Обстановка';
+    $('furnish-title').textContent=shopPlacing?'Выбираем место':shopOpen?'Магазин':
+      warehouseOpen?'Склад':item&&selectable
+        ?'Обстановка · '+editorLabel(item.instanceId):'Обстановка';
     if(shopOpen||warehouseOpen||!selectable)furnitureGhost.enabled=false;
     else showGhost(editSelectedId);
     $('furnish-balance').textContent='Кредиты: '+game.shop.credits;
@@ -1944,26 +1946,34 @@ function boot() {
     $('furnish-edit-toggle').setAttribute('aria-pressed',String(!shopOpen&&!warehouseOpen));
     $('furnish-shop').dataset.placing=String(shopPlacing);
     $('furniture-editor').dataset.shopPlacing=String(shopPlacing);
+    $('furnish-placement-guide').hidden=!shopPlacing;
     $('furnish-place-cancel').hidden=!shopPlacing;
     $('furnish-placement-controls').hidden=!shopPlacing;
     marketGhost.enabled=false;
     if(!shopOpen){clearShopPreviewEntity();return;}
-    for(const button of $('furnish-stock').querySelectorAll('button'))
-      button.setAttribute('aria-pressed',String(button.dataset.prefabId===shopSelected));
+    for(const button of $('furnish-stock').querySelectorAll('button')){
+      const active=button.dataset.prefabId===shopSelected;
+      button.setAttribute('aria-pressed',String(active));
+      button.classList.toggle('selected-product',active);
+      button.querySelector('.furnish-selected-mark').hidden=!active;
+    }
     const listing=shopListings.find(i=>i.prefabId===shopSelected);
+    $('furnish-placement-guide').hidden=!shopPlacing;
+    $('furnish-placing-name').textContent=listing?.name||'Предмет';
+    $('furnish-placing-status').textContent=shopPlacing
+      ?'Свайпни, чтобы переместить. Тапни пол, чтобы уточнить место.':'';
     const preview=shopPlacing&&listing&&shopPose
       ?buyMarketItem(game.world.furniture,game.shop,shopSelected,shopPose,editorContext())
       :null;
     const suitable=preview?.ok===true;
     const previewLabel=!listing?'Выбери товар в каталоге':
-      !shopPlacing?'Нажми «Купить», чтобы взять '+listing.name+
-        ' и подобрать место в 3D. Деньги пока не списываются.':
-      !shopPose?'Передвигайся свайпом по дому или коснись пола, чтобы выбрать место':
+      !shopPlacing?'Выбран: '+listing.name+'. Нажми «Купить» — увидишь его в комнате.':
+      !shopPose?'Предмет готов. Сдвигай камеру или выбери место тапом по полу':
       suitable?'✓ Место подходит · свайп для перемещения камеры, «Поставить» для покупки':
       '✕ '+editorMessage(preview.reason)+' · подбери другое место свайпом';
     $('furnish-preview').textContent=previewLabel;
     $('furnish-preview').dataset.invalid=String(shopPlacing&&!!listing&&!suitable);
-    $('furnish-buy').textContent=shopPlacing?'✓ Поставить здесь':
+    $('furnish-buy').textContent=shopPlacing?'✓ Установить · '+(listing?.price??0)+' кр.':
       'Купить · '+(listing?.price??0)+' кр.';
     $('furnish-buy').disabled=shopPlacing?!suitable:
       !listing||game.shop.credits<listing.price;
@@ -1972,8 +1982,8 @@ function boot() {
     if(shopPlacing&&shopPose&&listing){
       const rect=instanceRect(shopPose,FURNITURE_CATALOG[shopSelected].footprint);
       marketGhost.setPosition((rect.minX+rect.maxX)/2,.079,(rect.minZ+rect.maxZ)/2);
-      marketGhost.setLocalScale(Math.max(.1,rect.maxX-rect.minX),.04,
-        Math.max(.1,rect.maxZ-rect.minZ));
+      marketGhost.setLocalScale(Math.max(.22,rect.maxX-rect.minX+.14),.052,
+        Math.max(.22,rect.maxZ-rect.minZ+.14));
       marketGhost.render.material=suitable?ghostValid:ghostInvalid;
       marketGhost.enabled=furnishMode;
     }
@@ -2029,7 +2039,10 @@ function boot() {
     button.type='button';button.dataset.prefabId=item.prefabId;
     const name=document.createElement('strong');name.textContent=item.name;
     const cost=document.createElement('small');cost.textContent=item.price+' проб. кр.';
-    button.append(name,cost);
+    const mark=document.createElement('span');
+    mark.className='furnish-selected-mark';mark.textContent='✓ ВЫБРАНО';
+    mark.hidden=true;
+    button.append(name,cost,mark);
     button.setAttribute('aria-pressed','false');
     button.addEventListener('click',()=>chooseShopProduct(item.prefabId));
     $('furnish-stock').append(button);
@@ -2071,7 +2084,7 @@ function boot() {
       shopPlacing=true;shopPose=null;shopManualPose=false;
       // Let the edit sheet collapse BEFORE choosing the visible room anchor.
       renderMarket();moveShopPreviewToCamera(true);
-      editorFeedback('Предмет в руках · двигай камеру свайпом, затем «Поставить здесь»');
+      editorFeedback('Размещение: предмет перед тобой. Свайп — камера, тап — точное место, затем «Установить».');
       return;
     }
     if(!shopPose)return;
@@ -2214,29 +2227,14 @@ function boot() {
     const {near,far}=furnitureRay(pos);
     return furnitureFloorPoint(near,far);
   };
-  // Follow the visible room, not the canvas bottom hidden by the editor.
-  // A camera swipe pans/orbits the room under this screen-space placement
-  // anchor; the preview stays active until Place or Cancel is pressed.
-  const shopCameraAnchor=()=>{
-    const rect=canvas.getBoundingClientRect();
-    const panel=$('furniture-editor').getBoundingClientRect();
-    const visibleHeight=Math.max(100,Math.min(rect.bottom,panel.top)-rect.top);
-    return {x:rect.left+rect.width*.5,
-      y:rect.top+Math.max(62,visibleHeight*.58)};
-  };
+  // Use the camera's own visible focus instead of a nullable screen ray.
+  // A ray missing the floor used to disable the 3D preview after Buy on Safari.
   const moveShopPreviewToCamera=(force=false)=>{
     if(!furnishMode||!shopOpen||!shopPlacing)return;
     const now=performance.now();
-    // Full route validation is deliberately limited to 10Hz on iPhone.
     if(!force&&now-lastShopCameraPreviewAt<100)return;
     lastShopCameraPreviewAt=now;
-    const floor=editorFloorAt(shopCameraAnchor());
-    if(!floor){
-      if(force){shopPose=null;renderMarket();}
-      return;
-    }
-    const candidate={x:snapFurnitureCoordinate(floor.x),
-      z:snapFurnitureCoordinate(floor.z),yaw:shopPose?.yaw??0};
+    const candidate=cameraPlacementPose(view,shopPose);
     if(shopPose&&shopPose.x===candidate.x&&shopPose.z===candidate.z)return;
     shopPose=candidate;shopManualPose=false;renderMarket();
   };
