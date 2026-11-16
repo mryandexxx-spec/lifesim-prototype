@@ -576,7 +576,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=['sofa','seat','bed','tv','hobby','music','paint',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','seat','dining','bed','tv','hobby','music','paint',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -587,7 +587,7 @@ function select(id,instanceId=null) {
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
       id==='tv'?'Просмотр этого телевизора · с дивана, если он свободен и экран виден':
-      id==='hobby'||id==='music'||id==='paint'||id==='seat'||UTILITY_ACTION_IDS.includes(id)?META[id].description:
+      id==='hobby'||id==='music'||id==='paint'||id==='seat'||id==='dining'||UTILITY_ACTION_IDS.includes(id)?META[id].description:
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('music-style-field').hidden=id!=='music';
@@ -3400,7 +3400,7 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:2.02,z:r.maxZ}}};
       });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...chairSeats,...musicStations,...easels,...movedVolumes,...blockers]);
+      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...easels,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
