@@ -85,8 +85,8 @@ test('H1 buys one physical bookcase via atomic F4b2 transaction and preserves pr
   const approach=furnitureActionApproach(r.world,'hobby',id);
   const visible=furniturePoint(r.world,'bookcase',{x:0,z:.92},id);
   assert.ok(Math.hypot(approach.x-visible.x,approach.z-visible.z)<.00001);
-  const pose=furniturePose(r.world,'bookcase',{x:0,z:.92,yaw:180},id);
-  assert.equal(pose.yaw,180-physical.yaw);
+  const readingPose=furniturePose(r.world,'bookcase',{x:0,z:.92,yaw:180},id);
+  assert.equal(readingPose.yaw,180-physical.yaw);
   assert.equal(r.shop.credits,5000-320);
   assert.equal(r.world.furniture.instances.length,11);
   const restored=restoreFurnitureWorld(copy(r.world.furniture));

@@ -31,7 +31,7 @@ test('F1b all five physical appliances are scene grouped and registered for touc
   }
   assert.match(scene,/fixtureType:decorDrawing\?\.origin\.prefabId\|\|null/);
   assert.match(scene,/bounds:furnitureBounds\(game\.world,volume\.fixtureType/);
-  assert.match(scene,/const placed=furniturePoint\(game\.world,id,/);
+  assert.match(scene,/const placed=furniturePoint\(game\.world,id==='hobby'\?'bookcase':id,/);
 });
 test('F1b bed two slots and available sleeping destination use current transformed instance',()=>{
   const root=newHousehold();
