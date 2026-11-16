@@ -176,8 +176,11 @@ export function completeSharedSession(root){
       // Snapshot productivity BEFORE the success memory/emotion is recorded;
       // that new positive receipt must not retroactively amplify its own fun.
       const pastime={type:'shared',mode:'leisure'};
-      const giverGain=12*voluntaryMoodEfficiency(giver,pastime);
-      const receiverGain=12*voluntaryMoodEfficiency(receiver,pastime);
+      // TV pleasure was gained gradually while physically watching, not
+      // fabricated again at the final canonical completion receipt.
+      const finalFun=session.choiceId==='tv'?0:12;
+      const giverGain=finalFun*voluntaryMoodEfficiency(giver,pastime);
+      const receiverGain=finalFun*voluntaryMoodEfficiency(receiver,pastime);
       const mem='leisure.'+session.choiceId;
       remember(root,from,mem);remember(root,to,mem);
       giver.needs.fun=clamp(giver.needs.fun+giverGain,0,100);
