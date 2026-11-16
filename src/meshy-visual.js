@@ -1,7 +1,7 @@
 import {canShowMeshy, meshClipFor, availableMeshClips,
   MESHY_ASSET_URL, meshPlacement,MESHY_SEAT_RIG_PROFILE,
   ALEX_GREETING_CLIP,alexGreetingClipTime,ALEX_ALTERNATE_IDLE_CLIP,
-  alexIdleClipFor} from './meshy-visual-policy.js';
+  alexIdleClipFor} from './meshy-visual-policy.js?v=1.2p';
 import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} from './meshy-sofa-pose.js';
 import {createSkinnedSeatController} from './meshy-seat-runtime.js';
 import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
