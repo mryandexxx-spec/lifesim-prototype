@@ -1,5 +1,5 @@
 import {MIRA_MESHY_URL,miraHasClips,miraClipFor,
-  miraMeshPlacement,canShowMiraMeshy} from './meshy-mira-policy.js';
+  miraMeshPlacement,canShowMiraMeshy} from './meshy-mira-policy.js?v=1.2p';
 import {MIRA_SOFA_CLIP,MIRA_SOFA_DURATION,miraSofaClipTime,miraSofaOffset}
   from './meshy-mira-sofa.js';
 import {MIRA_SLEEP_CLIP,MIRA_SLEEP_DURATION,miraBedPose,createMiraBedController}
