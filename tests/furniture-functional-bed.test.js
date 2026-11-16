@@ -83,7 +83,7 @@ test('invalid bed location never charges, and unsuitable 3D preview cannot be fi
 
 test('3D bed picks, visual targets, transition poses and individual quilts all use instance ID',()=>{
   const source=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
-  assert.match(source,/selectedFurnitureInstanceId=\['sofa','seat','bed','tv','hobby','music'\]\.includes\(id\)/);
+  assert.match(source,/selectedFurnitureInstanceId=\['sofa','seat','bed','tv','hobby','music',\.\.\.UTILITY_ACTION_IDS\]\.includes\(id\)/);
   assert.match(source,/const bedCopies=game\.world\.furniture\.instances/);
   assert.match(source,/id:'bed',instanceId:item\.instanceId/);
   assert.match(source,/bedVisualTargets\.alex=game\.action\?\.targetInstanceId/);
