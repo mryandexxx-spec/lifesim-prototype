@@ -1,5 +1,5 @@
 import {MIRA_MESHY_URL,miraHasClips,miraClipFor,
-  miraMeshPlacement,canShowMiraMeshy} from './meshy-mira-policy.js?v=1.2p';
+  miraMeshPlacement,canShowMiraMeshy} from './meshy-mira-policy.js?v=1.2q';
 import {MIRA_SOFA_CLIP,MIRA_SOFA_DURATION,miraSofaClipTime,miraSofaOffset}
   from './meshy-mira-sofa.js';
 import {MIRA_SLEEP_CLIP,MIRA_SLEEP_DURATION,miraBedPose,createMiraBedController}
@@ -10,7 +10,7 @@ import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
 import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
 import {createMeshyHugController} from './meshy-hug-runtime.js';
 import {createMeshyKissController} from './meshy-kiss-runtime.js';
-import {createMeshyReadingController} from './meshy-reading-runtime.js';
+import {createMeshyReadingController} from './meshy-reading-runtime.js?v=1.2q';
 
 /** Read undeformed geometry AABBs, never pose-dependent meshInstance.aabb.
  * The validated female GLB has one original skinned mesh.
@@ -247,7 +247,6 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       if(!show||!state.model){
         state.readingRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
-        state.readingRuntime?.setFrame(null);
         state.hugRuntime?.setFrame(null);
         state.kissRuntime?.setFrame(null);
         state.fridgeRuntime?.setFrame(null);

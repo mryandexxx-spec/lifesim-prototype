@@ -2,7 +2,11 @@ import {solveTwoBoneTargets} from './interaction-anchors.js';
 
 /** H1 visual-only: an open book held in both Meshy hands. No action/XP/save writes. */
 const clamp01=n=>Math.min(1,Math.max(0,n));
-export function readingMotion({active=false,elapsed=0}={}){
+export function readingMotion(frame=null){
+  // Inactive residents, pause/reset and first-frame startup pass null.
+  // Destructuring null crashed the entire Safari render loop after GLB load.
+  if(!frame||typeof frame!=='object')return null;
+  const {active=false,elapsed=0}=frame;
   if(!active||!Number.isFinite(elapsed)||elapsed<0)return null;
   // Simulation minutes make page turns deterministic across 1x/3x and reload.
   const cycle=elapsed%7;
