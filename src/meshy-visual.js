@@ -1,7 +1,7 @@
 import {canShowMeshy, meshClipFor, availableMeshClips,
   MESHY_ASSET_URL, meshPlacement,MESHY_SEAT_RIG_PROFILE,
   ALEX_GREETING_CLIP,alexGreetingClipTime,ALEX_ALTERNATE_IDLE_CLIP,
-  alexIdleClipFor} from './meshy-visual-policy.js?v=1.2p';
+  alexIdleClipFor} from './meshy-visual-policy.js?v=1.2q';
 import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} from './meshy-sofa-pose.js';
 import {createSkinnedSeatController} from './meshy-seat-runtime.js';
 import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
@@ -11,7 +11,7 @@ import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
 import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
 import {createMeshyHugController} from './meshy-hug-runtime.js';
 import {createMeshyKissController} from './meshy-kiss-runtime.js';
-import {createMeshyReadingController} from './meshy-reading-runtime.js';
+import {createMeshyReadingController} from './meshy-reading-runtime.js?v=1.2q';
 
 /**
  * Meshy visual adapter for the EXISTING LifeSim procedural character root.
@@ -238,7 +238,6 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       if(!useMeshy||!state.model){
         state.readingRuntime?.setFrame(null);
         state.fridgeRuntime?.setFrame(null);
-        state.readingRuntime?.setFrame(null);
         state.hugRuntime?.setFrame(null);
         state.kissRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
