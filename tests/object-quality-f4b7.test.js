@@ -87,7 +87,7 @@ test('F4b7 Pages ships comparison module, one panel, stable SKU and no gameplay 
   assert.match(pages,/node --check src\/object-quality-comparison\.js/);
   assert.match(pages,/src\/object-quality-comparison\.js site\/src\//);
   assert.match(html,/id="furnish-variant-compare"/);
-  assert.match(game,/compareShopVariants\(shopQualityRegistry,shopListings,listing\.itemId\)/);
+  assert.match(game,/compareShopVariants\(shopQualityRegistry,visibleShopListings,listing\.itemId\)/);
   assert.match(game,/formatShopVariantComparison\(other\)/);
   assert.match(css,/\.furnish-variant-compare\{/);
   assert.doesNotMatch(game,/if\(item\.itemId==='sofa\.comfort'\)/);

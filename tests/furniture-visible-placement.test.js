@@ -92,7 +92,9 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
     buyMarketItem,editorContext:()=>({residents:[]}),editorMessage:r=>r,
     shopPreviewEntity:{enabled:true},syncShopPreviewEntity(){},
     marketGhost:visual,instanceRect,FURNITURE_CATALOG,
-    ghostValid:{kind:'valid'},ghostInvalid:{kind:'invalid'},furnishMode:true
+    ghostValid:{kind:'valid'},ghostInvalid:{kind:'invalid'},furnishMode:true,
+    shopRoomCategory:null,shopFunctionCategory:null,
+    selectShopCatalog:()=>[] // placement hides variants but still computes visible filters
   };
   runInNewContext('(()=>{'+game.slice(begin,end)+'\nrenderMarket();})()',state,{timeout:1500});
   assert.equal(plant.attrs['aria-pressed'],'true');
