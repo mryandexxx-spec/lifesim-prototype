@@ -292,16 +292,16 @@ test('H1 Safari integration exposes real touch, store, session, personal XP and 
   assert.match(game,/withDecor\('bookcase'/);
   assert.match(game,/item\.prefabId==='bookcase'/);
   assert.match(game,/type:'activity',activityId:READING_ACTIVITY_ID/);
-  assert.match(game,/beginAction\('hobby',false,residentId,true,command\.targetInstanceId/);
+  assert.match(game,/beginAction\(actionId,false,residentId,true,command\.targetInstanceId/);
   assert.match(game,/readingHasBook\(game\.action\)/);
   assert.match(html,/id="mind-reading-skill"/);
   assert.match(game,/currentSkillLevel\(current\.skills,HOBBY_SKILLS,READING_SKILL_ID\)/);
   assert.match(workflow,/node --check src\/hobby-reading\.js/);
   assert.match(workflow,/cp src\/hobby-reading\.js site\/src\//);
-  assert.match(html,/src\/game\.js\?v=1\.2t/);
-  assert.match(html,/styles\.css\?v=1\.2t/);
+  assert.match(html,/src\/game\.js\?v=1\.2u/);
+  assert.match(html,/styles\.css\?v=1\.2u/);
   const pkg=JSON.parse(source('../package.json'));
-  assert.equal(pkg.version,'1.0.0-alpha.72');
+  assert.equal(pkg.version,'1.0.0-alpha.73');
 });
 
 test('H1 browser boot builds hidden bookcase prefab without an installed origin.instanceId',()=>{
