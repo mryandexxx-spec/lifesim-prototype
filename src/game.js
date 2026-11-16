@@ -61,6 +61,7 @@ import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js?v=1.2t';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
+import {purchasedSeatPrefab,purchasedSeatPose,purchasedSeatSurface} from './seat-furniture.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2t';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
@@ -259,6 +260,7 @@ const META = {
   shower: { title: 'Душевая', category: 'Ванная', description: 'Душ повышает уровень гигиены', icon: '✧', anchor: [-3.65, 2.16, 2.45] },
   toilet: { title: 'Унитаз', category: 'Ванная', description: 'Приватное использование туалета восстановит потребность', icon: 'WC', anchor: [-1.65, 1.28, 3.14] },
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] },
+  seat: { title: 'Кресло или стул', category: 'Сиденья', description: 'Посидеть на выбранном предмете · без бонуса навыков', icon: '▣', anchor: [0,1.2,0] },
   tv: { title: 'Телевизор', category: 'Гостиная', description: 'Сядет на свободный диван с видом на экран или посмотрит стоя, если мест нет', icon: '▣', anchor: [3.5, 1.42, .36] },
   hobby: { title: 'Книжный шкаф', category: 'Гостиная',
     description: 'Подойти к шкафу, выбрать историю и почитать. Досуг растёт во время чтения, а навык — от практики.',
@@ -473,7 +475,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=['sofa','bed','tv','hobby','music'].includes(id)&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','seat','bed','tv','hobby','music'].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -484,7 +486,7 @@ function select(id,instanceId=null) {
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
       id==='tv'?'Просмотр этого телевизора · с дивана, если он свободен и экран виден':
-      id==='hobby'||id==='music'?META[id].description:
+      id==='hobby'||id==='music'||id==='seat'?META[id].description:
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('music-style-field').hidden=id!=='music';
@@ -1663,6 +1665,9 @@ function boot() {
   // Future armchairs and couch variants register the same metadata and
   // reuse this controller: no per-sofa adjustments of the avatar's Y.
   const makeSofaSeat=(instanceId=null,romanticSlot=null)=>{
+    // The same skinned-seat contact solver now handles single-seat furniture.
+    if(purchasedSeatPrefab(game.world,instanceId))
+      return purchasedSeatSurface(game.world,instanceId);
     const center=furniturePoint(game.world,'sofa',
       {x:SOFA_LAYOUT.x,z:SOFA_LAYOUT.z},instanceId);
     const instance=furnitureInstance(game.world,'sofa',instanceId);
@@ -2249,6 +2254,7 @@ function boot() {
       'unreachable-sofa':'К этому дивану нельзя пройти · выбери другое место',
       'unreachable-tv':'Нельзя подойти к экрану этого телевизора · выбери другое место',
       'unreachable-music':'К музыкальному центру не подойти · поверни его или освободи проход',
+      'unreachable-seat':'К стулу или креслу нельзя подойти · освободи место спереди',
       'insufficient-credits':'Недостаточно пробных кредитов',
       'full-household':'Слишком много предметов',
       'already-stored':'Предмет уже на складе',
@@ -3092,6 +3098,15 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:2.05,z:r.maxZ}}};
       });
+    // F4D bought chairs are real ray targets: one tappable action per instance.
+    const chairSeats=game.world.furniture.instances
+      .filter(item=>['chair','armchair'].includes(item.prefabId)&&item.location==='home')
+      .map(item=>{
+        const r=instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint);
+        return {kind:'object',id:'seat',instanceId:item.instanceId,
+          bounds:{min:{x:r.minX,y:0,z:r.minZ},
+            max:{x:r.maxX,y:item.prefabId==='armchair'?1.7:1.6,z:r.maxZ}}};
+      });
     const musicStations=game.world.furniture.instances
       .filter(item=>item.prefabId==='music'&&item.location==='home')
       .map(item=>{
@@ -3101,7 +3116,7 @@ function boot() {
             max:{x:r.maxX,y:1.3,z:r.maxZ}}};
       });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...musicStations,...movedVolumes,...blockers]);
+      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...chairSeats,...musicStations,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -3422,21 +3437,23 @@ function boot() {
     if(alexDateSofa){
       sofaVisualTargets.alex=romanticSofa.sofaId;
       romanticSofaSlots.alex=sofaDateFor('alex');
-    }else if(useId==='sofa'||alexWatchSeat||alexReadingSeated)
+    }else if(useId==='sofa'||useId==='seat'||alexWatchSeat||alexReadingSeated)
       sofaVisualTargets.alex=alexReadingSeated
         ?game.action.readingSeatInstanceId
         :(alexWatchSeat||game.action?.targetInstanceId)||null;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
-      (useId==='sofa'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated)&&
+      (useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated)&&
         bedStates.alex.progress===0&&!showerStates.alex.active,
       alexReadingStage?animDt*game.speed:animDt);
     const alexSeatBase=sofaTransitionPose(sofaStates.alex);
-    const seatPose=furniturePose(game.world,'sofa',
-      romanticSofaSlots.alex===null?alexSeatBase:
-        {...alexSeatBase,x:alexSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.alex)},
-      sofaVisualTargets.alex)||
+    const seatPose=(purchasedSeatPrefab(game.world,sofaVisualTargets.alex)
+      ?purchasedSeatPose(game.world,sofaVisualTargets.alex,alexSeatBase)
+      :furniturePose(game.world,'sofa',
+        romanticSofaSlots.alex===null?alexSeatBase:
+          {...alexSeatBase,x:alexSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.alex)},
+        sofaVisualTargets.alex))||
       {...display,sofaWeight:0};
-    const seating=useId==='sofa'||Boolean(alexWatchSeat)||alexReadingSeated||
+    const seating=useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexReadingSeated||
       sofaStates.alex.progress>0||alexDateSofa;
     if(!seating){sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;}
     if(alexSeatInstanceId!==sofaVisualTargets.alex||
@@ -3559,21 +3576,23 @@ function boot() {
     if(miraDateSofa){
       sofaVisualTargets.mira=romanticSofa.sofaId;
       romanticSofaSlots.mira=sofaDateFor('mira');
-    }else if(miraUseId==='sofa'||miraWatchSeat||miraReadingSeated)
+    }else if(miraUseId==='sofa'||miraUseId==='seat'||miraWatchSeat||miraReadingSeated)
       sofaVisualTargets.mira=miraReadingSeated
         ?game.otherSim.action.readingSeatInstanceId
         :(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
-      (miraUseId==='sofa'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated)&&
+      (miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated)&&
         bedStates.mira.progress===0&&!showerStates.mira.active,
       miraReadingStage?animDt*game.speed:animDt);
     const miraSeatBase=sofaTransitionPose(sofaStates.mira);
-    const miraSeatPose=furniturePose(game.world,'sofa',
-      romanticSofaSlots.mira===null?miraSeatBase:
-        {...miraSeatBase,x:miraSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.mira)},
-      sofaVisualTargets.mira)||
+    const miraSeatPose=(purchasedSeatPrefab(game.world,sofaVisualTargets.mira)
+      ?purchasedSeatPose(game.world,sofaVisualTargets.mira,miraSeatBase)
+      :furniturePose(game.world,'sofa',
+        romanticSofaSlots.mira===null?miraSeatBase:
+          {...miraSeatBase,x:miraSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.mira)},
+        sofaVisualTargets.mira))||
       {...miraDisplay,sofaWeight:0};
-    const miraSeating=miraUseId==='sofa'||Boolean(miraWatchSeat)||miraReadingSeated||
+    const miraSeating=miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraReadingSeated||
       sofaStates.mira.progress>0||miraDateSofa;
     if(!miraSeating){sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;}
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
@@ -3669,7 +3688,7 @@ function boot() {
         !miraSeating&&!miraBedding&&!miraShower,
       social:socialUsing&&!pairedTv?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
-      actionId:miraUseId,
+      actionId:miraUseId==='seat'?'sofa':miraUseId,
       readingStage:miraReadingStage,
       readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
       readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
@@ -3708,7 +3727,7 @@ function boot() {
       socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
-      actionId:useId,
+      actionId:useId==='seat'?'sofa':useId,
       readingStage:alexReadingStage,
       readingStepElapsed:game.action?.readingStepElapsed??0,
       readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
