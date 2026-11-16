@@ -1,0 +1,29 @@
+name: R5c shared sofa preflight
+on:
+  push:
+    branches: [feature/romance-r5c-over-f3c-20261116]
+  pull_request:
+    paths: ['src/**','tests/romance-r5c.test.js','.github/workflows/pages.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Full regression and source syntax
+        run: |
+          npm ci
+          npm test
+          node --check src/game.js
+          node --check src/romantic-sofa-stage.js
+          node --check src/romantic-evening-stage.js
+          node --check src/relationships.js
+          node --check src/animations.js
+      - name: Original Meshy character GLBs unchanged
+        run: |
+          echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -
+          echo "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a  assets/characters/meshy-mira-mobile-v1.glb" | sha256sum -c -

@@ -71,6 +71,8 @@ export function chooseTvSofa(root,residentId,tvId){
     return null;
   const other=residentId==='mira'?root:root?.otherSim;
   const occupied=new Set();
+  if(root?.socialAction?.eveningSofa?.instanceId)
+    occupied.add(root.socialAction.eveningSofa.instanceId);
   if(other?.action?.id==='sofa')
     occupied.add(other.action.targetInstanceId||'home-sofa-1');
   if(other?.action?.id==='tv'&&other.action.watchSeatInstanceId)

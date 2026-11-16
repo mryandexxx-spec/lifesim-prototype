@@ -75,6 +75,7 @@ jobs:
           node --check src/romantic-intimacy.js
           node --check src/romantic-evening-scene.js
           node --check src/romantic-evening-stage.js
+          node --check src/romantic-sofa-stage.js
           node --check src/meshy-kiss-runtime.js
           node --check src/meshy-hug-runtime.js
           node --check src/reaction-badges.js
@@ -138,6 +139,7 @@ jobs:
           cp src/romantic-intimacy.js site/src/
           cp src/romantic-evening-scene.js site/src/
           cp src/romantic-evening-stage.js site/src/
+          cp src/romantic-sofa-stage.js site/src/
           cp src/toilet-interaction.js site/src/
           cp src/need-balance.js site/src/
           cp src/environment-effects.js site/src/
