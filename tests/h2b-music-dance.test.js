@@ -124,6 +124,12 @@ test('dance and listening motion are different in real joint positions and loop 
   assert.ok(Math.abs(active.legs[0])>Math.abs(passive.legs[0]));
   assert.deepEqual(active,musicMovementFrame({phase:'using',
     activityId:MUSIC_DANCE_ACTIVITY_ID,contentId:'music.rhythmic',elapsed:1.1}));
+  const before=musicMovementFrame({phase:'using',activityId:MUSIC_DANCE_ACTIVITY_ID,
+    contentId:'music.rhythmic',elapsed:4.19999});
+  const after=musicMovementFrame({phase:'using',activityId:MUSIC_DANCE_ACTIVITY_ID,
+    contentId:'music.rhythmic',elapsed:4.20001});
+  assert.ok(Math.abs(before.arms[0]-after.arms[0])<.05,'dance must not snap at loop boundary');
+  assert.ok(Math.abs(before.torsoRoll-after.torsoRoll)<.05);
   assert.equal(musicMovementFrame(null),null);
   assert.equal(musicMovementFrame({phase:'walking',activityId:MUSIC_DANCE_ACTIVITY_ID,elapsed:1.1}),null);
   assert.equal(musicMovementFrame({phase:'using',activityId:'not.music',elapsed:1.1}),null);
