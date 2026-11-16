@@ -57,8 +57,8 @@ test('both Meshy visuals mount post-Anim controller and hide obsolete elbow book
   const workflow=source('../.github/workflows/pages.yml');
   assert.match(workflow,/node --check src\/meshy-reading-runtime\.js/);
   assert.match(workflow,/cp src\/meshy-reading-runtime\.js site\/src\//);
-  assert.match(source('../index.html'),/src\/game\.js\?v=1\.2s-seated-reader/);
-  for(const code of [alex,mira])assert.match(code,/meshy-reading-runtime\.js\?v=1\.2s/);
+  assert.match(source('../index.html'),/src\/game\.js\?v=1\.2t-closed-book-f4b9/);
+  for(const code of [alex,mira])assert.match(code,/meshy-reading-runtime\.js\?v=1\.2t/);
 });
 
 test('P0 Safari boot: loaded Meshy reading controller accepts idle, reset and reload frames',()=>{
@@ -112,6 +112,14 @@ test('P0 Safari boot: loaded Meshy reading controller accepts idle, reset and re
     const controller=createMeshyReadingController({pc,model,avatar,resident});
     assert.equal(controller.ready,true);
     const book=model.children.at(-1);
+    const closed=book.children.find(e=>e.name==='closed hardcover');
+    const openCover=book.children.find(e=>e.name==='open green cover');
+    const leftPage=book.children.find(e=>e.name==='left story pages');
+    const rightPage=book.children.find(e=>e.name==='right story pages');
+    assert.ok(closed&&openCover&&leftPage&&rightPage);
+    assert.equal(closed.children.length,4,'closed hardcover is a solid, single-volume book');
+    const front=closed.children.find(e=>e.name==='front green cover');
+    assert.ok(front.scale.x<.3,'closed book width is less than a single spread');
     // Immediately after GLB load there is NO reading activity at all.
     for(const frame of [null,undefined,{active:false},{active:true,elapsed:0}]){
       assert.doesNotThrow(()=>controller.setFrame(frame));
@@ -126,21 +134,41 @@ test('P0 Safari boot: loaded Meshy reading controller accepts idle, reset and re
     controller.setFrame(null);
     assert.equal(book.enabled,false);
     assert.equal(controller.apply(),false);
-    controller.setFrame({active:true,stage:'taking',elapsed:0,stepElapsed:1.2});
-    assert.equal(book.enabled,true);
-    assert.doesNotThrow(()=>controller.apply(),'book follows real wrist while borrowing');
-    assert.equal(book.children[1].enabled,false,'closed book has no spread pages');
-    controller.setFrame({active:true,stage:'toSeat',elapsed:0});
-    assert.doesNotThrow(()=>controller.apply(),'book stays attached while walking');
+    // The real H1n stages must swap GEOMETRY, not merely hide white
+    // pages while retaining a double-width, flat green open cover.
+    for(const stage of ['taking','toSeat','sitting','standing','returnShelf','returning']){
+      controller.setFrame({active:true,stage,elapsed:0,stepElapsed:1.2});
+      assert.equal(book.enabled,true,stage+' keeps borrowed book visible');
+      assert.equal(closed.enabled,true,stage+' displays the compact hardcover');
+      assert.equal(openCover.enabled,false,stage+' hides the entire open cover');
+      assert.equal(leftPage.enabled,false,stage+' hides open pages');
+      assert.equal(rightPage.enabled,false,stage+' hides open pages');
+      assert.doesNotThrow(()=>controller.apply(),stage+' follows the right hand');
+      assert.equal(book.euler.x,67,'carry pose tilts the closed book, not a flat spread');
+    }
+    controller.setFrame({active:true,stage:'opening',elapsed:0,stepElapsed:0});
+    assert.equal(closed.enabled,true,'book starts closed while sitting');
+    controller.setFrame({active:true,stage:'opening',elapsed:0,stepElapsed:1.2});
+    assert.equal(closed.enabled,false,'opening switches to actual double-page model');
+    assert.equal(openCover.enabled,true);
+    assert.equal(leftPage.enabled,true);
+    assert.equal(rightPage.enabled,true);
     controller.setFrame({active:true,stage:'reading',elapsed:6});
-    assert.equal(book.children[1].enabled,true,'pages open only when seated');
+    assert.equal(closed.enabled,false,'only seated reading uses the open book');
+    assert.equal(openCover.enabled,true);
     assert.doesNotThrow(()=>controller.apply());
+    controller.setFrame({active:true,stage:'closing',elapsed:36,stepElapsed:2.4});
+    assert.equal(closed.enabled,true,'closing completes with hardcover shut');
+    assert.equal(openCover.enabled,false,'no flat cover after closing');
     controller.setFrame({active:true,stage:'returnShelf',elapsed:36});
     assert.doesNotThrow(()=>controller.apply());
-    assert.equal(book.children[1].enabled,false);
+    assert.equal(closed.enabled,true,'book remains closed on return route');
+    assert.equal(openCover.enabled,false);
     controller.setFrame({active:true,elapsed:6});
     assert.equal(book.enabled,true,'same rig can restart after stopping');
     controller.setFrame();
     assert.equal(book.enabled,false,'reset/no frame never crashes renderer');
+    assert.equal(closed.enabled,false,'no ghost book after cancellation');
+    assert.equal(openCover.enabled,false,'no ghost open spread after cancellation');
   }
 });
