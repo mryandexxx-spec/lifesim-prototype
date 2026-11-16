@@ -255,6 +255,15 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
     event.type===id||event.type===id+'.refused');
   if(romanceEvent&&!['romance.breakup','romance.divorce'].includes(event.type)&&
     !romanceSafety(graph,event.actorId,event.targetId).allowed)return null;
+  // Direct graph callers must not bypass the same third-party restriction as
+  // the UI. Otherwise an invalid flirt could fabricate a jealousy incident.
+  if(event.type==='romance.flirt'&&
+    ((currentDatingPartner(graph,event.actorId)&&
+      currentDatingPartner(graph,event.actorId)!==event.targetId)||
+     (currentDatingPartner(graph,event.targetId)&&
+      currentDatingPartner(graph,event.targetId)!==event.actorId))&&
+    !romanceAvailability(graph,event.actorId,event.targetId,event.type,event.at).enabled)
+    return null;
   // A canonical relationship milestone must be eligible even when written by
   // a headless client directly; otherwise an event could bypass consent gates.
   if(['romance.date','romance.tender','romance.propose','romance.marry',
