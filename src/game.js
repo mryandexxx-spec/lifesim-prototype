@@ -2650,7 +2650,7 @@ function boot() {
       ?kissPairTarget(game.position,game.otherSim.position,kissCandidate.weight):null;
     const kissFrame=kissTargets?kissCandidate:{weight:0,progress:0,active:false};
     if(kissQAMode){
-      const status=$('kiss-qa-status');
+      const status=document.getElementById('kiss-qa-status');
       if(status){
         const s=game.socialAction;
         if(s?.branchAction?.id!=='romance.kiss')
