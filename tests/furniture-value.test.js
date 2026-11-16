@@ -61,5 +61,5 @@ test('F4a production bundle contains the descriptor module and real card copy',(
   assert.match(ui,/effect\.textContent=item\.effectText/);
   assert.match(ui,/button\.append\(name,cost,effect,mark\)/);
   assert.match(css,/\.furnish-product-effect/);
-  assert.match(html,/aria-label="Шесть товаров для покупки"/);
+  assert.match(html,/aria-label="Товары для покупки"/);
 });

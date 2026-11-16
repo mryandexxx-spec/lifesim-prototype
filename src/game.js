@@ -18,7 +18,8 @@ import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
-import {SHOP_ITEMS,marketListing,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
+import {SHOP_ITEMS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
+import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -2094,7 +2095,10 @@ function boot() {
       editorFeedback(editorLabel(id)+': удерживай 0,5 секунды для переноса или поверни кнопкой');
     else editorFeedback('Коснись предмета на 3D-сцене или открой каталог');
   };
-  const shopListings=marketListing();
+  // F4b1: shop cards and category facets come from validated item definitions.
+  // Transactions below intentionally remain legacy prefab+price until F4b2.
+  const shopListings=selectShopCatalog();
+  let shopRoomCategory=null,shopFunctionCategory=null;
   // Separate visual staging entity is never a purchased item and never enters
   // world.furniture or household saves. The floor outline shows validation.
   const clearShopPreviewEntity=()=>{
@@ -2226,9 +2230,51 @@ function boot() {
     clearShopPreviewEntity();
     renderMarket();renderFurnitureSelection();
   };
+  // The two native Safari dropdowns are generated from the registry, not an
+  // ever-growing list of hardcoded furniture category buttons.
+  const addShopFacetOptions=(facet,elementId)=>{
+    const selector=$(elementId);
+    for(const category of shopCategoryOptions(facet)){
+      const option=document.createElement('option');
+      option.value=category.id;option.textContent=category.label;
+      selector.append(option);
+    }
+  };
+  addShopFacetOptions('room','furnish-room-filter');
+  addShopFacetOptions('function','furnish-function-filter');
+  const renderShopFilteredItems=()=>{
+    const visible=selectShopCatalog({
+      roomCategoryId:shopRoomCategory,functionCategoryId:shopFunctionCategory
+    });
+    const ids=new Set(visible.map(item=>item.itemId));
+    for(const button of $('furnish-stock').querySelectorAll('button'))
+      button.hidden=!ids.has(button.dataset.itemId);
+    $('furnish-filter-count').textContent='Показано '+visible.length+' из '+shopListings.length;
+    $('furnish-filter-empty').hidden=visible.length!==0;
+    $('furnish-stock').setAttribute('aria-label',
+      'Товары для покупки · '+visible.length+' из '+shopListings.length);
+    // A filtered-out card cannot remain silently selected for a purchase.
+    if(!shopPlacing&&!visible.some(item=>item.prefabId===shopSelected)){
+      shopSelected=visible[0]?.prefabId||null;
+      shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
+      clearShopPreviewEntity();
+    }
+    renderMarket();
+  };
+  $('furnish-room-filter').addEventListener('change',event=>{
+    if(!shopOpen||shopPlacing)return;
+    shopRoomCategory=event.currentTarget.value||null;
+    renderShopFilteredItems();renderFurnitureSelection();
+  });
+  $('furnish-function-filter').addEventListener('change',event=>{
+    if(!shopOpen||shopPlacing)return;
+    shopFunctionCategory=event.currentTarget.value||null;
+    renderShopFilteredItems();renderFurnitureSelection();
+  });
   for(const item of shopListings){
     const button=document.createElement('button');
     button.type='button';button.dataset.prefabId=item.prefabId;
+    button.dataset.itemId=item.itemId;
     const name=document.createElement('strong');name.textContent=item.name;
     const cost=document.createElement('small');cost.textContent=item.price+' проб. кр.';
     const effect=document.createElement('small');
@@ -2242,6 +2288,7 @@ function boot() {
     button.addEventListener('click',()=>chooseShopProduct(item.prefabId));
     $('furnish-stock').append(button);
   }
+  renderShopFilteredItems();
   $('furnish-edit-toggle').addEventListener('click',()=>setEditorView('edit'));
   $('furnish-shop-toggle').addEventListener('click',()=>setEditorView(shopOpen?'edit':'shop'));
   $('furnish-warehouse-toggle').addEventListener('click',()=>setEditorView(warehouseOpen?'edit':'warehouse'));
