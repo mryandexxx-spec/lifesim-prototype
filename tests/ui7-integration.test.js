@@ -40,7 +40,7 @@ test('UI7 six real bars and camera gestures are retained from concurrently relea
 test('UI7 Pages ships onboarding module, current cache identity and no simulator fork',()=>{
  assert.match(workflow,/node --check src\/ui-onboarding\.js/);
  assert.match(workflow,/cp src\/ui-onboarding\.js site\/src\//);
- assert.match(html,/сборка \/ 1\.1x/);
- assert.match(html,/styles\.css\?v=1\.1x/);
- assert.match(html,/src\/game\.js\?v=1\.1x/);
+ assert.match(html,/сборка \/ 1\.1y/);
+ assert.match(html,/styles\.css\?v=1\.1y/);
+ assert.match(html,/src\/game\.js\?v=1\.1y/);
 });
