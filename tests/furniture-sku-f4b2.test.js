@@ -209,7 +209,7 @@ test('F4b2 Pages packages product source; visible bundle/lock bump without schem
   const pkg=JSON.parse(src('../package.json'));
   const lock=JSON.parse(src('../package-lock.json'));
   assert.match(pages,/node --check src\/furniture-products\.js/);
-  assert.match(pages,/cp src\/furniture-products\.js src\/furniture-procedural-library\.js src\/furniture-thumbnails\.js src\/seat-furniture\.js site\/src\//);
+  assert.match(pages,/cp src\/furniture-products\.js src\/furniture-procedural-library\.js src\/furniture-thumbnails\.js src\/seat-furniture\.js src\/furniture-interactions\.js site\/src\//);
   assert.match(html,/src\/game\.js\?v=1\.2u/);
   assert.match(html,/styles\.css\?v=1\.2u/);
   assert.equal(pkg.version,'1.0.0-alpha.73');

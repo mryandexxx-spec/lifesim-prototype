@@ -123,7 +123,7 @@ test('H4 Safari presentation, owned unlock, voice-over semantics and static depl
   assert.match(html,/id="mind-skills-list"/);
   assert.match(html,/id="reading-content-select"/);
   assert.match(html,/book.classic.pathways/);
-  assert.ok(html.includes('1.2u.5 · F4D / H4'));
+  assert.ok(html.includes('1.2u.6 · F4D / H3 / F4E / H4'));
   assert.match(game,/skillProfileRows/);
   assert.match(game,/canReadHobbyContent/);
   assert.ok(css.includes('.skill-card-progress'));

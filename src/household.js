@@ -35,6 +35,7 @@ import {newObjectOnceLedger,restoreObjectOnceLedger} from './object-once-ledger.
 import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
 import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
+import {switchLampAtArrival} from './furniture-interactions.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
 export const RESIDENT_NAMES = Object.freeze({ alex: 'Алекс', mira: 'Мира' });
@@ -564,6 +565,10 @@ export function tickHousehold(root,minutes) {
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
   const pairMinutes=paired?Math.min(minutes,Math.max(0,
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
+  // Toggle after the real A* arrival, never when walking/queued/paused.
+  // Capture state before tick completion so short actions cannot miss it.
+  switchLampAtArrival(root.world,root);
+  switchLampAtArrival(root.world,other);
   const alexUse=captureObjectUse(root),miraUse=captureObjectUse(other);
   tick(root,minutes,root.world);
   tick(other,minutes,root.world);

@@ -10,28 +10,28 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2y-h4" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
-      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3",
+      "./src/household.js":"./src/household.js?v=1.2u-h4-f4e",
       "./src/paired-hobby.js":"./src/paired-hobby.js?v=1.2x-h3",
       "./src/gifts-leisure.js":"./src/gifts-leisure.js?v=1.2x-h3",
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
       "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3",
-      "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2y-h4",
-      "./src/skill-presentation.js":"./src/skill-presentation.js?v=1.2y-h4",
-      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b-f4d-h3",
-      "./src/animations.js":"./src/animations.js?v=1.2w-h2b",
+      "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2u-h4",
+      "./src/skill-presentation.js":"./src/skill-presentation.js?v=1.2u-h4",
+      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b-f4d-h3-f4e",
+      "./src/animations.js":"./src/animations.js?v=1.2w-h2b-f4e",
       "./src/music-movement.js":"./src/music-movement.js?v=1.2w-h2b",
       "./src/meshy-music-runtime.js":"./src/meshy-music-runtime.js?v=1.2w-h2b",
-      "./src/meshy-visual.js":"./src/meshy-visual.js?v=1.2w-h2b",
-      "./src/meshy-mira-visual.js":"./src/meshy-mira-visual.js?v=1.2w-h2b",
-      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2v-f4d",
+      "./src/meshy-visual.js":"./src/meshy-visual.js?v=1.2w-h2b-f4e",
+      "./src/meshy-mira-visual.js":"./src/meshy-mira-visual.js?v=1.2w-h2b-f4e",
+      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2v-f4d-f4e",
       "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1-f4c",
-      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d",
-      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2v-f4d",
-      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2v-f4d",
-      "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2v-f4d",
+      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d-f4e",
+      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2v-f4d-f4e",
+      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2v-f4d-f4e",
+      "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2v-f4d-f4e",
       "./src/shop-catalog-selector.js":"./src/shop-catalog-selector.js?v=1.2u-f4c",
       "./src/furniture-value.js":"./src/furniture-value.js?v=1.2u-f4c",
       "./src/furniture-procedural-library.js":"./src/furniture-procedural-library.js?v=1.2u-f4c",
@@ -40,7 +40,10 @@
       "./src/navigation.js":"./src/navigation.js?v=1.2v-f4d",
       "./src/camera-controls.js":"./src/camera-controls.js?v=1.2v-f4d",
       "./src/furniture-placement-preview.js":"./src/furniture-placement-preview.js?v=1.2v-f4d",
-      "./src/seat-furniture.js":"./src/seat-furniture.js?v=1.2v-f4d"}}
+      "./src/seat-furniture.js":"./src/seat-furniture.js?v=1.2v-f4d",
+      "./src/furniture-interactions.js":"./src/furniture-interactions.js?v=1.2u-f4e",
+      "./src/meshy-visual-policy.js":"./src/meshy-visual-policy.js?v=1.2u-f4e",
+      "./src/meshy-mira-policy.js":"./src/meshy-mira-policy.js?v=1.2u-f4e"}}
   </script>
 </head>
 <body>
@@ -58,7 +61,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.5 · F4D / H4</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.6 · F4D / H3 / F4E / H4</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -353,7 +356,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2y-h4"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h4-f4e"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

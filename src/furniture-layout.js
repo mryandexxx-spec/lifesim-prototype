@@ -39,8 +39,8 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
   if(target.prefabId==='music'&&!musicListeningSpots(candidate,instanceId).length)
     return {ok:false,reason:'unreachable-music'};
   // Sitting needs a real clear front approach, not just a renderable mesh.
-  if(['chair','armchair'].includes(target.prefabId)){
-    const approach=furnitureActionApproach(candidate,'seat',instanceId);
+  if(['chair','armchair','floorlamp','mirror','dresser','wardrobe'].includes(target.prefabId)){
+    const approach=furnitureActionApproach(candidate,FURNITURE_CATALOG[target.prefabId].actionId,instanceId);
     if(!approach||!isWalkable(approach.x,approach.z,candidate))
       return {ok:false,reason:'unreachable-seat'};
   }
@@ -55,8 +55,8 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
     }
     if(target.prefabId==='music'&&!chooseMusicListeningSpot(candidate,person,instanceId))
       return {ok:false,reason:'unreachable-music'};
-    if(['chair','armchair'].includes(target.prefabId)){
-      const sitting=furnitureActionApproach(candidate,'seat',instanceId);
+    if(['chair','armchair','floorlamp','mirror','dresser','wardrobe'].includes(target.prefabId)){
+      const sitting=furnitureActionApproach(candidate,FURNITURE_CATALOG[target.prefabId].actionId,instanceId);
       if(!sitting||!findPath(person,sitting,candidate))
         return {ok:false,reason:'unreachable-seat'};
     }

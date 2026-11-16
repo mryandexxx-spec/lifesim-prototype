@@ -63,6 +63,7 @@ import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js?v=1.2t';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
 import {purchasedSeatPrefab,purchasedSeatPose,purchasedSeatSurface} from './seat-furniture.js';
+import {UTILITY_FURNITURE,UTILITY_ACTION_IDS,furnitureUseWeight,lampIsOn} from './furniture-interactions.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2t';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
@@ -263,6 +264,10 @@ const META = {
   toilet: { title: 'Унитаз', category: 'Ванная', description: 'Приватное использование туалета восстановит потребность', icon: 'WC', anchor: [-1.65, 1.28, 3.14] },
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] },
   seat: { title: 'Кресло или стул', category: 'Сиденья', description: 'Посидеть на выбранном предмете · без бонуса навыков', icon: '▣', anchor: [0,1.2,0] },
+  lamp: { title:'Торшер',category:'Освещение',description:'Переключить настоящий свет после подхода к выбранному торшеру',icon:'☀',anchor:[0,1.3,0] },
+  mirror: { title:'Зеркало',category:'Уход за собой',description:'Подойти к зеркалу и привести себя в порядок',icon:'◇',anchor:[0,1.4,0] },
+  dresser: { title:'Комод',category:'Хранение',description:'Подойти и открыть ящики или дверцы комода',icon:'▤',anchor:[0,.75,0] },
+  wardrobe: { title:'Гардероб',category:'Хранение',description:'Подойти к шкафу и осмотреть одежду и полки',icon:'▥',anchor:[0,1.6,0] },
   tv: { title: 'Телевизор', category: 'Гостиная', description: 'Сядет на свободный диван с видом на экран или посмотрит стоя, если мест нет', icon: '▣', anchor: [3.5, 1.42, .36] },
   hobby: { title: 'Книжный шкаф', category: 'Гостиная',
     description: 'Подойти к шкафу, выбрать историю и почитать. Досуг растёт во время чтения, а навык — от практики.',
@@ -551,7 +556,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=['sofa','seat','bed','tv','hobby','music'].includes(id)&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','seat','bed','tv','hobby','music',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -562,14 +567,17 @@ function select(id,instanceId=null) {
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
       id==='tv'?'Просмотр этого телевизора · с дивана, если он свободен и экран виден':
-      id==='hobby'||id==='music'||id==='seat'?META[id].description:
+      id==='hobby'||id==='music'||id==='seat'||UTILITY_ACTION_IDS.includes(id)?META[id].description:
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('music-style-field').hidden=id!=='music';
   $('reading-content-field').hidden=id!=='hobby';
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
-  $('action-button').innerHTML = `${ACTIONS[id].label} <span>↗</span>`;
+  const lampLabel=id==='lamp'
+    ?(lampIsOn(game?.world,selectedFurnitureInstanceId)?'Выключить торшер':'Включить торшер')
+    :ACTIONS[id].label;
+  $('action-button').innerHTML = `${lampLabel} <span>↗</span>`;
 }
 const markers = {};
 for (const id of Object.keys(META)) {
@@ -1460,6 +1468,7 @@ function boot() {
   };
   const decorNodes=new Map();
   const decorTemplates=new Map();
+  const f4eOriginalPositions=new WeakMap();
   let decorDrawing=null;
   let refreshSofaSeat=()=>{};
   const withDecor=(prefabId,render)=>{
@@ -1490,6 +1499,31 @@ function boot() {
       node.name='F2 purchased / '+item.instanceId;
       applySkuModel(node,item.itemDefinitionId||
         PROCEDURAL_DEFAULT_SKU[item.prefabId]);
+      // F4E: each bought lamp has a real world-space light source and a
+      // tiny emissive bulb. Parent it to the persistent instance node, so
+      // rotating/storing/moving the furniture cannot leave orphan lights.
+      if(item.prefabId==='floorlamp'){
+        const light=new pc.Entity('F4E lamp light');
+        const arc=furnitureProduct(item.itemDefinitionId)?.modelKey==='floorlamp.arc';
+        light.setLocalPosition(arc ? .48 : 0,arc ? 1.23 : 1.48,0);
+        light.addComponent('light',{type:'omni',
+          color:new pc.Color(1,.80,.54),intensity:.75,range:4.6,
+          castShadows:false});
+        const glow=new pc.Entity('F4E lamp bulb');
+        glow.addComponent('render',{type:'sphere',
+          material:mat('#ffdb94',{emissive:1.1})});
+        glow.setLocalScale(.20,.16,.20);
+        light.addChild(glow);node.addChild(light);
+        light.light.enabled=false;glow.enabled=false;
+      }
+      if(item.prefabId==='mirror'){
+        const glint=new pc.Entity('F4E mirror highlight');
+        glint.addComponent('render',{type:'sphere',
+          material:mat('#fff6d7',{emissive:.42,opacity:.55})});
+        glint.setLocalPosition(0,1.36,-.16);
+        glint.setLocalScale(.13,.32,.026);
+        node.addChild(glint);glint.enabled=false;
+      }
       app.root.addChild(node);
       decorNodes.set(item.instanceId,node);
     }
@@ -1869,7 +1903,11 @@ function boot() {
     hobby: {x:0,y:0,z:.92,pitch:0,yaw:180},
     sofa:   SOFA_POSE,
     tv: TV_WATCH_POSE,
-    fridge: {x:FRIDGE_LAYOUT.approach.x,y:0,z:FRIDGE_LAYOUT.approach.z,pitch:0,yaw:FRIDGE_FACING_YAW}
+    fridge: {x:FRIDGE_LAYOUT.approach.x,y:0,z:FRIDGE_LAYOUT.approach.z,pitch:0,yaw:FRIDGE_FACING_YAW},
+    lamp: {x:0,y:0,z:-.90,pitch:0,yaw:0},
+    mirror: {x:0,y:0,z:-.88,pitch:0,yaw:0},
+    dresser: {x:0,y:0,z:-1.06,pitch:0,yaw:0},
+    wardrobe: {x:0,y:0,z:-1.20,pitch:0,yaw:0}
   };
   if(game.action?.phase==='using') {
     const dest=game.action.id==='bed'
@@ -2395,7 +2433,8 @@ function boot() {
       'unreachable-sofa':'К этому дивану нельзя пройти · выбери другое место',
       'unreachable-tv':'Нельзя подойти к экрану этого телевизора · выбери другое место',
       'unreachable-music':'К музыкальному центру не подойти · поверни его или освободи проход',
-      'unreachable-seat':'К стулу или креслу нельзя подойти · освободи место спереди',
+      'unreachable-seat':'К предмету нельзя подойти · освободи место спереди',
+      'unreachable-utility':'К этой мебели нельзя подойти · освободи место перед ней',
       'insufficient-credits':'Недостаточно пробных кредитов',
       'full-household':'Слишком много предметов',
       'already-stored':'Предмет уже на складе',
@@ -3202,7 +3241,18 @@ function boot() {
       if(!volume.fixtureType)return volume;
       return {...volume,bounds:furnitureBounds(game.world,volume.fixtureType,
         volume.bounds)};
-    });
+    }).concat(game.world.furniture.instances
+      .filter(item=>item.location==='home'&&
+        Object.values(UTILITY_FURNITURE).some(p=>p.prefabId===item.prefabId))
+      .map(item=>{
+        const p=FURNITURE_CATALOG[item.prefabId];
+        const rect=instanceRect(item,p.footprint);
+        return {kind:'object',id:p.actionId,instanceId:item.instanceId,
+          bounds:{min:{x:rect.minX,y:.04,z:rect.minZ},
+            max:{x:rect.maxX,y:item.prefabId==='wardrobe'?2.52:
+              item.prefabId==='dresser'?1.17:item.prefabId==='mirror'?2.15:1.94,
+              z:rect.maxZ}}};
+      }));
     // Cloned sofa has a real, movable scene node but no authored touchBoxes.
     // Raycasting its rotated saved footprint preserves exact instance identity.
     const sofaCopies=game.world.furniture.instances
@@ -3633,7 +3683,8 @@ function boot() {
       ?{...pairedTv.places.alex,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
-      ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null);
+      ?furniturePose(game.world,useId==='lamp'?'floorlamp':useId,
+          ACTOR_POSES[useId],game.action?.targetInstanceId):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
@@ -3773,7 +3824,8 @@ function boot() {
       ?{...pairedTv.places.mira,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
-      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
+      ?furniturePose(game.world,miraUseId==='lamp'?'floorlamp':miraUseId,
+          ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
@@ -3957,6 +4009,78 @@ function boot() {
       if(point){accent.setPosition(point.x,point.y,point.z);
         accent.setLocalScale(point.size,point.size,point.size);}
     }
+    // F4E: interaction visuals depend only on the real targeted action.
+    // Lights persist in v1, while drawers, doors and mirror highlights close
+    // automatically after completion, interruption or save reload.
+    let litUtilityCount=0;
+    for(const item of game.world.furniture.instances){
+      if(item.location!=='home')continue;
+      const node=decorNodes.get(item.instanceId);
+      if(!node?.enabled)continue;
+      if(item.prefabId==='floorlamp'){
+        const light=node.findByName('F4E lamp light');
+        if(light?.light){
+          const on=lampIsOn(game.world,item.instanceId);
+          light.light.enabled=on&&litUtilityCount<5;
+          if(on)litUtilityCount++;
+          const bulb=light.findByName('F4E lamp bulb');
+          if(bulb)bulb.enabled=on;
+        }
+      }
+      if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
+      const weight=Math.max(0,...HOUSEHOLD_IDS.map(id=>
+        furnitureUseWeight(getActor(game,id)?.action,item.instanceId)));
+      const reposition=(part,dx=0,dz=0)=>{
+        if(!part)return;
+        let base=f4eOriginalPositions.get(part);
+        if(!base){const p=part.getLocalPosition();
+          base={x:p.x,y:p.y,z:p.z};f4eOriginalPositions.set(part,base);}
+        part.setLocalPosition(base.x+dx,base.y,base.z+dz);
+      };
+      if(item.prefabId==='dresser'){
+        const sku=furnitureProduct(item.itemDefinitionId)?.modelKey;
+        if(sku==='dresser.reed')for(let i=0;i<3;i++){
+          reposition(node.findByName('SKU dresser.reed dresser drawer '+i),0,-.31*weight);
+          reposition(node.findByName('SKU dresser.reed drawer pull '+i),0,-.31*weight);
+        }
+        if(sku==='dresser.arch')for(const sign of [-1,1]){
+          const side=sign===-1?'-0.41':'0.41';
+          for(const name of ['arched door ','arched door arch '])
+            reposition(node.findByName('SKU dresser.arch '+name+side),
+              sign*.17*weight,-.15*weight);
+          const handle=sign===-1?'-0.12':'0.12';
+          reposition(node.findByName('SKU dresser.arch arched brass knob '+handle),
+            sign*.17*weight,-.15*weight);
+        }
+      }else if(item.prefabId==='wardrobe'){
+        const sku=furnitureProduct(item.itemDefinitionId)?.modelKey;
+        if(sku==='wardrobe.classic')for(const sign of [-1,1]){
+          const side=sign===-1?'-0.41':'0.41';
+          reposition(node.findByName('SKU wardrobe.classic carved wardrobe door '+side),
+            sign*.36*weight,-.13*weight);
+          const handle=sign===-1?'-0.11':'0.11';
+          reposition(node.findByName('SKU wardrobe.classic long brass handle '+handle),
+            sign*.36*weight,-.13*weight);
+        }
+        if(sku==='wardrobe.open'){
+          for(let i=0;i<3;i++)reposition(
+            node.findByName('SKU wardrobe.open hanging garment '+i),
+            0,-.21*weight);
+          for(let i=0;i<2;i++)reposition(
+            node.findByName('SKU wardrobe.open folded basket '+i),
+            0,-.26*weight);
+        }
+      }else{
+        const glint=node.findByName('F4E mirror highlight');
+        if(glint){glint.enabled=weight>.008;
+          if(glint.enabled){
+            glint.setLocalPosition(Math.sin(effectTime*1.7)*.13*weight,
+              1.36,-.16);
+            glint.setLocalScale(.12+.09*weight,.28+.13*weight,.026);
+          }
+        }
+      }
+    }
     // A TV only plays while one of its OWN watchers is actually using it.
     // Each instance keeps its own small procedural screen and no video files.
     for(const item of game.world.furniture.instances){
@@ -4071,8 +4195,8 @@ function boot() {
       $('mind-reading-skill').textContent='Литературная эрудиция · уровень '+level+
         '/'+skill.maxLevel+' · '+Math.floor(currentXP)+' / '+nextXP+' опыта'+
         (current.action?.id==='hobby'&&current.action.phase==='using'?' · 📖 читает':'');
-       if(!$('reading-content-field').hidden)updateReadingContentChoice();
-       renderSkillsTab(false);
+      if(!$('reading-content-field').hidden)updateReadingContentChoice();
+      renderSkillsTab(false);
       const relation=game.relationship;
       $('relationship-value').textContent=Math.round(relation.affinity)+'/100';
       $('relationship-label').textContent=relationshipLabel(relation.affinity);

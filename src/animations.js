@@ -133,6 +133,20 @@ export function stepAnimation(previous,signals,dt) {
     // These motions never translate the simulation root or bypass A*.
     legTarget=[...music.legs];kneeTarget=[...music.knees];
     armTarget=[...music.arms];elbowTarget=[...music.elbows];
+  }else if(['lamp','mirror','dresser','wardrobe'].includes(action)){
+    // F4E: the authored procedural rig performs a physical hand gesture
+    // toward the utility object while staying at the verified A* approach.
+    // Meshy rigs use their existing Listening_Gesture clip instead.
+    const wave=Math.sin(t*(action==='mirror'?3.2:2.1));
+    if(action==='mirror'){
+      armTarget=[-75+8*wave,-47-8*wave];
+      elbowTarget=[-64,-42];
+    }else if(action==='lamp'){
+      armTarget=[-18,-72+8*wave];elbowTarget=[8,-44];
+    }else{
+      armTarget=[-26-8*wave,-53+8*wave];
+      elbowTarget=[-18,-35];
+    }
   }else if(action==='hobby'){
     // A readable open book in front of the body, both arms gently supporting it.
     armTarget=[-40,-47];elbowTarget=[-52,-47];
