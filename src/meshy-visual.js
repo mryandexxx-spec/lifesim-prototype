@@ -171,6 +171,11 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
   app.assets.load(asset);
 
   return {
+    // Opt-in QA displays facts from actual runtime post-Anim bone rotations,
+    // not only an eligible social receipt / movement between residents.
+    get hugStatus(){return {modelReady:state.ready,visible:state.visible,
+      controllerReady:Boolean(state.hugRuntime?.ready),
+      ...(state.hugRuntime?.status?.()||{})};},
     get ready(){return state.ready;},
     get status(){return state.status;},
     get error(){return state.error;},
@@ -200,7 +205,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         state.showerRuntime?.setFrame(null);
         return useMeshy;
       }
-      state.hugRuntime?.setFrame(hugFrame);
+      state.hugRuntime?.setFrame(hugFrame,paused);
       // Game updates the pose; postUpdate applies joint rotations after Anim.
       const fridge=actionId==='fridge'||fridgeBusy;
       state.fridgeRuntime?.setFrame(fridge&&actionId==='fridge'?fridgeFrame:null);

@@ -70,6 +70,9 @@ test('R1a must actually rotate both shoulders and elbows even for a wide stance'
   assert.equal(ctrl.ready,true);
   ctrl.setFrame({weight:1,active:true});
   assert.equal(ctrl.apply(),true,'old silent reach cutoff must not skip all arms');
+  assert.equal(ctrl.status().lastApplied,true);
+  assert.ok(ctrl.status().armRotations>=4);
+  assert.equal(ctrl.status().lastReason,'кости поворачиваются');
   for(const side of ['Left','Right']){
     assert.ok(f.bones['mixamorig:'+side+'Arm'].calls>0,side+' shoulder static');
     assert.ok(f.bones['mixamorig:'+side+'ForeArm'].calls>0,side+' elbow static');
@@ -78,4 +81,16 @@ test('R1a must actually rotate both shoulders and elbows even for a wide stance'
   const prev=f.bones['mixamorig:LeftArm'].calls;
   assert.equal(ctrl.apply(),false);
   assert.equal(f.bones['mixamorig:LeftArm'].calls,prev);
+  ctrl.setFrame({weight:1,active:true},true);
+  assert.equal(ctrl.apply(),false,'pause must not accumulate world rotations');
+  assert.equal(f.bones['mixamorig:LeftArm'].calls,prev);
+  const alex=readFileSync(new URL('../src/meshy-visual.js',import.meta.url),'utf8');
+  const mira=readFileSync(new URL('../src/meshy-mira-visual.js',import.meta.url),'utf8');
+  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  for(const src of [alex,mira]){
+    assert.match(src,/get hugStatus\(\)/);
+    assert.match(src,/setFrame\(hugFrame,paused\)/);
+  }
+  assert.match(game,/id="hug-qa-kinematics"/);
+  assert.match(game,/visual\?\.lastApplied/);
 });

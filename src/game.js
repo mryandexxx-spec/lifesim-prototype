@@ -228,7 +228,8 @@ if(hugQAMode){
   qaPanel.className='hug-qa-controls';
   qaPanel.setAttribute('aria-label','Режим проверки объятий');
   qaPanel.innerHTML='<strong>🎬 Проверка объятий</strong>'+
-    '<span>Тестовая пара · сохранение не меняется</span>'+
+    '<span>Тестовая пара · сохранение не меняется</span>'+ 
+    '<span id="hug-qa-kinematics">Руки: ожидание действия</span>'+
     '<div class="hug-qa-buttons">'+
       '<button type="button" data-initiator="alex">Алекс → Мира</button>'+
       '<button type="button" data-initiator="mira">Мира → Алекс</button>'+
@@ -2644,6 +2645,21 @@ function boot() {
     const hugTargets=hugCandidate.active
       ?hugPairTarget(game.position,game.otherSim.position,hugCandidate.weight):null;
     const hugFrame=hugTargets?hugCandidate:{weight:0,progress:0};
+    if(hugQAMode){
+      const status=$('hug-qa-kinematics');
+      if(status){
+        const word=visual=>visual?.controllerReady
+          ?visual?.lastApplied?'двигаются ✓':
+            visual?.lastReason==='пауза'?'пауза':
+            (visual?.lastReason||'ожидание')
+          :'нет контроллера';
+        if(!hugFrame.active)status.textContent='Руки: ожидание объятия';
+        else if(!meshyPreferred)
+          status.textContent='СТАРЫЕ облики · процедурные руки';
+        else status.textContent='Руки · Алекс: '+word(meshyAlex.hugStatus)+
+          ' · Мира: '+word(meshyMira.hugStatus);
+      }
+    }
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',

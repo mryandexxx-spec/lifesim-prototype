@@ -180,6 +180,11 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
   app.assets.load(asset);
 
   return {
+    // Opt-in QA displays facts from actual runtime post-Anim bone rotations,
+    // not only an eligible social receipt / movement between residents.
+    get hugStatus(){return {modelReady:state.ready,visible:state.visible,
+      controllerReady:Boolean(state.hugRuntime?.ready),
+      ...(state.hugRuntime?.status?.()||{})};},
     get ready(){return state.ready;},
     get status(){return state.status;},
     get error(){return state.error;},
@@ -209,7 +214,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         state.showerRuntime?.setFrame(null);
         return show;
       }
-      state.hugRuntime?.setFrame(hugFrame);
+      state.hugRuntime?.setFrame(hugFrame,paused);
       const shower=actionId==='shower'||showerBusy;
       state.showerRuntime?.setFrame(shower?showerFrame:null,paused);
       const fridge=actionId==='fridge'||fridgeBusy;
