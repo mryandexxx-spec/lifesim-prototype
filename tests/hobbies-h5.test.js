@@ -165,5 +165,6 @@ test('H5 Safari chooser, physical canvas, mesh gesture and Pages files are wired
   assert.match(game,/PAINT_ACTIVITY_ID/);
   assert.match(game,/easelInstanceId/);
   assert.match(pages,/node --check src\/painting\.js/);
-  assert.match(pages,/cp src\/painting\.js src\/hobby-reading\.js site\/src\//);
+  assert.match(pages,/cp src\/painting\.js site\/src\//);
+  assert.match(pages,/cp src\/hobby-reading\.js site\/src\//);
 });

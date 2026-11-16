@@ -16,11 +16,6 @@ const offered=[
   {itemId:'music.starter',prefabId:'music',price:390,
     name:'Музыкальный центр «Волна»',
     description:'Три стиля музыки · досуг без опыта игры на инструментах'},
-  // H5: real creative station, distinct from decorative art; no sales or wages.
-  {itemId:'easel.starter',prefabId:'easel',price:460,
-    name:'Мольберт «Мастерская»',modelKey:'easel.starter',
-    typeCategoryId:'type.creative.painting',
-    description:'Рисование · личный навык живописи и сохранённые картины'},
   // Pilot of physical appearance only. No quality/buff, price differential or XP.
   {itemId:'plant.amber',prefabId:'plant',price:130,
     name:'Растение «Янтарные листья»',appearanceId:'foliage.amber',
@@ -117,7 +112,12 @@ const offered=[
     description:'Двухдверный шкаф · можно разобрать гардероб'},
   {itemId:'wardrobe.open',prefabId:'wardrobe',price:540,name:'Гардероб «Открытый»',
     typeCategoryId:'type.storage.wardrobes',modelKey:'wardrobe.open',
-    description:'Открытые полки с одеждой · можно разобрать гардероб'}
+    description:'Открытые полки с одеждой · можно разобрать гардероб'},
+  // H5: real creative station, distinct from decorative art; no sales or wages.
+  {itemId:'easel.starter',prefabId:'easel',price:460,
+    name:'Мольберт «Мастерская»',modelKey:'easel.starter',
+    typeCategoryId:'type.creative.painting',
+    description:'Рисование · личный навык живописи и сохранённые картины'},
 ];
 export const FURNITURE_PRODUCTS=Object.freeze(offered.map(x=>Object.freeze({...x,
   ...(x.effects?{effects:Object.freeze(x.effects.map(e=>Object.freeze({...e})))}:{})})));
