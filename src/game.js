@@ -52,6 +52,8 @@ import {kissMotion,kissPairTarget} from './romantic-kiss.js';
 import {intimacyFrame,intimacyBedPlan} from './romantic-intimacy.js';
 import {romanticEveningVignette} from './romantic-evening-scene.js';
 import {planRomanticEveningTable} from './romantic-evening-stage.js';
+import {planRomanticEveningSofa,romanticEveningSofaFrame,
+  romanticSofaSlotOffset} from './romantic-sofa-stage.js';
 import {meshVisualPreference,MESHY_VISUAL_KEY,meshSeatRuntimeSettings} from './meshy-visual-policy.js';
 import { createAnimationState,stepAnimation,applyCharacterAnimation } from './animations.js';
 import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
@@ -765,7 +767,8 @@ function renderQueuePanel(force=true){
   const active=activeTaskLabel(residentId);
   const key=JSON.stringify([queueVisible,residentId,pending,active,game.socialAction?.phase,
     getActor(game,residentId).action?.phase,
-    game.socialAction?.eveningStage&&game.socialAction.phase==='using'
+    (game.socialAction?.eveningStage||game.socialAction?.eveningSofa)&&
+      game.socialAction.phase==='using'
       ?Math.floor(game.socialAction.elapsed/3):null]);
   $('queue-toggle').textContent='Очередь · '+pending.length;
   if(!force&&key===queueDisplayKey)return;
@@ -780,14 +783,15 @@ function renderQueuePanel(force=true){
   label.textContent=active?'Сейчас: '+active:'Сейчас: свободен';
   activeEl.append(label);
   const evening=game.socialAction?.branchAction?.id==='romance.evening'&&
-    game.socialAction?.eveningStage;
+    (game.socialAction?.eveningStage||game.socialAction?.eveningSofa);
   if(evening&&active){
+    const atSofa=Boolean(game.socialAction.eveningSofa);
     const detail=document.createElement('div');
     detail.className='shared-progress-text';
     detail.textContent=game.socialAction.phase==='walking'
-      ?'Оба жителя идут к столику · ждём встречи'
+      ?'Оба жителя идут к '+(atSofa?'дивану':'столику')+' · ждём встречи'
       :game.socialAction.branchAction.eveningConsent===true
-        ?'Вечер у столика · '+Math.round(Math.min(1,
+        ?'Вечер '+(atSofa?'на диване':'у столика')+' · '+Math.round(Math.min(1,
           game.socialAction.elapsed/30)*100)+'%':'Приглашение не принято';
     activeEl.append(detail);
   }
@@ -1482,21 +1486,23 @@ function boot() {
   // Furniture publishes its own physical seat dimensions/placement.
   // Future armchairs and couch variants register the same metadata and
   // reuse this controller: no per-sofa adjustments of the avatar's Y.
-  const makeSofaSeat=(instanceId=null)=>{
+  const makeSofaSeat=(instanceId=null,romanticSlot=null)=>{
     const center=furniturePoint(game.world,'sofa',
       {x:SOFA_LAYOUT.x,z:SOFA_LAYOUT.z},instanceId);
     const instance=furnitureInstance(game.world,'sofa',instanceId);
     if(!center||!instance)return null;
+    const pair=romanticSlot===0||romanticSlot===1;
     return seatSlot(createSeatSurface({
       id:'living-sofa',origin:{x:center.x,y:0,z:center.z},
       yaw:SOFA_POSE.yaw-instance.yaw,width:SOFA_LAYOUT.seatWidth,depth:SOFA_LAYOUT.seatDepth,
       seatHeight:SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2,
-      floorY:0,slots:1,sideMargin:.35,backClearance:.10,approachGap:.50
-    }),0);
+      floorY:0,slots:pair?2:1,sideMargin:pair?.63:.35,
+      backClearance:.10,approachGap:.50
+    }),pair?romanticSlot:0);
   };
-  let alexSeatInstanceId=null;
+  let alexSeatInstanceId=null,alexSeatSlot=null;
   let livingSofaSeat=makeSofaSeat();
-  refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId);};
+  refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId,alexSeatSlot);};
   const alexRig=createCharacterRig(rigContext,'alex');
   const miraRig=createCharacterRig(rigContext,'mira');
   // Visual-only experimental Alex skin. The procedural rig and every action
@@ -1517,6 +1523,8 @@ function boot() {
   }});
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
+  // R5c seat indices outlive consent while the two skinned avatars stand up.
+  const romanticSofaSlots={alex:null,mira:null};
   // The last used sofa remains the visual target while standing up.
   const sofaVisualTargets={alex:null,mira:null};
   const bedStates={alex:createBedTransition(),mira:createBedTransition()};
@@ -1653,8 +1661,25 @@ function boot() {
       partner=getActor(game,partnerId);
     // Optional: only the romantic evening can claim TWO walkable spots on an
     // actual table. Other social actions preserve their accepted navigation.
-    const tablePlan=branchId==='romance.evening'
+    // R5c tries TWO real seats on an unreserved sofa. The earlier R5b.1
+    // table staging remains the fallback, and plain R5a remains last resort.
+    const sofaReservations=new Set();
+    for(const id of HOUSEHOLD_IDS){
+      const resident=getActor(game,id);
+      if(resident.action?.id==='sofa')
+        sofaReservations.add(resident.action.targetInstanceId||'home-sofa-1');
+      if(resident.action?.watchSeatInstanceId)
+        sofaReservations.add(resident.action.watchSeatInstanceId);
+      for(const task of pendingActions(game.actionQueues,id))
+        if(task.type==='object'&&task.actionId==='sofa')
+          sofaReservations.add(task.targetInstanceId||'home-sofa-1');
+    }
+    const sofaPlan=branchId==='romance.evening'
+      ?planRomanticEveningSofa(game.world,self.position,partner.position,findPath,
+        {blockedIds:sofaReservations}):null;
+    const tablePlan=branchId==='romance.evening'&&!sofaPlan
       ?planRomanticEveningTable(game.world,self.position,partner.position,findPath):null;
+    const pairPlan=sofaPlan||tablePlan;
     const offsets=[[.84,0],[-.84,0],[0,.84],[0,-.84],[.62,.62],[-.62,.62],[.62,-.62],[-.62,-.62]];
     const candidates=offsets.map(([dx,dz])=>{
       const goal={x:partner.position.x+dx,z:partner.position.z+dz};
@@ -1671,7 +1696,7 @@ function boot() {
       for(const point of points){len+=Math.hypot(point.x-previous.x,point.z-previous.z);previous=point;}
       if(len<bestLength){best={goal,points};bestLength=len;}
     }
-    if(tablePlan)best={goal:tablePlan.stage.actor,points:tablePlan.actorRoute};
+    if(pairPlan)best={goal:pairPlan.stage.actor,points:pairPlan.actorRoute};
     if(!best){if(!automatic&&!fromQueue)toast('Сейчас не получается подойти к собеседнику');return false;}
     if(!(branchId?startBranchSocial(game,actorId,best.goal,branchId,automatic)
       :shared?startSharedSocial(game,actorId,best.goal,shared.mode,shared.choiceId,automatic)
@@ -1679,9 +1704,9 @@ function boot() {
       :startSocial(game,kind,actorId,best.goal,automatic)))return false;
     // Both residents are idle. Do not clear either existing action or path.
     paths[actorId]={points:best.points,index:0,id:'social:'+kind};
-    if(tablePlan){
-      game.socialAction.eveningStage=tablePlan.stage; // validated optional v1
-      paths[partnerId]={points:tablePlan.partnerRoute,index:0,id:'social:'+kind};
+    if(pairPlan){
+      game.socialAction[sofaPlan?'eveningSofa':'eveningStage']=pairPlan.stage;
+      paths[partnerId]={points:pairPlan.partnerRoute,index:0,id:'social:'+kind};
       partner.event='Идёт на вечер вдвоём';
     }
     restartAutonomyWait();
@@ -1692,7 +1717,7 @@ function boot() {
     return session?.phase==='walking'&&
       (session.initiator===residentId||
         (session.branchAction?.id==='romance.evening'&&
-          session.eveningStage&&session.partner===residentId));
+          (session.eveningStage||session.eveningSofa)&&session.partner===residentId));
   };
   dispatchPlannedActions=()=>{
     if(game.paused||dialogueNeedsDecision(game))return [];
@@ -1808,6 +1833,7 @@ function boot() {
     for(const id of HOUSEHOLD_IDS){
       sofaStates[id]=createSofaTransition();
       sofaVisualTargets[id]=null;
+      romanticSofaSlots[id]=null;
       bedStates[id]=createBedTransition();
       showerStates[id]=createShowerTransition();
       toiletStates[id]=createToiletTransition();
@@ -1905,6 +1931,8 @@ function boot() {
     const busy=new Set();
     if(game.socialAction?.eveningStage?.instanceId)
       busy.add(game.socialAction.eveningStage.instanceId);
+    if(game.socialAction?.eveningSofa?.instanceId)
+      busy.add(game.socialAction.eveningSofa.instanceId);
     const lockPrefab=prefabId=>{
       // Conservative transient lock over all instances of this prefab:
       // future F2 can add duplicates without original home-*-1 hardcodes.
@@ -2709,7 +2737,8 @@ function boot() {
           showerStates[residentId].active||toiletStates[residentId].active||
           fridgeLeaving[residentId])continue;
         const socialWalking=Boolean(socialWalkingFor(residentId));
-        const eveningStage=socialWalking?game.socialAction?.eveningStage:null;
+        const eveningStage=socialWalking
+          ?game.socialAction?.eveningSofa||game.socialAction?.eveningStage:null;
         const socialGoal=eveningStage&&game.socialAction.partner===residentId
           ?eveningStage.partner:game.socialAction?.target;
         // A stage guest already at their destination waits for their partner.
@@ -2760,7 +2789,8 @@ function boot() {
                   fridgeLeaving[partnerId];
                 // Consent is requested once, only after both partners have
                 // actually arrived at their opposite table staging positions.
-                const staged=game.socialAction?.eveningStage;
+                const staged=game.socialAction?.eveningSofa||
+                  game.socialAction?.eveningStage;
                 const otherGoal=staged
                   ?game.socialAction.initiator===partnerId?staged.actor:staged.partner
                   :null;
@@ -2829,6 +2859,11 @@ function boot() {
     const eveningFrame=romanticEveningVignette(furnishMode?null:game.socialAction,
       game.world,{alex:game.position,mira:game.otherSim.position},effectTime,
       {eligible:Boolean(dateAllowed)});
+    const romanticSofa=romanticEveningSofaFrame(game.socialAction,game.world,
+      {eligible:!furnishMode&&Boolean(dateAllowed)});
+    const sofaDateFor=id=>romanticSofa.active&&
+      (id===game.socialAction.initiator
+        ?romanticSofa.actorSlot:romanticSofa.partnerSlot);
     // Both visible avatars follow the same consented hug timeline.
     // Simulation coordinates stay authoritative for movement and saves.
     const hugCandidate=hugMotion(game.socialAction);
@@ -2864,18 +2899,27 @@ function boot() {
     const walking=active&&(game.action?.phase==='walking'||
       socialWalkingFor('alex'));
     const alexWatchSeat=useId==='tv'?game.action?.watchSeatInstanceId:null;
-    if(useId==='sofa'||alexWatchSeat)
+    const alexDateSofa=romanticSofa.active;
+    if(alexDateSofa){
+      sofaVisualTargets.alex=romanticSofa.sofaId;
+      romanticSofaSlots.alex=sofaDateFor('alex');
+    }else if(useId==='sofa'||alexWatchSeat)
       sofaVisualTargets.alex=(alexWatchSeat||game.action?.targetInstanceId)||null;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
-      (useId==='sofa'||Boolean(alexWatchSeat))&&
+      (useId==='sofa'||Boolean(alexWatchSeat)||alexDateSofa)&&
         bedStates.alex.progress===0&&!showerStates.alex.active,animDt);
+    const alexSeatBase=sofaTransitionPose(sofaStates.alex);
     const seatPose=furniturePose(game.world,'sofa',
-      sofaTransitionPose(sofaStates.alex),sofaVisualTargets.alex)||
+      romanticSofaSlots.alex===null?alexSeatBase:
+        {...alexSeatBase,x:alexSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.alex)},
+      sofaVisualTargets.alex)||
       {...display,sofaWeight:0}; // deleted/stale target never teleports to original
-    const seating=useId==='sofa'||sofaStates.alex.progress>0;
-    if(!seating)sofaVisualTargets.alex=null;
-    if(alexSeatInstanceId!==sofaVisualTargets.alex){
+    const seating=useId==='sofa'||sofaStates.alex.progress>0||alexDateSofa;
+    if(!seating){sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;}
+    if(alexSeatInstanceId!==sofaVisualTargets.alex||
+      alexSeatSlot!==romanticSofaSlots.alex){
       alexSeatInstanceId=sofaVisualTargets.alex;
+      alexSeatSlot=romanticSofaSlots.alex;
       refreshSofaSeat();
     }
     if(useId==='bed')bedVisualTargets.alex=game.action?.targetInstanceId??'home-bed-1';
@@ -2932,6 +2976,8 @@ function boot() {
       toiletSitWeight:alexToilet?.seated||0,
       toiletStep:alexToilet?.walkWeight||0,
       sofaWeight:seatPose.sofaWeight,
+      romanticSeatTurn:alexDateSofa
+        ?(romanticSofaSlots.alex===0?-12:12)*eveningFrame.weight:0,
       tvGazeYaw:alexWatchSeat?tvSofaView(game.world,alexWatchSeat,
         game.action?.targetInstanceId)?.torsoYaw||0:0,
       bedStepWeight:bedPose?.bedStepWeight||0,
@@ -2977,16 +3023,23 @@ function boot() {
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
       socialWalkingFor('mira'));
     const miraWatchSeat=miraUseId==='tv'?game.otherSim.action?.watchSeatInstanceId:null;
-    if(miraUseId==='sofa'||miraWatchSeat)
+    const miraDateSofa=romanticSofa.active;
+    if(miraDateSofa){
+      sofaVisualTargets.mira=romanticSofa.sofaId;
+      romanticSofaSlots.mira=sofaDateFor('mira');
+    }else if(miraUseId==='sofa'||miraWatchSeat)
       sofaVisualTargets.mira=(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
-      (miraUseId==='sofa'||Boolean(miraWatchSeat))&&
+      (miraUseId==='sofa'||Boolean(miraWatchSeat)||miraDateSofa)&&
         bedStates.mira.progress===0&&!showerStates.mira.active,animDt);
+    const miraSeatBase=sofaTransitionPose(sofaStates.mira);
     const miraSeatPose=furniturePose(game.world,'sofa',
-      sofaTransitionPose(sofaStates.mira),sofaVisualTargets.mira)||
+      romanticSofaSlots.mira===null?miraSeatBase:
+        {...miraSeatBase,x:miraSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.mira)},
+      sofaVisualTargets.mira)||
       {...miraDisplay,sofaWeight:0};
-    const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
-    if(!miraSeating)sofaVisualTargets.mira=null;
+    const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0||miraDateSofa;
+    if(!miraSeating){sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;}
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
     bedStates.mira=advanceBedTransition(bedStates.mira,
       miraUseId==='bed'&&sofaStates.mira.progress===0&&!showerStates.mira.active,
@@ -3037,6 +3090,8 @@ function boot() {
       toiletSitWeight:miraToilet?.seated||0,
       toiletStep:miraToilet?.walkWeight||0,
       sofaWeight:miraSeatPose.sofaWeight,
+      romanticSeatTurn:miraDateSofa
+        ?(romanticSofaSlots.mira===0?-12:12)*eveningFrame.weight:0,
       tvGazeYaw:miraWatchSeat?tvSofaView(game.world,miraWatchSeat,
         game.otherSim.action?.targetInstanceId)?.torsoYaw||0:0,
       bedStepWeight:miraBedPose?.bedStepWeight||0,

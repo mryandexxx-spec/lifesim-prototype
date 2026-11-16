@@ -46,6 +46,9 @@ export function stepAnimation(previous,signals,dt) {
   // Progress lets the figure bend AFTER approaching and turning; the headless
   // animator remains backward compatible when no progress signal is supplied.
   const sofaWeight=clamp(safe(signals?.sofaWeight,action==='sofa'?1:0),0,1);
+  // R5c: a small opposite-side glance, never a forced physical touch.
+  const romanticSeatTurn=sofaWeight>.65
+    ?clamp(safe(signals?.romanticSeatTurn,0),-15,15)*sofaWeight:0;
   const toiletWeight=clamp(safe(signals?.toiletSitWeight,0),0,1);
   const toiletStep=clamp(safe(signals?.toiletStep,0),0,1);
   const bedStepWeight=clamp(safe(signals?.bedStepWeight,0),0,1);
@@ -59,6 +62,10 @@ export function stepAnimation(previous,signals,dt) {
     legTarget=[SOFA_HIP_PITCH*sofaWeight,SOFA_HIP_PITCH*sofaWeight];
     kneeTarget=[SOFA_KNEE_PITCH*sofaWeight,SOFA_KNEE_PITCH*sofaWeight];
     armTarget=[26*sofaWeight,35*sofaWeight];
+    if(romanticSeatTurn!==0){
+      const gesture=Math.sin(t*1.55)*eveningWeight;
+      armTarget=[armTarget[0]+gesture*5,armTarget[1]-gesture*4];
+    }
   }else if(bedStepWeight>0){
     // A short, mirrored step over the long rail. Previously the entire avatar
     // slid ~0.6 m without taking a visible step on entering the bed.
@@ -190,7 +197,8 @@ export function stepAnimation(previous,signals,dt) {
   const tvGaze=action==='tv'&&sofaWeight>.5
     ?clamp(safe(signals?.tvGazeYaw,0),-30,30)*sofaWeight:0;
   const spineTwist=blend(safe(previous.spineTwist,0),
-    bedSign*16*bedSwing+(inGait?walkPose.spineTwist:0)+tvGaze,14,step);
+    bedSign*16*bedSwing+(inGait?walkPose.spineTwist:0)+tvGaze+
+      romanticSeatTurn,14,step);
   const spineRoll=blend(safe(previous.spineRoll,0),
     bedSign*8*bedSwing+(inGait?walkPose.spineRoll:0),14,step);
   const hipShift=blend(safe(previous.hipShift,0),
