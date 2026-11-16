@@ -37,6 +37,8 @@ test('female source asset has its own clips and separate 2.05 game-height placem
 test('female visuals use a guarded authored sofa, but retain fallback elsewhere',()=>{
   const ready={preferred:true,ready:true};
   assert.equal(canShowMiraMeshy(ready),true);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'hobby'}),false);
+  assert.equal(canShowMiraMeshy({...ready,actionId:'hobby',readingReady:true}),true);
   assert.equal(canShowMiraMeshy({...ready,ready:false}),false);
   for(const name of ['sofa','bed','fridge','shower'])
     assert.equal(canShowMiraMeshy({...ready,actionId:name}),false);
