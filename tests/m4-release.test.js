@@ -19,7 +19,7 @@ test('M4 Safari release cache bust is consistent with package and lock',()=>{
   assert.ok(html.includes('src/game.js?v=1.1t'));
   const pkg=JSON.parse(read('../package.json'));
   const lock=JSON.parse(read('../package-lock.json'));
-  assert.equal(pkg.version,'1.0.0-alpha.45');
+  assert.equal(pkg.version,'1.0.0-alpha.46');
   assert.equal(lock.version,pkg.version);
   assert.equal(lock.packages[''].version,pkg.version);
   assert.ok(html.includes('id="bar-bladder"'));
