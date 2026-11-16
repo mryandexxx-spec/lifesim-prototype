@@ -842,6 +842,11 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   overflow-wrap:anywhere;background:#e1f0e5;border-radius:6px;padding:3px 5px;
   color:#245d40;font-weight:750;}
 .furnish-stock button[aria-pressed="true"] .furnish-product-quality{background:#235e48;color:#e4f6eb;}
+.furnish-variant-compare{border:1px solid #c8dfcf;border-radius:11px;background:#edf5ed;
+  color:#325c46;padding:8px 10px;display:grid;gap:5px;}
+.furnish-variant-compare[hidden]{display:none!important;}
+.furnish-variant-compare>strong{font-size:11px;line-height:1.2;}
+.furnish-variant-row{font-size:11px;line-height:1.4;margin:0;overflow-wrap:anywhere;}
 .furnish-stock button[aria-pressed="true"]{background:#317b60;border-color:#317b60;color:white;}
 .furnish-stock button[aria-pressed="true"] small{color:#d6eee0;}
 .furnish-map-tip{font-size:11px!important;line-height:1.35!important;}
