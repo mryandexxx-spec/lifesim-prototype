@@ -69,7 +69,12 @@ export function settleObjectUseStep({registry=legacyObjectRegistry(),world,actor
   const eligible=proposals.filter(x=>x.statId.startsWith('needs.')&&
     Number.isFinite(actor.needs?.[x.statId.slice(6)]));
   if(!eligible.length)return [];
-  const staged=stageObjectOnceEffects(actor.objectOnceLedger,eligible);
+  // Ordinary per-minute furniture effects run every simulation tick: never
+  // scan/copy the durable ledger unless an actual once proposal is present.
+  const hasOnce=eligible.some(x=>x.eventId!==null&&x.eventId!==undefined);
+  const staged=hasOnce
+    ?stageObjectOnceEffects(actor.objectOnceLedger,eligible)
+    :{contributions:eligible,ledger:actor.objectOnceLedger};
   if(!staged.contributions.length)return [];
   const values={};
   for(const statId of Object.keys(registry.stats)){
@@ -88,6 +93,6 @@ export function settleObjectUseStep({registry=legacyObjectRegistry(),world,actor
   }
   // Same synchronous simulation update as the reward. JSON v1 persistence
   // includes both fields on the next autosave/pagehide/manual save.
-  if(applied.length)actor.objectOnceLedger=staged.ledger;
+  if(applied.length&&hasOnce)actor.objectOnceLedger=staged.ledger;
   return applied;
 }
