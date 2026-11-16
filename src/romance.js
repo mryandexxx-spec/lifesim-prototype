@@ -8,7 +8,7 @@ export const ROMANCE_ACTION_IDS=Object.freeze([
   'romance.flirt','romance.confess','romance.date','romance.breakup',
   'romance.tender','romance.propose','romance.marry','romance.divorce',
   'romance.checkin','romance.repair','romance.hug','romance.kiss',
-  'romance.intimacy'
+  'romance.intimacy','romance.evening'
 ]);
 export const ROMANCE_COOLDOWN_MINUTES=1440;
 const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -97,6 +97,9 @@ export function restoreRomanceState(raw,ids,lastAt=null){
       if(time(bond.lastConnectionAt)&&bond.lastConnectionAt>=since&&
         bond.lastConnectionAt<=horizon)
         dating.lastConnectionAt=bond.lastConnectionAt;
+      if(time(bond.lastEveningAt)&&bond.lastEveningAt>=since&&
+        bond.lastEveningAt<=horizon)
+        dating.lastEveningAt=bond.lastEveningAt;
       // Validate the engagement on its own merits. A forged wedding must
       // never erase a genuine engagement that preceded it.
       const engagedAt=time(bond.engagedAt)&&bond.engagedAt>=since&&
@@ -262,6 +265,14 @@ export function romanceAvailability(graph,a,b,actionId,now=0){
     return {enabled:false,reason:'Для отношений нужно узнать чувства друг друга'};
   if(actionId==='romance.tender'&&!bondActive(bond))
     return {enabled:false,reason:'Сначала нужно стать парой'};
+  if(actionId==='romance.evening'){
+    if(!bondActive(bond)||src.trust<53||target.trust<53||
+      src.tension>=36||target.tension>=36||climate.state==='strained')
+      return {enabled:false,reason:'Для вечера вдвоём нужны спокойствие и доверие'};
+    if(time(bond.lastEveningAt)&&bond.lastEveningAt<=now&&
+      Math.floor(bond.lastEveningAt/DAY)===Math.floor(now/DAY))
+      return {enabled:false,reason:'Сегодня вы уже провели вечер вдвоём'};
+  }
   if(actionId==='romance.hug'&&!bondActive(bond)&&
     (feelings[a].attraction<42||feelings[b].attraction<42||
       !reciprocalFlirt(pair,a,b,now)))
@@ -341,7 +352,7 @@ export function recordRomanceReceipt(graph,pair,receipt){
     bond.status='none';bond.since=null;bond.ex=true;
     bond.lastEndedAt=receipt.at;
     delete bond.engagedAt;delete bond.marriedAt;delete bond.careDays;
-    delete bond.lastConnectionAt;
+    delete bond.lastConnectionAt;delete bond.lastEveningAt;
   }else if(receipt.type==='romance.date'&&bond.status==='none'){
     bond.status='dating';bond.since=receipt.at;
     bond.careDays=careFrom(null,pair.ids,Math.floor(receipt.at/1440));
@@ -358,6 +369,9 @@ export function recordRomanceReceipt(graph,pair,receipt){
     }
   }else if(['romance.hug','romance.kiss','romance.intimacy'].includes(receipt.type)&&bondActive(bond)){
     bond.lastConnectionAt=receipt.at;
+  }else if(receipt.type==='romance.evening'&&bondActive(bond)){
+    bond.lastEveningAt=receipt.at;
+    bond.lastConnectionAt=receipt.at;
   }else if(['romance.checkin','romance.repair'].includes(receipt.type)&&
     bondActive(bond)){
     // Successful response restores emotional connection. Declined offers
@@ -372,7 +386,8 @@ export function recordRomanceReceipt(graph,pair,receipt){
     target.attraction=clamp(target.attraction-9,0,100);
     return true;
   }
-  if(['romance.hug.refused','romance.kiss.refused','romance.intimacy.refused'].includes(receipt.type)){
+  if(['romance.hug.refused','romance.kiss.refused','romance.intimacy.refused',
+    'romance.evening.refused'].includes(receipt.type)){
     // Declining a physical gesture must not penalize either person's feelings.
     target.lastRefusedAt=receipt.at;
     return true;
@@ -392,12 +407,13 @@ export function recordRomanceReceipt(graph,pair,receipt){
   const kiss=receipt.type==='romance.kiss';
   const intimacy=receipt.type==='romance.intimacy';
   const checkin=receipt.type==='romance.checkin';
+  const evening=receipt.type==='romance.evening';
   const repair=receipt.type==='romance.repair';
   const proposal=['romance.propose','romance.marry'].includes(receipt.type);
   actor.attraction=clamp(actor.attraction+(accepted?
-    proposal?4:repair?5:checkin?3:intimacy?6:kiss?5:hug?6:tender?9:dating?7:confession?16:10:-5),0,100);
+    proposal?4:repair?5:checkin?3:evening?5:intimacy?6:kiss?5:hug?6:tender?9:dating?7:confession?16:10:-5),0,100);
   target.attraction=clamp(target.attraction+(accepted?
-    proposal?4:repair?5:checkin?3:intimacy?6:kiss?5:hug?6:tender?8:dating?7:confession?14:7:-1),0,100);
+    proposal?4:repair?5:checkin?3:evening?5:intimacy?6:kiss?5:hug?6:tender?8:dating?7:confession?14:7:-1),0,100);
   if(!accepted)target.lastRefusedAt=receipt.at;
   return true;
 }
