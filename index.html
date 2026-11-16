@@ -10,31 +10,32 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
-      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4",
+      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4-h5",
       "./src/paired-hobby.js":"./src/paired-hobby.js?v=1.2x-h3",
       "./src/gifts-leisure.js":"./src/gifts-leisure.js?v=1.2x-h3",
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
       "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3",
-      "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2u-h4",
-      "./src/skill-presentation.js":"./src/skill-presentation.js?v=1.2u-h4",
-      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b-f4d-h3-f4e",
-      "./src/animations.js":"./src/animations.js?v=1.2w-h2b-f4e",
+      "./src/painting.js":"./src/painting.js?v=1.2u-h5",
+      "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2u-h4-h5",
+      "./src/skill-presentation.js":"./src/skill-presentation.js?v=1.2u-h4-h5",
+      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b-f4d-h3-f4e-h5",
+      "./src/animations.js":"./src/animations.js?v=1.2w-h2b-f4e-h5",
       "./src/music-movement.js":"./src/music-movement.js?v=1.2w-h2b",
       "./src/meshy-music-runtime.js":"./src/meshy-music-runtime.js?v=1.2w-h2b",
-      "./src/meshy-visual.js":"./src/meshy-visual.js?v=1.2w-h2b-f4e",
-      "./src/meshy-mira-visual.js":"./src/meshy-mira-visual.js?v=1.2w-h2b-f4e",
+      "./src/meshy-visual.js":"./src/meshy-visual.js?v=1.2w-h2b-f4e-h5",
+      "./src/meshy-mira-visual.js":"./src/meshy-mira-visual.js?v=1.2w-h2b-f4e-h5",
       "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2v-f4d-f4e",
       "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1-f4c",
       "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d-f4e",
-      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2v-f4d-f4e",
-      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2v-f4d-f4e",
+      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2v-f4d-f4e-h5",
+      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2v-f4d-f4e-h5",
       "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2v-f4d-f4e",
       "./src/shop-catalog-selector.js":"./src/shop-catalog-selector.js?v=1.2u-f4c",
       "./src/furniture-value.js":"./src/furniture-value.js?v=1.2u-f4c",
-      "./src/furniture-procedural-library.js":"./src/furniture-procedural-library.js?v=1.2u-f4c",
+      "./src/furniture-procedural-library.js":"./src/furniture-procedural-library.js?v=1.2u-f4c-h5",
       "./src/furniture-thumbnails.js":"./src/furniture-thumbnails.js?v=1.2u-f4c",
       "./src/furniture-transform.js":"./src/furniture-transform.js?v=1.2v-f4d",
       "./src/navigation.js":"./src/navigation.js?v=1.2v-f4d",
@@ -207,6 +208,14 @@
           <option value="book.classic.pathways" disabled>Пути старых городов · откроется на уровне 3</option>
         </select>
       </label>
+      <label id="painting-theme-field" class="music-style-field" for="painting-theme-select" hidden>
+        Что рисовать
+        <select id="painting-theme-select" aria-label="Тема картины">
+          <option value="painting.hills">Долина ветров</option>
+          <option value="painting.garden">Летний сад</option>
+          <option value="painting.city">Городские крыши</option>
+        </select>
+      </label>
       <label id="music-style-field" class="music-style-field" for="music-style-select" hidden>
         Музыкальный стиль
         <select id="music-style-select" aria-label="Музыкальный стиль для слушания или танца">
@@ -254,7 +263,8 @@
       <div id="mind-skills-tab" role="tabpanel" aria-labelledby="mind-tab-skills" hidden>
         <p class="skills-intro">Навыки каждого жителя растут только от реальной практики. Досуг — не то же самое, что мастерство.</p>
         <div id="mind-skills-list" class="skills-list" aria-label="Личные навыки выбранного жителя"></div>
-        <p class="skills-future">Позже: живопись, логика и игра на музыкальных инструментах. Прослушивание музыки не даёт опыта исполнения.</p>
+          <div id="mind-painting-works" class="skill-works" aria-label="Коллекция написанных картин"></div>
+        <p class="skills-future">Позже: логика и игра на музыкальных инструментах. Прослушивание музыки не даёт опыта исполнения.</p>
       </div>
     </section>
 
@@ -356,7 +366,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b-f4d-h3-f4e-h4"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b-f4d-h3-f4e-h4-h5"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

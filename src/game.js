@@ -1494,6 +1494,22 @@ function boot() {
   const decorNodes=new Map();
   const decorTemplates=new Map();
   const f4eOriginalPositions=new WeakMap();
+  // H5: three original 2D brush compositions layered onto the actual canvas.
+  // Their meshes are created once per bought easel; only visibility changes.
+  const paintingShapes={
+    'painting.hills':[
+      ['box',0,1.51,.74,.71,0],['sphere',.25,1.65,.18,.18,3],
+      ['sphere',-.23,1.29,.69,.37,1],['sphere',.24,1.20,.67,.35,4],
+      ['box',0,1.01,.73,.19,2],['box',-.12,1.06,.18,.09,3]],
+    'painting.garden':[
+      ['box',0,1.52,.73,.70,0],['box',0,1.07,.73,.24,1],
+      ['box',-.25,1.29,.055,.47,4],['sphere',-.25,1.55,.28,.25,2],
+      ['box',.22,1.32,.05,.47,4],['sphere',.22,1.53,.27,.27,3]],
+    'painting.city':[
+      ['box',0,1.54,.74,.67,0],['sphere',.25,1.69,.20,.20,3],
+      ['box',-.25,1.18,.25,.43,4],['box',0,1.25,.19,.53,2],
+      ['box',.24,1.16,.25,.40,1],['box',0,.99,.74,.14,4]]
+  };
   let decorDrawing=null;
   let refreshSofaSeat=()=>{};
   const withDecor=(prefabId,render)=>{
@@ -1524,6 +1540,16 @@ function boot() {
       node.name='F2 purchased / '+item.instanceId;
       applySkuModel(node,item.itemDefinitionId||
         PROCEDURAL_DEFAULT_SKU[item.prefabId]);
+      if(item.prefabId==='easel'){
+        for(const contentId of PAINT_CONTENT_IDS){
+          paintingShapes[contentId].forEach(([kind,x,y,sx,sy,paletteIndex],i)=>{
+            const color=PAINT_SUBJECTS[contentId].palette[paletteIndex];
+            const stroke=primitive(kind,'H5 paint '+contentId+' '+i,
+              x,y,-.181-i*.0007,sx,sy,.009,mat(color),node);
+            stroke.enabled=false;
+          });
+        }
+      }
       // F4E: each bought lamp has a real world-space light source and a
       // tiny emissive bulb. Parent it to the persistent instance node, so
       // rotating/storing/moving the furniture cannot leave orphan lights.
@@ -4061,6 +4087,22 @@ function boot() {
           const bulb=light.findByName('F4E lamp bulb');
           if(bulb)bulb.enabled=on;
         }
+      }
+      if(item.prefabId==='easel'){
+        const activeAction=[game.action,game.otherSim.action].find(action=>
+          action?.id==='paint'&&action.targetInstanceId===item.instanceId);
+        const lastWork=[...(game.createdWorks||[]),...(game.otherSim.createdWorks||[])]
+          .filter(work=>work.easelInstanceId===item.instanceId)
+          .sort((a,b)=>b.createdAt-a.createdAt)[0];
+        const contentId=activeAction?.contentId||lastWork?.contentId;
+        const stage=activeAction?.phase==='using'
+          ?Math.floor(Math.min(1,activeAction.elapsed/ACTIONS.paint.duration)*6)
+          :activeAction?0:lastWork?6:0;
+        for(const theme of PAINT_CONTENT_IDS)for(let i=0;i<6;i++){
+          const stroke=node.findByName('H5 paint '+theme+' '+i);
+          if(stroke)stroke.enabled=theme===contentId&&i<stage;
+        }
+        continue;
       }
       if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
       const weight=Math.max(0,...HOUSEHOLD_IDS.map(id=>
