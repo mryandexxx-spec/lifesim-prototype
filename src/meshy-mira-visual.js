@@ -247,7 +247,6 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       if(!show||!state.model){
         state.readingRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
-        state.readingRuntime?.setFrame(null);
         state.hugRuntime?.setFrame(null);
         state.kissRuntime?.setFrame(null);
         state.fridgeRuntime?.setFrame(null);
