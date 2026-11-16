@@ -17,26 +17,38 @@ export function createMeshyHugController({pc,model,avatar,partnerAvatar}={}){
   const targets=arms.map(a=>new pc.Vec3(-a.sign*.21,1.13,-.10));
   const poles=arms.map(a=>new pc.Vec3(a.sign*.48,.05,.12));
   const xyz=v=>({x:v.x,y:v.y,z:v.z});
-  let frame=null;
+  let frame=null,paused=false;
+  // Compact runtime proof for the opt-in iPhone hug QA panel. All stats are
+  // volatile renderer state; never enter the serialized household.
+  const diagnostic={frames:0,armRotations:0,lastApplied:false,
+    lastReason:'ожидание'};
   function rotateToward(bone,oldEnd,newEnd,weight){
     const origin=bone.getPosition();
     from.set(oldEnd.x-origin.x,oldEnd.y-origin.y,oldEnd.z-origin.z);
     to.set(newEnd.x-origin.x,newEnd.y-origin.y,newEnd.z-origin.z);
-    if(from.length()<1e-5||to.length()<1e-5)return;
+    if(from.length()<1e-5||to.length()<1e-5)return false;
     from.normalize();to.normalize();
     const cosine=Math.max(-1,Math.min(1,from.dot(to)));
-    if(cosine>.99999)return;
+    if(cosine>.99999)return false;
     swing.setFromDirections(from,to);
     const current=bone.getRotation();
     destinationQ.mul2(swing,current);
     blendedQ.slerp(current,destinationQ,Math.min(.92,weight));
     bone.setRotation(blendedQ);
+    return true;
   }
   function apply(){
     const weight=Number.isFinite(frame?.weight)
       ?Math.max(0,Math.min(1,frame.weight)):0;
-    if(weight<.005)return false;
-    let applied=false;
+    // Anim is frozen on pause. Applying a world rotation twice would
+    // accumulate on unchanged bones and twist a resting hand unnaturally.
+    if(paused||weight<.005){
+      diagnostic.lastApplied=false;
+      diagnostic.lastReason=paused?'пауза':'ожидание';
+      return false;
+    }
+    diagnostic.frames++;
+    let applied=false,rotated=0,degenerate=0;
     for(let i=0;i<arms.length;i++){
       const a=arms[i];
       const shoulder=xyz(a.upper.getPosition()),
@@ -49,8 +61,14 @@ export function createMeshyHugController({pc,model,avatar,partnerAvatar}={}){
         wrist.y-elbow.y,wrist.z-elbow.z);
       const distance=Math.hypot(target.x-shoulder.x,
         target.y-shoulder.y,target.z-shoulder.z);
-      if(upperLength<.06||lowerLength<.06||
-        distance>(upperLength+lowerLength)*1.45)continue;
+      // NEVER reject an embrace solely because the partner is farther
+      // than a full arm's length. The two-bone solver intentionally clamps
+      // the goal to the safe anatomical extension (maxStretch .985).
+      // The old 1.45x cutoff silently disabled BOTH arms at the normal
+      // 0.84m social approach distance in real Meshy geometry.
+      if(upperLength<.035||lowerLength<.035||!Number.isFinite(distance)){
+        degenerate++;continue;
+      }
       let solved;
       try{
         solved=solveTwoBoneTargets({
@@ -59,11 +77,21 @@ export function createMeshyHugController({pc,model,avatar,partnerAvatar}={}){
             z:shoulder.z+poleWorld.z},maxStretch:.985
         });
       }catch{continue;}
-      rotateToward(a.upper,elbow,solved.knee,weight*.94);
-      rotateToward(a.fore,xyz(a.hand.getPosition()),solved.ankle,weight*.91);
-      applied=true;
+      if(rotateToward(a.upper,elbow,solved.knee,weight*.94))rotated++;
+      if(rotateToward(a.fore,xyz(a.hand.getPosition()),solved.ankle,
+        weight*.91))rotated++;
+      applied=applied||rotated>0;
     }
+    diagnostic.armRotations+=rotated;
+    diagnostic.lastApplied=applied;
+    diagnostic.lastReason=applied?'кости поворачиваются':
+      degenerate===2?'несовместимый скелет':'цель совпадает с текущей позой';
     return applied;
   }
-  return {ready:true,setFrame(value){frame=value;},apply};
+  return {
+    ready:true,
+    setFrame(value,freeze=false){frame=value;paused=Boolean(freeze);},
+    status(){return {...diagnostic};},
+    apply
+  };
 }
