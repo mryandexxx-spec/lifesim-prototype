@@ -167,6 +167,6 @@ test('F4C: full catalogue is generated only from authored data; generic script r
   assert.match(html,/id="furnish-search"/);
   assert.match(html,/1\.2t-closed-book-f4b9-f4c/);
   assert.match(pages,/node --check src\/furniture-procedural-library\.js/);
-  assert.match(pages,/src\/furniture-procedural-library\.js site\/src\//);
+  assert.match(pages,/src\/furniture-procedural-library\.js src\/furniture-thumbnails\.js site\/src\//);
   assert.doesNotMatch(game,/if\(item\.itemId==='armchair\.wing'\)/);
 });
