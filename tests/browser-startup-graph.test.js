@@ -22,7 +22,7 @@ test('Browser module graph is all present in GitHub Pages artifact',()=>{
    assert.ok(assembly.includes(file),'Not copied into Pages: '+file);
    for(const dep of imports(read(file))){
      if(!dep.startsWith('.'))continue;
-     const full=posix.normalize(posix.join(posix.dirname(file),dep));
+     const full=posix.normalize(posix.join(posix.dirname(file),dep.split('?')[0]));
      assert.ok(full.startsWith('src/'),'Unexpected import '+full);
      todo.push(full);
    }
@@ -37,5 +37,5 @@ test('Safari startup has bounded SW registration and optional model loading',()=
  assert.match(game,/loadingProgress\.failUnresolved\(\)/);
  assert.match(game,/18000/);
  assert.match(html,/Повторить загрузку/);
- assert.match(html,/game\.js\?v=1\.2o/);
+ assert.match(html,/game\.js\?v=1\.2p/);
 });
