@@ -2711,15 +2711,20 @@ function boot() {
         if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0||
           showerStates[residentId].active||toiletStates[residentId].active||
           fridgeLeaving[residentId])continue;
-        const socialWalking=game.socialAction?.phase==='walking' &&
-          game.socialAction.initiator===residentId;
+        const pairedPlan=game.socialAction?.shared?.tvPlan;
+        const socialWalking=game.socialAction?.phase==='walking'&&
+          (game.socialAction.initiator===residentId||Boolean(pairedPlan?.places?.[residentId]));
+        const socialGoal=pairedPlan?.places?.[residentId]||game.socialAction?.target;
+        if(socialWalking&&pairedPlan&&
+          Math.hypot(resident.position.x-socialGoal.x,resident.position.z-socialGoal.z)<.04)
+          continue; // already arrived: partner must complete their own route first
         const jobId=socialWalking?'social:'+game.socialAction.kind:
           resident.action?.phase==='walking'?resident.action.id:null;
         if(jobId){
           let p=paths[residentId];
           if(p.id!==jobId || !p.points){
             const available=socialWalking
-              ? findPath(resident.position,game.socialAction.target,game.world)
+              ? findPath(resident.position,socialGoal,game.world)
               : (buildRoute(jobId,residentId,resident.action?.targetInstanceId,
                   resident.action?.watchSeatInstanceId)?paths[residentId].points:null);
             if(!available){
@@ -2746,10 +2751,19 @@ function boot() {
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
             }
             if(p.index>=p.points.length){
-              resident.position=socialWalking?{...game.socialAction.target}:
+              resident.position=socialWalking?{x:socialGoal.x,z:socialGoal.z}:
                 destination(jobId,residentId,resident.action?.targetInstanceId,
                    resident.action?.watchSeatInstanceId);
               if(socialWalking){
+                if(pairedPlan){
+                  const ready=HOUSEHOLD_IDS.every(id=>{
+                    const goal=pairedPlan.places[id],pos=getActor(game,id).position;
+                    return Math.hypot(pos.x-goal.x,pos.z-goal.z)<.06;
+                  });
+                  if(ready)arriveSocial(game); // partner decides only after both arrive
+                  paths[residentId]={points:null,index:0,id:null};
+                  continue;
+                }
                 const partnerId=residentId==='alex'?'mira':'alex';
                 const partnerExiting=sofaStates[partnerId].progress>0||
                   bedStates[partnerId].progress>0||
