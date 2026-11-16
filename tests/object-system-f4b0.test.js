@@ -147,5 +147,5 @@ test('F4b0 Pages packaging checks future modules; no new runtime on scene import
   assert.match(pages,/node --check src\/object-effect-engine\.js/);
   assert.match(pages,/cp src\/object-definition-registry\.js src\/object-effect-engine\.js src\/object-legacy-adapter\.js src\/shop-catalog-selector\.js site\/src\//);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
-  assert.match(html,/src\/game\.js\?v=1\.2p/);
+  assert.match(html,/src\/game\.js\?v=1\.2q/);
 });
