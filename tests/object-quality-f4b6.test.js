@@ -16,7 +16,7 @@ test('F4b6: measured quality describes ONLY actual authored effects, no fake tie
   assert.deepEqual(enhanced.ratings,[]);
   assert.equal(enhanced.effects.length,1);
   assert.equal(enhanced.effects[0].amount,0.2);
-  assert.match(shopQualitySummary(enhanced),/energy \+0,2\/мин/);
+  assert.match(shopQualitySummary(enhanced),/Энергия \+0,2\/мин/);
   assert.equal(enhanced.hasMeasuredQuality,true);
   assert.equal(shopQualitySummary(describeObjectQualities(registry,'legacy.sofa')),'');
   assert.equal(shopQualitySummary(describeObjectQualities(registry,'plant.amber')),'');
