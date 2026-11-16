@@ -47,7 +47,7 @@ test('F1b bed two slots and available sleeping destination use current transform
     assert.deepEqual(bedDestinationFor(root,'alex'),
       furniturePoint(root.world,'bed',BED_SLOTS[choice].approach));
   }
-  assert.match(house,/const to=furniturePoint\(world,'bed',BED_SLOTS\[id\]\.approach\)/);
+  assert.match(house,/const to=furniturePoint\(world,'bed',BED_SLOTS\[id\]\.approach,targetInstanceId\)/);
   assert.match(layout,/findPath\(person,furniturePoint\(candidate,'bed',slot\.approach\),candidate\)/);
 });
 test('F1b positional frame transforms keep sitter, masked toilet and bathing shower co-located',()=>{
