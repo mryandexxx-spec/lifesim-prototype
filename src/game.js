@@ -32,6 +32,7 @@ import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-previ
 import {furnitureProduct,FURNITURE_APPEARANCES,FURNITURE_SHOP_TYPES,
   PROCEDURAL_NEW_PREFABS,PROCEDURAL_DEFAULT_SKU} from './furniture-products.js';
 import {proceduralFurnitureModel} from './furniture-procedural-library.js';
+import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -2216,6 +2217,28 @@ function boot() {
   // F4b2: store UI selects SKU identity; renderer/footprint still use prefab.
   const shopListings=selectShopCatalog();
   const shopQualityRegistry=legacyObjectRegistry();
+  // Sculptural SVG previews reuse modelKey geometry; no image downloads and
+  // no PlayCanvas instances are created while scrolling the store.
+  const svgNS='http://www.w3.org/2000/svg';
+  const buildProductThumbnail=offer=>{
+    const svg=document.createElementNS(svgNS,'svg');
+    svg.setAttribute('viewBox','0 0 92 76');
+    svg.setAttribute('aria-hidden','true');
+    svg.classList.add('furnish-sku-sketch');
+    const recipe=furnitureThumbnailFaces(offer.prefabId,offer.modelKey);
+    for(const face of recipe){
+      const part=document.createElementNS(svgNS,face.kind==='ellipse'?'ellipse':'polygon');
+      part.setAttribute('fill',face.fill);
+      if(face.kind==='ellipse'){
+        for(const attribute of ['x','y','rx','ry'])
+          part.setAttribute(attribute==='x'?'cx':attribute==='y'?'cy':attribute,String(face[attribute]));
+      }else{
+        part.setAttribute('points',face.points.map(p=>p.join(',')).join(' '));
+      }
+      svg.append(part);
+    }
+    return svg;
+  };
   let shopRoomCategory=null,shopFunctionCategory=null;
   let shopTypeCategory=null,shopSearchText='';
   // Separate visual staging entity is never a purchased item and never enters
@@ -2412,6 +2435,7 @@ function boot() {
   // Touch-friendly category rail, independent from room/function facets.
   // Category IDs are registered data; no product-specific UI switches.
   const typeTabs=$('furnish-type-tabs');
+  const subtypeTabs=$('furnish-subtype-tabs');
   const buildTypeTab=(category)=>{
     const button=document.createElement('button');
     button.type='button';button.dataset.categoryId=category?.id||'';
@@ -2429,6 +2453,29 @@ function boot() {
   for(const category of FURNITURE_SHOP_TYPES)
     if(!category.parentId&&availableTypeIds.has(category.id))
       buildTypeTab(category);
+  const syncSubtypes=()=>{
+    const selected=FURNITURE_SHOP_TYPES.find(cat=>cat.id===shopTypeCategory);
+    const root=selected?.parentId||selected?.id||null;
+    for(const tab of typeTabs.querySelectorAll('button'))
+      tab.setAttribute('aria-pressed',String(tab.dataset.categoryId===(root||'')));
+    subtypeTabs.replaceChildren();
+    subtypeTabs.hidden=!root;
+    if(!root)return;
+    const entries=[{id:root,label:'Все'}].concat(
+      FURNITURE_SHOP_TYPES.filter(cat=>cat.parentId===root&&availableTypeIds.has(cat.id)));
+    for(const entry of entries){
+      const button=document.createElement('button');
+      button.type='button';button.textContent=entry.label;
+      button.dataset.categoryId=entry.id;
+      button.setAttribute('aria-pressed',String(shopTypeCategory===entry.id));
+      button.addEventListener('click',()=>{
+        if(!shopOpen||shopPlacing)return;
+        shopTypeCategory=entry.id;
+        renderShopFilteredItems();renderFurnitureSelection();
+      });
+      subtypeTabs.append(button);
+    }
+  };
   $('furnish-search').addEventListener('input',event=>{
     if(!shopOpen||shopPlacing)return;
     shopSearchText=event.currentTarget.value||'';
@@ -2440,8 +2487,7 @@ function boot() {
       typeCategoryId:shopTypeCategory,searchText:shopSearchText
     });
     const ids=new Set(visible.map(item=>item.itemId));
-    for(const tab of typeTabs.querySelectorAll('button'))
-      tab.setAttribute('aria-pressed',String(tab.dataset.categoryId===(shopTypeCategory||'')));
+    syncSubtypes();
     for(const button of $('furnish-stock').querySelectorAll('button'))
       button.hidden=!ids.has(button.dataset.itemId);
     $('furnish-filter-count').textContent='Показано '+visible.length+' из '+shopListings.length;
@@ -2472,6 +2518,7 @@ function boot() {
     button.type='button';button.dataset.prefabId=item.prefabId;
     button.dataset.itemId=item.itemId;
     const name=document.createElement('strong');name.textContent=item.name;
+    const skuSketch=buildProductThumbnail(item);
     const cost=document.createElement('small');cost.textContent=item.price+' проб. кр.';
     const effect=document.createElement('small');
     effect.className='furnish-product-effect';
@@ -2485,6 +2532,7 @@ function boot() {
     mark.className='furnish-selected-mark';mark.textContent='✓ ВЫБРАНО';
     mark.hidden=true;
     button.append(name,cost,effect,mark);
+    button.prepend(skuSketch);
     if(qualitySummary)button.append(quality);
     button.setAttribute('aria-pressed','false');
     button.addEventListener('click',()=>chooseShopProduct(item.itemId));

@@ -156,7 +156,7 @@ test('F4b1 DOM filtering hides wrong cards and reselects an offered item',()=>{
   const ctx={
     $:id=>elements.get(id),selectShopCatalog:legacyCatalog,shopListings:legacyCatalog(),
     shopRoomCategory:'room.bedroom',shopFunctionCategory:null,
-    shopTypeCategory:null,shopSearchText:'',typeTabs:{querySelectorAll:()=>[]},
+    shopTypeCategory:null,shopSearchText:'',syncSubtypes(){},
     shopPlacing:false,shopSelected:'plant',shopSelectedItemId:'legacy.plant',shopPose:{x:1,z:2,yaw:0},
     shopManualPose:true,shopSwipeRawPose:{x:1,z:2},
     clearShopPreviewEntity:()=>{clears++;},

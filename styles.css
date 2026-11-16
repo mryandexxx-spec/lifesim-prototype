@@ -1020,3 +1020,14 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   .furnish-stock{grid-template-columns:repeat(3,minmax(0,1fr));}
   .furniture-editor[data-editor-view="shop"]{max-height:75dvh;}
 }
+
+/* F4C gallery sketches: deterministic vectors generated from the same modelKey
+   geometry as PlayCanvas; always original, always offline, no asset network. */
+.furnish-sku-sketch{width:100%;height:76px;max-height:76px;display:block;
+  background:linear-gradient(160deg,#fcfbf5,#e5efdf);border-radius:9px;
+  border:1px solid #dae7d6;flex-shrink:0;pointer-events:none;}
+.furnish-stock button[aria-pressed="true"] .furnish-sku-sketch{
+  border-color:#a9edb2;background:linear-gradient(145deg,#e7f3e9,#bddac6);}
+.furnish-subtype-tabs{padding-top:0;margin-top:-3px;}
+.furnish-subtype-tabs[hidden]{display:none!important;}
+.furnish-subtype-tabs button{min-height:36px;font-size:11px;padding:6px 11px;}
