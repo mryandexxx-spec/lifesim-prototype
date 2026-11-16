@@ -233,7 +233,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       toiletBusy=false,toiletFrame=null,fridgeBusy=false,
       socialInitiator=false,socialElapsed=null,hugFrame=null,kissFrame=null,fridgeFrame=null,
       worldMinutes=null,mood=null,energy=null,readingElapsed=null,
-      readingStage=null,readingStepElapsed=0,musicFrame=null}={}){
+      readingStage=null,readingStepElapsed=0,musicFrame=null,diningFrame=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
         preferred:requested&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready))&&
@@ -266,7 +266,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         ?{active:true,stage:readingStage||'reading',
           elapsed:Number.isFinite(readingElapsed)?readingElapsed:0,
           stepElapsed:readingStepElapsed}:null,paused);
-      state.musicRuntime?.setFrame(actionId==='music'?musicFrame:null,paused);
+      state.musicRuntime?.setFrame(actionId==='music'?musicFrame:diningFrame,paused);
       state.hugRuntime?.setFrame(hugFrame,paused);
       state.kissRuntime?.setFrame(kissFrame,paused);
       // Game updates the pose; postUpdate applies joint rotations after Anim.
