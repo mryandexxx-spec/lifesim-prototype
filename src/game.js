@@ -697,7 +697,8 @@ function activeTaskLabel(id){
   if(s&&(s.initiator===id||s.partner===id)){
     if(s.conversation)return 'Беседа с '+getActorName(s.partner===id?s.initiator:s.partner);
     if(s.branchAction)return BRANCH_ACTIONS[s.branchAction.id]?.label||'Общение';
-    if(s.shared)return s.shared.mode==='gift'?'Вручает или принимает подарок':'Проводит время вместе';
+    if(s.shared)return s.shared.choiceId==='tv'?'Смотрит телевизор вместе':
+      s.shared.mode==='gift'?'Вручает или принимает подарок':'Проводит время вместе';
     return SOCIAL_ACTIONS[s.kind]?.label||'Общается';
   }
   const actor=getActor(game,id);
@@ -2952,7 +2953,7 @@ function boot() {
       bedReclineWeight:bedPose?.bedReclineWeight||0,
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
-      social:socialUsing&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
       eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
@@ -3063,7 +3064,7 @@ function boot() {
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
-      social:socialUsing&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv&&!hugFrame.active&&!kissFrame.active?game.socialAction.kind:null,
       eveningWeight:eveningFrame.gestureWeight,
       hugWeight:hugFrame.weight,
       kissWeight:kissFrame.weight,
@@ -3087,9 +3088,11 @@ function boot() {
     const miraMeshShown=meshyMira.update({
       preferred:meshyPreferred,paused:!active,dt:animDt,
       walking:(game.otherSim.action?.phase==='walking'||
-        (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'))&&
+        (game.socialAction?.phase==='walking'&&
+          (game.socialAction.initiator==='mira'||
+            Boolean(game.socialAction.shared?.tvPlan?.places?.mira))))&&
         !miraSeating&&!miraBedding&&!miraShower,
-      social:socialUsing?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
       actionId:miraUseId,
       sofaBusy:sofaStates.mira.progress>0,
@@ -3116,12 +3119,14 @@ function boot() {
       // Preserve the Walking clip on pause: playback freezes but the
       // resident has not arrived at the destination.
       walking:(game.action?.phase==='walking'||
-        (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'))&&
+        (game.socialAction?.phase==='walking'&&
+          (game.socialAction.initiator==='alex'||
+            Boolean(game.socialAction.shared?.tvPlan?.places?.alex))))&&
         !seating&&!bedding&&!alexShower,
       worldMinutes:game.minutes,
       mood:game.mind?.mood?.value,
       energy:game.needs.energy,
-      social:socialUsing?game.socialAction.kind:null,
+      social:socialUsing&&!pairedTv?game.socialAction.kind:null,
       socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
