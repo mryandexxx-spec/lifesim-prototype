@@ -30,6 +30,7 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     !a.fore?.getRotation||!a.fore?.setRotation||!a.hand?.getPosition))
     return unavailable;
   const neck=model.findByName('mixamorig:Neck');
+  const hips=model.findByName('mixamorig:Hips');
   const book=new pc.Entity('Meshy '+resident+' open reading book');
   model.addChild(book);
   book.setLocalPosition(0,1.12,.36);
@@ -65,14 +66,22 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
   const heldStages=new Set(['taking','toSeat','sitting','opening','reading',
     'closing','standing','returnShelf','returning']);
   const readingStages=new Set(['opening','reading','closing']);
-  const atHand=new pc.Vec3();
+  const atHand=new pc.Vec3(),lapOffset=new pc.Vec3(),
+    lapLocal=new pc.Vec3(0,.14,.32);
   // A closed volume stays attached to the REAL animated right wrist while
   // walking; an opened spread rests above the thighs when seated.
   function bookPose(stage,stepElapsed=0){
     if(!heldStages.has(stage))return false;
     const opening=readingStages.has(stage);
-    leftPage.enabled=opening;
-    rightPage.enabled=opening;
+    const open=stage==='opening'
+      ?Math.min(1,Math.max(0,stepElapsed/2.4))
+      :stage==='closing'
+        ?1-Math.min(1,Math.max(0,stepElapsed/2.4))
+        :opening?1:0;
+    leftPage.enabled=open>.015;
+    rightPage.enabled=open>.015;
+    leftPage.setLocalEulerAngles(0,(1-open)*60,0);
+    rightPage.setLocalEulerAngles(0,(open-1)*60,0);
     if(stage==='taking'||stage==='returning'){
       const progress=Math.min(1,Math.max(0,stepElapsed/2.4));
       book.setLocalScale(stage==='taking'?Math.max(.01,progress):Math.max(.01,1-progress),
@@ -112,8 +121,19 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
       book.setEulerAngles(0,0,0);
       return true;
     }
-    book.setLocalPosition(0,.84,.38);
-    book.setLocalEulerAngles(-19,0,0);
+    if(hips?.getPosition){
+      // The seat animation moves actual Mixamo pelvis bones. Attach the
+      // spread above THOSE thighs, not at a fixed floating world height.
+      const hip=hips.getPosition();
+      avatar.getWorldTransform().transformVector(lapLocal,lapOffset);
+      book.setPosition(hip.x+lapOffset.x,hip.y+lapOffset.y,
+        hip.z+lapOffset.z);
+      book.setEulerAngles(-19,0,0);
+    }else{
+      // Rig fallback for future skeletons without an audited hips bone.
+      book.setLocalPosition(0,.72,.33);
+      book.setLocalEulerAngles(-19,0,0);
+    }
     let moved=false;
     for(let index=0;index<arms.length;index++){
       const arm=arms[index],shoulder=xyz(arm.upper.getPosition()),
