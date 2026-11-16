@@ -29,7 +29,7 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes,socialCommunicationNotes} from './social-graph.js';
 import {latestEpisodes} from './social-episodes.js';
 import {pairDynamic} from './social-dynamics.js';
-import {romanceStatus,romanceLoveDescription,romanceClimate,
+import {romanceStatus,romanceLoveDescription,romanceClimate,romanceAvailability,
   setRomancePreference,romancePreferenceSummary} from './romance.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
