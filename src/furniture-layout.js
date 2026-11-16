@@ -4,6 +4,7 @@ import {FURNITURE_CATALOG,instanceRect,restoreFurnitureWorld,
 import {ROOM,isWalkable,findPath} from './navigation.js';
 import {BED_SLOTS} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
+import {musicListeningSpots,chooseMusicListeningSpot} from './music-listening.js';
 
 const validPose=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&[0,90,180,270].includes(p.yaw);
 const overlap=(a,b)=>Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*
@@ -33,6 +34,10 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
     if(boxes.some(other=>other.instanceId!==instanceId&&overlap(b,other)>.025))
       return {ok:false,reason:'collision'};
   }
+  // Unlike H2 1.2u, a green shop preview cannot knowingly place a music
+  // station against every wall/obstacle with no walkable listening side.
+  if(target.prefabId==='music'&&!musicListeningSpots(candidate,instanceId).length)
+    return {ok:false,reason:'unreachable-music'};
   for(const person of residents){
     if(!person||!Number.isFinite(person.x)||!Number.isFinite(person.z))continue;
     if(!isWalkable(person.x,person.z,candidate))return {ok:false,reason:'resident-blocked'};
@@ -42,6 +47,8 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
       if(!reading||!findPath(person,reading,candidate))
         return {ok:false,reason:'unreachable-bookcase'};
     }
+    if(target.prefabId==='music'&&!chooseMusicListeningSpot(candidate,person,instanceId))
+      return {ok:false,reason:'unreachable-music'};
     // A moved television must retain a real approach to its own screen.
     if(target.prefabId==='tv'){
       const watching=furnitureActionApproach(candidate,'tv',instanceId);

@@ -1,11 +1,12 @@
 name: H2 music and physical skills regression
 on:
   push:
-    branches: ['feature/h2-*']
+    branches: ['feature/h2-*', 'fix/h2-*']
   pull_request:
     paths:
       - 'src/hobby-reading.js'
       - 'src/music-audio.js'
+      - 'src/music-listening.js'
       - 'src/furniture-*.js'
       - 'src/object-legacy-adapter.js'
       - 'src/household.js'
@@ -16,6 +17,7 @@ on:
       - 'index.html'
       - 'styles.css'
       - 'tests/hobbies-h2.test.js'
+      - 'tests/h2-music-access-rotate.test.js'
       - '.github/workflows/hobby-h2-checks.yml'
 permissions:
   contents: read
@@ -31,6 +33,7 @@ jobs:
       - name: Validate music and regress entire game
         run: |
           node --check src/music-audio.js
+          node --check src/music-listening.js
           node --check src/hobby-reading.js
           node --check src/game.js
           node --check src/simulation.js

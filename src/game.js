@@ -25,6 +25,7 @@ import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {createMusicAudio,audibleMusicStyle} from './music-audio.js';
+import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
 import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
 import {describeObjectQualities,shopQualitySummary} from './object-quality-presentation.js';
 import {compareShopVariants,formatShopVariantComparison,chooseComparableVariant} from './object-quality-comparison.js';
@@ -101,6 +102,7 @@ let game;
 try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
 catch { game = newHousehold(); }
 const musicAudio=createMusicAudio();
+let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
 const audioButton=$('music-audio-toggle');
 function refreshMusicAudioButton(){
   const state=musicAudio.status();
@@ -113,8 +115,11 @@ function refreshMusicAudioButton(){
 }
 audioButton.addEventListener('click',async()=>{
   const state=musicAudio.status();
-  if(state.enabled&&!state.muted&&state.running)musicAudio.setMuted(true);
-  else await musicAudio.enable();
+  if(state.enabled&&!state.muted&&state.running){
+    musicMutedByPlayer=true;musicAudio.setMuted(true);
+  }else{
+    musicMutedByPlayer=false;await musicAudio.enable();
+  }
   refreshMusicAudioButton();
 });
 refreshMusicAudioButton();
@@ -526,6 +531,16 @@ $('action-button').addEventListener('click', () => {
         ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
       :{type:'object',actionId:selected,
         ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
+  // A tap on the explicit "Listen to music" action is itself an iOS user
+  // gesture: unlock audio HERE rather than requiring an unrelated View menu.
+  // Never re-enable after the player has deliberately selected Mute.
+  if(selected==='music'&&!musicMutedByPlayer&&
+    (!musicAudio.status().enabled||!musicAudio.status().running)){
+    void musicAudio.enable().then(ok=>{
+      refreshMusicAudioButton();
+      if(!ok)toast('Звук Safari недоступен. Действие выполняется без аудио.');
+    });
+  }
   if (scheduleCommand(command)) {
     select(null);
   }
@@ -1781,16 +1796,25 @@ function boot() {
     }
     if(id==='hobby:toShelf'||id==='hobby:returnShelf')
       return furnitureActionApproach(game.world,'hobby',targetInstanceId);
+    if(id==='music'){
+      const person=getActor(game,residentId);
+      if(person?.action?.id==='music'&&
+        validMusicListeningSpot(game.world,
+          person.action.targetInstanceId,person.action.musicSpot))
+        return person.action.musicSpot;
+      return chooseMusicListeningSpot(game.world,person.position,targetInstanceId)?.point||null;
+    }
     return id==='bed'
       ?bedDestinationFor(game,residentId,targetInstanceId)
       :id==='tv'&&watchSeatInstanceId
         ?furnitureActionApproach(game.world,'sofa',watchSeatInstanceId)
         :furnitureActionApproach(game.world,id,targetInstanceId);
   };
-  function buildRoute(id,actorId='alex',targetInstanceId=null,watchSeatInstanceId=null) {
+  function buildRoute(id,actorId='alex',targetInstanceId=null,watchSeatInstanceId=null,
+    musicPlan=null) {
     const actor=getActor(game,actorId);
-    const goal=destination(id,actorId,targetInstanceId,watchSeatInstanceId);
-    const points=goal&&findPath(actor.position,goal,game.world);
+    const goal=musicPlan?.point||destination(id,actorId,targetInstanceId,watchSeatInstanceId);
+    const points=musicPlan?.path||(goal&&findPath(actor.position,goal,game.world));
     if(!points) return false;
     paths[actorId]={points,index:0,id};
     return true;
@@ -1815,13 +1839,18 @@ function boot() {
     }
     const watchSeat=id==='tv'?chooseTvSofa(game,actorId,
       resolveActionFurniture(game.world,'tv',targetInstanceId)?.instanceId||'home-tv-1'):null;
-    if(!buildRoute(id,actorId,targetInstanceId,watchSeat?.sofaId||null)){
+    // Music is not a fixed front-facing appliance. Pick a clear A* approach
+    // around the player's actual rotated station, and persist the SAME goal.
+    const musicPlan=id==='music'
+      ?chooseMusicListeningSpot(game.world,actor.position,targetInstanceId):null;
+    if((id==='music'&&!musicPlan)||
+      !buildRoute(id,actorId,targetInstanceId,watchSeat?.sofaId||null,musicPlan)){
       if(!automatic&&!fromQueue) toast(getActorName(actorId)+' не может добраться до предмета');
       else actor.autonomy.nextAt=game.minutes+15;
       return false;
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
-      activityId,contentId);
+      activityId,contentId,musicPlan);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
@@ -1996,8 +2025,11 @@ function boot() {
           const count=(routeFailures.get(command.seq)||0)+1;
           routeFailures.set(command.seq,count);
           if(count===3){
+            const musicBlocked=command.type==='activity'&&command.activityId===MUSIC_ACTIVITY_ID;
             const message=getActorName(residentId)+
-              ': путь пока недоступен — проверь расположение мебели или удали задание из очереди';
+              (musicBlocked
+                ? ': нет свободного подхода к музыкальному центру. В «Дом → Комната» поверни или перенеси его.'
+                : ': путь пока недоступен — проверь расположение мебели или удали задание из очереди');
             $('queue-feedback').textContent=message;
             toast(message);
           }
@@ -2130,7 +2162,7 @@ function boot() {
   furnitureGhost.enabled=false;
   const marketGhost=box('F2 shop preview',0,.078,0,.1,.04,.1,ghostValid);
   marketGhost.enabled=false;
-  const lockedFurnitureIds=()=>{
+  const lockedFurnitureIds=(includePending=true)=>{
     const busy=new Set();
     if(game.socialAction?.eveningStage?.instanceId)
       busy.add(game.socialAction.eveningStage.instanceId);
@@ -2178,14 +2210,19 @@ function boot() {
         busy.add(actor.action.readingSeatInstanceId);
       if(actor?.action?.id==='tv'&&actor.action.watchSeatInstanceId)
         busy.add(actor.action.watchSeatInstanceId);
-      for(const pending of pendingActions(game.actionQueues,id))
+      // Pending commands identify the same durable instance ID after moving
+      // or rotating it, so allow repositioning to repair a blocked approach.
+      // Storing/selling is still prohibited while commands are pending.
+      if(includePending)for(const pending of pendingActions(game.actionQueues,id))
         if(['object','activity'].includes(pending.type)&&pending.targetInstanceId)
           busy.add(pending.targetInstanceId);
     }
     return [...busy];
   };
-  const editorContext=()=>({lockedInstanceIds:lockedFurnitureIds(),
-    residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)});
+  const editorContext=(allowQueuedReposition=false)=>({
+    lockedInstanceIds:lockedFurnitureIds(!allowQueuedReposition),
+    residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)
+  });
   const editorLabel=instanceId=>{
     const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
     return item?(furnitureProduct(item.itemDefinitionId)?.name||
@@ -2209,6 +2246,7 @@ function boot() {
       'protected-item':'Исходная функциональная мебель защищена',
       'unreachable-sofa':'К этому дивану нельзя пройти · выбери другое место',
       'unreachable-tv':'Нельзя подойти к экрану этого телевизора · выбери другое место',
+      'unreachable-music':'К музыкальному центру не подойти · поверни его или освободи проход',
       'insufficient-credits':'Недостаточно пробных кредитов',
       'full-household':'Слишком много предметов',
       'already-stored':'Предмет уже на складе',
@@ -2240,6 +2278,27 @@ function boot() {
     const item=editorItem(editSelectedId);
     const selectable=!!item&&item.location==='home';
     $('furnish-commands').hidden=!furnishMode||shopOpen||warehouseOpen||!selectable;
+    // Unlike the former hidden selection-only turn button, this room toolbar
+    // is always present. A native picker lets Safari users select items even
+    // when the 3D ray is partly covered by another piece of furniture.
+    const roomTools=$('furnish-room-tools');
+    roomTools.hidden=!furnishMode||shopOpen||warehouseOpen;
+    if(!roomTools.hidden){
+      const picker=$('furnish-item-select');
+      const prompt=document.createElement('option');
+      prompt.value='';prompt.textContent='Выбери мебель…';
+      const options=[prompt];
+      for(const instance of game.world.furniture.instances){
+        if(!canMoveFurniture(instance))continue;
+        const option=document.createElement('option');
+        option.value=instance.instanceId;
+        option.textContent=editorLabel(instance.instanceId)+
+          (instance.instanceId.startsWith('shop-')?' · №'+instance.instanceId.split('-').at(-1):'');
+        options.push(option);
+      }
+      picker.replaceChildren(...options);
+      picker.value=selectable&&canMoveFurniture(item)?item.instanceId:'';
+    }
     $('furnish-rotate').disabled=!selectable||!canMoveFurniture(item);
     const tradable=selectable&&canTradeMarketInstance(item);
     $('furnish-store').disabled=!tradable;
@@ -2592,6 +2651,10 @@ function boot() {
     $('furnish-stock').append(button);
   }
   renderShopFilteredItems();
+  $('furnish-item-select').addEventListener('change',event=>{
+    if(!furnishMode||shopOpen||warehouseOpen)return;
+    chooseFurniture(event.currentTarget.value||null);
+  });
   $('furnish-edit-toggle').addEventListener('click',()=>setEditorView('edit'));
   $('furnish-shop-toggle').addEventListener('click',()=>setEditorView(shopOpen?'edit':'shop'));
   $('furnish-warehouse-toggle').addEventListener('click',()=>setEditorView(warehouseOpen?'edit':'warehouse'));
@@ -2676,7 +2739,7 @@ function boot() {
   $('furnish-sell').addEventListener('click',()=>sellFurniture(editSelectedId));
   const commitFurniture=(instanceId,pose)=>{
     if(!editSession||!furnishMode)return false;
-    const result=editSession.commit(instanceId,pose,editorContext());
+    const result=editSession.commit(instanceId,pose,editorContext(true));
     if(!result.ok){
       editorFeedback(editorMessage(result.reason),true);
       updateDecorNodes();renderFurnitureSelection();return false;
@@ -2718,7 +2781,8 @@ function boot() {
   $('furnish-rotate').addEventListener('click',()=>{
     const item=editorItem(editSelectedId);
     if(!furnishMode||!canMoveFurniture(item))return;
-    commitFurniture(item.instanceId,{x:item.x,z:item.z,yaw:(item.yaw+90)%360});
+    if(commitFurniture(item.instanceId,{x:item.x,z:item.z,yaw:(item.yaw+90)%360}))
+      editorFeedback(editorLabel(item.instanceId)+' · повёрнут на 90°');
   });
   const exitFurniture=()=>{
     if(!furnishMode)return;
@@ -2761,7 +2825,7 @@ function boot() {
     shopPose=null;shopManualPose=false;
     chooseFurniture(null);setEditorView('edit');
     renderPauseButton();
-    editorFeedback('Коснись предмета, чтобы выбрать. Для перемещения удерживай палец 0,5 секунды. Свайп по мебели поворачивает камеру.');
+    editorFeedback('Выбери мебель в списке или коснись её в 3D, затем нажми «Повернуть 90°». Для переноса удерживай палец 0,5 секунды.');
   };
   $('furnish-toggle').addEventListener('click',()=>furnishMode?exitFurniture():enterFurniture());
   $('furnish-exit').addEventListener('click',exitFurniture);
@@ -2856,7 +2920,7 @@ function boot() {
       return true;
     }
     editDrag.lastCheck=performance.now();
-    const candidate=proposeFurnitureMove(game.world.furniture,editDrag.instanceId,pose,editorContext());
+    const candidate=proposeFurnitureMove(game.world.furniture,editDrag.instanceId,pose,editorContext(true));
     editDrag.valid=candidate.ok;
     updateDecorNodes(editDrag.instanceId,pose);
     showGhost(editDrag.instanceId,pose,candidate.ok);
