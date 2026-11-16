@@ -172,8 +172,8 @@ test('F3c: Safari wires both independently routed citizens and protected two res
   const g=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
   const pages=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
   assert.match(g,/planSharedTv\(game,actorId/);
-  assert.match(g,/game\.socialAction\.shared\?\.tvPlan\?\.places\?\.mira/);
-  assert.match(g,/game\.socialAction\.shared\?\.tvPlan\?\.places\?\.alex/);
+  assert.match(g,/session\.shared\.tvPlan\?\.places\?\.\[residentId\]/);
+  assert.match(g,/pairedPlan\?\.places\?\.\[residentId\]/);
   assert.match(g,/if\(ready\)arriveSocial\(game\)/);
   assert.match(g,/const pairedTv=liveSharedTv\(game\)/);
   assert.match(g,/frame=tvScreenFrame\(\[game,game.otherSim\],item.instanceId,effectTime,/);
