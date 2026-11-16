@@ -10,6 +10,10 @@ test('Browser module graph is all present in GitHub Pages artifact',()=>{
  const workflow=read('.github/workflows/pages.yml');
  const assembly=workflow.split('- name: Assemble static website')[1];
  assert.ok(assembly);
+ const html=read('index.html');
+ assert.match(html, /"playcanvas":"\.\/vendor\/playcanvas\.mjs"/);
+ assert.ok(assembly.includes('cp node_modules/playcanvas/build/playcanvas.mjs site/vendor/'));
+ assert.ok(existsSync(root+'node_modules/playcanvas/build/playcanvas.mjs'),'PlayCanvas distribution file missing');
  const seen=new Set(),todo=['src/game.js'];
  while(todo.length){
    const file=todo.pop();if(seen.has(file))continue;

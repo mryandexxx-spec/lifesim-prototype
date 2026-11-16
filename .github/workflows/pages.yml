@@ -105,6 +105,9 @@ jobs:
           echo "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a  assets/characters/meshy-mira-mobile-v1.glb" | sha256sum -c -
       - name: Assemble static website
         run: |
+          mkdir -p site/src site/vendor
+          test -s node_modules/playcanvas/build/playcanvas.mjs
+          cp node_modules/playcanvas/build/playcanvas.mjs site/vendor/
           mkdir -p site/src
           cp index.html character-lab.html character-lab-mira.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
           mkdir -p site/src
