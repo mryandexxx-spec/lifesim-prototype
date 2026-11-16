@@ -22,7 +22,8 @@ import {liveSharedTv} from './tv-together.js';
 import {captureObjectUse,settleObjectUseStep} from './object-use-runtime.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
-import {HOBBY_ACTIVITIES,HOBBY_CONTENT,HOBBY_SKILLS,READING_ACTIVITY_ID,READING_CONTENT_ID} from './hobby-reading.js';
+import {HOBBY_ACTIVITIES,HOBBY_CONTENT,HOBBY_SKILLS,READING_ACTIVITY_ID,READING_CONTENT_ID,
+  MUSIC_ACTIVITY_ID,MUSIC_CONTENT_IDS} from './hobby-reading.js';
 import {getActivityDefinition,activityFitsItem} from './activity-registry.js';
 import {createActivitySession,restoreActivitySession,arriveActivitySession,
   advanceActivitySession} from './activity-session.js';
@@ -120,6 +121,22 @@ export function loadHousehold(raw) {
     const saved=id==='alex'?raw:raw.otherSim;
     actor.skills=restoreSkillProgress(saved?.skills,HOBBY_SKILLS);
     actor.activitySession=null;
+    if(actor.action?.id==='music'){
+      const listening=restoreActivitySession(HOBBY_ACTIVITIES,saved?.activitySession,HOBBY_CONTENT);
+      const point=furnitureActionApproach(root.world,'music',actor.action.targetInstanceId);
+      if(!listening||listening.actorId!==id||listening.activityId!==MUSIC_ACTIVITY_ID||
+        listening.targetInstanceId!==actor.action.targetInstanceId||
+        listening.contentId!==actor.action.contentId||
+        !validMusicSource(root,actor)||
+        Math.abs(listening.elapsed-actor.action.elapsed)>.00001||
+        !((listening.phase==='walking'&&actor.action.phase==='walking')||
+          (listening.phase==='using'&&actor.action.phase==='using'))||
+        (actor.action.phase==='using'&&(!point||
+          Math.hypot(actor.position.x-point.x,actor.position.z-point.z)>.35)))
+        actor.action=null;
+      else actor.activitySession=listening;
+      continue;
+    }
     if(actor.action?.id!=='hobby')continue;
     const restored=restoreActivitySession(HOBBY_ACTIVITIES,saved?.activitySession,HOBBY_CONTENT);
     if(!restored||restored.actorId!==id||
@@ -305,6 +322,15 @@ function validReadingSource(root,actor){
   return Boolean(item&&activity&&action.contentId===READING_CONTENT_ID&&
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
+function validMusicSource(root,actor){
+  const action=actor?.action;
+  const item=action?.id==='music'
+    ?resolveActionFurniture(root.world,'music',action.targetInstanceId):null;
+  const activity=getActivityDefinition(HOBBY_ACTIVITIES,action?.activityId);
+  return Boolean(item&&activity?.id===MUSIC_ACTIVITY_ID&&
+    MUSIC_CONTENT_IDS.includes(action.contentId)&&
+    activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
+}
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
   activityId=null,contentId=null) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
@@ -318,6 +344,13 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;
     readingSeat=chooseReadingSeat(root,residentId,item.instanceId);
     if(!readingSeat)return false;
+  }
+  if(itemId==='music'){
+    const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
+    if(activity?.id!==MUSIC_ACTIVITY_ID||
+      !MUSIC_CONTENT_IDS.includes(contentId)||
+      !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))
+      return false;
   }
   // Explicit actions never supersede an ongoing action or interrupt a social.
   // Future manual commands are stored by action-queue.js and dispatched later.
@@ -337,6 +370,16 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     if(!beginReadingJourney(resident.action,readingSeat)){
       resident.action=null;return false;
     }
+    resident.activitySession=session;
+  }
+  if(chosen&&itemId==='music'){
+    const session=createActivitySession(HOBBY_ACTIVITIES,{
+      sessionId:'music:'+residentId+':'+root.actionQueues.nextSeq+':'+Math.round(root.minutes*1000),
+      activityId,actorId:residentId,targetInstanceId:item.instanceId,contentId
+    },HOBBY_CONTENT);
+    if(!session){resident.action=null;return false;}
+    resident.action.activityId=activityId;
+    resident.action.contentId=contentId;
     resident.activitySession=session;
   }
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
@@ -396,7 +439,7 @@ export function setHouseholdAutonomy(root,enabled) {
  */
 function advanceReading(root,id,minutes){
   const actor=getActor(root,id),action=actor?.action;
-  if(action?.id!=='hobby'){if(actor)actor.activitySession=null;return;}
+  if(action?.id!=='hobby'){if(actor&&action?.id!=='music')actor.activitySession=null;return;}
   const stage=readingStage(action);
   const seat=stage?chooseReadingSeat(root,id,action.targetInstanceId,
     action.readingSeatInstanceId):null;
@@ -433,6 +476,32 @@ function advanceReading(root,id,minutes){
   if(xp){actor.skills=xp.progress;session=xp.session;}
   actor.activitySession=session;
 }
+/** H2: leisure only at the actual occupied, reachable playback station. */
+function advanceMusic(root,id,minutes){
+  const actor=getActor(root,id),action=actor?.action;
+  if(action?.id!=='music')return;
+  const point=furnitureActionApproach(root.world,'music',action.targetInstanceId);
+  let session=actor.activitySession;
+  if(!validMusicSource(root,actor)||
+    !furnitureAvailable(root,'music',id,action.targetInstanceId)||
+    !session||session.actorId!==id||session.activityId!==MUSIC_ACTIVITY_ID||
+    session.contentId!==action.contentId||
+    session.targetInstanceId!==action.targetInstanceId){
+    actor.action=null;actor.activitySession=null;
+    actor.event='Музыкальный центр недоступен';return;
+  }
+  if(action.phase!=='using')return;
+  if(!point||Math.hypot(actor.position.x-point.x,actor.position.z-point.z)>.35){
+    actor.action=null;actor.activitySession=null;
+    actor.event='Не удалось добраться до музыки';return;
+  }
+  if(session.phase==='walking')
+    session=arriveActivitySession(session,{authorized:true,resourceAvailable:true});
+  if(!session){actor.action=null;actor.activitySession=null;return;}
+  const advanced=advanceActivitySession(HOBBY_ACTIVITIES,session,minutes,
+    {authorized:true,resourceAvailable:true,paused:root.paused});
+  actor.activitySession=advanced.session;
+}
 /** A single time step, applied to both actors without doubling the household clock. */
 export function tickHousehold(root,minutes) {
   // A paused or invalid tick must be completely side-effect free, including Mira's fields.
@@ -447,6 +516,8 @@ export function tickHousehold(root,minutes) {
   // can grant Fun, and account only physically performed game minutes.
   advanceReading(root,'alex',minutes);
   advanceReading(root,'mira',minutes);
+  advanceMusic(root,'alex',minutes);
+  advanceMusic(root,'mira',minutes);
   // Capture stages BEFORE the simulation. The completion tick may switch
   // reading→closing; it must not also consume a full closing interval.
   const stageBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>
@@ -473,7 +544,7 @@ export function tickHousehold(root,minutes) {
   settleObjectUseStep({world:root.world,actor:other,before:miraUse});
   for(const id of HOUSEHOLD_IDS){
     const person=getActor(root,id);
-    if(person.action?.id!=='hobby')person.activitySession=null;
+    if(!['hobby','music'].includes(person.action?.id))person.activitySession=null;
   }
   if(watchMinutes>0){
     // Fun reflects REAL time in front of a running screen. Only the final

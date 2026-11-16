@@ -21,7 +21,7 @@ const capabilityLabels=Object.freeze({
   sleep:'Сон',relax:'Отдых',decor:'Украшения',surface:'Поверхности',
   'tv.watch':'Телевизоры','food.take':'Приём пищи',
   'hygiene.shower':'Гигиена','bladder.toilet':'Туалет',
-  'books.borrow':'Книги и чтение'
+  'books.borrow':'Книги и чтение','music.playback':'Музыка и прослушивание'
 });
 const categories=[
   ...Object.entries(historicalRooms).map(([label,id])=>({id,label,facet:'room'})),

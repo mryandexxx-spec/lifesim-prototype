@@ -113,7 +113,7 @@ test('Safari 3D scene wires original and bought TV pickers and only-on-usage fra
   assert.match(game,/touchBox\('tv','tv glass'/);
   assert.match(game,/const tvCopies=game.world.furniture.instances/);
   assert.match(game,/id:'tv',instanceId:item.instanceId/);
-  assert.match(game,/selectedFurnitureInstanceId=\['sofa','bed','tv','hobby'\]/);
+  assert.match(game,/selectedFurnitureInstanceId=\['sofa','bed','tv','hobby','music'\]/);
   assert.match(game,/tvScreenFrame\(\[game,game.otherSim\],item.instanceId,effectTime,/);
   assert.match(game,/program.enabled=frame.on/);
   assert.match(workflow,/node --check src\/tv-interaction.js/);

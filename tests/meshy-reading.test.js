@@ -57,7 +57,7 @@ test('both Meshy visuals mount post-Anim controller and hide obsolete elbow book
   const workflow=source('../.github/workflows/pages.yml');
   assert.match(workflow,/node --check src\/meshy-reading-runtime\.js/);
   assert.match(workflow,/cp src\/meshy-reading-runtime\.js site\/src\//);
-  assert.match(source('../index.html'),/src\/game\.js\?v=1\.2t-closed-book-f4b9/);
+  assert.match(source('../index.html'),/src\/game\.js\?v=1\.2u-h2-music/);
   for(const code of [alex,mira])assert.match(code,/meshy-reading-runtime\.js\?v=1\.2t/);
 });
 

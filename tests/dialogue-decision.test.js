@@ -64,7 +64,7 @@ test('1.0q: mandatory choice applies only to a real using-phase multi-turn socia
   assert.equal(dialogueNeedsDecision(root),false);
 });
 test('1.0q: simulation time and animation stop while player has decisions',()=>{
-  assert.ok(gameSource.includes('const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game);'));
+  assert.ok(gameSource.includes('const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&!document.hidden;'));
   assert.ok(gameSource.includes('const animDt=active?dt:0;'));
   assert.ok(gameSource.includes('tickHousehold(game,.30 * game.speed)'));
   assert.ok(gameSource.includes('renderPauseButton();'));
@@ -193,9 +193,9 @@ test('1.0q: even a synthetic click on hidden X cannot dismiss a required prompt'
   assert.ok(dialogueNeedsDecision(root));
 });
 test('1.0s: Safari safe-area, compact modal, Pages copy, mood M1 still present',()=>{
-  assert.match(html,/сборка \/ 1\.2t/);
-  assert.match(html,/styles\.css\?v=1\.2t/);
-  assert.match(html,/src\/game\.js\?v=1\.2t/);
+  assert.match(html,/сборка \/ 1\.2u/);
+  assert.match(html,/styles\.css\?v=1\.2u/);
+  assert.match(html,/src\/game\.js\?v=1\.2u/);
   assert.match(html,/id="conversation-panel"[^>]+tabindex="-1"/);
   assert.match(css,/#conversation-panel\.dialogue-required\{/);
   assert.match(css,/width:min\(440px,calc\(100vw - 28px\)\)/);

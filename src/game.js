@@ -19,11 +19,12 @@ import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
-import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_SKILL_ID} from './hobby-reading.js';
+import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_CONTENT_IDS} from './hobby-reading.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
 import {currentSkillLevel} from './skills-engine.js';
+import {createMusicAudio,audibleMusicStyle} from './music-audio.js';
 import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
 import {describeObjectQualities,shopQualitySummary} from './object-quality-presentation.js';
 import {compareShopVariants,formatShopVariantComparison,chooseComparableVariant} from './object-quality-comparison.js';
@@ -96,6 +97,24 @@ const loadingProgress=createLoadingProgress(['scene','alex','mira'],({completed,
 let game;
 try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
 catch { game = newHousehold(); }
+const musicAudio=createMusicAudio();
+const audioButton=$('music-audio-toggle');
+function refreshMusicAudioButton(){
+  const state=musicAudio.status();
+  const audible=state.enabled&&!state.muted&&state.running;
+  audioButton.textContent=audible?'🔊 Выключить звук':'🔇 Включить звук';
+  audioButton.setAttribute('aria-pressed',String(audible));
+  audioButton.title=state.enabled&&!state.running
+    ?'Safari приостановил звук — коснитесь для возобновления'
+    :'Звук звучит только во время прослушивания';
+}
+audioButton.addEventListener('click',async()=>{
+  const state=musicAudio.status();
+  if(state.enabled&&!state.muted&&state.running)musicAudio.setMuted(true);
+  else await musicAudio.enable();
+  refreshMusicAudioButton();
+});
+refreshMusicAudioButton();
 const selectedActor = () => getActor(game,game.selectedSim);
 const selectedName = () => getActorName(game.selectedSim);
 const visualQuery = new URLSearchParams(window.location.search).get('model') || '';
@@ -235,7 +254,10 @@ const META = {
   tv: { title: 'Телевизор', category: 'Гостиная', description: 'Сядет на свободный диван с видом на экран или посмотрит стоя, если мест нет', icon: '▣', anchor: [3.5, 1.42, .36] },
   hobby: { title: 'Книжный шкаф', category: 'Гостиная',
     description: 'Подойти к шкафу, выбрать историю и почитать. Досуг растёт во время чтения, а навык — от практики.',
-    icon: '📖', anchor: [0,1.5,0] }
+    icon: '📖', anchor: [0,1.5,0] },
+  music: {title:'Музыкальный центр',category:'Гостиная',
+    description:'Выбери стиль и подойди к центру. Звук включается отдельно в меню «Вид».',
+    icon:'♫',anchor:[0,1.1,0]}
 };
 
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
@@ -289,7 +311,11 @@ function taskLabel(task){
 }
 function scheduleCommand(command,residentId=game.selectedSim){
   if(command.type==='object'||command.type==='activity'){
-    const actionId=command.type==='activity'?'hobby':command.actionId;
+    const definition=command.type==='activity'
+      ?getActivityDefinition(HOBBY_ACTIVITIES,command.activityId):null;
+    const actionId=command.type==='activity'
+      ?(definition?.requiredCapabilities.includes('music.playback')?'music':'hobby')
+      :command.actionId;
     const target=resolveActionFurniture(game.world,actionId,command.targetInstanceId);
     if(!target){toast('Этот предмет недоступен');return false;}
     command={...command,targetInstanceId:target.instanceId};
@@ -439,7 +465,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=['sofa','bed','tv','hobby'].includes(id)&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','bed','tv','hobby','music'].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -450,8 +476,10 @@ function select(id,instanceId=null) {
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
       id==='tv'?'Просмотр этого телевизора · с дивана, если он свободен и экран виден':
+      id==='hobby'||id==='music'?META[id].description:
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
+  $('music-style-field').hidden=id!=='music';
   $('action-button').innerHTML = `${ACTIONS[id].label} <span>↗</span>`;
 }
 const markers = {};
@@ -488,8 +516,13 @@ $('action-button').addEventListener('click', () => {
   const command=selected==='hobby'
     ?{type:'activity',activityId:READING_ACTIVITY_ID,contentId:READING_CONTENT_ID,
       ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
-    :{type:'object',actionId:selected,
-      ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
+    :selected==='music'
+      ?{type:'activity',activityId:MUSIC_ACTIVITY_ID,
+        contentId:MUSIC_CONTENT_IDS.includes($('music-style-select').value)
+          ?$('music-style-select').value:MUSIC_CONTENT_IDS[0],
+        ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
+      :{type:'object',actionId:selected,
+        ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
   if (scheduleCommand(command)) {
     select(null);
   }
@@ -1549,6 +1582,19 @@ function boot() {
         bookColors[(row*3+i)%bookColors.length]);
     }
   });
+  // H2: original procedural console; template is hidden until the user buys it.
+  withDecor('music',()=>{
+    box('music cabinet',0,.60,0,.92,1.04,.50,M.wood);
+    box('music face',0,.65,.258,.84,.87,.025,M.darkGreen);
+    box('music display',0,.93,.279,.38,.18,.035,M.mint);
+    box('music dial',0,.72,.286,.12,.12,.035,M.cream);
+    for(const x of [-.30,.30]){
+      box('music speaker '+x,x,.49,.281,.33,.37,.038,M.green);
+      box('music speaker center '+x,x,.49,.309,.17,.17,.018,M.blue);
+    }
+    box('music shelf',0,.085,0,.97,.13,.55,M.paleWood);
+    box('music top',0,1.17,0,1,.10,.56,M.paleWood);
+  });
   // Potted plant, decorations and an oversized welcoming mat.
   withDecor('plant',()=>{
     cylinder('plant pot',4.19,.30,3.22,.58,.63,.58,M.rust);
@@ -1840,8 +1886,12 @@ function boot() {
         if(actor.action||sofaStates[residentId].progress>0||
           bedStates[residentId].progress>0||showerStates[residentId].active||
           toiletStates[residentId].active||fridgeLeaving[residentId])return false;
-        if(command.type==='activity')
-          return furnitureAvailable(game,'hobby',residentId,command.targetInstanceId);
+        if(command.type==='activity'){
+          const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
+          return furnitureAvailable(game,
+            activity?.requiredCapabilities.includes('music.playback')?'music':'hobby',
+            residentId,command.targetInstanceId);
+        }
         if(command.type==='object')
           return furnitureAvailable(game,command.actionId,residentId,command.targetInstanceId)&&
             !(command.actionId==='shower'&&HOUSEHOLD_IDS.some(id=>
@@ -1886,9 +1936,12 @@ function boot() {
         let started=false;
         if(command.type==='object')
           started=beginAction(command.actionId,false,residentId,true,command.targetInstanceId);
-        else if(command.type==='activity')
-          started=beginAction('hobby',false,residentId,true,command.targetInstanceId,
+        else if(command.type==='activity'){
+          const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
+          const actionId=activity?.requiredCapabilities.includes('music.playback')?'music':'hobby';
+          started=beginAction(actionId,false,residentId,true,command.targetInstanceId,
             command.activityId,command.contentId);
+        }
         else if(command.type==='social')
           started=beginSocial(command.actionId,false,residentId,null,null,null,true);
         else if(command.type==='conversation')
@@ -2632,7 +2685,7 @@ function boot() {
         const rect=instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint);
         const height={table:.63,nightstand:1.49,tv:2.0,plant:1.87,
           bed:1.40,counter:2.50,fridge:2.2,sofa:1.3,shower:2.75,toilet:1.45,
-        bookcase:2.05}[item.prefabId]||2;
+        bookcase:2.05,music:1.2}[item.prefabId]||2;
         return {kind:'object',id:item.instanceId,bounds:{
           min:{x:rect.minX,y:0,z:rect.minZ},
           max:{x:rect.maxX,y:height,z:rect.maxZ}
@@ -2860,8 +2913,16 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:2.05,z:r.maxZ}}};
       });
+    const musicStations=game.world.furniture.instances
+      .filter(item=>item.prefabId==='music'&&item.location==='home')
+      .map(item=>{
+        const r=instanceRect(item,FURNITURE_CATALOG.music.footprint);
+        return {kind:'object',id:'music',instanceId:item.instanceId,
+          bounds:{min:{x:r.minX,y:0,z:r.minZ},
+            max:{x:r.maxX,y:1.3,z:r.maxZ}}};
+      });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...movedVolumes,...blockers]);
+      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...musicStations,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -2938,7 +2999,9 @@ function boot() {
     dt=Math.min(dt,.06);
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
-    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game);
+    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&!document.hidden;
+    musicAudio.update(audibleMusicStyle([game,game.otherSim],{
+      paused:!active,hidden:document.hidden,editing:furnishMode}));
     const animDt=active?dt:0;
     if(active){
       accumulator+=dt;

@@ -992,3 +992,14 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .intimacy-veil-message strong{font-size:22px;font-weight:800;}
 .intimacy-veil-message p{margin:0;font-size:13px;line-height:1.6;color:#dbe5e7;}
 .intimacy-veil-message small{font-size:13px;color:#b8d9d8;}
+
+/* H2: music selection and global audio permission on mobile Safari. */
+.music-audio-toggle{display:block;width:100%;margin:8px 0;padding:10px 12px;
+  text-align:left;border:1px solid #b2d5c0;background:#e8f5ea;color:#295941;
+  border-radius:12px;font-size:12px;font-weight:800;min-height:44px;}
+.music-audio-toggle[aria-pressed="true"]{background:#397e61;color:#fff;}
+.music-style-field{display:flex;flex-direction:column;gap:6px;color:#556f5d;
+  font-weight:700;font-size:12px;margin:0 0 12px;}
+.music-style-field[hidden]{display:none;}
+.music-style-field select{height:43px;border:1px solid #b9d9c5;
+  background:white;border-radius:12px;padding:0 10px;color:#354d3f;font:inherit;}

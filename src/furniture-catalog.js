@@ -48,7 +48,10 @@ const original=[
   // never in initial world. Purchased copies have real individual instance IDs.
   {prefabId:'bookcase',instanceId:'template-bookcase-1',name:'Книжный шкаф',
     category:'Гостиная',actionId:'hobby',capabilities:['books.borrow'],
-    templateOnly:true,x:0,z:0,rect:[-.53,.53,-.27,.27],approach:[0,.92]}
+    templateOnly:true,x:0,z:0,rect:[-.53,.53,-.27,.27],approach:[0,.92]},
+  {prefabId:'music',instanceId:'template-music-1',name:'Музыкальный центр',
+    category:'Гостиная',actionId:'music',capabilities:['music.playback'],
+    templateOnly:true,x:0,z:0,rect:[-.46,.46,-.26,.26],approach:[0,.84]}
 ];
 const frozenRect=(r,cx,cz)=>Object.freeze({
   minX:r[0]-cx,maxX:r[1]-cx,minZ:r[2]-cz,maxZ:r[3]-cz
