@@ -12,6 +12,7 @@ import {findPath,nearestWalkable} from './navigation.js';
 import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './furniture-catalog.js';
 import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {furniturePoint} from './furniture-transform.js';
+import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 
@@ -103,6 +104,21 @@ export function loadHousehold(raw) {
   if(!raw.socialGraph||!Object.hasOwn(raw.socialGraph,'lifeStages'))
     for(const id of HOUSEHOLD_IDS)setLifeStage(root.socialGraph,id,'adult');
   root.socialAction=loadSocialAction(raw.socialAction,root);
+  // Restore F3b sofa reservations from optional v1 action data. A removed,
+  // relocated or doubly booked seat cannot silently seize another sofa.
+  const occupiedSofas=new Set();
+  for(const id of HOUSEHOLD_IDS){
+    const action=getActor(root,id)?.action;
+    if(action?.id==='sofa')occupiedSofas.add(action.targetInstanceId||'home-sofa-1');
+  }
+  for(const id of HOUSEHOLD_IDS){
+    const action=getActor(root,id)?.action;
+    if(action?.id!=='tv'||!action.watchSeatInstanceId)continue;
+    const seat=action.watchSeatInstanceId;
+    if(occupiedSofas.has(seat)||!tvSofaView(root.world,seat,action.targetInstanceId))
+      delete action.watchSeatInstanceId; // continue the valid TV action standing
+    else occupiedSofas.add(seat);
+  }
   // F0 committed furniture is now a first-class ambient mood input for both
   // residents; no ambient field or fabricated memory is persisted.
   refreshMind(root,root.world);refreshMind(mira,root.world);
@@ -211,6 +227,8 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
   if(!item)return false;
   if(itemId==='bed')return bedSlotFor(root,residentId,item.instanceId)!==null;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
+  if(itemId==='sofa'&&other?.action?.id==='tv'&&
+     other.action.watchSeatInstanceId===item.instanceId)return false;
   return other?.action?.targetInstanceId!==item.instanceId &&
     !(other?.action?.id===itemId&&!other.action.targetInstanceId);
 }
@@ -227,6 +245,12 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   const chosen=chooseAction(resident,itemId,automatic);
   if(chosen)resident.action.targetInstanceId=item.instanceId;
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
+  // Book the same physical sofa before walking, so an ordinary rest or a
+  // second television viewer cannot sit in the occupied spot.
+  if(chosen&&itemId==='tv'){
+    const seat=chooseTvSofa(root,residentId,item.instanceId);
+    if(seat)resident.action.watchSeatInstanceId=seat.sofaId;
+  }
   return chosen;
 }
 
