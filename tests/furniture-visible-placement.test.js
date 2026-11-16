@@ -78,13 +78,13 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
     'furnish-warehouse-toggle','furnish-edit-toggle','furniture-editor',
     'furnish-placement-guide','furnish-placing-name','furnish-placing-status',
     'furnish-place-cancel','furnish-placement-controls','furnish-preview',
-    'furnish-buy','furnish-preview-turn','furnish-stock'])
+    'furnish-buy','furnish-preview-turn','furnish-stock','hint'])
     elements.set(id,makeEl());
   elements.get('furnish-stock').querySelectorAll=()=>[plant,table];
   const pos=cameraPlacementPose({centerX:0,centerZ:0});
   const visual={enabled:false,render:{material:null},setPosition(){},setLocalScale(){}};
   const state={
-    $:key=>elements.get(key),shopOpen:true,warehouseOpen:false,
+    $:key=>elements.get(key),shopOpen:true,warehouseOpen:false,oneFingerMode:'pan',
     shopSelected:'plant',shopPlacing:true,shopPose:pos,
     shopListings:[{name:'Растение',prefabId:'plant',price:130}],
     game:{world:{furniture:newFurnitureWorld()},shop:newFurnitureShop()},
