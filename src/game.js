@@ -2403,6 +2403,9 @@ function boot() {
     if(furnishMode&&holdGesture.pointerId===event.pointerId)
       cancelPendingGrab();
     const pos=cameraGesture.end(gesturePoint(event),performance.now());
+    // A quick swipe may end before the 100ms preview throttle fires.
+    // Snap the preview to the final camera pose on release.
+    if(furnishMode&&shopPlacing&&!pos)moveShopPreviewToCamera(true);
     if(!pos||dialogueNeedsDecision(game))return;
     if(furnishMode){
       if(shopOpen&&shopPlacing&&shopSelected){
