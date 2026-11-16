@@ -49,11 +49,11 @@ test('both Meshy visuals mount post-Anim controller and hide obsolete elbow book
   for(const code of [alex,mira]){
     assert.match(code,/createMeshyReadingController/);
     assert.match(code,/readingReady:Boolean\(state\.readingRuntime\?\.ready\)/);
-    assert.match(code,/state\.readingRuntime\?\.setFrame\(actionId==='hobby'/);
+    assert.match(code,/state\.readingRuntime\?\.setFrame\(readingStage\|\|actionId==='hobby'/);
     assert.match(code,/if\(actionId==='hobby'\)/);
   }
-  assert.match(game,/miraMeshShown&&\(miraUseId==='sofa'\|\|miraUseId==='hobby'\)/);
-  assert.match(game,/meshyShown&&\(useId==='sofa'\|\|useId==='hobby'\)/);
+  assert.match(game,/miraMeshShown&&\(miraUseId==='sofa'\|\|game\.otherSim\.action\?\.id==='hobby'\)/);
+  assert.match(game,/meshyShown&&\(useId==='sofa'\|\|game\.action\?\.id==='hobby'\)/);
   const workflow=source('../.github/workflows/pages.yml');
   assert.match(workflow,/node --check src\/meshy-reading-runtime\.js/);
   assert.match(workflow,/cp src\/meshy-reading-runtime\.js site\/src\//);
@@ -86,6 +86,8 @@ test('P0 Safari boot: loaded Meshy reading controller accepts idle, reset and re
     addChild(child){this.children.push(child);}
     addComponent(){this.render=true;}
     setLocalPosition(x,y,z){this.position={x,y,z};}
+    setPosition(x,y,z){this.position={x,y,z};}
+    setEulerAngles(x,y,z){this.euler={x,y,z};}
     setLocalEulerAngles(x,y,z){this.euler={x,y,z};}
     setLocalScale(x,y,z){this.scale={x,y,z};}
     getWorldTransform(){return transform;}
@@ -124,6 +126,18 @@ test('P0 Safari boot: loaded Meshy reading controller accepts idle, reset and re
     controller.setFrame(null);
     assert.equal(book.enabled,false);
     assert.equal(controller.apply(),false);
+    controller.setFrame({active:true,stage:'taking',elapsed:0,stepElapsed:1.2});
+    assert.equal(book.enabled,true);
+    assert.doesNotThrow(()=>controller.apply(),'book follows real wrist while borrowing');
+    assert.equal(book.children[1].enabled,false,'closed book has no spread pages');
+    controller.setFrame({active:true,stage:'toSeat',elapsed:0});
+    assert.doesNotThrow(()=>controller.apply(),'book stays attached while walking');
+    controller.setFrame({active:true,stage:'reading',elapsed:6});
+    assert.equal(book.children[1].enabled,true,'pages open only when seated');
+    assert.doesNotThrow(()=>controller.apply());
+    controller.setFrame({active:true,stage:'returnShelf',elapsed:36});
+    assert.doesNotThrow(()=>controller.apply());
+    assert.equal(book.children[1].enabled,false);
     controller.setFrame({active:true,elapsed:6});
     assert.equal(book.enabled,true,'same rig can restart after stopping');
     controller.setFrame();
