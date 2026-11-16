@@ -12,16 +12,17 @@ const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 test('F4b1 selector uses SKU definitions for the six real offers, keeps legacy order and prices',()=>{
   const list=selectShopCatalog(),old=marketListing(),registry=legacyObjectRegistry();
   assert.deepEqual(list.slice(0,6).map(x=>x.prefabId),SHOP_ITEMS.map(x=>x.prefabId));
-  assert.equal(list.length,8);
+  assert.equal(list.length,9);
   assert.deepEqual(list.map(x=>x.price),old.map(x=>x.price));
   assert.deepEqual(list.map(x=>x.name),old.map(x=>x.name));
   assert.deepEqual(list.map(x=>x.effectText),old.map(x=>x.effectText));
   for(const item of list){
     assert.ok(item.itemId==='legacy.'+item.prefabId||item.itemId==='plant.amber'||
-      item.itemId==='bookcase.starter');
+      item.itemId==='bookcase.starter'||item.itemId==='sofa.comfort');
     assert.deepEqual(item.categoryIds,registry.items[item.itemId].categoryIds);
     assert.ok(Object.isFrozen(item.categoryIds));
-    assert.deepEqual(registry.items[item.itemId].effects,[]);
+    if(item.itemId==='sofa.comfort')assert.equal(registry.items[item.itemId].effects[0].statId,'needs.energy');
+    else assert.deepEqual(registry.items[item.itemId].effects,[]);
   }
 });
 test('F4b1 category choices come from sellable registry items, not all household fixtures',()=>{
@@ -40,7 +41,7 @@ test('F4b1 room category switches available products without altering shopping i
   assert.deepEqual(selectShopCatalog({roomCategoryId:'room.bedroom'}).map(x=>x.prefabId),
     ['nightstand','bed']);
   assert.deepEqual(selectShopCatalog({roomCategoryId:'room.living'}).map(x=>x.prefabId),
-    ['table','tv','sofa','bookcase']);
+    ['table','tv','sofa','bookcase','sofa']);
   assert.deepEqual(selectShopCatalog({roomCategoryId:'room.decor'}).map(x=>x.prefabId),
     ['plant','plant']);
   assert.equal(SHOP_ITEMS.length,6);
@@ -51,7 +52,7 @@ test('F4b1 function filters support multiple SKU with same capability',()=>{
   assert.deepEqual(selectShopCatalog({functionCategoryId:'function.surface'}).map(x=>x.prefabId),
     ['table']);
   assert.deepEqual(selectShopCatalog({functionCategoryId:'function.relax'}).map(x=>x.prefabId),
-    ['sofa']);
+    ['sofa','sofa']);
   assert.deepEqual(selectShopCatalog({functionCategoryId:'function.sleep'}).map(x=>x.prefabId),
     ['bed']);
 });
@@ -101,7 +102,7 @@ test('F4b1 never exposes a registry-only, missing or mismatched product for purc
     {prefabId:'kitchen-machine',price:1}
   ]}),[]);
   assert.equal(selectShopCatalog({registry,offers:[]}).length,0);
-  assert.equal(selectShopCatalog({registry}).length,8);
+  assert.equal(selectShopCatalog({registry}).length,9);
 });
 test('F4b1 real Safari shop has native two-facet filters, count and safe empty state',()=>{
   const html=read('../index.html'),css=read('../styles.css'),game=read('../src/game.js');
@@ -127,9 +128,9 @@ test('F4b1 Pages packages registry selector, mobile build version and leaves sav
   const pkg=JSON.parse(read('../package.json'));
   assert.match(workflow,/node --check src\/shop-catalog-selector\.js/);
   assert.match(workflow,/cp src\/object-definition-registry\.js src\/object-effect-engine\.js src\/object-legacy-adapter\.js src\/shop-catalog-selector\.js site\/src\//);
-  assert.match(html,/src\/game\.js\?v=1\.2n/);
-  assert.match(html,/styles\.css\?v=1\.2n/);
-  assert.equal(pkg.version,'1.0.0-alpha.66');
+  assert.match(html,/src\/game\.js\?v=1\.2o/);
+  assert.match(html,/styles\.css\?v=1\.2o/);
+  assert.equal(pkg.version,'1.0.0-alpha.67');
   assert.deepEqual(newFurnitureShop(),{schema:1,credits:5000,nextId:1});
   assert.equal(newFurnitureWorld().schema,1);
 });
@@ -161,7 +162,7 @@ test('F4b1 DOM filtering hides wrong cards and reselects an offered item',()=>{
   run();
   assert.equal(ctx.shopSelected,'nightstand');
   assert.equal(buttons.filter(b=>!b.hidden).length,2);
-  assert.equal(elements.get('furnish-filter-count').textContent,'Показано 2 из 8');
+  assert.equal(elements.get('furnish-filter-count').textContent,'Показано 2 из 9');
   assert.equal(elements.get('furnish-filter-empty').hidden,true);
   assert.equal(ctx.shopPose,null);
   assert.equal(ctx.shopManualPose,false);
@@ -171,7 +172,7 @@ test('F4b1 DOM filtering hides wrong cards and reselects an offered item',()=>{
   assert.ok(buttons.every(b=>b.hidden));
   assert.equal(ctx.shopSelected,null);
   assert.equal(elements.get('furnish-filter-empty').hidden,false);
-  assert.equal(elements.get('furnish-filter-count').textContent,'Показано 0 из 8');
+  assert.equal(elements.get('furnish-filter-count').textContent,'Показано 0 из 9');
   ctx.shopRoomCategory=null;ctx.shopFunctionCategory=null;
   run();
   assert.equal(ctx.shopSelected,'plant');
