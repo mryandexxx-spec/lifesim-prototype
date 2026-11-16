@@ -219,7 +219,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       bedBusy=false,bedFrame=null,showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,fridgeBusy=false,
       socialInitiator=false,socialElapsed=null,hugFrame=null,kissFrame=null,fridgeFrame=null,
-      worldMinutes=null,mood=null,energy=null,readingElapsed=null}={}){
+      worldMinutes=null,mood=null,energy=null,readingElapsed=null,
+      readingStage=null,readingStepElapsed=0}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
         preferred:requested&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready))&&
@@ -244,8 +245,12 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         state.showerRuntime?.setFrame(null);
         return useMeshy;
       }
-      state.readingRuntime?.setFrame(actionId==='hobby'
-        ?{active:true,elapsed:readingElapsed}:null,paused);
+      // The book is present in travel/take/return frames too. Only the
+      // actual seated reading stage may earn XP; this is pure cosmetics.
+      state.readingRuntime?.setFrame(readingStage||actionId==='hobby'
+        ?{active:true,stage:readingStage||'reading',
+          elapsed:Number.isFinite(readingElapsed)?readingElapsed:0,
+          stepElapsed:readingStepElapsed}:null,paused);
       state.hugRuntime?.setFrame(hugFrame,paused);
       state.kissRuntime?.setFrame(kissFrame,paused);
       // Game updates the pose; postUpdate applies joint rotations after Anim.
