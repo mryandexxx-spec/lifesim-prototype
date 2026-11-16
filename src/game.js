@@ -2126,7 +2126,7 @@ function boot() {
   furnitureGhost.enabled=false;
   const marketGhost=box('F2 shop preview',0,.078,0,.1,.04,.1,ghostValid);
   marketGhost.enabled=false;
-  const lockedFurnitureIds=()=>{
+  const lockedFurnitureIds=(includePending=true)=>{
     const busy=new Set();
     if(game.socialAction?.eveningStage?.instanceId)
       busy.add(game.socialAction.eveningStage.instanceId);
@@ -2174,14 +2174,19 @@ function boot() {
         busy.add(actor.action.readingSeatInstanceId);
       if(actor?.action?.id==='tv'&&actor.action.watchSeatInstanceId)
         busy.add(actor.action.watchSeatInstanceId);
-      for(const pending of pendingActions(game.actionQueues,id))
+      // Pending commands identify the same durable instance ID after moving
+      // or rotating it, so allow repositioning to repair a blocked approach.
+      // Storing/selling is still prohibited while commands are pending.
+      if(includePending)for(const pending of pendingActions(game.actionQueues,id))
         if(['object','activity'].includes(pending.type)&&pending.targetInstanceId)
           busy.add(pending.targetInstanceId);
     }
     return [...busy];
   };
-  const editorContext=()=>({lockedInstanceIds:lockedFurnitureIds(),
-    residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)});
+  const editorContext=(allowQueuedReposition=false)=>({
+    lockedInstanceIds:lockedFurnitureIds(!allowQueuedReposition),
+    residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)
+  });
   const editorLabel=instanceId=>{
     const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
     return item?(furnitureProduct(item.itemDefinitionId)?.name||
@@ -2620,7 +2625,7 @@ function boot() {
   $('furnish-sell').addEventListener('click',()=>sellFurniture(editSelectedId));
   const commitFurniture=(instanceId,pose)=>{
     if(!editSession||!furnishMode)return false;
-    const result=editSession.commit(instanceId,pose,editorContext());
+    const result=editSession.commit(instanceId,pose,editorContext(true));
     if(!result.ok){
       editorFeedback(editorMessage(result.reason),true);
       updateDecorNodes();renderFurnitureSelection();return false;
@@ -2799,7 +2804,7 @@ function boot() {
       return true;
     }
     editDrag.lastCheck=performance.now();
-    const candidate=proposeFurnitureMove(game.world.furniture,editDrag.instanceId,pose,editorContext());
+    const candidate=proposeFurnitureMove(game.world.furniture,editDrag.instanceId,pose,editorContext(true));
     editDrag.valid=candidate.ok;
     updateDecorNodes(editDrag.instanceId,pose);
     showGhost(editDrag.instanceId,pose,candidate.ok);
