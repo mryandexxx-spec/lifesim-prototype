@@ -7,8 +7,8 @@ const source=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const html=source('../index.html'),game=source('../src/game.js'),css=source('../styles.css');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 
-test('F2.1 UX five products including first functional sofa share a single catalog',()=>{
-  assert.deepEqual(SHOP_ITEMS.map(p=>p.prefabId),['plant','table','nightstand','tv','sofa']);
+test('F2.1 UX six products including bed share a single catalog',()=>{
+  assert.deepEqual(SHOP_ITEMS.map(p=>p.prefabId),['plant','table','nightstand','tv','sofa','bed']);
   assert.match(game,/for\(const item of shopListings\)\{/);
   assert.match(game,/button\.append\(name,cost,mark\)/);
   for(const item of SHOP_ITEMS){
