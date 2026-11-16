@@ -46,6 +46,7 @@ jobs:
           node --check src/skill-registry.js
           node --check src/skills-engine.js
           node --check src/activity-registry.js
+          node --check src/hobby-reading.js
           node --check src/activity-session.js
           node --check src/hobby-content.js
           node --check src/tv-interaction.js
@@ -144,6 +145,7 @@ jobs:
           cp src/hobby-content.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/
+          cp src/hobby-reading.js site/src/
           cp src/skills-engine.js site/src/
           cp src/skill-registry.js site/src/
           cp src/tv-interaction.js site/src/

@@ -252,11 +252,12 @@ test('H0 does not change existing household saves, catalog, inventory or runtime
   assert.equal(LEISURE_CATALOG.books.tag,'books');
   assert.equal(GIFT_CATALOG.book.tag,'books');
   assert.ok(starterInventory().mira.some(v=>v.type==='book'));
-  assert.equal(Object.hasOwn(restored,'skills'),false);
-  assert.equal(Object.hasOwn(restored.otherSim,'skills'),false);
-  assert.equal(Object.hasOwn(restored,'activitySession'),false);
+  assert.deepEqual(restored.skills,{schema:1,xpById:{}});
+  assert.deepEqual(restored.otherSim.skills,{schema:1,xpById:{}});
+  assert.equal(restored.activitySession,null);
   const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
-  assert.doesNotMatch(game,/from ['"]\.\/(skill-registry|skills-engine|activity-registry|activity-session|hobby-content)\.js['"]/);
+  assert.match(game,/from '\.\/hobby-reading\.js'/);
+  assert.match(game,/from '\.\/skills-engine\.js'/);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/src\/game\.js\?v=1\.2m/);
 });

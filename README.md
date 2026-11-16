@@ -1,3 +1,13 @@
+# Блин’С H1 — настоящее чтение (1.2n)
+
+Новый покупаемый товар **«Шкаф с историями»** (`bookcase.starter`, пилотная стоимость 320 пробных кр.) использует F4b2 SKU и F4b1 каталог с фильтром «Книги и чтение». ДОМ → Каталог → купить → установить в 3D; в обычной игре тапни по физическому шкафу и выбери «Читать книгу». Персонаж идёт по A*, берёт книгу, читает 36 игровых минут, получает досуг и собственный опыт «Литературная эрудиция». Уровень/опыт доступны в панели «Внутренний мир». Один шкаф физически занимает только один житель, для параллельного чтения нужны две полки.
+
+**Безопасность:** existing original 10 home objects, older F4b1/F4b2 SKU, prices/refunds, PlayCanvas/Meshy, romance and TV preserved. Purchases only after valid placement; stop/pause/walk/no room access do not grant XP. New optional resident `skills` and `activitySession` are compatible with `lifesim.room01.v1`; old saves restore neutral XP, active sessions validate exact installed item and recorded elapsed/watermark on reload. FIFO activity tasks identify the actual instance. 320 credits, 36 game minutes, 1.05 fun/min and 1 XP/min are **provisional pilot values** subject to later owner gameplay review, not approved final balance.
+
+**Scope:** the gifted book remains an inventory gift until H3, abstract shared leisure not migrated until H3; music is H2. Owner iPhone acceptance is a separate step after CI/Pages, no acceptance assumed. Version 1.2n / npm alpha66.
+
+---
+
 # F4b2 — самостоятельные SKU мебели, безопасные сохранения и пилот варианта (1.2m)
 
 Новая отдельная чистая `src/furniture-products.js` хранит товарные предложения: **шесть исходных** `legacy.<prefabId>` с прежними ценами и **первый дополнительный** `plant.amber` («Растение „Янтарные листья“», те же 130 пробных кредитов). Оба растения используют одну и ту же PlayCanvas-геометрию `prefabId='plant'`, но купленные экземпляры сохраняют отдельные `itemDefinitionId` и `purchasePriceCredits`. На 3D-клонах и preview новая окраска листвы берётся из именованной палитры, базовая зелёная модель остаётся неизменной.
