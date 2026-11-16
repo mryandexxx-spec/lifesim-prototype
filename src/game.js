@@ -59,6 +59,7 @@ import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './s
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {TV_WATCH_POSE,tvScreenFrame} from './tv-interaction.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
+import {planSharedTv,liveSharedTv} from './tv-together.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
 import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
@@ -916,12 +917,28 @@ function renderSharedPanel(force=true){
   }
   const activities=document.createElement('h3');activities.textContent='Провести время вместе';
   options.append(activities);
-  for(const [id,def] of Object.entries(LEISURE_CATALOG))
+  for(const [id,def] of Object.entries(LEISURE_CATALOG)){
+    if(id==='tv'){
+      // Keep a physical screen ID in the FIFO; the TV may later be moved,
+      // sold or occupied, but the command must never silently change TVs.
+      for(const item of game.world.furniture.instances.filter(i=>
+        i.prefabId==='tv'&&i.location==='home')){
+        options.append(conversationButton(def.symbol+' '+def.label+
+          (item.instanceId==='home-tv-1'?' · Домашний ТВ':' · Купленный ТВ'),()=>{
+          if(queuedSocial('shared',{mode:'leisure',choiceId:'tv',
+            targetInstanceId:item.instanceId})){
+            sharedPicker=false;renderSharedPanel();
+          }
+        }));
+      }
+      continue;
+    }
     options.append(conversationButton(def.symbol+' '+def.label,()=>{
       if(queuedSocial('shared',{mode:'leisure',choiceId:id})){
         sharedPicker=false;renderSharedPanel();
       }
     }));
+  }
 }
 function conversationButton(label,callback,secondary=false){
   const button=document.createElement('button');
@@ -1635,6 +1652,18 @@ function boot() {
       return false;
     }
     const self=getActor(game,actorId), partner=getActor(game,actorId==='alex'?'mira':'alex');
+    if(shared?.mode==='leisure'&&shared.choiceId==='tv'){
+      const plan=planSharedTv(game,actorId,shared.targetInstanceId||'home-tv-1');
+      if(!plan)return false; // retain FIFO, no teleport or fabricated receipt
+      const selfPlace=plan.places[actorId],peerId=actorId==='alex'?'mira':'alex';
+      const a=findPath(self.position,selfPlace,game.world);
+      const b=findPath(partner.position,plan.places[peerId],game.world);
+      if(!a||!b||!startSharedSocial(game,actorId,selfPlace,
+          'leisure','tv',false,plan))return false;
+      paths[actorId]={points:a,index:0,id:'social:'+kind};
+      paths[peerId]={points:b,index:0,id:'social:'+kind};
+      restartAutonomyWait();return true;
+    }
     const offsets=[[.84,0],[-.84,0],[0,.84],[0,-.84],[.62,.62],[-.62,.62],[.62,-.62],[-.62,-.62]];
     const candidates=offsets.map(([dx,dz])=>{
       const goal={x:partner.position.x+dx,z:partner.position.z+dz};
@@ -1724,7 +1753,8 @@ function boot() {
           started=beginSocial('talk',false,residentId,null,null,command.actionId,true);
         else if(command.type==='shared')
           started=beginSocial('talk',false,residentId,null,
-            {mode:command.mode,choiceId:command.choiceId},null,true);
+            {mode:command.mode,choiceId:command.choiceId,
+              targetInstanceId:command.targetInstanceId},null,true);
         if(started){
           routeRetryAt.delete(command.seq);
           routeFailures.delete(command.seq);
@@ -1897,6 +1927,14 @@ function boot() {
       lockPrefab('toilet');
     if(fridgeOpen>.001||Object.values(fridgeLeaving).some(Boolean))
       lockPrefab('fridge');
+    const jointTv=game.socialAction?.shared?.tvPlan;
+    if(jointTv){
+      busy.add(jointTv.tvId);
+      for(const id of HOUSEHOLD_IDS){
+        const seat=jointTv.places?.[id]?.seatId;
+        if(seat)busy.add(seat);
+      }
+    }
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
@@ -3106,7 +3144,8 @@ function boot() {
       if(item.prefabId!=='tv'||item.location!=='home')continue;
       const program=decorNodes.get(item.instanceId)?.findByName('tv program');
       if(!program)continue;
-      const frame=tvScreenFrame([game,game.otherSim],item.instanceId,effectTime);
+      const frame=tvScreenFrame([game,game.otherSim],item.instanceId,effectTime,
+        game.socialAction);
       program.enabled=frame.on;
       if(frame.on)program.render.material=[M.mint,M.blue,M.peach][frame.frame];
     }
