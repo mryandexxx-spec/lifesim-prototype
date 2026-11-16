@@ -124,7 +124,7 @@ const schemes={
     ...[-.65,-.37,-.09,.19,.47].map(z=>b('woven stripe '+z,0,.053,z,1.75,.012,.08,
       p.cream)),
     ...[-.90,-.65,-.4,-.15,.1,.35,.6,.85].flatMap(x=>[-.76,.76].map(z=>
-      b('braided fringe '+x+','+z,x,.030,z,.055,.026,.14,p.birch))]},
+      b('braided fringe '+x+','+z,x,.030,z,.055,.026,.14,p.birch)))]},
   'dresser.reed':{parts:[
     b('dresser walnut case',0,.60,0,1.70,.96,.77,p.walnut),
     ...[.31,.62,.92].map((y,i)=>[
