@@ -5,19 +5,26 @@ export function createMeshyKissController({pc,model}={}){
   const neck=model.findByName('mixamorig:Neck');
   if(!neck?.getLocalRotation||!neck?.setLocalRotation)return absent;
   const tilt=new pc.Quat(),posed=new pc.Quat();
-  let frame=null,paused=false;
+  let frame=null,paused=false,lastApplied=false,lastReason='ожидание';
   return {
     ready:true,
-    setFrame(next,freeze=false){frame=next;paused=Boolean(freeze);},
+    setFrame(next,freeze=false){
+      frame=next;paused=Boolean(freeze);
+      if(!next?.active){lastApplied=false;lastReason='ожидание';}
+    },
+    status(){return {lastApplied,lastReason};},
     apply(){
-      if(paused||!frame?.active||!Number.isFinite(frame.weight)||
-        frame.weight<=.002)return false;
+      if(paused){lastApplied=false;lastReason='пауза';return false;}
+      if(!frame?.active||!Number.isFinite(frame.weight)||frame.weight<=.002){
+        lastApplied=false;lastReason='нет кадра';return false;
+      }
       const w=Math.max(0,Math.min(1,frame.weight));
       // Add to the base Mixamo pose after animation each unpaused frame.
       // Paused postUpdate must not accumulate repeated local rotations.
       tilt.setFromEulerAngles(6*w,0,(frame.initiator?9:-9)*w);
       posed.mul2(neck.getLocalRotation(),tilt);
       neck.setLocalRotation(posed);
+      lastApplied=true;lastReason='поворот';
       return true;
     }
   };
