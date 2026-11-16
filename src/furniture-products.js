@@ -9,12 +9,21 @@ const offered=[
   {itemId:'legacy.tv',prefabId:'tv',price:650},
   {itemId:'legacy.sofa',prefabId:'sofa',price:550},
   {itemId:'legacy.bed',prefabId:'bed',price:850},
-  // Pilot of physical appearance only. No quality/buff, price differential or XP.
+  // F4b2 appearance-only pilot; F4b4 adds a separate, priced gameplay pilot.
   {itemId:'plant.amber',prefabId:'plant',price:130,
     name:'Растение «Янтарные листья»',appearanceId:'foliage.amber',
-    description:'Янтарная листва · украшение без дополнительного бонуса'}
+    description:'Янтарная листва · украшение без дополнительного бонуса'},
+  // F4b4 trial balance: secondary Energy ONLY during verified sofa rest.
+  // No passive benefit, and no bonus while watching television on this sofa.
+  {itemId:'sofa.comfort',prefabId:'sofa',price:700,
+    name:'Диван «Комфорт»',appearanceId:'upholstery.sage',
+    description:'Отдых → досуг и +0,2 энергии за игровую минуту',
+    effects:[{id:'rest.energy',trigger:'item.use.tick',actionId:'sofa',
+      statId:'needs.energy',mode:'perMinute',amount:0.2,
+      stacking:'highest',group:'comfort.rest.energy'}]}
 ];
-export const FURNITURE_PRODUCTS=Object.freeze(offered.map(x=>Object.freeze({...x})));
+export const FURNITURE_PRODUCTS=Object.freeze(offered.map(x=>Object.freeze({...x,
+  ...(x.effects?{effects:Object.freeze(x.effects.map(e=>Object.freeze({...e})))}:{})})));
 export const FURNITURE_PRODUCT_BY_ID=Object.freeze(
   Object.fromEntries(FURNITURE_PRODUCTS.map(x=>[x.itemId,x])));
 if(Object.keys(FURNITURE_PRODUCT_BY_ID).length!==FURNITURE_PRODUCTS.length)
@@ -25,6 +34,11 @@ export const FURNITURE_LEGACY_OFFERS=Object.freeze(FURNITURE_PRODUCTS.filter(x=>
  * New colorways reference a named palette; unknown style is no-op.
  */
 export const FURNITURE_APPEARANCES=Object.freeze({
+  'upholstery.sage':Object.freeze({
+    'sofa seat':'#748f7c', 'sofa back':'#486f5b',
+    'sofa arm left':'#486f5b', 'sofa arm right':'#486f5b',
+    'sofa pillow left':'#d1d0b6', 'sofa pillow right':'#acc4aa'
+  }),
   'foliage.amber':Object.freeze({
     'leaf crown':'#bd8940',
     'plant leaf':'#d6a45d'
