@@ -2854,7 +2854,9 @@ function boot() {
     const kissAlexFrame={...kissFrame,initiator:game.socialAction?.initiator==='alex'};
     const kissMiraFrame={...kissFrame,initiator:game.socialAction?.initiator==='mira'};
     const pairTargets=hugTargets||kissTargets;
-    const using=game.action?.phase==='using', useId=using?game.action.id:null;
+    const pairedTv=liveSharedTv(game);
+    const using=game.action?.phase==='using',
+      useId=using?game.action.id:pairedTv?'tv':null;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
@@ -2867,8 +2869,11 @@ function boot() {
     const alexToilet=toiletStates.alex.frame?{...toiletStates.alex.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
     const walking=active&&(game.action?.phase==='walking'||
-      (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='alex'));
-    const alexWatchSeat=useId==='tv'?game.action?.watchSeatInstanceId:null;
+      (game.socialAction?.phase==='walking'&&
+        (game.socialAction.initiator==='alex'||
+          Boolean(game.socialAction.shared?.tvPlan?.places?.alex))));
+    const alexWatchSeat=useId==='tv'
+      ?(pairedTv?.places?.alex?.seatId||game.action?.watchSeatInstanceId):null;
     if(useId==='sofa'||alexWatchSeat)
       sofaVisualTargets.alex=(alexWatchSeat||game.action?.targetInstanceId)||null;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
@@ -2877,7 +2882,7 @@ function boot() {
     const seatPose=furniturePose(game.world,'sofa',
       sofaTransitionPose(sofaStates.alex),sofaVisualTargets.alex)||
       {...display,sofaWeight:0}; // deleted/stale target never teleports to original
-    const seating=useId==='sofa'||sofaStates.alex.progress>0;
+    const seating=useId==='sofa'||Boolean(alexWatchSeat)||sofaStates.alex.progress>0;
     if(!seating)sofaVisualTargets.alex=null;
     if(alexSeatInstanceId!==sofaVisualTargets.alex){
       alexSeatInstanceId=sofaVisualTargets.alex;
@@ -2892,8 +2897,11 @@ function boot() {
       ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex),bedVisualTargets.alex):null;
     if(bedStates.alex.progress===0)bedVisualTargets.alex=null;
     const bedding=Boolean(bedPose);
-    const pose=useId&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
-      ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null;
+    const pairedTvStand=pairedTv&&!alexWatchSeat
+      ?{...pairedTv.places.alex,y:0,pitch:0,
+        yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
+    const pose=pairedTvStand||(useId&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
+      ?furniturePose(game.world,useId,ACTOR_POSES[useId],game.action?.targetInstanceId):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
@@ -2938,7 +2946,7 @@ function boot() {
       toiletStep:alexToilet?.walkWeight||0,
       sofaWeight:seatPose.sofaWeight,
       tvGazeYaw:alexWatchSeat?tvSofaView(game.world,alexWatchSeat,
-        game.action?.targetInstanceId)?.torsoYaw||0:0,
+        pairedTv?.tvId||game.action?.targetInstanceId)?.torsoYaw||0:0,
       bedStepWeight:bedPose?.bedStepWeight||0,
       bedSitWeight:bedPose?.bedSitWeight||0,
       bedReclineWeight:bedPose?.bedReclineWeight||0,
@@ -2967,7 +2975,7 @@ function boot() {
     book.enabled=using&&useId==='sofa';
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
-    const miraUseId=miraUsing?game.otherSim.action.id:null;
+    const miraUseId=miraUsing?game.otherSim.action.id:pairedTv?'tv':null;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
       game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
@@ -2980,8 +2988,11 @@ function boot() {
     const miraToilet=toiletStates.mira.frame?{...toiletStates.mira.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
     const miraWalking=active&&(game.otherSim.action?.phase==='walking'||
-      (game.socialAction?.phase==='walking'&&game.socialAction.initiator==='mira'));
-    const miraWatchSeat=miraUseId==='tv'?game.otherSim.action?.watchSeatInstanceId:null;
+      (game.socialAction?.phase==='walking'&&
+        (game.socialAction.initiator==='mira'||
+          Boolean(game.socialAction.shared?.tvPlan?.places?.mira))));
+    const miraWatchSeat=miraUseId==='tv'
+      ?(pairedTv?.places?.mira?.seatId||game.otherSim.action?.watchSeatInstanceId):null;
     if(miraUseId==='sofa'||miraWatchSeat)
       sofaVisualTargets.mira=(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
@@ -2990,7 +3001,7 @@ function boot() {
     const miraSeatPose=furniturePose(game.world,'sofa',
       sofaTransitionPose(sofaStates.mira),sofaVisualTargets.mira)||
       {...miraDisplay,sofaWeight:0};
-    const miraSeating=miraUseId==='sofa'||sofaStates.mira.progress>0;
+    const miraSeating=miraUseId==='sofa'||Boolean(miraWatchSeat)||sofaStates.mira.progress>0;
     if(!miraSeating)sofaVisualTargets.mira=null;
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
     bedStates.mira=advanceBedTransition(bedStates.mira,
@@ -3001,8 +3012,11 @@ function boot() {
       ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira),bedVisualTargets.mira):null;
     if(bedStates.mira.progress===0)bedVisualTargets.mira=null;
     const miraBedding=Boolean(miraBedPose);
-    const miraPose=miraUseId&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
-      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null;
+    const pairedTvMiraStand=pairedTv&&!miraWatchSeat
+      ?{...pairedTv.places.mira,y:0,pitch:0,
+        yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
+    const miraPose=pairedTvMiraStand||(miraUseId&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
+      ?furniturePose(game.world,miraUseId,ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
@@ -3043,7 +3057,7 @@ function boot() {
       toiletStep:miraToilet?.walkWeight||0,
       sofaWeight:miraSeatPose.sofaWeight,
       tvGazeYaw:miraWatchSeat?tvSofaView(game.world,miraWatchSeat,
-        game.otherSim.action?.targetInstanceId)?.torsoYaw||0:0,
+        pairedTv?.tvId||game.otherSim.action?.targetInstanceId)?.torsoYaw||0:0,
       bedStepWeight:miraBedPose?.bedStepWeight||0,
       bedSitWeight:miraBedPose?.bedSitWeight||0,
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
