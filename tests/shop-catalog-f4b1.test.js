@@ -113,6 +113,7 @@ test('F4b1 real Safari shop has native two-facet filters, count and safe empty s
   assert.match(game,/if\(!shopPlacing&&!visible\.some\(item=>item\.prefabId===shopSelected\)\)/);
   assert.match(game,/shopRoomCategory=event\.currentTarget\.value\|\|null/);
   assert.match(game,/shopFunctionCategory=event\.currentTarget\.value\|\|null/);
+  assert.match(game,/if\(shopOpen\)renderShopFilteredItems\(\);\s*else renderMarket\(\);/);
   assert.match(css,/\.furnish-catalog-filters\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css,/\.furnish-stock button\[hidden\]\{display:none!important;/);
   assert.match(css,/\.furnish-shop\[data-placing="true"\] \.furnish-catalog-filters/);

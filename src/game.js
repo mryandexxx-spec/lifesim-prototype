@@ -2222,8 +2222,11 @@ function boot() {
     warehouseOpen=mode==='warehouse';
     if(!shopOpen){shopPlacing=false;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;}
     $('furniture-editor').dataset.editorView=mode;
-    if(shopOpen&&!shopSelected)shopSelected='plant';
-    renderMarket();renderWarehouse();renderFurnitureSelection();
+    // Reconcile a saved-in-UI filter even when returning from Warehouse/Room.
+    // A hidden product must never become buyable after reopening the shop.
+    if(shopOpen)renderShopFilteredItems();
+    else renderMarket();
+    renderWarehouse();renderFurnitureSelection();
   };
   const chooseShopProduct=prefabId=>{
     shopPlacing=false;shopSelected=prefabId;shopManualPose=false;shopPose=null;shopSwipeRawPose=null;
