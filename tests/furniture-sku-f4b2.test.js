@@ -210,9 +210,9 @@ test('F4b2 Pages packages product source; visible bundle/lock bump without schem
   const lock=JSON.parse(src('../package-lock.json'));
   assert.match(pages,/node --check src\/furniture-products\.js/);
   assert.match(pages,/cp src\/furniture-products\.js site\/src\//);
-  assert.match(html,/src\/game\.js\?v=1\.2n/);
-  assert.match(html,/styles\.css\?v=1\.2n/);
-  assert.equal(pkg.version,'1.0.0-alpha.66');
+  assert.match(html,/src\/game\.js\?v=1\.2o/);
+  assert.match(html,/styles\.css\?v=1\.2o/);
+  assert.equal(pkg.version,'1.0.0-alpha.67');
   assert.equal(lock.version,pkg.version);
   assert.deepEqual(newFurnitureShop(),{schema:1,credits:5000,nextId:1});
 });
