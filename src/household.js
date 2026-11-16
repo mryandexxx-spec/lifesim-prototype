@@ -1,10 +1,12 @@
 /** Two-person household without importing PlayCanvas, DOM or browser APIs.
  * Legacy root fields remain Alex's exact v1 state; otherSim is an optional extension.
  */
-import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled } from './simulation.js';
+import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS } from './simulation.js';
 import { refreshMind } from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
-import {starterInventory,restoreInventory} from './gifts-leisure.js';
+import {starterInventory,restoreInventory,sharedDuration} from './gifts-leisure.js';
+import {voluntaryMoodEfficiency} from './mood-action-policy.js';
+import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
@@ -13,6 +15,7 @@ import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './
 import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {furniturePoint} from './furniture-transform.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
+import {liveSharedTv} from './tv-together.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 
@@ -304,8 +307,24 @@ export function tickHousehold(root,minutes) {
   other.paused=root.paused;
   other.speed=root.speed;
   other.autonomy.enabled=root.autonomy.enabled;
+  const shared=liveSharedTv(root);
+  const watchMinutes=shared?Math.min(minutes,Math.max(0,
+    sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
   tick(root,minutes,root.world);
   tick(other,minutes,root.world);
+  if(watchMinutes>0){
+    // Fun reflects REAL time in front of a running screen. Only the final
+    // canonically accepted leisure receipt later grants the SOCIAL benefit.
+    for(const id of HOUSEHOLD_IDS){
+      const actor=getActor(root,id),seat=shared.places[id]?.seatId;
+      const efficiency=voluntaryMoodEfficiency(actor,{type:'shared',mode:'leisure'});
+      actor.needs.fun=Math.min(100,actor.needs.fun+
+        ACTIONS.tv.benefitPerMinute*efficiency*watchMinutes);
+      if(seat)actor.needs.energy=Math.min(100,actor.needs.energy+
+        NEED_DECAY_PER_MINUTE.energy*watchMinutes);
+      refreshMind(actor,root.world);
+    }
+  }
   // Both clocks remain identical (including when paused).
   other.minutes=root.minutes;
   tickSocial(root,minutes);
