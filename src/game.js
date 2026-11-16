@@ -29,7 +29,8 @@ import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
 import {availableSocialActions,relationSummary,BRANCH_ACTIONS,getPair,episodeContext,socialKnowledgeNotes,socialCommunicationNotes} from './social-graph.js';
 import {latestEpisodes} from './social-episodes.js';
 import {pairDynamic} from './social-dynamics.js';
-import {romanceStatus,romanceLoveDescription,romanceClimate} from './romance.js';
+import {romanceStatus,romanceLoveDescription,romanceClimate,
+  setRomancePreference,romancePreferenceSummary} from './romance.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
@@ -629,17 +630,53 @@ function renderSocialMenu(force=true){
     addBranch('friend.tease');
     addBranch('friend.confide');
   }else if(category==='romance'){
-    const options=availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
+    // R3 settings belong only to the active resident. No automatic
+    // acceptance or synthetic interaction is issued from this menu.
+    const chosen=game.selectedSim;
+    const prefs=romancePreferenceSummary(game.socialGraph,chosen,targetId);
+    if(prefs){
+      const heading=document.createElement('p');
+      heading.className='shared-progress-text';
+      heading.textContent='Личные границы '+getActorName(chosen)+
+        ' · только для выбранного жителя';
+      options.append(heading);
+      for(const [kind,label,values] of [
+        ['boundary','Романтическое общение',['open','closed']],
+        ['touchBoundary','Прикосновения',['open','closed']],
+        ['exclusivity','Ожидание верности',['exclusive','open']]
+      ]){
+        const value=prefs[kind];
+        const detail=kind==='exclusivity'
+          ?value==='exclusive'?'ожидает исключительности':'допускает флирт без обязательств'
+          :value==='closed'?'пока не готов(а)':'открыт(а)';
+        const next=values.find(v=>v!==value);
+        options.append(conversationButton(label+': '+detail+' · изменить',()=>{
+          if(dialogueNeedsDecision(game))return;
+          if(setRomancePreference(game.socialGraph,chosen,targetId,kind,next)){
+            save(true);renderSocialMenu(true);
+            toast('Границы '+getActorName(chosen)+' обновлены');
+          }
+        }));
+      }
+      if(prefs.jealousy>0){
+        const note=document.createElement('p');
+        note.className='shared-progress-text';
+        note.textContent='Переживает из-за замеченного нарушения договорённостей. '+
+          'Откровенный разговор поможет восстановить доверие.';
+        options.append(note);
+      }
+    }
+    const romanceActions=availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
       .filter(action=>action.category==='romance')
       .map(action=>action.id==='romance.intimacy'&&!intimacyBedPlan(game,game.selectedSim)
         ?{...action,enabled:false,reason:'Нужна свободная двуспальная кровать'}:action);
-    for(const action of options){
+    for(const action of romanceActions){
       if(action.enabled)add(action.label,{type:'branch',actionId:action.id});
     }
-    if(!options.some(action=>action.enabled)){
+    if(!romanceActions.some(action=>action.enabled)){
       const hint=document.createElement('p');
       hint.className='shared-progress-text';
-      hint.textContent=options[0]?.reason||'Для романтики пока не время';
+      hint.textContent=romanceActions[0]?.reason||'Для романтики пока не время';
       $('social-menu-options').append(hint);
     }
   }else if(category==='conflict'){
