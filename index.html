@@ -13,17 +13,23 @@
   <link rel="stylesheet" href="./styles.css?v=1.2u-h2fix1-f4c" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
-      "./src/household.js":"./src/household.js?v=1.2u-h2fix1",
-      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2u-h2fix1",
+      "./src/household.js":"./src/household.js?v=1.2v-f4d",
+      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2v-f4d",
       "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1-f4c",
-      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2u-h2fix1",
-      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2u-f4c",
-      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2u-f4c",
-      "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2u-f4c",
+      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d",
+      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2v-f4d",
+      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2v-f4d",
+      "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2v-f4d",
       "./src/shop-catalog-selector.js":"./src/shop-catalog-selector.js?v=1.2u-f4c",
       "./src/furniture-value.js":"./src/furniture-value.js?v=1.2u-f4c",
       "./src/furniture-procedural-library.js":"./src/furniture-procedural-library.js?v=1.2u-f4c",
-      "./src/furniture-thumbnails.js":"./src/furniture-thumbnails.js?v=1.2u-f4c"}}
+      "./src/furniture-thumbnails.js":"./src/furniture-thumbnails.js?v=1.2u-f4c",
+      "./src/furniture-transform.js":"./src/furniture-transform.js?v=1.2v-f4d",
+      "./src/navigation.js":"./src/navigation.js?v=1.2v-f4d",
+      "./src/simulation.js":"./src/simulation.js?v=1.2v-f4d",
+      "./src/camera-controls.js":"./src/camera-controls.js?v=1.2v-f4d",
+      "./src/furniture-placement-preview.js":"./src/furniture-placement-preview.js?v=1.2v-f4d",
+      "./src/seat-furniture.js":"./src/seat-furniture.js?v=1.2v-f4d"}}
   </script>
 </head>
 <body>
@@ -41,7 +47,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.1 · F4C</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2v · F4D</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -317,7 +323,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-f4d"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
