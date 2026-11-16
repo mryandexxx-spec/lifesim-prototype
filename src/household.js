@@ -24,7 +24,8 @@ import {captureObjectUse,settleObjectUseStep} from './object-use-runtime.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 import {HOBBY_ACTIVITIES,HOBBY_CONTENT,HOBBY_SKILLS,READING_ACTIVITY_ID,READING_CONTENT_ID,
-  MUSIC_ACTIVITY_ID,MUSIC_ACTIVITY_IDS,MUSIC_CONTENT_IDS,READING_SKILL_ID} from './hobby-reading.js';
+  MUSIC_ACTIVITY_ID,MUSIC_ACTIVITY_IDS,MUSIC_CONTENT_IDS,READING_SKILL_ID,
+  canReadHobbyContent} from './hobby-reading.js';
 import {getActivityDefinition,activityFitsItem} from './activity-registry.js';
 import {createActivitySession,restoreActivitySession,arriveActivitySession,
   advanceActivitySession} from './activity-session.js';
@@ -344,7 +345,7 @@ function validReadingSource(root,actor){
   const id=actor===root?'alex':'mira';
   const owned=action?.inventoryItemId===undefined||inventoryFor(root,id)
     .some(gift=>gift.type==='book'&&gift.id===action.inventoryItemId);
-  return Boolean(owned&&item&&activity&&action.contentId===READING_CONTENT_ID&&
+  return Boolean(owned&&item&&activity&&canReadHobbyContent(actor.skills,action.contentId)&&
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
 function validMusicSource(root,actor){
@@ -369,7 +370,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
       gift.id===inventoryItemId)))return false;
   if(itemId==='hobby'){
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
-    if(!activity||contentId!==READING_CONTENT_ID||
+    if(!activity||!canReadHobbyContent(resident.skills,contentId)||
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;
     readingSeat=chooseReadingSeat(root,residentId,item.instanceId);
     if(!readingSeat)return false;

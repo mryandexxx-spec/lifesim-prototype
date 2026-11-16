@@ -1,0 +1,34 @@
+name: H4 skill progression and unlocked literature regression
+on:
+  push:
+    branches: ['feature/h4-*', 'fix/h4-*']
+  pull_request:
+    paths:
+      - 'src/hobby-reading.js'
+      - 'src/skill-presentation.js'
+      - 'src/household.js'
+      - 'src/game.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'tests/hobbies-h4.test.js'
+      - '.github/workflows/hobby-h4-checks.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check H4 syntax
+        run: |
+          node --check src/skill-presentation.js
+          node --check src/hobby-reading.js
+          node --check src/household.js
+          node --check src/game.js
+          node --check tests/hobbies-h4.test.js
+      - name: Install pinned test dependencies
+        run: npm ci --ignore-scripts
+      - name: Full compatibility suite
+        run: npm test

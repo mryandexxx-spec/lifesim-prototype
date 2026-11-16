@@ -1067,3 +1067,25 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   font:inherit;font-weight:850;font-size:14px;display:flex;align-items:center;
   justify-content:space-between;gap:10px;touch-action:manipulation;}
 .music-dance-button[hidden]{display:none!important;}
+
+/* H4 compact native Safari + VoiceOver-friendly skills; no new fixed overlays. */
+.mind-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:0 0 13px;}
+.mind-tabs button{min-height:44px;border:1px solid #d4e4d7;border-radius:13px;background:#eff5ed;color:#597466;font-weight:800;font-size:13px;}
+.mind-tabs button[aria-selected="true"]{background:#3b846b;color:#fff;border-color:#3b846b;}
+#mind-skills-tab[hidden],#mind-overview[hidden]{display:none!important;}
+.skills-intro,.skills-future{margin:2px 0 12px;color:#667d71;font-size:12px;line-height:1.45;}
+.skills-future{margin-top:12px;padding:10px;border-radius:12px;background:#f0f5ed;}
+.skills-list{display:grid;gap:10px;}
+.skill-card{padding:12px;border:1px solid #daeadf;border-radius:16px;background:#f9fbf6;}
+.skill-card-head{display:flex;justify-content:space-between;gap:8px;align-items:center;}
+.skill-card-head strong{font-size:14px;line-height:1.3;color:#2d644e;}
+.skill-card-level{padding:5px 8px;border-radius:9px;background:#dcefe0;color:#33664d;font-weight:800;font-size:11px;white-space:nowrap;}
+.skill-card-progress{height:10px;overflow:hidden;border-radius:12px;background:#dbe7dd;margin:11px 0 5px;}
+.skill-card-progress i{height:100%;display:block;background:#4eaa7c;border-radius:12px;transition:width .25s ease-out;}
+.skill-card-detail,.skill-card-hint,.skill-unlock{font-size:12px;line-height:1.45;color:#597166;}
+.skill-card-detail{font-variant-numeric:tabular-nums;}
+.skill-card-hint{margin:8px 0 0;}
+.skill-unlocks{display:grid;gap:5px;margin-top:12px;}
+.skill-unlock{padding:7px 9px;border-radius:9px;background:#edf4eb;}
+.skill-unlock[data-unlocked="true"]{background:#def2e3;color:#2d6d4c;}
+@media(prefers-reduced-motion:reduce){.skill-card-progress i{transition:none;}}
