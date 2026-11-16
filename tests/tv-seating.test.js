@@ -118,8 +118,8 @@ test('runtime routes to reserved sofa, animation targets and stores lock both ID
   const w=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
   assert.match(g,/chooseTvSofa\(game,actorId/);
   assert.match(g,/watchSeatInstanceId\)\?paths\[residentId\]/);
-  assert.match(g,/sofaVisualTargets\.alex=\(alexWatchSeat/);
-  assert.match(g,/sofaVisualTargets\.mira=\(miraWatchSeat/);
+  assert.match(g,/sofaVisualTargets\.alex=alexReadingSeated/);
+  assert.match(g,/sofaVisualTargets\.mira=miraReadingSeated/);
   assert.match(g,/actor\.action\.watchSeatInstanceId\)\s*busy\.add\(actor\.action\.watchSeatInstanceId\)/);
   assert.match(g,/tvGazeYaw:alexWatchSeat/);
   assert.match(g,/tvGazeYaw:miraWatchSeat/);
