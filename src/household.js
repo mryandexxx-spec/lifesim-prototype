@@ -16,6 +16,7 @@ import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {furniturePoint} from './furniture-transform.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {liveSharedTv} from './tv-together.js';
+import {captureObjectUse,settleObjectUseStep} from './object-use-runtime.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 import {HOBBY_ACTIVITIES,HOBBY_CONTENT,HOBBY_SKILLS,READING_ACTIVITY_ID,READING_CONTENT_ID} from './hobby-reading.js';
@@ -408,8 +409,12 @@ export function tickHousehold(root,minutes) {
   const shared=liveSharedTv(root);
   const watchMinutes=shared?Math.min(minutes,Math.max(0,
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
+  const alexUse=captureObjectUse(root),miraUse=captureObjectUse(other);
   tick(root,minutes,root.world);
   tick(other,minutes,root.world);
+  // Canonical F4b3 item-use receipts and H1 reading XP coexist.
+  settleObjectUseStep({world:root.world,actor:root,before:alexUse});
+  settleObjectUseStep({world:root.world,actor:other,before:miraUse});
   for(const id of HOUSEHOLD_IDS){
     const person=getActor(root,id);
     if(person.action?.id!=='hobby')person.activitySession=null;
