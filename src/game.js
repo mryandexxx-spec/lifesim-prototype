@@ -1752,6 +1752,8 @@ function boot() {
   let editSession=null,editSelectedId=null,editDrag=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopManualPose=false,shopPreviousCameraMode=null;
+  let shopPlacing=false,shopPreviewEntity=null,shopPreviewType=null;
+  let lastShopCameraPreviewAt=0;
   const ghostValid=mat('#3b9c73',{opacity:.23});
   const ghostInvalid=mat('#b84d55',{opacity:.26});
   const furnitureGhost=box('F1 placement preview',0,.075,0,.1,.038,.1,ghostValid);
@@ -1868,34 +1870,69 @@ function boot() {
     else editorFeedback('Коснись предмета на 3D-сцене или открой каталог');
   };
   const shopListings=marketListing();
+  // Separate visual staging entity is never a purchased item and never enters
+  // world.furniture or household saves. The floor outline shows validation.
+  const clearShopPreviewEntity=()=>{
+    if(shopPreviewEntity){shopPreviewEntity.destroy();shopPreviewEntity=null;}
+    shopPreviewType=null;
+    marketGhost.enabled=false;
+  };
+  const syncShopPreviewEntity=()=>{
+    if(!shopOpen||!shopPlacing||!shopSelected){
+      clearShopPreviewEntity();return;
+    }
+    if(shopPreviewType!==shopSelected){
+      clearShopPreviewEntity();
+      const template=decorTemplates.get(shopSelected);
+      if(template){
+        shopPreviewEntity=template.clone();
+        shopPreviewEntity.name='Unsaved furniture placement preview';
+        app.root.addChild(shopPreviewEntity);
+        shopPreviewType=shopSelected;
+      }
+    }
+    if(shopPreviewEntity){
+      shopPreviewEntity.enabled=!!shopPose;
+      if(shopPose){
+        shopPreviewEntity.setPosition(shopPose.x,0,shopPose.z);
+        shopPreviewEntity.setEulerAngles(0,-shopPose.yaw,0);
+      }
+    }
+  };
   const renderMarket=()=>{
     $('furnish-shop').hidden=!shopOpen;
     $('furnish-warehouse').hidden=!warehouseOpen;
     $('furnish-shop-toggle').setAttribute('aria-expanded',String(shopOpen));
     $('furnish-warehouse-toggle').setAttribute('aria-expanded',String(warehouseOpen));
     $('furnish-edit-toggle').setAttribute('aria-pressed',String(!shopOpen&&!warehouseOpen));
+    $('furnish-shop').dataset.placing=String(shopPlacing);
+    $('furniture-editor').dataset.shopPlacing=String(shopPlacing);
+    $('furnish-place-cancel').hidden=!shopPlacing;
+    $('furnish-placement-controls').hidden=!shopPlacing;
     marketGhost.enabled=false;
-    if(!shopOpen)return;
+    if(!shopOpen){clearShopPreviewEntity();return;}
     for(const button of $('furnish-stock').querySelectorAll('button'))
       button.setAttribute('aria-pressed',String(button.dataset.prefabId===shopSelected));
     const listing=shopListings.find(i=>i.prefabId===shopSelected);
-    if(listing&&!shopManualPose&&!shopPose)
-      shopPose=findMarketPlacement(game.world.furniture,game.shop,shopSelected,editorContext());
-    // The preview is verified by the EXACT same pure transaction as purchase.
-    // It never mutates credit or furniture until the user presses Buy.
-    const preview=listing&&shopPose
+    const preview=shopPlacing&&listing&&shopPose
       ?buyMarketItem(game.world.furniture,game.shop,shopSelected,shopPose,editorContext())
       :null;
     const suitable=preview?.ok===true;
     const previewLabel=!listing?'Выбери товар в каталоге':
-      !shopPose?'Нет готового места — коснись пола в 3D':
-      suitable?'✓ Место подходит · '+listing.price+' кр. · поверни предмет при необходимости':
-      '✕ '+editorMessage(preview.reason)+' · выбери другое место';
+      !shopPlacing?'Нажми «Купить», чтобы взять '+listing.name+
+        ' и подобрать место в 3D. Деньги пока не списываются.':
+      !shopPose?'Передвигайся свайпом по дому или коснись пола, чтобы выбрать место':
+      suitable?'✓ Место подходит · свайп для перемещения камеры, «Поставить» для покупки':
+      '✕ '+editorMessage(preview.reason)+' · подбери другое место свайпом';
     $('furnish-preview').textContent=previewLabel;
-    $('furnish-preview').dataset.invalid=String(!!listing&&!suitable);
-    $('furnish-buy').disabled=!suitable;
-    $('furnish-preview-turn').disabled=!shopPose;
-    if(shopPose&&listing){
+    $('furnish-preview').dataset.invalid=String(shopPlacing&&!!listing&&!suitable);
+    $('furnish-buy').textContent=shopPlacing?'✓ Поставить здесь':
+      'Купить · '+(listing?.price??0)+' кр.';
+    $('furnish-buy').disabled=shopPlacing?!suitable:
+      !listing||game.shop.credits<listing.price;
+    $('furnish-preview-turn').disabled=!shopPlacing||!shopPose;
+    syncShopPreviewEntity();
+    if(shopPlacing&&shopPose&&listing){
       const rect=instanceRect(shopPose,FURNITURE_CATALOG[shopSelected].footprint);
       marketGhost.setPosition((rect.minX+rect.maxX)/2,.079,(rect.minZ+rect.maxZ)/2);
       marketGhost.setLocalScale(Math.max(.1,rect.maxX-rect.minX),.04,
@@ -1940,16 +1977,14 @@ function boot() {
     }
     shopOpen=mode==='shop';
     warehouseOpen=mode==='warehouse';
+    if(!shopOpen){shopPlacing=false;shopPose=null;shopManualPose=false;}
     $('furniture-editor').dataset.editorView=mode;
     if(shopOpen&&!shopSelected)shopSelected='plant';
-    if(shopOpen&&!shopPose){
-      shopManualPose=false;
-      shopPose=findMarketPlacement(game.world.furniture,game.shop,shopSelected,editorContext());
-    }
     renderMarket();renderWarehouse();renderFurnitureSelection();
   };
   const chooseShopProduct=prefabId=>{
-    shopSelected=prefabId;shopManualPose=false;shopPose=null;
+    shopPlacing=false;shopSelected=prefabId;shopManualPose=false;shopPose=null;
+    clearShopPreviewEntity();
     renderMarket();renderFurnitureSelection();
   };
   for(const item of shopListings){
@@ -1966,12 +2001,12 @@ function boot() {
   $('furnish-shop-toggle').addEventListener('click',()=>setEditorView(shopOpen?'edit':'shop'));
   $('furnish-warehouse-toggle').addEventListener('click',()=>setEditorView(warehouseOpen?'edit':'warehouse'));
   $('furnish-preview-turn').addEventListener('click',()=>{
-    if(!shopOpen||!shopPose)return;
+    if(!shopOpen||!shopPlacing||!shopPose)return;
     shopPose={...shopPose,yaw:(shopPose.yaw+90)%360};
     shopManualPose=true;renderMarket();
   });
   $('furnish-preview-auto').addEventListener('click',()=>{
-    if(!shopOpen||!shopSelected)return;
+    if(!shopOpen||!shopPlacing||!shopSelected)return;
     shopPose=findMarketPlacement(game.world.furniture,game.shop,shopSelected,editorContext());
     shopManualPose=false;renderMarket();
   });
@@ -1989,11 +2024,33 @@ function boot() {
     editorFeedback(success);save(true);return true;
   };
   $('furnish-buy').addEventListener('click',()=>{
-    if(!furnishMode||!shopOpen||!shopSelected||!shopPose)return;
+    if(!furnishMode||!shopOpen||!shopSelected)return;
+    if(!shopPlacing){
+      const listing=shopListings.find(i=>i.prefabId===shopSelected);
+      if(!listing||game.shop.credits<listing.price){
+        editorFeedback('Недостаточно пробных кредитов',true);return;
+      }
+      // Buy enters a NON-persistent 3D placement session, not an instant sale.
+      shopPlacing=true;shopPose=null;shopManualPose=false;
+      moveShopPreviewToCamera(true);renderMarket();
+      editorFeedback('Предмет в руках · двигай камеру свайпом, затем «Поставить здесь»');
+      return;
+    }
+    if(!shopPose)return;
+    // Only this second, explicit confirmation commits money and furniture.
     const ok=applyMarketTransaction(buyMarketItem(game.world.furniture,game.shop,
       shopSelected,{...shopPose},editorContext()),
-      'Куплено и установлено · выбери ещё товар или вернись в комнату');
-    if(ok){shopPose=null;shopManualPose=false;renderMarket();}
+      'Куплено и установлено · можно выбрать следующий предмет');
+    if(ok){
+      shopPlacing=false;shopPose=null;shopManualPose=false;
+      clearShopPreviewEntity();renderMarket();
+    }
+  });
+  $('furnish-place-cancel').addEventListener('click',()=>{
+    if(!shopPlacing)return;
+    shopPlacing=false;shopPose=null;shopManualPose=false;
+    clearShopPreviewEntity();renderMarket();
+    editorFeedback('Расстановка отменена · деньги и дом без изменений');
   });
   $('furnish-store').addEventListener('click',()=>{
     if(!furnishMode||!editSelectedId)return;
