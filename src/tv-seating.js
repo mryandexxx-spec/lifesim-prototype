@@ -7,6 +7,7 @@ import {furnitureActionApproach} from './furniture-catalog.js';
 import {furniturePoint} from './furniture-transform.js';
 import {findPath} from './navigation.js';
 import {SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
+import {readingSeatId} from './reading-journey.js';
 
 const SCREEN_FRONT=Object.freeze({x:3.39,z:0.345});
 const SCREEN_FORWARD=Object.freeze({x:2.39,z:0.345});
@@ -77,6 +78,7 @@ export function chooseTvSofa(root,residentId,tvId){
     occupied.add(other.action.targetInstanceId||'home-sofa-1');
   if(other?.action?.id==='tv'&&other.action.watchSeatInstanceId)
     occupied.add(other.action.watchSeatInstanceId);
+  if(readingSeatId(other?.action))occupied.add(other.action.readingSeatInstanceId);
   const otherId=residentId==='mira'?'alex':'mira';
   const pending=root?.actionQueues?.byResident?.[otherId]||[];
   for(const command of pending){

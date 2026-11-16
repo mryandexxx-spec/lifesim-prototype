@@ -20,6 +20,7 @@ import {enqueueAction,pendingActions,restoreActionQueues} from '../src/action-qu
 import {newHousehold,loadHousehold,chooseResidentAction,
   furnitureAvailable,tickHousehold,getActor} from '../src/household.js';
 import {arrive,ACTIONS,SAVE_KEY} from '../src/simulation.js';
+import {arriveReadingJourney,readingStage} from '../src/reading-journey.js';
 import {stepAnimation,createAnimationState} from '../src/animations.js';
 const copy=value=>JSON.parse(JSON.stringify(value));
 const source=path=>readFileSync(new URL(path,import.meta.url),'utf8');
@@ -39,8 +40,28 @@ const startReading=(root,who,id)=>{
   const resident=getActor(root,who);
   const anchor=furnitureActionApproach(root.world,'hobby',id);
   assert.ok(findPath(resident.position,anchor,root.world));
-  resident.position={...anchor};arrive(resident);
+  resident.position={...anchor};
+  assert.equal(arriveReadingJourney(resident.action),true);
+  tickHousehold(root,2.4); // take the closed book
+  const seat=furnitureActionApproach(root.world,'sofa',resident.action.readingSeatInstanceId);
+  assert.ok(seat);
+  assert.ok(findPath(resident.position,seat,root.world));
+  resident.position={...seat};
+  assert.equal(arriveReadingJourney(resident.action),true);
+  tickHousehold(root,6);   // physically sit (no reading XP)
+  tickHousehold(root,2.4); // open the book (no reading XP)
+  assert.equal(readingStage(resident.action),'reading');
   assert.equal(resident.action.phase,'using');
+};
+const finishReturn=(root,who='alex')=>{
+  const resident=getActor(root,who);
+  assert.equal(readingStage(resident.action),'closing');
+  tickHousehold(root,2.4); // close
+  tickHousehold(root,5.4); // stand
+  const shelf=furnitureActionApproach(root.world,'hobby',resident.action.targetInstanceId);
+  resident.position={...shelf};
+  assert.equal(arriveReadingJourney(resident.action),true);
+  tickHousehold(root,2.4); // put back
 };
 test('H1 contains one authored content and skill, with independent capability item bridge',()=>{
   const skill=getSkillDefinition(HOBBY_SKILLS,READING_SKILL_ID);
@@ -148,6 +169,9 @@ test('H1 finite time and 3x chunks account same per-resident XP and session prog
   tickHousehold(a,18);
   tickHousehold(a,18);
   for(let i=0;i<12;i++)tickHousehold(b,3);
+  assert.equal(readingStage(a.action),'closing');
+  assert.equal(readingStage(b.action),'closing');
+  finishReturn(a);finishReturn(b);
   assert.equal(a.action,null);
   assert.equal(b.action,null);
   assert.equal(a.skills.xpById.literature,36);
@@ -269,15 +293,15 @@ test('H1 Safari integration exposes real touch, store, session, personal XP and 
   assert.match(game,/item\.prefabId==='bookcase'/);
   assert.match(game,/type:'activity',activityId:READING_ACTIVITY_ID/);
   assert.match(game,/beginAction\('hobby',false,residentId,true,command\.targetInstanceId/);
-  assert.match(game,/book\.enabled=using&&\(useId==='sofa'\|\|useId==='hobby'\)/);
+  assert.match(game,/readingHasBook\(game\.action\)/);
   assert.match(html,/id="mind-reading-skill"/);
   assert.match(game,/currentSkillLevel\(current\.skills,HOBBY_SKILLS,READING_SKILL_ID\)/);
   assert.match(workflow,/node --check src\/hobby-reading\.js/);
   assert.match(workflow,/cp src\/hobby-reading\.js site\/src\//);
-  assert.match(html,/src\/game\.js\?v=1\.2r/);
-  assert.match(html,/styles\.css\?v=1\.2r/);
+  assert.match(html,/src\/game\.js\?v=1\.2s/);
+  assert.match(html,/styles\.css\?v=1\.2s/);
   const pkg=JSON.parse(source('../package.json'));
-  assert.equal(pkg.version,'1.0.0-alpha.70');
+  assert.equal(pkg.version,'1.0.0-alpha.71');
 });
 
 test('H1 browser boot builds hidden bookcase prefab without an installed origin.instanceId',()=>{

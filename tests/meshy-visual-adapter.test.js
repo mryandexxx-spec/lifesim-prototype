@@ -209,7 +209,7 @@ test('game supplies saved simulation clock and preserves walk during pause',()=>
   assert.match(source,/worldMinutes:game\.minutes/);
   assert.match(source,/mood:game\.mind\?\.mood\?\.value/);
   assert.match(source,/energy:game\.needs\.energy/);
-  assert.match(source,/walking:\(game\.action\?\.phase==='walking'/);
+  assert.match(source,/walking:\(\(game\.action\?\.phase==='walking'/);
 });
 
 test('Alex Meshy stays attached to toilet during authored walk, sit, frozen pause and exit',()=>{

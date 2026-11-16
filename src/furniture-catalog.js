@@ -63,6 +63,9 @@ export const FURNITURE_CATALOG=Object.freeze(Object.fromEntries(original.map(ite
   return [item.prefabId,Object.freeze({
     prefabId:item.prefabId,name:item.name,category:item.category,
     actionId:item.actionId||null,capabilities:Object.freeze(item.capabilities),
+    // Physical interaction affordances are NOT shopper function facets.
+    // Later chairs can opt in without exposing fabricated retail categories.
+    seating:Object.freeze(item.prefabId==='sofa'?['reading']:[]),
     footprint,extras,approach,rendererKey:item.prefabId,version:1,
     templateOnly:item.templateOnly===true,
     maxOccupants:item.prefabId==='bed'?2:1,
