@@ -57,6 +57,7 @@ import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {TV_WATCH_POSE,tvScreenFrame} from './tv-interaction.js';
+import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
 import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
@@ -216,7 +217,7 @@ const META = {
   shower: { title: 'Душевая', category: 'Ванная', description: 'Душ повышает уровень гигиены', icon: '✧', anchor: [-3.65, 2.16, 2.45] },
   toilet: { title: 'Унитаз', category: 'Ванная', description: 'Приватное использование туалета восстановит потребность', icon: 'WC', anchor: [-1.65, 1.28, 3.14] },
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] },
-  tv: { title: 'Телевизор', category: 'Гостиная', description: 'Просмотр передач повышает досуг, пока житель смотрит экран', icon: '▣', anchor: [3.5, 1.42, .36] }
+  tv: { title: 'Телевизор', category: 'Гостиная', description: 'Сядет на свободный диван с видом на экран или посмотрит стоя, если мест нет', icon: '▣', anchor: [3.5, 1.42, .36] }
 };
 
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
@@ -428,7 +429,7 @@ function select(id,instanceId=null) {
   $('action-title').textContent = META[id].title;
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
-      id==='tv'?'Просмотр именно этого телевизора · собственный маршрут к экрану':
+      id==='tv'?'Просмотр этого телевизора · с дивана, если он свободен и экран виден':
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('action-button').innerHTML = `${ACTIONS[id].label} <span>↗</span>`;
@@ -1502,7 +1503,9 @@ function boot() {
   };
   if(game.action?.phase==='using') {
     const dest=game.action.id==='bed'
-      ?bedDestinationFor(game,'alex',game.action.targetInstanceId):null;
+      ?bedDestinationFor(game,'alex',game.action.targetInstanceId):
+      game.action.id==='tv'&&game.action.watchSeatInstanceId
+        ?furnitureActionApproach(game.world,'sofa',game.action.watchSeatInstanceId):null;
     const actual=dest||furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
@@ -1510,7 +1513,9 @@ function boot() {
   game.position=nearestWalkable(game.position,game.world);
   if(game.otherSim.action?.phase==='using') {
     const dest=game.otherSim.action.id==='bed'
-      ?bedDestinationFor(game,'mira',game.otherSim.action.targetInstanceId):null;
+      ?bedDestinationFor(game,'mira',game.otherSim.action.targetInstanceId):
+      game.otherSim.action.id==='tv'&&game.otherSim.action.watchSeatInstanceId
+        ?furnitureActionApproach(game.world,'sofa',game.otherSim.action.watchSeatInstanceId):null;
     const actual=dest||furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
@@ -1552,12 +1557,14 @@ function boot() {
   // head, including up to eight A* social approaches. On mobile this can
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
-  const destination=(id,residentId='alex',targetInstanceId=null)=>id==='bed'
+  const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>id==='bed'
     ?bedDestinationFor(game,residentId,targetInstanceId)
-    :furnitureActionApproach(game.world,id,targetInstanceId);
-  function buildRoute(id,actorId='alex',targetInstanceId=null) {
+    :id==='tv'&&watchSeatInstanceId
+      ?furnitureActionApproach(game.world,'sofa',watchSeatInstanceId)
+      :furnitureActionApproach(game.world,id,targetInstanceId);
+  function buildRoute(id,actorId='alex',targetInstanceId=null,watchSeatInstanceId=null) {
     const actor=getActor(game,actorId);
-    const goal=destination(id,actorId,targetInstanceId);
+    const goal=destination(id,actorId,targetInstanceId,watchSeatInstanceId);
     const points=goal&&findPath(actor.position,goal,game.world);
     if(!points) return false;
     paths[actorId]={points,index:0,id};
@@ -1580,7 +1587,9 @@ function boot() {
       if(!automatic&&!fromQueue)toast('Предмет сейчас занят другим жителем');
       return false;
     }
-    if(!buildRoute(id,actorId,targetInstanceId)){
+    const watchSeat=id==='tv'?chooseTvSofa(game,actorId,
+      resolveActionFurniture(game.world,'tv',targetInstanceId)?.instanceId||'home-tv-1'):null;
+    if(!buildRoute(id,actorId,targetInstanceId,watchSeat?.sofaId||null)){
       if(!automatic&&!fromQueue) toast(getActorName(actorId)+' не может добраться до предмета');
       else actor.autonomy.nextAt=game.minutes+15;
       return false;
@@ -1862,6 +1871,8 @@ function boot() {
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
+      if(actor?.action?.id==='tv'&&actor.action.watchSeatInstanceId)
+        busy.add(actor.action.watchSeatInstanceId);
       for(const pending of pendingActions(game.actionQueues,id))
         if(pending.type==='object'&&pending.targetInstanceId)
           busy.add(pending.targetInstanceId);
@@ -2642,7 +2653,8 @@ function boot() {
           if(p.id!==jobId || !p.points){
             const available=socialWalking
               ? findPath(resident.position,game.socialAction.target,game.world)
-              : (buildRoute(jobId,residentId,resident.action?.targetInstanceId)?paths[residentId].points:null);
+              : (buildRoute(jobId,residentId,resident.action?.targetInstanceId,
+                  resident.action?.watchSeatInstanceId)?paths[residentId].points:null);
             if(!available){
               if(socialWalking)cancelSocial(game);
               else {resident.action=null;resident.event='Путь недоступен';}
@@ -2668,7 +2680,8 @@ function boot() {
             }
             if(p.index>=p.points.length){
               resident.position=socialWalking?{...game.socialAction.target}:
-                destination(jobId,residentId,resident.action?.targetInstanceId);
+                destination(jobId,residentId,resident.action?.targetInstanceId,
+                   resident.action?.watchSeatInstanceId);
               if(socialWalking){
                 const partnerId=residentId==='alex'?'mira':'alex';
                 const partnerExiting=sofaStates[partnerId].progress>0||
