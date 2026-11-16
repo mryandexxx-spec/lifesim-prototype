@@ -27,7 +27,7 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
  */
 export function isReadingSeat(item){
   const def=FURNITURE_CATALOG[item?.prefabId];
-  return Boolean(item?.location==='home'&&def?.capabilities.includes('seat.read')&&
+  return Boolean(item?.location==='home'&&def?.seating.includes('reading')&&
     def?.actionId==='sofa');
 }
 export const readingSeatId=action=>action?.id==='hobby'&&
