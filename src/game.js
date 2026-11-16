@@ -1715,6 +1715,7 @@ function boot() {
   cameraUpdate();
   $('reset-camera-btn').addEventListener('click',()=>{
     setView(CAMERA_INITIAL);
+    if(furnishMode&&shopPlacing)moveShopPreviewToCamera(true);
     toast('Камера сброшена');
   });
   // One finger pans by default; two fingers orbit and pinch.
@@ -2176,6 +2177,32 @@ function boot() {
     const {near,far}=furnitureRay(pos);
     return furnitureFloorPoint(near,far);
   };
+  // Follow the visible room, not the canvas bottom hidden by the editor.
+  // A camera swipe pans/orbits the room under this screen-space placement
+  // anchor; the preview stays active until Place or Cancel is pressed.
+  const shopCameraAnchor=()=>{
+    const rect=canvas.getBoundingClientRect();
+    const panel=$('furniture-editor').getBoundingClientRect();
+    const visibleHeight=Math.max(100,Math.min(rect.bottom,panel.top)-rect.top);
+    return {x:rect.left+rect.width*.5,
+      y:rect.top+Math.max(62,visibleHeight*.58)};
+  };
+  const moveShopPreviewToCamera=(force=false)=>{
+    if(!furnishMode||!shopOpen||!shopPlacing)return;
+    const now=performance.now();
+    // Full route validation is deliberately limited to 10Hz on iPhone.
+    if(!force&&now-lastShopCameraPreviewAt<100)return;
+    lastShopCameraPreviewAt=now;
+    const floor=editorFloorAt(shopCameraAnchor());
+    if(!floor){
+      if(force){shopPose=null;renderMarket();}
+      return;
+    }
+    const candidate={x:snapFurnitureCoordinate(floor.x),
+      z:snapFurnitureCoordinate(floor.z),yaw:shopPose?.yaw??0};
+    if(shopPose&&shopPose.x===candidate.x&&shopPose.z===candidate.z)return;
+    shopPose=candidate;shopManualPose=false;renderMarket();
+  };
   const editorFurnitureAt=pos=>{
     const {near,far}=furnitureRay(pos);
     const boxes=game.world.furniture.instances.filter(item=>item.location==='home')
@@ -2321,6 +2348,7 @@ function boot() {
     if(result.changed){
       if(event.cancelable)event.preventDefault();
       setView(result.view);
+      if(furnishMode&&shopPlacing)moveShopPreviewToCamera();
     }
   });
   // CSS-pixel tap -> PlayCanvas camera ray -> nearest ACTUAL registered 3D
@@ -2376,7 +2404,7 @@ function boot() {
     const pos=cameraGesture.end(gesturePoint(event),performance.now());
     if(!pos||dialogueNeedsDecision(game))return;
     if(furnishMode){
-      if(shopOpen&&shopSelected){
+      if(shopOpen&&shopPlacing&&shopSelected){
         const floor=editorFloorAt(pos);
         if(floor){
           shopPose={x:snapFurnitureCoordinate(floor.x),z:snapFurnitureCoordinate(floor.z),
