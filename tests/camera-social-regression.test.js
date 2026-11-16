@@ -109,7 +109,7 @@ test('camera input is tracked beyond canvas for iOS, keeps single/multitouch saf
  assert.ok(src.includes("window.addEventListener('pointermove'"));
  assert.ok(src.includes("window.addEventListener('pointerup'"));
  assert.ok(src.includes("window.addEventListener('pointercancel'"));
- assert.ok(src.includes("let oneFingerMode='orbit'"));
+ assert.ok(src.includes("let oneFingerMode='pan'"));
  assert.ok(src.includes('createCameraGestureSession()'));
  assert.ok(src.includes('cameraGesture.move(gesturePoint(event),view,'));
  assert.ok(src.includes('cameraGesture.end(gesturePoint(event),performance.now())'));
