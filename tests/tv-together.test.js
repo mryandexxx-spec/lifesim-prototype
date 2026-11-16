@@ -105,7 +105,7 @@ test('F3c: refusal at arrival creates no positive or negative social receipt',()
   root.relationship.views.mira.trust=0;
   root.relationship.views.mira.tension=100;
   root.otherSim.personality=createProfile(['temperament.cheerful','social.outgoing'],
-    {likes:['music'],dislikes:['television']});
+    {likes:['music'],dislikes:['games']});
   assert.equal(evaluateLeisure(root,'alex','tv')?.accepted,false);
   const plan=planSharedTv(root,'alex','home-tv-1');
   assert.ok(startSharedSocial(root,'alex',plan.places.alex,'leisure','tv',false,plan));
