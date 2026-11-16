@@ -440,7 +440,8 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
         return true;
       }
-      const target=walking||social
+      const utilityUsing=['lamp','mirror','dresser','wardrobe'].includes(actionId)&&!walking;
+      const target=utilityUsing?'Listening_Gesture':walking||social
         ? meshClipFor({walking,social:hugFrame?.active?null:social})
         : alexIdleClipFor({minutes:worldMinutes,mood,energy,walking,social,
           actionId,sofaBusy,bedBusy,showerBusy,fridgeBusy,
