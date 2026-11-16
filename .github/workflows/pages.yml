@@ -38,6 +38,8 @@ jobs:
           node --check src/furniture-hold.js
           node --check src/furniture-shop.js
           node --check src/furniture-products.js
+          node --check src/furniture-procedural-library.js
+          node --check src/furniture-thumbnails.js
           node --check src/furniture-value.js
           node --check src/object-definition-registry.js
           node --check src/object-effect-engine.js
@@ -148,7 +150,7 @@ jobs:
           cp src/hud-panel.js site/src/
           cp src/furniture-catalog.js src/furniture-layout.js src/furniture-editor.js src/furniture-transform.js src/furniture-hold.js site/src/
           cp src/furniture-shop.js src/furniture-value.js site/src/
-          cp src/furniture-products.js site/src/
+          cp src/furniture-products.js src/furniture-procedural-library.js src/furniture-thumbnails.js site/src/
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
           cp src/object-once-ledger.js site/src/

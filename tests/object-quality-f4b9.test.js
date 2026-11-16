@@ -133,6 +133,7 @@ test('F4b9: actual browser renderMarket button selects real visible SKU without 
     shopOpen:true,warehouseOpen:false,shopPlacing:false,furnishMode:true,
     shopSelected:'sofa',shopSelectedItemId:'legacy.sofa',
     shopRoomCategory:null,shopFunctionCategory:null,
+    shopTypeCategory:null,shopSearchText:'',
     oneFingerMode:'pan',showCameraMode(){},shopPose:null,
     marketGhost:{enabled:false},shopListings:offers,shopQualityRegistry:registry,
     selectShopCatalog,compareShopVariants,formatShopVariantComparison,chooseComparableVariant,
@@ -148,7 +149,7 @@ test('F4b9: actual browser renderMarket button selects real visible SKU without 
   const panel=elements.get('furnish-variant-compare');
   const rows=elements.get('furnish-variant-rows');
   assert.equal(panel.hidden,false);
-  assert.equal(rows.children.length,1);
+  assert.equal(rows.children.length,3);
   const pick=rows.children[0].children[1];
   assert.equal(pick.textContent,'Выбрать вариант');
   assert.match(pick.attrs['aria-label'],/Комфорт/);

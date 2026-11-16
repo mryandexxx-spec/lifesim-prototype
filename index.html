@@ -10,13 +10,20 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h2fix1" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h2fix1-f4c" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/household.js":"./src/household.js?v=1.2u-h2fix1",
       "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2u-h2fix1",
-      "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1",
-      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2u-h2fix1"}}
+      "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1-f4c",
+      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2u-h2fix1",
+      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2u-f4c",
+      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2u-f4c",
+      "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2u-f4c",
+      "./src/shop-catalog-selector.js":"./src/shop-catalog-selector.js?v=1.2u-f4c",
+      "./src/furniture-value.js":"./src/furniture-value.js?v=1.2u-f4c",
+      "./src/furniture-procedural-library.js":"./src/furniture-procedural-library.js?v=1.2u-f4c",
+      "./src/furniture-thumbnails.js":"./src/furniture-thumbnails.js?v=1.2u-f4c"}}
   </script>
 </head>
 <body>
@@ -34,7 +41,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.1</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.1 · F4C</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -110,6 +117,16 @@
           aria-label="Повернуть выбранную мебель на 90 градусов" disabled>⟳ Повернуть 90°</button>
       </div>
       <div id="furnish-shop" class="furnish-shop" hidden aria-label="Каталог новых предметов">
+        <div id="furnish-type-tabs" class="furnish-type-tabs" role="group"
+          aria-label="Категории мебели"></div>
+        <div id="furnish-subtype-tabs" class="furnish-type-tabs furnish-subtype-tabs"
+          role="group" aria-label="Подкатегории мебели" hidden></div>
+        <label class="furnish-search-label" for="furnish-search">
+          <span>⌕</span>
+          <input id="furnish-search" type="search" enterkeyhint="search"
+            aria-label="Поиск товаров по названию и назначению"
+            autocomplete="off" placeholder="Поиск мебели и декора…" />
+        </label>
         <div id="furnish-catalog-filters" class="furnish-catalog-filters" role="group" aria-label="Фильтры каталога">
           <label for="furnish-room-filter">КОМНАТА
             <select id="furnish-room-filter" aria-label="Фильтр товаров по комнате">
@@ -122,7 +139,7 @@
             </select>
           </label>
         </div>
-        <small id="furnish-filter-count" class="furnish-filter-count" role="status" aria-live="polite">Показано 6 из 6</small>
+        <small id="furnish-filter-count" class="furnish-filter-count" role="status" aria-live="polite">Показаны товары каталога</small>
         <div id="furnish-stock" class="furnish-stock" role="group" aria-label="Товары для покупки"></div>
         <section id="furnish-variant-compare" class="furnish-variant-compare" aria-label="Сравнение вариантов выбранного предмета" hidden>
           <strong>Сравнение вариантов · фактические свойства и цена</strong>
@@ -146,6 +163,7 @@
         <div id="furnish-storage-list" class="furnish-storage-list" role="group" aria-label="Предметы на складе"></div>
       </div>
       <div id="furnish-commands" class="furnish-commands" role="group" aria-label="Действия с мебелью, выбранной в 3D" hidden>
+
         <button type="button" id="furnish-store">📦 В склад</button>
         <button type="button" id="furnish-restore">↩ Из склада</button>
         <button type="button" id="furnish-sell">Продать</button>
@@ -299,7 +317,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

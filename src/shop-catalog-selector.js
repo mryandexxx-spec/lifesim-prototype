@@ -12,7 +12,8 @@ import {filterObjectItems,getObjectItem} from './object-definition-registry.js';
  */
 export function selectShopCatalog({
   registry=legacyObjectRegistry(),offers=marketListing(),
-  roomCategoryId=null,functionCategoryId=null
+  roomCategoryId=null,functionCategoryId=null,typeCategoryId=null,
+  searchText=''
 }={}){
   const byRoom=roomCategoryId
     ?new Set(filterObjectItems(registry,{categoryId:roomCategoryId}).map(item=>item.id))
@@ -20,6 +21,11 @@ export function selectShopCatalog({
   const byFunction=functionCategoryId
     ?new Set(filterObjectItems(registry,{categoryId:functionCategoryId}).map(item=>item.id))
     :null;
+  const byType=typeCategoryId
+    ?new Set(filterObjectItems(registry,{categoryId:typeCategoryId}).map(item=>item.id))
+    :null;
+  const query=typeof searchText==='string'
+    ?searchText.trim().slice(0,80).toLocaleLowerCase('ru'):'';
   const result=[];
   for(const offer of offers){
     const itemId=offer.itemId||legacyItemIdForPrefab(offer.prefabId);
@@ -27,7 +33,15 @@ export function selectShopCatalog({
     if(!definition||definition.prefabId!==offer.prefabId||
       !Number.isSafeInteger(definition.price)||definition.price<0||
       (byRoom&&!byRoom.has(itemId))||
-      (byFunction&&!byFunction.has(itemId)))continue;
+      (byFunction&&!byFunction.has(itemId))||
+      (byType&&!byType.has(itemId)))continue;
+    const label=definition.name;
+    if(query){
+      const haystack=[label,offer.description,offer.effectText,
+        ...definition.categoryIds.map(id=>registry.categories[id]?.label)]
+        .filter(x=>typeof x==='string').join(' ').toLocaleLowerCase('ru');
+      if(!haystack.includes(query))continue;
+    }
     result.push({...offer,itemId,name:definition.name,price:definition.price,
       categoryIds:definition.categoryIds,capabilities:definition.capabilities});
   }
