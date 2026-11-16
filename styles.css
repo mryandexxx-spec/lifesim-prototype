@@ -885,3 +885,22 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   .furnish-stock button{min-height:40px;}
   .furnish-map-tip{display:none;}
 }
+
+/* F2.1 placement session: buy arms a draggable 3D ghost, confirm pays once.
+   Collapse the catalog while placing so the game camera remains accessible. */
+.furnish-purchase-actions{display:flex;gap:7px;min-width:0;}
+.furnish-purchase-actions #furnish-buy{flex:1;min-width:0;}
+.furnish-purchase-actions #furnish-place-cancel{min-height:46px;padding:8px 13px;
+  border:1px solid #d6dfd4;border-radius:12px;background:#f2f6ef;color:#47715b;
+  font-size:12px;font-weight:800;}
+.furnish-purchase-actions #furnish-place-cancel[hidden]{display:none!important;}
+.furnish-placement-controls[hidden]{display:none!important;}
+.furnish-shop[data-placing="true"] .furnish-stock,
+.furnish-shop[data-placing="true"] .furnish-map-tip,
+.furnish-shop[data-placing="true"] > small{display:none!important;}
+.furniture-editor[data-editor-view="shop"][data-shop-placing="true"]{
+  max-height:min(42dvh,315px);
+}
+.furnish-shop[data-placing="true"] #furnish-preview{font-weight:850;}
+.furnish-shop[data-placing="true"] .furnish-placement-controls{display:flex;}
+.furnish-shop[data-placing="true"] #furnish-buy:disabled{opacity:.38;}
