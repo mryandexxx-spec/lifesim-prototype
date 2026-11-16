@@ -405,14 +405,8 @@ function advanceReading(root,id,minutes){
     session.targetInstanceId!==action.targetInstanceId){
     actor.action=null;actor.activitySession=null;return;
   }
-  if(stage&&action.phase==='walking'){
-    const progress=advanceReadingJourney(action,minutes);
-    if(progress.done){
-      actor.action=null;actor.activitySession=null;
-      actor.event='Книга возвращена в шкаф';
-      return;
-    }
-  }
+  // Stage timers are stepped AFTER the simulation tick, so the transition
+  // from opening to using never earns a phantom same-frame reading reward.
   if(action.phase!=='using')return;
   if(stage&&readingStage(action)!=='reading')return;
   const target=stage
@@ -448,12 +442,27 @@ export function tickHousehold(root,minutes) {
   // can grant Fun, and account only physically performed game minutes.
   advanceReading(root,'alex',minutes);
   advanceReading(root,'mira',minutes);
+  // Capture stages BEFORE the simulation. The completion tick may switch
+  // reading→closing; it must not also consume a full closing interval.
+  const stageBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>
+    [id,readingStage(getActor(root,id)?.action)]));
   const shared=liveSharedTv(root);
   const watchMinutes=shared?Math.min(minutes,Math.max(0,
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
   const alexUse=captureObjectUse(root),miraUse=captureObjectUse(other);
   tick(root,minutes,root.world);
   tick(other,minutes,root.world);
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),action=actor?.action;
+    if(action?.id==='hobby'&&action.phase==='walking'&&
+      readingStage(action)===stageBefore[id]){
+      const progressed=advanceReadingJourney(action,minutes);
+      if(progressed.done){
+        actor.action=null;actor.activitySession=null;
+        actor.event='Книга возвращена в шкаф';
+      }
+    }
+  }
   // Canonical F4b3 item-use receipts and H1 reading XP coexist.
   settleObjectUseStep({world:root.world,actor:root,before:alexUse});
   settleObjectUseStep({world:root.world,actor:other,before:miraUse});
