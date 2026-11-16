@@ -52,17 +52,17 @@ test('R5c: two independent reachable physical cushions on a real sofa',()=>{
 });
 test('R5c: rotation, purchase, storage and blocked paths are strictly validated',()=>{
   const world=home(),sofa=world.furniture.instances.find(i=>i.instanceId==='home-sofa-1');
-  sofa.yaw=90;
+  sofa.yaw=90;world.furniture.revision++;
   const plan=planRomanticEveningSofa(world,a,b,findPath);
   if(plan)assert.equal(validRomanticEveningSofa(world,plan.stage),true);
-  sofa.yaw=0;
+  sofa.yaw=0;world.furniture.revision++;
   const normal=planRomanticEveningSofa(world,a,b,findPath);
   assert.ok(normal);
-  sofa.x+=.1;
+  sofa.x+=.1;world.furniture.revision++;
   assert.equal(validRomanticEveningSofa(world,normal.stage),false);
-  sofa.location='storage';
+  sofa.location='storage';world.furniture.revision++;
   assert.equal(planRomanticEveningSofa(world,a,b,findPath),null);
-  sofa.location='home';sofa.x-=.1;
+  sofa.location='home';sofa.x-=.1;world.furniture.revision++;
   assert.equal(planRomanticEveningSofa(world,a,b,()=>null),null);
   assert.equal(planRomanticEveningSofa(world,a,b,findPath,
     {blockedIds:['home-sofa-1']}),null);
