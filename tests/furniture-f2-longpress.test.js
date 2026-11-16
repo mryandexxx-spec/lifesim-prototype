@@ -65,7 +65,7 @@ test('Game input: pickup only in timed callback, never on pointerdown, with shar
   assert.ok(down.includes('armFurnitureHold(event,now)'));
   assert.doesNotMatch(down,/startEditorDrag\(event\)/);
   assert.match(game,/const armFurnitureHold=\(event,now\)=>/);
-  assert.match(game,/if\(!furnishMode\|\|cameraGesture\.count\(\)!==1\)return/);
+  assert.match(game,/if\(!furnishMode\|\|shopOpen\|\|warehouseOpen\|\|cameraGesture\.count\(\)!==1\)return/);
   assert.match(game,/furnitureHoldTimer=setTimeout\(\(\)=>\{/);
   assert.match(game,/furnitureHoldTimer=null;/);
   assert.match(game,/holdGesture\.activate\(performance\.now\(\)\)/);
