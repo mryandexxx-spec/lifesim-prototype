@@ -85,7 +85,7 @@ test('H1 new bookcase SKU is in shop and room/function filters without changing 
   const product=FURNITURE_PRODUCTS.find(x=>x.itemId==='bookcase.starter');
   assert.equal(product.price,320);
   assert.deepEqual(selectShopCatalog({functionCategoryId:'function.books.borrow'}).map(x=>x.itemId),
-    ['bookcase.starter']);
+    ['bookcase.starter','bookcase.open']);
   assert.ok(shopCategoryOptions('function').some(x=>x.id==='function.books.borrow'));
 });
 test('H1 buys one physical bookcase via atomic F4b2 transaction and preserves price snapshot',()=>{

@@ -83,7 +83,7 @@ test('F4C: all 26 crafted modelKeys are visually different by actual dimensions/
 test('F4C: interiors have functional category hierarchy without inventing action capabilities',()=>{
   assert.equal(shopCategoryOptions('type').some(x=>x.id==='type.seating'),true);
   assert.ok(FURNITURE_SHOP_TYPES.some(x=>x.id==='type.storage.wardrobes'));
-  assert.equal(selectShopCatalog({typeCategoryId:'type.seating'}).length,7);
+  assert.equal(selectShopCatalog({typeCategoryId:'type.seating'}).length,8);
   assert.equal(selectShopCatalog({typeCategoryId:'type.seating.armchairs'}).length,2);
   assert.equal(selectShopCatalog({typeCategoryId:'type.decor.rugs'}).length,2);
   assert.equal(selectShopCatalog({typeCategoryId:'type.tables.dining'}).length,2);

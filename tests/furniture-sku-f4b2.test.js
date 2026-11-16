@@ -15,11 +15,11 @@ const copy=value=>JSON.parse(JSON.stringify(value));
 const src=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 test('F4b2 canonical products preserve six old SKU prices plus a same-price plant colorway',()=>{
-  assert.equal(FURNITURE_PRODUCTS.length,9);
+  assert.equal(FURNITURE_PRODUCTS.length,35);
   assert.deepEqual(FURNITURE_LEGACY_OFFERS.map(x=>x.prefabId),
     ['plant','table','nightstand','tv','sofa','bed']);
   assert.deepEqual(SHOP_ITEMS.map(x=>x.price),[130,250,170,650,550,850]);
-  assert.equal(MARKET_OFFERS.length,9);
+  assert.equal(MARKET_OFFERS.length,35);
   const amber=furnitureProduct('plant.amber');
   assert.equal(amber.prefabId,'plant');
   assert.equal(amber.price,130);
@@ -33,22 +33,22 @@ test('F4b2 registry and UI expose two distinct plant SKU with shared renderer/ne
   const r=legacyObjectRegistry();
   const base=r.items['legacy.plant'],amber=r.items['plant.amber'];
   assert.equal(amber.prefabId,base.prefabId);
-  assert.equal(amber.rendererKey,base.rendererKey);
+  assert.equal(amber.rendererKey,'plant.amber'); // visual modelKey
   assert.deepEqual(amber.capabilities,base.capabilities);
   assert.deepEqual(amber.categoryIds,base.categoryIds);
   assert.deepEqual(amber.effects,[]);
   assert.equal(amber.appearanceId,'foliage.amber');
   const offers=selectShopCatalog();
-  assert.equal(offers.length,9);
-  assert.equal(offers.filter(x=>x.prefabId==='plant').length,2);
-  assert.deepEqual(offers.filter(x=>x.prefabId==='plant').map(x=>x.itemId),
+  assert.equal(offers.length,35);
+  assert.equal(offers.filter(x=>x.prefabId==='plant').length,3);
+  assert.deepEqual(offers.filter(x=>x.prefabId==='plant').map(x=>x.itemId).slice(0,2),
     ['legacy.plant','plant.amber']);
   assert.equal(offers.find(x=>x.itemId==='plant.amber').effectText.includes('дополнительного бонуса'),true);
   assert.equal(offers.find(x=>x.itemId==='bookcase.starter').prefabId,'bookcase');
-  assert.deepEqual(selectShopCatalog({roomCategoryId:'room.decor'}).map(x=>x.itemId),
+  assert.deepEqual(selectShopCatalog({roomCategoryId:'room.decor'}).map(x=>x.itemId).slice(0,2),
     ['legacy.plant','plant.amber']);
   assert.equal(shopCategoryOptions('room').filter(x=>x.id==='room.decor').length,1);
-  assert.deepEqual(marketListing().map(x=>x.price),[130,250,170,650,550,850,320,130,700]);
+  assert.deepEqual(marketListing().slice(0,9).map(x=>x.price),[130,250,170,650,550,850,320,130,700]);
 });
 test('F4b2 two plant SKUs both buy via one prefab without clone ID conflicts or hidden charge',()=>{
   const w=newFurnitureWorld(),shop=newFurnitureShop();
@@ -173,8 +173,8 @@ test('F4b2 nonmatching old save metadata cannot mint a larger refund',()=>{
 test('F4b2 product appearance is applied only on the bought clone, not every plant',()=>{
   const game=src('../src/game.js');
   assert.match(game,/const applyItemAppearance=\(node,itemDefinitionId\)=>/);
-  assert.match(game,/if\(item.itemDefinitionId\)applyItemAppearance\(node,item.itemDefinitionId\)/);
-  assert.match(game,/if\(shopSelectedItemId\)applyItemAppearance\(shopPreviewEntity,shopSelectedItemId\)/);
+  assert.match(game,/applySkuModel\(node,item.itemDefinitionId\|\|/);
+  assert.match(game,/if\(shopSelectedItemId\)applySkuModel\(shopPreviewEntity,shopSelectedItemId\)/);
   const start=game.indexOf('  const updateDecorNodes=(previewId=null,previewPose=null)=>{');
   const end=game.indexOf('  const primitive =',start);
   assert.ok(start>0&&end>start);
@@ -188,7 +188,7 @@ test('F4b2 product appearance is applied only on the bought clone, not every pla
       location:'home',x:0,z:0,yaw:0}]}}},
     decorNodes:nodes,decorTemplates:new Map([['plant',{clone(){clones++;return node();}}]]),
     MARKET_OFFERS:[{prefabId:'plant'}],app:{root:{addChild(){}}},
-    applyItemAppearance:(node,id)=>style.push(id),refreshSofaSeat(){}};
+    applySkuModel:(node,id)=>style.push(id),PROCEDURAL_DEFAULT_SKU:{},refreshSofaSeat(){}};
   runInNewContext('(()=>{'+game.slice(start,end)+'\nupdateDecorNodes();})()',ctx,{timeout:1200});
   assert.equal(clones,1);
   assert.deepEqual(style,['plant.amber']);
@@ -209,7 +209,7 @@ test('F4b2 Pages packages product source; visible bundle/lock bump without schem
   const pkg=JSON.parse(src('../package.json'));
   const lock=JSON.parse(src('../package-lock.json'));
   assert.match(pages,/node --check src\/furniture-products\.js/);
-  assert.match(pages,/cp src\/furniture-products\.js site\/src\//);
+  assert.match(pages,/cp src\/furniture-products\.js src\/furniture-procedural-library\.js site\/src\//);
   assert.match(html,/src\/game\.js\?v=1\.2t/);
   assert.match(html,/styles\.css\?v=1\.2t/);
   assert.equal(pkg.version,'1.0.0-alpha.72');
