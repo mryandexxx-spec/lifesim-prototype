@@ -1354,6 +1354,7 @@ function boot() {
   };
   const decorNodes=new Map();
   const decorTemplates=new Map();
+  const f4eOriginalPositions=new WeakMap();
   let decorDrawing=null;
   let refreshSofaSeat=()=>{};
   const withDecor=(prefabId,render)=>{
@@ -1384,6 +1385,31 @@ function boot() {
       node.name='F2 purchased / '+item.instanceId;
       applySkuModel(node,item.itemDefinitionId||
         PROCEDURAL_DEFAULT_SKU[item.prefabId]);
+      // F4E: each bought lamp has a real world-space light source and a
+      // tiny emissive bulb. Parent it to the persistent instance node, so
+      // rotating/storing/moving the furniture cannot leave orphan lights.
+      if(item.prefabId==='floorlamp'){
+        const light=new pc.Entity('F4E lamp light');
+        const arc=furnitureProduct(item.itemDefinitionId)?.modelKey==='floorlamp.arc';
+        light.setLocalPosition(arc?.48:0,arc?1.23:1.48,0);
+        light.addComponent('light',{type:'omni',
+          color:new pc.Color(1,.80,.54),intensity:.75,range:4.6,
+          castShadows:false});
+        const glow=new pc.Entity('F4E lamp bulb');
+        glow.addComponent('render',{type:'sphere',
+          material:mat('#ffdb94',{emissive:1.1})});
+        glow.setLocalScale(.20,.16,.20);
+        light.addChild(glow);node.addChild(light);
+        light.light.enabled=false;glow.enabled=false;
+      }
+      if(item.prefabId==='mirror'){
+        const glint=new pc.Entity('F4E mirror highlight');
+        glint.addComponent('render',{type:'sphere',
+          material:mat('#fff6d7',{emissive:.42,opacity:.55})});
+        glint.setLocalPosition(0,1.36,-.16);
+        glint.setLocalScale(.13,.32,.026);
+        node.addChild(glint);glint.enabled=false;
+      }
       app.root.addChild(node);
       decorNodes.set(item.instanceId,node);
     }
@@ -3839,6 +3865,78 @@ function boot() {
       accent.enabled=Boolean(point);
       if(point){accent.setPosition(point.x,point.y,point.z);
         accent.setLocalScale(point.size,point.size,point.size);}
+    }
+    // F4E: interaction visuals depend only on the real targeted action.
+    // Lights persist in v1, while drawers, doors and mirror highlights close
+    // automatically after completion, interruption or save reload.
+    let litUtilityCount=0;
+    for(const item of game.world.furniture.instances){
+      if(item.location!=='home')continue;
+      const node=decorNodes.get(item.instanceId);
+      if(!node?.enabled)continue;
+      if(item.prefabId==='floorlamp'){
+        const light=node.findByName('F4E lamp light');
+        if(light?.light){
+          const on=lampIsOn(game.world,item.instanceId);
+          light.light.enabled=on&&litUtilityCount<5;
+          if(on)litUtilityCount++;
+          const bulb=light.findByName('F4E lamp bulb');
+          if(bulb)bulb.enabled=on;
+        }
+      }
+      if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
+      const weight=Math.max(0,...HOUSEHOLD_IDS.map(id=>
+        furnitureUseWeight(getActor(game,id)?.action,item.instanceId)));
+      const reposition=(part,dx=0,dz=0)=>{
+        if(!part)return;
+        let base=f4eOriginalPositions.get(part);
+        if(!base){const p=part.getLocalPosition();
+          base={x:p.x,y:p.y,z:p.z};f4eOriginalPositions.set(part,base);}
+        part.setLocalPosition(base.x+dx,base.y,base.z+dz);
+      };
+      if(item.prefabId==='dresser'){
+        const sku=furnitureProduct(item.itemDefinitionId)?.modelKey;
+        if(sku==='dresser.reed')for(let i=0;i<3;i++){
+          reposition(node.findByName('SKU dresser.reed dresser drawer '+i),0,-.31*weight);
+          reposition(node.findByName('SKU dresser.reed drawer pull '+i),0,-.31*weight);
+        }
+        if(sku==='dresser.arch')for(const sign of [-1,1]){
+          const side=sign===-1?'-.41':'.41';
+          for(const name of ['arched door ','arched door arch '])
+            reposition(node.findByName('SKU dresser.arch '+name+side),
+              sign*.17*weight,-.15*weight);
+          const handle=sign===-1?'-.12':'.12';
+          reposition(node.findByName('SKU dresser.arch arched brass knob '+handle),
+            sign*.17*weight,-.15*weight);
+        }
+      }else if(item.prefabId==='wardrobe'){
+        const sku=furnitureProduct(item.itemDefinitionId)?.modelKey;
+        if(sku==='wardrobe.classic')for(const sign of [-1,1]){
+          const side=sign===-1?'-.41':'.41';
+          reposition(node.findByName('SKU wardrobe.classic carved wardrobe door '+side),
+            sign*.36*weight,-.13*weight);
+          const handle=sign===-1?'-.11':'.11';
+          reposition(node.findByName('SKU wardrobe.classic long brass handle '+handle),
+            sign*.36*weight,-.13*weight);
+        }
+        if(sku==='wardrobe.open'){
+          for(let i=0;i<3;i++)reposition(
+            node.findByName('SKU wardrobe.open hanging garment '+i),
+            0,-.21*weight);
+          for(let i=0;i<2;i++)reposition(
+            node.findByName('SKU wardrobe.open folded basket '+i),
+            0,-.26*weight);
+        }
+      }else{
+        const glint=node.findByName('F4E mirror highlight');
+        if(glint){glint.enabled=weight>.008;
+          if(glint.enabled){
+            glint.setLocalPosition(Math.sin(effectTime*1.7)*.13*weight,
+              1.36,-.16);
+            glint.setLocalScale(.12+.09*weight,.28+.13*weight,.026);
+          }
+        }
+      }
     }
     // A TV only plays while one of its OWN watchers is actually using it.
     // Each instance keeps its own small procedural screen and no video files.
