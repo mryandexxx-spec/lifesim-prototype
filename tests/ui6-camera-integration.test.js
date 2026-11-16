@@ -8,7 +8,7 @@ test('UI6 points camera at a pure session and defaults to one-finger pan',()=>{
  assert.match(src,/let oneFingerMode='pan'/);
  assert.match(src,/cameraGesture=createCameraGestureSession\(\)/);
  assert.match(src,/cameraGesture\.move\(gesturePoint\(event\),view,/);
- assert.match(src,/oneFinger:oneFingerMode/);
+ assert.match(src,/oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'/);
  assert.match(src,/if\(result.changed\)\{/);
  assert.match(src,/setView\(result.view\)/);
  assert.doesNotMatch(src,/let dragMode='pan'/);
@@ -37,7 +37,7 @@ test('UI6 preserves fallback, strict dialogue, camera reset and iPhone pointer c
 test('UI6 static pages includes all new runtime dependencies',()=>{
  assert.match(workflow,/node --check src\/camera-gestures\.js/);
  assert.match(workflow,/cp src\/camera-gestures\.js site\/src\//);
- assert.match(html,/сборка \/ 1\.1v/);
- assert.match(html,/styles\.css\?v=1\.1v/);
- assert.match(html,/src\/game\.js\?v=1\.1v/);
+ assert.match(html,/сборка \/ 1\.1w/);
+ assert.match(html,/styles\.css\?v=1\.1w/);
+ assert.match(html,/src\/game\.js\?v=1\.1w/);
 });

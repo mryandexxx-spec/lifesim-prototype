@@ -68,7 +68,7 @@ test('real game pointermove moves shop preview only, not camera; 2-finger orbit 
  handlers.pointermove({pointerId:1,clientX:230,clientY:200,cancelable:true,
    preventDefault(){}});
  assert.equal(ctx.viewChanges,1);
- assert.deepEqual(ctx.shopPose,frozen);
+ assert.equal(JSON.stringify(ctx.shopPose),JSON.stringify(frozen));
 });
 test('shop-only mode preserves existing furniture long hold and two-step unpaid confirmation',()=>{
  assert.match(game,/shopPlacing&&oneFingerMode==='pan'\s*\?'placement':oneFingerMode/);

@@ -38,7 +38,7 @@ test('F2.1 camera orbit/pan switch stays visible and entering shop defaults to p
   assert.match(game,/shopPreviousCameraMode=oneFingerMode;\s*oneFingerMode='pan';showCameraMode\(\)/);
   assert.match(game,/oneFingerMode=shopPreviousCameraMode;showCameraMode\(\)/);
   assert.match(game,/rotateButton\.addEventListener\('click'/);
-  assert.match(game,/oneFinger:oneFingerMode/);
+  assert.match(game,/oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'/);
 });
 test('F2.1 purchase preview is a real validatable 3D tap with red blocked place, never a charge',()=>{
   assert.match(game,/if\(shopOpen&&shopPlacing&&shopSelected\)\{\s*const floor=editorFloorAt\(pos\)/);

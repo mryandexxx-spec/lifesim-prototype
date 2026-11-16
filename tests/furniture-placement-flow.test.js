@@ -91,7 +91,7 @@ test('Placement retains 3D prefab and floor outline; swipe moves object without 
   assert.match(game,/const moveShopPreviewToCamera=\(force=false\)=>\{/);
   assert.match(game,/lastShopCameraPreviewAt<100/);
   assert.match(game,/if\(shopOpen&&shopPlacing&&shopSelected\)\{/);
-  assert.match(game,/if\(!shopOpen\)\{shopPlacing=false;shopPose=null;shopManualPose=false;\}/);
+  assert.match(game,/if\(!shopOpen\)\{shopPlacing=false;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;\}/);
   assert.match(html,/id="furnish-place-cancel"/);
   assert.match(html,/id="furnish-buy" type="button">Купить<\/button>/);
   assert.match(css,/\.furnish-shop\[data-placing="true"\] \.furnish-stock/);
