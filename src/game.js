@@ -2153,6 +2153,19 @@ function boot() {
   window.addEventListener('blur',()=>{
     cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();
   });
+  // Safari may suspend a background tab without a matching pointerup/blur.
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();
+    }
+  });
+  canvas.addEventListener('lostpointercapture',event=>{
+    if(holdGesture.pointerId===event.pointerId)cancelPendingGrab();
+    if(editDrag?.pointerId===event.pointerId){
+      cancelEditorDrag();holdGesture.cancel();
+    }
+    cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true});
+  });
   canvas.addEventListener('wheel',event=>{
     event.preventDefault();
     setView(wheelCamera(view,event.deltaY));

@@ -27,7 +27,7 @@ test('UI6 preserves fallback, strict dialogue, camera reset and iPhone pointer c
  assert.match(src,/rotateButton\.addEventListener\('click'/);
  assert.match(src,/oneFingerMode==='orbit'\?'pan':'orbit'/);
  assert.match(src,/canvas\.setPointerCapture\?\.\(event\.pointerId\)/);
- assert.match(src,/if\(dialogueNeedsDecision\(game\)\)\{cameraGesture\.clear\(\);return;\}/);
+ assert.match(src,/if\(dialogueNeedsDecision\(game\)\)\{\s*cancelPendingGrab\(\);cameraGesture\.clear\(\);return;\s*\}/);
  assert.match(src,/setView\(CAMERA_INITIAL\)/);
  assert.match(src,/wheelCamera\(view,event\.deltaY\)/);
  assert.match(html,/id="rotate-camera-btn"[^>]*aria-label="Одним пальцем вращать камеру/);

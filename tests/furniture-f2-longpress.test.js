@@ -80,6 +80,8 @@ test('Game input: iPhone cancelled/second touches never commit layout or suppres
   assert.match(game,/if\(furnishMode&&holdGesture\.pointerId===event\.pointerId\)\s*cancelPendingGrab\(\)/);
   assert.match(game,/window\.addEventListener\('pointercancel',event=>\{/);
   assert.match(game,/window\.addEventListener\('blur',\(\)=>\{\s*cancelPendingGrab\(\)/);
+  assert.match(game,/document\.addEventListener\('visibilitychange',\(\)=>\{/);
+  assert.match(game,/canvas\.addEventListener\('lostpointercapture',event=>\{/);
   assert.match(game,/const exitFurniture=\(\)=>\{\s*if\(!furnishMode\)return;\s*cancelPendingGrab\(\)/);
   assert.match(game,/canvas\.addEventListener\('contextmenu',event=>event\.preventDefault\(\)\)/);
   assert.match(game,/if\(event\.cancelable\)event\.preventDefault\(\)/);
