@@ -194,7 +194,7 @@ test('F4C iPhone import map refreshes every changed furniture core ES module',()
       'furniture-thumbnails']){
     const key='./src/'+name+'.js';
     const version=['furniture-products','furniture-catalog','object-legacy-adapter'].includes(name)
-      ?'1.2v-f4d-f4e'+(['furniture-products','furniture-catalog'].includes(name)?'-h5':'')
+      ?'1.2v-f4d-f4e'+(['furniture-products','furniture-catalog'].includes(name)?'-h5-f4f':'')
       :'1.2u-f4c'+(name==='furniture-procedural-library'?'-h5':'');
     assert.equal(imports[key],key+'?v='+version);
   }
