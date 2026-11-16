@@ -1477,14 +1477,16 @@ function boot() {
     fridge: {x:FRIDGE_LAYOUT.approach.x,y:0,z:FRIDGE_LAYOUT.approach.z,pitch:0,yaw:FRIDGE_FACING_YAW}
   };
   if(game.action?.phase==='using') {
-    const dest=game.action.id==='bed'?bedDestinationFor(game,'alex'):null;
+    const dest=game.action.id==='bed'
+      ?bedDestinationFor(game,'alex',game.action.targetInstanceId):null;
     const actual=dest||furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
   game.position=nearestWalkable(game.position,game.world);
   if(game.otherSim.action?.phase==='using') {
-    const dest=game.otherSim.action.id==='bed'?bedDestinationFor(game,'mira'):null;
+    const dest=game.otherSim.action.id==='bed'
+      ?bedDestinationFor(game,'mira',game.otherSim.action.targetInstanceId):null;
     const actual=dest||furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
@@ -1527,7 +1529,7 @@ function boot() {
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
   const destination=(id,residentId='alex',targetInstanceId=null)=>id==='bed'
-    ?bedDestinationFor(game,residentId)
+    ?bedDestinationFor(game,residentId,targetInstanceId)
     :furnitureActionApproach(game.world,id,targetInstanceId);
   function buildRoute(id,actorId='alex',targetInstanceId=null) {
     const actor=getActor(game,actorId);

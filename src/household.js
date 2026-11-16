@@ -109,19 +109,30 @@ export function loadHousehold(raw) {
   // Legacy v1 had no bedSlot. Keep valid reservations first, then assign
   // any remaining sleepers a distinct free half by actual route distance.
   // No preference or ownership of a bed side by Alex or Mira.
-  const used=[];
+  // Bed halves are reserved PER INSTANCE. Two different beds may both use
+  // their left halves; duplicate left claims on the SAME bed are repaired.
+  const usedByBed=new Map();
   for(const id of HOUSEHOLD_IDS){
-    const resident=getActor(root,id);
-    if(resident.action?.id!=='bed'||!validBedSlot(resident.action.bedSlot))continue;
-    if(!used.includes(resident.action.bedSlot))used.push(resident.action.bedSlot);
-    else delete resident.action.bedSlot;
+    const resident=getActor(root,id),action=resident.action;
+    if(action?.id!=='bed'||!validBedSlot(action.bedSlot))continue;
+    const bed=resolveActionFurniture(root.world,'bed',action.targetInstanceId);
+    if(!bed){resident.action=null;continue;}
+    const used=usedByBed.get(bed.instanceId)||[];
+    if(!used.includes(action.bedSlot)){
+      used.push(action.bedSlot);usedByBed.set(bed.instanceId,used);
+    }else delete action.bedSlot;
   }
   for(const id of HOUSEHOLD_IDS){
-    const resident=getActor(root,id);
-    if(resident.action?.id!=='bed'||validBedSlot(resident.action.bedSlot))continue;
-    const slot=chooseFreeBedSlot(resident.position,used,root.world);
-    if(slot){resident.action.bedSlot=slot;used.push(slot);}
-    else resident.action=null;
+    const resident=getActor(root,id),action=resident.action;
+    if(action?.id!=='bed'||validBedSlot(action.bedSlot))continue;
+    const bed=resolveActionFurniture(root.world,'bed',action.targetInstanceId);
+    if(!bed){resident.action=null;continue;}
+    const used=usedByBed.get(bed.instanceId)||[];
+    const slot=chooseFreeBedSlot(resident.position,used,root.world,bed.instanceId);
+    if(slot){
+      action.bedSlot=slot;
+      used.push(slot);usedByBed.set(bed.instanceId,used);
+    }else resident.action=null;
   }
   return root;
 }
@@ -141,12 +152,16 @@ export function selectResident(root,id) {
 /** Choose the nearest *reachable* unoccupied bed half. This is not tied to
  * identity; either resident can sleep on either side on different nights.
  */
-export function chooseFreeBedSlot(position,occupied=[],world=null) {
+export function chooseFreeBedSlot(position,occupied=[],world=null,targetInstanceId=null) {
+  // An explicit target must not silently redirect to a different saved bed.
+  if(targetInstanceId!==null&&!resolveActionFurniture(world,'bed',targetInstanceId))
+    return null;
   const origin=nearestWalkable(position,world);
   let best=null,bestCost=Infinity;
   for(const id of BED_SLOT_IDS){
     if(occupied.includes(id))continue;
-    const to=furniturePoint(world,'bed',BED_SLOTS[id].approach);
+    const to=furniturePoint(world,'bed',BED_SLOTS[id].approach,targetInstanceId);
+    if(!to)continue;
     const path=findPath(origin,to,world);
     if(!path)continue;
     let prev=origin,cost=0;
@@ -161,25 +176,40 @@ export function chooseFreeBedSlot(position,occupied=[],world=null) {
 /** Two independently reserved physical halves, no owner-specific defaults.
  * Occupancy is kept in the existing optional v1 action.bedSlot.
  */
-export function bedSlotFor(root,residentId='alex') {
+/** A slot belongs to a specific saved bed ID, not to the global prefab.
+ * Keep the optional target argument last for every existing v1 callsite.
+ */
+export function bedSlotFor(root,residentId='alex',targetInstanceId=null) {
   if(!HOUSEHOLD_IDS.includes(residentId))return null;
+  const bed=resolveActionFurniture(root.world,'bed',targetInstanceId);
+  if(!bed)return null;
   const self=getActor(root,residentId);
-  if(self?.action?.id==='bed'&&validBedSlot(self.action.bedSlot))
+  if(!self)return null;
+  const ownBed=self.action?.id==='bed'
+    ?resolveActionFurniture(root.world,'bed',self.action.targetInstanceId):null;
+  if(ownBed?.instanceId===bed.instanceId&&validBedSlot(self.action.bedSlot))
     return self.action.bedSlot;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
-  const taken=other?.action?.id==='bed'&&validBedSlot(other.action.bedSlot)
-    ?[other.action.bedSlot]:[];
-  return chooseFreeBedSlot(self.position,taken,root.world);
+  const otherBed=other?.action?.id==='bed'
+    ?resolveActionFurniture(root.world,'bed',other.action.targetInstanceId):null;
+  const taken=otherBed?.instanceId===bed.instanceId&&
+      validBedSlot(other.action.bedSlot)?[other.action.bedSlot]:[];
+  return chooseFreeBedSlot(self.position,taken,root.world,bed.instanceId);
 }
-export function bedDestinationFor(root,residentId='alex'){
-  const slot=bedSlotFor(root,residentId);
-  return slot?furniturePoint(root.world,'bed',BED_SLOTS[slot].approach):null;
+export function bedDestinationFor(root,residentId='alex',targetInstanceId=null){
+  const self=getActor(root,residentId);
+  const requested=targetInstanceId??(self?.action?.id==='bed'
+    ?self.action.targetInstanceId??null:null);
+  const bed=resolveActionFurniture(root.world,'bed',requested);
+  if(!bed)return null;
+  const slot=bedSlotFor(root,residentId,bed.instanceId);
+  return slot?furniturePoint(root.world,'bed',BED_SLOTS[slot].approach,bed.instanceId):null;
 }
 /** Beds capacity=2; each of the other furniture actions remains exclusive. */
 export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceId=null) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(!item)return false;
-  if(itemId==='bed')return bedSlotFor(root,residentId)!==null;
+  if(itemId==='bed')return bedSlotFor(root,residentId,item.instanceId)!==null;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
   return other?.action?.targetInstanceId!==item.instanceId &&
     !(other?.action?.id===itemId&&!other.action.targetInstanceId);
@@ -193,7 +223,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   // Future manual commands are stored by action-queue.js and dispatched later.
   if (!resident || resident.action || root.socialAction ||
     (automatic && (root.paused||pendingActions(root.actionQueues,residentId).length)))return false;
-  const slot=itemId==='bed'?bedSlotFor(root,residentId):null;
+  const slot=itemId==='bed'?bedSlotFor(root,residentId,item.instanceId):null;
   const chosen=chooseAction(resident,itemId,automatic);
   if(chosen)resident.action.targetInstanceId=item.instanceId;
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
