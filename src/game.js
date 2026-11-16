@@ -244,6 +244,10 @@ if(intimacyQAMode){
       if(furnishMode){toast('Выйди из режима ДОМ');return;}
       if(game.paused){toast('Сними игру с паузы');return;}
       if(game.socialAction)cancelSocial(game);
+      // Reset ONLY the disposable QA pair for each direction. This makes
+      // repeats possible without bypassing the real 12-hour cooldown.
+      game=createIntimacyQAHousehold();
+      resetRuntime();restartAutonomyWait();updateAutoButton();updateResidentPicker();
       const initiatorId=button.dataset.initiator;
       if(beginSocial('talk',false,initiatorId,null,null,'romance.intimacy'))
         toast(getActorName(initiatorId)+' предлагает побыть наедине');
