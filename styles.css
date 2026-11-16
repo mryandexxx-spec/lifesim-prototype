@@ -942,17 +942,32 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   .furnish-placement-guide small{display:none;}
 }
 
-/* Temporary R1b QA overlay, visible only when ?debug=kiss creates it. */
-.kiss-qa-controls{position:absolute;z-index:24;left:max(12px,env(safe-area-inset-left));
-  top:calc(env(safe-area-inset-top) + 160px);width:min(248px,calc(100vw - 92px));
-  padding:12px;background:#fffaf1f4;color:#3e594c;border:1px solid #fff;
+/* R2 adult privacy: scene blackout only; topbar/HUD retain pause and queue. */
+.intimacy-veil{position:absolute;inset:0;z-index:4;display:flex;align-items:center;
+  justify-content:center;pointer-events:none;visibility:hidden;opacity:0;
+  background:radial-gradient(ellipse at center,#273744f5 0%,#101b28fa 80%);
+  color:#fff;text-align:center;transition:opacity .45s ease,visibility 0s linear .45s;}
+.intimacy-veil.visible{visibility:visible;opacity:1;
+  transition:opacity .45s ease,visibility 0s linear 0s;}
+.intimacy-veil-message{max-width:300px;padding:18px 26px;
+  display:flex;align-items:center;gap:12px;flex-direction:column;
+  text-shadow:0 2px 8px #061423cc;}
+.intimacy-veil-message>span{font-size:48px;color:#f3b9cc;}
+.intimacy-veil-message strong{font-size:22px;font-weight:800;}
+.intimacy-veil-message p{margin:0;font-size:13px;line-height:1.6;color:#dbe5e7;}
+.intimacy-veil-message small{font-size:13px;color:#b8d9d8;}
+
+/* Temporary R2 QA controls: created only with ?debug=intimacy. */
+.intimacy-qa-controls{position:absolute;z-index:24;left:max(12px,env(safe-area-inset-left));
+  top:calc(env(safe-area-inset-top) + 160px);width:min(246px,calc(100vw - 92px));
+  padding:12px;background:#fffaf1f5;color:#3e594c;border:1px solid #fff;
   border-radius:16px;box-shadow:0 9px 28px #243f302b;display:flex;
   flex-direction:column;gap:8px;backdrop-filter:blur(13px);font-size:11px;line-height:1.35;}
-.kiss-qa-controls strong{font-size:14px;}
-.kiss-qa-controls span{color:#516e5f;}
-.kiss-qa-buttons{display:flex;gap:6px;flex-wrap:wrap;}
-.kiss-qa-buttons button{padding:9px 7px;border:0;border-radius:10px;
+.intimacy-qa-controls strong{font-size:14px;}
+.intimacy-qa-controls span{color:#516e5f;}
+.intimacy-qa-buttons{display:flex;gap:6px;flex-wrap:wrap;}
+.intimacy-qa-buttons button{padding:9px 7px;border:0;border-radius:10px;
   background:#368369;color:white;font-size:11px;font-weight:800;min-height:42px;}
-.kiss-qa-controls a{color:#377d69;font-weight:800;text-decoration:underline;text-underline-offset:3px;}
-@media(max-width:500px){.kiss-qa-controls{top:calc(env(safe-area-inset-top) + 153px);
-  width:min(215px,calc(100vw - 92px));}}
+.intimacy-qa-controls a{color:#377d69;font-weight:800;text-decoration:underline;text-underline-offset:3px;}
+@media(max-width:500px){.intimacy-qa-controls{top:calc(env(safe-area-inset-top) + 153px);
+  width:min(214px,calc(100vw - 92px));}}
