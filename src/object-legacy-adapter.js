@@ -4,6 +4,7 @@
  */
 import {FURNITURE_CATALOG} from './furniture-catalog.js';
 import {SHOP_ITEMS} from './furniture-shop.js';
+import {FURNITURE_PRODUCTS} from './furniture-products.js';
 import {NEEDS} from './simulation.js';
 import {createObjectRegistry} from './object-definition-registry.js';
 
@@ -36,6 +37,21 @@ const items=defs.map(d=>({
   capabilities:[...d.capabilities],price:shop.get(d.prefabId)??null,
   ratings:{},effects:[] // Existing gameplay already owns rewards; no duplicates.
 }));
+// Multiple distinct SKU identities can share one authored 3D prefab and action.
+// The trial colorway is display/appearance only, no invented rewards.
+for(const offer of FURNITURE_PRODUCTS){
+  if(offer.itemId==='legacy.'+offer.prefabId)continue;
+  const prefab=FURNITURE_CATALOG[offer.prefabId];
+  if(!prefab)throw new Error('Unknown prefab in furniture SKU '+offer.itemId);
+  items.push({
+    id:offer.itemId,prefabId:offer.prefabId,rendererKey:prefab.rendererKey,
+    name:offer.name||prefab.name,
+    categoryIds:[historicalRooms[prefab.category],
+      ...prefab.capabilities.map(x=>'function.'+x)],
+    capabilities:[...prefab.capabilities],price:offer.price,
+    appearanceId:offer.appearanceId||null,ratings:{},effects:[]
+  });
+}
 const registry=createObjectRegistry({categories,stats,attributes:[],triggers,items});
 export function legacyObjectRegistry(){return registry;}
 export function legacyItemIdForPrefab(prefabId){

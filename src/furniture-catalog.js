@@ -6,6 +6,7 @@ import {FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT} from './shower-interaction.js';
 import {TOILET_LAYOUT} from './toilet-interaction.js';
 import {TV_APPROACH} from './tv-interaction.js';
+import {compatibleFurnitureProduct} from './furniture-products.js';
 
 export const FURNITURE_SCHEMA=1;
 const finite=(n)=>typeof n==='number'&&Number.isFinite(n);
@@ -88,8 +89,19 @@ export function restoreFurnitureWorld(raw){
       !['home','storage'].includes(item.location)||seen.has(item.instanceId))
       return newFurnitureWorld();
     seen.add(item.instanceId);
-    instances.push({instanceId:item.instanceId,prefabId:item.prefabId,
-      x:item.x,z:item.z,yaw:item.yaw,location:item.location});
+    const restored={instanceId:item.instanceId,prefabId:item.prefabId,
+      x:item.x,z:item.z,yaw:item.yaw,location:item.location};
+    // Additive optional v1 fields: old homes retain their exact shape. Unknown
+    // variants or a mismatched prefab fall back to the existing 3D object,
+    // never reset an otherwise healthy household or grant unverified refunds.
+    const product=compatibleFurnitureProduct(item.prefabId,item.itemDefinitionId);
+    if(product){
+      restored.itemDefinitionId=product.itemId;
+      if(Number.isSafeInteger(item.purchasePriceCredits)&&
+        item.purchasePriceCredits>=0&&item.purchasePriceCredits<=1_000_000)
+        restored.purchasePriceCredits=item.purchasePriceCredits;
+    }
+    instances.push(restored);
   }
   return {schema:FURNITURE_SCHEMA,
     revision:Number.isSafeInteger(raw.revision)&&raw.revision>=0&&raw.revision<=1e9

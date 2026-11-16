@@ -9,19 +9,20 @@ import {BED_SLOTS} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
 import {describeFurnitureValue} from './furniture-value.js';
+import {FURNITURE_PRODUCTS,FURNITURE_LEGACY_OFFERS,
+  compatibleFurnitureProduct,legacyProductId} from './furniture-products.js';
 
 export const SHOP_SCHEMA=1;
 export const SHOP_START_CREDITS=5000; // Provisional, NOT a signed-off economy.
 export const SHOP_SELL_PERCENT=70;
-export const SHOP_ITEMS=Object.freeze([
-  Object.freeze({prefabId:'plant',price:130}),
-  Object.freeze({prefabId:'table',price:250}),
-  Object.freeze({prefabId:'nightstand',price:170}),
-  Object.freeze({prefabId:'tv',price:650}),
-  Object.freeze({prefabId:'sofa',price:550}),
-  Object.freeze({prefabId:'bed',price:850}) // provisional trial price
-]);
-const stock=new Map(SHOP_ITEMS.map(item=>[item.prefabId,item]));
+// Old six-item API remains byte-shape compatible for existing tests/saves.
+export const SHOP_ITEMS=Object.freeze(FURNITURE_LEGACY_OFFERS.map(({prefabId,price})=>
+  Object.freeze({prefabId,price})));
+export const MARKET_OFFERS=FURNITURE_PRODUCTS;
+const stock=new Map(MARKET_OFFERS.map(item=>[item.itemId,item]));
+const shopPrefabs=new Set(MARKET_OFFERS.map(x=>x.prefabId));
+/** F2 callers may still pass prefabId; F4b2 UI passes the stable SKU id. */
+const offerFor=id=>stock.get(id)||stock.get(legacyProductId(id));
 const safeInt=n=>Number.isSafeInteger(n)&&n>=0;
 const cap=1_000_000;
 export function newFurnitureShop(){return {schema:SHOP_SCHEMA,credits:SHOP_START_CREDITS,nextId:1};}
@@ -31,11 +32,13 @@ export function restoreFurnitureShop(raw){
   return {schema:SHOP_SCHEMA,credits:raw.credits,nextId:raw.nextId};
 }
 export function marketListing(){
-  return SHOP_ITEMS.map(item=>({...item,...{
-    name:FURNITURE_CATALOG[item.prefabId].name,
+  return MARKET_OFFERS.map(item=>({
+    ...item,
+    name:item.name||FURNITURE_CATALOG[item.prefabId].name,
     category:FURNITURE_CATALOG[item.prefabId].category,
-    ...describeFurnitureValue(item.prefabId)
-  }}));
+    ...describeFurnitureValue(item.prefabId),
+    ...(item.description?{effectText:item.description}:{})
+  }));
 }
 function reject(reason){return {ok:false,reason};}
 function context({lockedInstanceIds=[],residents=[]}={}){
@@ -51,23 +54,25 @@ function placement(world,instanceId,pose,opts){
   return result.ok?{ok:true,world:result.world}:reject(result.reason);
 }
 export function buyMarketItem(world,shop,prefabId,pose,opts={}){
-  const item=stock.get(prefabId);
+  const item=offerFor(prefabId);
   if(!item)return reject('not-in-shop');
+  const productPrefabId=item.prefabId;
   if(!validPosition(pose))return reject('invalid-pose');
   const current=normalized(world,shop);
   if(current.shop.credits<item.price)return reject('insufficient-credits');
   if(current.world.instances.length>=128)return reject('full-household');
-  const id='shop-'+prefabId+'-'+current.shop.nextId;
+  const id='shop-'+productPrefabId+'-'+current.shop.nextId;
   if(current.world.instances.some(x=>x.instanceId===id))return reject('duplicate-id');
-  const added={instanceId:id,prefabId,x:pose.x,z:pose.z,yaw:pose.yaw,location:'home'};
+  const added={instanceId:id,prefabId:productPrefabId,x:pose.x,z:pose.z,yaw:pose.yaw,
+    location:'home',itemDefinitionId:item.itemId,purchasePriceCredits:item.price};
   const candidate={...current.world,instances:[...current.world.instances,added]};
   const valid=placement(candidate,id,pose,opts);
   if(!valid.ok)return valid;
-  if(prefabId==='sofa'&&!sofaReachable(valid.world,id,opts))
+  if(productPrefabId==='sofa'&&!sofaReachable(valid.world,id,opts))
     return reject('unreachable-sofa');
-  if(prefabId==='bed'&&!bedReachable(valid.world,id,opts))
+  if(productPrefabId==='bed'&&!bedReachable(valid.world,id,opts))
     return reject('unreachable-bed');
-  if(prefabId==='tv'&&!sofaReachable(valid.world,id,opts,'tv'))
+  if(productPrefabId==='tv'&&!sofaReachable(valid.world,id,opts,'tv'))
     return reject('unreachable-tv');
   return {ok:true,world:valid.world,
     shop:{...current.shop,credits:current.shop.credits-item.price,nextId:current.shop.nextId+1},
@@ -77,7 +82,7 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
  * enter storage or be sold; keep older decor trade rules intact.
  */
 export function canTradeMarketInstance(item){
-  return !!item&&stock.has(item.prefabId)&&(
+  return !!item&&shopPrefabs.has(item.prefabId)&&(
     !['sofa','bed'].includes(item.prefabId)||
     new RegExp('^shop-'+item.prefabId+'-[1-9][0-9]*$').test(item.instanceId));
 }
@@ -136,7 +141,15 @@ export function sellMarketItem(world,shop,instanceId,opts={}){
   if(!item)return reject('protected-item');
   if(item.location==='home'&&(opts.lockedInstanceIds||[]).includes(instanceId))
     return reject('reserved');
-  const amount=Math.floor(stock.get(item.prefabId).price*SHOP_SELL_PERCENT/100);
+  const product=compatibleFurnitureProduct(item.prefabId,item.itemDefinitionId)||
+    stock.get(legacyProductId(item.prefabId));
+  if(!product)return reject('protected-item');
+  // The price paid belongs to the physical instance, not current catalog price.
+  // Old v1 items without a snapshot preserve the original fallback sale value.
+  const paid=Number.isSafeInteger(item.purchasePriceCredits)&&
+    item.purchasePriceCredits>=0&&item.purchasePriceCredits<=cap
+    ?item.purchasePriceCredits:product.price;
+  const amount=Math.floor(paid*SHOP_SELL_PERCENT/100);
   if(current.shop.credits+amount>cap)return reject('wallet-limit');
   return {ok:true,world:{...current.world,revision:current.world.revision+1,
     instances:current.world.instances.filter(x=>x.instanceId!==instanceId)},
