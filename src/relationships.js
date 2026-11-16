@@ -175,6 +175,10 @@ export function arriveSocial(root) {
   // No physical contact until the recipient has answered this invitation.
   if(['romance.hug','romance.kiss','romance.intimacy'].includes(social.branchAction?.id)){
     const a=social.initiator,b=social.partner;
+    if(social.branchAction.id==='romance.intimacy'&&!intimacyBedPlan(root,a)){
+      // An unavailable private place cannot be misreported as rejection.
+      root.socialAction=null;return false;
+    }
     const response=resolveBranchResponse(root.socialGraph,a,b,social.branchAction.id,{
       recipient:get(root,b),minutes:root.minutes,
       compatibilityBias:socialCompatibility(
@@ -276,6 +280,10 @@ export function tickSocial(root,minutes){
     const length=physical&&consent!==true
       ?intimacy?INTIMACY_REFUSAL_DURATION_MINUTES:HUG_REFUSAL_DURATION_MINUTES
       :intimacy?INTIMACY_DURATION_MINUTES:kissing?KISS_DURATION_MINUTES:18;
+    if(intimacy&&consent===true&&!intimacyBedPlan(root,s.initiator)){
+      // No phantom completed intimacy when the bed disappears mid-scene.
+      root.socialAction=null;return false;
+    }
     if(s.elapsed<length)return false;
     const physicalAccepted=physical&&consent===true&&
       romanceAvailability(root.socialGraph,s.initiator,s.partner,
@@ -420,7 +428,9 @@ export function loadSocialAction(data,root) {
           branch.id==='romance.kiss'?'kissConsent':'intimacyConsent']==='boolean'))||
     !availableSocialActions(root.socialGraph,data.initiator,data.partner,root.minutes)
       .some(action=>action.id===branch.id&&action.enabled)||
-    (branch?.id==='romance.intimacy'&&!intimacyBedPlan(root,data.initiator))||
+    (branch?.id==='romance.intimacy'&&(
+      !intimacyBedPlan(root,data.initiator)||
+      (data.phase==='using'&&typeof branch.intimacyConsent!=='boolean')))||
     session||shared||data.kind!=='talk'||
     (data.automatic===true&&!AUTONOMOUS_FRIEND_BRANCHES.includes(branch.id))))return null;
   return {kind:data.kind,initiator:data.initiator,partner:data.partner,
