@@ -1888,8 +1888,9 @@ function boot() {
     const history=editSession?.state();
     $('furnish-undo').disabled=!furnishMode||!history?.canUndo;
     $('furnish-redo').disabled=!furnishMode||!history?.canRedo;
-    $('furnish-title').textContent=shopOpen?'Магазин':warehouseOpen?'Склад':
-      item&&selectable?'Обстановка · '+editorLabel(item.instanceId):'Обстановка';
+    $('furnish-title').textContent=shopPlacing?'Выбираем место':shopOpen?'Магазин':
+      warehouseOpen?'Склад':item&&selectable
+        ?'Обстановка · '+editorLabel(item.instanceId):'Обстановка';
     if(shopOpen||warehouseOpen||!selectable)furnitureGhost.enabled=false;
     else showGhost(editSelectedId);
     $('furnish-balance').textContent='Кредиты: '+game.shop.credits;
