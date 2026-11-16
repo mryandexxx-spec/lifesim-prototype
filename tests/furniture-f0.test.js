@@ -17,7 +17,7 @@ test('F0 legacy geometry is exact and every old obstacle comes from instances',(
   assert.deepEqual(furnitureObstacles(world),FURNITURE);
   assert.equal(FURNITURE.length,11); // fridge swept door
   assert.equal(FURNITURE_CATALOG.toilet.actionId,'toilet');
-  assert.equal(FURNITURE_CATALOG.tv.actionId,null); // F3 functional television, not fake yet
+  assert.equal(FURNITURE_CATALOG.tv.actionId,'tv'); // F3a real TV action, legacy geometry unchanged
   assert.deepEqual(ORIGINAL_FURNITURE.map(x=>x.instanceId),world.instances.map(x=>x.instanceId));
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
 });
