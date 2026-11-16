@@ -68,9 +68,13 @@ test('R1a refusal never moves two bodies and never rewards hug',()=>{
   s.mind.mood.value=10;
   assert.equal(arriveSocial(s),true);
   assert.equal(s.socialAction.branchAction.hugConsent,false);
+  const before=getPair(s.socialGraph,'alex','mira').romance.views;
+  const attraction=[before.alex.attraction,before.mira.attraction];
   assert.equal(hugMotion(s.socialAction).weight,0);
   assert.equal(tickSocial(s,HUG_REFUSAL_DURATION_MINUTES),true);
   assert.deepEqual(hugs(s).map(e=>e.type),['romance.hug.refused']);
+  const after=getPair(s.socialGraph,'alex','mira').romance.views;
+  assert.deepEqual([after.alex.attraction,after.mira.attraction],attraction);
 });
 test('R1a consent cannot be converted to a forged positive after revoked boundary',()=>{
   const s=couple();
@@ -120,6 +124,7 @@ test('R1a synchronized pose is bounded and symmetric, independent of actor names
   const w=hugMotion({phase:'using',elapsed:9,branchAction:
     {id:'romance.hug',hugConsent:true}});
   assert.ok(w.weight>.7);
+  assert.equal(w.active,true);
   assert.equal(hugMotion({phase:'using',elapsed:18,branchAction:
     {id:'romance.hug',hugConsent:true}}).weight,0);
 });

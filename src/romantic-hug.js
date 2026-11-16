@@ -7,9 +7,9 @@ const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
 export function hugMotion(social){
   if(social?.phase!=='using'||social.branchAction?.id!=='romance.hug'||
     social.branchAction.hugConsent!==true||!Number.isFinite(social.elapsed))
-    return {weight:0,progress:0};
+    return {weight:0,progress:0,active:false};
   const progress=clamp(social.elapsed/HUG_DURATION_MINUTES);
-  return {weight:smooth(.06,.34,progress)*(1-smooth(.74,.96,progress)),progress};
+  return {weight:smooth(.06,.34,progress)*(1-smooth(.74,.96,progress)),progress,active:true};
 }
 /** Symmetric cosmetic approach. The authoritative simulation positions stay put. */
 export function hugPairTarget(a,b,weight){

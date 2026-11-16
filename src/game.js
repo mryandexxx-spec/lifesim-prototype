@@ -2324,7 +2324,7 @@ function boot() {
     const socialUsing=game.socialAction?.phase==='using';
     // Both visual roots share one timed embrace, without rewriting A* positions.
     const hugCandidate=hugMotion(game.socialAction);
-    const hugTargets=hugCandidate.weight>.001
+    const hugTargets=hugCandidate.active
       ?hugPairTarget(game.position,game.otherSim.position,hugCandidate.weight):null;
     const hugFrame=hugTargets?hugCandidate:{weight:0,progress:0};
     const using=game.action?.phase==='using', useId=using?game.action.id:null;
@@ -2401,7 +2401,7 @@ function boot() {
       bedReclineWeight:bedPose?.bedReclineWeight||0,
       bedSwingWeight:bedPose?.bedSwingWeight||0,
       bedSide:bedPose?.bedSide||null,bedJoints:bedPose?.bedJoints,bedFootYaw:bedPose?.bedFootYaw,
-      social:socialUsing?game.socialAction.kind:null,
+      social:socialUsing&&!hugFrame.active?game.socialAction.kind:null,
       hugWeight:hugFrame.weight,
       fridgeReach:alexFridge?.reach||0,fridgeEat:alexFridge?.eat||0,
       fridgeChew:alexFridge?.chew||0,
@@ -2492,7 +2492,7 @@ function boot() {
       bedReclineWeight:miraBedPose?.bedReclineWeight||0,
       bedSwingWeight:miraBedPose?.bedSwingWeight||0,
       bedSide:miraBedPose?.bedSide||null,bedJoints:miraBedPose?.bedJoints,bedFootYaw:miraBedPose?.bedFootYaw,
-      social:socialUsing?game.socialAction.kind:null,
+      social:socialUsing&&!hugFrame.active?game.socialAction.kind:null,
       hugWeight:hugFrame.weight,
       fridgeReach:miraFridge?.reach||0,fridgeEat:miraFridge?.eat||0,
       fridgeChew:miraFridge?.chew||0,

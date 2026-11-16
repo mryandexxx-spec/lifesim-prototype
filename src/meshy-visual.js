@@ -182,7 +182,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       worldMinutes=null,mood=null,energy=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
-        preferred:requested&&(!hugFrame?.weight||Boolean(state.hugRuntime?.ready)),ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
+        preferred:requested&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready)),ready:state.ready,actionId,sofaBusy,bedBusy,showerBusy,
         fridgeBusy,fridgeReady:Boolean(state.fridgeRuntime?.ready),
         bedReady:Boolean(state.bedRuntime?.ready),
         showerReady:Boolean(state.showerRuntime?.ready),
@@ -334,7 +334,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         // the seat. The scrub was applied before the contact/foot pass.
         return true;
       }
-      const greetingTime=alexGreetingClipTime({
+      const greetingTime=hugFrame?.active?null:alexGreetingClipTime({
         social,initiator:socialInitiator,elapsed:socialElapsed,
         duration:state.greetingDuration
       });
@@ -351,7 +351,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         return true;
       }
       const target=walking||social
-        ? meshClipFor({walking,social:hugFrame?.weight>.005?null:social})
+        ? meshClipFor({walking,social:hugFrame?.active?null:social})
         : alexIdleClipFor({minutes:worldMinutes,mood,energy,walking,social,
           actionId,sofaBusy,bedBusy,showerBusy,fridgeBusy,
           available:state.alternateIdleAvailable});

@@ -320,6 +320,11 @@ export function recordRomanceReceipt(graph,pair,receipt){
     target.attraction=clamp(target.attraction-9,0,100);
     return true;
   }
+  if(receipt.type==='romance.hug.refused'){
+    // Declining a physical gesture must not penalize either person's feelings.
+    target.lastRefusedAt=receipt.at;
+    return true;
+  }
   const accepted=!receipt.type.endsWith('.refused');
   const confession=receipt.type.startsWith('romance.confess');
   const dating=receipt.type.startsWith('romance.date');

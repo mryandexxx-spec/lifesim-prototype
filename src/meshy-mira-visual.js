@@ -190,7 +190,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       toiletBusy=false,toiletFrame=null,
       fridgeBusy=false,fridgeFrame=null}={}){
       const show=canShowMiraMeshy({
-        preferred:preferred&&(!hugFrame?.weight||Boolean(state.hugRuntime?.ready)),ready:state.ready,actionId,
+        preferred:preferred&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready)),ready:state.ready,actionId,
         sofaBusy,sofaReady:state.sofaReady,
         bedBusy,bedReady:state.bedReady,showerBusy,
         showerReady:Boolean(state.showerRuntime?.ready),
@@ -330,7 +330,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         anim.playing=!paused;
         return true;
       }
-      const clip=miraClipFor({walking,social:hugFrame?.weight>.005?null:social});
+      const clip=miraClipFor({walking,social:hugFrame?.active?null:social});
       if(state.clip===MIRA_SOFA_CLIP){
         state.sofaRelease={remaining:.2,offset:{...state.sofaOffset}};
       }
