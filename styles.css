@@ -813,9 +813,13 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .app-shell[data-furnish-mode="true"] #rotate-camera-btn,
 .app-shell[data-furnish-mode="true"] #reset-camera-btn{display:flex;align-items:center;justify-content:center;}
 .app-shell[data-furnish-mode="true"] #rotate-camera-btn{flex-direction:column;}
-.furniture-editor[data-editor-view="shop"],
+.furniture-editor[data-editor-view="shop"]{
+  /* Four products, preview and buy button fit without inner scrolling
+     on regular portrait iPhones; short landscape may scroll the sheet. */
+  max-height:min(70dvh,570px);
+}
 .furniture-editor[data-editor-view="warehouse"]{
-  max-height:min(62dvh,480px);
+  max-height:min(60dvh,480px);
 }
 .furniture-editor[data-editor-view="edit"]{max-height:min(35dvh,245px);}
 .furnish-market-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-height:43px;}
