@@ -33,7 +33,8 @@ const BRANCH_TAGS=Object.freeze({
   'romance.repair':'socializing',
   'romance.hug':'socializing',
   'romance.kiss':'socializing',
-  'romance.intimacy':'socializing'
+  'romance.intimacy':'socializing',
+  'romance.evening':'socializing'
 });
 const BRANCH_THRESHOLDS=Object.freeze({
   'acquaint.introduce':-Infinity,
@@ -54,7 +55,8 @@ const BRANCH_THRESHOLDS=Object.freeze({
   'romance.repair':24,
   'romance.hug':43,
   'romance.kiss':48,
-  'romance.intimacy':56
+  'romance.intimacy':56,
+  'romance.evening':42
 });
 const unwell=emotion=>['sadness','irritation','anxiety'].includes(emotion.kind);
 const delighted=emotion=>['joy','enthusiasm','inspiration'].includes(emotion.kind);

@@ -41,7 +41,8 @@ export const SOCIAL_NEED_REWARDS=Object.freeze({
   'romance.propose':16,
   'romance.marry':18,
   'romance.checkin':13,
-  'romance.repair':15
+  'romance.repair':15,
+  'romance.evening':18
 });
 
 /** Pure receipt->gain boundary for ANY N-person residents dictionary. Call

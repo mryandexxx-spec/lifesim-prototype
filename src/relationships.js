@@ -22,6 +22,8 @@ export const SOCIAL_ACTIONS=Object.freeze({
   argue:{label:'Поспорить',duration:16,affinity:-12,fun:-5}
 });
 export const SOCIAL_COOLDOWN_MINUTES=180;
+export const ROMANTIC_EVENING_DURATION_MINUTES=30;
+export const ROMANTIC_EVENING_REFUSAL_MINUTES=3;
 export const RECONCILIATION_WINDOW_MINUTES=480;
 const SOCIAL_MEMORY_IDS=new Set(['talk','argue','regret','hurt','reconcile']);
 const CONFLICT_MEMORY_IDS=new Set(['argue','regret','hurt']);
@@ -173,7 +175,7 @@ export function arriveSocial(root) {
   const social=root.socialAction;
   if(social?.phase!=='walking')return false;
   // No physical contact until the recipient has answered this invitation.
-  if(['romance.hug','romance.kiss','romance.intimacy'].includes(social.branchAction?.id)){
+  if(['romance.hug','romance.kiss','romance.intimacy','romance.evening'].includes(social.branchAction?.id)){
     const a=social.initiator,b=social.partner;
     if(social.branchAction.id==='romance.intimacy'&&!intimacyBedPlan(root,a)){
       // An unavailable private place cannot be misreported as rejection.
@@ -194,6 +196,8 @@ export function arriveSocial(root) {
         get(root,a).position={...plan.actor};
         get(root,b).position={...plan.partner};
       }
+    }else if(social.branchAction.id==='romance.evening'){
+      social.branchAction.eveningConsent=response?.accepted===true;
     }else{
       social.branchAction[social.branchAction.id==='romance.hug'?'hugConsent':'kissConsent']=
         response?.accepted===true;
@@ -274,22 +278,27 @@ export function tickSocial(root,minutes){
     const hugging=s.branchAction.id==='romance.hug';
     const kissing=s.branchAction.id==='romance.kiss';
     const intimacy=s.branchAction.id==='romance.intimacy';
+    const evening=s.branchAction.id==='romance.evening';
     const physical=hugging||kissing||intimacy;
-    const consent=hugging?s.branchAction.hugConsent:
+    const consent=evening?s.branchAction.eveningConsent:
+      hugging?s.branchAction.hugConsent:
       kissing?s.branchAction.kissConsent:s.branchAction.intimacyConsent;
-    const length=physical&&consent!==true
-      ?intimacy?INTIMACY_REFUSAL_DURATION_MINUTES:HUG_REFUSAL_DURATION_MINUTES
-      :intimacy?INTIMACY_DURATION_MINUTES:kissing?KISS_DURATION_MINUTES:18;
+    const agreedBeforeUsing=physical||evening;
+    const length=agreedBeforeUsing&&consent!==true
+      ?evening?ROMANTIC_EVENING_REFUSAL_MINUTES:
+        intimacy?INTIMACY_REFUSAL_DURATION_MINUTES:HUG_REFUSAL_DURATION_MINUTES
+      :evening?ROMANTIC_EVENING_DURATION_MINUTES:
+        intimacy?INTIMACY_DURATION_MINUTES:kissing?KISS_DURATION_MINUTES:18;
     if(intimacy&&consent===true&&!intimacyBedPlan(root,s.initiator)){
       // No phantom completed intimacy when the bed disappears mid-scene.
       root.socialAction=null;return false;
     }
     if(s.elapsed<length)return false;
-    const physicalAccepted=physical&&consent===true&&
+    const physicalAccepted=agreedBeforeUsing&&consent===true&&
       romanceAvailability(root.socialGraph,s.initiator,s.partner,
         s.branchAction.id,root.minutes).enabled&&
       (!intimacy||Boolean(intimacyBedPlan(root,s.initiator)));
-    const response=physical
+    const response=agreedBeforeUsing
       ?{accepted:physicalAccepted,
         type:physicalAccepted?s.branchAction.id:s.branchAction.id+'.refused',
         outcome:physicalAccepted?'warm':'refused',intensity:1}
@@ -302,12 +311,20 @@ export function tickSocial(root,minutes){
     if(['romance.date','romance.breakup','romance.tender',
       'romance.propose','romance.marry','romance.divorce',
       'romance.checkin','romance.repair','romance.hug','romance.kiss',
-      'romance.intimacy'].includes(s.branchAction.id)){
+      'romance.intimacy','romance.evening'].includes(s.branchAction.id)){
       // A commitment or loving gesture is a verified canonical milestone,
       // never a fake generic talk, quarrel or automatic affinity reward.
       const completed=recordPairCompletion(root,s,response.type);
       root.socialAction=null;
       if(!completed)return false;
+      if(evening&&response.accepted){
+        // Modest leisure benefit only after the accepted canonical receipt.
+        for(const id of [s.initiator,s.partner]){
+          const resident=get(root,id);
+          resident.needs.fun=clamp(resident.needs.fun+8,0,100);
+          refreshMind(resident);
+        }
+      }
       root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
       const accepted=response.accepted;
       const separated=['romance.breakup','romance.divorce'].includes(response.type);
@@ -317,6 +334,7 @@ export function tickSocial(root,minutes){
         'romance.hug':'Нежно обнялись',
         'romance.kiss':'Поцеловались',
         'romance.intimacy':'Побыли наедине',
+        'romance.evening':'Провели вечер вдвоём',
         'romance.checkin':'Уделил(а) внимание',
         'romance.repair':'Поговорил(а) об обиде',
         'romance.propose':'Обручились',
@@ -403,7 +421,11 @@ export function loadSocialAction(data,root) {
   const duration=shared?sharedDuration(shared):
     data?.branchAction?.id==='romance.intimacy'&&
     data?.branchAction?.intimacyConsent===true
-      ?INTIMACY_DURATION_MINUTES:SOCIAL_ACTIONS[data?.kind]?.duration;
+      ?INTIMACY_DURATION_MINUTES:
+    data?.branchAction?.id==='romance.evening'
+      ?(data.branchAction.eveningConsent===true
+        ?ROMANTIC_EVENING_DURATION_MINUTES:ROMANTIC_EVENING_REFUSAL_MINUTES):
+      SOCIAL_ACTIONS[data?.kind]?.duration;
   if(!data||typeof data!=='object'||Array.isArray(data)||
     !Object.hasOwn(SOCIAL_ACTIONS,data.kind)||!validId(data.initiator)||
     data.partner!==otherId(data.initiator)||!['walking','using'].includes(data.phase)||
@@ -422,15 +444,18 @@ export function loadSocialAction(data,root) {
     !branch||typeof branch!=='object'||Array.isArray(branch)||
     !Object.hasOwn(branch,'id')||
     !(Object.keys(branch).length===1||
-      (['romance.hug','romance.kiss','romance.intimacy'].includes(branch.id)&&
+      (['romance.hug','romance.kiss','romance.intimacy','romance.evening'].includes(branch.id)&&
         Object.keys(branch).length===2&&
         typeof branch[branch.id==='romance.hug'?'hugConsent':
-          branch.id==='romance.kiss'?'kissConsent':'intimacyConsent']==='boolean'))||
+          branch.id==='romance.kiss'?'kissConsent':
+            branch.id==='romance.evening'?'eveningConsent':'intimacyConsent']==='boolean'))||
     !availableSocialActions(root.socialGraph,data.initiator,data.partner,root.minutes)
       .some(action=>action.id===branch.id&&action.enabled)||
     (branch?.id==='romance.intimacy'&&(
       !intimacyBedPlan(root,data.initiator)||
       (data.phase==='using'&&typeof branch.intimacyConsent!=='boolean')))||
+    (branch?.id==='romance.evening'&&data.phase==='using'&&
+      typeof branch.eveningConsent!=='boolean')||
     session||shared||data.kind!=='talk'||
     (data.automatic===true&&!AUTONOMOUS_FRIEND_BRANCHES.includes(branch.id))))return null;
   return {kind:data.kind,initiator:data.initiator,partner:data.partner,
@@ -439,12 +464,14 @@ export function loadSocialAction(data,root) {
     ...(session?{conversation:session}:{}),
     ...(shared?{shared}:{}),
     ...(branch?{branchAction:{id:branch.id,
-      ...(['romance.hug','romance.kiss','romance.intimacy'].includes(branch.id)&&
+      ...(['romance.hug','romance.kiss','romance.intimacy','romance.evening'].includes(branch.id)&&
           data.phase==='using'
         ?{[branch.id==='romance.hug'?'hugConsent':
-            branch.id==='romance.kiss'?'kissConsent':'intimacyConsent']:
+            branch.id==='romance.kiss'?'kissConsent':
+            branch.id==='romance.evening'?'eveningConsent':'intimacyConsent']:
           branch[branch.id==='romance.hug'?'hugConsent':
-            branch.id==='romance.kiss'?'kissConsent':'intimacyConsent']===true&&
+            branch.id==='romance.kiss'?'kissConsent':
+            branch.id==='romance.evening'?'eveningConsent':'intimacyConsent']===true&&
           resolveBranchResponse(root.socialGraph,data.initiator,data.partner,
             branch.id,{recipient:get(root,data.partner),
               minutes:root.minutes,
