@@ -85,8 +85,8 @@ test('Placement remains a real 3D prefab + floor outline, follows camera as play
   assert.match(game,/shopPreviewEntity.setEulerAngles\(0,-shopPose.yaw,0\)/);
   assert.match(game,/if\(furnishMode&&shopPlacing\)moveShopPreviewToCamera\(\)/);
   assert.match(game,/if\(furnishMode&&shopPlacing&&!pos\)moveShopPreviewToCamera\(true\)/);
-  assert.match(game,/const shopCameraAnchor=\(\)=>\{/);
-  assert.match(game,/const visibleHeight=Math.max\(100,Math.min\(rect.bottom,panel.top\)-rect.top\)/);
+  assert.match(game,/const candidate=cameraPlacementPose\(view,shopPose\)/);
+  assert.doesNotMatch(game,/const shopCameraAnchor=/);
   assert.match(game,/const moveShopPreviewToCamera=\(force=false\)=>\{/);
   assert.match(game,/lastShopCameraPreviewAt<100/);
   assert.match(game,/if\(shopOpen&&shopPlacing&&shopSelected\)\{/);
