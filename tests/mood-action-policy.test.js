@@ -274,13 +274,13 @@ test('1.0s release retains M2 in Pages, preserves 1.0q dialogue, M1 and Safari c
   assert.match(workflow,/src\/game\.js src\/simulation\.js/);
   assert.match(workflow,/src\/mood-presentation\.js src\/social-perspective\.js/);
   assert.match(workflow,/src\/conversation-engine\.js src\/dialogue-decision\.js src\/world-interactions\.js src\/gifts-leisure\.js/);
-  assert.match(html,/сборка \/ 1\.2g/);
-  assert.match(html,/styles\.css\?v=1\.2g/);
-  assert.match(html,/src\/game\.js\?v=1\.2g/);
+  assert.match(html,/сборка \/ 1\.2h/);
+  assert.match(html,/styles\.css\?v=1\.2h/);
+  assert.match(html,/src\/game\.js\?v=1\.2h/);
   assert.match(html,/id="mood-orbit"/);
   assert.match(html,/id="mood-overview"/);
   assert.match(html,/id="conversation-panel"/);
-  assert.equal(pkg.version,'1.0.0-alpha.59');
+  assert.equal(pkg.version,'1.0.0-alpha.60');
   assert.equal(lock.version,pkg.version);
   assert.equal(lock.packages[''].version,pkg.version);
 });
