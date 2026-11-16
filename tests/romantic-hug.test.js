@@ -158,7 +158,7 @@ test('R1a renderer and production Pages include pair poses, script and fallback'
   assert.ok(alex.includes('state.hugRuntime?.setFrame(null)'));
   assert.ok(mira.includes('state.hugRuntime?.setFrame(null)'));
   assert.ok(ci.includes('node --check src/meshy-hug-runtime.js'));
-  assert.ok(ci.includes('cp src/romantic-hug.js src/meshy-hug-runtime.js site/src/'));
+  assert.ok(ci.includes('cp src/romantic-hug.js src/meshy-hug-runtime.js src/romantic-kiss.js src/meshy-kiss-runtime.js site/src/'));
   assert.ok(ci.includes('node --check src/romantic-hug.js'));
   assert.ok(!read('../src/romantic-hug.js').includes('Math.random('));
 });

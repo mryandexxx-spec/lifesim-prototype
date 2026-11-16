@@ -47,7 +47,7 @@ test('1.0k romantic category is separate from friendship, and no hidden numeric 
   assert.deepEqual(ROMANCE_ACTION_IDS,['romance.flirt','romance.confess',
     'romance.date','romance.breakup','romance.tender','romance.propose',
     'romance.marry','romance.divorce','romance.checkin','romance.repair',
-    'romance.hug']);
+    'romance.hug','romance.kiss']);
   assert.equal(pair.friendship,'none');
   assert.equal(action(g).enabled,true);
   assert.equal(action(g,'romance.confess').enabled,false);

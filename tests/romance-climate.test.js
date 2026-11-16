@@ -254,7 +254,7 @@ test('1.0n: mobile status UI and ROMANCE actions exist without numeric climate m
   const read=x=>readFileSync(new URL(x,import.meta.url),'utf8');
   const html=read('../index.html'),game=read('../src/game.js'),
     logic=read('../src/romance.js'),graph=read('../src/social-graph.js');
-  assert.ok(html.includes('сборка / 1.1s'));
+  assert.ok(html.includes('сборка / 1.1t'));
   assert.ok(html.includes('id="romance-climate"'));
   assert.ok(game.includes("romanceClimate(game.socialGraph"));
   assert.ok(graph.includes('Уделить внимание'));
