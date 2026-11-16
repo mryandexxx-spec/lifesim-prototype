@@ -80,7 +80,8 @@ export function calculateObjectEffectChanges(registry,contributions,values={}){
     let sum=0;
     for(const policies of groups.values())for(const [policy,rows] of policies){
       let gained;
-      if(policy==='sum')gained=rows.reduce((n,row)=>n+row.delta,0);
+      if(policy==='sum')gained=rows.slice().sort(sourceOrder)
+        .reduce((n,row)=>n+row.delta,0);
       else if(policy==='highest'){
         const best=rows.slice().sort((a,b)=>
           Math.abs(b.delta)-Math.abs(a.delta)||sourceOrder(a,b))[0];
