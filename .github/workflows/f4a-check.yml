@@ -1,7 +1,7 @@
 name: F4a store value preflight
 on:
   push:
-    branches: [feature/f4a-store-value-20261116]
+    branches: [feature/f4a-integrate-r5c-20261116]
 permissions:
   contents: read
 jobs:
