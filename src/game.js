@@ -25,6 +25,7 @@ import {getSkillDefinition} from './skill-registry.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
 import {describeObjectQualities,shopQualitySummary} from './object-quality-presentation.js';
+import {compareShopVariants,formatShopVariantComparison} from './object-quality-comparison.js';
 import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
 import {furnitureProduct,FURNITURE_APPEARANCES} from './furniture-products.js';
@@ -2224,6 +2225,18 @@ function boot() {
       button.querySelector('.furnish-selected-mark').hidden=!active;
     }
     const listing=shopListings.find(i=>i.itemId===shopSelectedItemId);
+    const comparable=listing?compareShopVariants(shopQualityRegistry,shopListings,listing.itemId):[];
+    const comparePanel=$('furnish-variant-compare');
+    comparePanel.hidden=!shopOpen||shopPlacing||comparable.length===0;
+    // Data is produced by the canonical SKU registry, never from 3D/UI state.
+    const compareRows=$('furnish-variant-rows');
+    compareRows.replaceChildren();
+    if(!comparePanel.hidden)for(const other of comparable){
+      const line=document.createElement('p');
+      line.className='furnish-variant-row';
+      line.textContent=formatShopVariantComparison(other);
+      compareRows.append(line);
+    }
     $('furnish-placement-guide').hidden=!shopPlacing;
     $('furnish-placing-name').textContent=listing?.name||'Предмет';
     $('furnish-placing-status').textContent=shopPlacing
