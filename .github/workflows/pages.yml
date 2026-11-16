@@ -131,6 +131,10 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: ./site
+      # GitHub's upload API can report success before the Pages API lists
+      # the artifact. Avoid a fast-fail deploy metadata lookup during bursts.
+      - name: Let Pages artifact metadata propagate
+        run: sleep 20
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
