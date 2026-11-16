@@ -1,0 +1,24 @@
+name: F2.0 furniture long-press and camera gesture preflight
+on:
+  push:
+    branches: [feature/furniture-f2-longpress-20261116]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  regress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify all life, privacy, camera, furniture and social tests
+        run: |
+          npm ci
+          npm test
+          node --check src/game.js
+          node --check src/camera-gestures.js
+          node --check src/furniture-hold.js
+          node --check src/furniture-editor.js
+          node --check src/furniture-layout.js
+          echo "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4  assets/characters/meshy-casual-v1.glb" | sha256sum -c -
+          echo "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a  assets/characters/meshy-mira-mobile-v1.glb" | sha256sum -c -
