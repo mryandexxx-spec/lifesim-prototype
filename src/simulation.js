@@ -193,6 +193,16 @@ export function tick(state, minutes,world=state?.world??null) {
   refreshMind(state,world);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
+    // F4F: collect a real portion at the fridge before walking to the chair.
+    // No hunger reward during collection or transit.
+    if(state.action.id==='dining'&&state.action.diningStage==='taking'){
+      state.action.elapsed+=Math.min(minutes,Math.max(0,6-state.action.elapsed));
+      if(state.action.elapsed>=6){
+        state.action.phase='walking';state.action.diningStage='toSeat';
+        state.action.elapsed=0;state.event='Несёт еду к обеденному столу';
+      }
+      return;
+    }
     const hobby=['hobby','music','paint'].includes(state.action.id)
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
@@ -241,7 +251,7 @@ export function tick(state, minutes,world=state?.world??null) {
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
-        (!['seat','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['seat','dining','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
