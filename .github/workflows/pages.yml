@@ -134,6 +134,9 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: ./site
+      # GitHub's upload API can report success before Pages registers the artifact.
+      - name: Let Pages artifact metadata propagate
+        run: sleep 20
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
