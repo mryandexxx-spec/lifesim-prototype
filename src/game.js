@@ -55,6 +55,7 @@ import {WALK_PHASE_PER_METER,advanceVisualGait} from './locomotion.js';
 import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
+import {TV_WATCH_POSE,tvScreenFrame} from './tv-interaction.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
 import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
@@ -213,7 +214,8 @@ const META = {
   fridge: { title: 'Холодильник', category: 'Кухня', description: 'Перекус восстанавливает сытость', icon: '◕', anchor: [3.42, 2.13, -2.79] },
   shower: { title: 'Душевая', category: 'Ванная', description: 'Душ повышает уровень гигиены', icon: '✧', anchor: [-3.65, 2.16, 2.45] },
   toilet: { title: 'Унитаз', category: 'Ванная', description: 'Приватное использование туалета восстановит потребность', icon: 'WC', anchor: [-1.65, 1.28, 3.14] },
-  sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] }
+  sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] },
+  tv: { title: 'Телевизор', category: 'Гостиная', description: 'Просмотр передач повышает досуг, пока житель смотрит экран', icon: '▣', anchor: [3.5, 1.42, .36] }
 };
 
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
@@ -415,7 +417,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=['sofa','bed'].includes(id)&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','bed','tv'].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -425,6 +427,7 @@ function select(id,instanceId=null) {
   $('action-title').textContent = META[id].title;
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
+      id==='tv'?'Просмотр именно этого телевизора · собственный маршрут к экрану':
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
   $('action-button').innerHTML = `${ACTIONS[id].label} <span>↗</span>`;
@@ -1309,9 +1312,12 @@ function boot() {
       cylinder('table leg',x,.20,z,.085,.33,.085,M.wood);
   });
   withDecor('tv',()=>{
-    box('tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
+    touchBox('tv','tv console',3.91,.41,.37,.66,.73,1.69,M.paleWood);
     box('tv screen',3.52,1.35,.36,.16,1.07,1.62,M.dark);
-    box('tv glass',3.42,1.35,.36,.045,.89,1.44,M.slate);
+    touchBox('tv','tv glass',3.42,1.35,.36,.045,.89,1.44,M.slate);
+    // Cheap original broadcast colours, no copyrighted footage or heavy video.
+    const program=box('tv program',3.386,1.35,.36,.025,.77,1.26,M.mint);
+    program.enabled=false;
     box('tv stand',3.67,.80,.37,.35,.12,.28,M.black);
   });
 
@@ -1454,6 +1460,7 @@ function boot() {
   });
   const ACTOR_POSES = {
     sofa:   SOFA_POSE,
+    tv: TV_WATCH_POSE,
     fridge: {x:FRIDGE_LAYOUT.approach.x,y:0,z:FRIDGE_LAYOUT.approach.z,pitch:0,yaw:FRIDGE_FACING_YAW}
   };
   if(game.action?.phase==='using') {
@@ -1847,6 +1854,7 @@ function boot() {
       'not-in-shop':'Этот товар пока недоступен',
       'protected-item':'Исходная функциональная мебель защищена',
       'unreachable-sofa':'К этому дивану нельзя пройти · выбери другое место',
+      'unreachable-tv':'Нельзя подойти к экрану этого телевизора · выбери другое место',
       'insufficient-credits':'Недостаточно пробных кредитов',
       'full-household':'Слишком много предметов',
       'already-stored':'Предмет уже на складе',
@@ -2462,8 +2470,16 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:1.42,z:r.maxZ}}};
       });
+    const tvCopies=game.world.furniture.instances
+      .filter(item=>item.prefabId==='tv'&&item.location==='home'&&
+        item.instanceId!=='home-tv-1')
+      .map(item=>{
+        const r=instanceRect(item,FURNITURE_CATALOG.tv.footprint);
+        return {kind:'object',id:'tv',instanceId:item.instanceId,
+          bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:1.97,z:r.maxZ}}};
+      });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...bedCopies,...movedVolumes,...blockers]);
+      [...residents,...sofaCopies,...bedCopies,...tvCopies,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -2969,6 +2985,16 @@ function boot() {
     if(meshyShown&&useId==='sofa')book.enabled=false;
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
+    // A TV only plays while one of its OWN watchers is actually using it.
+    // Each instance keeps its own small procedural screen and no video files.
+    for(const item of game.world.furniture.instances){
+      if(item.prefabId!=='tv'||item.location!=='home')continue;
+      const program=decorNodes.get(item.instanceId)?.findByName('tv program');
+      if(!program)continue;
+      const frame=tvScreenFrame([game,game.otherSim],item.instanceId,effectTime);
+      program.enabled=frame.on;
+      if(frame.on)program.render.material=[M.mint,M.blue,M.peach][frame.frame];
+    }
     // Independently animate blankets on the actual sleeping bed, not the original.
     for(const item of game.world.furniture.instances){
       if(item.prefabId!=='bed'||item.location!=='home')continue;
