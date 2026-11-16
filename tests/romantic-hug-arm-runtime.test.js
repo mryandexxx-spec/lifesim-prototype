@@ -91,6 +91,6 @@ test('R1a must actually rotate both shoulders and elbows even for a wide stance'
     assert.match(src,/get hugStatus\(\)/);
     assert.match(src,/setFrame\(hugFrame,paused\)/);
   }
-  assert.match(game,/id="hug-qa-kinematics"/);
-  assert.match(game,/visual\?\.lastApplied/);
+  assert.doesNotMatch(game,/hug-qa-kinematics|hugQAMode/);
+  assert.match(game,/hugPairTarget\(game.position,game.otherSim.position/);
 });
