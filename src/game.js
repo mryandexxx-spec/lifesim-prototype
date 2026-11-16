@@ -1410,14 +1410,16 @@ function boot() {
   };
 
   // Room platform: visible cutaway walls, planks, and sunlight accents.
-  box('foundation',0,-0.28,0,10.5,.47,9.2,M.edge);
-  box('floor',0,-0.032,0,10,.12,8.65,M.floor);
-  for (let i=0;i<10;i++) box('floor plank',-4.45+i*.99,.034,0,.021,.008,8.6,M.line);
-  box('back wall',0,1.40,-4.34,10.02,2.9,.16,M.wall);
+  // F4D: double the navigable area eastward; never move legacy furnishings.
+  // Old floor starts at x=-5; the new wing ends at x=14.25.
+  box('foundation',4.65,-0.28,0,19.8,.47,9.2,M.edge);
+  box('floor',4.625,-0.032,0,19.25,.12,8.65,M.floor);
+  for (let i=0;i<19;i++) box('floor plank',-4.45+i*.99,.034,0,.021,.008,8.6,M.line);
+  box('back wall',4.625,1.40,-4.34,19.27,2.9,.16,M.wall);
   box('left wall',-4.97,1.40,0,.16,2.9,8.65,M.wall2);
-  box('back top trim',0,2.91,-4.30,10.1,.13,.2,M.trim);
+  box('back top trim',4.625,2.91,-4.30,19.35,.13,.2,M.trim);
   box('left top trim',-4.96,2.91,0,.20,.13,8.68,M.trim);
-  box('baseboard back',0,.16,-4.19,10,.18,.13,M.trim);
+  box('baseboard back',4.625,.16,-4.19,19.25,.18,.13,M.trim);
   box('baseboard left',-4.83,.16,0,.13,.18,8.5,M.trim);
   // Wall art: one picture, one shelf and one window with sky-coloured panes.
   box('window frame',-2.18,1.87,-4.16,2.0,1.28,.1,M.paleWood);
