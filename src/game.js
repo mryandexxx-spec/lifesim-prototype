@@ -64,6 +64,7 @@ import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js?v=1.2t';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
 import {purchasedSeatPrefab,purchasedSeatPose,purchasedSeatSurface} from './seat-furniture.js';
+import {diningSeatApproach,diningPlatePosition} from './dining.js';
 import {UTILITY_FURNITURE,UTILITY_ACTION_IDS,furnitureUseWeight,lampIsOn} from './furniture-interactions.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2t';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
@@ -265,6 +266,7 @@ const META = {
   toilet: { title: 'Унитаз', category: 'Ванная', description: 'Приватное использование туалета восстановит потребность', icon: 'WC', anchor: [-1.65, 1.28, 3.14] },
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] },
   seat: { title: 'Кресло или стул', category: 'Сиденья', description: 'Посидеть на выбранном предмете · без бонуса навыков', icon: '▣', anchor: [0,1.2,0] },
+  dining: {title:'Обеденный стол',category:'Столовая',description:'Нужны холодильник и свободный стул лицом к столу. Житель возьмёт еду, сядет и поест.',icon:'🍽',anchor:[0,.85,0]},
   lamp: { title:'Торшер',category:'Освещение',description:'Переключить настоящий свет после подхода к выбранному торшеру',icon:'☀',anchor:[0,1.3,0] },
   mirror: { title:'Зеркало',category:'Уход за собой',description:'Подойти к зеркалу и привести себя в порядок',icon:'◇',anchor:[0,1.4,0] },
   dresser: { title:'Комод',category:'Хранение',description:'Подойти и открыть ящики или дверцы комода',icon:'▤',anchor:[0,.75,0] },
@@ -1938,6 +1940,13 @@ function boot() {
   const {avatar:miraAvatar,torso:miraTorso,leftEye:miraLeftEye,rightEye:miraRightEye,
     legPivot:miraLegPivot,armPivot:miraArmPivot,snack:miraSnack,book:miraBook,
     selected:miraSelected}=miraRig;
+  // F4F: simple original tableware, visible only for a verified seated meal.
+  const diningDishes=Object.fromEntries(HOUSEHOLD_IDS.map(id=>{
+    const plate=cylinder('F4F plate '+id,0,.79,0,.34,.024,.34,M.white);
+    const food=ball('F4F meal '+id,0,.84,0,.23,.075,.18,M.yellow);
+    plate.enabled=false;food.enabled=false;
+    return [id,{plate,food}];
+  }));
   const reactionBadges=createReactionBadges($('reaction-layer'));
   const reactionRigs={alex:alexRig,mira:miraRig};
   const moodOrbit=$('mood-orbit');
@@ -1967,7 +1976,11 @@ function boot() {
       game.action.id==='tv'&&game.action.watchSeatInstanceId
         ?furnitureActionApproach(game.world,'sofa',game.action.watchSeatInstanceId):
       game.action.id==='hobby'&&game.action.readingSeatInstanceId
-        ?furnitureActionApproach(game.world,'sofa',game.action.readingSeatInstanceId):null;
+        ?furnitureActionApproach(game.world,'sofa',game.action.readingSeatInstanceId):
+      game.action.id==='dining'
+        ?(game.action.diningStage==='eating'
+          ?diningSeatApproach(game.world,game.action.targetInstanceId,game.action.diningSeatInstanceId)
+          :furnitureActionApproach(game.world,'fridge')):null;
     const actual=dest||furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
@@ -1979,7 +1992,11 @@ function boot() {
       game.otherSim.action.id==='tv'&&game.otherSim.action.watchSeatInstanceId
         ?furnitureActionApproach(game.world,'sofa',game.otherSim.action.watchSeatInstanceId):
       game.otherSim.action.id==='hobby'&&game.otherSim.action.readingSeatInstanceId
-        ?furnitureActionApproach(game.world,'sofa',game.otherSim.action.readingSeatInstanceId):null;
+        ?furnitureActionApproach(game.world,'sofa',game.otherSim.action.readingSeatInstanceId):
+      game.otherSim.action.id==='dining'
+        ?(game.otherSim.action.diningStage==='eating'
+          ?diningSeatApproach(game.world,game.otherSim.action.targetInstanceId,game.otherSim.action.diningSeatInstanceId)
+          :furnitureActionApproach(game.world,'fridge')):null;
     const actual=dest||furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
@@ -2029,6 +2046,12 @@ function boot() {
     }
     if(id==='hobby:toShelf'||id==='hobby:returnShelf')
       return furnitureActionApproach(game.world,'hobby',targetInstanceId);
+    if(id==='dining'){
+      const a=getActor(game,residentId)?.action;
+      return !a||['toFridge','taking'].includes(a.diningStage)
+        ?furnitureActionApproach(game.world,'fridge')
+        :diningSeatApproach(game.world,a.targetInstanceId,a.diningSeatInstanceId);
+    }
     if(id==='music'){
       const person=getActor(game,residentId);
       if(person?.action?.id==='music'&&
@@ -2450,6 +2473,8 @@ function boot() {
         busy.add(actor.action.readingSeatInstanceId);
       if(actor?.action?.id==='tv'&&actor.action.watchSeatInstanceId)
         busy.add(actor.action.watchSeatInstanceId);
+      if(actor?.action?.id==='dining'&&actor.action.diningSeatInstanceId)
+        busy.add(actor.action.diningSeatInstanceId);
       // Pending commands identify the same durable instance ID after moving
       // or rotating it, so allow repositioning to repair a blocked approach.
       // Storing/selling is still prohibited while commands are pending.
@@ -3343,6 +3368,13 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:2.05,z:r.maxZ}}};
       });
+    const diningTables=game.world.furniture.instances
+      .filter(item=>item.prefabId==='diningtable'&&item.location==='home')
+      .map(item=>{
+        const r=instanceRect(item,FURNITURE_CATALOG.diningtable.footprint);
+        return {kind:'object',id:'dining',instanceId:item.instanceId,
+          bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:1.08,z:r.maxZ}}};
+      });
     // F4D bought chairs are real ray targets: one tappable action per instance.
     const chairSeats=game.world.furniture.instances
       .filter(item=>['chair','armchair'].includes(item.prefabId)&&item.location==='home')
@@ -3481,7 +3513,9 @@ function boot() {
       // On cancellation, finish closing before the former fridge user departs.
       for(const residentId of HOUSEHOLD_IDS){
         const a=getActor(game,residentId);
-        const stillUsing=a.action?.id==='fridge'&&a.action.phase==='using';
+        const stillUsing=(a.action?.id==='fridge'||
+      (a.action?.id==='dining'&&a.action.diningStage==='taking'))&&
+      a.action.phase==='using';
         if(fridgeWasUsing[residentId]&&!stillUsing&&fridgeOpen>.015)fridgeLeaving[residentId]=true;
         if(fridgeLeaving[residentId]&&fridgeOpen<=.015)fridgeLeaving[residentId]=false;
         fridgeWasUsing[residentId]=Boolean(stillUsing);
@@ -3575,7 +3609,13 @@ function boot() {
                 arriveSocial(game);
               }else if(resident.action?.id==='hobby'&&
                 readingRouteId(resident.action))arriveReadingJourney(resident.action);
-              else arrive(resident);
+              else if(resident.action?.id==='dining'){
+                if(resident.action.diningStage==='toFridge'){
+                  arrive(resident);resident.action.diningStage='taking';
+                }else if(resident.action.diningStage==='toSeat'){
+                  arrive(resident);resident.action.diningStage='eating';
+                }
+              }else arrive(resident);
               paths[residentId]={points:null,index:0,id:null};
             }
           }
@@ -3683,8 +3723,11 @@ function boot() {
     const pairedBooks=pairedHobby?.choiceId==='books';
     const pairedMusic=pairedHobby?.choiceId==='music';
     const using=game.action?.phase==='using',
-      useId=using?game.action.id:pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
-    const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,ACTIONS.fridge.duration):null;
+      useId=using?(game.action.id==='dining'&&game.action.diningStage==='taking'
+        ?'fridge':game.action.id):pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
+    const alexDining=useId==='dining'&&game.action?.diningStage==='eating';
+    const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,
+      game.action?.id==='dining'?6:ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
       inverseFurniturePose(game.world,'shower',display).yaw);
@@ -3706,12 +3749,12 @@ function boot() {
     if(alexDateSofa){
       sofaVisualTargets.alex=romanticSofa.sofaId;
       romanticSofaSlots.alex=sofaDateFor('alex');
-    }else if(useId==='sofa'||useId==='seat'||alexWatchSeat||alexReadingSeated)
-      sofaVisualTargets.alex=alexReadingSeated
-        ?game.action.readingSeatInstanceId
-        :(alexWatchSeat||game.action?.targetInstanceId)||null;
+    }else if(useId==='sofa'||useId==='seat'||alexWatchSeat||alexReadingSeated||alexDining)
+      sofaVisualTargets.alex=alexDining?game.action.diningSeatInstanceId:
+        alexReadingSeated?game.action.readingSeatInstanceId:
+        (alexWatchSeat||game.action?.targetInstanceId)||null;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
-      (useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated)&&
+      (useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated||alexDining)&&
         bedStates.alex.progress===0&&!showerStates.alex.active,
       alexReadingStage?animDt*game.speed:animDt);
     const alexSeatBase=sofaTransitionPose(sofaStates.alex);
@@ -3722,7 +3765,7 @@ function boot() {
           {...alexSeatBase,x:alexSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.alex)},
         sofaVisualTargets.alex))||
       {...display,sofaWeight:0};
-    const seating=useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexReadingSeated||
+    const seating=useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexReadingSeated||alexDining||
       sofaStates.alex.progress>0||alexDateSofa;
     if(!seating){sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;}
     if(alexSeatInstanceId!==sofaVisualTargets.alex||
@@ -3745,7 +3788,7 @@ function boot() {
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
       ?furniturePose(game.world,useId==='lamp'?'floorlamp':useId,
-          ACTOR_POSES[useId],game.action?.targetInstanceId):null);
+          ACTOR_POSES[useId],game.action?.id==='dining'?null:game.action?.targetInstanceId):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
@@ -3822,16 +3865,24 @@ function boot() {
     }
     applyCharacterAnimation(alexRig,animationStates.alex);
     applyShowerAppearance(alexRig,Boolean(alexShower?.privacy||alexToilet?.privacy),Boolean(alexShower?.bathing));
-    snack.enabled=Boolean(alexFridge&&alexFridge.handFood>.012);
-    if(snack.enabled)snack.setLocalScale(.20*alexFridge.handFood,.17*alexFridge.handFood,.20*alexFridge.handFood);
+    const alexCarryMeal=game.action?.id==='dining'&&
+      ['toSeat','eating'].includes(game.action.diningStage);
+    snack.enabled=Boolean((alexFridge&&alexFridge.handFood>.012)||alexCarryMeal);
+    if(snack.enabled){
+      const size=alexCarryMeal?(alexDining?Math.max(.20,1-game.action.elapsed/ACTIONS.dining.duration):.85):alexFridge.handFood;
+      snack.setLocalScale(.20*size,.17*size,.20*size);
+    }
     book.enabled=pairedBooks||(using&&useId==='sofa')||
       (game.action?.id==='hobby'&&
        (readingHasBook(game.action)||alexReadingStage==='taking'));
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
-    const miraUseId=miraUsing?game.otherSim.action.id:
+    const miraUseId=miraUsing?(game.otherSim.action.id==='dining'&&
+      game.otherSim.action.diningStage==='taking'?'fridge':game.otherSim.action.id):
       pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
-    const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,ACTIONS.fridge.duration):null;
+    const miraDining=miraUseId==='dining'&&game.otherSim.action?.diningStage==='eating';
+    const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,
+      game.otherSim.action?.id==='dining'?6:ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
       game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
       inverseFurniturePose(game.world,'shower',miraDisplay).yaw);
@@ -3853,12 +3904,12 @@ function boot() {
     if(miraDateSofa){
       sofaVisualTargets.mira=romanticSofa.sofaId;
       romanticSofaSlots.mira=sofaDateFor('mira');
-    }else if(miraUseId==='sofa'||miraUseId==='seat'||miraWatchSeat||miraReadingSeated)
-      sofaVisualTargets.mira=miraReadingSeated
-        ?game.otherSim.action.readingSeatInstanceId
-        :(miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
+    }else if(miraUseId==='sofa'||miraUseId==='seat'||miraWatchSeat||miraReadingSeated||miraDining)
+      sofaVisualTargets.mira=miraDining?game.otherSim.action.diningSeatInstanceId:
+        miraReadingSeated?game.otherSim.action.readingSeatInstanceId:
+        (miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
-      (miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated)&&
+      (miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated||miraDining)&&
         bedStates.mira.progress===0&&!showerStates.mira.active,
       miraReadingStage?animDt*game.speed:animDt);
     const miraSeatBase=sofaTransitionPose(sofaStates.mira);
@@ -3869,7 +3920,7 @@ function boot() {
           {...miraSeatBase,x:miraSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.mira)},
         sofaVisualTargets.mira))||
       {...miraDisplay,sofaWeight:0};
-    const miraSeating=miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraReadingSeated||
+    const miraSeating=miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraReadingSeated||miraDining||
       sofaStates.mira.progress>0||miraDateSofa;
     if(!miraSeating){sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;}
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
@@ -3886,7 +3937,7 @@ function boot() {
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
       ?furniturePose(game.world,miraUseId==='lamp'?'floorlamp':miraUseId,
-          ACTOR_POSES[miraUseId],game.otherSim.action?.targetInstanceId):null);
+          ACTOR_POSES[miraUseId],game.otherSim.action?.id==='dining'?null:game.otherSim.action?.targetInstanceId):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
@@ -3956,8 +4007,13 @@ function boot() {
     }
     applyCharacterAnimation(miraRig,animationStates.mira);
     applyShowerAppearance(miraRig,Boolean(miraShower?.privacy||miraToilet?.privacy),Boolean(miraShower?.bathing));
-    miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
-    if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
+    const miraCarryMeal=game.otherSim.action?.id==='dining'&&
+      ['toSeat','eating'].includes(game.otherSim.action.diningStage);
+    miraSnack.enabled=Boolean((miraFridge&&miraFridge.handFood>.012)||miraCarryMeal);
+    if(miraSnack.enabled){
+      const size=miraCarryMeal?(miraDining?Math.max(.20,1-game.otherSim.action.elapsed/ACTIONS.dining.duration):.85):miraFridge.handFood;
+      miraSnack.setLocalScale(.20*size,.17*size,.20*size);
+    }
     miraBook.enabled=pairedBooks||(miraUsing&&miraUseId==='sofa')||
       (game.otherSim.action?.id==='hobby'&&
         (readingHasBook(game.otherSim.action)||miraReadingStage==='taking'));
@@ -3972,7 +4028,7 @@ function boot() {
         !miraSeating&&!miraBedding&&!miraShower,
       social:socialUsing&&!pairedTv&&!pairedHobby?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
-      actionId:miraUseId==='seat'?'sofa':miraUseId,
+      actionId:(miraUseId==='seat'||miraDining)?'sofa':miraUseId,
       readingStage:pairedBooks?'reading':miraReadingStage,
       readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
       readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
@@ -3983,6 +4039,7 @@ function boot() {
         elapsed:game.otherSim.action.elapsed
       }:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
         contentId:'music.calm',elapsed:game.socialAction.elapsed}:null,
+      diningFrame:miraDining?{phase:'using',activityId:'dining.meal',elapsed:game.otherSim.action.elapsed}:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
@@ -4000,7 +4057,7 @@ function boot() {
       miraBook.enabled=false;
     if(miraMeshShown&&pairedBooks)miraBook.enabled=false;
     // The old snack is on the hidden procedural elbow, not the Meshy hand.
-    if(miraMeshShown&&miraUseId==='fridge')miraSnack.enabled=false;
+    if(miraMeshShown&&(miraUseId==='fridge'||miraCarryMeal))miraSnack.enabled=false;
     // Alex stays on the same 3D rig for bed and fridge when their verified
     // skeleton controllers exist. The original simulation/root still owns
     // mattress placement, both bed slots, shower movement and opaque privacy.
@@ -4019,7 +4076,7 @@ function boot() {
       socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
-      actionId:useId==='seat'?'sofa':useId,
+      actionId:(useId==='seat'||alexDining)?'sofa':useId,
       readingStage:pairedBooks?'reading':alexReadingStage,
       readingStepElapsed:game.action?.readingStepElapsed??0,
       readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
@@ -4028,6 +4085,7 @@ function boot() {
         contentId:game.action.contentId,elapsed:game.action.elapsed
       }:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
         contentId:'music.calm',elapsed:game.socialAction.elapsed}:null,
+      diningFrame:alexDining?{phase:'using',activityId:'dining.meal',elapsed:game.action.elapsed}:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
       seat:seatContactEnabled?livingSofaSeat:null,
@@ -4043,12 +4101,27 @@ function boot() {
     });
     // The old snack is attached to the hidden procedural elbow; use the
     // new Meshy hand-bone prop instead, never show both at once.
-    if(meshyShown&&useId==='fridge')snack.enabled=false;
+    if(meshyShown&&(useId==='fridge'||alexCarryMeal))snack.enabled=false;
     // The existing procedural book is attached to the old right elbow.
     // Never let it float beside the Meshy hand until a real socket exists.
     if(meshyShown&&(useId==='sofa'||game.action?.id==='hobby'))
       book.enabled=false;
     if(meshyShown&&pairedBooks)book.enabled=false;
+    // Plates and their portions track the chosen purchased table and real seat.
+    // Cancellation, completion, storage or removal hides them immediately.
+    for(const id of HOUSEHOLD_IDS){
+      const a=getActor(game,id)?.action;
+      const pos=a?.id==='dining'&&a.phase==='using'&&a.diningStage==='eating'
+        ?diningPlatePosition(game.world,a.targetInstanceId,a.diningSeatInstanceId):null;
+      const dish=diningDishes[id];
+      dish.plate.enabled=Boolean(pos);dish.food.enabled=Boolean(pos);
+      if(pos){
+        dish.plate.setPosition(pos.x,pos.y,pos.z);
+        dish.food.setPosition(pos.x,pos.y+.055,pos.z);
+        const size=Math.max(.07,1-a.elapsed/ACTIONS.dining.duration);
+        dish.food.setLocalScale(.23*size,.075,.18*size);
+      }
+    }
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
     // R5b never writes to the simulator. Tableware only follows existing
