@@ -20,7 +20,7 @@ export const LEISURE_CATALOG=Object.freeze({
   music:Object.freeze({label:'Вместе слушать музыку',symbol:'♫',tag:'music',duration:28}),
   books:Object.freeze({label:'Читать и обсуждать истории',symbol:'📖',tag:'books',duration:30}),
   games:Object.freeze({label:'Играть вместе',symbol:'♟',tag:'games',duration:36}),
-  tv:Object.freeze({label:'Смотреть телевизор вместе',symbol:'▣',tag:'television',duration:32})
+  tv:Object.freeze({label:'Смотреть телевизор вместе',symbol:'▣',tag:'socializing',duration:32})
 });
 export const GIFT_DURATION=12;
 export const INVENTORY_LIMIT=12;
