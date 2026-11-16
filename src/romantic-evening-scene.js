@@ -15,8 +15,8 @@ const inactive=()=>({active:false,weight:0,gestureWeight:0,tableInstanceId:null,
  * The geometry is always in world coordinates; the renderer may attach
  * tabletop props directly to the associated saved furniture instance.
  */
-export function romanticEveningVignette(social,world,positions,clock=0){
-  if(social?.phase!=='using'||social.branchAction?.id!=='romance.evening'||
+export function romanticEveningVignette(social,world,positions,clock=0,{eligible=true}={}){
+  if(eligible!==true||social?.phase!=='using'||social.branchAction?.id!=='romance.evening'||
     social.branchAction.eveningConsent!==true||
     !Number.isFinite(social.elapsed)||social.elapsed<0||
     social.elapsed>=ROMANTIC_EVENING_DURATION_MINUTES||
