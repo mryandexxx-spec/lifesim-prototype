@@ -242,7 +242,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,
       fridgeBusy=false,fridgeFrame=null,readingElapsed=null,
-      readingStage=null,readingStepElapsed=0,musicFrame=null}={}){
+      readingStage=null,readingStepElapsed=0,musicFrame=null,diningFrame=null}={}){
       const show=canShowMiraMeshy({
         preferred:preferred&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready))&&
           (!kissFrame?.active||Boolean(state.kissRuntime?.ready)),ready:state.ready,actionId,
@@ -275,7 +275,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         ?{active:true,stage:readingStage||'reading',
           elapsed:Number.isFinite(readingElapsed)?readingElapsed:0,
           stepElapsed:readingStepElapsed}:null,paused);
-      state.musicRuntime?.setFrame(actionId==='music'?musicFrame:null,paused);
+      state.musicRuntime?.setFrame(actionId==='music'?musicFrame:diningFrame,paused);
       state.hugRuntime?.setFrame(hugFrame,paused);
       state.kissRuntime?.setFrame(kissFrame,paused);
       const shower=actionId==='shower'||showerBusy;
