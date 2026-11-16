@@ -101,6 +101,7 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     // Frozen Anim does not reset bones. Never compound rotation during pause.
     if(paused||!intent||!book.enabled)return false;
     const stage=current?.stage||'reading';
+    if(stage==='reading'&&intent.weight<.005)return false;
     const open=bookPose(stage,current?.stepElapsed||0);
     if(!open){
       // PlayCanvas child book node uses world placement so it follows the
