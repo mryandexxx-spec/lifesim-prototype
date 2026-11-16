@@ -57,8 +57,8 @@ const offered=[
     typeCategoryId:'type.storage.dressers',modelKey:'nightstand.open',
     description:'Открытая ниша и стройные ножки · декор'},
   // Nine new independent geometry types (two actually different forms each).
-  // Non-interactive seating is labelled honestly; real rig/seat interactions
-  // will only be enabled after contact anchors and poses are implemented.
+  // F4D: all four new seating variants share real seat anchors and an
+  // instance-based sit/stand action. Pure decoration remains non-interactive.
   {itemId:'armchair.wing',prefabId:'armchair',price:400,name:'Кресло «Крыло»',
     typeCategoryId:'type.seating.armchairs',modelKey:'armchair.wing',
     description:'Высокая крылатая спинка · можно сесть'},
