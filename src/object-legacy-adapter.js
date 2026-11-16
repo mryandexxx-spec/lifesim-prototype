@@ -20,7 +20,7 @@ const defs=Object.values(FURNITURE_CATALOG);
 const caps=[...new Set(defs.flatMap(d=>d.capabilities))];
 // Labels are presentation data, not an item-type condition in gameplay.
 const capabilityLabels=Object.freeze({
-  sleep:'Сон',relax:'Отдых',decor:'Украшения',surface:'Поверхности',
+  sleep:'Сон',relax:'Отдых',seat:'Сидеть',decor:'Украшения',surface:'Поверхности',
   'tv.watch':'Телевизоры','food.take':'Приём пищи',
   'hygiene.shower':'Гигиена','bladder.toilet':'Туалет',
   'books.borrow':'Книги и чтение','music.playback':'Музыка и прослушивание'

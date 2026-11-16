@@ -13,24 +13,29 @@
   <link rel="stylesheet" href="./styles.css?v=1.2u-h2b-f4c" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
-      "./src/household.js":"./src/household.js?v=1.2w-h2b",
+      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d",
       "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2w-h2b",
-      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b",
+      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b-f4d",
       "./src/animations.js":"./src/animations.js?v=1.2w-h2b",
       "./src/music-movement.js":"./src/music-movement.js?v=1.2w-h2b",
       "./src/meshy-music-runtime.js":"./src/meshy-music-runtime.js?v=1.2w-h2b",
       "./src/meshy-visual.js":"./src/meshy-visual.js?v=1.2w-h2b",
       "./src/meshy-mira-visual.js":"./src/meshy-mira-visual.js?v=1.2w-h2b",
-      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2u-h2fix1",
+      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2v-f4d",
       "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1-f4c",
-      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2u-h2fix1",
-      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2u-f4c",
-      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2u-f4c",
-      "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2u-f4c",
+      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d",
+      "./src/furniture-products.js":"./src/furniture-products.js?v=1.2v-f4d",
+      "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2v-f4d",
+      "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2v-f4d",
       "./src/shop-catalog-selector.js":"./src/shop-catalog-selector.js?v=1.2u-f4c",
       "./src/furniture-value.js":"./src/furniture-value.js?v=1.2u-f4c",
       "./src/furniture-procedural-library.js":"./src/furniture-procedural-library.js?v=1.2u-f4c",
-      "./src/furniture-thumbnails.js":"./src/furniture-thumbnails.js?v=1.2u-f4c"}}
+      "./src/furniture-thumbnails.js":"./src/furniture-thumbnails.js?v=1.2u-f4c",
+      "./src/furniture-transform.js":"./src/furniture-transform.js?v=1.2v-f4d",
+      "./src/navigation.js":"./src/navigation.js?v=1.2v-f4d",
+      "./src/camera-controls.js":"./src/camera-controls.js?v=1.2v-f4d",
+      "./src/furniture-placement-preview.js":"./src/furniture-placement-preview.js?v=1.2v-f4d",
+      "./src/seat-furniture.js":"./src/seat-furniture.js?v=1.2v-f4d"}}
   </script>
 </head>
 <body>
@@ -48,7 +53,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.2 · F4C / H2b</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.3 · F4D / H2b</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -325,7 +330,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b-f4d"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

@@ -38,6 +38,12 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
   // station against every wall/obstacle with no walkable listening side.
   if(target.prefabId==='music'&&!musicListeningSpots(candidate,instanceId).length)
     return {ok:false,reason:'unreachable-music'};
+  // Sitting needs a real clear front approach, not just a renderable mesh.
+  if(['chair','armchair'].includes(target.prefabId)){
+    const approach=furnitureActionApproach(candidate,'seat',instanceId);
+    if(!approach||!isWalkable(approach.x,approach.z,candidate))
+      return {ok:false,reason:'unreachable-seat'};
+  }
   for(const person of residents){
     if(!person||!Number.isFinite(person.x)||!Number.isFinite(person.z))continue;
     if(!isWalkable(person.x,person.z,candidate))return {ok:false,reason:'resident-blocked'};
@@ -49,6 +55,11 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
     }
     if(target.prefabId==='music'&&!chooseMusicListeningSpot(candidate,person,instanceId))
       return {ok:false,reason:'unreachable-music'};
+    if(['chair','armchair'].includes(target.prefabId)){
+      const sitting=furnitureActionApproach(candidate,'seat',instanceId);
+      if(!sitting||!findPath(person,sitting,candidate))
+        return {ok:false,reason:'unreachable-seat'};
+    }
     // A moved television must retain a real approach to its own screen.
     if(target.prefabId==='tv'){
       const watching=furnitureActionApproach(candidate,'tv',instanceId);

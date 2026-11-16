@@ -14,7 +14,7 @@ test('Camera-centered previews always yield visible finite floor pose even witho
     {x:2.25,z:-1.5,yaw:270});
   assert.deepEqual(cameraPlacementPose({centerX:undefined,centerZ:NaN}),{x:0,z:0,yaw:0});
   assert.deepEqual(cameraPlacementPose({centerX:800,centerZ:-800},{yaw:90}),
-    {x:4.25,z:-3.75,yaw:90});
+    {x:13.25,z:-3.75,yaw:90});
   assert.ok(cameraPlacementPose({centerX:0,centerZ:0}).x!==null);
   const first=cameraPlacementPose({centerX:0,centerZ:0});
   const moved=cameraPlacementPose({centerX:2.5,centerZ:0.5},first);

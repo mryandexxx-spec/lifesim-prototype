@@ -70,7 +70,7 @@ test('can access functional fixture transactions, but cannot move locked target 
 test('invalid edge, occupied resident, overlap, and no-op cannot modify state',()=>{
   const w=newFurnitureWorld(),editor=createFurnitureEditor(w),table=item(w,'table');
   assert.equal(editor.commit(table.instanceId,{x:Infinity,z:1,yaw:0}).ok,false);
-  assert.equal(editor.commit(table.instanceId,{x:8,z:1,yaw:0}).ok,false);
+  assert.equal(editor.commit(table.instanceId,{x:15,z:1,yaw:0}).ok,false);
   assert.equal(editor.commit(table.instanceId,{x:1,z:0,yaw:5}).ok,false);
   assert.equal(editor.commit(table.instanceId,{x:table.x,z:table.z,yaw:0}).reason,'unchanged');
   assert.equal(editor.commit(table.instanceId,{x:-.8,z:2.95,yaw:0},

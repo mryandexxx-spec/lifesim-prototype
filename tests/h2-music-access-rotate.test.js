@@ -170,9 +170,11 @@ test('Safari import map busts every modified H2 dependency, not only the game en
   for(const name of ['household','furniture-layout','furniture-editor','furniture-shop']){
     const key='./src/'+name+'.js';
     assert.ok(imports[key],key+' must be independently cache-busted');
-    assert.equal(new URL(imports[key],base).search,
-      name==='household'?'?v=1.2w-h2b':
-         name==='furniture-editor'?'?v=1.2u-h2fix1-f4c':'?v=1.2u-h2fix1');
+    const expected={'household':'?v=1.2w-h2b-f4d',
+      'furniture-layout':'?v=1.2v-f4d',
+      'furniture-editor':'?v=1.2u-h2fix1-f4c',
+      'furniture-shop':'?v=1.2v-f4d'};
+    assert.equal(new URL(imports[key],base).search,expected[name]);
     // A nested ./foo.js import in an ES module beneath src/ resolves to
     // precisely this import-map key, irrespective of the parent module URL.
     assert.equal(new URL(key,base).href,
@@ -191,7 +193,9 @@ test('F4C iPhone import map refreshes every changed furniture core ES module',()
       'shop-catalog-selector','furniture-value','furniture-procedural-library',
       'furniture-thumbnails']){
     const key='./src/'+name+'.js';
-    assert.equal(imports[key],key+'?v=1.2u-f4c');
+    const version=['furniture-products','furniture-catalog','object-legacy-adapter'].includes(name)
+      ?'1.2v-f4d':'1.2u-f4c';
+    assert.equal(imports[key],key+'?v='+version);
   }
   assert.match(html,/src\/game\.js\?v=1\.2u-h2-music-fix1-cache-f4c/);
 });
