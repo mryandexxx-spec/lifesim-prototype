@@ -801,3 +801,24 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   .furnish-items button{min-height:37px;}
   .furnish-commands button{min-height:38px;min-width:38px;}
 }
+
+/* F2.1a: compact, independently scrollable shop within existing bottom editor. */
+.furnish-market-bar{display:flex;align-items:center;gap:8px;min-height:40px;}
+.furnish-market-bar button,.furnish-shop button{min-height:39px;border:1px solid #bddcc8;
+ background:#e5f2e8;color:#275b42;border-radius:10px;padding:7px 12px;font-weight:800;font-size:12px;}
+.furnish-market-bar output{font-size:12px;font-weight:800;color:#357553;}
+.furnish-shop{display:grid;gap:7px;padding:8px;background:#f1f7ed;border-radius:13px;
+ border:1px solid #d3e8d8;max-height:min(32dvh,190px);overflow-y:auto;overscroll-behavior:contain;}
+.furnish-shop[hidden]{display:none!important;}
+.furnish-shop small{font-size:10px;color:#6b806d;line-height:1.3;}
+.furnish-stock{display:flex;overflow-x:auto;gap:7px;}
+.furnish-stock button{flex:none;min-height:44px;}
+.furnish-stock button[aria-pressed="true"]{background:#2b7555;color:white;}
+.furnish-shop #furnish-buy{background:#327f5e;color:white;}
+.furnish-shop #furnish-buy:disabled{opacity:.4;}
+.furniture-editor:has(.furnish-shop:not([hidden])){max-height:min(65dvh,530px);overflow-y:auto;}
+@media(max-height:560px){
+ .furniture-editor:has(.furnish-shop:not([hidden])){max-height:74dvh;}
+ .furnish-market-bar{min-height:32px;}
+ .furnish-stock button{min-height:38px;}
+}
