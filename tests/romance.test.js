@@ -257,7 +257,7 @@ test('shipped Safari menu and CI include romance module without showing formulas
   assert.ok(game.includes('romanceStatus(game.socialGraph'));
   assert.ok(game.includes("category==='romance'"));
   assert.ok(ci.includes('node --check src/romance.js'));
-  assert.ok(ci.includes('src/social-dynamics.js src/romance.js src/reaction-badges.js'));
+  assert.ok(ci.includes('src/social-dynamics.js src/romance.js src/romantic-hug.js src/reaction-badges.js'));
   assert.ok(!/\b(alex|mira|document|localStorage|playcanvas)\b/i.test(romance));
   assert.ok(!romance.includes('Math.random('));
 });
