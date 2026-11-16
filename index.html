@@ -12,7 +12,11 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./styles.css?v=1.2u-h2fix1" />
   <script type="importmap">
-    {"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}
+    {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
+      "./src/household.js":"./src/household.js?v=1.2u-h2fix1",
+      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2u-h2fix1",
+      "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1",
+      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2u-h2fix1"}}
   </script>
 </head>
 <body>
@@ -295,7 +299,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
