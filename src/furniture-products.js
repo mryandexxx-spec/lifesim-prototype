@@ -9,6 +9,9 @@ const offered=[
   {itemId:'legacy.tv',prefabId:'tv',price:650},
   {itemId:'legacy.sofa',prefabId:'sofa',price:550},
   {itemId:'legacy.bed',prefabId:'bed',price:850},
+  // H1: first functional leisure station. Pilot price only; economy TBD.
+  {itemId:'bookcase.starter',prefabId:'bookcase',price:320,
+    name:'Шкаф с историями',description:'Чтение повышает досуг и литературную эрудицию'},
   // Pilot of physical appearance only. No quality/buff, price differential or XP.
   {itemId:'plant.amber',prefabId:'plant',price:130,
     name:'Растение «Янтарные листья»',appearanceId:'foliage.amber',

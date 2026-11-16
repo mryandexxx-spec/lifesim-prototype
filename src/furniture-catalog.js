@@ -43,7 +43,12 @@ const original=[
     rect:[TOILET_LAYOUT.bounds.minX,TOILET_LAYOUT.bounds.maxX,TOILET_LAYOUT.bounds.minZ,TOILET_LAYOUT.bounds.maxZ],
     approach:[TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z]},
   {prefabId:'plant',instanceId:'home-plant-1',name:'Растение',category:'Декор',
-    capabilities:['decor'],x:4.175,z:3.22,rect:[3.83,4.52,2.78,3.66]}
+    capabilities:['decor'],x:4.175,z:3.22,rect:[3.83,4.52,2.78,3.66]},
+  // Template-only procedural 3D model: not gifted to existing saves and
+  // never in initial world. Purchased copies have real individual instance IDs.
+  {prefabId:'bookcase',instanceId:'template-bookcase-1',name:'Книжный шкаф',
+    category:'Гостиная',actionId:'hobby',capabilities:['books.borrow'],
+    templateOnly:true,x:0,z:0,rect:[-.53,.53,-.27,.27],approach:[0,.92]}
 ];
 const frozenRect=(r,cx,cz)=>Object.freeze({
   minX:r[0]-cx,maxX:r[1]-cx,minZ:r[2]-cz,maxZ:r[3]-cz
@@ -70,7 +75,7 @@ export const LEGACY_FURNITURE_IDS=Object.freeze(Object.fromEntries(original.map(
   [item.prefabId,item.instanceId])));
 export const ACTION_PREFABS=Object.freeze(Object.fromEntries(original.filter(x=>x.actionId).map(x=>
   [x.actionId,x.prefabId])));
-export const ORIGINAL_FURNITURE=Object.freeze(original.map(item=>Object.freeze({
+export const ORIGINAL_FURNITURE=Object.freeze(original.filter(item=>!item.templateOnly).map(item=>Object.freeze({
   instanceId:item.instanceId,prefabId:item.prefabId,x:item.x,z:item.z,yaw:0,location:'home'
 })));
 export function newFurnitureWorld(){

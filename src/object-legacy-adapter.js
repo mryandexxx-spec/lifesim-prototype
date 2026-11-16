@@ -20,7 +20,8 @@ const caps=[...new Set(defs.flatMap(d=>d.capabilities))];
 const capabilityLabels=Object.freeze({
   sleep:'Сон',relax:'Отдых',decor:'Украшения',surface:'Поверхности',
   'tv.watch':'Телевизоры','food.take':'Приём пищи',
-  'hygiene.shower':'Гигиена','bladder.toilet':'Туалет'
+  'hygiene.shower':'Гигиена','bladder.toilet':'Туалет',
+  'books.borrow':'Книги и чтение'
 });
 const categories=[
   ...Object.entries(historicalRooms).map(([label,id])=>({id,label,facet:'room'})),
