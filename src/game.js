@@ -2205,6 +2205,7 @@ function boot() {
       'protected-item':'Исходная функциональная мебель защищена',
       'unreachable-sofa':'К этому дивану нельзя пройти · выбери другое место',
       'unreachable-tv':'Нельзя подойти к экрану этого телевизора · выбери другое место',
+      'unreachable-music':'К музыкальному центру не подойти · поверни его или освободи проход',
       'insufficient-credits':'Недостаточно пробных кредитов',
       'full-household':'Слишком много предметов',
       'already-stored':'Предмет уже на складе',
@@ -2236,6 +2237,27 @@ function boot() {
     const item=editorItem(editSelectedId);
     const selectable=!!item&&item.location==='home';
     $('furnish-commands').hidden=!furnishMode||shopOpen||warehouseOpen||!selectable;
+    // Unlike the former hidden selection-only turn button, this room toolbar
+    // is always present. A native picker lets Safari users select items even
+    // when the 3D ray is partly covered by another piece of furniture.
+    const roomTools=$('furnish-room-tools');
+    roomTools.hidden=!furnishMode||shopOpen||warehouseOpen;
+    if(!roomTools.hidden){
+      const picker=$('furnish-item-select');
+      const prompt=document.createElement('option');
+      prompt.value='';prompt.textContent='Выбери мебель…';
+      const options=[prompt];
+      for(const instance of game.world.furniture.instances){
+        if(!canMoveFurniture(instance))continue;
+        const option=document.createElement('option');
+        option.value=instance.instanceId;
+        option.textContent=editorLabel(instance.instanceId)+
+          (instance.instanceId.startsWith('shop-')?' · №'+instance.instanceId.split('-').at(-1):'');
+        options.push(option);
+      }
+      picker.replaceChildren(...options);
+      picker.value=selectable&&canMoveFurniture(item)?item.instanceId:'';
+    }
     $('furnish-rotate').disabled=!selectable||!canMoveFurniture(item);
     const tradable=selectable&&canTradeMarketInstance(item);
     $('furnish-store').disabled=!tradable;
@@ -2510,6 +2532,10 @@ function boot() {
     $('furnish-stock').append(button);
   }
   renderShopFilteredItems();
+  $('furnish-item-select').addEventListener('change',event=>{
+    if(!furnishMode||shopOpen||warehouseOpen)return;
+    chooseFurniture(event.currentTarget.value||null);
+  });
   $('furnish-edit-toggle').addEventListener('click',()=>setEditorView('edit'));
   $('furnish-shop-toggle').addEventListener('click',()=>setEditorView(shopOpen?'edit':'shop'));
   $('furnish-warehouse-toggle').addEventListener('click',()=>setEditorView(warehouseOpen?'edit':'warehouse'));
@@ -2636,7 +2662,8 @@ function boot() {
   $('furnish-rotate').addEventListener('click',()=>{
     const item=editorItem(editSelectedId);
     if(!furnishMode||!canMoveFurniture(item))return;
-    commitFurniture(item.instanceId,{x:item.x,z:item.z,yaw:(item.yaw+90)%360});
+    if(commitFurniture(item.instanceId,{x:item.x,z:item.z,yaw:(item.yaw+90)%360}))
+      editorFeedback(editorLabel(item.instanceId)+' · повёрнут на 90°');
   });
   const exitFurniture=()=>{
     if(!furnishMode)return;
@@ -2679,7 +2706,7 @@ function boot() {
     shopPose=null;shopManualPose=false;
     chooseFurniture(null);setEditorView('edit');
     renderPauseButton();
-    editorFeedback('Коснись предмета, чтобы выбрать. Для перемещения удерживай палец 0,5 секунды. Свайп по мебели поворачивает камеру.');
+    editorFeedback('Выбери мебель в списке или коснись её в 3D, затем нажми «Повернуть 90°». Для переноса удерживай палец 0,5 секунды.');
   };
   $('furnish-toggle').addEventListener('click',()=>furnishMode?exitFurniture():enterFurniture());
   $('furnish-exit').addEventListener('click',exitFurniture);
