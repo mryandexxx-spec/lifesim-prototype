@@ -44,7 +44,7 @@ test('F2.1 purchase preview is a real validatable 3D tap with red blocked place,
   assert.match(game,/if\(shopOpen&&shopPlacing&&shopSelected\)\{\s*const floor=editorFloorAt\(pos\)/);
   assert.match(game,/shopPose=\{x:snapFurnitureCoordinate\(floor\.x\),z:snapFurnitureCoordinate\(floor\.z\)/);
   assert.match(game,/shopManualPose=true;renderMarket\(\)/);
-  assert.match(game,/const preview=listing&&shopPose\s*\?buyMarketItem/);
+  assert.match(game,/const preview=shopPlacing&&listing&&shopPose\s*\?buyMarketItem/);
   assert.match(game,/marketGhost\.render\.material=suitable\?ghostValid:ghostInvalid/);
   assert.match(game,/\$\('furnish-buy'\)\.disabled=shopPlacing\?!suitable/);
   assert.match(game,/shopPose=\{\.\.\.shopPose,yaw:\(shopPose\.yaw\+90\)%360\}/);
