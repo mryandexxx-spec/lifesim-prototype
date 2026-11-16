@@ -79,6 +79,10 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
   if(['chair','armchair'].includes(productPrefabId)&&
     !sofaReachable(valid.world,id,opts,'seat'))
     return reject('unreachable-seat');
+  const utilityActions={floorlamp:'lamp',mirror:'mirror',dresser:'dresser',wardrobe:'wardrobe'};
+  if(utilityActions[productPrefabId]&&
+    !sofaReachable(valid.world,id,opts,utilityActions[productPrefabId]))
+    return reject('unreachable-utility');
   return {ok:true,world:valid.world,
     shop:{...current.shop,credits:current.shop.credits-item.price,nextId:current.shop.nextId+1},
     instanceId:id,amount:-item.price};
