@@ -69,6 +69,7 @@ jobs:
           node --check src/romance.js
           node --check src/romantic-hug.js
           node --check src/romantic-kiss.js
+          node --check src/romance-kiss-qa.js
           node --check src/meshy-kiss-runtime.js
           node --check src/meshy-hug-runtime.js
           node --check src/reaction-badges.js
@@ -126,6 +127,7 @@ jobs:
           cp src/mood-action-policy.js site/src/
           cp src/social-need.js site/src/
           cp src/romantic-hug.js src/meshy-hug-runtime.js src/romantic-kiss.js src/meshy-kiss-runtime.js site/src/
+          cp src/romance-kiss-qa.js site/src/
           cp src/toilet-interaction.js site/src/
           cp src/need-balance.js site/src/
           cp src/environment-effects.js site/src/
