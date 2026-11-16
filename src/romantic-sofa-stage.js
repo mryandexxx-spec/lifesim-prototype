@@ -2,7 +2,6 @@
  * Ordinary sofa relaxation and F3b television continue to reserve the WHOLE sofa.
  * A consented romantic evening alone may use two distinct physical cushion slots.
  */
-import {rotateLocal} from './furniture-catalog.js';
 import {SOFA_APPROACH,SOFA_POSE} from './pose-config.js';
 import {furniturePoint} from './furniture-transform.js';
 

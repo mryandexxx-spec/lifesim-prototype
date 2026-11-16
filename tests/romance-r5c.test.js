@@ -49,6 +49,7 @@ test('R5c: two independent reachable physical cushions on a real sofa',()=>{
   assert.deepEqual(romanticSofaApproach(world,stage.instanceId,stage.actorSlot),stage.actor);
   assert.deepEqual(romanticSofaApproach(world,stage.instanceId,stage.partnerSlot),stage.partner);
   assert.equal(Math.abs(romanticSofaSlotOffset(stage.actorSlot)),.635);
+  assert.equal(Math.abs(romanticSofaSlotOffset(stage.partnerSlot)),.635);
 });
 test('R5c: rotation, purchase, storage and blocked paths are strictly validated',()=>{
   const world=home(),sofa=world.furniture.instances.find(i=>i.instanceId==='home-sofa-1');
@@ -146,7 +147,8 @@ test('R5c runtime uses two real seats, pending locks and still ships table and F
     /romanticSofaSlotOffset\(romanticSofaSlots\.alex\)/,
     /romanticSofaSlotOffset\(romanticSofaSlots\.mira\)/,
     /busy\.add\(game\.socialAction\.eveningSofa\.instanceId\)/,
-    /socialWalkingFor\(residentId\)/,/tvScreenFrame\(/])
+    /socialWalkingFor\(residentId\)/,/const waitingStage=game\.socialAction/,
+    /tvScreenFrame\(/])
     assert.match(src,pattern);
   assert.match(rel,/validRomanticEveningSofa\(root\.world/);
   assert.match(pages,/node --check src\/romantic-sofa-stage\.js/);

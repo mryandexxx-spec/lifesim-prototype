@@ -2808,6 +2808,21 @@ function boot() {
           }
         }
       }
+      // On restore, both A* routes may already have zero remaining steps.
+      // In that case no route follower can invoke consent; handle the real
+      // two-person arrival once, respecting physical stand-up transitions.
+      const waitingStage=game.socialAction?.phase==='walking'
+        ?game.socialAction.eveningSofa||game.socialAction.eveningStage:null;
+      if(waitingStage&&HOUSEHOLD_IDS.every(id=>{
+        const resident=getActor(game,id);
+        const goal=game.socialAction.initiator===id
+          ?waitingStage.actor:waitingStage.partner;
+        return Math.hypot(resident.position.x-goal.x,
+          resident.position.z-goal.z)<.075&&
+          sofaStates[id].progress===0&&bedStates[id].progress===0&&
+          !showerStates[id].active&&!toiletStates[id].active&&
+          !fridgeLeaving[id];
+      }))arriveSocial(game);
       // Real active-time wait is independent for each sim and unaffected by game speed.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
