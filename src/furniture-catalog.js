@@ -48,11 +48,11 @@ const original=[
   // F4C: independent procedural 3D types. None spawn in old homes; every
   // instance is bought and saved with stable SKU identity.
   {prefabId:'armchair',instanceId:'template-armchair-1',name:'Кресло',
-    category:'Гостиная',capabilities:['decor'],templateOnly:true,
-    x:0,z:0,rect:[-.62,.62,-.65,.65]},
+    category:'Гостиная',actionId:'seat',capabilities:['seat'],templateOnly:true,
+    x:0,z:0,rect:[-.62,.62,-.65,.65],approach:[0,-1.22]},
   {prefabId:'chair',instanceId:'template-chair-1',name:'Стул',
-    category:'Столовая',capabilities:['decor'],templateOnly:true,
-    x:0,z:0,rect:[-.46,.46,-.48,.48]},
+    category:'Столовая',actionId:'seat',capabilities:['seat'],templateOnly:true,
+    x:0,z:0,rect:[-.46,.46,-.48,.48],approach:[0,-1.03]},
   {prefabId:'diningtable',instanceId:'template-diningtable-1',name:'Обеденный стол',
     category:'Столовая',capabilities:['surface'],templateOnly:true,
     x:0,z:0,rect:[-1.13,1.13,-.72,.72]},
@@ -98,7 +98,8 @@ export const FURNITURE_CATALOG=Object.freeze(Object.fromEntries(original.map(ite
     actionId:item.actionId||null,capabilities:Object.freeze(item.capabilities),
     // Physical interaction affordances are NOT shopper function facets.
     // Later chairs can opt in without exposing fabricated retail categories.
-    seating:Object.freeze(item.prefabId==='sofa'?['reading']:[]),
+    seating:Object.freeze(['sofa','chair','armchair'].includes(item.prefabId)
+      ?(item.prefabId==='sofa'?['reading','sitting']:['sitting']):[]),
     footprint,extras,approach,rendererKey:item.prefabId,version:1,
     templateOnly:item.templateOnly===true,
     walkThrough:item.walkThrough===true,
