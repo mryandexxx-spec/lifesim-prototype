@@ -41,6 +41,7 @@ jobs:
           node --check src/furniture-value.js
           node --check src/object-definition-registry.js
           node --check src/object-effect-engine.js
+          node --check src/object-once-ledger.js
           node --check src/object-legacy-adapter.js
           node --check src/object-use-runtime.js
           node --check src/object-quality-presentation.js
@@ -147,6 +148,7 @@ jobs:
           cp src/furniture-products.js site/src/
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
+          cp src/object-once-ledger.js site/src/
           cp src/hobby-content.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/

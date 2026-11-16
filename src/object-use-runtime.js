@@ -7,6 +7,7 @@ import {resolveActionFurniture} from './furniture-catalog.js';
 import {legacyObjectRegistry,legacyItemIdForPrefab} from './object-legacy-adapter.js';
 import {getObjectItem} from './object-definition-registry.js';
 import {proposeObjectEffectDeltas,calculateObjectEffectChanges} from './object-effect-engine.js';
+import {stageObjectOnceEffects} from './object-once-ledger.js';
 
 const validTime=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
 const clamp=(n,min,max)=>Math.min(max,Math.max(min,n));
@@ -63,12 +64,18 @@ export function settleObjectUseStep({registry=legacyObjectRegistry(),world,actor
       trigger:'item.use.complete',actionId:before.actionId,eventId
     }).filter(x=>x.statId!=='needs.'+action.need));
   }
-  if(!proposals.length)return [];
+  // Only supported, actually existing secondary needs can consume a receipt.
+  // Unsupported mood, skill, and currency adapters MUST NOT spend once events.
+  const eligible=proposals.filter(x=>x.statId.startsWith('needs.')&&
+    Number.isFinite(actor.needs?.[x.statId.slice(6)]));
+  if(!eligible.length)return [];
+  const staged=stageObjectOnceEffects(actor.objectOnceLedger,eligible);
+  if(!staged.contributions.length)return [];
   const values={};
   for(const statId of Object.keys(registry.stats)){
     if(statId.startsWith('needs.'))values[statId]=actor.needs?.[statId.slice(6)];
   }
-  const changes=calculateObjectEffectChanges(registry,proposals,values);
+  const changes=calculateObjectEffectChanges(registry,staged.contributions,values);
   const applied=[];
   for(const change of changes){
     // No mood/environment or skill writes until their own canonical adapters
@@ -79,5 +86,8 @@ export function settleObjectUseStep({registry=legacyObjectRegistry(),world,actor
     actor.needs[need]=clamp(change.next,0,100);
     applied.push(change);
   }
+  // Same synchronous simulation update as the reward. JSON v1 persistence
+  // includes both fields on the next autosave/pagehide/manual save.
+  if(applied.length)actor.objectOnceLedger=staged.ledger;
   return applied;
 }
