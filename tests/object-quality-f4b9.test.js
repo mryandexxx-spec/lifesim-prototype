@@ -92,7 +92,7 @@ test('F4b9: Safari markup has real variant buttons, filter guard, no purchase on
   assert.match(game,/chooseShopProduct\(id\)/);
   assert.doesNotMatch(game,/selectVariant\.addEventListener\('click',[\s\S]{0,800}buyMarketItem\(/);
   assert.match(css,/\.furnish-variant-select\{/);
-  assert.match(html,/1\.2t-f4b9/);
+  assert.match(html,/1\.2u-h2/);
   assert.match(pages,/node --check src\/object-quality-comparison\.js/);
   assert.match(pages,/src\/object-quality-comparison\.js site\/src\//);
 });
