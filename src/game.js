@@ -18,7 +18,11 @@ import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
-import {SHOP_ITEMS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
+import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
+import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_SKILL_ID} from './hobby-reading.js';
+import {getActivityDefinition} from './activity-registry.js';
+import {getSkillDefinition} from './skill-registry.js';
+import {currentSkillLevel} from './skills-engine.js';
 import {selectShopCatalog,shopCategoryOptions} from './shop-catalog-selector.js';
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
 import {furnitureProduct,FURNITURE_APPEARANCES} from './furniture-products.js';
@@ -224,7 +228,10 @@ const META = {
   shower: { title: 'Душевая', category: 'Ванная', description: 'Душ повышает уровень гигиены', icon: '✧', anchor: [-3.65, 2.16, 2.45] },
   toilet: { title: 'Унитаз', category: 'Ванная', description: 'Приватное использование туалета восстановит потребность', icon: 'WC', anchor: [-1.65, 1.28, 3.14] },
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] },
-  tv: { title: 'Телевизор', category: 'Гостиная', description: 'Сядет на свободный диван с видом на экран или посмотрит стоя, если мест нет', icon: '▣', anchor: [3.5, 1.42, .36] }
+  tv: { title: 'Телевизор', category: 'Гостиная', description: 'Сядет на свободный диван с видом на экран или посмотрит стоя, если мест нет', icon: '▣', anchor: [3.5, 1.42, .36] },
+  hobby: { title: 'Книжный шкаф', category: 'Гостиная',
+    description: 'Подойти к шкафу, выбрать историю и почитать. Досуг растёт во время чтения, а навык — от практики.',
+    icon: '📖', anchor: [0,1.5,0] }
 };
 
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
@@ -265,6 +272,7 @@ function save(silent = false) {
 function taskLabel(task){
   if(!task)return 'Неизвестное действие';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
+  if(task.type==='activity')return getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
   if(task.type==='social')return SOCIAL_ACTIONS[task.actionId]?.label||'Общение';
   if(task.type==='conversation')return 'Беседа: '+(CONVERSATION_TOPICS[task.topicId]?.label||'Разговор');
   if(task.type==='branch')return BRANCH_ACTIONS[task.actionId]?.label||'Общение';
@@ -276,8 +284,9 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
-  if(command.type==='object'){
-    const target=resolveActionFurniture(game.world,command.actionId,command.targetInstanceId);
+  if(command.type==='object'||command.type==='activity'){
+    const actionId=command.type==='activity'?'hobby':command.actionId;
+    const target=resolveActionFurniture(game.world,actionId,command.targetInstanceId);
     if(!target){toast('Этот предмет недоступен');return false;}
     command={...command,targetInstanceId:target.instanceId};
   }
@@ -302,7 +311,7 @@ function scheduleCommand(command,residentId=game.selectedSim){
   $('queue-feedback').textContent=getActorName(residentId)+': добавлено в очередь — '+
     taskLabel({...task,residentId});
   save(true);
-  if(command.type!=='object'){
+  if(command.type!=='object'&&command.type!=='activity'){
     // A confirmed queue entry closes only presentation, never the action.
     socialContextVisible=false;socialAnchor=null;
     socialMenuCategory=null;conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
@@ -426,7 +435,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=['sofa','bed','tv'].includes(id)&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','bed','tv','hobby'].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -472,8 +481,12 @@ updateItemLabels();
 $('close-action').addEventListener('click', () => select(null));
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
-  if (scheduleCommand({type:'object',actionId:selected,
-    ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})})) {
+  const command=selected==='hobby'
+    ?{type:'activity',activityId:READING_ACTIVITY_ID,contentId:READING_CONTENT_ID,
+      ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
+    :{type:'object',actionId:selected,
+      ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
+  if (scheduleCommand(command)) {
     select(null);
   }
 });
@@ -806,7 +819,10 @@ function renderQueuePanel(force=true){
       const social=game.socialAction;
       if(social&&(social.initiator===residentId||social.partner===residentId))
         cancelSocial(game);
-      else getActor(game,residentId).action=null;
+      else {
+        getActor(game,residentId).action=null;
+        getActor(game,residentId).activitySession=null;
+      }
       getActor(game,residentId).event='Действие прервано по команде игрока';
       renderQueuePanel(true);save(true);
       toast('Текущее действие остановлено по твоей команде');
@@ -1247,7 +1263,7 @@ function boot() {
     for(const item of items){
       if(decorNodes.has(item.instanceId))continue;
       const template=decorTemplates.get(item.prefabId);
-      if(!template||!SHOP_ITEMS.some(s=>s.prefabId===item.prefabId))continue;
+      if(!template||!MARKET_OFFERS.some(s=>s.prefabId===item.prefabId))continue;
       const node=template.clone();
       node.name='F2 purchased / '+item.instanceId;
       if(item.itemDefinitionId)applyItemAppearance(node,item.itemDefinitionId);
@@ -1508,6 +1524,23 @@ function boot() {
   toiletPrivacy.enabled=false;
   });
 
+  // H1: the original bookcase is a hidden prefab template, not free furniture.
+  // Purchased instances clone this complete shelf, including physical books.
+  withDecor('bookcase',()=>{
+    box('bookcase back',0,1.03,-.15,1.04,1.95,.13,M.wood);
+    box('bookcase left side',-.48,1.03,0,.085,1.95,.53,M.paleWood);
+    box('bookcase right side',.48,1.03,0,.085,1.95,.53,M.paleWood);
+    box('bookcase top',0,2.01,0,1.04,.10,.54,M.paleWood);
+    box('bookcase bottom',0,.09,0,1.04,.13,.54,M.paleWood);
+    for(const y of [.53,1.06,1.59])
+      box('bookcase shelf',0,y,0,1.01,.075,.52,M.paleWood);
+    const bookColors=[M.mint,M.pink,M.yellow,M.blue,M.peach,M.green,M.cream];
+    for(let row=0;row<3;row++)for(let i=0;i<7;i++){
+      const x=-.36+i*.12,y=.30+row*.53;
+      box('bookcase story '+row+' '+i,x,y,.025,.095,.34+(i%3)*.025,.30,
+        bookColors[(row*3+i)%bookColors.length]);
+    }
+  });
   // Potted plant, decorations and an oversized welcoming mat.
   withDecor('plant',()=>{
     cylinder('plant pot',4.19,.30,3.22,.58,.63,.58,M.rust);
@@ -1588,6 +1621,7 @@ function boot() {
     drop.enabled=false;return drop;
   });
   const ACTOR_POSES = {
+    hobby: {x:0,y:0,z:.92,pitch:0,yaw:180},
     sofa:   SOFA_POSE,
     tv: TV_WATCH_POSE,
     fridge: {x:FRIDGE_LAYOUT.approach.x,y:0,z:FRIDGE_LAYOUT.approach.z,pitch:0,yaw:FRIDGE_FACING_YAW}
@@ -1661,7 +1695,8 @@ function boot() {
     paths[actorId]={points,index:0,id};
     return true;
   }
-  beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null)=>{
+  beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null,
+    activityId=null,contentId=null)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
@@ -1685,7 +1720,8 @@ function boot() {
       else actor.autonomy.nextAt=game.minutes+15;
       return false;
     }
-    const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId);
+    const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
+      activityId,contentId);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
@@ -1783,6 +1819,8 @@ function boot() {
         if(actor.action||sofaStates[residentId].progress>0||
           bedStates[residentId].progress>0||showerStates[residentId].active||
           toiletStates[residentId].active||fridgeLeaving[residentId])return false;
+        if(command.type==='activity')
+          return furnitureAvailable(game,'hobby',residentId,command.targetInstanceId);
         if(command.type==='object')
           return furnitureAvailable(game,command.actionId,residentId,command.targetInstanceId)&&
             !(command.actionId==='shower'&&HOUSEHOLD_IDS.some(id=>
@@ -1827,6 +1865,9 @@ function boot() {
         let started=false;
         if(command.type==='object')
           started=beginAction(command.actionId,false,residentId,true,command.targetInstanceId);
+        else if(command.type==='activity')
+          started=beginAction('hobby',false,residentId,true,command.targetInstanceId,
+            command.activityId,command.contentId);
         else if(command.type==='social')
           started=beginSocial(command.actionId,false,residentId,null,null,null,true);
         else if(command.type==='conversation')
@@ -2029,7 +2070,7 @@ function boot() {
       if(actor?.action?.id==='tv'&&actor.action.watchSeatInstanceId)
         busy.add(actor.action.watchSeatInstanceId);
       for(const pending of pendingActions(game.actionQueues,id))
-        if(pending.type==='object'&&pending.targetInstanceId)
+        if(['object','activity'].includes(pending.type)&&pending.targetInstanceId)
           busy.add(pending.targetInstanceId);
     }
     return [...busy];
@@ -2522,7 +2563,8 @@ function boot() {
       .map(item=>{
         const rect=instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint);
         const height={table:.63,nightstand:1.49,tv:2.0,plant:1.87,
-          bed:1.40,counter:2.50,fridge:2.2,sofa:1.3,shower:2.75,toilet:1.45}[item.prefabId]||2;
+          bed:1.40,counter:2.50,fridge:2.2,sofa:1.3,shower:2.75,toilet:1.45,
+        bookcase:2.05}[item.prefabId]||2;
         return {kind:'object',id:item.instanceId,bounds:{
           min:{x:rect.minX,y:0,z:rect.minZ},
           max:{x:rect.maxX,y:height,z:rect.maxZ}
@@ -2742,8 +2784,16 @@ function boot() {
         return {kind:'object',id:'tv',instanceId:item.instanceId,
           bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:1.97,z:r.maxZ}}};
       });
+    const bookshelves=game.world.furniture.instances
+      .filter(item=>item.prefabId==='bookcase'&&item.location==='home')
+      .map(item=>{
+        const r=instanceRect(item,FURNITURE_CATALOG.bookcase.footprint);
+        return {kind:'object',id:'hobby',instanceId:item.instanceId,
+          bounds:{min:{x:r.minX,y:0,z:r.minZ},
+            max:{x:r.maxX,y:2.05,z:r.maxZ}}};
+      });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...bedCopies,...tvCopies,...movedVolumes,...blockers]);
+      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -2882,7 +2932,7 @@ function boot() {
                   resident.action?.watchSeatInstanceId)?paths[residentId].points:null);
             if(!available){
               if(socialWalking)cancelSocial(game);
-              else {resident.action=null;resident.event='Путь недоступен';}
+              else {resident.action=null;resident.activitySession=null;resident.event='Путь недоступен';}
               paths[residentId]={points:null,index:0,id:null};
             } else if(socialWalking){
               paths[residentId]={points:available,index:0,id:jobId};
@@ -3161,7 +3211,7 @@ function boot() {
     applyShowerAppearance(alexRig,Boolean(alexShower?.privacy||alexToilet?.privacy),Boolean(alexShower?.bathing));
     snack.enabled=Boolean(alexFridge&&alexFridge.handFood>.012);
     if(snack.enabled)snack.setLocalScale(.20*alexFridge.handFood,.17*alexFridge.handFood,.20*alexFridge.handFood);
-    book.enabled=using&&useId==='sofa';
+    book.enabled=using&&(useId==='sofa'||useId==='hobby');
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
     const miraUseId=miraUsing?game.otherSim.action.id:pairedTv?'tv':null;
@@ -3277,7 +3327,7 @@ function boot() {
     applyShowerAppearance(miraRig,Boolean(miraShower?.privacy||miraToilet?.privacy),Boolean(miraShower?.bathing));
     miraSnack.enabled=Boolean(miraFridge&&miraFridge.handFood>.012);
     if(miraSnack.enabled)miraSnack.setLocalScale(.20*miraFridge.handFood,.17*miraFridge.handFood,.20*miraFridge.handFood);
-    miraBook.enabled=miraUsing&&miraUseId==='sofa';
+    miraBook.enabled=miraUsing&&(miraUseId==='sofa'||miraUseId==='hobby');
     // Mira retains one 3D skin for sofa, bed, fridge and clothed shower
     // entry/exit. The original game owns shower water, cover, full avatar
     // privacy and all simulation/save state; no private body is visible.
@@ -3470,6 +3520,13 @@ function boot() {
       const t=readableTime(game.minutes);$('day-label').textContent=t.day;$('time-label').textContent=t.time;
       const current=selectedActor();
       $('resident-name').textContent=selectedName();
+      const skill=getSkillDefinition(HOBBY_SKILLS,READING_SKILL_ID);
+      const currentXP=current.skills?.xpById?.[READING_SKILL_ID]||0;
+      const level=currentSkillLevel(current.skills,HOBBY_SKILLS,READING_SKILL_ID);
+      const nextXP=skill.xpThresholds[level]??skill.xpThresholds.at(-1);
+      $('mind-reading-skill').textContent='Литературная эрудиция · уровень '+level+
+        '/'+skill.maxLevel+' · '+Math.floor(currentXP)+' / '+nextXP+' опыта'+
+        (current.action?.id==='hobby'&&current.action.phase==='using'?' · 📖 читает':'');
       const relation=game.relationship;
       $('relationship-value').textContent=Math.round(relation.affinity)+'/100';
       $('relationship-label').textContent=relationshipLabel(relation.affinity);
@@ -3598,10 +3655,12 @@ function boot() {
       for(const [id,meta] of Object.entries(META)){
         const placed=furniturePoint(game.world,id,
           {x:meta.anchor[0],z:meta.anchor[2]});
+        const el=markers[id];
+        if(!placed){el.hidden=true;continue;}
+        el.hidden=false;
         const p=camera.camera.worldToScreen(new pc.Vec3(placed.x,meta.anchor[1],placed.z));
         const x=p.x;
         const y=p.y; // PlayCanvas worldToScreen already returns CSS pixels.
-        const el=markers[id];
         el.style.left=x+'px';el.style.top=y+'px';
         const pointInView=camera.camera.viewMatrix.transformPoint(
           new pc.Vec3(placed.x,meta.anchor[1],placed.z));
