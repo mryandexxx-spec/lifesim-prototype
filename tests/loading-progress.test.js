@@ -20,6 +20,14 @@ test('startup waits for scene plus both 3D models and reports integer progress',
   await all;
   assert.deepEqual(loader.snapshot(),{completed:3,total:3,failed:0});
 });
+test('stalled optional models unblock the loading gate with fallback',async()=>{
+ const loader=createLoadingProgress(['scene','alex','mira']);
+ loader.finish('scene');
+ const waiting=loader.wait();
+ assert.deepEqual(loader.failUnresolved(),{completed:3,total:3,failed:2});
+ assert.deepEqual(await waiting,{completed:3,total:3,failed:2});
+ assert.equal(loader.finish('mira',true),false);
+});
 test('duplicate readiness is ignored; unknown IDs rejected',()=>{
   const loader=createLoadingProgress(['scene','alex']);
   assert.equal(loader.finish('scene'),true);

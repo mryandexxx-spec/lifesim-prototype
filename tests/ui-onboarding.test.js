@@ -7,6 +7,8 @@ test('UI7 concise, immutable original walkthrough and independent key',()=>{
  assert.ok(UI_TOUR_STEPS.every(step=>step.title&&step.body&&step.hint));
  assert.ok(UI_TOUR_STEPS.every(Object.isFrozen));
  assert.match(UI_TOUR_STEPS[0].body,/одним пальцем/);
+ assert.match(UI_TOUR_STEPS[0].body,/переместить камеру/);
+ assert.match(UI_TOUR_STEPS[0].body,/Двумя пальцами вращай/);
  assert.match(UI_TOUR_STEPS[1].body,/коснись/);
  assert.match(UI_TOUR_STEPS[2].body,/очередь/);
 });

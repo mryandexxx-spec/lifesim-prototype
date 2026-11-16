@@ -11,31 +11,33 @@ test('single gentle touch remains a selectable tap; hand jitter does not rotate'
  assert.deepEqual(g.end(pt(5,105,213),190),{x:105,y:213});
  assert.deepEqual(v,CAMERA_INITIAL);assert.equal(g.count(),0);
 });
-test('single drag orbits without moving target: initial slop not lost',()=>{
+test('default single-finger swipe moves camera without rotating',()=>{
  const g=createCameraGestureSession();g.begin(pt(1,120,120),0);
  let r=g.move(pt(1,125,123),initial(),680);
  assert.equal(r.changed,false);
  r=g.move(pt(1,145,140),r.view,680);
- assert.equal(r.changed,true);assert.notEqual(r.view.yaw,CAMERA_INITIAL.yaw);
- assert.notEqual(r.view.pitch,CAMERA_INITIAL.pitch);
- assert.equal(r.view.centerX,CAMERA_INITIAL.centerX);
- assert.equal(r.view.centerZ,CAMERA_INITIAL.centerZ);
+ assert.equal(r.changed,true);assert.equal(r.view.yaw,CAMERA_INITIAL.yaw);
+ assert.equal(r.view.pitch,CAMERA_INITIAL.pitch);
+ assert.notEqual(r.view.centerX,CAMERA_INITIAL.centerX);
+ assert.notEqual(r.view.centerZ,CAMERA_INITIAL.centerZ);
  assert.equal(g.end(pt(1,145,140),170),null);
 });
-test('explicit one-finger pan remains accessible but is not default',()=>{
+test('side button allows one-finger rotation without camera translation',()=>{
  const g=createCameraGestureSession();g.begin(pt(1,100,100),0);
- const r=g.move(pt(1,145,155),initial(),680,{oneFinger:'pan'});
- assert.equal(r.changed,true);assert.equal(r.view.yaw,CAMERA_INITIAL.yaw);
- assert.notEqual(r.view.centerX,CAMERA_INITIAL.centerX);
+ const r=g.move(pt(1,145,155),initial(),680,{oneFinger:'orbit'});
+ assert.equal(r.changed,true);assert.notEqual(r.view.yaw,CAMERA_INITIAL.yaw);
+ assert.equal(r.view.centerX,CAMERA_INITIAL.centerX);
+ assert.equal(r.view.centerZ,CAMERA_INITIAL.centerZ);
 });
-test('two-finger translation pans without rotating; pinch zooms while tracking centroid',()=>{
+test('two-finger swipe rotates without moving target, pinch zooms',()=>{
  const g=createCameraGestureSession();g.begin(pt(1,100,100),0);
  g.begin(pt(2,200,100),70);
  let r=g.move(pt(1,120,110),initial(),680);
  r=g.move(pt(2,220,110),r.view,680);
- assert.equal(r.view.yaw,CAMERA_INITIAL.yaw);
- assert.equal(r.view.pitch,CAMERA_INITIAL.pitch);
- assert.notEqual(r.view.centerX,CAMERA_INITIAL.centerX);
+ assert.notEqual(r.view.yaw,CAMERA_INITIAL.yaw);
+ assert.notEqual(r.view.pitch,CAMERA_INITIAL.pitch);
+ assert.equal(r.view.centerX,CAMERA_INITIAL.centerX);
+ assert.equal(r.view.centerZ,CAMERA_INITIAL.centerZ);
  assert.equal(r.view.distance,CAMERA_INITIAL.distance);
  const near=g.move(pt(1,80,110),r.view,680);
  assert.ok(near.view.distance<CAMERA_INITIAL.distance);
@@ -69,7 +71,7 @@ test('duration, travel and out-of-order pointers are safe',()=>{
 test('pinch and orbit remain bounded across aggressive moves',()=>{
  const g=createCameraGestureSession();
  g.begin(pt(1,1,1),0);
- let r=g.move(pt(1,20001,20001),initial(),750);
+ let r=g.move(pt(1,20001,20001),initial(),750,{oneFinger:'orbit'});
  assert.ok(r.view.pitch<=CAMERA_BOUNDS.maxPitch);
  g.end(pt(1,20001,20001),100);
  g.begin(pt(2,100,100),150);g.begin(pt(3,200,100),160);

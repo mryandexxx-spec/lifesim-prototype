@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const src=read('../src/game.js'),html=read('../index.html'),workflow=read('../.github/workflows/pages.yml');
-test('UI6 points camera at a pure session and defaults to one-finger orbit',()=>{
+test('UI6 points camera at a pure session and defaults to one-finger pan',()=>{
  assert.match(src,/import \{createCameraGestureSession\} from '\.\/camera-gestures\.js'/);
- assert.match(src,/let oneFingerMode='orbit'/);
+ assert.match(src,/let oneFingerMode='pan'/);
  assert.match(src,/cameraGesture=createCameraGestureSession\(\)/);
  assert.match(src,/cameraGesture\.move\(gesturePoint\(event\),view,/);
  assert.match(src,/oneFinger:oneFingerMode/);
@@ -30,14 +30,14 @@ test('UI6 preserves fallback, strict dialogue, camera reset and iPhone pointer c
  assert.match(src,/if\(dialogueNeedsDecision\(game\)\)\{\s*cancelPendingGrab\(\);cameraGesture\.clear\(\);return;\s*\}/);
  assert.match(src,/setView\(CAMERA_INITIAL\)/);
  assert.match(src,/wheelCamera\(view,event\.deltaY\)/);
- assert.match(html,/id="rotate-camera-btn"[^>]*aria-label="Одним пальцем вращать камеру/);
- assert.match(html,/Один палец — вращение · два — сдвиг и масштаб/);
+ assert.match(html,/id="rotate-camera-btn"[^>]*aria-label="Включить вращение камеры одним пальцем/);
+ assert.match(html,/Один палец — сдвиг · два — вращение и масштаб/);
  assert.match(html,/id="game-canvas"/);
 });
 test('UI6 static pages includes all new runtime dependencies',()=>{
  assert.match(workflow,/node --check src\/camera-gestures\.js/);
  assert.match(workflow,/cp src\/camera-gestures\.js site\/src\//);
- assert.match(html,/сборка \/ 1\.1m/);
- assert.match(html,/styles\.css\?v=1\.1m/);
- assert.match(html,/src\/game\.js\?v=1\.1m/);
+ assert.match(html,/сборка \/ 1\.1n/);
+ assert.match(html,/styles\.css\?v=1\.1n/);
+ assert.match(html,/src\/game\.js\?v=1\.1n/);
 });

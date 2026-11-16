@@ -8,13 +8,14 @@ const read=file=>readFileSync(new URL(file,import.meta.url),'utf8');
 const game=read('../src/game.js');
 const page=read('../.github/workflows/pages.yml');
 const pt=(id,x,y)=>({id,x,y});
-test('orbit over a sofa begins immediately before any furniture pickup',()=>{
+test('pan over a sofa begins before any furniture pickup',()=>{
   const camera=createCameraGestureSession(),hold=createFurnitureHoldGesture();
   camera.begin(pt(1,130,130),0);hold.begin(pt(1,130,130),'home-sofa-1',0);
   assert.equal(hold.move(pt(1,150,130)),'camera');
-  const rotated=camera.move(pt(1,150,130),{...CAMERA_INITIAL},700);
-  assert.equal(rotated.changed,true);
-  assert.notEqual(rotated.view.yaw,CAMERA_INITIAL.yaw);
+  const panned=camera.move(pt(1,150,130),{...CAMERA_INITIAL},700);
+  assert.equal(panned.changed,true);
+  assert.equal(panned.view.yaw,CAMERA_INITIAL.yaw);
+  assert.notEqual(panned.view.centerX,CAMERA_INITIAL.centerX);
   assert.equal(hold.activate(700),null);
   assert.equal(camera.end(pt(1,150,130),701),null);
 });
