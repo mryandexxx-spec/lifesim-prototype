@@ -16,6 +16,7 @@ import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {furniturePoint} from './furniture-transform.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {liveSharedTv} from './tv-together.js';
+import {captureObjectUse,settleObjectUseStep} from './object-use-runtime.js';
 import { newRelationship,loadRelationship,loadSocialAction,cancelSocial,
   tickSocial } from './relationships.js';
 
@@ -310,8 +311,13 @@ export function tickHousehold(root,minutes) {
   const shared=liveSharedTv(root);
   const watchMinutes=shared?Math.min(minutes,Math.max(0,
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
+  const alexUse=captureObjectUse(root),miraUse=captureObjectUse(other);
   tick(root,minutes,root.world);
   tick(other,minutes,root.world);
+  // Canonical receipts are built from the same real simulation step, not
+  // from rendering, catalog selections, or self-reported action completions.
+  settleObjectUseStep({world:root.world,actor:root,before:alexUse});
+  settleObjectUseStep({world:root.world,actor:other,before:miraUse});
   if(watchMinutes>0){
     // Fun reflects REAL time in front of a running screen. Only the final
     // canonically accepted leisure receipt later grants the SOCIAL benefit.
