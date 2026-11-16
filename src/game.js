@@ -1992,8 +1992,11 @@ function boot() {
           const count=(routeFailures.get(command.seq)||0)+1;
           routeFailures.set(command.seq,count);
           if(count===3){
+            const musicBlocked=command.type==='activity'&&command.activityId===MUSIC_ACTIVITY_ID;
             const message=getActorName(residentId)+
-              ': путь пока недоступен — проверь расположение мебели или удали задание из очереди';
+              (musicBlocked
+                ? ': нет свободного подхода к музыкальному центру. В «Дом → Комната» поверни или перенеси его.'
+                : ': путь пока недоступен — проверь расположение мебели или удали задание из очереди');
             $('queue-feedback').textContent=message;
             toast(message);
           }
