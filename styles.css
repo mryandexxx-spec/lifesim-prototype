@@ -941,3 +941,18 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   .furnish-placement-guide{bottom:calc(75dvh + 8px);font-size:11px;padding:5px 9px;}
   .furnish-placement-guide small{display:none;}
 }
+
+/* Temporary R1b QA overlay, visible only when ?debug=kiss creates it. */
+.kiss-qa-controls{position:absolute;z-index:24;left:max(12px,env(safe-area-inset-left));
+  top:calc(env(safe-area-inset-top) + 160px);width:min(248px,calc(100vw - 92px));
+  padding:12px;background:#fffaf1f4;color:#3e594c;border:1px solid #fff;
+  border-radius:16px;box-shadow:0 9px 28px #243f302b;display:flex;
+  flex-direction:column;gap:8px;backdrop-filter:blur(13px);font-size:11px;line-height:1.35;}
+.kiss-qa-controls strong{font-size:14px;}
+.kiss-qa-controls span{color:#516e5f;}
+.kiss-qa-buttons{display:flex;gap:6px;flex-wrap:wrap;}
+.kiss-qa-buttons button{padding:9px 7px;border:0;border-radius:10px;
+  background:#368369;color:white;font-size:11px;font-weight:800;min-height:42px;}
+.kiss-qa-controls a{color:#377d69;font-weight:800;text-decoration:underline;text-underline-offset:3px;}
+@media(max-width:500px){.kiss-qa-controls{top:calc(env(safe-area-inset-top) + 153px);
+  width:min(215px,calc(100vw - 92px));}}
