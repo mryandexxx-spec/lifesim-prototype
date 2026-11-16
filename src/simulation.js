@@ -23,6 +23,9 @@ export const ACTIONS = Object.freeze({
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
   // F4D: sitting is a real physical activity, not an unearned skill or need bonus.
   seat: { label: 'Посидеть', need: 'fun', duration: 42, benefitPerMinute: 0, location: [0,-1.03] },
+  // F4F: a real fridge-to-purchased-chair dining journey; hunger only during bites.
+  dining: { label:'Пообедать за столом',need:'hunger',duration:31,
+    benefitPerMinute:1.55,location:[0,-1.5] },
   // F4E: actual nearby utility interactions, no fictional need/XP boosts.
   lamp: { label:'Переключить свет',need:'fun',duration:5,benefitPerMinute:0,location:[0,-.90] },
   mirror: { label:'Причесаться у зеркала',need:'fun',duration:17,benefitPerMinute:0,location:[0,-.88] },
@@ -79,7 +82,16 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
   restoreMind(data.mind, next);
   if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase) && (next.autonomy.enabled || !data.action.automatic)) {
     next.action = { id: data.action.id, phase: data.action.phase, elapsed: Math.max(0, Math.min(1000, Number(data.action.elapsed) || 0)), automatic: Boolean(data.action.automatic) };
-    if(data.action.id==='lamp'&&data.action.lampSwitched===true)
+    if(data.action.id==='dining'){
+      if(validFurnitureInstanceId(data.action.diningSeatInstanceId)&&
+        ['toFridge','taking','toSeat','eating'].includes(data.action.diningStage)){
+        next.action.diningSeatInstanceId=data.action.diningSeatInstanceId;
+        next.action.diningStage=data.action.diningStage;
+        if((next.action.phase==='using')!==['taking','eating'].includes(data.action.diningStage))
+          next.action=null;
+      }else next.action=null;
+    }
+    if(next.action&&data.action.id==='lamp'&&data.action.lampSwitched===true)
       next.action.lampSwitched=true;
     if(data.action.id==='bed'&&validBedSlot(data.action.bedSlot))
       next.action.bedSlot=data.action.bedSlot;
@@ -161,6 +173,7 @@ export function tick(state, minutes,world=state?.world??null) {
   // Sitting at an actual occupied sofa (resting or watching television)
   // suspends Energy decay while using it; standing TV viewing does NOT.
   const sitting=state.action?.id==='sofa'||
+    (state.action?.id==='dining'&&state.action.phase==='using'&&state.action.diningStage==='eating')||
     (state.action?.id==='tv'&&Boolean(state.action.watchSeatInstanceId))||
     (state.action?.id==='hobby'&&state.action.readingStage==='reading'&&
       Boolean(state.action.readingSeatInstanceId));
@@ -177,6 +190,16 @@ export function tick(state, minutes,world=state?.world??null) {
   refreshMind(state,world);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
+    // Six game minutes at the fridge with a visible food pickup. No hunger
+    // reward is granted until the resident has reached the actual chair.
+    if(state.action.id==='dining'&&state.action.diningStage==='taking'){
+      state.action.elapsed+=Math.min(minutes,Math.max(0,6-state.action.elapsed));
+      if(state.action.elapsed>=6){
+        state.action.phase='walking';state.action.diningStage='toSeat';
+        state.action.elapsed=0;state.event='Несёт еду к обеденному столу';
+      }
+      return;
+    }
     const hobby=['hobby','music'].includes(state.action.id)
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
@@ -225,7 +248,7 @@ export function tick(state, minutes,world=state?.world??null) {
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
-        (!['seat','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['seat','dining','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
