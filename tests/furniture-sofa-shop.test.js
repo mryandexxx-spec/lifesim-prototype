@@ -86,8 +86,8 @@ test('3D ray selects the exact purchased sofa instance, unlike the default sofa'
 });
 test('visual sit and exit stay bound to action target; Meshy seat contact is per instance',()=>{
  assert.match(game,/sofaVisualTargets=\{alex:null,mira:null\}/);
- assert.match(game,/sofaVisualTargets.alex=game.action\?\.targetInstanceId\?\?null/);
- assert.match(game,/sofaVisualTargets.mira=game.otherSim.action\?\.targetInstanceId\?\?null/);
+ assert.match(game,/sofaVisualTargets.alex=\(alexWatchSeat\|\|game.action\?\.targetInstanceId\)\|\|null/);
+ assert.match(game,/sofaVisualTargets.mira=\(miraWatchSeat\|\|game.otherSim.action\?\.targetInstanceId\)\|\|null/);
  assert.match(game,/sofaTransitionPose\(sofaStates.alex\),sofaVisualTargets.alex/);
  assert.match(game,/sofaTransitionPose\(sofaStates.mira\),sofaVisualTargets.mira/);
  assert.match(game,/makeSofaSeat=\(instanceId=null\)=>/);
