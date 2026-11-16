@@ -118,7 +118,11 @@ export function loadHousehold(raw) {
        restored.targetInstanceId!==actor.action.targetInstanceId||
        restored.contentId!==actor.action.contentId||
        !((restored.phase==='walking'&&actor.action.phase==='walking')||
-          (restored.phase==='using'&&actor.action.phase==='using'))||
+          (restored.phase==='using'&&actor.action.phase==='using')||
+          (restored.phase==='walking'&&actor.action.phase==='using'&&
+            (()=>{const point=furnitureActionApproach(root.world,'hobby',
+              actor.action.targetInstanceId);return Boolean(point&&
+              Math.hypot(actor.position.x-point.x,actor.position.z-point.z)<=.35);})()))||
        Math.abs(restored.elapsed-actor.action.elapsed)>.00001||
        !validReadingSource(root,actor)){
       actor.action=null;continue;

@@ -103,7 +103,7 @@ test('F2.1 PlayCanvas runtime creates, stores and removes real independent prefa
   const nodes=new Map([[plant,original]]);
   const template={clone(){clones++;return fakeNode();}};
   const ctx={game,decorNodes:nodes,decorTemplates:new Map([['plant',template]]),
-    SHOP_ITEMS:[{prefabId:'plant'}],app:{root:{addChild(){}}},
+    MARKET_OFFERS:[{prefabId:'plant'}],app:{root:{addChild(){}}},
     refreshSofaSeat(){refreshes++;}};
   assert.doesNotThrow(()=>runInNewContext(updateCode,ctx,{timeout:1000}));
   assert.equal(clones,1);
