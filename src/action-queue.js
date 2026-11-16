@@ -64,8 +64,10 @@ export function sanitizeQueueCommand(id,raw,persons){
         targetInstanceId:raw.targetInstanceId||'home-tv-1'};
     }
     if(['books','music'].includes(raw.choiceId)){
-      if(raw.targetInstanceId!==undefined&&
-        !validFurnitureInstanceId(raw.targetInstanceId))return null;
+      if(raw.targetInstanceId!==undefined&&(
+        !validFurnitureInstanceId(raw.targetInstanceId)||
+        !(raw.choiceId==='books'?/^shop-bookcase-[0-9]+$/:/^shop-music-[0-9]+$/)
+          .test(raw.targetInstanceId)))return null;
       return {type,targetId,mode:'leisure',choiceId:raw.choiceId,
         ...(raw.targetInstanceId?{targetInstanceId:raw.targetInstanceId}:{})};
     }
