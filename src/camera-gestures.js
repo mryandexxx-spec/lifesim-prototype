@@ -1,6 +1,5 @@
-/** UI6: one-pointer look, two-pointer move/zoom, deliberate tap.
- * Pure gesture state; no DOM, PlayCanvas, save writes or global listeners.
- * Mode 'pan' remains an explicit accessibility alternative for one finger.
+/** One-finger pan by default; two-finger orbit/tilt and pinch zoom.
+ * Side button enables one-finger orbit. Pure and independent of game saves.
  */
 import {orbitCamera,panCamera,pinchCamera} from './camera-controls.js';
 
@@ -37,7 +36,7 @@ export function createCameraGestureSession(){
     }
     return true;
   }
-  function move(e,view,height,{oneFinger='orbit'}={}){
+  function move(e,view,height,{oneFinger='pan'}={}){
     const p=point(e),old=p&&pointers.get(p.id);
     if(!old)return {view,changed:false};
     const travel=old.travel+moved(old,p);
@@ -49,9 +48,9 @@ export function createCameraGestureSession(){
       // once on the first actual gesture; after that use per-event deltas.
       const dx=old.travel<TAP_SLOP_PX?p.x-old.originX:p.x-old.x;
       const dy=old.travel<TAP_SLOP_PX?p.y-old.originY:p.y-old.y;
-      const next=oneFinger==='pan'
-        ?panCamera(view,dx,dy,height)
-        :orbitCamera(view,dx,dy,2);
+      const next=oneFinger==='orbit'
+        ?orbitCamera(view,dx,dy,2)
+        :panCamera(view,dx,dy,height);
       return {view:next,changed:true};
     }
     if(pointers.size===2){
@@ -60,8 +59,8 @@ export function createCameraGestureSession(){
       const dx=nextPair.x-previousPair.x,dy=nextPair.y-previousPair.y;
       const zoom=nextPair.distance-previousPair.distance;
       previousPair=nextPair;
-      const panned=panCamera(view,dx,dy,height);
-      const next=pinchCamera(panned,
+      const rotated=orbitCamera(view,dx,dy,2);
+      const next=pinchCamera(rotated,
         nextPair.distance-zoom,nextPair.distance);
       return {view:next,changed:dx!==0||dy!==0||zoom!==0};
     }

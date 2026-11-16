@@ -1717,29 +1717,29 @@ function boot() {
     setView(CAMERA_INITIAL);
     toast('Камера сброшена');
   });
-  // UI6: scene touch defaults to one-finger orbit (look around), while two
-  // fingers translate and pinch the camera. The existing rotate button remains
-  // a discoverable single-finger PAN alternative; no save or gameplay writes.
-  let oneFingerMode='orbit';
+  // One finger pans by default; two fingers orbit and pinch.
+  // Side button temporarily switches one-finger movement to rotation.
+  let oneFingerMode='pan';
   const rotateButton=$('rotate-camera-btn');
   const showCameraMode=()=>{
-    const panning=oneFingerMode==='pan';
-    rotateButton.setAttribute('aria-pressed',String(panning));
-    rotateButton.setAttribute('aria-label',panning
-      ?'Одним пальцем перемещать камеру. Нажмите для вращения'
-      :'Одним пальцем вращать камеру. Нажмите для перемещения');
-    rotateButton.title=panning?'Одним пальцем вращать':'Одним пальцем перемещать';
-    rotateButton.querySelector('small').textContent=panning?'СДВИГ':'ПОВОРОТ';
-    $('hint').textContent=panning
-      ?'Один палец — сдвиг · два — сдвиг и масштаб'
-      :'Один палец — вращение · два — сдвиг и масштаб';
+    const rotating=oneFingerMode==='orbit';
+    rotateButton.setAttribute('aria-pressed',String(rotating));
+    rotateButton.setAttribute('aria-label',rotating
+      ?'Выключить вращение камеры одним пальцем'
+      :'Включить вращение камеры одним пальцем');
+    rotateButton.title=rotating?'Вернуть перемещение одним пальцем'
+      :'Вращать одним пальцем';
+    rotateButton.querySelector('small').textContent=rotating?'ВРАЩЕНИЕ':'ПОВОРОТ';
+    $('hint').textContent=rotating
+      ?'Один палец — вращение · два — вращение и масштаб'
+      :'Один палец — сдвиг · два — вращение и масштаб';
   };
   rotateButton.addEventListener('click',()=>{
     oneFingerMode=oneFingerMode==='orbit'?'pan':'orbit';
     showCameraMode();
-    toast(oneFingerMode==='pan'
-      ?'Камера: перемещай одним пальцем'
-      :'Камера: вращай одним пальцем');
+    toast(oneFingerMode==='orbit'
+      ?'Поворот включён: вращай одним пальцем'
+      :'Перемещай одним пальцем · вращай двумя');
   });
   showCameraMode();
 
@@ -2931,7 +2931,15 @@ function boot() {
   app.start();
   // Count the scene after rendering has had a chance to draw its first frame.
   requestAnimationFrame(()=>requestAnimationFrame(()=>loadingProgress.finish('scene')));
+  // A stalled optional GLB request may not hold the full-screen loader forever.
+  const loadingWatchdog=setTimeout(()=>{
+    if(loadingProgress.snapshot().completed<loadingProgress.snapshot().total){
+      console.warn('3D loading timeout; proceeding with fallback');
+      loadingProgress.failUnresolved();
+    }
+  },18000);
   void loadingProgress.wait().then(({failed})=>{
+    clearTimeout(loadingWatchdog);
     $('loading').hidden=true;
     let seen='done';
     try{seen=localStorage.getItem(UI_TOUR_STORAGE_KEY);}
@@ -2944,8 +2952,11 @@ function boot() {
 }
 
 void (async()=>{
-  // Register before PlayCanvas requests the character GLBs, including first visit.
-  await registerModelCache();
+  // Optional Safari model cache must not indefinitely block 3D startup.
+  await Promise.race([
+    registerModelCache(),
+    new Promise(resolve=>setTimeout(resolve,3500))
+  ]);
   boot();
 })().catch(error=>{
   console.error('Блин’С startup failed',error);

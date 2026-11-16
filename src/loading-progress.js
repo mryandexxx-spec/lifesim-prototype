@@ -26,5 +26,11 @@ export function createLoadingProgress(ids, onProgress=()=>{}) {
       : new Promise(resolve=>waiting.push(resolve));
   };
   onProgress(snapshot());
-  return {finish,wait,snapshot};
+  const failUnresolved=()=>{
+    for(const [id,state] of states){
+      if(state===null)finish(id,false);
+    }
+    return snapshot();
+  };
+  return {finish,wait,snapshot,failUnresolved};
 }
