@@ -63,6 +63,9 @@ test('F2.1 atomic storage/sale within editor and full save/reload preserve curre
 });
 test('F2.1 frontend owns one compatible shop for world furniture and safeguards',()=>{
   const game=source('../src/game.js'),html=source('../index.html'),css=source('../styles.css');
+  const pages=source('../.github/workflows/pages.yml');
+  assert.ok(pages.includes('node --check src/furniture-shop.js'));
+  assert.ok(pages.includes('cp src/furniture-shop.js site/src/'));
   assert.match(game,/template\.clone\(\)/);
   assert.match(game,/decorNodes\.set\(item\.instanceId,node\)/);
   assert.match(game,/node\.enabled=item\.location==='home'/);
