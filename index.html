@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.1w" />
+  <link rel="stylesheet" href="./styles.css?v=1.1x" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}
   </script>
@@ -18,11 +18,19 @@
 <body>
   <div class="app-shell">
     <canvas id="game-canvas" aria-label="Трёхмерная комната Блин’С"></canvas>
+    <div id="intimacy-veil" class="intimacy-veil" aria-hidden="true">
+      <div class="intimacy-veil-message">
+        <span aria-hidden="true">♡</span>
+        <strong>Время для двоих</strong>
+        <p>Личное мгновение вдали от посторонних взглядов</p>
+        <small id="intimacy-progress"></small>
+      </div>
+    </div>
 
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.1w</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.1x</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -249,7 +257,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.1w"></script>
+  <script type="module" src="./src/game.js?v=1.1x"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

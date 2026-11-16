@@ -140,14 +140,15 @@ const POSITIVE=new Set(['talk','conversation.talk','gift.accepted','leisure.acce
   'acquaint.chat','friend.tease','friend.confide','rival.truce',
   'romance.flirt','romance.confess','romance.date',
   'romance.tender','romance.propose','romance.marry',
-  'romance.checkin','romance.repair','romance.hug','romance.kiss']);
+  'romance.checkin','romance.repair','romance.hug','romance.kiss',
+  'romance.intimacy']);
 const NEGATIVE=new Set(['argue','conversation.argue','gift.refused','leisure.refused',
   'rival.taunt','friend.tease.refused','friend.confide.refused','rival.truce.refused','acquaint.chat.refused',
   'romance.flirt.refused','romance.confess.refused',
   'romance.date.refused','romance.breakup','romance.divorce',
   'romance.tender.refused','romance.propose.refused','romance.marry.refused',
   'romance.checkin.refused','romance.repair.refused',
-  'romance.hug.refused','romance.kiss.refused']);
+  'romance.hug.refused','romance.kiss.refused','romance.intimacy.refused']);
 const TYPES=new Set([...POSITIVE,...NEGATIVE,'introduced']);
 const positive=type=>POSITIVE.has(type);
 const weights={
@@ -169,6 +170,7 @@ const weights={
   'romance.repair':{friendship:1,trust:3,tension:-3},
   'romance.hug':{friendship:1,trust:1,tension:-1},
   'romance.kiss':{friendship:1,trust:1,tension:-1},
+  'romance.intimacy':{friendship:1,trust:2,tension:-1},
   argue:{friendship:-9,trust:-9,tension:12},
   'conversation.argue':{friendship:-9,trust:-9,tension:12},
   'gift.refused':{friendship:-2,trust:-3,tension:4},
@@ -189,7 +191,8 @@ const weights={
   'romance.checkin.refused':{friendship:0,trust:0,tension:0},
   'romance.repair.refused':{friendship:0,trust:0,tension:0},
   'romance.hug.refused':{friendship:0,trust:0,tension:0},
-  'romance.kiss.refused':{friendship:0,trust:0,tension:0}
+  'romance.kiss.refused':{friendship:0,trust:0,tension:0},
+  'romance.intimacy.refused':{friendship:0,trust:0,tension:0}
 };
 function recompute(pair){
   const [a,b]=pair.ids,v=pair.views;
@@ -228,7 +231,7 @@ export function applySocialEvent(graph,event,{observedViews=null}={}){
   // A canonical relationship milestone must be eligible even when written by
   // a headless client directly; otherwise an event could bypass consent gates.
   if(['romance.date','romance.tender','romance.propose','romance.marry',
-    'romance.hug','romance.kiss','romance.breakup','romance.divorce','romance.checkin',
+    'romance.hug','romance.kiss','romance.intimacy','romance.breakup','romance.divorce','romance.checkin',
     'romance.repair'].includes(event.type)&&
     !romanceAvailability(graph,event.actorId,event.targetId,event.type,event.at).enabled)
     return null;
@@ -308,7 +311,8 @@ export const BRANCH_ACTIONS=Object.freeze({
   'romance.checkin':action('Уделить внимание','romance','Нужно свободное общение'),
   'romance.repair':action('Обсудить обиду','romance','Сначала должна возникнуть обида'),
   'romance.hug':action('Нежно обнять','romance','Нужна взаимная симпатия'),
-  'romance.kiss':action('Поцеловать','romance','Нужно сблизиться и стать парой')
+  'romance.kiss':action('Поцеловать','romance','Нужно сблизиться и стать парой'),
+  'romance.intimacy':action('Предложить близость','romance','Нужна взаимная взрослая пара и уединение')
 });
 export function availableSocialActions(graph,a,b,minutes=0){
   if(!validPersonId(a)||!validPersonId(b)||a===b||
@@ -374,6 +378,7 @@ export function resolveBranchResponse(graph,a,b,id,context={}){
         id==='romance.tender'?'Оценил(а) нежность':
         id==='romance.hug'?'Принял(а) объятие':
          id==='romance.kiss'?'Ответил(а) на поцелуй':
+         id==='romance.intimacy'?'Взаимно согласились на близость':
         id==='romance.checkin'?'Почувствовал(а) внимание':
         id==='romance.repair'?'Удалось поговорить об обиде':
         id==='romance.propose'?'Обручились':
