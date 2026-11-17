@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g",
@@ -19,8 +19,9 @@
       "./src/gifts-leisure.js":"./src/gifts-leisure.js?v=1.2x-h3",
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
       "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3-f4f2-f4g",
-      "./src/painting.js":"./src/painting.js?v=1.2u-h5-bounds-20261117-h5asafe",
+      "./src/painting.js":"./src/painting.js?v=1.2u.15-h5b",
        "./src/painting-visual.js":"./src/painting-visual.js?v=1.2u-h5asafe",
+       "./src/painting-gallery.js":"./src/painting-gallery.js?v=1.2u-h5b-20261117",
        "./src/meshy-painting-runtime.js":"./src/meshy-painting-runtime.js?v=1.2u-h5asafe",
       "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2u-h4-h5-f4g",
       "./src/skill-presentation.js":"./src/skill-presentation.js?v=1.2u-h4-h5-f4g",
@@ -66,7 +67,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.14 · F4G / H5a-safe / H5.1 / F4F.2</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.15 · H5b / F4G / H5a-safe / H5.1 / F4F.2</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -380,7 +381,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b-f4d-h3-f4e-h4-h5-f4f1-f4f2-h51-h5asafe-f4g"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

@@ -26,6 +26,8 @@ import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_
 import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
   chooseKitchenPlan} from './kitchen.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
+import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
+  paintingResaleCredits,transactPainting} from './painting-gallery.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -558,10 +560,49 @@ function renderSkillsTab(force=false){
     empty.textContent='Пока пусто. Купи мольберт и закончи рисунок.';
     portfolio.append(empty);
   }
-  for(const work of [...works].reverse().slice(0,8)){
+  for(const work of [...works].reverse()){
     const item=document.createElement('div');item.className='skill-work';
-    item.textContent=(PAINT_SUBJECTS[work.contentId]?.label||'Картина')+
-      ' · качество '+work.quality+'/100';portfolio.append(item);
+    const status=work.location==='wall'?'На стене · место '+(work.wallSlot+1):
+      work.location==='inventory'?'В инвентаре':
+      work.location==='studio'?'В комнате':'Старая коллекция';
+    const name=document.createElement('div');
+    name.textContent=(PAINT_SUBJECTS[work.contentId]?.label||'Картина')+
+      ' · качество '+work.quality+'/100 · '+status;
+    item.append(name);
+    const actions=document.createElement('div');actions.className='skill-work-actions';
+    const command=(label,operation,slot=null)=>{
+      const button=document.createElement('button');
+      button.type='button';button.textContent=label;
+      button.addEventListener('click',()=>{
+        if(operation==='sell'&&!window.confirm('Продать картину за '+
+          paintingResaleCredits(work)+' пробных кредитов?'))return;
+        const result=transactPainting(game,game.selectedSim,work.id,operation,slot===null
+          ?null:Number(slot.value));
+        if(!result.ok){toast('Картина: действие недоступно ('+result.reason+')');return;}
+        selectedActor().createdWorks=result.works;
+        if(result.shop)game.shop=result.shop;
+        save(true);renderSkillsTab(true);
+        toast(operation==='sell'?'Картина продана · +'+result.amount+' кредитов':
+          operation==='hang'?'Картина на стене':
+          'Картина в личном инвентаре');
+      });
+      actions.append(button);return button;
+    };
+    if(work.location==='studio'||!work.kind)command('📦 В инвентарь','store');
+    if(work.location==='wall')command('Снять со стены','store');
+    if(work.location==='inventory'){
+      const free=availablePaintingWallSlots(game),slots=document.createElement('select');
+      slots.setAttribute('aria-label','Место картины на стене');
+      for(const slot of free){
+        const option=document.createElement('option');option.value=String(slot.id);
+        option.textContent=slot.label;slots.append(option);
+      }
+      if(free.length){actions.append(slots);command('Повесить','hang',slots);}
+      else{const note=document.createElement('small');note.textContent='Свободных мест нет';
+        actions.append(note);}
+      command('Продать · +'+paintingResaleCredits(work),'sell');
+    }
+    item.append(actions);portfolio.append(item);
   }
 }
 function setMindTab(tab){
@@ -1695,7 +1736,7 @@ function boot() {
   // H5b will transfer these IDs to inventory/walls without recreating art.
   const artworkNodes=new Map();
   const allArtwork=()=>[...(game.createdWorks||[]),...(game.otherSim.createdWorks||[])]
-    .filter(work=>work.kind==='artwork'&&work.location==='studio')
+    .filter(work=>work.kind==='artwork'&&['studio','wall'].includes(work.location))
     .sort((a,b)=>a.createdAt-b.createdAt||a.id.localeCompare(b.id));
   const updateArtworkNodes=()=>{
     const works=allArtwork(),keep=new Set(works.map(w=>w.id));
@@ -1706,7 +1747,7 @@ function boot() {
       const source=game.world.furniture.instances.find(i=>
         i.instanceId===work.easelInstanceId&&i.prefabId==='easel');
       const origin=work.origin||(source?{x:source.x,z:source.z,yaw:source.yaw}:null);
-      const position=studioArtworkPose({...work,origin},index);
+      const position=artworkDisplayPose(work,index,origin);
       if(!position)continue;
       let node=artworkNodes.get(work.id);
       if(!node){
@@ -1729,8 +1770,11 @@ function boot() {
         primitive('box','H5a frame foot',0,.31,.10,.63,.10,.12,frame,node);
         artworkNodes.set(work.id,node);
       }
-      node.setPosition(position.x,0,position.z);
+      // Mount on the visible room-side of the back wall; no studio floor foot.
+      node.setPosition(position.x,position.wall?position.y-.79:0,position.z);
       node.setEulerAngles(0,-position.yaw,0);
+      const foot=node.findByName('H5a frame foot');
+      if(foot)foot.enabled=!position.wall;
     }
   };
 
@@ -3599,11 +3643,14 @@ function boot() {
     const finishedArt=allArtwork().map((work,index)=>{
       const source=game.world.furniture.instances.find(i=>i.instanceId===work.easelInstanceId);
       const origin=work.origin||(source?{x:source.x,z:source.z,yaw:source.yaw}:null);
-      const pos=studioArtworkPose({...work,origin},index);
+      const pos=artworkDisplayPose(work,index,origin);
       if(!pos)return null;
       return {kind:'artwork',id:work.id,work,
-        bounds:{min:{x:pos.x-.39,y:.25,z:pos.z-.39},
-          max:{x:pos.x+.39,y:1.23,z:pos.z+.39}}};
+        bounds:pos.wall
+          ?{min:{x:pos.x-.38,y:pos.y-.44,z:pos.z-.13},
+            max:{x:pos.x+.38,y:pos.y+.44,z:pos.z+.13}}
+          :{min:{x:pos.x-.39,y:.25,z:pos.z-.39},
+            max:{x:pos.x+.39,y:1.23,z:pos.z+.39}}};
     }).filter(Boolean);
     const kitchenAppliances=game.world.furniture.instances
       .filter(item=>['stove','prep','sink'].includes(item.prefabId)&&item.location==='home')
@@ -3658,9 +3705,11 @@ function boot() {
     if(target?.kind==='resident')openSocialContext(pos);
     else if(target?.kind==='artwork'){
       closeSocialContext();select(null);
-      const work=target.work;
-      toast('Картина «'+(PAINT_SUBJECTS[work.contentId]?.label||'Картина')+
-        '» · качество '+work.quality+'/100 · отдельный предмет');
+      game.selectedSim=target.work.ownerId;
+      $('mind-panel').hidden=false;
+      $('mind-toggle').setAttribute('aria-expanded','true');
+      setMindTab('skills');
+      toast('Картина · открыть инвентарь, повесить или продать во вкладке «Навыки»');
     }
     else if(target?.kind==='object')select(target.id,target.instanceId);
     else{closeSocialContext();select(null);}
