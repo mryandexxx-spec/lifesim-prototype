@@ -9,6 +9,7 @@ import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
+import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
@@ -115,6 +116,9 @@ import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, g
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
 const canvas = $('game-canvas');
+// Prevent Safari native selection/callouts on game UI without swallowing taps,
+// camera pointer events, scrollable panels or editable field gestures.
+installMobileGesturePolicy(document.querySelector('.app-shell'),canvas);
 const intimacyVeil=$('intimacy-veil');
 const loadingProgress=createLoadingProgress(['scene','alex','mira'],({completed,total,failed})=>{
   $('loading-count').textContent=completed+' / '+total;
