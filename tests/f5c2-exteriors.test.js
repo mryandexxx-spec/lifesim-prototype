@@ -118,7 +118,7 @@ test('F5-C.2 true external door accepts navigable 1.5m porch, keeps roof indoor'
   assert.ok(entries[0].footprint.cells.every(k=>!porch.floorCells.includes(k)));
   assert.equal(constructionContains(porch,18.6,0),true);
   assert.equal(constructionWallAt(porch,18,0),false,'actual door must stay a passage');
-  assert.equal(isWalkable(18.6,0,porch),true,'entrance deck traversable');
+  assert.equal(isWalkable(18.6,0,{construction:porch}),true,'entrance deck traversable');
   assert.deepEqual(porch.roofModules,withRoof.roofModules,
     'automatic indoor roof must not cover outdoor porch');
   const restored=restoreConstructionWorld(JSON.parse(JSON.stringify(porch)));
