@@ -12,7 +12,10 @@ export const FURNITURE_SCHEMA=1;
 const finite=(n)=>typeof n==='number'&&Number.isFinite(n);
 export const validFurnitureInstanceId=id=>typeof id==='string'&&/^[a-z][a-z0-9-]{2,63}$/.test(id);
 // Sanitize saved object centers across the doubled eastward room without changing v1.
-const limits=Object.freeze({minX:-4.8,maxX:14.05,minZ:-4.2,maxZ:4.2});
+// F5-D.2: the build lot is larger than the original double-width starter home.
+// Keep the original coordinates unchanged, but allow purchased furniture on
+// constructed room floors; placement and collision rules remain authoritative.
+const limits=Object.freeze({minX:-8.99,maxX:22.99,minZ:-11.99,maxZ:11.99});
 const original=[
   {prefabId:'bed',instanceId:'home-bed-1',name:'Уютная кровать',category:'Спальня',
     actionId:'bed',capabilities:['sleep'],x:-2.62,z:-1.425,rect:[-3.83,-1.41,-2.69,-.16]},
