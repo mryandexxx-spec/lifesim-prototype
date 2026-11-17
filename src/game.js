@@ -14,6 +14,7 @@ import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.j
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
+import {createDayNightRenderer} from './day-night-render.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
@@ -3353,6 +3354,10 @@ function boot() {
   const camera = new pc.Entity('Camera');
   camera.addComponent('camera',{ clearColor:new pc.Color(0.85,0.91,0.86), fov:41, nearClip:.1, farClip:120 });
   app.root.addChild(camera);
+  // W1-A.2: physically varying environment uses ONLY the existing two
+  // non-shadow directional lights and one camera. Saved lamp states stay manual.
+  const dayNightRenderer=createDayNightRenderer({scene:app.scene,sun,fill,camera,Color:pc.Color});
+  dayNightRenderer.update(game.calendar,game.minutes);
   const view={...CAMERA_INITIAL};
   const cameraTarget=new pc.Vec3(view.centerX,view.centerY,view.centerZ);
   function cameraUpdate(){
@@ -6283,6 +6288,9 @@ function boot() {
       moodOrbit.hidden=!pos;
       if(pos){moodOrbit.style.left=pos.x+'px';moodOrbit.style.top=pos.y+'px';}
     }
+    // Apply scene colors after the authoritative fixed-step clock tick.
+    // No visual time advancement while paused, hidden or in Build/Furnish.
+    const daylight=dayNightRenderer.update(game.calendar,game.minutes);
     uiTimer+=dt;autosaveTime+=dt;
     if(uiTimer>.14){
       uiTimer=0;
@@ -6291,6 +6299,7 @@ function boot() {
       $('day-label').textContent=formatCalendarDay(date);
       $('calendar-anchor-toggle').title=formatCalendarDay(date,{includeYear:true})+' · День '+date.gameDay+' · изменить дату';
       $('time-label').textContent=t.time;
+      $('light-phase-label').textContent=daylight.phaseLabel;
       const current=selectedActor();
       $('resident-name').textContent=selectedName();
       const skill=getSkillDefinition(HOBBY_SKILLS,READING_SKILL_ID);
