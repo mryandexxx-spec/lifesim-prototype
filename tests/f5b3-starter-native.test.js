@@ -72,7 +72,7 @@ test('F5-B.3 protected authored painting/shelf and hung player artwork cannot be
    {wallDecor:[{x:11.25,z:-4.34,radius:.45}]});
  assert.equal(work.reason,'wall-has-decor');
  const oldWindow=edit(world,{type:'window',
-   edgeId:segment(world,'north',-4).id,styleId:'window.panorama'});
+   edgeId:segment(world,'north',-5).id,styleId:'window.panorama'});
  assert.equal(oldWindow.openings[0].edgeIds.length,4,
    'the old decorative window can be visually replaced');
 });
