@@ -15,6 +15,7 @@ on:
       - 'tests/f5b-finishes.test.js'
       - 'tests/f5b2-openings.test.js'
       - 'tests/f5b3-starter-native.test.js'
+      - 'tests/f5b4-ceilings-patterns.test.js'
       - '.github/workflows/f5a-browser-checks.yml'
   workflow_dispatch:
 permissions:
@@ -53,4 +54,6 @@ jobs:
             f5b-browser-finish.png
             f5b2-browser-openings.png
             f5b3-original-wall-openings.png
+            f5b4-ceiling-preview.png
+            f5b4-floor-direction.png
           retention-days: 7
