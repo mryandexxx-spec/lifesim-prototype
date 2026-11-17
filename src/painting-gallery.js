@@ -1,5 +1,6 @@
 /** H5b: one painting ID has one location. No PlayCanvas/DOM, no new save schema. */
 import {studioArtworkPose} from './painting-visual.js';
+import {starterShellOffset} from './construction.js';
 
 export const PAINT_WALL_SLOTS=Object.freeze(
   Array.from({length:8},(_,i)=>Object.freeze({
@@ -16,11 +17,12 @@ export const availablePaintingWallSlots=root=>{
       .map(w=>w.wallSlot)));
   return PAINT_WALL_SLOTS.filter(s=>!occupied.has(s.id));
 };
-export function artworkDisplayPose(work,index=0,sourceOrigin=null){
+export function artworkDisplayPose(work,index=0,sourceOrigin=null,construction=null){
   if(work?.kind!=='artwork')return null;
   if(work.location==='wall'){
     const slot=PAINT_WALL_SLOTS[work.wallSlot];
-    return slot?{x:slot.x,y:slot.y,z:slot.z,yaw:slot.yaw,wall:true}:null;
+    return slot?{x:slot.x,y:slot.y,z:slot.z+
+      starterShellOffset(construction,'north'),yaw:slot.yaw,wall:true}:null;
   }
   if(work.location==='studio')
     return studioArtworkPose({...work,origin:work.origin||sourceOrigin},index);

@@ -107,3 +107,50 @@ test('F5-A iPhone wall selector knows the exterior direction of an enlarged room
  const inside=room.world.wallEdges.find(w=>w.axis==='v'&&w.i===28&&w.j===0);
  assert.equal(constructionWallOutward(room.world,inside.id),null);
 });
+
+test('F5-A.3 starter perimeter enlarges all four directions without moving originals',()=>{
+ const old=newConstructionWorld();
+ const changes=[['west',-1,0,-5.25,0],['north',0,-1,0,-4.75],
+  ['east',1,0,14.25,0],['south',0,1,0,4.75]];
+ const ids={west:'starter:west',north:'starter:north',east:'starter:east',south:'starter:south'};
+ for(const [side,di,dj,x,z] of changes){
+  const command={type:'move-wall',edgeId:ids[side],deltaI:di,deltaJ:dj};
+  const result=proposeConstructionEdit(old,command);
+  assert.ok(result.ok,side+': '+result.reason);
+  assert.ok(constructionContains(result.world,x,z),side+' new foundation');
+  assert.equal(result.world.starterShell[side],old.starterShell[side]+di+dj);
+  assert.ok(result.world.floorCells.length>old.floorCells.length);
+  assert.deepEqual(restoreConstructionWorld(result.world).starterShell,result.world.starterShell);
+  assert.deepEqual(restoreConstructionWorld(result.world).starterOwned,result.world.starterOwned);
+  const back=proposeConstructionEdit(result.world,{
+   type:'move-wall',edgeId:ids[side],deltaI:-di,deltaJ:-dj});
+  assert.ok(back.ok,side+' retract '+back.reason);
+  assert.equal(back.world.starterShell[side],old.starterShell[side]);
+  assert.deepEqual([...back.world.floorCells].sort(),[...old.floorCells].sort());
+ }
+ assert.deepEqual(old.starterShell,{west:-10,east:28,north:-9,south:9});
+ assert.equal(old.legacy,true);
+ assert.equal(constructionWallOutward(old,'starter:west'),-1);
+ assert.equal(constructionWallOutward(old,'starter:east'),1);
+ assert.equal(constructionWallOutward(old,'starter:north'),-1);
+ assert.equal(constructionWallOutward(old,'starter:south'),1);
+});
+test('F5-A.3 starter original perimeter respects lot, furniture, resident, undo and legacy saves',()=>{
+ const old=newConstructionWorld();
+ assert.equal(proposeConstructionEdit(old,{type:'move-wall',edgeId:'starter:west',
+  deltaI:1,deltaJ:0}).reason,'starter-minimum');
+ assert.equal(proposeConstructionEdit(old,{type:'move-wall',edgeId:'starter:west',
+  deltaI:-20,deltaJ:0}).reason,'invalid-wall-move');
+ const occupied=[{minX:-5.7,maxX:-5.4,minZ:-.2,maxZ:.2}];
+ const blocked=proposeConstructionEdit(old,{type:'move-wall',edgeId:'starter:west',
+  deltaI:-1,deltaJ:0},{furnitureBoxes:occupied});
+ assert.equal(blocked.reason,'wall-intersects-furniture');
+ const editor=createConstructionEditor(old);
+ const result=editor.commit({type:'move-wall',edgeId:'starter:north',
+  deltaI:0,deltaJ:-1});
+ assert.equal(result.ok,true,result.reason);
+ assert.equal(editor.undo().world.starterShell.north,-9);
+ assert.equal(editor.redo().world.starterShell.north,-10);
+ assert.deepEqual(restoreConstructionWorld({schema:1,step:.5,legacy:true,
+  floorCells:old.floorCells,wallEdges:[],openings:[]}).starterShell,old.starterShell);
+});
