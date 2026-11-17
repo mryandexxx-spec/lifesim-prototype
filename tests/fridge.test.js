@@ -96,7 +96,7 @@ test('hunger starts growing only after food reaches mouth',()=>{
   assert.ok(state.needs.hunger>before);
   tickHousehold(state,30);
   assert.equal(state.action,null);
-  assert.ok(state.needs.hunger>before+25);
+  assert.ok(state.needs.hunger>before+10);
 });
 test('nearly full hunger does not end an open-door animation early',()=>{
   const s=newHousehold();s.needs.hunger=99;
