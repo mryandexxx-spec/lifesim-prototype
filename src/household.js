@@ -3,6 +3,9 @@
  */
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS } from './simulation.js';
 import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar} from './calendar-core.js';
+import {restoreEventRecords} from './calendar-events.js';
+import {holidayDefinitions} from './calendar-holidays.js';
+import {restoreReminderReceipts} from './calendar-reminders.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
@@ -98,7 +101,12 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   const root=loadGame(raw,DEMO_PROFILES.first);
   // Missing old v1 calendar: align the SUGGESTED date to the current game day.
   // This adds one optional field without touching minutes, money, people or possessions.
-  root.calendar=restoreCalendar(raw.calendar,root.minutes,suggestedDate);
+  root.calendar={...restoreCalendar(raw.calendar,root.minutes,suggestedDate),
+    ...restoreEventRecords(raw.calendar),
+    holidays:Array.isArray(raw.calendar?.holidays)
+      ?holidayDefinitions({holidays:raw.calendar.holidays}).filter(h=>
+        raw.calendar.holidays.some(saved=>saved?.id===h.id)):[],
+    reminderReceipts:restoreReminderReceipts(raw.calendar?.reminderReceipts)};
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
     construction:restoreConstructionWorld(raw.world?.construction)};
   root.kitchen=restoreKitchen(raw.kitchen);

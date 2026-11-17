@@ -1353,3 +1353,8 @@ npm test
 
 
 
+
+
+### W1-A.3 — Calendar & events
+
+Tap the top game date to open the mobile month/week/day calendar, create family or individual events, repeat them daily/weekly/monthly/yearly, edit or skip one occurrence, customize original holidays and nonworking flags. Optional reminders use only simulation time and persisted receipts. Existing v1 save, two residents, objects and seasonal lighting remain intact; no iOS background notifications or careers yet.
