@@ -3750,6 +3750,9 @@ function boot() {
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
     buildTool='camera';
+    // Restore the previously tested camera gesture path unchanged:
+    // entering Build explicitly selects pan, without altering shop VM listeners.
+    oneFingerMode='pan';showCameraMode();
     buildPreviousView={...view};
     buildMode=true;setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
@@ -4018,8 +4021,7 @@ function boot() {
       cancelPendingGrab();cameraGesture.clear();return;
     }
     const result=cameraGesture.move(gesturePoint(event),view,
-      canvas.clientHeight,{oneFinger:buildMode?'pan'
-        :furnishMode&&shopPlacing&&oneFingerMode==='pan'
+      canvas.clientHeight,{oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'
         ?'placement':oneFingerMode});
     if(result.placementDelta&&furnishMode&&shopPlacing&&shopPose){
       if(event.cancelable)event.preventDefault();

@@ -47,7 +47,7 @@ test('F5-A iPhone build defaults to camera pan, wall tool has direct resize affo
  assert.match(html,/id="build-wall-expand"/);
  assert.match(html,/id="build-wall-contract"/);
  assert.match(game,/buildTool='camera'/);
- assert.match(game,/oneFinger:buildMode\?'pan'/);
+ assert.match(game,/oneFingerMode='pan';showCameraMode\(\)/);
  assert.match(game,/selectBuildWall\(target\)/);
  assert.match(game,/constructionWallOutward\(game\.world\.construction/);
  assert.match(css,/\.build-wall-controls\[hidden\]/);
