@@ -103,10 +103,12 @@ test('W1-B.3b.1 promotion requires return home even if requirements are met',()=
   assert.equal(promoteCareer(root,'alex').ok,true);
 });
 test('W1-B.3b.1 Alex and Mira have separate performance, fatigue, career rank and wallet receipts',()=>{
-  const root=fresh(),alex=employ(root,'alex','city-services'),
-    mira=employ(root,'mira','art-studio');
-  root.otherSim.skills.xpById.painting=160;
+  const root=fresh(),alex=employ(root,'alex','city-services');
   shiftDay(root,'alex',1);
+  // Hire Mira after Alex's shift; the headless test does not simulate 3D
+  // departure for a second resident during a jumped-over earlier shift.
+  const mira=employ(root,'mira','art-studio');
+  root.otherSim.skills.xpById.painting=160;
   assert.equal(mira.workedShifts,0);
   assert.equal(mira.performance,50);
   shiftDay(root,'mira',2);
