@@ -3257,7 +3257,8 @@ function boot() {
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
   let finishFloor='floor.oak',finishWall='wall.sage',finishCeiling='ceiling.chalk',finishSide='both';
   const openingChoice={door:'door.simple',window:'window.classic',arch:'arch.round'};
-  let selectedBuildOpening=null;
+  let selectedBuildOpening=null,selectedBuildRoof=null;
+  const roofChoice={styleId:'roof.gable',materialId:'roof.slate',pitch:.38,eaves:.4};
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
@@ -3975,7 +3976,13 @@ function boot() {
     'wall-has-decor':'На этом участке висит картина или полка · выбери свободный участок',
     'starter-opening-outside':'Сначала убери проём или отверстие на удаляемой полосе стены',
     'opening-needs-wall-space':'Для этого широкого проёма нужны четыре свободных секции стены',
-    'opening-style-unavailable':'Выбери дизайн двери, окна или арки'
+    'opening-style-unavailable':'Выбери дизайн двери, окна или арки',
+    'invalid-roof-rectangle':'Для секции крыши протяни область хотя бы 2×2 м',
+    'roof-needs-floor':'Под крышей должен быть построенный пол. Сначала убери крышу перед сносом пола',
+    'roof-overlap':'Секции крыши не должны перекрываться',
+    'roof-too-complex':'Слишком сложный контур: укрой отдельными секциями',
+    'roof-not-found':'Коснись существующей секции крыши',
+    'unknown-roof-style':'Выбери форму, материал, уклон и свес крыши'
   };
   const buildFeedback=(msg,invalid=false)=>{
     $('build-feedback').textContent=msg;
@@ -4001,6 +4008,7 @@ function boot() {
     }).filter(Boolean)});
   const buildProposal=(cmd)=>proposeConstructionEdit(game.world.construction,cmd,buildContext());
   const buildCommand=(from,to)=>{
+    if(buildTool==='roof-add')return {type:'roof-add',from,to,...roofChoice};
     if(buildTool!=='wall')return {type:buildTool,from,to};
     // Deliberate axis lock: imperfect diagonal touch still draws a straight wall.
     const straight=Math.abs(to.x-from.x)>=Math.abs(to.z-from.z)
@@ -4008,7 +4016,7 @@ function boot() {
     return {type:'wall',from,to:straight};
   };
   const showBuildGhost=(from,to)=>{
-    if(!from||!to||!['room','floor','wall','remove-floor','move-wall'].includes(buildTool)){
+    if(!from||!to||!['room','floor','wall','remove-floor','move-wall','roof-add'].includes(buildTool)){
       buildGhost.enabled=false;return;
     }
     const command=buildTool==='move-wall'
@@ -4149,6 +4157,50 @@ function boot() {
       :'Направление досок и мозаика — отдельные образцы.';
   };
   $('build-finish-side').addEventListener('change',event=>{finishSide=event.target.value;});
+  const roofStylesRoot=$('build-roof-styles'),roofMaterialsRoot=$('build-roof-materials');
+  const stageRoofSettings=()=>{
+    if(buildTool==='roof-auto')stageBuild({type:'roof-auto',...roofChoice});
+    else if(buildTool==='roof-edit'&&selectedBuildRoof)
+      stageBuild({type:'roof-update',id:selectedBuildRoof.id,...roofChoice});
+    else buildFeedback('Форма выбрана · отметь участок крыши');
+  };
+  const refreshBuildRoofs=()=>{
+    const make=(root,registry,key)=>{
+      root.replaceChildren();
+      for(const [id,info] of Object.entries(registry)){
+        const button=document.createElement('button');
+        button.type='button';button.dataset.roofChoice=id;
+        button.setAttribute('aria-pressed',String(roofChoice[key]===id));
+        button.textContent=info.label;
+        if(info.color){
+          const chip=document.createElement('span');chip.style.background=info.color;
+          chip.className='build-roof-color';button.prepend(chip);
+        }
+        button.addEventListener('click',()=>{
+          roofChoice[key]=id;refreshBuildRoofs();stageRoofSettings();
+        });
+        root.appendChild(button);
+      }
+    };
+    make(roofStylesRoot,ROOF_STYLES,'styleId');
+    make(roofMaterialsRoot,ROOF_MATERIALS,'materialId');
+    $('build-roof-pitch').value=String(roofChoice.pitch);
+    $('build-roof-eaves').value=String(roofChoice.eaves);
+    $('build-roof-tip').textContent=buildTool==='roof-edit'
+      ?selectedBuildRoof?'Секция выбрана · поменяй форму, цвет, уклон или свес и примени':
+        'Коснись секции крыши в 3D, затем изменяй параметры.'
+      :buildTool==='roof-add'?'Протяни над построенным полом прямоугольник от 2×2 м.'
+      :buildTool==='roof-remove'?'Коснись крыши, чтобы снять только её секцию.'
+      :buildTool==='roof-clear'?'Удаляем все секции крыши только после подтверждения.'
+      :'Построит кровлю по существующему полу. Изменения требуют подтверждения.';
+  };
+  for(const [id,key] of [['build-roof-pitch','pitch'],['build-roof-eaves','eaves']])
+    $(id).addEventListener('change',event=>{
+      const value=Number(event.target.value);
+      if((key==='pitch'?ROOF_PITCHES:ROOF_EAVES).includes(value)){
+        roofChoice[key]=value;stageRoofSettings();
+      }
+    });
   const buildOpeningPalette=$('build-opening-variants');
   const refreshBuildOpenings=()=>{
     const replace=buildTool==='change-opening';
@@ -4187,8 +4239,14 @@ function boot() {
   };
   const setBuildTool=type=>{
     clearBuildPending();resetBuildWallSelection();
-    selectedBuildOpening=null;
+    selectedBuildOpening=null;selectedBuildRoof=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
+    const wantRoof=type.startsWith('roof-')||(type==='camera'&&roofPreview);
+    if(roofPreview!==wantRoof){
+      roofPreview=wantRoof;
+      $('build-roof-toggle').setAttribute('aria-pressed',String(roofPreview));
+      syncConstructionRender(true);
+    }
     const wantCeiling=type.startsWith('paint-ceiling');
     if(wantCeiling!==ceilingPreview){
       ceilingPreview=wantCeiling;
@@ -4202,6 +4260,8 @@ function boot() {
     const openings=['door','window','arch','change-opening'];
     $('build-opening-picker').hidden=!openings.includes(type);
     if(openings.includes(type))refreshBuildOpenings();
+    $('build-roof-picker').hidden=!type.startsWith('roof-');
+    if(type.startsWith('roof-'))refreshBuildRoofs();
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
@@ -4222,10 +4282,17 @@ function boot() {
       'paint-wall':'Выбери обои или панели, затем коснись любой стены.',
       'paint-ceiling-room':'Выбери цвет и коснись пола комнаты — отделаем потолок над ней.',
       'paint-ceiling-tile':'Выбери цвет и коснись плитки — отделаем потолок над ней.',
-      'sample-finish':'Пипетка: коснись уже отделанной поверхности, чтобы взять её покрытие.'
+      'sample-finish':'Пипетка: коснись уже отделанной поверхности, чтобы взять её покрытие.',
+      'roof-auto':'Подберём крышу под весь дом. Выбери форму и нажми «Применить».',
+      'roof-add':'Протяни прямоугольник над полом для отдельной секции крыши.',
+      'roof-edit':'Коснись крыши, чтобы выбрать секцию и изменить её дизайн.',
+      'roof-remove':'Коснись секции крыши для её демонтажа.',
+      'roof-clear':'Уберём все крыши после нажатия «Применить».'
     };
     $('build-instruction').textContent=tips[type]||'Выбери инструмент';
     buildFeedback(tips[type]||'Готово');
+    if(type==='roof-auto')stageBuild({type:'roof-auto',...roofChoice});
+    if(type==='roof-clear')stageBuild({type:'roof-clear'});
   };
   document.querySelectorAll('[data-build-tool]').forEach(btn=>
     btn.addEventListener('click',()=>setBuildTool(btn.dataset.buildTool)));
@@ -4237,6 +4304,17 @@ function boot() {
       syncConstructionRender(true);
       buildFeedback('Видимость стен: '+btn.textContent);
     }));
+  $('build-roof-toggle').addEventListener('click',()=>{
+    roofPreview=!roofPreview;
+    $('build-roof-toggle').setAttribute('aria-pressed',String(roofPreview));
+    if(roofPreview&&ceilingPreview){
+      ceilingPreview=false;
+      $('build-ceiling-toggle').setAttribute('aria-pressed','false');
+    }
+    syncConstructionRender(true);
+    buildFeedback(roofPreview?'Крыша показана для внешнего осмотра':
+      'Крыша скрыта, интерьер виден');
+  });
   $('build-ceiling-toggle').addEventListener('click',()=>{
     ceilingPreview=!ceilingPreview;
     $('build-ceiling-toggle').setAttribute('aria-pressed',String(ceilingPreview));
@@ -4251,7 +4329,8 @@ function boot() {
   });
   const exitBuild=()=>{
     if(!buildMode)return;
-    buildMode=false;ceilingPreview=false;
+    buildMode=false;ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
+    $('build-roof-toggle').setAttribute('aria-pressed','false');
     $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
     cameraGesture.clear();setCameraBuildBounds();
@@ -4273,7 +4352,8 @@ function boot() {
     buildSession=createConstructionEditor(game.world.construction);
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
-    buildTool='camera';ceilingPreview=false;
+    buildTool='camera';ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
+    $('build-roof-toggle').setAttribute('aria-pressed','false');
     $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     // Restore the previously tested camera gesture path unchanged:
     // entering Build explicitly selects pan, without altering shop VM listeners.
@@ -4339,6 +4419,20 @@ function boot() {
         stageBuild({type:'remove-opening',id:opening?.id});
       }else stageBuild({type,edgeId:target?.id,at:to,
         ...(openingChoice[type]?{styleId:openingChoice[type]}:{})});
+    }else if(type==='roof-remove'){
+      stageBuild({type:'roof-remove',at:hit||from});
+    }else if(type==='roof-edit'){
+      selectedBuildRoof=[...(game.world.construction.roofModules||[])].reverse()
+        .find(roof=>roofContains(roof,hit||from))||null;
+      if(selectedBuildRoof){
+        Object.assign(roofChoice,{styleId:selectedBuildRoof.styleId,
+          materialId:selectedBuildRoof.materialId,pitch:selectedBuildRoof.pitch,
+          eaves:selectedBuildRoof.eaves});
+        buildFeedback('Секция крыши выбрана · изменяй параметры');
+      }else buildFeedback('Секция не найдена: выбери крышу над полом',true);
+      refreshBuildRoofs();
+    }else if(type==='roof-add'){
+      stageBuild(buildCommand(from,to));
     }else if(type==='move-wall'){
       const target=wallEdge||buildWallAtScreen(gesturePoint(event));
       if(target)selectBuildWall(target);
@@ -4524,7 +4618,8 @@ function boot() {
         cameraGesture.begin(point,now);
         return;
       }
-      if(buildTool!=='camera'&&cameraGesture.count()===0){
+      if(buildTool!=='camera'&&!['roof-auto','roof-clear'].includes(buildTool)&&
+        cameraGesture.count()===0){
         const raw=editorFloorAt(point);
         const pickWall=['move-wall','door','window','arch','change-opening','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
