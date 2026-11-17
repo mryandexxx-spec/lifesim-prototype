@@ -6,6 +6,10 @@
 import {ROOF_MAX_MODULES,validRoofSettings,validRoofModule,roofRect,
   roofRectSupported,roofsOverlap,roofContains,roofAutomaticModules}
   from './roof-construction.js';
+import {BUILD_WALL_HEIGHTS,BUILD_FACADE_FINISHES,BUILD_PORCH_FINISHES,
+  exteriorWallSegments,porchFootprint,porchFootprints} from './exterior-construction.js';
+export {BUILD_WALL_HEIGHTS,BUILD_FACADE_FINISHES,BUILD_PORCH_FINISHES}
+  from './exterior-construction.js';
 export const BUILD_STEP=.5;
 // F5-B: immutable, original stylized interior finishes. IDs, not colors,
 // are persisted in construction.materials so visual assets may later change.
@@ -101,6 +105,16 @@ export function constructionWallSegments(world){
   const removed=new Set(state?.starterRemoved||[]);
   return [...(state?.wallEdges||[]),...starterShellSegments(state).filter(w=>!removed.has(w.id))];
 }
+/** Real exterior surface topology, not the camera's temporary wall cutaway. */
+export function constructionExteriorSegments(world){
+  const state=world?.construction||world;
+  return exteriorWallSegments(state,constructionWallSegments(state));
+}
+export function constructionPorches(world){
+  const state=world?.construction||world;
+  return porchFootprints(state,constructionWallSegments(state))
+    .filter(p=>p.footprint);
+}
 // One physical wall may carry both a pre-F5-A structural edge and a
 // virtual starter edge (e.g. east boundary of the old home + new room).
 // An opening cuts the SAME place through both render/collision layers.
@@ -133,7 +147,8 @@ function topology(state){
   let found=topologyCache.get(state);
   if(!found){found={floors:new Set(state.floorCells),
     doors:constructionOpeningEdgeIds(state,['door','arch']),
-    removed:new Set(state.starterRemoved||[]),solid:new Set(state.starterSolidSides||[])};
+    removed:new Set(state.starterRemoved||[]),solid:new Set(state.starterSolidSides||[]),
+    porches:new Set(constructionPorches(state).flatMap(p=>p.footprint.cells))};
     topologyCache.set(state,found);}
   return found;
 }
@@ -232,6 +247,37 @@ export function restoreConstructionWorld(raw){
         id!=='ceiling.default')ceiling[key]=id;
     if(Object.keys(ceiling).length)materials.ceiling=ceiling;
   }
+  // F5-C.2: independently sanitize optional exterior coats and wall height.
+  const wallHeightClass=Object.hasOwn(BUILD_WALL_HEIGHTS,raw.wallHeightClass)
+    ?raw.wallHeightClass:'normal';
+  const rawFacade=raw.materials?.facade;
+  if(rawFacade&&typeof rawFacade==='object'&&!Array.isArray(rawFacade)){
+    const facade={},validEdges=new Set([...keys,...virtual]);
+    for(const [id,materialId] of Object.entries(rawFacade).slice(0,5000))
+      if(validEdges.has(id)&&!starterRemoved.includes(id)&&
+        Object.hasOwn(BUILD_FACADE_FINISHES,materialId)&&materialId!=='facade.default')
+        facade[id]=materialId;
+    if(Object.keys(facade).length)materials.facade=facade;
+  }
+  // Porches are anchored to immutable door IDs; never trust user-supplied mesh
+  // coordinates, and never add their exterior deck to the automatic roof floor.
+  const originalWalls=[...walls,...starterShellSegments({starterShell:shell})
+    .filter(w=>!starterRemoved.includes(w.id))];
+  const originalWorld={floorCells:[...floors],openings,wallEdges:walls,
+    starterShell:shell,starterRemoved,starterSolidSides};
+  const porches=[],occupiedPorch=new Set();
+  if(Array.isArray(raw.porches)&&raw.porches.length<=32)
+    for(const entry of raw.porches){
+      if(!entry||typeof entry.id!=='string'||!/^porch-[0-9]+$/.test(entry.id)||
+        porches.some(p=>p.id===entry.id||p.openingId===entry.openingId)||
+        !Object.hasOwn(BUILD_PORCH_FINISHES,entry.materialId))continue;
+      const door=openings.find(o=>o.id===entry.openingId);
+      const deck=porchFootprint(originalWorld,door,originalWalls,entry.depthSections);
+      if(!deck||deck.cells.some(c=>occupiedPorch.has(c)))continue;
+      deck.cells.forEach(c=>occupiedPorch.add(c));
+      porches.push({id:entry.id,openingId:entry.openingId,
+        depthSections:entry.depthSections,materialId:entry.materialId});
+    }
   // Old saves always have roofModules:[]; sanitize optional v1 roof records
   // independently rather than discard an entire household for bad roof data.
   const storedRoofs=Array.isArray(raw.roofModules)&&raw.roofModules.length<=ROOF_MAX_MODULES
@@ -246,6 +292,8 @@ export function restoreConstructionWorld(raw){
   const cleanRoofs=rebuiltAuto||roofModules;
   const roofAuto=Boolean(rebuiltAuto);
   return {...initial,materials,roofModules:cleanRoofs,...(roofAuto?{roofAuto:true}:{}),
+    ...(wallHeightClass!=='normal'?{wallHeightClass}:{}),
+    ...(porches.length?{porches}:{}),
     revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
     legacy:raw.legacy===true&&walls.length===0&&openings.length===0&&starterRemoved.length===0&&
       starterSolidSides.length===0&&floors.size===initial.floorCells.length&&
@@ -259,7 +307,8 @@ export function constructionContains(world,x,z){
   const state=world?.construction||world;
   if(!state||state.schema!==1)return x>=-4.62&&x<=13.86&&z>=-3.96&&z<=3.98;
   if(state.legacy)return x>=-4.62&&x<=13.86&&z>=-3.96&&z<=3.98;
-  return topology(state).floors.has(cell(floorIndex(x),floorIndex(z)));
+  const topo=topology(state),key=cell(floorIndex(x),floorIndex(z));
+  return topo.floors.has(key)||topo.porches.has(key);
 }
 /** A full wall can never be traversed, windows never act as doors. */
 export function constructionWallAt(world,x,z,radius=.26){
@@ -374,6 +423,8 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   let floors=new Set(world.floorCells),walls=new Map(world.wallEdges.map(w=>[w.id,w]));
   let openings=[...world.openings],nextId=world.nextId;
   let roofModules=world.roofModules.map(roof=>({...roof})),roofAuto=world.roofAuto===true;
+  let porches=(world.porches||[]).map(p=>({...p}));
+  let wallHeightClass=world.wallHeightClass||'normal';
   const materials=clone(world.materials);
   let starterShell={...world.starterShell},starterOwned=new Set(world.starterOwned);
   const starterRemoved=new Set(world.starterRemoved||[]);
@@ -561,9 +612,56 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       }
     }
     openings=openings.map(o=>({...o,edgeIds:o.edgeIds.map(id=>replaceIds.get(id)||id)}));
-    for(const [from,to] of replaceIds)if(materials.wall[from]){
-      materials.wall[to]=materials.wall[from];delete materials.wall[from];
+    for(const [from,to] of replaceIds){
+      if(materials.wall[from]){
+        materials.wall[to]=materials.wall[from];delete materials.wall[from];
+      }
+      if(materials.facade?.[from]){
+        materials.facade[to]=materials.facade[from];delete materials.facade[from];
+      }
     }
+  }else if(type==='set-wall-height'){
+    if(!Object.hasOwn(BUILD_WALL_HEIGHTS,command.heightClass))return fail('unknown-wall-height');
+    wallHeightClass=command.heightClass;
+  }else if(type==='paint-facade'){
+    if(!Object.hasOwn(BUILD_FACADE_FINISHES,command.materialId))return fail('unknown-facade');
+    if(!['all','segment'].includes(command.scope))return fail('invalid-facade-scope');
+    const candidate={...world,wallEdges:[...walls.values()],floorCells:[...floors],
+      starterShell,starterRemoved:[...starterRemoved],starterSolidSides:[...starterSolidSides]};
+    const exterior=constructionExteriorSegments(candidate);
+    const painted=command.scope==='all'?exterior:
+      exterior.filter(e=>e.id===command.edgeId);
+    if(!painted.length)return fail('not-exterior-wall');
+    const facade={...(materials.facade||{})};
+    for(const target of painted)
+      if(command.materialId==='facade.default')delete facade[target.id];
+      else facade[target.id]=command.materialId;
+    if(Object.keys(facade).length)materials.facade=facade;
+    else delete materials.facade;
+  }else if(type==='porch-add'){
+    if(!Object.hasOwn(BUILD_PORCH_FINISHES,command.materialId))return fail('unknown-porch');
+    if(porches.length>=32)return fail('too-many-porches');
+    const found=openings.find(o=>o.id===command.openingId);
+    if(!found||found.type!=='door')return fail('porch-needs-door');
+    if(porches.some(p=>p.openingId===found.id))return fail('porch-exists');
+    const candidate={...world,wallEdges:[...walls.values()],floorCells:[...floors],
+      starterShell,starterRemoved:[...starterRemoved],starterSolidSides:[...starterSolidSides]};
+    const deck=porchFootprint(candidate,found,[...allWalls().values()],command.depthSections);
+    if(!deck)return fail('porch-needs-exterior-door');
+    const occupied=new Set(constructionPorches({...candidate,porches}).flatMap(p=>p.footprint.cells));
+    if(deck.cells.some(c=>occupied.has(c)))return fail('porch-overlap');
+    // An entrance cannot materialize through an occupied furniture footprint.
+    for(const r of furnitureBoxes)
+      if(deck.cells.some(key=>{
+        const [i,j]=key.split(',').map(Number);
+        return overlap({minX:i*.5,minZ:j*.5,maxX:(i+1)*.5,maxZ:(j+1)*.5},r);
+      }))return fail('porch-intersects-furniture');
+    porches.push({id:'porch-'+nextId++,openingId:found.id,
+      depthSections:command.depthSections,materialId:command.materialId});
+  }else if(type==='porch-remove'){
+    const existing=porches.find(p=>p.id===command.id||p.openingId===command.openingId);
+    if(!existing)return fail('porch-not-found');
+    porches=porches.filter(p=>p.id!==existing.id);
   }else if(['roof-auto','roof-add','roof-update','roof-remove','roof-clear'].includes(type)){
     if(type==='roof-clear'){
       roofModules=[];roofAuto=false;
@@ -716,14 +814,38 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   for(const k of Object.keys(materials.wall))if(!walls.has(k)&&
     !['starter:west','starter:east','starter:north','starter:south'].includes(k))
       delete materials.wall[k];
+  if(materials.facade){
+    const validExterior=new Set(constructionExteriorSegments({
+      ...world,wallEdges:[...walls.values()],floorCells:[...floors],
+      starterShell,starterRemoved:[...starterRemoved],
+      starterSolidSides:[...starterSolidSides]}).map(w=>w.id));
+    for(const key of Object.keys(materials.facade))
+      if(!validExterior.has(key))delete materials.facade[key];
+    if(!Object.keys(materials.facade).length)delete materials.facade;
+  }
+  // Any wall, door or floor change must preserve entrance anchors and never
+  // put porch deck over an interior floor or another porch.
+  const porchWorld={...world,wallEdges:[...walls.values()],openings,
+    floorCells:[...floors],starterShell,starterRemoved:[...starterRemoved],
+    starterSolidSides:[...starterSolidSides],porches};
+  const occupiedPorch=new Set();
+  for(const p of porches){
+    const door=openings.find(o=>o.id===p.openingId);
+    const deck=porchFootprint(porchWorld,door,[...allWalls().values()],p.depthSections);
+    if(!deck)return fail('porch-needs-exterior-door');
+    if(deck.cells.some(c=>occupiedPorch.has(c)))return fail('porch-overlap');
+    deck.cells.forEach(c=>occupiedPorch.add(c));
+  }
   const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),
       openings,starterShell,starterRemoved:[...starterRemoved].sort(),
-      starterSolidSides:[...starterSolidSides].sort(),materials,roofModules,roofAuto})!==
+      starterSolidSides:[...starterSolidSides].sort(),materials,roofModules,roofAuto,
+      wallHeightClass,porches})!==
     JSON.stringify({floors:[...world.floorCells].sort(),walls:world.wallEdges.map(w=>w.id).sort(),
       openings:world.openings,starterShell:world.starterShell,
       starterRemoved:[...(world.starterRemoved||[])].sort(),
       starterSolidSides:[...(world.starterSolidSides||[])].sort(),materials:world.materials,
-      roofModules:world.roofModules||[],roofAuto:world.roofAuto===true});
+      roofModules:world.roofModules||[],roofAuto:world.roofAuto===true,
+      wallHeightClass:world.wallHeightClass||'normal',porches:world.porches||[]});
   if(!changed)return fail('unchanged');
   // A room wall is structural, never allowed through a purchased object,
   // protected kitchen fixture, painting easel or resident's occupied space.
@@ -738,11 +860,15 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     if(furnitureBoxes.some(r=>overlap(volume,r)))return fail('wall-intersects-furniture');
   }
   const next={...world,revision:world.revision+1,
-    legacy:['paint-floor','paint-wall','paint-ceiling'].includes(type)?world.legacy:false,
+    legacy:['paint-floor','paint-wall','paint-ceiling','paint-facade','set-wall-height'].includes(type)?world.legacy:false,
     materials,nextId,floorCells:[...floors],
     starterShell,starterOwned:[...starterOwned],starterRemoved:[...starterRemoved],
     starterSolidSides:[...starterSolidSides],wallEdges:[...walls.values()],openings,
     roofModules};
+  if(wallHeightClass!=='normal')next.wallHeightClass=wallHeightClass;
+  else delete next.wallHeightClass;
+  if(porches.length)next.porches=porches;
+  else delete next.porches;
   if(roofAuto)next.roofAuto=true;else delete next.roofAuto;
   for(const resident of residents)if(finite(resident?.x)&&finite(resident?.z)&&
     (!constructionContains(next,resident.x,resident.z)||constructionWallAt(next,resident.x,resident.z)))return fail('resident-blocked');
