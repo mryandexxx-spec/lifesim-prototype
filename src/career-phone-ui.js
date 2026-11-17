@@ -108,7 +108,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       body.append(element('h3','career-phone-section-title','Повышение: '+growth.rank));
       const requirements=element('div','career-phone-facts');
       for(const req of growth.requirements){
-        requirements.append(element('span',null,(req.met?'✓ ':'○ ')+req.label+
+        requirements.append(element('span',null,(req.met?'✓ ':'○ ')+(req.label==='Результативность'?'Рейтинг для повышения':req.label)+
           ': '+req.current+' / '+req.target));
       }
       body.append(requirements);
