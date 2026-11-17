@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newConstructionWorld,restoreConstructionWorld,constructionContains,constructionWallAt,
- proposeConstructionEdit,createConstructionEditor,constructionRooms,BUILD_LOT} from '../src/construction.js';
+ proposeConstructionEdit,createConstructionEditor,constructionRooms,constructionWallOutward,BUILD_LOT} from '../src/construction.js';
 test('F5-A legacy migration preserves old exact walking envelope, no shifted floor',()=>{
  const old=newConstructionWorld();
  assert.equal(old.schema,1);assert.equal(old.legacy,true);
@@ -89,4 +89,21 @@ test('F5-A walls never cut through bought furniture or delete its supporting flo
  const extension=proposeConstructionEdit(initial,{type:'floor',from:{x:15,z:-2},to:{x:18,z:2}}).world;
  assert.equal(proposeConstructionEdit(extension,{type:'remove-floor',from:{x:15,z:-1},to:{x:17,z:1}},
    {furnitureBoxes:occupied}).reason,'furniture-on-floor');
+});
+
+test('F5-A iPhone wall selector knows the exterior direction of an enlarged room',()=>{
+ const room=proposeConstructionEdit(newConstructionWorld(),{
+  type:'room',from:{x:14,z:-2},to:{x:18,z:2}});
+ assert.equal(room.ok,true);
+ const east=room.world.wallEdges.find(w=>w.axis==='v'&&w.i===36&&w.j===0);
+ const south=room.world.wallEdges.find(w=>w.axis==='h'&&w.i===32&&w.j===4);
+ assert.equal(constructionWallOutward(room.world,east.id),1);
+ assert.equal(constructionWallOutward(room.world,south.id),1);
+ const expanded=proposeConstructionEdit(room.world,{
+  type:'move-wall',edgeId:east.id,deltaI:1,deltaJ:0});
+ assert.equal(expanded.ok,true,expanded.reason);
+ assert.ok(constructionContains(expanded.world,18.2,0));
+ assert.equal(constructionWallOutward(room.world,'missing'),null);
+ const inside=room.world.wallEdges.find(w=>w.axis==='v'&&w.i===28&&w.j===0);
+ assert.equal(constructionWallOutward(room.world,inside.id),null);
 });
