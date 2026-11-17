@@ -9,7 +9,7 @@ const result=proposeConstructionEdit(state.world.construction,{type:'room',
 assert.ok(result.ok,result.reason);
 state.world.construction=result.world;
 state.world.furniture.instances.push({instanceId:'shop-plant-a',prefabId:'plant',
-  x:16,z:-2,yaw:0,location:'home',purchasePriceCredits:100});
+  x:16,z:-2,yaw:0,location:'home',itemDefinitionId:'plant.amber',purchasePriceCredits:100});
 state.world.furniture.revision++;
 const originalPlant={...state.world.furniture.instances.at(-1)};
 state.autonomy.enabled=false;state.otherSim.autonomy.enabled=false;
