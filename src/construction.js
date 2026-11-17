@@ -3,6 +3,9 @@
  * Grid edges are canonical: h:i,j spans [i,i+1] on X; v:i,j spans [j,j+1] on Z.
  * The legacy floor/fixtures keep their exact transforms and save schema v1.
  */
+import {ROOF_MAX_MODULES,validRoofSettings,validRoofModule,roofRect,
+  roofRectSupported,roofsOverlap,roofContains,roofAutomaticModules}
+  from './roof-construction.js';
 export const BUILD_STEP=.5;
 // F5-B: immutable, original stylized interior finishes. IDs, not colors,
 // are persisted in construction.materials so visual assets may later change.
@@ -229,7 +232,21 @@ export function restoreConstructionWorld(raw){
         id!=='ceiling.default')ceiling[key]=id;
     if(Object.keys(ceiling).length)materials.ceiling=ceiling;
   }
-  return {...initial,materials,revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
+  // Old saves always have roofModules:[]; sanitize optional v1 roof records
+  // independently rather than discard an entire household for bad roof data.
+  const storedRoofs=Array.isArray(raw.roofModules)&&raw.roofModules.length<=ROOF_MAX_MODULES
+    ?raw.roofModules:[];
+  const roofModules=[],roofIds=new Set();
+  for(const entry of storedRoofs){
+    const valid=validRoofModule(entry,floors,roofIds,roofModules);
+    if(valid){roofModules.push(valid);roofIds.add(valid.id);}
+  }
+  const autoSettings=raw.roofAuto===true?validRoofSettings(storedRoofs[0]):null;
+  const rebuiltAuto=autoSettings?roofAutomaticModules(floors,autoSettings):null;
+  const cleanRoofs=rebuiltAuto||roofModules;
+  const roofAuto=Boolean(rebuiltAuto);
+  return {...initial,materials,roofModules:cleanRoofs,...(roofAuto?{roofAuto:true}:{}),
+    revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
     legacy:raw.legacy===true&&walls.length===0&&openings.length===0&&starterRemoved.length===0&&
       starterSolidSides.length===0&&floors.size===initial.floorCells.length&&
       Object.keys(STARTER_SHELL).every(k=>shell[k]===STARTER_SHELL[k]),
@@ -356,6 +373,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   if(!command||typeof command.type!=='string')return fail('invalid-command');
   let floors=new Set(world.floorCells),walls=new Map(world.wallEdges.map(w=>[w.id,w]));
   let openings=[...world.openings],nextId=world.nextId;
+  let roofModules=world.roofModules.map(roof=>({...roof})),roofAuto=world.roofAuto===true;
   const materials=clone(world.materials);
   let starterShell={...world.starterShell},starterOwned=new Set(world.starterOwned);
   const starterRemoved=new Set(world.starterRemoved||[]);
@@ -546,6 +564,37 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     for(const [from,to] of replaceIds)if(materials.wall[from]){
       materials.wall[to]=materials.wall[from];delete materials.wall[from];
     }
+  }else if(['roof-auto','roof-add','roof-update','roof-remove','roof-clear'].includes(type)){
+    if(type==='roof-clear'){
+      roofModules=[];roofAuto=false;
+    }else if(type==='roof-remove'){
+      const target=roofModules.find(r=>r.id===command.id)||
+        [...roofModules].reverse().find(r=>roofContains(r,command.at));
+      if(!target)return fail('roof-not-found');
+      roofModules=roofModules.filter(r=>r.id!==target.id);roofAuto=false;
+    }else if(type==='roof-update'){
+      const index=roofModules.findIndex(r=>r.id===command.id);
+      if(index<0)return fail('roof-not-found');
+      const settings=validRoofSettings(command);
+      if(!settings)return fail('unknown-roof-style');
+      roofModules[index]={...roofModules[index],...settings};roofAuto=false;
+    }else{
+      const settings=validRoofSettings(command);
+      if(!settings)return fail('unknown-roof-style');
+      if(type==='roof-auto'){
+        const generated=roofAutomaticModules(floors,settings);
+        if(!generated)return fail('roof-too-complex');
+        roofModules=generated;roofAuto=true;
+      }else{
+        const rect=roofRect(command.from,command.to);
+        if(!rect)return fail('invalid-roof-rectangle');
+        if(!roofRectSupported(rect,floors))return fail('roof-needs-floor');
+        if(roofModules.some(other=>roofsOverlap(other,rect)))return fail('roof-overlap');
+        if(roofModules.length>=ROOF_MAX_MODULES)return fail('roof-too-complex');
+        while(roofModules.some(r=>r.id==='roof-'+nextId))nextId++;
+        roofModules.push({id:'roof-'+nextId++,...rect,...settings});roofAuto=false;
+      }
+    }
   }else if(type==='paint-floor'){
     const at=command.at;
     if(!finite(at?.x)||!finite(at?.z))return fail('invalid-finish-target');
@@ -651,6 +700,14 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     openings=openings.filter(o=>o.id!==command.id);
   }else return fail('unsupported-command');
   if(floors.size>4000||walls.size>5000)return fail('too-large');
+  // Auto roofs follow the actual supported footprint when a room or original
+  // wall grows. Manual roof modules must not remain suspended above removed floor.
+  if(roofAuto&&!['roof-auto','roof-add','roof-update','roof-remove','roof-clear'].includes(type)){
+    const options=roofModules[0]&&validRoofSettings(roofModules[0]);
+    roofModules=options?roofAutomaticModules(floors,options):null;
+    if(!roofModules)return fail('roof-too-complex');
+  }
+  if(roofModules.some(r=>!roofRectSupported(r,floors)))return fail('roof-needs-floor');
   for(const k of Object.keys(materials.floor))if(!floors.has(k))delete materials.floor[k];
   if(materials.ceiling){
     for(const k of Object.keys(materials.ceiling))if(!floors.has(k))delete materials.ceiling[k];
@@ -661,11 +718,12 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       delete materials.wall[k];
   const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),
       openings,starterShell,starterRemoved:[...starterRemoved].sort(),
-      starterSolidSides:[...starterSolidSides].sort(),materials})!==
+      starterSolidSides:[...starterSolidSides].sort(),materials,roofModules,roofAuto})!==
     JSON.stringify({floors:[...world.floorCells].sort(),walls:world.wallEdges.map(w=>w.id).sort(),
       openings:world.openings,starterShell:world.starterShell,
       starterRemoved:[...(world.starterRemoved||[])].sort(),
-      starterSolidSides:[...(world.starterSolidSides||[])].sort(),materials:world.materials});
+      starterSolidSides:[...(world.starterSolidSides||[])].sort(),materials:world.materials,
+      roofModules:world.roofModules||[],roofAuto:world.roofAuto===true});
   if(!changed)return fail('unchanged');
   // A room wall is structural, never allowed through a purchased object,
   // protected kitchen fixture, painting easel or resident's occupied space.
@@ -683,7 +741,9 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     legacy:['paint-floor','paint-wall','paint-ceiling'].includes(type)?world.legacy:false,
     materials,nextId,floorCells:[...floors],
     starterShell,starterOwned:[...starterOwned],starterRemoved:[...starterRemoved],
-    starterSolidSides:[...starterSolidSides],wallEdges:[...walls.values()],openings};
+    starterSolidSides:[...starterSolidSides],wallEdges:[...walls.values()],openings,
+    roofModules};
+  if(roofAuto)next.roofAuto=true;else delete next.roofAuto;
   for(const resident of residents)if(finite(resident?.x)&&finite(resident?.z)&&
     (!constructionContains(next,resident.x,resident.z)||constructionWallAt(next,resident.x,resident.z)))return fail('resident-blocked');
   return {ok:true,world:next,diff:{floorCount:next.floorCells.length-world.floorCells.length,
