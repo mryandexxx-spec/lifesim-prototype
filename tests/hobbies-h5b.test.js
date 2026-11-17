@@ -7,6 +7,7 @@ import {findMarketPlacement,buyMarketItem} from '../src/furniture-shop.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from '../src/painting-gallery.js';
 import {SAVE_KEY} from '../src/simulation.js';
+import {newConstructionWorld,proposeConstructionEdit} from '../src/construction.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 function work(id,ownerId='alex',location='studio'){
