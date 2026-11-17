@@ -3,6 +3,7 @@ import {CAREER_CATALOG,careerDefinition} from './career-catalog.js';
 import {hireCareer,resignCareer,CAREER_RESIDENT_IDS} from './career-state.js';
 import {nextCareerShift,plannedCareerShift} from './career-scheduler.js';
 import {civilToSerial} from './calendar-core.js';
+import {canResignNow} from './career-work.js';
 
 const DAY_NAMES=Object.freeze(['Пн','Вт','Ср','Чт','Пт','Сб','Вс']);
 export function clockLabel(minute){
@@ -57,6 +58,8 @@ export function acceptCareerOffer(root,residentId,careerId){
 export function leaveCareer(root,residentId){
   if(!legalRoot(root,residentId)||!root.careerSystem.byResident?.[residentId])
     return {ok:false,reason:'Нет действующего договора'};
+  if(!canResignNow(root,residentId))
+    return {ok:false,reason:'Дождись возвращения со смены перед увольнением'};
   return {ok:true,careerSystem:resignCareer(root.careerSystem,residentId)};
 }
 

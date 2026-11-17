@@ -4,6 +4,7 @@
 import {careerVacancies,acceptCareerOffer,leaveCareer,describeCareerShift} from './career-job-board.js';
 import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
+import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 function element(tag,className,text){
@@ -78,13 +79,42 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     body.append(element('h2','career-phone-section-title',career.title));
     body.append(element('p','career-phone-muted',career.ranks[current.level]?.title||'Должность'));
     const shift=nextCareerShift(root.calendar,current,root.minutes);
+    const status=residentWorkStatus(root,who);
+    const active=current.currentShift;
     const facts=element('div','career-phone-facts');
     facts.append(element('span',null,'Ставка: '+career.ranks[current.level]?.hourlyCredits+' кр./час'));
     facts.append(element('span',null,'Следующая смена: '+describeCareerShift(shift)));
+    facts.append(element('span',null,'Статус: '+status.label));
+    facts.append(element('span',null,'Баланс семьи: '+root.shop.credits+' кр.'));
     facts.append(element('span',null,'Результативность: '+current.performance+'/100'));
+    if(current.lastShift)facts.append(element('span',null,'Прошлая смена: '+
+      (current.lastShift.outcome==='worked'?'отработано':'пропущено')+
+      ' · +'+current.lastShift.salary+' кр.'+
+      (current.lastShift.lateMinutes?' · опоздание '+current.lastShift.lateMinutes+' мин.':'')));
     body.append(facts);
-    body.append(element('p','career-phone-notice',
-      'Договор сохранён. Уход на работу, фактические смены и зарплата появятся в следующем этапе карьеры.'));
+    if(active?.phase==='pending'&&root.minutes>=active.start-15){
+      body.append(action('Отправиться на работу',()=>{
+        const live=personRoot();if(!live)return;
+        const result=requestCareerDeparture(live,who,live.minutes);
+        if(!result.ok){notify(result.reason);return;}
+        save(true);notify(NAMES[who]+' идёт к выходу');render();
+      },'career-phone-primary'));
+    }
+    if(['pending','departing'].includes(active?.phase)&&root.minutes>=active.start-15){
+      body.append(action('Пропустить эту смену',()=>{
+        if(!window.confirm('Пропустить смену? Зарплата за неё будет 0 кр.'))return;
+        const live=personRoot();if(!live)return;
+        if(skipCareerShift(live,who)){
+          save(true);notify(NAMES[who]+': смена пропущена');render();
+        }
+      },'career-phone-secondary'));
+    }
+    if(active?.phase==='working')
+      body.append(element('p','career-phone-notice',
+        'Житель находится вне участка. До '+clockAt(active.end)+
+        ' домашние действия недоступны. Выплата придёт в конце смены.'));
+    else body.append(element('p','career-phone-notice',
+      'Смены проходят по игровому календарю. Автоматический выход включён; занятое ручное действие не прерывается.'));
     body.append(action('Уволиться',()=>{
       if(!window.confirm('Расторгнуть договор с '+career.title+'?'))return;
       const result=leaveCareer(getRoot(),who);
@@ -104,7 +134,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     for(const label of [
       'Стартовая должность: '+offer.rank,
       'Ставка: '+offer.hourlyCredits+' кредитов/час',
-      'Одна смена: '+offer.shiftCredits+' кредитов (после внедрения зарплаты)',
+      'Одна смена: до '+offer.shiftCredits+' кредитов за полный рабочий день',
       'Рабочие дни: '+offer.workdays,
       'Часы: '+offer.hours,
       'Первая смена: '+offer.firstShiftLabel
@@ -112,7 +142,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     body.append(facts);
     if(view==='contract'){
       body.append(element('p','career-phone-notice',
-        'Подписание закрепит эту работу за '+NAMES[who]+'. Первая смена рассчитана по игровому календарю. Сейчас зарплата не начисляется.'));
+        'Подписание закрепит эту работу за '+NAMES[who]+'. Первая смена рассчитана по игровому календарю. Зарплата начисляется в конце фактически отработанной смены.'));
       body.append(action('Подписать договор',()=>{
         const live=personRoot();if(!live)return;
         const result=acceptCareerOffer(live,who,chosen);

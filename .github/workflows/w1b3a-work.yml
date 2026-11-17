@@ -1,0 +1,37 @@
+name: W1-B.3a work shift iPhone-sized PlayCanvas smoke
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  career-shift-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test actual PlayCanvas/WebGL and saved salary receipt at 390x844
+        run: |
+          node --check src/game.js
+          node --check src/career-work.js
+          npm test
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/w1b3a-http.log 2>&1 &
+          sleep 2
+          node tests/w1b3a-browser-smoke.mjs
+      - name: Upload iPhone-sized screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w1b3a-work-390x844
+          path: w1b3a-working-iphone.png
+          if-no-files-found: ignore

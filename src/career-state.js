@@ -1,19 +1,55 @@
-/** W1-B.1: additive root-v1 career save contract. No work is simulated yet. */
+/** W1-B.3a: additive root-v1 career save contract and sanitized work receipts. */
 import {careerDefinition} from './career-catalog.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
 const validEmployeeId=id=>typeof id==='string'&&/^e[1-9]\d{0,8}$/.test(id);
+function cleanWorkShift(raw,contract){
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+  const {id,start,end,phase,departedAt,hourlyCredits}=raw;
+  const career=careerDefinition(contract.careerId);
+  const expectedRate=career?.ranks[contract.level]?.hourlyCredits;
+  if(!Number.isSafeInteger(start)||start<contract.hiredAt||start<0||
+    !Number.isSafeInteger(end)||end-start<60||end-start>720||
+    id!==contract.employmentId+'@'+Math.floor(start/1440)+'@'+start||
+    !['pending','departing','working','returning'].includes(phase)||
+    raw.employmentId!==contract.employmentId||
+    raw.careerId!==contract.careerId||hourlyCredits!==expectedRate||
+    (['working','returning'].includes(phase)&&
+      (!validTime(departedAt)||departedAt<start||departedAt>end)))return null;
+  return {id,employmentId:contract.employmentId,careerId:contract.careerId,
+    start,end,hourlyCredits,phase,warn60:raw.warn60===true,warn15:raw.warn15===true,
+    departedAt:['working','returning'].includes(phase)?departedAt:null};
+}
+function cleanLastShift(raw,contract){
+  if(!raw||typeof raw!=='object'||typeof raw.id!=='string')return null;
+  const parts=raw.id.split('@');
+  if(parts.length!==3||parts[0]!==contract.employmentId||
+    !parts.slice(1).every(part=>/^\d+$/.test(part))||
+    !validTime(raw.start)||!validTime(raw.end)||raw.end<=raw.start||
+    !['missed','worked'].includes(raw.outcome)||
+    !Number.isSafeInteger(raw.salary)||raw.salary<0||raw.salary>1000000000||
+    !Number.isFinite(raw.workedMinutes)||raw.workedMinutes<0||
+    !Number.isFinite(raw.lateMinutes)||raw.lateMinutes<0||
+    !validTime(raw.finishedAt))return null;
+  return {id:raw.id,start:raw.start,end:raw.end,outcome:raw.outcome,
+    salary:raw.salary,workedMinutes:raw.workedMinutes,
+    lateMinutes:raw.lateMinutes,finishedAt:raw.finishedAt};
+}
 function cleanContract(raw,id){
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.residentId!==id||
     !validEmployeeId(raw.employmentId)||!validTime(raw.hiredAt)||
     raw.status!=='employed'||!Number.isInteger(raw.level))return null;
   const career=careerDefinition(raw.careerId);
   if(!career||raw.level<0||raw.level>=career.ranks.length)return null;
-  return {residentId:id,employmentId:raw.employmentId,careerId:career.id,level:raw.level,
+  const contract={residentId:id,employmentId:raw.employmentId,careerId:career.id,level:raw.level,
     hiredAt:raw.hiredAt,status:'employed',performance:Number.isFinite(raw.performance)?
       Math.max(0,Math.min(100,Math.round(raw.performance))):50,
-    currentShift:null}; // W1-B.1 never fabricates an absent work-presence shift
+    currentShift:null};
+  contract.currentShift=cleanWorkShift(raw.currentShift,contract);
+  const last=cleanLastShift(raw.lastShift,contract);
+  if(last)contract.lastShift=last;
+  return contract;
 }
 export function newCareerSystem(){
   return {schema:CAREER_SCHEMA,nextEmploymentId:1,byResident:{alex:null,mira:null},settlementIds:[]};

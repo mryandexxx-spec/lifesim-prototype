@@ -7,6 +7,7 @@ import {restoreEventRecords} from './calendar-events.js';
 import {holidayDefinitions,restoreWeekendDays} from './calendar-holidays.js';
 import {restoreReminderReceipts} from './calendar-reminders.js';
 import {newCareerSystem,restoreCareerSystem} from './career-state.js';
+import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork} from './career-work.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
@@ -130,6 +131,13 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   mira.autonomy.enabled=root.autonomy.enabled;
   if (!root.autonomy.enabled && mira.action?.automatic) mira.action=null;
   root.otherSim=mira;
+  // Restored off-lot residents cannot resume a stale home action or grant
+  // cooking/painting/social rewards after refreshing Safari midshift.
+  for(const id of HOUSEHOLD_IDS){
+    if(!residentUnavailableForHome(root,id))continue;
+    const actor=getActor(root,id);
+    actor.action=null;actor.activitySession=null;
+  }
   mira.objectOnceLedger=restoreObjectOnceLedger(raw.otherSim?.objectOnceLedger);
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
   root.inventory=restoreInventory(raw.inventory);
@@ -490,6 +498,7 @@ function validMusicSource(root,actor){
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
   activityId=null,contentId=null,musicPlan=null,inventoryItemId=null,recipeId=null) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
+  if(residentUnavailableForHome(root,residentId))return false;
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
     !furnitureAvailable(root,itemId,residentId,item.instanceId))return false;
   const resident=getActor(root,residentId);
@@ -745,6 +754,7 @@ export function tickHousehold(root,minutes) {
   if (root.paused || !Number.isFinite(minutes) || minutes<=0) return;
   const other=root.otherSim;
   if (!other) return tick(root,minutes);
+  const careerEvents=progressCareerWork(root,root.minutes,root.minutes+minutes);
   other.minutes=root.minutes;
   other.paused=root.paused;
   other.speed=root.speed;
@@ -852,8 +862,13 @@ export function tickHousehold(root,minutes) {
       stage:a.diningStage,cookStage:a.cookStage,recipeId:recipe?.id,
       cookingMinutes}];
   }));
-  tick(root,minutes,root.world);
-  tick(other,minutes,root.world);
+  // Away residents do not eat, cook, paint, socialize or run household AI.
+  // Advance only the single canonical clock (once per resident in their v1
+  // representation). The at-home partner still receives the full tick.
+  if(residentAwayAtWork(root,'alex'))root.minutes+=minutes;
+  else tick(root,minutes,root.world);
+  if(residentAwayAtWork(root,'mira'))other.minutes+=minutes;
+  else tick(other,minutes,root.world);
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),before=kitchenBefore[id];
     if(!before)continue;
@@ -954,9 +969,11 @@ export function tickHousehold(root,minutes) {
   // Both clocks remain identical (including when paused).
   other.minutes=root.minutes;
   tickSocial(root,minutes);
+  return careerEvents;
 }
 
 export function residentAutonomousChoice(root,id='alex') {
+  if(residentUnavailableForHome(root,id))return null;
   if(root.socialAction||pendingActions(root.actionQueues,id).length)return null;
   const resident=getActor(root,id);
   if (!root.autonomy.enabled || !resident) return null;

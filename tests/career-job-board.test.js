@@ -112,7 +112,7 @@ test('W1-B.2a: source and deploy graph include accessible phone, not fake payche
   assert.match(ui,/aria-modal/);
   assert.match(ui,/aria-expanded/);
   assert.match(ui,/Одна смена: /);
-  assert.match(ui,/зарплата не начисляется/);
+  assert.match(ui,/Зарплата начисляется/);
   assert.match(ui,/Подписать договор/);
   assert.match(ui,/window\.confirm/);
   assert.match(css,/career-phone-body.*?overflow-y:auto/s);
