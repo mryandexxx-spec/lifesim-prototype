@@ -6,6 +6,7 @@ import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar} from './calendar-core
 import {restoreEventRecords} from './calendar-events.js';
 import {holidayDefinitions,restoreWeekendDays} from './calendar-holidays.js';
 import {restoreReminderReceipts} from './calendar-reminders.js';
+import {newCareerSystem,restoreCareerSystem} from './career-state.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
@@ -71,6 +72,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   const state=newGame(DEMO_PROFILES.first);
   // W1-A.1: one root-only Gregorian epoch; neither resident keeps a separate calendar.
   state.calendar=createCalendar(suggestedDate);
+  state.careerSystem=newCareerSystem();
   state.otherSim=newMira(state.minutes);
   state.skills=newSkillProgress();
   state.createdWorks=[];
@@ -112,6 +114,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     construction:restoreConstructionWorld(raw.world?.construction)};
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
+  root.careerSystem=restoreCareerSystem(raw.careerSystem);
   root.objectOnceLedger=restoreObjectOnceLedger(raw.objectOnceLedger);
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
     raw.otherSim.version===1 && raw.otherSim.needs && raw.otherSim.position;
