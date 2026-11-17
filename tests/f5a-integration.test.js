@@ -33,7 +33,7 @@ test('F5-A browser graph actually exposes touch tools and runtime transaction wi
    assert.ok(html.includes('id="'+id+'"'),id);
  for(const mode of ['room','floor','wall','move-wall','door','window','erase-wall','remove-opening','remove-floor','camera'])
    assert.ok(html.includes('data-build-tool="'+mode+'"'),mode);
- assert.match(game,/createConstructionEditor\(game\.world\.construction\)/);
+ assert.match(game,/create(?:Household)?ConstructionEditor\(game\.world\.construction(?:,game\.world\.furniture)?\)/);
  assert.match(game,/proposeConstructionEdit\(game\.world\.construction/);
  assert.match(game,/const frameActive=active&&!buildMode/);
  assert.match(workflow,/cp src\/construction\.js site\/src\//);
