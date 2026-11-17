@@ -116,7 +116,7 @@ test('F4b0 a completely new bonus/trigger needs authoring data only',()=>{
 });
 test('F4b0 legacy bridge maps all ten original prefabs, with no newly minted gameplay buffs',()=>{
   const r=legacyObjectRegistry();
-  assert.equal(Object.values(r.items).length,Object.keys(FURNITURE_CATALOG).length+34);
+  assert.equal(Object.values(r.items).length,Object.keys(FURNITURE_CATALOG).length+marketListing().length-SHOP_ITEMS.length);
   for(const original of Object.values(FURNITURE_CATALOG)){
     const item=getObjectItem(r,legacyItemIdForPrefab(original.prefabId));
     assert.equal(item.prefabId,original.prefabId);
