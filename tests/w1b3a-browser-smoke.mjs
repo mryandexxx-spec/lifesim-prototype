@@ -41,7 +41,9 @@ try{
   const before=await state();
   assert.equal(before.careerSystem.byResident.alex.currentShift.phase,'working');
   assert.equal(before.shop.credits,5000);
-  await page.locator('#pause-btn').click();
+  // v1 loadGame intentionally restores the simulation running (paused is not
+  // persisted); tapping Pause here would freeze the salary forever.
+  assert.equal(await page.locator('#pause-btn').getAttribute('aria-label'),'Пауза');
   await page.locator('#speed-btn').click();
   await page.waitForFunction(key=>{
     const data=JSON.parse(localStorage.getItem(key)||'null');
