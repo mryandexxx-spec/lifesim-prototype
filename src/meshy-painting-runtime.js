@@ -28,7 +28,7 @@ export function createMeshyPaintingController({pc,model,avatar}={}){
   const from=new pc.Vec3(),to=new pc.Vec3(),point=new pc.Vec3(),
     pole=new pc.Vec3(),worldPole=new pc.Vec3(),swing=new pc.Quat(),
     next=new pc.Quat(),mix=new pc.Quat(),neckDelta=new pc.Quat();
-  let current=null,paused=false;
+  let current=null,paused=false,healthy=true;
   const xyz=v=>({x:v.x,y:v.y,z:v.z});
   function swingBone(bone,oldEnd,target,weight,maxDegrees){
     const start=bone.getPosition();
@@ -43,14 +43,15 @@ export function createMeshyPaintingController({pc,model,avatar}={}){
     mix.slerp(bone.getRotation(),next,Math.min(.92,weight,Math.PI*maxDegrees/180/theta));
     bone.setRotation(mix);
   }
-  return {ready:true,
+  return {get ready(){return healthy;},
     setFrame(frame,freeze=false){
-      current=paintingStrokeFrame(frame);
+      current=healthy?paintingStrokeFrame(frame):null;
       paused=Boolean(freeze);
       brush.enabled=Boolean(current);
     },
     apply(){
-      if(!current||paused)return false;
+      if(!healthy||!current||paused)return false;
+      try{
       // +Z is the easel-facing direction of the existing character rig.
       avatar.getWorldTransform().transformPoint(
         new pc.Vec3(.11+current.strokeX,1.36+current.strokeY,.72),point);
@@ -73,6 +74,13 @@ export function createMeshyPaintingController({pc,model,avatar}={}){
         mix.mul2(neck.getLocalRotation(),neckDelta);neck.setLocalRotation(mix);
       }
       return true;
+      }catch(error){
+        // A bad bone or browser-specific quaternion MUST NOT poison the
+        // PlayCanvas frame. The next frame switches to procedural fallback.
+        healthy=false;current=null;brush.enabled=false;
+        console.warn('H5a brush controller disabled safely',error);
+        return false;
+      }
     }
   };
 }

@@ -39,6 +39,13 @@ test('H5a: face the true canvas in ALL four saved quarter-turns, never last walk
     const position=furnitureActionApproach(home.world,'paint',instanceId);
     const pose=easelPaintingPose(home.world,instanceId,position);
     assert.ok(pose);
+    // Safari render contract: undefined height/pitch previously caused NaN
+    // and made Alex disappear, followed by frozen camera/scene updates.
+    for(const field of ['x','y','z','yaw','pitch','roll'])
+      assert.ok(Number.isFinite(pose[field]),yaw+' '+field+' must be finite');
+    const damp=(from,to)=>from+(to-from)*(1-Math.exp(-10*.016));
+    assert.ok(Number.isFinite(damp(0,pose.y)));
+    assert.ok(Number.isFinite(damp(0,pose.pitch)));
     assert.equal(Math.abs(pose.yaw-expected)<.001,true,yaw+' facing');
     assert.deepEqual({x:pose.x,z:pose.z},position);
   }

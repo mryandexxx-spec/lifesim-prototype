@@ -9,7 +9,9 @@ export function easelPaintingPose(world,instanceId,actorPosition=null){
     Number.isFinite(actorPosition.z)?actorPosition:point;
   const dx=item.x-pos.x,dz=item.z-pos.z;
   const heading=Math.hypot(dx,dz)>.01?Math.atan2(dx,dz)*180/Math.PI:-item.yaw;
-  return {x:point.x,z:point.z,yaw:heading};
+  // All six components are required by the game frame's easing/transform.
+  // Missing y/pitch produced NaN and corrupted the Safari scene transform.
+  return {x:point.x,y:0,z:point.z,pitch:0,roll:0,yaw:heading};
 }
 export function paintingStrokeFrame(frame){
   if(!frame||frame.phase!=='using'||!Number.isFinite(frame.elapsed)||frame.elapsed<0)
@@ -30,7 +32,9 @@ export function studioArtworkPose(work,index=0){
   const step=Math.max(0,Math.min(23,Number.isInteger(index)?index:0));
   const angle=p.yaw*Math.PI/180;
   // A small framed board just to the side of the easel, outside its center.
-  const x=.83+.035*Math.min(step,7),z=.11+.012*step;
+  // Place finished objects on the ACTOR side of the easel rather than
+  // behind the canvas toward a wall. Keep a gap from the easel footprint.
+  const x=1.10+.04*Math.min(step,7),z=-.85-.015*step;
   return {x:p.x+x*Math.cos(angle)-z*Math.sin(angle),
     z:p.z+x*Math.sin(angle)+z*Math.cos(angle),
     yaw:p.yaw,slot:step};
