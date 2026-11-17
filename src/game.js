@@ -3854,19 +3854,21 @@ function boot() {
     armFurnitureHold(event,now);
   });
   // Global listeners survive canvas leaving the viewport on iOS Safari.
+  // Separate capture listener preserves the furniture VM touch contract.
   window.addEventListener('pointermove',event=>{
-    if(buildMode&&buildDrag?.pointerId===event.pointerId){
-      if(event.cancelable)event.preventDefault();
-      const raw=editorFloorAt(gesturePoint(event));
-      buildDrag.last=gesturePoint(event);
-      if(raw){
-        const next=buildSnap(raw);
-        if(next.x!==buildDrag.to.x||next.z!==buildDrag.to.z){
-          buildDrag.to=next;showBuildGhost(buildDrag.from,next);
-        }
+    if(!buildMode||buildDrag?.pointerId!==event.pointerId)return;
+    if(event.cancelable)event.preventDefault();
+    const raw=editorFloorAt(gesturePoint(event));
+    buildDrag.last=gesturePoint(event);
+    if(raw){
+      const next=buildSnap(raw);
+      if(next.x!==buildDrag.to.x||next.z!==buildDrag.to.z){
+        buildDrag.to=next;showBuildGhost(buildDrag.from,next);
       }
-      return;
     }
+    event.stopImmediatePropagation?.();
+  },true);
+  window.addEventListener('pointermove',event=>{
     if(furnishMode&&editDrag?.pointerId===event.pointerId){
       if(event.cancelable)event.preventDefault();
       moveEditorDrag(event);return;
@@ -4097,8 +4099,8 @@ function boot() {
     shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
-    buildDrag=null;buildGhost.enabled=false;
-    cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
+    cancelPendingGrab();
+    buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
   // Safari may suspend a background tab without a matching pointerup/blur.
   document.addEventListener('visibilitychange',()=>{
@@ -4131,13 +4133,14 @@ function boot() {
     syncConstructionRender();
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
-    const active=!game.paused&&!furnishMode&&!buildMode&&!dialogueNeedsDecision(game)&&!document.hidden;
-    const sharedSound=active&&game.socialAction?.phase==='using'&&
+    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&!document.hidden;
+    const frameActive=active&&!buildMode;
+    const sharedSound=frameActive&&game.socialAction?.phase==='using'&&
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
     musicAudio.update(audibleMusicStyle([game,game.otherSim],{
-      paused:!active,hidden:document.hidden,editing:furnishMode||buildMode})||sharedSound);
-    const animDt=active?dt:0;
-    if(active){
+      paused:!frameActive,hidden:document.hidden,editing:furnishMode||buildMode})||sharedSound);
+    const animDt=frameActive?dt:0;
+    if(frameActive){
       accumulator+=dt;
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
@@ -4415,7 +4418,7 @@ function boot() {
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
     const alexReadingStage=readingStage(game.action);
     const alexReadingSeated=readingIsSeated(game.action);
-    const walking=active&&((game.action?.phase==='walking'&&
+    const walking=frameActive&&((game.action?.phase==='walking'&&
       (game.action.id!=='hobby'||Boolean(readingRouteId(game.action))))||
       socialWalkingFor('alex'));
     const alexWatchSeat=useId==='tv'
@@ -4507,7 +4510,7 @@ function boot() {
       display.yaw=approachAngle(display.yaw,alexMotion.heading,13,animDt);
     avatar.setPosition(display.x,display.y,display.z);
     avatar.setEulerAngles(display.pitch,display.yaw,display.roll);
-    if(active)effectTime+=dt*game.speed;
+    if(frameActive)effectTime+=dt*game.speed;
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
@@ -4585,7 +4588,7 @@ function boot() {
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
     const miraReadingStage=readingStage(game.otherSim.action);
     const miraReadingSeated=readingIsSeated(game.otherSim.action);
-    const miraWalking=active&&((game.otherSim.action?.phase==='walking'&&
+    const miraWalking=frameActive&&((game.otherSim.action?.phase==='walking'&&
       (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
       socialWalkingFor('mira'));
     const miraWatchSeat=miraUseId==='tv'
@@ -4722,7 +4725,7 @@ function boot() {
     // entry/exit. The original game owns shower water, cover, full avatar
     // privacy and all simulation/save state; no private body is visible.
     const miraMeshShown=meshyMira.update({
-      preferred:meshyPreferred,paused:!active,dt:animDt,
+      preferred:meshyPreferred,paused:!frameActive,dt:animDt,
       walking:((game.otherSim.action?.phase==='walking'&&
         (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
         socialWalkingFor('mira'))&&
@@ -4765,7 +4768,7 @@ function boot() {
     // skeleton controllers exist. The original simulation/root still owns
     // mattress placement, both bed slots, shower movement and opaque privacy.
     const meshyShown=meshyAlex.update({
-      preferred:meshyPreferred,paused:!active,dt:animDt,
+      preferred:meshyPreferred,paused:!frameActive,dt:animDt,
       // Preserve the Walking clip on pause: playback freezes but the
       // resident has not arrived at the destination.
       walking:((game.action?.phase==='walking'&&
