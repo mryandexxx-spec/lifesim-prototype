@@ -40,7 +40,7 @@ import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
 import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
 import {switchLampAtArrival} from './furniture-interactions.js';
-import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,restoreCreatedWorks,finishPainting} from './painting.js';
+import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_WORKS_LIMIT,restoreCreatedWorks,finishPainting} from './painting.js';
 import {chooseDiningSeat,diningSeatApproach} from './dining.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
@@ -496,6 +496,9 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     if(!readingSeat)return false;
   }
   if(itemId==='paint'){
+    // H5b: a full collection is NOT a ring buffer. Finished works, including
+    // those on a wall or in inventory, must not disappear on a 25th painting.
+    if((resident.createdWorks?.length||0)>=PAINT_WORKS_LIMIT)return false;
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
     if(activity?.id!==PAINT_ACTIVITY_ID||!PAINT_CONTENT_IDS.includes(contentId)||
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;

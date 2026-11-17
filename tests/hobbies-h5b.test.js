@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {newHousehold,loadHousehold} from '../src/household.js';
-import {restoreCreatedWorks,PAINT_CONTENT_IDS} from '../src/painting.js';
+import {newHousehold,loadHousehold,chooseResidentAction} from '../src/household.js';
+import {restoreCreatedWorks,PAINT_CONTENT_IDS,PAINT_ACTIVITY_ID,PAINT_WORKS_LIMIT} from '../src/painting.js';
+import {findMarketPlacement,buyMarketItem} from '../src/furniture-shop.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from '../src/painting-gallery.js';
 import {SAVE_KEY} from '../src/simulation.js';
@@ -94,6 +95,27 @@ test('H5b: corrupt wall slots and conflicting saved mounts never lose art',()=>{
   const migrated=loadHousehold(copy(root));
   assert.equal(migrated.createdWorks[0].location,'inventory');
   assert.equal(migrated.createdWorks[0].id,a.id);
+});
+test('H5b: 24 paintings persist; trying for number 25 never evicts wall or inventory art',()=>{
+  const root=newHousehold(),position=findMarketPlacement(root.world.furniture,root.shop,'easel.starter');
+  assert.ok(position);
+  const tx=buyMarketItem(root.world.furniture,root.shop,'easel.starter',position);
+  assert.equal(tx.ok,true);root.world.furniture=tx.world;root.shop=tx.shop;
+  root.createdWorks=Array.from({length:PAINT_WORKS_LIMIT},(_,i)=>({
+    ...work('a'),id:'work:painting:alex:'+i+':480000',
+    location:i===0?'wall':'inventory',...(i===0?{wallSlot:0}:{})
+  }));
+  const original=copy(root.createdWorks);
+  assert.equal(chooseResidentAction(root,'paint',false,'alex',tx.instanceId,
+    PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS[0]),false);
+  assert.equal(root.action,null);
+  assert.deepEqual(root.createdWorks,original);
+  assert.deepEqual(loadHousehold(copy(root)).createdWorks,original);
+  commit(root,'alex',transactPainting(root,'alex',original[0].id,'store'));
+  commit(root,'alex',transactPainting(root,'alex',original[0].id,'sell'));
+  assert.equal(root.createdWorks.length,PAINT_WORKS_LIMIT-1);
+  assert.equal(chooseResidentAction(root,'paint',false,'alex',tx.instanceId,
+    PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS[0]),true);
 });
 test('H5b: wall geometry and browser/build wiring',()=>{
   const game=read('../src/game.js'),html=read('../index.html'),
