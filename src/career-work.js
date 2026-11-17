@@ -5,6 +5,7 @@
 import {nextCareerShift} from './career-scheduler.js';
 import {CAREER_RESIDENT_IDS} from './career-state.js';
 import {SHOP_MAX_CREDITS} from './furniture-shop.js';
+import {careerReadiness,recordCompletedCareerShift,recordMissedCareerShift,promotionReadiness} from './career-progression.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 const ACTIVE=new Set(['departing','working','returning']);
@@ -24,18 +25,20 @@ export function residentAwayAtWork(root,id){
 function shiftSnapshot(shift){
   return {id:shift.id,employmentId:shift.employmentId,careerId:shift.careerId,
     start:shift.start,end:shift.end,hourlyCredits:shift.hourlyCredits,
-    phase:'pending',warn60:false,warn15:false,departedAt:null};
+    phase:'pending',warn60:false,warn15:false,departedAt:null,readiness:null};
 }
 function emit(messages,id,type,text){
   messages.push({residentId:id,type,text:NAMES[id]+': '+text});
 }
 function finalizeMissed(contract,at){
   const shift=contract.currentShift;
+  const result=recordMissedCareerShift(contract);
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
-    outcome:'missed',salary:0,workedMinutes:0,lateMinutes:0,finishedAt:at};
+    outcome:'missed',salary:0,workedMinutes:0,lateMinutes:0,finishedAt:at,
+    grade:result.grade,performanceDelta:result.delta};
   contract.currentShift=null;
 }
-function settle(root,contract,at){
+function settle(root,contract,id,at){
   const shift=contract.currentShift;
   const ledger=root.careerSystem.settlementIds;
   const already=ledger.includes(shift.id);
@@ -43,17 +46,21 @@ function settle(root,contract,at){
   const gross=Math.max(0,Math.round(worked*shift.hourlyCredits/60));
   // Never mint a second payment for the same immutable employment/day/shift ID.
   const salary=already?0:Math.min(gross,Math.max(0,CASH_LIMIT-root.shop.credits));
+  const lateMinutes=Math.max(0,Math.round(shift.departedAt-shift.start));
+  let result=null;
   if(!already){
     root.shop.credits+=salary;
     ledger.push(shift.id);
     if(ledger.length>256)ledger.splice(0,ledger.length-256);
+    // Salary, performance, fatigue and receipt belong to ONE saved snapshot.
+    result=recordCompletedCareerShift(contract,actorFor(root,id),shift,worked,lateMinutes);
   }
-  const lateMinutes=Math.max(0,Math.round(shift.departedAt-shift.start));
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
     outcome:'worked',salary:already?0:salary,
-    workedMinutes:Math.round(worked),lateMinutes,finishedAt:at};
+    workedMinutes:Math.round(worked),lateMinutes,finishedAt:at,
+    grade:result?.grade??null,performanceDelta:result?.delta??null};
   shift.phase='returning';
-  return salary;
+  return {salary,result};
 }
 /** One canonical sweep. Call just once per active household tick BEFORE ticking
  * individual actors; after this, root.minutes and otherSim.minutes advance once.
@@ -77,9 +84,12 @@ export function progressCareerWork(root,before,after){
     if(shift.phase==='returning')continue;
     if(shift.phase==='working'){
       if(after>=shift.end){
-        const salary=settle(root,contract,shift.end);
-        actor.event='Смена завершена · заработано '+salary+' кр.';
-        emit(messages,id,'salary','смена окончена, начислено '+salary+' кр. Возвращается домой');
+        const {salary,result}=settle(root,contract,id,shift.end);
+        const growth=result?' · '+result.grade+' · результативность '+contract.performance+'/100':'';
+        const ready=promotionReadiness(root,id);
+        actor.event='Смена завершена · заработано '+salary+' кр.'+growth;
+        emit(messages,id,'salary','смена окончена, начислено '+salary+' кр.'+growth+
+          (ready?.ready?' · условия повышения выполнены':'')+'. Возвращается домой');
       }
       continue;
     }
@@ -131,8 +141,9 @@ export function arriveCareerPortal(root,id,at=root?.minutes){
   if(!shift||shift.phase!=='departing'||!validMinute(at))return false;
   if(at>=shift.end)return false;
   shift.departedAt=Math.max(shift.start,at);
-  shift.phase='working';
   const actor=actorFor(root,id);
+  shift.readiness=careerReadiness(actor);
+  shift.phase='working';
   if(actor){actor.action=null;actor.activitySession=null;actor.event='На работе до '+clockAt(shift.end);}
   return true;
 }

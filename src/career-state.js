@@ -19,7 +19,8 @@ function cleanWorkShift(raw,contract){
       (!validTime(departedAt)||departedAt<start||departedAt>end)))return null;
   return {id,employmentId:contract.employmentId,careerId:contract.careerId,
     start,end,hourlyCredits,phase,warn60:raw.warn60===true,warn15:raw.warn15===true,
-    departedAt:['working','returning'].includes(phase)?departedAt:null};
+    departedAt:['working','returning'].includes(phase)?departedAt:null,
+    readiness:Number.isFinite(raw.readiness)?Math.max(0,Math.min(100,Math.round(raw.readiness))):null};
 }
 function cleanLastShift(raw,contract){
   if(!raw||typeof raw!=='object'||typeof raw.id!=='string')return null;
@@ -34,7 +35,10 @@ function cleanLastShift(raw,contract){
     !validTime(raw.finishedAt))return null;
   return {id:raw.id,start:raw.start,end:raw.end,outcome:raw.outcome,
     salary:raw.salary,workedMinutes:raw.workedMinutes,
-    lateMinutes:raw.lateMinutes,finishedAt:raw.finishedAt};
+    lateMinutes:raw.lateMinutes,finishedAt:raw.finishedAt,
+    grade:['удачный день','обычная смена','сложный день','пропуск'].includes(raw.grade)?raw.grade:null,
+    performanceDelta:Number.isInteger(raw.performanceDelta)&&raw.performanceDelta>=-10&&raw.performanceDelta<=12
+      ?raw.performanceDelta:null};
 }
 function cleanContract(raw,id){
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.residentId!==id||
@@ -42,7 +46,10 @@ function cleanContract(raw,id){
     raw.status!=='employed'||!Number.isInteger(raw.level))return null;
   const career=careerDefinition(raw.careerId);
   if(!career||raw.level<0||raw.level>=career.ranks.length)return null;
+  const validCount=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000?n:0;
   const contract={residentId:id,employmentId:raw.employmentId,careerId:career.id,level:raw.level,
+    workedShifts:validCount(raw.workedShifts),rankShifts:validCount(raw.rankShifts),
+    missedShifts:validCount(raw.missedShifts),lateShifts:validCount(raw.lateShifts),
     hiredAt:raw.hiredAt,status:'employed',performance:Number.isFinite(raw.performance)?
       Math.max(0,Math.min(100,Math.round(raw.performance))):50,
     currentShift:null};
@@ -83,7 +90,8 @@ export function hireCareer(system,residentId,careerId,atMinute){
   if(state.nextEmploymentId>999999999)throw new RangeError('Employment limit');
   const id='e'+state.nextEmploymentId++;
   state.byResident[residentId]={residentId,employmentId:id,careerId,level:0,
-    hiredAt:atMinute,status:'employed',performance:50,currentShift:null};
+    hiredAt:atMinute,status:'employed',performance:50,currentShift:null,
+    workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0};
   return state;
 }
 export function resignCareer(system,residentId){

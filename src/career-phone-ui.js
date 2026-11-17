@@ -4,6 +4,7 @@
 import {careerVacancies,acceptCareerOffer,leaveCareer,describeCareerShift} from './career-job-board.js';
 import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
+import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
@@ -87,11 +88,46 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     facts.append(element('span',null,'Статус: '+status.label));
     facts.append(element('span',null,'Баланс семьи: '+root.shop.credits+' кр.'));
     facts.append(element('span',null,'Результативность: '+current.performance+'/100'));
+    facts.append(element('span',null,'Отработано смен: '+(current.workedShifts||0)+
+      ' · на должности: '+(current.rankShifts||0)));
+    facts.append(element('span',null,'Опозданий: '+(current.lateShifts||0)+
+      ' · пропусков: '+(current.missedShifts||0)));
     if(current.lastShift)facts.append(element('span',null,'Прошлая смена: '+
       (current.lastShift.outcome==='worked'?'отработано':'пропущено')+
       ' · +'+current.lastShift.salary+' кр.'+
+      (current.lastShift.grade?' · '+current.lastShift.grade:'')+
+      (Number.isInteger(current.lastShift.performanceDelta)?
+        ' · результат '+(current.lastShift.performanceDelta>=0?'+':'')+
+          current.lastShift.performanceDelta:'')+
       (current.lastShift.lateMinutes?' · опоздание '+current.lastShift.lateMinutes+' мин.':'')));
     body.append(facts);
+    const growth=promotionReadiness(root,who);
+    if(growth?.maxLevel){
+      body.append(element('p','career-phone-notice','Высшая должность этой карьерной ветки достигнута.'));
+    }else if(growth){
+      body.append(element('h3','career-phone-section-title','Повышение: '+growth.rank));
+      const requirements=element('div','career-phone-facts');
+      for(const req of growth.requirements){
+        requirements.append(element('span',null,(req.met?'✓ ':'○ ')+(req.label==='Результативность'?'Рейтинг для повышения':req.label)+
+          ': '+req.current+' / '+req.target));
+      }
+      body.append(requirements);
+      if(growth.ready){
+        if(active)body.append(element('p','career-phone-notice',
+          'Условия выполнены. Повышение доступно после возвращения со смены.'));
+        else body.append(action('Получить повышение',()=>{
+          const live=personRoot();if(!live)return;
+          const result=promoteCareer(live,who);
+          if(!result.ok){notify(result.reason);render();return;}
+          save(true);notify(NAMES[who]+': повышение · '+result.rank+
+            ' · новая ставка '+result.rate+' кр./час');
+          render();
+        },'career-phone-primary'));
+      }else{
+        body.append(element('p','career-phone-muted',
+          'Выполняй реальные смены и развивай навыки дома, чтобы открыть следующую должность.'));
+      }
+    }
     if(active?.phase==='pending'&&root.minutes>=active.start-15){
       body.append(action('Отправиться на работу',()=>{
         const live=personRoot();if(!live)return;
