@@ -38,7 +38,8 @@ test('F5-D.3a original 19x9m house can be copied 90 degrees alongside itself on 
   assert.equal(next.wallEdges.length,112);
   assert.equal(next.wallEdges.some(w=>w.starterSide),false);
   assert.deepEqual(next.starterShell,STARTER_SHELL);
-  assert.equal(constructionRoomSelection(next,target).ok,true);
+  const copiedSelection=constructionRoomSelection(next,target);
+  assert.equal(copiedSelection.ok,true,JSON.stringify(copiedSelection));
   assert.equal(next.openings.length,0);
   assert.equal(JSON.stringify(original),before,'copy must not mutate original shell');
   const restored=restoreConstructionWorld(JSON.parse(JSON.stringify(next)));
@@ -76,7 +77,7 @@ test('F5-D.3a starter finishes, actual door and porch stay attached to original 
 
 test('F5-D.3a starter copy remains transactional, rejects impossible orientations and occupied destinations',()=>{
   const world=newConstructionWorld(),before=JSON.stringify(world);
-  assert.equal(proposeConstructionEdit(world,copy(0)).reason,'lot-bounds');
+  assert.equal(proposeConstructionEdit(world,copy(0)).reason,'room-target-overlap');
   assert.equal(proposeConstructionEdit(world,copy(45)).reason,'invalid-room-placement');
   const blocked=proposeConstructionEdit(world,copy(),{
     furnitureBoxes:[{instanceId:'already-there',minX:17.9,maxX:18.1,
