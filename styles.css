@@ -1370,7 +1370,7 @@ button.time-card:active {transform:translateY(1px);}
 @media(min-width:680px){.lc-sheet{height:min(96dvh,950px);margin:auto;border-radius:22px}}
 
 /* W1-B.2a: discoverable, original in-game smartphone. No camera gesture interception when closed. */
-.control-tray .career-phone-toggle{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+.control-tray .career-phone-toggle{position:absolute;right:58px;top:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
   color:#fff;background:#3b8575;border:1px solid #a4cabc;box-shadow:0 8px 22px #2d6e5b45;}
 .career-phone-toggle span{font-size:22px;line-height:23px;}
 .career-phone-toggle small{font-size:8px;letter-spacing:.4px;line-height:12px;font-weight:800;}
