@@ -93,9 +93,10 @@ test('visual sit and exit stay bound to action target; Meshy seat contact is per
  assert.match(game,/makeSofaSeat=\(instanceId=null,romanticSlot=null\)=>/);
  assert.match(game,/furnitureInstance\(game.world,'sofa',instanceId\)/);
  assert.match(game,/alexSeatInstanceId=sofaVisualTargets.alex/);
- assert.match(game,/seat:seatContactEnabled\?livingSofaSeat:null/);
- assert.match(game,/if\(!seating\)\{sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;\}/);
- assert.match(game,/if\(!miraSeating\)\{sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;\}/);
+ assert.match(game,/seat:seatContactEnabled\?\(alexDiningVisual&&/);
+ assert.match(game,/purchasedDiningSeatSurface\(game.world,alexDiningVisual.chairId/);
+ assert.match(game,/if\(!seating\)\{sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;diningVisual.alex=null;\}/);
+ assert.match(game,/if\(!miraSeating\)\{sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;diningVisual.mira=null;\}/);
  assert.match(game,/if\(sofaVisualTargets\[id\]\)busy.add\(sofaVisualTargets\[id\]\)/);
 });
 test('functional sofa has a 3D prefab clone and real shop transaction, not fake mood bonus',()=>{

@@ -5,6 +5,9 @@ on:
   pull_request:
     paths:
       - 'src/dining.js'
+      - 'src/seat-furniture.js'
+      - 'src/furniture-layout.js'
+      - 'tests/furniture-f4f-chair-clearance.test.js'
       - 'src/game.js'
       - 'src/household.js'
       - 'src/simulation.js'
@@ -29,10 +32,12 @@ jobs:
       - run: |
           npm ci
           node --check src/dining.js
+          node --check src/seat-furniture.js
+          node --check src/furniture-layout.js
           node --check src/game.js
           node --check src/household.js
           node --check src/animations.js
           node --check src/meshy-visual.js
           node --check src/meshy-mira-visual.js
-          node --test tests/furniture-f4f-dining.test.js
+          node --test tests/furniture-f4f-dining.test.js tests/furniture-f4f-chair-clearance.test.js
           npm test
