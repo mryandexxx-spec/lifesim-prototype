@@ -144,20 +144,44 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor}){
   el('lc-week').hidden=field(eventForm,'repeat').value!=='weekly';
   for(const n of ['start','end'])field(eventForm,n).disabled=field(eventForm,'allDay').checked;
  }
+ // Editing an occurrence must NEVER silently re-anchor its entire series.
+ // For a single override show the chosen day; for the series show original fields.
+ function fillEventDetails(item){
+  const f=n=>field(eventForm,n),source=item||null;
+  f('title').value=source?.title||'';f('description').value=source?.description||'';
+  f('date').value=source?.iso||source?.date||selected;
+  f('allDay').checked=source?.allDay||false;
+  f('start').value=time(source?.start??1080);
+  f('end').value=time(source?.end===1440?1439:source?.end??1140);
+  f('participants').value=source?.participants?.length===2?'both':source?.participants?.[0]||'both';
+  f('category').value=source?.category||'family';
+  f('repeat').value=source?.repeat||'none';f('until').value=source?.until||'';
+  f('count').value=source?.count||'';
+  f('reminder').value=source?.reminder===null||source?.reminder===undefined?'none':String(source.reminder);
+  for(let i=0;i<7;i++)f('w'+i).checked=(source?.weekdays||
+    [weekdayFromSerial(civilToSerial(selected))]).includes(i);
+ }
+ function syncEventScope({refill=false}={}){
+  const f=n=>field(eventForm,n),single=Boolean(editing&&editing.repeat!=='none'&&f('scope').value==='one');
+  const source=single?editing:getRoot().calendar.events?.find(x=>x.id===editing?.id)||editing;
+  if(refill&&editing)fillEventDetails(single?{...source,iso:editing.iso}:source);
+  f('date').disabled=single;
+  for(const name of ['repeat','until','count'])f(name).disabled=single;
+  for(let i=0;i<7;i++)f('w'+i).disabled=single;
+  eventFields();
+ }
  function showEvent(item=null){
   editing=item;browse.hidden=true;holidayForm.hidden=true;eventForm.hidden=false;
   const f=n=>field(eventForm,n);
-  f('title').value=item?.title||'';f('description').value=item?.description||'';
-  f('date').value=item?.iso||selected;f('allDay').checked=item?.allDay||false;
-  f('start').value=time(item?.start??1080);f('end').value=time(item?.end===1440?1439:item?.end??1140);
-  f('participants').value=item?.participants?.length===2?'both':item?.participants?.[0]||'both';
-  f('category').value=item?.category||'family';f('repeat').value=item?.repeat||'none';
-  f('until').value=item?.until||'';f('count').value=item?.count||'';
-  f('reminder').value=item?.reminder===null||item?.reminder===undefined?'none':String(item.reminder);
-  f('scope').value='series';
-  for(let i=0;i<7;i++)f('w'+i).checked=(item?.weekdays||[weekdayFromSerial(civilToSerial(selected))]).includes(i);
-  el('lc-scope-box').hidden=!item||item.repeat==='none';el('lc-event-delete').hidden=!item;
-  el('lc-event-error').hidden=true;eventFields();f('title').focus({preventScroll:true});
+  f('scope').value=item?.overridden?'one':'series';
+  const single=Boolean(item?.overridden);
+  const base=item?getRoot().calendar.events?.find(x=>x.id===item.id):null;
+  fillEventDetails(single?item:base||item);
+  el('lc-scope-box').hidden=!item||item.repeat==='none';
+  el('lc-event-delete').hidden=!item;
+  el('lc-event-error').hidden=true;
+  syncEventScope();
+  f('title').focus({preventScroll:true});
  }
  function eventData(){
   const f=n=>field(eventForm,n),allDay=f('allDay').checked,start=allDay?0:fromTime(f('start').value),end=allDay?1440:fromTime(f('end').value);
@@ -194,6 +218,7 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor}){
  }));
  field(eventForm,'repeat').addEventListener('change',eventFields);
  field(eventForm,'allDay').addEventListener('change',eventFields);
+ field(eventForm,'scope').addEventListener('change',()=>syncEventScope({refill:true}));
  eventForm.addEventListener('submit',e=>{
   e.preventDefault();try{
    const data=eventData(),calendar=getRoot().calendar;

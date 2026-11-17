@@ -103,7 +103,9 @@ export function calendarAt(calendar,minutes){
   const hour=Math.floor(withinDay/60),minute=withinDay%60;
   return {
     ...civil,iso:toISODate(civil),serial,weekday,weekdayLabel:WEEKDAYS_RU[weekday],
-    isWeekend:weekday>=5,dayIndex,gameDay:dayIndex+1,hour,minute,
+    isWeekend:(Array.isArray(calendar.weekendDays)
+      ?calendar.weekendDays.includes(weekday):weekday>=5),
+    dayIndex,gameDay:dayIndex+1,hour,minute,
     time:String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0')
   };
 }
@@ -120,5 +122,7 @@ export function setCurrentCalendarDate(calendar,minutes,currentISO){
   if(['events','holidays','occurrenceOverrides','reminderReceipts','workSchedules']
     .some(key=>Array.isArray(calendar[key])&&calendar[key].length))
     throw new Error('Cannot move calendar dates after scheduling events');
-  return calendarForCurrentDate(currentISO,minutes,true);
+  // Keep independent weekend preferences when the anchor is still editable.
+  // Existing appointments/holidays already forbid this operation above.
+  return {...calendar,...calendarForCurrentDate(currentISO,minutes,true)};
 }

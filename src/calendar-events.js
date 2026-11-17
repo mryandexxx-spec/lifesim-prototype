@@ -46,9 +46,13 @@ export function restoreEventRecords(raw){
     if(keys.has(key))continue;
     const fields=x.deleted===true?{}:{
       title:clean(x.title,80),description:clean(x.description,280),
-      start:boundedInt(x.start,0,1439,0),end:boundedInt(x.end,1,1440,1440),allDay:x.allDay===true
+      start:boundedInt(x.start,0,1439,0),end:boundedInt(x.end,1,1440,1440),allDay:x.allDay===true,
+      ...(Array.isArray(x.participants)
+        ?{participants:EVENT_PARTICIPANTS.filter(p=>x.participants.includes(p))}:{}),
+      ...(CATEGORIES.includes(x.category)?{category:x.category}:{})
     };
-    if(x.deleted!==true&&(!fields.title||fields.end<=fields.start&&!fields.allDay))continue;
+    if(x.deleted!==true&&(!fields.title||(fields.end<=fields.start&&!fields.allDay)||
+      (fields.participants&&fields.participants.length===0)))continue;
     overrides.push({eventId:x.eventId,date:x.date,deleted:x.deleted===true,...fields});keys.add(key);
   }
   const maxId=Math.max(0,...events.map(e=>Number(e.id.slice(3))));
@@ -129,7 +133,9 @@ export function expandCalendarEvents(calendar,fromISO,toISO,{limit=600}={}){
       if(override?.deleted)continue;
       const item={...e,iso,occurrenceId:overrideKey(e.id,iso),originalDate:e.date,
         ...(override?{title:override.title,description:override.description,start:override.start,
-          end:override.end,allDay:override.allDay,overridden:true}:{})};
+          end:override.end,allDay:override.allDay,
+          participants:override.participants??e.participants,category:override.category??e.category,
+          overridden:true}:{})};
       result.push(item);
       if(result.length>=limit)break;
     }
@@ -150,7 +156,8 @@ export function changeEventOccurrence(calendar,id,iso,changes=null){
       const projected=normalize({...event,...changes,date:iso},id);
       if(!projected)throw new RangeError('Некорректное изменение');
       next.push({eventId:id,date:iso,deleted:false,title:projected.title,
-        description:projected.description,start:projected.start,end:projected.end,allDay:projected.allDay});
+        description:projected.description,start:projected.start,end:projected.end,
+        allDay:projected.allDay,participants:projected.participants,category:projected.category});
     }
   }
   if(next.length>512)throw new RangeError('Слишком много исключений');
