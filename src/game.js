@@ -2989,6 +2989,7 @@ function boot() {
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
+  let finishFloor='floor.oak',finishWall='wall.sage',finishSide='both';
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
@@ -3698,7 +3699,10 @@ function boot() {
     'wall-already-exists':'Здесь уже есть другая стена',
     'empty-history':'Нет изменений для отмены',
     'unchanged':'Здесь уже всё построено',
-    'inaccessible-essential':'После перестройки житель не дойдёт до важных предметов'
+    'inaccessible-essential':'После перестройки житель не дойдёт до важных предметов',
+    'finish-needs-floor':'Отделку пола можно положить только на построенный пол',
+    'invalid-finish-target':'Выбери нужную поверхность: пол или стену',
+    'unknown-finish':'Этот вариант покрытия недоступен'
   };
   const buildFeedback=(msg,invalid=false)=>{
     $('build-feedback').textContent=msg;
@@ -3840,11 +3844,41 @@ function boot() {
         .filter(w=>w.starterSide===side);
       selectBuildWall(edges[Math.floor(edges.length/2)]);
     }));
+  const buildFinishPalette=$('build-finish-colors');
+  const refreshBuildFinishes=()=>{
+    const kind=buildTool==='paint-wall'?'wall':'floor';
+    const selected=kind==='wall'?finishWall:finishFloor;
+    buildFinishPalette.replaceChildren();
+    for(const [id,definition] of Object.entries(BUILD_FINISHES[kind])){
+      const button=document.createElement('button');
+      button.type='button';button.className='build-finish-swatch';
+      button.dataset.finishId=id;
+      button.setAttribute('aria-pressed',String(selected===id));
+      button.setAttribute('aria-label',definition.label);
+      const chip=document.createElement('span');chip.style.background=definition.color;
+      chip.className='build-finish-chip';
+      const title=document.createElement('small');title.textContent=definition.label;
+      button.append(chip,title);
+      button.addEventListener('click',()=>{
+        if(kind==='wall')finishWall=id;else finishFloor=id;
+        refreshBuildFinishes();
+        buildFeedback('Материал выбран: '+definition.label+' · коснись поверхности');
+      });
+      buildFinishPalette.appendChild(button);
+    }
+    $('build-finish-side').hidden=kind!=='wall';
+    $('build-finish-side').value=finishSide;
+    $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':'Покрытие пола';
+  };
+  $('build-finish-side').addEventListener('change',event=>{finishSide=event.target.value;});
   const setBuildTool=type=>{
     clearBuildPending();resetBuildWallSelection();
     buildTool=type;buildDrag=null;cameraGesture.clear();
     $('build-editor').dataset.tool=type;
     $('build-starter-picker').hidden=type!=='move-wall';
+    const finishes=['paint-floor','paint-room','paint-wall','sample-finish'];
+    $('build-finish-picker').hidden=!finishes.includes(type);
+    if(finishes.includes(type))refreshBuildFinishes();
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
@@ -3856,7 +3890,11 @@ function boot() {
       door:'Коснись стены для установки двери',window:'Коснись стены для установки окна',
       'erase-wall':'Коснись стены для демонтажа',
       'remove-opening':'Коснись двери или окна для удаления',
-      'remove-floor':'Протяни область пола, которую нужно убрать'
+      'remove-floor':'Протяни область пола, которую нужно убрать',
+      'paint-floor':'Выбери покрытие и коснись одной плитки пола. Затем «Применить».',
+      'paint-room':'Выбери покрытие и коснись комнаты — зальём весь её пол.',
+      'paint-wall':'Выбери цвет, затем коснись стены — окрасим всю непрерывную стену.',
+      'sample-finish':'Пипетка: коснись уже отделанной поверхности, чтобы взять её покрытие.'
     };
     $('build-instruction').textContent=tips[type]||'Выбери инструмент';
     buildFeedback(tips[type]||'Готово');
@@ -3925,7 +3963,8 @@ function boot() {
     const rect=canvas.getBoundingClientRect();
     let selected=null,best=45;
     for(const wall of [...game.world.construction.wallEdges,
-      ...(buildTool==='move-wall'?starterShellSegments(game.world.construction):[])]){
+      ...(['move-wall','paint-wall','sample-finish'].includes(buildTool)
+        ?starterShellSegments(game.world.construction):[])]){
       const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
       const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
       // Screen rays hit walls above the floor. Accept taps near the base,
@@ -3940,7 +3979,7 @@ function boot() {
   };
   const endBuildDrag=event=>{
     if(!buildDrag||buildDrag.pointerId!==event.pointerId)return false;
-    const {from,to,wallEdge}=buildDrag;
+    const {from,to,wallEdge,hit}=buildDrag;
     buildDrag=null;
     const type=buildTool;
     if(['door','window','erase-wall','remove-opening'].includes(type)){
@@ -3956,6 +3995,25 @@ function boot() {
       const dI=target?.axis==='v'?Math.round((to.x-from.x)*2):0;
       const dJ=target?.axis==='h'?Math.round((to.z-from.z)*2):0;
       if(dI||dJ)stageBuild({type:'move-wall',edgeId:target?.id,deltaI:dI,deltaJ:dJ});
+    }else if(type==='paint-floor'||type==='paint-room'){
+      stageBuild({type:'paint-floor',at:hit||from,materialId:finishFloor,
+        scope:type==='paint-room'?'room':'tile'});
+    }else if(type==='paint-wall'){
+      const target=wallEdge||buildWallAtScreen(gesturePoint(event));
+      stageBuild({type:'paint-wall',edgeId:target?.id,materialId:finishWall,
+        side:finishSide,scope:'run'});
+    }else if(type==='sample-finish'){
+      const target=wallEdge||buildWallAtScreen(gesturePoint(event));
+      const value=target?.id&&game.world.construction.materials?.wall?.[target.id]?.b;
+      if(value){
+        finishWall=value;setBuildTool('paint-wall');
+        buildFeedback('Пипетка взяла покрытие стены · коснись другой стены');
+      }else{
+        const point=hit||from,key=Math.floor(point.x*2)+','+Math.floor(point.z*2);
+        finishFloor=game.world.construction.materials?.floor?.[key]||'floor.default';
+        setBuildTool('paint-floor');
+        buildFeedback('Пипетка взяла покрытие пола · коснись другого участка');
+      }
     }else if(type!=='camera'){
       stageBuild(buildCommand(from,to));
     }
@@ -4114,14 +4172,14 @@ function boot() {
       }
       if(buildTool!=='camera'&&cameraGesture.count()===0){
         const raw=editorFloorAt(point);
-        const pickWall=['move-wall','door','window','erase-wall','remove-opening'].includes(buildTool);
+        const pickWall=['move-wall','door','window','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
         if(pickWall&&!wallEdge&&buildTool==='move-wall')
           buildFeedback('Выбери исходную стену кнопками ниже или коснись её; свайп по пустому месту двигает камеру');
         // Swiping empty background pans even when a wall tool is selected.
-        if(raw&&(!pickWall||wallEdge)){
+        if(raw&&(!pickWall||wallEdge||buildTool==='sample-finish')){
           const from=buildSnap(raw);
-          buildDrag={pointerId:event.pointerId,from,to:from,last:point,wallEdge};
+          buildDrag={pointerId:event.pointerId,from,to:from,hit:raw,last:point,wallEdge};
           showBuildGhost(from,from);return;
         }
       }
