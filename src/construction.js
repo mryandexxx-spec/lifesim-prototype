@@ -444,7 +444,7 @@ export function constructionRoomSelection(raw,at){
     cells:selected.cells,wallIds:walls}};
 }
 /** Pure preview; no state, queue, furniture, money or localStorage mutation. */
-export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[],wallDecor=[]}={}){
+export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[],wallDecor=[],movableFurnitureIds=[]}={}){
   const world=restoreConstructionWorld(raw);
   if(!command||typeof command.type!=='string')return fail('invalid-command');
   let floors=new Set(world.floorCells),walls=new Map(world.wallEdges.map(w=>[w.id,w]));
@@ -540,10 +540,11 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     // Neither shop products nor legacy fixtures/artworks may be silently
     // duplicated or deleted. F5-D.2 handles furniture as a separate atomic
     // household transaction after object IDs, inventory and action locks.
-    if(furniture.some(item=>item?.location==='home'&&
+    const carriedIds=type==='room-relocate'?new Set(movableFurnitureIds):new Set();
+    if(furniture.some(item=>!carriedIds.has(item.instanceId)&&item?.location==='home'&&
         finite(item.x)&&finite(item.z)&&item.x>=rect.minX&&item.x<rect.maxX&&
         item.z>=rect.minZ&&item.z<rect.maxZ)||
-      furnitureBoxes.some(box=>overlap(rect,box)))
+      furnitureBoxes.some(box=>!carriedIds.has(box.instanceId)&&overlap(rect,box)))
       return fail('room-has-furniture');
     if(wallDecor.some(item=>finite(item?.x)&&finite(item?.z)&&
       item.x>=rect.minX-.6&&item.x<=rect.maxX+.6&&
