@@ -12,6 +12,7 @@ import {createCameraGestureSession} from './camera-gestures.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
+import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
@@ -122,9 +123,25 @@ const loadingProgress=createLoadingProgress(['scene','alex','mira'],({completed,
     ? 'Не все модели доступны — используем резервные облики'
     : completed===total?'Готово!':'Загружаем сцену и 3D-модели';
 });
+// Only propose the phone's LOCAL date at first creation/migration. Saved anchors win forever.
+function suggestedGameDate(){
+  try{
+    const d=new Date();
+    return toISODate({year:d.getFullYear(),month:d.getMonth()+1,day:d.getDate()});
+  }catch{return DEFAULT_CIVIL_DATE;}
+}
+const calendarSuggestion=suggestedGameDate();
 let game;
-try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); }
-catch { game = newHousehold(); }
+let calendarNeedsPersistence=false;
+try {
+  const stored=JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+  calendarNeedsPersistence=stored?.calendar?.schema!==1||
+    !parseCivilDate(stored.calendar.startCivilDate);
+  game=loadHousehold(stored,calendarSuggestion);
+} catch {
+  game=newHousehold(calendarSuggestion);
+  calendarNeedsPersistence=true;
+}
 const musicAudio=createMusicAudio();
 let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
 const audioButton=$('music-audio-toggle');
@@ -338,6 +355,30 @@ function save(silent = false) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); if (!silent) toast('Игра сохранена на этом устройстве'); }
   catch { if (!silent) toast('Не удалось сохранить: браузер запретил хранилище'); }
 }
+// Fix the epoch at first migration, not on some later autosave after a phone date change.
+if(calendarNeedsPersistence)save(true);
+// W1-A.1 anchor picker: date only; no real-time tick, timescale or queue mutation.
+const datePanel=$('calendar-anchor-panel');
+function closeCalendarAnchorPanel(){
+  datePanel.hidden=true;
+  $('calendar-anchor-toggle').setAttribute('aria-expanded','false');
+}
+$('calendar-anchor-toggle').addEventListener('click',()=>{
+  const opening=datePanel.hidden;
+  datePanel.hidden=!opening;
+  $('calendar-anchor-toggle').setAttribute('aria-expanded',String(opening));
+  if(opening)$('calendar-anchor-date').value=calendarAt(game.calendar,game.minutes).iso;
+});
+$('calendar-anchor-close').addEventListener('click',closeCalendarAnchorPanel);
+$('calendar-anchor-apply').addEventListener('click',()=>{
+  try{
+    const date=$('calendar-anchor-date').value;
+    game.calendar=setCurrentCalendarDate(game.calendar,game.minutes,date);
+    save(true);
+    closeCalendarAnchorPanel();
+    toast('Игровая дата: '+formatCalendarDay(calendarAt(game.calendar,game.minutes),{includeYear:true}));
+  }catch{toast('Не удалось установить дату. Проверьте день, месяц и год.');}
+});
 function taskLabel(task){
   if(!task)return 'Неизвестное действие';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
@@ -6241,7 +6282,11 @@ function boot() {
     uiTimer+=dt;autosaveTime+=dt;
     if(uiTimer>.14){
       uiTimer=0;
-      const t=readableTime(game.minutes);$('day-label').textContent=t.day;$('time-label').textContent=t.time;
+      const t=readableTime(game.minutes);
+      const date=calendarAt(game.calendar,game.minutes);
+      $('day-label').textContent=formatCalendarDay(date);
+      $('calendar-anchor-toggle').title=formatCalendarDay(date,{includeYear:true})+' · День '+date.gameDay+' · изменить дату';
+      $('time-label').textContent=t.time;
       const current=selectedActor();
       $('resident-name').textContent=selectedName();
       const skill=getSkillDefinition(HOBBY_SKILLS,READING_SKILL_ID);

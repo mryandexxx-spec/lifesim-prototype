@@ -1260,3 +1260,26 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   border:1px solid #c1d3c7;border-radius:9px;padding:6px;
   font-size:13px;color:#345f46;background:#fff;}
 #build-height-picker small,#build-porch-picker small{font-size:11px;line-height:1.4;}
+
+/* W1-A.1: accessible, nonblocking Gregorian clock / date-anchor editor. */
+button.time-card {font:inherit;color:inherit;cursor:pointer;pointer-events:auto;line-height:1.2;white-space:nowrap;}
+button.time-card strong {display:block;font-size:23px;font-weight:800;}
+button.time-card:active {transform:translateY(1px);}
+.calendar-anchor-panel {
+  position:absolute;z-index:12;right:max(12px,env(safe-area-inset-right));
+  top:calc(env(safe-area-inset-top) + 91px);
+  width:min(310px,calc(100vw - 24px));padding:16px;
+  background:#fffffff7;border:1px solid #dbe9de;border-radius:20px;
+  box-shadow:0 16px 50px #234a3a32;display:grid;gap:10px;
+  font-size:13px;color:#385344;pointer-events:auto;
+}
+.calendar-anchor-panel[hidden]{display:none;}
+.calendar-anchor-head {display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.calendar-anchor-head strong{font-size:16px;}
+.calendar-anchor-head button{border:0;border-radius:9px;background:#eef3ec;min-width:32px;min-height:32px;font-size:20px;}
+.calendar-anchor-panel p{margin:0;color:#627468;line-height:1.4;}
+.calendar-anchor-panel label{font-weight:800;}
+.calendar-anchor-panel input{width:100%;min-height:42px;padding:8px 10px;border-radius:11px;border:1px solid #bdcfc3;background:#fff;color:#314b3f;font:inherit;font-size:16px;}
+.calendar-anchor-apply{padding:12px;border:0;border-radius:12px;background:#367d61;color:#fff;font-weight:800;}
+.calendar-anchor-panel small{font-size:10px;color:#728477;}
+@media(max-width:430px){button.time-card{min-width:88px;padding:8px 7px;}}

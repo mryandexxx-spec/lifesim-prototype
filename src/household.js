@@ -2,6 +2,7 @@
  * Legacy root fields remain Alex's exact v1 state; otherSim is an optional extension.
  */
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS } from './simulation.js';
+import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar} from './calendar-core.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
@@ -63,8 +64,10 @@ function newMira(minutes=480) {
   return mira;
 }
 
-export function newHousehold() {
+export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   const state=newGame(DEMO_PROFILES.first);
+  // W1-A.1: one root-only Gregorian epoch; neither resident keeps a separate calendar.
+  state.calendar=createCalendar(suggestedDate);
   state.otherSim=newMira(state.minutes);
   state.skills=newSkillProgress();
   state.createdWorks=[];
@@ -90,9 +93,12 @@ export function newHousehold() {
 }
 
 /** Do not change save key or version: parse and sanitize each resident using v1 loader. */
-export function loadHousehold(raw) {
-  if (!raw || raw.version!==1) return newHousehold();
+export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
+  if (!raw || raw.version!==1) return newHousehold(suggestedDate);
   const root=loadGame(raw,DEMO_PROFILES.first);
+  // Missing old v1 calendar: align the SUGGESTED date to the current game day.
+  // This adds one optional field without touching minutes, money, people or possessions.
+  root.calendar=restoreCalendar(raw.calendar,root.minutes,suggestedDate);
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
     construction:restoreConstructionWorld(raw.world?.construction)};
   root.kitchen=restoreKitchen(raw.kitchen);
