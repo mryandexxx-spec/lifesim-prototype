@@ -6,6 +6,10 @@ import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
+import {calendarAt} from './calendar-core.js';
+import {RECRUITMENT_CAREERS,EDITORIAL_QUESTIONS,submitCareerApplication,
+  startCareerInterview,answerCareerInterview,markRecruitmentRead,
+  finishRecruitmentApplication,interviewScore} from './career-recruitment.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 function element(tag,className,text){
@@ -41,13 +45,13 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
   header.append(heading,closeButton);
   const body=element('div','career-phone-body');
   frame.append(header,body);overlay.append(shade,frame);host.append(overlay);
-  let who=null,view='list',chosen=null,lastFocus=null;
+  let who=null,view='list',chosen=null,lastFocus=null,lastInterviewFeedback='';
   const opened=()=>!overlay.hidden;
   function close({focus=true}={}){
     if(!opened())return;
     overlay.hidden=true;trigger.setAttribute('aria-expanded','false');
     onOpenChange(null);
-    who=null;view='list';chosen=null;
+    who=null;view='list';chosen=null;lastInterviewFeedback='';
     if(focus)(lastFocus?.isConnected?lastFocus:trigger).focus({preventScroll:true});
   }
   shade.addEventListener('click',()=>close());
@@ -159,6 +163,96 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       view='list';chosen=null;render();
     },'career-phone-secondary'));
   }
+  function gameDueLabel(root,minute){
+    if(!Number.isFinite(minute))return '—';
+    const d=calendarAt(root.calendar,minute);
+    return d.iso+' · '+d.time;
+  }
+  function renderRecruitment(root){
+    const app=root.recruitmentSystem?.byResident?.[who];
+    if(!app)return render();
+    top('📨 '+NAMES[who]+' · МОЙ ОТКЛИК');
+    body.append(element('h2','career-phone-section-title',
+      careerDefinition(app.careerId)?.title||'Работа'));
+    const labels={
+      waiting_reply:'Резюме отправлено. Работодатель рассматривает заявку.',
+      interview_invited:'Приглашение на собеседование получено!',
+      interview_active:'Собеседование · выбери ответ',
+      waiting_decision:'Собеседование окончено. Работодатель принимает решение.',
+      offer_ready:'Предложение работы получено!',
+      rejected:'Работодатель отказал. Можно попробовать другой путь.'
+    };
+    body.append(element('p','career-phone-notice',labels[app.phase]||'Статус отклика'));
+    if(app.phase==='waiting_reply'||app.phase==='waiting_decision'){
+      body.append(element('p','career-phone-muted','Ожидаемый ответ: '+
+        gameDueLabel(root,app.phase==='waiting_reply'?app.replyDueAt:app.decisionDueAt)+
+        '. Время идёт только вместе с игрой.'));
+    }
+    if(app.phase==='interview_invited'){
+      body.append(element('p','career-phone-muted',
+        'Три профессиональных вопроса. Ответы, характер, настроение и литературная эрудиция влияют на результат.'));
+      body.append(action('Начать собеседование',()=>{
+        const live=personRoot();if(!live)return;
+        const result=startCareerInterview(live,who);
+        if(!result.ok){notify(result.reason);render();return;}
+        lastInterviewFeedback='';save(true);render();
+      },'career-phone-primary'));
+    }
+    if(app.phase==='interview_active'){
+      const index=app.interview?.answers?.length||0;
+      const question=EDITORIAL_QUESTIONS[index];
+      body.append(element('p','career-phone-muted','Вопрос '+(index+1)+' из 3 · игровое время остановлено, пока открыт экран ответа.'));
+      if(lastInterviewFeedback)
+        body.append(element('p','career-phone-notice',lastInterviewFeedback));
+      body.append(element('h3','career-phone-section-title',question.text));
+      for(const option of question.answers){
+        body.append(action(option.text,()=>{
+          const live=personRoot();if(!live)return;
+          const result=answerCareerInterview(live,who,option.id);
+          if(!result.ok){notify(result.reason);render();return;}
+          lastInterviewFeedback=result.feedback;
+          save(true);render();
+        },'career-phone-secondary'));
+      }
+    }
+    if(['offer_ready','rejected'].includes(app.phase)&&app.interview){
+      const score=interviewScore(app);
+      const facts=element('div','career-phone-facts');
+      facts.append(element('span',null,'Ответы: '+(score>=45?'Убедительные':score>=25?'Смешанные':'Неубедительные')));
+      facts.append(element('span',null,'Литературная эрудиция: уровень '+app.interview.skill));
+      facts.append(element('span',null,'Настроение на собеседовании: '+app.interview.mood+'/100'));
+      facts.append(element('span',null,'Подходящие особенности характера: '+
+        (app.interview.traitBoost>0?'помогли':app.interview.traitBoost<0?'потребовали усилий':'нейтральны')));
+      body.append(facts);
+    }
+    if(app.phase==='offer_ready'){
+      body.append(element('p','career-phone-muted',
+        'Вакансия подтверждена работодателем. Смены и зарплата начнутся только после подписания договора.'));
+      body.append(action('Подписать договор',()=>{
+        const live=personRoot();if(!live)return;
+        const result=finishRecruitmentApplication(live,who,'accept');
+        if(!result.ok){notify(result.reason);render();return;}
+        setCareerSystem(live.careerSystem);save(true);
+        notify(NAMES[who]+': подписан договор · '+careerDefinition(result.contract.careerId).title);
+        lastInterviewFeedback='';render();
+      },'career-phone-primary'));
+      body.append(action('Отклонить предложение',()=>{
+        const live=personRoot();if(!live)return;
+        const result=finishRecruitmentApplication(live,who,'dismiss');
+        if(!result.ok){notify(result.reason);return;}
+        save(true);view='list';lastInterviewFeedback='';render();
+      },'career-phone-secondary'));
+    }
+    if(app.phase==='rejected'){
+      body.append(action('Вернуться к поиску',()=>{
+        const live=personRoot();if(!live)return;
+        const result=finishRecruitmentApplication(live,who,'dismiss');
+        if(!result.ok){notify(result.reason);return;}
+        save(true);view='list';lastInterviewFeedback='';render();
+      },'career-phone-primary'));
+    }
+    if(markRecruitmentRead(root,who))save(true);
+  }
   function renderOffer(root){
     const offer=careerVacancies(root,who).find(x=>x.id===chosen);
     if(!offer){chosen=null;view='list';return render();}
@@ -176,7 +270,17 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       'Первая смена: '+offer.firstShiftLabel
     ])facts.append(element('span',null,label));
     body.append(facts);
-    if(view==='contract'){
+    if(view==='details'&&RECRUITMENT_CAREERS.includes(chosen)){
+      body.append(element('p','career-phone-notice',
+        'Сначала отправь отклик. Работодатель ответит через несколько игровых часов.'));
+      body.append(action('Отправить отклик',()=>{
+        const live=personRoot();if(!live)return;
+        const result=submitCareerApplication(live,who,chosen);
+        if(!result.ok){notify(result.reason);render();return;}
+        save(true);notify(NAMES[who]+': отклик отправлен · '+offer.title);
+        view='application';render();
+      },'career-phone-primary'));
+    }else if(view==='contract'){
       body.append(element('p','career-phone-notice',
         'Подписание закрепит эту работу за '+NAMES[who]+'. Первая смена рассчитана по игровому календарю. Зарплата начисляется в конце фактически отработанной смены.'));
       body.append(action('Подписать договор',()=>{
@@ -213,6 +317,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     if(!opened())return;
     const root=personRoot();if(!root)return;
     if(root.careerSystem?.byResident?.[who])renderEmployed(root);
+    else if(root.recruitmentSystem?.byResident?.[who])renderRecruitment(root);
     else if(view==='details'||view==='contract')renderOffer(root);
     else renderList(root);
     body.scrollTop=0;
@@ -229,5 +334,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     render();onOpenChange(who);closeButton.focus({preventScroll:true});
   }
   trigger.addEventListener('click',open);
-  return {open,close,refresh:render,isOpen:opened};
+  return {open,close,refresh:render,isOpen:opened,
+    interviewNeedsDecision:()=>opened()&&
+      getRoot()?.recruitmentSystem?.byResident?.[who]?.phase==='interview_active'};
 }
