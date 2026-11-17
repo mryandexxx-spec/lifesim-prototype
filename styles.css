@@ -1223,3 +1223,25 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .build-walls{flex-wrap:wrap;min-width:0;}
 .build-walls button{flex:1 1 65px;min-width:58px;}
 #build-ceiling-toggle[aria-pressed="true"]{background:#347b61;color:#fff;}
+
+/* F5-C.1 original procedural roof editor: large tap targets, horizontal swatches. */
+.build-roof-picker{display:flex;flex-direction:column;gap:8px;background:#f1f5f1;
+  padding:9px;border:1px solid #cadbcf;border-radius:13px;}
+.build-roof-picker[hidden]{display:none!important;}
+.build-roof-picker strong{font-size:12px;color:#3c684e;}
+.build-roof-picker small{font-size:10px;color:#567261;line-height:1.4;}
+.build-roof-choices{display:flex;gap:6px;overflow-x:auto;min-height:48px;
+  padding:2px 2px 4px;touch-action:pan-x;scrollbar-width:thin;}
+.build-roof-choices button{flex:none;min-height:45px;min-width:87px;padding:6px 9px;
+  display:flex;align-items:center;gap:5px;border-radius:10px;border:2px solid #d3ded5;
+  background:#fff;color:#42594c;font-size:11px;font-weight:800;}
+.build-roof-choices button[aria-pressed="true"]{border-color:#2c815d;
+  background:#e6f3ea;color:#215f42;}
+.build-roof-color{width:23px;height:25px;border-radius:6px;border:1px solid #0002;flex:none;}
+.build-roof-params{display:flex;gap:10px;flex-wrap:wrap;}
+.build-roof-params label{display:flex;align-items:center;gap:6px;color:#466651;
+  font-size:11px;font-weight:800;flex:1;}
+.build-roof-params select{background:#fff;border:1px solid #bccfc2;border-radius:9px;
+  color:#376349;min-height:44px;flex:1;min-width:102px;padding:4px;}
+#build-roof-toggle[aria-pressed="true"]{background:#347b61;color:#fff;}
+.build-editor[data-tool^="roof-"]{max-height:min(68dvh,540px);}
