@@ -91,11 +91,13 @@ export function finishPainting({session,actor,actorId,world,at,registry,skills}=
     !PAINT_CONTENT_IDS.includes(session.contentId)||
     !Number.isFinite(at)||at<0||at>10000000)return null;
   const id='work:'+session.sessionId;
+  const previous=restoreCreatedWorks(actor?.createdWorks,actorId);
+  // Do not silently evict previously created/hung/stored artwork at capacity.
+  if(previous.length>=PAINT_WORKS_LIMIT||previous.some(work=>work.id===id))
+    return null;
   const committed=completeActivitySession(registry,session,{
     authorized:true,resourceAvailable:true,eventId:id});
   if(!committed)return null;
-  const previous=restoreCreatedWorks(actor?.createdWorks,actorId);
-  if(previous.some(work=>work.id===id))return null;
   const level=currentSkillLevel(actor.skills,skills,PAINT_SKILL_ID);
   const energy=Number.isFinite(actor.needs?.energy)?actor.needs.energy:50;
   const fun=Number.isFinite(actor.needs?.fun)?actor.needs.fun:50;
@@ -106,5 +108,5 @@ export function finishPainting({session,actor,actorId,world,at,registry,skills}=
   const work={id,ownerId:actorId,easelInstanceId:item.instanceId,
     contentId:session.contentId,seed:seedFrom(id),quality,createdAt:round(at),
     kind:'artwork',location:'studio',origin:{x:item.x,z:item.z,yaw:item.yaw}};
-  return {work,works:[...previous,work].slice(-PAINT_WORKS_LIMIT)};
+  return {work,works:[...previous,work]};
 }
