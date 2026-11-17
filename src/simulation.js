@@ -101,6 +101,8 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
           next.action=null;
       }else next.action=null;
     }
+    if(next.action&&data.action.id==='dining'&&kitchenRecipe(data.action.selectedRecipeId))
+      next.action.selectedRecipeId=data.action.selectedRecipeId;
     if(next.action&&data.action.id==='dining'&&
       data.action.portionTaken===true&&kitchenRecipe(data.action.cookedRecipeId)){
       next.action.portionTaken=true;
@@ -111,10 +113,10 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     if(next.action&&data.action.id==='cook'){
       if(!kitchenRecipe(data.action.recipeId)||
         !validFurnitureInstanceId(data.action.prepInstanceId)||
-        !['toFridge','taking','toPrep','preparing','toStove','cooking']
+        !['toFridge','taking','toPrep','preparing','toStove','cooking','toFridgeStore','storing']
           .includes(data.action.cookStage)||
         (data.action.phase==='using')!==
-          ['taking','preparing','cooking'].includes(data.action.cookStage))
+          ['taking','preparing','cooking','storing'].includes(data.action.cookStage))
         next.action=null;
       else{
         next.action.recipeId=data.action.recipeId;
@@ -228,20 +230,22 @@ export function tick(state, minutes,world=state?.world??null) {
       const stage=state.action.cookStage;
       const recipe=kitchenRecipe(state.action.recipeId);
       const budget=stage==='taking'?5:stage==='preparing'?8:
-        stage==='cooking'?recipe?.cookMinutes:0;
+        stage==='cooking'?recipe?.cookMinutes:stage==='storing'?6:0;
       if(!budget){state.action=null;return;}
       state.action.elapsed+=Math.min(minutes,Math.max(0,budget-state.action.elapsed));
       if(state.action.elapsed>=budget){
-        if(stage==='cooking'){
-          state.event='Приготовлено: '+recipe.label;
+        if(stage==='storing'){
+          state.event='Убрал готовое блюдо в холодильник';
           rememberAction(state,'cook');
           state.autonomy.nextAt=state.minutes+7;
           state.action=null;
         }else{
           state.action.phase='walking';
-          state.action.cookStage=stage==='taking'?'toPrep':'toStove';
+          state.action.cookStage=stage==='taking'?'toPrep':
+            stage==='preparing'?'toStove':'toFridgeStore';
           state.action.elapsed=0;
-          state.event=stage==='taking'?'Несёт продукты к столешнице':'Идёт к плите';
+          state.event=stage==='taking'?'Несёт продукты к столешнице':
+            stage==='preparing'?'Идёт к плите':'Несёт приготовленное в холодильник';
         }
       }
       return;
