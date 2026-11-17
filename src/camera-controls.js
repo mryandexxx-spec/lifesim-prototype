@@ -58,10 +58,10 @@ export function pinchCamera(view,previousDistance,nextDistance){
   if(!valid(previousDistance)||!valid(nextDistance)||
      previousDistance<=0||nextDistance<=0)return {...view};
   return {...view,distance:clamp(view.distance*previousDistance/nextDistance,
-    CAMERA_BOUNDS.minDistance,CAMERA_BOUNDS.maxDistance)};
+    panBounds.minDistance,panBounds.maxDistance)};
 }
 export function wheelCamera(view,dy){
   if(!valid(dy))return {...view};
   return {...view,distance:clamp(view.distance+dy*.012,
-    CAMERA_BOUNDS.minDistance,CAMERA_BOUNDS.maxDistance)};
+    panBounds.minDistance,panBounds.maxDistance)};
 }
