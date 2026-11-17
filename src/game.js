@@ -12,7 +12,7 @@ import {createCameraGestureSession} from './camera-gestures.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
-import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
+import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
@@ -132,8 +132,16 @@ function suggestedGameDate(){
 }
 const calendarSuggestion=suggestedGameDate();
 let game;
-try { game = loadHousehold(JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'),calendarSuggestion); }
-catch { game = newHousehold(calendarSuggestion); }
+let calendarNeedsPersistence=false;
+try {
+  const stored=JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+  calendarNeedsPersistence=stored?.calendar?.schema!==1||
+    !parseCivilDate(stored.calendar.startCivilDate);
+  game=loadHousehold(stored,calendarSuggestion);
+} catch {
+  game=newHousehold(calendarSuggestion);
+  calendarNeedsPersistence=true;
+}
 const musicAudio=createMusicAudio();
 let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
 const audioButton=$('music-audio-toggle');
@@ -347,6 +355,8 @@ function save(silent = false) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); if (!silent) toast('Игра сохранена на этом устройстве'); }
   catch { if (!silent) toast('Не удалось сохранить: браузер запретил хранилище'); }
 }
+// Fix the epoch at first migration, not on some later autosave after a phone date change.
+if(calendarNeedsPersistence)save(true);
 // W1-A.1 anchor picker: date only; no real-time tick, timescale or queue mutation.
 const datePanel=$('calendar-anchor-panel');
 function closeCalendarAnchorPanel(){
