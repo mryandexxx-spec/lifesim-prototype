@@ -425,6 +425,49 @@ function buildRect(a,b){
   return {cells,walls};
 }
 /**
+ * F5-D.3a/next: find a continuous shared partition separating TWO actual
+ * topological rooms. Never infer room membership from rectangular footprints:
+ * rooms may abut the starter house or have irregular shapes.
+ * Only canonical constructed walls are eligible. Legacy virtual walls keep
+ * their authored fixtures and artwork until the anchor migration phase.
+ */
+export function constructionSharedPartition(raw,edgeId){
+  const world=raw?.construction||raw;
+  const selected=world?.wallEdges?.find(w=>w.id===edgeId);
+  if(!selected)return fail('partition-wall-not-found');
+  const floor=new Set(world.floorCells);
+  const members=new Map();
+  constructionRooms(world).forEach((room,index)=>
+    room.cells.forEach(key=>members.set(key,index)));
+  const sides=w=>w.axis==='h'
+    ?[cell(w.i,w.j-1),cell(w.i,w.j)]
+    :[cell(w.i-1,w.j),cell(w.i,w.j)];
+  const source=sides(selected);
+  if(!source.every(k=>floor.has(k)))return fail('partition-needs-two-rooms');
+  const a=members.get(source[0]),b=members.get(source[1]);
+  if(a===undefined||b===undefined||a===b)return fail('partition-already-connected');
+  const sameLine=w=>w.axis===selected.axis&&
+    (w.axis==='h'?w.j===selected.j:w.i===selected.i);
+  const position=w=>w.axis==='h'?w.i:w.j;
+  const eligible=new Map(world.wallEdges.filter(w=>{
+    if(!sameLine(w))return false;
+    const pair=sides(w);
+    return pair.every(k=>floor.has(k))&&members.get(pair[0])===a&&members.get(pair[1])===b;
+  }).map(w=>[position(w),w]));
+  let lo=position(selected),hi=lo;
+  while(eligible.has(lo-1))lo--;
+  while(eligible.has(hi+1))hi++;
+  const segments=Array.from({length:hi-lo+1},(_,index)=>eligible.get(lo+index));
+  if(!segments.length)return fail('partition-wall-not-found');
+  // A virtual starter mesh may overlap a canonical edge. Deleting only the
+  // canonical copy would leave an invisible collision/visual ghost behind.
+  const virtual=new Set(starterShellSegments(world)
+    .filter(w=>!(world.starterRemoved||[]).includes(w.id))
+    .map(w=>edge(w.axis,w.i,w.j)));
+  if(segments.some(w=>virtual.has(w.id)))return fail('partition-legacy-wall');
+  return {ok:true,edgeIds:segments.map(w=>w.id)};
+}
+/**
  * A room is derived from floor and wall topology, never a persistent index.
  * A starter room is selectable ONLY as a geometry-only duplicate blueprint:
  * legacy fixtures, purchased furniture, wall art and actors cannot be moved
@@ -685,6 +728,32 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       for(const [key,value] of copiedFacade)materials.facade[key]=value;
     }
     openings.push(...movedOpenings);
+  }else if(type==='room-join'){
+    const partition=constructionSharedPartition(world,command.edgeId);
+    if(!partition.ok)return partition;
+    const deleted=new Set(partition.edgeIds);
+    // Existing window/door/arch spanning this exact shared partition is
+    // removed atomically with it. Partial opening deletion is never allowed.
+    const touched=openings.filter(o=>o.edgeIds.some(id=>deleted.has(id)));
+    if(touched.some(o=>o.edgeIds.some(id=>!deleted.has(id))))
+      return fail('partition-partial-opening');
+    if(porches.some(p=>touched.some(o=>o.id===p.openingId)))
+      return fail('partition-has-porch');
+    for(const id of deleted){
+      const w=walls.get(id);
+      const x=w.i*BUILD_STEP,z=w.j*BUILD_STEP;
+      // H5 art has legacy wall slots; do not remove a hosting surface until
+      // its full edge anchor/inventory migration has been implemented.
+      if(wallDecor.some(p=>finite(p?.x)&&finite(p?.z)&&(()=>{
+        const radius=finite(p.radius)?Math.max(.25,Math.min(1.3,p.radius)):.46;
+        return w.axis==='h'
+          ?Math.abs(p.z-z)<radius+.08&&p.x>x-radius&&p.x<x+BUILD_STEP+radius
+          :Math.abs(p.x-x)<radius+.08&&p.z>z-radius&&p.z<z+BUILD_STEP+radius;
+      })()))return fail('partition-has-art');
+    }
+    for(const id of deleted)walls.delete(id);
+    const removedOpenings=new Set(touched.map(o=>o.id));
+    openings=openings.filter(o=>!removedOpenings.has(o.id));
   }else if(type==='wall'){
     if(!command.from||!command.to||![command.from.x,command.from.z,command.to.x,command.to.z].every(finite))return fail('invalid-wall');
     const line=editSegments(command.from,command.to);
