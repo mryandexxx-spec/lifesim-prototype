@@ -22,7 +22,8 @@ import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js'
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
-import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES} from './painting.js';
+import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES,canPaintContent,
+  compositionForArtwork,paintingSeedFromSession} from './painting.js';
 import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
   chooseKitchenPlan} from './kitchen.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
@@ -688,7 +689,19 @@ function select(id,instanceId=null) {
   $('music-style-field').hidden=id!=='music';
   $('reading-content-field').hidden=id!=='hobby';
   $('painting-theme-field').hidden=id!=='paint';
-  if(id==='paint')$('painting-theme-select').value=PAINT_CONTENT_IDS[0];
+  if(id==='paint'){
+    const menu=$('painting-theme-select');menu.replaceChildren();
+    for(const contentId of PAINT_CONTENT_IDS){
+      const theme=PAINT_SUBJECTS[contentId],allowed=canPaintContent(
+        selectedActor().skills,HOBBY_SKILLS,contentId);
+      const option=document.createElement('option');option.value=contentId;
+      option.disabled=!allowed;
+      option.textContent=theme.label+(allowed?' · доступно':
+        ' · 🔒 уровень '+theme.minLevel);
+      menu.append(option);
+    }
+    menu.value=PAINT_CONTENT_IDS[0];
+  }
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
   $('fridge-lunch-button').hidden=id!=='fridge';
@@ -728,6 +741,10 @@ updateItemLabels();
 $('close-action').addEventListener('click', () => select(null));
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
+  if(selected==='paint'&&!canPaintContent(selectedActor().skills,HOBBY_SKILLS,
+    $('painting-theme-select').value)){
+    toast('Тема картины ещё не открыта · практикуй живопись');return;
+  }
   const command=selected==='hobby'
     ?{type:'activity',activityId:READING_ACTIVITY_ID,
       contentId:canReadHobbyContent(selectedActor().skills,$('reading-content-select').value)
@@ -1598,6 +1615,9 @@ function boot() {
     applyItemAppearance(node,itemDefinitionId);
   };
   const decorNodes=new Map();
+  // H5c: cache the 78 theme stroke entities per easel instead of repeatedly
+  // traversing the PlayCanvas child tree at every Safari animation frame.
+  const paintStrokeCache=new WeakMap();
   const decorTemplates=new Map();
   const f4eOriginalPositions=new WeakMap();
   // H5: bounded brush compositions come from the testable data-only catalog.
@@ -1763,7 +1783,10 @@ function boot() {
           .70,.86,.062,frame,node);
         primitive('box','H5a finished painting support',0,.79,-.037,
           .61,.76,.018,paper,node);
-        const parts=PAINT_COMPOSITION_SHAPES[work.contentId]||[];
+        // Old artworks have no renderVersion and retain their original look.
+        const parts=work.renderVersion===1
+          ?compositionForArtwork(work.contentId,work.seed,work.renderVersion)
+          :PAINT_COMPOSITION_SHAPES[work.contentId]||[];
         parts.forEach(([kind,x,y,sx,sy,colorIndex],i)=>{
           const palette=PAINT_SUBJECTS[work.contentId]?.palette;
           if(!palette)return;
@@ -4532,17 +4555,34 @@ function boot() {
         }
       }
       if(item.prefabId==='easel'){
-        const activeAction=[game.action,game.otherSim.action].find(action=>
-          action?.id==='paint'&&action.targetInstanceId===item.instanceId);
+        const painter=[game,game.otherSim].find(actor=>
+          actor.action?.id==='paint'&&actor.action.targetInstanceId===item.instanceId);
+        const activeAction=painter?.action;
         // Do not paint the last completed image onto a fresh blank easel.
         // Finished paintings live in independent H5a artwork entities.
         const contentId=activeAction?.contentId;
         const stage=activeAction?.phase==='using'
           ?Math.floor(Math.min(1,activeAction.elapsed/ACTIONS.paint.duration)*6)
           :0;
+        let cached=paintStrokeCache.get(node);
+        if(!cached){
+          cached=new Map(PAINT_CONTENT_IDS.map(theme=>[theme,
+            Array.from({length:6},(_,i)=>node.findByName('H5 paint '+theme+' '+i))]));
+          paintStrokeCache.set(node,cached);
+        }
+        const seed=painter?.activitySession?.sessionId
+          ?paintingSeedFromSession(painter.activitySession.sessionId):0;
+        const preview=compositionForArtwork(contentId,seed,1);
         for(const theme of PAINT_CONTENT_IDS)for(let i=0;i<6;i++){
-          const stroke=node.findByName('H5 paint '+theme+' '+i);
-          if(stroke)stroke.enabled=theme===contentId&&i<stage;
+          const stroke=cached.get(theme)?.[i];
+          if(!stroke)continue;
+          const shown=theme===contentId&&i<stage&&Boolean(preview[i]);
+          if(shown){
+            const [,x,y,sx,sy]=preview[i];
+            stroke.setLocalPosition(x,y,-.181-i*.0007);
+            stroke.setLocalScale(sx,sy,.009);
+          }
+          stroke.enabled=shown;
         }
         continue;
       }

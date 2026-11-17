@@ -1,9 +1,10 @@
 /** H4: pure, read-only per-resident skill selectors, independent of DOM and 3D. */
 import {deriveSkillLevel,getSkillDefinition} from './skill-registry.js';
+import {PAINT_SUBJECTS} from './painting.js';
 
 const SKILL_GUIDANCE=Object.freeze({
   literature:'Читай книги у купленного книжного шкафа. Совместное чтение тоже развивает эрудицию.',
-  painting:'Рисуй у купленного мольберта: каждая законченная картина остаётся в коллекции.',
+  painting:'Практикуй живопись у мольберта. Новые сюжеты открываются с уровнями; картины остаются в коллекции.',
   cooking:'Готовь на плите после подготовки продуктов на рабочей поверхности. Новые блюда открываются по уровню кулинарии.'
 });
 const UNLOCK_LABELS=Object.freeze({
@@ -30,7 +31,8 @@ export function skillProfileRows(progress,registry){
       xp,next,previous,percentage,mastered:level===skill.maxLevel,
       hint:SKILL_GUIDANCE[skill.id]||'Практикуйся с подходящими предметами.',
       unlocks:Object.freeze(skill.unlocks.map(unlock=>Object.freeze({
-        id:unlock.id,label:UNLOCK_LABELS[unlock.id]||unlock.id,
+        id:unlock.id,label:UNLOCK_LABELS[unlock.id]||(PAINT_SUBJECTS[unlock.id]?.label
+          ?'Сюжет «'+PAINT_SUBJECTS[unlock.id].label+'»':unlock.id),
         minLevel:unlock.minLevel,unlocked:level>=unlock.minLevel
       })))
     });

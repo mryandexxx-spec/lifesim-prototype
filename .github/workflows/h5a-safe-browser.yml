@@ -3,6 +3,13 @@ on:
   push:
     branches:
       - feature/h5a-safe-painting-20261117
+      - feature/h5c-painting-mastery-20261117
+  pull_request:
+    paths:
+      - 'src/painting.js'
+      - 'src/game.js'
+      - 'tests/h5a-browser-smoke.mjs'
+      - '.github/workflows/h5a-safe-browser.yml'
   workflow_dispatch:
 permissions:
   contents: read

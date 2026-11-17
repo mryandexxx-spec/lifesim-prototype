@@ -15,6 +15,7 @@ on:
       - 'src/furniture-procedural-library.js'
       - 'index.html'
       - 'tests/hobbies-h5.test.js'
+      - 'tests/hobbies-h5c.test.js'
       - '.github/workflows/hobby-h5-checks.yml'
 jobs:
   regression:
@@ -33,6 +34,7 @@ jobs:
           node --check src/game.js
           node --check src/furniture-procedural-library.js
           node --check tests/hobbies-h5.test.js
+          node --check tests/hobbies-h5c.test.js
       - name: Install pinned test dependencies
         run: npm ci --ignore-scripts
       - name: Full compatibility suite
