@@ -36,6 +36,7 @@ try{
   assert.match(await chip.innerText(),/На работе/);
   await page.locator('#career-phone-toggle').click();
   await page.locator('#career-phone-panel').getByText(/На работе/).waitFor();
+  await page.locator('#career-phone-panel').getByText(/Повышение: Обозреватель/).waitFor();
   await page.screenshot({path:'w1b3a-working-iphone.png'});
   await page.locator('#career-phone-panel .career-phone-x').click();
   const before=await state();
@@ -53,12 +54,19 @@ try{
   const paid=await state();
   assert.equal(paid.shop.credits,5112);
   assert.equal(paid.careerSystem.byResident.alex.lastShift.salary,112);
+  assert.equal(paid.careerSystem.byResident.alex.workedShifts,1);
+  assert.ok(paid.careerSystem.byResident.alex.performance>50);
+  assert.ok(paid.needs.energy<seed.needs.energy,'Real post-shift fatigue');
   await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:35000});
   await page.waitForTimeout(1800);
   const stable=await state();
   assert.equal(stable.shop.credits,5112,'No duplicated salary after reload');
   assert.equal(stable.careerSystem.settlementIds.length,1);
+  assert.equal(stable.careerSystem.byResident.alex.workedShifts,1);
+  await page.locator('#career-phone-toggle').click();
+  await page.locator('#career-phone-panel').getByText(/Смен на должности/).waitFor();
+  await page.locator('#career-phone-panel .career-phone-x').click();
   assert.equal(errors.length,0,errors.join('\n'));
   console.log('W1-B.3a WebGL 390x844: work status, hidden-presence model, payroll and reload: passed');
 }finally{await browser.close();}
