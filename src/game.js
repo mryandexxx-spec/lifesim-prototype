@@ -2049,6 +2049,9 @@ function boot() {
     mirror: {x:0,y:0,z:-.88,pitch:0,yaw:0},
     dresser: {x:0,y:0,z:-1.06,pitch:0,yaw:0},
     wardrobe: {x:0,y:0,z:-1.20,pitch:0,yaw:0},
+    cook: {x:0,y:0,z:-1.08,pitch:0,yaw:0},
+    prep: {x:0,y:0,z:-1.04,pitch:0,yaw:0},
+    wash: {x:0,y:0,z:-1.05,pitch:0,yaw:0},
     paint: {x:0,y:0,z:-1.00,pitch:0,yaw:0}
   };
   if(game.action?.phase==='using') {
@@ -2061,7 +2064,13 @@ function boot() {
       game.action.id==='dining'
         ?(game.action.diningStage==='eating'
           ?diningSeatApproach(game.world,game.action.targetInstanceId,game.action.diningSeatInstanceId)
-          :furnitureActionApproach(game.world,'fridge')):null;
+          :furnitureActionApproach(game.world,'fridge')):
+      game.action.id==='cook'
+        ?(['taking','toFridge'].includes(game.action.cookStage)
+          ?furnitureActionApproach(game.world,'fridge')
+          :['toPrep','preparing'].includes(game.action.cookStage)
+            ?furnitureActionApproach(game.world,'prep',game.action.prepInstanceId)
+            :furnitureActionApproach(game.world,'cook',game.action.targetInstanceId)):null;
     const actual=dest||furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
@@ -2077,7 +2086,13 @@ function boot() {
       game.otherSim.action.id==='dining'
         ?(game.otherSim.action.diningStage==='eating'
           ?diningSeatApproach(game.world,game.otherSim.action.targetInstanceId,game.otherSim.action.diningSeatInstanceId)
-          :furnitureActionApproach(game.world,'fridge')):null;
+          :furnitureActionApproach(game.world,'fridge')):
+      game.otherSim.action.id==='cook'
+        ?(['taking','toFridge'].includes(game.otherSim.action.cookStage)
+          ?furnitureActionApproach(game.world,'fridge')
+          :['toPrep','preparing'].includes(game.otherSim.action.cookStage)
+            ?furnitureActionApproach(game.world,'prep',game.otherSim.action.prepInstanceId)
+            :furnitureActionApproach(game.world,'cook',game.otherSim.action.targetInstanceId)):null;
     const actual=dest||furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId);
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
@@ -2088,8 +2103,10 @@ function boot() {
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
-    alex:game.action?.id==='fridge'&&game.action.phase==='using',
-    mira:game.otherSim.action?.id==='fridge'&&game.otherSim.action.phase==='using'
+    alex:game.action?.phase==='using'&&(game.action.id==='fridge'||
+      (game.action.id==='cook'&&game.action.cookStage==='taking')),
+    mira:game.otherSim.action?.phase==='using'&&(game.otherSim.action.id==='fridge'||
+      (game.otherSim.action.id==='cook'&&game.otherSim.action.cookStage==='taking'))
   };
   const paths={
     alex:{points:null,index:0,id:null},
@@ -3833,11 +3850,13 @@ function boot() {
     const pairedMusic=pairedHobby?.choiceId==='music';
     const using=game.action?.phase==='using',
       useId=using?(game.action.id==='dining'&&game.action.diningStage==='taking'
-        ?'fridge':game.action.id):pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
+        ?'fridge':game.action.id==='cook'&&game.action.cookStage==='taking'
+          ?'fridge':game.action.id==='cook'&&game.action.cookStage==='preparing'
+            ?'prep':game.action.id):pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const alexDining=useId==='dining'&&game.action?.diningStage==='eating';
     const alexDiningVisual=alexDining?diningVisualFor('alex',game.action):diningVisual.alex;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,
-      game.action?.id==='dining'?6:ACTIONS.fridge.duration):null;
+      game.action?.id==='dining'?6:game.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
       inverseFurniturePose(game.world,'shower',display).yaw);
@@ -3991,12 +4010,15 @@ function boot() {
     // Mira uses the same pose definitions, but maintains her own position and gait.
     const miraUsing=game.otherSim.action?.phase==='using';
     const miraUseId=miraUsing?(game.otherSim.action.id==='dining'&&
-      game.otherSim.action.diningStage==='taking'?'fridge':game.otherSim.action.id):
+      game.otherSim.action.diningStage==='taking'?'fridge':
+      game.otherSim.action.id==='cook'&&game.otherSim.action.cookStage==='taking'?'fridge':
+      game.otherSim.action.id==='cook'&&game.otherSim.action.cookStage==='preparing'?'prep':
+      game.otherSim.action.id):
       pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const miraDining=miraUseId==='dining'&&game.otherSim.action?.diningStage==='eating';
     const miraDiningVisual=miraDining?diningVisualFor('mira',game.otherSim):diningVisual.mira;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,
-      game.otherSim.action?.id==='dining'?6:ACTIONS.fridge.duration):null;
+      game.otherSim.action?.id==='dining'?6:game.otherSim.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
       game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
       inverseFurniturePose(game.world,'shower',miraDisplay).yaw);
