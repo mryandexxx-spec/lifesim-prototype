@@ -3585,6 +3585,7 @@ function boot() {
     'outside-floor':'Строить стены можно по контуру построенного пола',
     'lot-bounds':'За границами участка 32×24',
     'protected-legacy-floor':'Исходный пол защищён: пристройку удалять можно',
+    'protected-starter-floor':'Пол расширенной исходной комнаты убирается возвратом её стены',
     'resident-on-floor':'На этом месте стоит житель',
     'furniture-on-floor':'На этом месте стоит мебель',
     'resident-blocked':'Стена задевает жителя',
@@ -3711,7 +3712,8 @@ function boot() {
     $('build-wall-controls').hidden=false;
     const outward=constructionWallOutward(game.world.construction,wall.id);
     $('build-wall-expand').disabled=outward===null;
-    $('build-wall-contract').disabled=outward===null;
+    $('build-wall-contract').disabled=outward===null||
+      Boolean(wall.starterSide&&starterShellOffset(game.world.construction,wall.starterSide)===0);
     $('build-wall-label').textContent=outward===null
       ?'Межкомнатная стена · проведи пальцем перпендикулярно стене'
       :wall.starterSide

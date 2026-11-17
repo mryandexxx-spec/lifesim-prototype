@@ -207,6 +207,8 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     for(const key of r.cells){const [i,j]=key.split(',').map(Number);
       if(!lotCell(i,j))return fail('lot-bounds');
       if(type==='remove-floor'&&isBase(i,j))return fail('protected-legacy-floor');
+      if(type==='remove-floor'&&i>=starterShell.west&&i<starterShell.east&&
+        j>=starterShell.north&&j<starterShell.south)return fail('protected-starter-floor');
     }
     if(type==='remove-floor'){
       const removed=new Set(r.cells);

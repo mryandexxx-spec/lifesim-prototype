@@ -154,3 +154,16 @@ test('F5-A.3 starter original perimeter respects lot, furniture, resident, undo 
  assert.deepEqual(restoreConstructionWorld({schema:1,step:.5,legacy:true,
   floorCells:old.floorCells,wallEdges:[],openings:[]}).starterShell,old.starterShell);
 });
+
+test('F5-A.3 expanded starter slab is never silently lost through remove-floor/reload',()=>{
+ const old=newConstructionWorld();
+ const grown=proposeConstructionEdit(old,{type:'move-wall',edgeId:'starter:east',
+  deltaI:1,deltaJ:0}).world;
+ const remove=proposeConstructionEdit(grown,{type:'remove-floor',
+  from:{x:13.5,z:-1},to:{x:15,z:1}});
+ assert.equal(remove.reason,'protected-legacy-floor');
+ const outsideBase=proposeConstructionEdit(grown,{type:'remove-floor',
+  from:{x:14,z:-1},to:{x:15,z:1}});
+ assert.equal(outsideBase.reason,'protected-starter-floor');
+ assert.deepEqual(restoreConstructionWorld(grown).starterOwned,grown.starterOwned);
+});
