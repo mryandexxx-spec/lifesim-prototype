@@ -67,7 +67,8 @@ test('F4F.2: Safari refrigerator sheet exposes both options and delayed routing'
   const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
   assert.match(html,/id="fridge-lunch-button" hidden/);
   assert.match(game,/fridge-lunch-button'\)\.hidden=id!=='fridge'/);
-  assert.match(game,/scheduleCommand\(\{type:'object',actionId:'dining',autoTable:true\}\)/);
+  assert.match(game,/fridge-prepared-select/);
+  assert.match(game,/scheduleCommand\(\{type:'object',actionId:'dining',autoTable:true,recipeId\}\)/);
   assert.match(game,/nearestAvailableDiningTable\(game,residentId\)/);
   assert.match(html,/F4F\.2/);
 });
