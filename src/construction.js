@@ -54,8 +54,15 @@ export const STARTER_SHELL=Object.freeze({
   west:BASE.minI,east:BASE.maxI,north:BASE.minJ,south:BASE.maxJ
 });
 const STARTER_SIDE=Object.freeze({west:-1,east:1,north:-1,south:1});
-const starterSide=id=>typeof id==='string'&&id.startsWith('starter:')
-  ?id.slice(8):null;
+// Original-house walls have the same per-cell identity as constructed walls.
+// Stable orthogonal indices survive moving the entire starter side.
+const starterSide=id=>typeof id==='string'
+  ?(/^starter:(west|east|north|south)(?::-?[0-9]+)?$/.exec(id)?.[1]||null):null;
+const starterEdgeId=(side,index)=>'starter:'+side+':'+index;
+const starterIndex=id=>{
+  const match=/^starter:(west|east|north|south):(-?[0-9]+)$/.exec(id||'');
+  return match?Number(match[2]):null;
+};
 function validStarter(raw){
   if(!raw||!Object.keys(STARTER_SHELL).every(k=>Number.isSafeInteger(raw[k])))
     return {...STARTER_SHELL};
@@ -69,10 +76,15 @@ function validStarter(raw){
 export function starterShellSegments(world){
   const s=validStarter(world?.starterShell),segments=[];
   for(let j=s.north;j<s.south;j++)for(const [side,i] of [['west',s.west],['east',s.east]])
-    segments.push({id:'starter:'+side,axis:'v',i,j,starterSide:side});
+    segments.push({id:starterEdgeId(side,j),axis:'v',i,j,starterSide:side,sideId:'starter:'+side});
   for(let i=s.west;i<s.east;i++)for(const [side,j] of [['north',s.north],['south',s.south]])
-    segments.push({id:'starter:'+side,axis:'h',i,j,starterSide:side});
+    segments.push({id:starterEdgeId(side,i),axis:'h',i,j,starterSide:side,sideId:'starter:'+side});
   return segments;
+}
+export function constructionWallSegments(world){
+  const state=world?.construction||world;
+  const removed=new Set(state?.starterRemoved||[]);
+  return [...(state?.wallEdges||[]),...starterShellSegments(state).filter(w=>!removed.has(w.id))];
 }
 export function starterShellOffset(world,side){
   const s=validStarter(world?.starterShell);
@@ -87,7 +99,10 @@ const clone=v=>JSON.parse(JSON.stringify(v));
 const topologyCache=new WeakMap();
 function topology(state){
   let found=topologyCache.get(state);
-  if(!found){found={floors:new Set(state.floorCells),doors:new Set(state.openings.filter(o=>o.type==='door'||o.type==='arch').flatMap(o=>o.edgeIds))};topologyCache.set(state,found);}
+  if(!found){found={floors:new Set(state.floorCells),
+    doors:new Set(state.openings.filter(o=>o.type==='door'||o.type==='arch').flatMap(o=>o.edgeIds)),
+    removed:new Set(state.starterRemoved||[]),solid:new Set(state.starterSolidSides||[])};
+    topologyCache.set(state,found);}
   return found;
 }
 const fail=reason=>({ok:false,reason});
@@ -98,7 +113,7 @@ export function newConstructionWorld(){
   for(let i=BASE.minI;i<BASE.maxI;i++)for(let j=BASE.minJ;j<BASE.maxJ;j++)floorCells.push(cell(i,j));
   return {schema:1,revision:0,lot:{...BUILD_LOT},step:BUILD_STEP,floorCells,wallEdges:[],openings:[],
     materials:{floor:{},wall:{}},roofModules:[],legacy:true,nextId:1,
-    starterShell:{...STARTER_SHELL},starterOwned:[]};
+    starterShell:{...STARTER_SHELL},starterOwned:[],starterRemoved:[],starterSolidSides:[]};
 }
 export function restoreConstructionWorld(raw){
   const initial=newConstructionWorld();
@@ -126,6 +141,11 @@ export function restoreConstructionWorld(raw){
     const key=cell(i,j);
     if(!floors.has(key)){floors.add(key);if(!isBase(i,j))owned.add(key);}
   }
+  const virtual=new Set(starterShellSegments({starterShell:shell}).map(w=>w.id));
+  const starterRemoved=Array.isArray(raw.starterRemoved)&&raw.starterRemoved.length<500
+    ?[...new Set(raw.starterRemoved.filter(id=>typeof id==='string'&&virtual.has(id)))]:[];
+  const starterSolidSides=Array.isArray(raw.starterSolidSides)
+    ?[...new Set(raw.starterSolidSides.filter(side=>side==='east'||side==='south'))]:[];
   const walls=[],keys=new Set();
   for(const value of raw.wallEdges){
     if(!value||!['h','v'].includes(value.axis)||!Number.isSafeInteger(value.i)||!Number.isSafeInteger(value.j)||
@@ -139,7 +159,7 @@ export function restoreConstructionWorld(raw){
     if(!rawOpening||!['door','window','arch'].includes(rawOpening.type)||
       typeof rawOpening.id!=='string'||openingKeys.has(rawOpening.id)||
       !Array.isArray(rawOpening.edgeIds)||rawOpening.edgeIds.length<1||
-      rawOpening.edgeIds.length>4||!rawOpening.edgeIds.every(k=>keys.has(k)))return initial;
+      rawOpening.edgeIds.length>4||!rawOpening.edgeIds.every(k=>(keys.has(k)||virtual.has(k))&&!starterRemoved.includes(k)))return initial;
     openingKeys.add(rawOpening.id);
     const ids=[...new Set(rawOpening.edgeIds)];
     // Old F5-A door/window records intentionally keep their missing styleId,
@@ -149,6 +169,10 @@ export function restoreConstructionWorld(raw){
       ?rawOpening.styleId:null;
     openings.push({id:rawOpening.id,type:rawOpening.type,edgeIds:ids,
       ...(styleId?{styleId}:{})});
+  }
+  for(const o of openings)for(const id of o.edgeIds){
+    const side=starterSide(id);
+    if((side==='east'||side==='south')&&!starterSolidSides.includes(side))starterSolidSides.push(side);
   }
   // Restore only known finite finish IDs attached to real surfaces. Unknown
   // palette IDs or retired wall/floor coordinates must not poison a v1 save.
@@ -168,9 +192,10 @@ export function restoreConstructionWorld(raw){
       if(Object.keys(stored).length)materials.wall[key]=stored;
     }
   return {...initial,materials,revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
-    legacy:raw.legacy===true&&walls.length===0&&floors.size===initial.floorCells.length&&
+    legacy:raw.legacy===true&&walls.length===0&&openings.length===0&&starterRemoved.length===0&&
+      starterSolidSides.length===0&&floors.size===initial.floorCells.length&&
       Object.keys(STARTER_SHELL).every(k=>shell[k]===STARTER_SHELL[k]),
-    starterShell:shell,starterOwned:[...owned],
+    starterShell:shell,starterOwned:[...owned],starterRemoved,starterSolidSides,
     nextId:Number.isSafeInteger(raw.nextId)&&raw.nextId>=1&&raw.nextId<1e8?raw.nextId:1,
     floorCells:[...floors],wallEdges:walls,openings};
 }
@@ -185,13 +210,27 @@ export function constructionContains(world,x,z){
 export function constructionWallAt(world,x,z,radius=.26){
   const state=world?.construction||world;
   if(!state||state.legacy)return false;
-  const opened=topology(state).doors;
-  const starter=validStarter(state.starterShell);
-  const west=starter.west*BUILD_STEP,north=starter.north*BUILD_STEP;
-  if((Math.abs(x-west)<radius+.055&&
-      z>=starter.north*BUILD_STEP-radius&&z<=starter.south*BUILD_STEP+radius)||
-     (Math.abs(z-north)<radius+.055&&
-      x>=starter.west*BUILD_STEP-radius&&x<=starter.east*BUILD_STEP+radius))return true;
+  const topo=topology(state),opened=topo.doors;
+  // East/south were cosmetic cutaway in historic saves. An explicit user
+  // opening turns that side into a real wall with a proper navigation portal.
+  const shell=validStarter(state.starterShell);
+  const clear=(side,index)=>topo.removed.has(starterEdgeId(side,index))||
+    opened.has(starterEdgeId(side,index))||
+    ((side==='east'||side==='south')&&!topo.solid.has(side));
+  for(const side of ['west','east']){
+    const i=shell[side],j=floorIndex(z),xx=i*BUILD_STEP;
+    if(Math.abs(x-xx)<radius+.055)for(const at of [j-1,j,j+1])
+      if(at>=shell.north&&at<shell.south&&
+        z>=at*BUILD_STEP-radius&&z<=(at+1)*BUILD_STEP+radius&&
+        !clear(side,at))return true;
+  }
+  for(const side of ['north','south']){
+    const j=shell[side],i=floorIndex(x),zz=j*BUILD_STEP;
+    if(Math.abs(z-zz)<radius+.055)for(const at of [i-1,i,i+1])
+      if(at>=shell.west&&at<shell.east&&
+        x>=at*BUILD_STEP-radius&&x<=(at+1)*BUILD_STEP+radius&&
+        !clear(side,at))return true;
+  }
   for(const w of state.wallEdges){
     if(opened.has(w.id))continue;
     const bx=w.i*BUILD_STEP,bz=w.j*BUILD_STEP;
@@ -229,7 +268,7 @@ export function constructionWallOutward(world,edgeId){
 export function nearestConstructionEdge(world,point,maxDistance=.38){
   if(!finite(point?.x)||!finite(point?.z))return null;
   let best=null,distance=Infinity;
-  for(const w of world.wallEdges){
+  for(const w of constructionWallSegments(world)){
     const a=w.i*BUILD_STEP,b=w.j*BUILD_STEP;
     const d=w.axis==='h'
       ?Math.hypot(point.x-Math.max(a,Math.min(a+BUILD_STEP,point.x)),point.z-b)
@@ -244,8 +283,10 @@ function segmentsForOpening(walls,at,sections){
   if(!at)return null;
   const offsets=sections===4?[[-1,0,1,2],[-2,-1,0,1]]:[[-1,0,1]];
   for(const sequence of offsets){
-    const ids=sequence.map(d=>edge(at.axis,at.i+(at.axis==='h'?d:0),
-      at.j+(at.axis==='v'?d:0)));
+    const ids=sequence.map(d=>at.starterSide
+      ?starterEdgeId(at.starterSide,(at.axis==='h'?at.i:at.j)+d)
+      :edge(at.axis,at.i+(at.axis==='h'?d:0),
+        at.j+(at.axis==='v'?d:0)));
     if(ids.every(id=>walls.has(id)))return ids;
   }
   return null;
