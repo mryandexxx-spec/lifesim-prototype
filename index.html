@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
@@ -20,7 +20,7 @@
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
       "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3-f4f2-f4g2",
       "./src/painting.js":"./src/painting.js?v=1.2u.16-h5c",
-      "./src/construction.js":"./src/construction.js?v=1.2u-f5b3",
+      "./src/construction.js":"./src/construction.js?v=1.2u-f5b3-f5b4",
        "./src/painting-visual.js":"./src/painting-visual.js?v=1.2u-h5asafe",
        "./src/painting-gallery.js":"./src/painting-gallery.js?v=1.2u-h5b-20261117-f5a3",
        "./src/meshy-painting-runtime.js":"./src/meshy-painting-runtime.js?v=1.2u-h5asafe",
@@ -134,6 +134,8 @@
         <button type="button" data-build-tool="paint-room">🎨 Пол комнаты</button>
         <button type="button" data-build-tool="paint-floor">▦ Плитка пола</button>
         <button type="button" data-build-tool="paint-wall">🖌 Обои / стены</button>
+        <button type="button" data-build-tool="paint-ceiling-room">▰ Потолок комнаты</button>
+        <button type="button" data-build-tool="paint-ceiling-tile">▤ Плитка потолка</button>
         <button type="button" data-build-tool="sample-finish">◉ Пипетка</button>
         <button type="button" data-build-tool="door">🚪 Дверь</button>
         <button type="button" data-build-tool="window">▥ Окно</button>
@@ -159,6 +161,7 @@
           </label>
         </div>
         <div id="build-finish-colors" class="build-finish-colors" role="group" aria-label="Палитра отделки"></div>
+        <small id="build-finish-tip">Узоры и направление досок входят в выбранное покрытие.</small>
       </div>
       <div id="build-wall-controls" class="build-wall-controls" hidden>
         <strong id="build-wall-label">Выбрана стена</strong>
@@ -171,6 +174,7 @@
         <button type="button" data-build-walls="up">Стены ↑</button>
         <button type="button" data-build-walls="cut" aria-pressed="true">Срез</button>
         <button type="button" data-build-walls="down">Стены ↓</button>
+        <button type="button" id="build-ceiling-toggle" aria-pressed="false">Потолок ◻</button>
       </div><button type="button" id="build-undo" aria-label="Отменить строительство" disabled>↶</button>
       <button type="button" id="build-redo" aria-label="Вернуть строительство" disabled>↷</button></div>
       <output id="build-feedback" class="build-feedback" role="status" aria-live="polite">Выбери инструмент и коснись участка</output>
@@ -446,7 +450,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
