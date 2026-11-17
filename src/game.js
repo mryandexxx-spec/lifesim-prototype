@@ -1615,6 +1615,9 @@ function boot() {
     applyItemAppearance(node,itemDefinitionId);
   };
   const decorNodes=new Map();
+  // H5c: cache the 78 theme stroke entities per easel instead of repeatedly
+  // traversing the PlayCanvas child tree at every Safari animation frame.
+  const paintStrokeCache=new WeakMap();
   const decorTemplates=new Map();
   const f4eOriginalPositions=new WeakMap();
   // H5: bounded brush compositions come from the testable data-only catalog.
@@ -4561,11 +4564,17 @@ function boot() {
         const stage=activeAction?.phase==='using'
           ?Math.floor(Math.min(1,activeAction.elapsed/ACTIONS.paint.duration)*6)
           :0;
+        let cached=paintStrokeCache.get(node);
+        if(!cached){
+          cached=new Map(PAINT_CONTENT_IDS.map(theme=>[theme,
+            Array.from({length:6},(_,i)=>node.findByName('H5 paint '+theme+' '+i))]));
+          paintStrokeCache.set(node,cached);
+        }
         const seed=painter?.activitySession?.sessionId
           ?paintingSeedFromSession(painter.activitySession.sessionId):0;
         const preview=compositionForArtwork(contentId,seed,1);
         for(const theme of PAINT_CONTENT_IDS)for(let i=0;i<6;i++){
-          const stroke=node.findByName('H5 paint '+theme+' '+i);
+          const stroke=cached.get(theme)?.[i];
           if(!stroke)continue;
           const shown=theme===contentId&&i<stage&&Boolean(preview[i]);
           if(shown){

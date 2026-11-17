@@ -18,6 +18,15 @@ arrive(h);
 tickHousehold(h,44.8);
 assert.equal(h.createdWorks.length,0);
 assert.equal(h.action?.id,'paint');
+// H5c: exercise a brand-new, seeded high-tier composition through the real
+// PlayCanvas finished-art renderer while the legacy H5a brush completes.
+h.createdWorks.push({
+  id:'work:painting:alex:h5c-webgl',ownerId:'alex',
+  easelInstanceId:tx.instanceId,contentId:'painting.aurora',
+  seed:9876543,quality:86,createdAt:h.minutes,
+  renderVersion:1,kind:'artwork',location:'studio',
+  origin:{x:pose.x,z:pose.z,yaw:pose.yaw}
+});
 h.autonomy.enabled=false;h.otherSim.autonomy.enabled=false;
 h.actionQueues.byResident.alex=[];
 const browser=await chromium.launch({headless:true,args:[
@@ -54,4 +63,6 @@ try{
     try{return JSON.parse(localStorage.getItem(key))}catch{return null}
   },SAVE_KEY);
   console.log('Saved state exists?',Boolean(saved));
+  assert.ok(saved?.createdWorks?.some(work=>work.contentId==='painting.aurora'&&
+    work.renderVersion===1),'Seeded high-tier artwork survived browser runtime');
 }finally{await browser.close();}
