@@ -1876,7 +1876,7 @@ function boot() {
   // Room platform: visible cutaway walls, planks, and sunlight accents.
   // F4D: double the navigable area eastward; never move legacy furnishings.
   // Old floor starts at x=-5; the new wing ends at x=14.25.  box('foundation',4.65,-0.28,0,19.8,.47,9.2,M.edge);
-  box('floor',4.625,-0.032,0,19.25,.12,8.65,M.floor);
+  const starterFloorSurface=box('floor',4.625,-0.032,0,19.25,.12,8.65,M.floor);
   for (let i=0;i<19;i++) box('floor plank',-4.45+i*.99,.034,0,.021,.008,8.6,M.line);
 
   const starterBackDecor=new pc.Entity('Starter back-wall art anchor');
@@ -1918,6 +1918,12 @@ function boot() {
     const n=starterShellOffset(state,'north'),s=starterShellOffset(state,'south');
     const width=19.27+e-w,depth=8.65+s-n;
     const widthCenter=4.625+(w+e)/2,depthCenter=(n+s)/2;
+    // The old visible planks end at +/-4.325 while the construction grid
+    // begins at +/-4.5. Bridge that seam only on sides actually extended,
+    // leaving the accepted original floor appearance unchanged before edits.
+    const floorMinZ=n<0?-4.515:-4.325,floorMaxZ=s>0?4.515:4.325;
+    starterFloorSurface.setPosition(4.625,-.032,(floorMinZ+floorMaxZ)/2);
+    starterFloorSurface.setLocalScale(19.25,.12,floorMaxZ-floorMinZ);
     // Preserve exact legacy geometry at zero offset. Resizing moves the real
     // original walls, their coping and skirting, not merely an outline.
     legacyWallNodes[0].setPosition(widthCenter,1.40,-4.34+n);
