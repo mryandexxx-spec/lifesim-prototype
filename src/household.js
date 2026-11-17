@@ -385,6 +385,23 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
   return other?.action?.targetInstanceId!==item.instanceId &&
     !(other?.action?.id===itemId&&!other.action.targetInstanceId);
 }
+/** F4F.2: nearest reachable dining table at dispatch, using this resident's position.
+ * The actual meal remains the existing table-specific dining action.
+ */
+export function nearestAvailableDiningTable(root,residentId='alex'){
+  const actor=getActor(root,residentId);
+  if(!actor||!resolveActionFurniture(root?.world,'fridge'))return null;
+  let best=null;
+  for(const table of root.world?.furniture?.instances??[]){
+    if(table.prefabId!=='diningtable'||table.location!=='home'||
+      !furnitureAvailable(root,'dining',residentId,table.instanceId))continue;
+    const distance=Math.hypot(actor.position.x-table.x,actor.position.z-table.z);
+    if(!best||distance<best.distance-1e-6||
+      (Math.abs(distance-best.distance)<=1e-6&&table.instanceId<best.instanceId))
+      best={instanceId:table.instanceId,distance};
+  }
+  return best;
+}
 const objectRegistry=legacyObjectRegistry();
 function validReadingSource(root,actor){
   const action=actor?.action;
