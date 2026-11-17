@@ -203,8 +203,10 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       const index=app.interview?.answers?.length||0;
       const question=INTERVIEW_QUESTIONS_BY_CAREER[app.careerId]?.[index];
       body.append(element('p','career-phone-muted','Вопрос '+(index+1)+' из 3 · игровое время остановлено, пока открыт экран ответа.'));
-      if(lastInterviewFeedback)
-        body.append(element('p','career-phone-notice',lastInterviewFeedback));
+      const preceding=index>0?INTERVIEW_QUESTIONS_BY_CAREER[app.careerId]?.[index-1]
+        ?.answers.find(a=>a.id===app.interview.answers[index-1])?.feedback:null;
+      if(lastInterviewFeedback||preceding)
+        body.append(element('p','career-phone-notice',lastInterviewFeedback||preceding));
       body.append(element('h3','career-phone-section-title',question.text));
       for(const option of question.answers){
         body.append(action(option.text,()=>{
@@ -237,7 +239,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         '. '+(app.kitchenSkill>=2?'Подготовка пригодится на кухне.':
           'Для начальной должности предусмотрено обучение на сменах.')));
       body.append(element('p','career-phone-muted',
-        'Вакансия подтверждена работодателем. Смены и зарплата начнутся только после подписания договора.'));
+        'Вакансия подтверждена работодателем. Смены начнутся после подписания договора. Зарплата начисляется в конце фактически отработанной смены.'));
       body.append(action('Подписать договор',()=>{
         const live=personRoot();if(!live)return;
         const result=finishRecruitmentApplication(live,who,'accept');
