@@ -145,6 +145,16 @@ export function stepAnimation(previous,signals,dt) {
     const stroke=Math.sin(t*5.2),breath=Math.sin(t*2.1);
     armTarget=[-28-5*breath,-67+14*stroke];
     elbowTarget=[-18,-38-7*stroke];
+  }else if(['cook','prep','wash'].includes(action)){
+    // F4G: actual repeated chopping/stirring/scrubbing gestures at a verified
+    // station. Cosmetic arm motion only; meals and XP come from real use.
+    const stir=Math.sin(t*(action==='cook'?5.0:action==='prep'?4.2:6.2));
+    const second=Math.sin(t*2.0);
+    armTarget=action==='cook'?[-34+6*second,-67+20*stir]:
+      action==='prep'?[-55+13*stir,-58-11*stir]:
+      [-47+15*stir,-51-13*stir];
+    elbowTarget=action==='cook'?[-27,-45+8*stir]:
+      action==='prep'?[-37,-40+13*stir]:[-45,-40+16*stir];
   }else if(['lamp','mirror','dresser','wardrobe'].includes(action)){
     // F4E: the authored procedural rig performs a physical hand gesture
     // toward the utility object while staying at the verified A* approach.

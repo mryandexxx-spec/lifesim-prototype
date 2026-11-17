@@ -11,6 +11,7 @@ import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getHobbyContent} from './hobby-content.js';
 import {HOBBY_ACTIVITIES,HOBBY_CONTENT} from './hobby-reading.js';
+import {kitchenRecipe} from './kitchen.js';
 
 export const ACTION_QUEUE_SCHEMA=1;
 export const MAX_ACTION_QUEUE=12;
@@ -31,6 +32,12 @@ export function sanitizeQueueCommand(id,raw,persons){
     if(raw.autoTable===true)return {type,actionId:'dining',autoTable:true};
     if(raw.targetInstanceId!==undefined&&!validFurnitureInstanceId(raw.targetInstanceId))
       return null;
+    if(raw.actionId==='cook'){
+      if(!kitchenRecipe(raw.recipeId)||!raw.targetInstanceId)return null;
+      return {type,actionId:'cook',targetInstanceId:raw.targetInstanceId,recipeId:raw.recipeId};
+    }
+    // No untrusted recipe metadata may alter old object tasks.
+    if(raw.recipeId!==undefined)return null;
     return raw.targetInstanceId
       ?{type,actionId:raw.actionId,targetInstanceId:raw.targetInstanceId}
       :{type,actionId:raw.actionId};

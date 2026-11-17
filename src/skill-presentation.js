@@ -3,9 +3,14 @@ import {deriveSkillLevel,getSkillDefinition} from './skill-registry.js';
 
 const SKILL_GUIDANCE=Object.freeze({
   literature:'Читай книги у купленного книжного шкафа. Совместное чтение тоже развивает эрудицию.',
-  painting:'Рисуй у купленного мольберта: каждая законченная картина остаётся в коллекции.'
+  painting:'Рисуй у купленного мольберта: каждая законченная картина остаётся в коллекции.',
+  cooking:'Готовь на плите после подготовки продуктов на рабочей поверхности. Новые блюда открываются по уровню кулинарии.'
 });
-const UNLOCK_LABELS=Object.freeze({'books.read.classics':'Книга «Пути старых городов»'});
+const UNLOCK_LABELS=Object.freeze({
+  'books.read.classics':'Книга «Пути старых городов»',
+  'cook.pasta':'Рецепт «Паста с овощами»',
+  'cook.gratin':'Рецепт «Сливочная запеканка»'
+});
 
 export function skillProfileRows(progress,registry){
   if(registry?.schema!==1||!registry.skills||typeof registry.skills!=='object')return [];

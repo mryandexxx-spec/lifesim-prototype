@@ -57,8 +57,9 @@ test('H4 invalid XP/old saves create no imaginary progress, no imaginary skill',
   assert.equal(skillProfileRows(broken,HOBBY_SKILLS)[0].xp,0);
   assert.equal(skillProfileRows({schema:1,xpById:{literature:-100}},HOBBY_SKILLS)[0].level,0);
   assert.equal(skillProfileRows({schema:1,xpById:{literature:'135'}},HOBBY_SKILLS)[0].level,0);
-  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS).length,2);
+  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS).length,3);
   assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS)[1].id,'painting');
+  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS)[2].id,'cooking');
 });
 
 test('H4 advanced authored literature is a real threshold-gated item content, not just a badge',()=>{
@@ -124,7 +125,7 @@ test('H4 Safari presentation, owned unlock, voice-over semantics and static depl
   assert.match(html,/id="mind-skills-list"/);
   assert.match(html,/id="reading-content-select"/);
   assert.match(html,/book.classic.pathways/);
-  assert.ok(html.includes('1.2u.13 · F4F.2 / H5a-safe / H5.1'));
+  assert.ok(html.includes('1.2u.14 · F4G / H5a-safe / H5.1 / F4F.2'));
   assert.match(game,/skillProfileRows/);
   assert.match(game,/canReadHobbyContent/);
   assert.ok(css.includes('.skill-card-progress'));

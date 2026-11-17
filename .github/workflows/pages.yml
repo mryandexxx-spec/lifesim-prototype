@@ -40,6 +40,7 @@ jobs:
           node --check src/furniture-products.js
           node --check src/furniture-procedural-library.js
           node --check src/dining.js
+          node --check src/kitchen.js
           node --check src/seat-furniture.js
           node --check src/furniture-interactions.js
           node --check src/furniture-thumbnails.js
@@ -164,7 +165,7 @@ jobs:
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
           cp src/object-once-ledger.js site/src/
-          cp src/hobby-content.js site/src/
+          cp src/kitchen.js src/hobby-content.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/
           cp src/painting.js site/src/

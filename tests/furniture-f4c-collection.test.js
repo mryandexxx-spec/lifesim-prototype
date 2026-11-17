@@ -20,13 +20,13 @@ const R=legacyObjectRegistry(),offers=selectShopCatalog();
 const text=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.36}]};
 test('F4C: original shop assortment plus the H5 functional easel',()=>{
-  assert.equal(FURNITURE_PRODUCTS.length,37);
-  assert.equal(offers.length,37);
+  assert.equal(FURNITURE_PRODUCTS.length,43);
+  assert.equal(offers.length,43);
   assert.equal(FURNITURE_LEGACY_OFFERS.length,6);
-  assert.equal(PROCEDURAL_NEW_PREFABS.length,10);
+  assert.equal(PROCEDURAL_NEW_PREFABS.length,13);
   assert.equal(ORIGINAL_FURNITURE.length,10);
-  assert.equal(marketListing().length,37);
-  assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,37);
+  assert.equal(marketListing().length,43);
+  assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,43);
   assert.equal(SHOP_START_CREDITS,5000);
   assert.equal(SHOP_SELL_PERCENT,70);
 });
@@ -60,11 +60,11 @@ test('F4C: each new floor prefab is template-only, safely movable, not gifted in
   }
   assert.deepEqual(restoreFurnitureWorld(JSON.parse(JSON.stringify(world))),world);
 });
-test('F4C: all 29 crafted modelKeys are visually different by actual dimensions/shape',()=>{
+test('F4C: all 35 crafted modelKeys are visually different by actual dimensions/shape',()=>{
   const authored=FURNITURE_PRODUCTS.filter(x=>x.modelKey);
-  assert.equal(authored.length,29);
-  assert.equal(Object.keys(PROCEDURAL_FURNITURE_MODELS).length,29);
-  assert.equal(new Set(authored.map(x=>x.modelKey)).size,29);
+  assert.equal(authored.length,35);
+  assert.equal(Object.keys(PROCEDURAL_FURNITURE_MODELS).length,35);
+  assert.equal(new Set(authored.map(x=>x.modelKey)).size,35);
   const geometry=new Map();
   for(const offer of authored){
     const shape=proceduralFurnitureModel(offer.modelKey);

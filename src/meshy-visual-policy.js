@@ -128,7 +128,7 @@ export function canShowMeshy({
   showerReady = false, toiletBusy = false, toiletReady = false
 } = {}) {
   const eligible=actionId===null||actionId==='sofa'||
-    ['lamp','mirror','dresser','wardrobe'].includes(actionId)||
+    ['lamp','mirror','dresser','wardrobe','cook','prep','wash'].includes(actionId)||
     (actionId==='music'&&(!musicBusy||musicReady))||
     (actionId==='hobby'&&readingReady)||
     (actionId==='paint'&&paintingReady)||
