@@ -124,7 +124,7 @@ function buildRect(a,b){
   return {cells,walls};
 }
 /** Pure preview; no state, queue, furniture, money or localStorage mutation. */
-export function proposeConstructionEdit(raw,command,{furniture=[],residents=[]}={}){
+export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[]}={}){
   const world=restoreConstructionWorld(raw);
   if(!command||typeof command.type!=='string')return fail('invalid-command');
   let floors=new Set(world.floorCells),walls=new Map(world.wallEdges.map(w=>[w.id,w]));
@@ -141,6 +141,12 @@ export function proposeConstructionEdit(raw,command,{furniture=[],residents=[]}=
       const removed=new Set(r.cells);
       for(const person of residents)if(finite(person?.x)&&finite(person?.z)&&removed.has(cell(floorIndex(person.x),floorIndex(person.z))))return fail('resident-on-floor');
       for(const item of furniture)if(item.location==='home'&&finite(item.x)&&finite(item.z)&&removed.has(cell(floorIndex(item.x),floorIndex(item.z))))return fail('furniture-on-floor');
+      for(const key of removed){
+        const [i,j]=key.split(',').map(Number);
+        const patch={minX:i*BUILD_STEP,minZ:j*BUILD_STEP,
+          maxX:(i+1)*BUILD_STEP,maxZ:(j+1)*BUILD_STEP};
+        if(furnitureBoxes.some(r=>overlap(patch,r)))return fail('furniture-on-floor');
+      }
       for(const k of removed)floors.delete(k);
       for(const [k,w] of walls)if(!floors.has(cell(w.i,w.j))&&!floors.has(cell(w.i-(w.axis==='v'?1:0),w.j-(w.axis==='h'?1:0))))walls.delete(k);
       openings=openings.filter(o=>o.edgeIds.every(k=>walls.has(k)));
@@ -154,6 +160,56 @@ export function proposeConstructionEdit(raw,command,{furniture=[],residents=[]}=
     if(!line)return fail('wall-must-be-straight');
     for(const w of line)if(!lotCell(w.i,w.j)||!floors.has(cell(w.i-(w.axis==='v'?1:0),w.j-(w.axis==='h'?1:0)))&&!floors.has(cell(w.i,w.j)))return fail('outside-floor');
     line.forEach(w=>walls.set(w.id,w));
+  }else if(type==='move-wall'){
+    const selected=walls.get(command.edgeId);
+    if(!selected)return fail('wall-not-found');
+    const step=selected.axis==='h'?command.deltaJ:command.deltaI;
+    const orth=selected.axis==='h'?command.deltaI:command.deltaJ;
+    if(!Number.isSafeInteger(step)||Math.abs(step)>8||step===0||orth!==0)
+      return fail('invalid-wall-move');
+    const axis=selected.axis,position=axis==='h'?selected.j:selected.i;
+    const candidates=[...walls.values()].filter(w=>w.axis===axis&&
+      (axis==='h'?w.j:w.i)===position);
+    const indexed=new Map(candidates.map(w=>[axis==='h'?w.i:w.j,w]));
+    const startIndex=axis==='h'?selected.i:selected.j;
+    let low=startIndex,high=startIndex;
+    while(indexed.has(low-1))low--;
+    while(indexed.has(high+1))high++;
+    const moved=[];
+    for(let i=low;i<=high;i++){
+      const original=indexed.get(i);
+      if(!original)return fail('invalid-wall-move');
+      moved.push(original);
+    }
+    const oldIds=new Set(moved.map(w=>w.id));
+    const replaceIds=new Map();
+    for(const w of moved){
+      const i=w.i+(axis==='v'?step:0),j=w.j+(axis==='h'?step:0);
+      if(!lotCell(i,j))return fail('lot-bounds');
+      const id=edge(axis,i,j);
+      if(walls.has(id)&&!oldIds.has(id))return fail('wall-already-exists');
+      replaceIds.set(w.id,id);
+    }
+    for(const w of moved)walls.delete(w.id);
+    for(const w of moved){
+      const i=w.i+(axis==='v'?step:0),j=w.j+(axis==='h'?step:0);
+      walls.set(edge(axis,i,j),{...w,id:edge(axis,i,j),i,j});
+      // The wall drags its floor strip so it cannot hang beyond the foundation.
+      for(let offset=Math.min(0,step);offset<Math.max(0,step);offset++){
+        const a=w.i+(axis==='v'?offset:0),b=w.j+(axis==='h'?offset:0);
+        if(lotCell(a,b))floors.add(cell(a,b));
+      }
+    }
+    const former=position,shifted=position+step;
+    for(let at=Math.min(former,shifted);at<Math.max(former,shifted);at++){
+      for(const extremity of [low,high+1]){
+        const i=axis==='v'?at:extremity,j=axis==='h'?at:extremity;
+        const perp=axis==='v'?'h':'v',id=edge(perp,i,j);
+        if(!lotCell(i,j))return fail('lot-bounds');
+        if(!walls.has(id))walls.set(id,{id,axis:perp,i,j,heightClass:'normal'});
+      }
+    }
+    openings=openings.map(o=>({...o,edgeIds:o.edgeIds.map(id=>replaceIds.get(id)||id)}));
   }else if(['erase-wall','door','window'].includes(type)){
     const found=typeof command.edgeId==='string'?walls.get(command.edgeId):
       nearestConstructionEdge(world,command.at||{});
@@ -179,6 +235,18 @@ export function proposeConstructionEdit(raw,command,{furniture=[],residents=[]}=
   const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),openings})!==
     JSON.stringify({floors:[...world.floorCells].sort(),walls:world.wallEdges.map(w=>w.id).sort(),openings:world.openings});
   if(!changed)return fail('unchanged');
+  // A room wall is structural, never allowed through a purchased object,
+  // protected kitchen fixture, painting easel or resident's occupied space.
+  const existing=new Set(world.wallEdges.map(w=>w.id));
+  for(const w of walls.values()){
+    if(existing.has(w.id))continue;
+    const x=w.i*BUILD_STEP,z=w.j*BUILD_STEP;
+    const thickness=.12;
+    const volume=w.axis==='h'
+      ?{minX:x,minZ:z-thickness,maxX:x+BUILD_STEP,maxZ:z+thickness}
+      :{minX:x-thickness,minZ:z,maxX:x+thickness,maxZ:z+BUILD_STEP};
+    if(furnitureBoxes.some(r=>overlap(volume,r)))return fail('wall-intersects-furniture');
+  }
   const next={...world,revision:world.revision+1,legacy:false,nextId,floorCells:[...floors],
     wallEdges:[...walls.values()],openings};
   for(const resident of residents)if(finite(resident?.x)&&finite(resident?.z)&&

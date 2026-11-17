@@ -64,3 +64,29 @@ test('F5-A edit guards lot and source revision',()=>{
  assert.equal(original.revision,0);
  assert.equal(BUILD_LOT.maxX,23);
 });
+
+test('F5-A wall relocation preserves door IDs and extends foundation safely',()=>{
+ const first=proposeConstructionEdit(newConstructionWorld(),{type:'room',
+   from:{x:14,z:-2},to:{x:18,z:2}}).world;
+ const wall=first.wallEdges.find(w=>w.axis==='v'&&w.i===36&&w.j===0);
+ const door=proposeConstructionEdit(first,{type:'door',edgeId:wall.id});
+ assert.equal(door.ok,true,door.reason);
+ const moved=proposeConstructionEdit(door.world,{type:'move-wall',edgeId:wall.id,deltaI:2,deltaJ:0});
+ assert.equal(moved.ok,true,moved.reason);
+ assert.ok(moved.world.wallEdges.some(w=>w.axis==='v'&&w.i===38&&w.j===0));
+ assert.ok(moved.world.openings[0].edgeIds.every(id=>moved.world.wallEdges.some(w=>w.id===id)));
+ assert.ok(constructionContains(moved.world,18.3,0));
+ assert.equal(moved.world.openings[0].id,door.world.openings[0].id);
+ assert.equal(proposeConstructionEdit(moved.world,{type:'move-wall',edgeId:'v:38,0',
+   deltaI:30,deltaJ:0}).reason,'invalid-wall-move');
+});
+test('F5-A walls never cut through bought furniture or delete its supporting floor',()=>{
+ const initial=newConstructionWorld();
+ const occupied=[{minX:15.1,maxX:15.9,minZ:-.4,maxZ:.4}];
+ const collision=proposeConstructionEdit(initial,{type:'room',from:{x:15,z:0},to:{x:17,z:2}},
+   {furnitureBoxes:occupied});
+ assert.equal(collision.reason,'wall-intersects-furniture');
+ const extension=proposeConstructionEdit(initial,{type:'floor',from:{x:15,z:-2},to:{x:18,z:2}}).world;
+ assert.equal(proposeConstructionEdit(extension,{type:'remove-floor',from:{x:15,z:-1},to:{x:17,z:1}},
+   {furnitureBoxes:occupied}).reason,'furniture-on-floor');
+});
