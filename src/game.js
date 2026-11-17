@@ -4149,9 +4149,10 @@ function boot() {
     clearBuildPending();resetBuildWallSelection();
     selectedBuildOpening=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
-    if(type.startsWith('paint-ceiling')&&!ceilingPreview){
-      ceilingPreview=true;
-      $('build-ceiling-toggle').setAttribute('aria-pressed','true');
+    const wantCeiling=type.startsWith('paint-ceiling');
+    if(wantCeiling!==ceilingPreview){
+      ceilingPreview=wantCeiling;
+      $('build-ceiling-toggle').setAttribute('aria-pressed',String(ceilingPreview));
       syncConstructionRender(true);
     }
     $('build-editor').dataset.tool=type;
