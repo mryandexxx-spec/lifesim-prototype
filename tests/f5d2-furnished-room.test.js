@@ -75,12 +75,16 @@ test('F5-D.2 unified undo and redo includes furniture and walls in one transacti
   assert.notDeepEqual(result.furniture,initial.furniture);
   assert.equal(get(result.furniture,'shop-rug-b').yaw,180);
 });
-test('F5-D.2 build room copy does not duplicate paid furniture',()=>{
-  const state=setup();
+test('F5-D.3a build room copy keeps purchased items only at original location',()=>{
+  const state=setup(),oldIds=state.world.furniture.instances.map(x=>x.instanceId);
   const result=proposeConstructionEdit(state.world.construction,{
     type:'room-duplicate',source,at:destination,rotation:90
   },{furniture:state.world.furniture.instances});
-  assert.equal(result.reason,'room-has-furniture');
+  assert.equal(result.ok,true,result.reason);
+  assert.equal(state.world.furniture.instances.length,12);
+  assert.deepEqual(state.world.furniture.instances.map(x=>x.instanceId),oldIds);
+  assert.equal(state.world.furniture.instances.find(x=>x.instanceId==='shop-rug-b').x,17);
+  assert.equal(constructionRoomSelection(result.world,destination).ok,true);
 });
 test('F5-D.2 rejects reserved furniture and leaves both worlds unchanged',()=>{
   const state=setup(),before=JSON.stringify(state.world);
