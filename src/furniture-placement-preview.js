@@ -10,10 +10,10 @@ const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 export function cameraPlacementPose(view,previous=null){
   const cx=Number.isFinite(view?.centerX)?view.centerX:0;
   const cz=Number.isFinite(view?.centerZ)?view.centerZ:0;
-  // Inside the visual room walls. Collision/nav rules remain the authoritative
+  // Inside the lot, including newly built detached rooms. Collision/nav rules remain the authoritative
   // final decision; these clamps do not silently "approve" a placement.
-  const x=snapFurnitureCoordinate(clamp(cx,-4.25,13.25));
-  const z=snapFurnitureCoordinate(clamp(cz,-3.75,3.75));
+  const x=snapFurnitureCoordinate(clamp(cx,-8.75,22.75));
+  const z=snapFurnitureCoordinate(clamp(cz,-11.75,11.75));
   const yaw=[0,90,180,270].includes(previous?.yaw)?previous.yaw:0;
   return {x,z,yaw};
 }
@@ -25,7 +25,7 @@ export function dragShopPlacement(view,rawPose,dx,dy,height){
   if(!rawPose||!Number.isFinite(rawPose.x)||!Number.isFinite(rawPose.z))
     return null;
   const delta=screenFloorDragDelta(view,dx,dy,height);
-  return {x:clamp(rawPose.x+delta.x,-4.25,13.25),
-    z:clamp(rawPose.z+delta.z,-3.75,3.75),
+  return {x:clamp(rawPose.x+delta.x,-8.75,22.75),
+    z:clamp(rawPose.z+delta.z,-11.75,11.75),
     yaw:[0,90,180,270].includes(rawPose.yaw)?rawPose.yaw:0};
 }
