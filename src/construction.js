@@ -444,7 +444,7 @@ export function constructionRoomSelection(raw,at,{allowStarter=false}={}){
       j>=world.starterShell.north&&j<world.starterShell.south));
   if(usesStarter&&!allowStarter)return fail('room-protected');
   if(i1-i0<2||j1-j0<2||selected.cells.length!==(i1-i0)*(j1-j0)||
-    selected.cells.length>(usesStarter?1200:512))return fail('room-not-rectangular');
+    selected.cells.length>1200)return fail('room-not-rectangular');
   const explicit=new Map(world.wallEdges.map(w=>[w.id,w]));
   const virtual=new Map(starterShellSegments(world)
     .filter(w=>!(world.starterRemoved||[]).includes(w.id))
