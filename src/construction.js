@@ -313,13 +313,40 @@ function buildRect(a,b){
   return {cells,walls};
 }
 /** Pure preview; no state, queue, furniture, money or localStorage mutation. */
-export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[]}={}){
+export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[],wallDecor=[]}={}){
   const world=restoreConstructionWorld(raw);
   if(!command||typeof command.type!=='string')return fail('invalid-command');
   let floors=new Set(world.floorCells),walls=new Map(world.wallEdges.map(w=>[w.id,w]));
   let openings=[...world.openings],nextId=world.nextId;
   const materials=clone(world.materials);
   let starterShell={...world.starterShell},starterOwned=new Set(world.starterOwned);
+  const starterRemoved=new Set(world.starterRemoved||[]);
+  const starterSolidSides=new Set(world.starterSolidSides||[]);
+  const starterEdges=()=>starterShellSegments({starterShell}).filter(w=>!starterRemoved.has(w.id));
+  const allWalls=()=>new Map([...walls,...starterEdges().map(w=>[w.id,w])]);
+  const openingFitsDecor=ids=>{
+    const records=ids.map(id=>allWalls().get(id)).filter(Boolean);
+    if(!records.length)return false;
+    const side=records[0].starterSide;
+    if(!side)return true;
+    const first=Math.min(...records.map(e=>(e.axis==='h'?e.i:e.j)*BUILD_STEP));
+    const last=Math.max(...records.map(e=>(e.axis==='h'?e.i:e.j)*BUILD_STEP+BUILD_STEP));
+    // Authored landscape and left-wall bookshelf are not movable shop items:
+    // never delete them to create a doorway. The prebuilt window may be
+    // replaced by hiding its visual mesh, but not its data or identity.
+    if(side==='north'&&first<.92&&last>-.53)return false;
+    if(side==='west'&&first<.90&&last>-.93)return false;
+    const line=starterShell[side]*BUILD_STEP;
+    for(const decor of wallDecor){
+      if(!finite(decor?.x)||!finite(decor?.z))continue;
+      const along=(side==='north'||side==='south')?decor.x:decor.z;
+      const across=(side==='north'||side==='south')?decor.z:decor.x;
+      if(Math.abs(across-line)>.6)continue;
+      const pad=finite(decor.radius)?Math.max(.25,Math.min(1.3,decor.radius)):.43;
+      if(first<along+pad&&last>along-pad)return false;
+    }
+    return true;
+  };
   const type=command.type;
   if(['room','floor','remove-floor'].includes(type)){
     const r=buildRect(command.from,command.to);
@@ -345,14 +372,18 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       openings=openings.filter(o=>o.edgeIds.every(k=>walls.has(k)));
     }else{
       r.cells.forEach(k=>floors.add(k));
-      if(type==='room')r.walls.forEach(w=>walls.set(w.id,w));
+      if(type==='room'){
+        const existingStarter=new Set(starterEdges().map(w=>edge(w.axis,w.i,w.j)));
+        r.walls.forEach(w=>{if(!existingStarter.has(w.id))walls.set(w.id,w);});
+      }
     }
   }else if(type==='wall'){
     if(!command.from||!command.to||![command.from.x,command.from.z,command.to.x,command.to.z].every(finite))return fail('invalid-wall');
     const line=editSegments(command.from,command.to);
     if(!line)return fail('wall-must-be-straight');
     for(const w of line)if(!lotCell(w.i,w.j)||!floors.has(cell(w.i-(w.axis==='v'?1:0),w.j-(w.axis==='h'?1:0)))&&!floors.has(cell(w.i,w.j)))return fail('outside-floor');
-    line.forEach(w=>walls.set(w.id,w));
+    const existingStarter=new Set(starterEdges().map(w=>edge(w.axis,w.i,w.j)));
+    line.forEach(w=>{if(!existingStarter.has(w.id))walls.set(w.id,w);});
   }else if(type==='move-wall'&&Object.hasOwn(STARTER_SIDE,starterSide(command.edgeId))){
     const side=starterSide(command.edgeId);
     const shift=(side==='west'||side==='east')?command.deltaI:command.deltaJ;
@@ -390,6 +421,14 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
         return fail('starter-strip-occupied');
       floors.delete(k);starterOwned.delete(k);
     }
+    const available=new Set(starterEdges().map(w=>w.id));
+    if(openings.some(o=>o.edgeIds.some(id=>starterSide(id)&&!available.has(id)))||
+      [...starterRemoved].some(id=>{
+        const at=starterIndex(id),s=starterSide(id);
+        return s&&(s==='north'||s==='south'
+          ?at<starterShell.west||at>=starterShell.east
+          :at<starterShell.north||at>=starterShell.south);
+      }))return fail('starter-opening-outside');
     if(side==='west'||side==='north'){
       const line=starterShell[side]*BUILD_STEP,half=.14;
       const corridor=side==='west'
@@ -468,6 +507,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       else materials.floor[k]=command.materialId;
   }else if(type==='paint-wall'){
     const id=command.edgeId,starter=Object.hasOwn(STARTER_SIDE,starterSide(id));
+    const materialKey=starter?'starter:'+starterSide(id):id;
     const target=walls.get(id);
     if(!starter&&!target)return fail('wall-not-found');
     if(!Object.hasOwn(BUILD_FINISHES.wall,command.materialId))return fail('unknown-finish');
@@ -486,12 +526,13 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       ids.splice(0,ids.length,...Array.from({length:high-low+1},(_,i)=>byIndex.get(low+i)));
     }
     for(const wallId of ids){
-      const faces={...(materials.wall[wallId]||{})};
+      const selected=starter?materialKey:wallId;
+      const faces={...(materials.wall[selected]||{})};
       for(const face of command.side==='both'||!command.side?['a','b']:[command.side])
         if(command.materialId==='wall.default')delete faces[face];
         else faces[face]=command.materialId;
-      if(Object.keys(faces).length)materials.wall[wallId]=faces;
-      else delete materials.wall[wallId];
+      if(Object.keys(faces).length)materials.wall[selected]=faces;
+      else delete materials.wall[selected];
     }
   }else if(['erase-wall','door','window','arch','change-opening'].includes(type)){
     if(type==='change-opening'){
@@ -502,29 +543,38 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       // Editing an opening preserves its immutable ID; changing from door to
       // window or vice versa also changes the A* portal on commit, never preview.
       const middle=before.edgeIds[Math.floor((before.edgeIds.length-1)/2)];
-      const anchor=walls.get(middle);
-      const ids=segmentsForOpening(walls,anchor,style.sections);
+      const candidateWalls=allWalls();
+      const anchor=candidateWalls.get(middle);
+      const ids=segmentsForOpening(candidateWalls,anchor,style.sections);
       if(!ids)return fail('opening-needs-wall-space');
       if(openings.some(o=>o.id!==before.id&&o.edgeIds.some(k=>ids.includes(k))))
         return fail('opening-overlap');
+      if(!openingFitsDecor(ids))return fail('wall-has-decor');
       openings=openings.map(o=>o.id===before.id?{
         ...o,type:style.type,styleId:command.styleId,edgeIds:ids
       }:o);
     }else{
-      const found=typeof command.edgeId==='string'?walls.get(command.edgeId):
+      const candidateWalls=allWalls();
+      const found=typeof command.edgeId==='string'?candidateWalls.get(command.edgeId):
         nearestConstructionEdge(world,command.at||{});
       if(!found)return fail('wall-not-found');
       if(type==='erase-wall'){
         if(openings.some(o=>o.edgeIds.includes(found.id)))return fail('wall-has-opening');
-        walls.delete(found.id);
+        if(found.starterSide){
+          if(!openingFitsDecor([found.id]))return fail('wall-has-decor');
+          starterRemoved.add(found.id);
+        }else walls.delete(found.id);
       }else{
         const styleId=command.styleId||BUILD_DEFAULT_OPENING_STYLE[type];
         const style=BUILD_OPENING_STYLES[styleId];
         if(!style||style.type!==type)return fail('unknown-opening-style');
-        const ids=segmentsForOpening(walls,found,style.sections);
+        const ids=segmentsForOpening(candidateWalls,found,style.sections);
         if(!ids)return fail(style.sections===3
           ?'opening-needs-three-wall-sections':'opening-needs-wall-space');
         if(openings.some(o=>o.edgeIds.some(k=>ids.includes(k))))return fail('opening-overlap');
+        if(!openingFitsDecor(ids))return fail('wall-has-decor');
+        if(found.starterSide&&(found.starterSide==='east'||found.starterSide==='south'))
+          starterSolidSides.add(found.starterSide);
         openings.push({id:'opening-'+nextId++,type,edgeIds:ids,
           ...(command.styleId?{styleId}:{})});
       }
@@ -538,9 +588,13 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   for(const k of Object.keys(materials.wall))if(!walls.has(k)&&
     !['starter:west','starter:east','starter:north','starter:south'].includes(k))
       delete materials.wall[k];
-  const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),openings,starterShell,materials})!==
+  const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),
+      openings,starterShell,starterRemoved:[...starterRemoved].sort(),
+      starterSolidSides:[...starterSolidSides].sort(),materials})!==
     JSON.stringify({floors:[...world.floorCells].sort(),walls:world.wallEdges.map(w=>w.id).sort(),
-      openings:world.openings,starterShell:world.starterShell,materials:world.materials});
+      openings:world.openings,starterShell:world.starterShell,
+      starterRemoved:[...(world.starterRemoved||[])].sort(),
+      starterSolidSides:[...(world.starterSolidSides||[])].sort(),materials:world.materials});
   if(!changed)return fail('unchanged');
   // A room wall is structural, never allowed through a purchased object,
   // protected kitchen fixture, painting easel or resident's occupied space.
@@ -557,7 +611,8 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   const next={...world,revision:world.revision+1,
     legacy:type==='paint-floor'||type==='paint-wall'?world.legacy:false,
     materials,nextId,floorCells:[...floors],
-    starterShell,starterOwned:[...starterOwned],wallEdges:[...walls.values()],openings};
+    starterShell,starterOwned:[...starterOwned],starterRemoved:[...starterRemoved],
+    starterSolidSides:[...starterSolidSides],wallEdges:[...walls.values()],openings};
   for(const resident of residents)if(finite(resident?.x)&&finite(resident?.z)&&
     (!constructionContains(next,resident.x,resident.z)||constructionWallAt(next,resident.x,resident.z)))return fail('resident-blocked');
   return {ok:true,world:next,diff:{floorCount:next.floorCells.length-world.floorCells.length,
