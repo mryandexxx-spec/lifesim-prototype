@@ -34,6 +34,7 @@ jobs:
           node --check src/navigation.js
           node --check src/construction.js
           node --check src/roof-construction.js
+          node --check src/exterior-construction.js
           node --check src/furniture-catalog.js
           node --check src/furniture-layout.js
           node --check src/furniture-editor.js
@@ -161,6 +162,7 @@ jobs:
           cp src/camera-gestures.js site/src/
           cp src/construction.js site/src/
           cp src/roof-construction.js site/src/
+          cp src/exterior-construction.js site/src/
           cp src/ui-onboarding.js site/src/
           cp src/hud-panel.js site/src/
           cp src/furniture-catalog.js src/furniture-layout.js src/furniture-editor.js src/furniture-transform.js src/furniture-hold.js site/src/

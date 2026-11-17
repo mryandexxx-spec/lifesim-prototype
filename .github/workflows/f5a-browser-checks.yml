@@ -7,6 +7,7 @@ on:
     paths:
       - 'src/construction.js'
       - 'src/roof-construction.js'
+      - 'src/exterior-construction.js'
       - 'src/navigation.js'
       - 'src/household.js'
       - 'src/game.js'
@@ -18,6 +19,7 @@ on:
       - 'tests/f5b3-starter-native.test.js'
       - 'tests/f5b4-ceilings-patterns.test.js'
       - 'tests/f5c1-roof.test.js'
+      - 'tests/f5c2-exteriors.test.js'
       - '.github/workflows/f5a-browser-checks.yml'
   workflow_dispatch:
 permissions:
@@ -35,6 +37,7 @@ jobs:
       - run: |
           node --check src/game.js
           node --check src/construction.js
+          node --check src/exterior-construction.js
           node --check src/navigation.js
           node --check src/household.js
           npm test
@@ -60,4 +63,6 @@ jobs:
             f5b4-floor-direction.png
             f5c1-auto-roof.png
             f5c1-hip-roof.png
+            f5c2-tall-facade.png
+            f5c2-porch.png
           retention-days: 7

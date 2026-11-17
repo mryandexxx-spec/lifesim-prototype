@@ -15,7 +15,9 @@ import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, cho
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
-  BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds} from './construction.js';
+  BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
+  constructionExteriorSegments,constructionPorches,
+  BUILD_WALL_HEIGHTS,BUILD_FACADE_FINISHES,BUILD_PORCH_FINISHES} from './construction.js';
 import {ROOF_STYLES,ROOF_MATERIALS,ROOF_PITCHES,ROOF_EAVES,
   roofContains,roofMeshGeometry} from './roof-construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
@@ -1930,7 +1932,8 @@ function boot() {
   const buildFinishMaterials=new Map();
   const finishMaterial=id=>{
     if(!buildFinishMaterials.has(id)){
-      const definition=BUILD_FINISHES[id.startsWith('floor.')?'floor':id.startsWith('ceiling.')?'ceiling':'wall'][id];
+      const definition=id.startsWith('facade.')?BUILD_FACADE_FINISHES[id]:
+        BUILD_FINISHES[id.startsWith('floor.')?'floor':id.startsWith('ceiling.')?'ceiling':'wall'][id];
       buildFinishMaterials.set(id,mat(definition.color));
     }
     return buildFinishMaterials.get(id);
@@ -1952,6 +1955,101 @@ function boot() {
     }
   };
   const roofPalette=new Map();
+  // Exterior entrance platforms are traversable via the pure construction
+  // footprint, yet never included in the indoor automatic roof footprint.
+  const renderConstructionPorches=state=>{
+    for(const porch of constructionPorches(state)){
+      const r=porch.footprint,definition=BUILD_PORCH_FINISHES[porch.materialId];
+      if(!r||!definition)continue;
+      if(!buildFinishMaterials.has(porch.materialId))
+        buildFinishMaterials.set(porch.materialId,mat(definition.color));
+      const finish=buildFinishMaterials.get(porch.materialId),accent=M.trim;
+      const x0=r.i0*.5,x1=r.i1*.5,z0=r.j0*.5,z1=r.j1*.5,
+        x=(x0+x1)/2,z=(z0+z1)/2;
+      const name='F5-C.2 porch '+porch.id;
+      buildBox(name+' deck',x,-.125,z,x1-x0,.27,z1-z0,finish);
+      const end=r.axis==='h'?(r.outward>0?z1:z0):(r.outward>0?x1:x0);
+      const breadth=r.axis==='h'?x1-x0:z1-z0;
+      for(let level=0;level<2;level++){
+        const at=end+(level+.5)*r.outward*.30;
+        buildBox(name+' stairs',r.axis==='h'?x:at,-.27-level*.14,
+          r.axis==='h'?at:z,r.axis==='h'?breadth:.3,.14,
+          r.axis==='v'?breadth:.3,finish);
+      }
+      const h=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
+      const doorway=r.axis==='h'?(r.outward>0?z0:z1):
+        (r.outward>0?x0:x1);
+      const canopy=doorway+r.outward*.44;
+      buildBox(name+' entrance canopy',r.axis==='h'?x:canopy,h-.20,
+        r.axis==='h'?canopy:z,r.axis==='h'?breadth:.9,.12,
+        r.axis==='v'?breadth:.9,finish);
+      for(const sign of [-1,1]){
+        const along=r.axis==='h'?x+sign*(breadth/2-.14):z+sign*(breadth/2-.14);
+        const outer=doorway+r.outward*.81;
+        buildBox(name+' support post',r.axis==='h'?along:outer,
+          (h-.27)/2,r.axis==='v'?along:outer,.085,h-.27,.085,accent);
+      }
+    }
+  };
+  const addFacadePattern=(id,axis,center,across,span,outward,height)=>{
+    const type=BUILD_FACADE_FINISHES[id]?.pattern;
+    if(!type)return;
+    const pos=across+outward*.14,accent=M.trim;
+    const line=(y,thick)=>buildBox('F5-C.2 facade course',
+      axis==='h'?center:pos,y,axis==='v'?center:pos,
+      axis==='h'?span:.019,thick,axis==='v'?span:.019,accent);
+    if(type==='brick'||type==='clapboard'){
+      const count=type==='brick'?8:12;
+      for(let k=1;k<count;k++)line(height*k/count,.024);
+    }else if(type==='stone'){
+      for(const fract of [.27,.54,.81])line(height*fract,.032);
+    }else if(type==='timber'){
+      const count=Math.min(12,Math.max(2,Math.ceil(span/1.4)));
+      for(let k=0;k<=count;k++){
+        const along=center-span/2+span*k/count;
+        buildBox('F5-C.2 facade timber batten',
+          axis==='h'?along:pos,height/2,axis==='v'?along:pos,
+          axis==='h'?.054:.018,height-.14,axis==='v'?.054:.018,accent);
+      }
+    }
+  };
+  const drawConstructionFacades=state=>{
+    if(constructionWallMode==='down')return;
+    const coatings=state.materials?.facade||{},opened=constructionOpeningEdgeIds(state);
+    const h=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
+    const grouped=new Map();
+    for(const wall of constructionExteriorSegments(state)){
+      if(opened.has(wall.id))continue;
+      const id=coatings[wall.id];if(!BUILD_FACADE_FINISHES[id])continue;
+      const coordinate=wall.starterSide
+        ?(wall.starterSide==='north'?-4.34+starterShellOffset(state,'north')
+          :wall.starterSide==='south'?4.34+starterShellOffset(state,'south')
+          :wall.starterSide==='west'?-4.97+starterShellOffset(state,'west')
+          :14.25+starterShellOffset(state,'east'))
+        :(wall.axis==='h'?wall.j:wall.i)*.5;
+      if(constructionWallMode==='cut'&&(wall.axis==='h'?coordinate>0:coordinate>14))continue;
+      const key=wall.axis+'|'+coordinate+'|'+wall.outward+'|'+id;
+      if(!grouped.has(key))grouped.set(key,{axis:wall.axis,coordinate,
+        outward:wall.outward,id,points:[]});
+      grouped.get(key).points.push(wall.axis==='h'?wall.i:wall.j);
+    }
+    for(const {axis,coordinate,outward,id,points} of grouped.values()){
+      points.sort((a,b)=>a-b);
+      let start=points[0],prev=start;
+      const flush=()=>{
+        const span=(prev-start+1)*.5,center=(start+prev+1)*.25;
+        const face=coordinate+outward*.106;
+        buildBox('F5-C.2 real facade '+id,axis==='h'?center:face,h/2,
+          axis==='v'?center:face,axis==='h'?span:.027,h-.12,
+          axis==='v'?span:.027,finishMaterial(id));
+        addFacadePattern(id,axis,center,coordinate,span,outward,h-.12);
+      };
+      for(const next of [...points.slice(1),Infinity]){
+        if(next===prev+1){prev=next;continue;}
+        flush();start=next;prev=next;
+      }
+    }
+  };
   const renderConstructionRoofs=state=>{
     if(!buildMode||!roofPreview)return;
     for(const roof of state.roofModules||[]){
@@ -1961,7 +2059,8 @@ function boot() {
         const m=mat(color);m.cull=pc.CULLFACE_NONE;m.update();
         roofPalette.set(roof.materialId,m);
       }
-      const shape=roofMeshGeometry(roof);
+      const wallHeight=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
+      const shape=roofMeshGeometry(roof,{wallHeight});
       const mesh=new pc.Mesh(app.graphicsDevice);
       mesh.setPositions(shape.positions);
       mesh.setIndices(shape.indices);
@@ -1977,13 +2076,14 @@ function boot() {
       const z0=roof.j0*.5-roof.eaves,z1=roof.j1*.5+roof.eaves;
       const cx=(x0+x1)/2,cz=(z0+z1)/2;
       for(const z of [z0,z1])
-        buildBox('F5-C roof fascia X',cx,3.025,z,x1-x0,.09,.085,M.trim);
+        buildBox('F5-C roof fascia X',cx,wallHeight+.125,z,x1-x0,.09,.085,M.trim);
       for(const x of [x0,x1])
-        buildBox('F5-C roof fascia Z',x,3.025,cz,.085,.09,z1-z0,M.trim);
+        buildBox('F5-C roof fascia Z',x,wallHeight+.125,cz,.085,.09,z1-z0,M.trim);
     }
   };
   const drawConstructionFinishes=state=>{
     const finish=state.materials||{};
+    const height=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
     // Group floor paint by material + row; a recolored room costs one slab
     // per material run rather than a fresh PlayCanvas entity for every tile.
     const rows=new Map();
@@ -2049,7 +2149,7 @@ function boot() {
         values.sort((a,b)=>a-b);
         let lo=values[0],last=lo;
         const flush=()=>buildBox('F5-B.4 ceiling '+id,(lo+last+1)*.25,
-          2.835,(j+.5)*.5,(last-lo+1)*.5,.065,.5,finishMaterial(id));
+          height-.065,(j+.5)*.5,(last-lo+1)*.5,.065,.5,finishMaterial(id));
         for(const next of [...values.slice(1),Infinity]){
           if(next===last+1){last=next;continue;}
           flush();lo=next;last=next;
@@ -2076,9 +2176,9 @@ function boot() {
       const draw=()=>{
         const span=(last-lo+1)*.5,mid=(lo+last+1)*.25,side=face==='a'?-1:1;
         buildBox('F5-B wall finish '+id,
-          axis==='h'?mid:position*.5+side*.081,1.42,
+          axis==='h'?mid:position*.5+side*.081,height/2,
           axis==='v'?mid:position*.5+side*.081,
-          axis==='h'?span:.02,2.72,axis==='v'?span:.02,finishMaterial(id));
+          axis==='h'?span:.02,height-.18,axis==='v'?span:.02,finishMaterial(id));
          addWallPattern(id,axis,mid,position*.5,span,face,.109);
       };
       for(const i of [...values.slice(1),Infinity]){
@@ -2111,9 +2211,9 @@ function boot() {
           const center=(point(last)+point(first)+1)*.25;
           const offset=(face==='a'?-1:1)*.096;
           buildBox('F5-B original wall finish '+id,
-            axis==='h'?center:renderLine[side]+offset,1.42,
+            axis==='h'?center:renderLine[side]+offset,height/2,
             axis==='v'?center:renderLine[side]+offset,
-            axis==='h'?span:.023,2.68,axis==='v'?span:.023,finishMaterial(id));
+            axis==='h'?span:.023,height-.22,axis==='v'?span:.023,finishMaterial(id));
            addWallPattern(id,axis,center,renderLine[side],span,face,.124);
         };
         for(const next of sorted.slice(1)){
@@ -2122,6 +2222,7 @@ function boot() {
         }flush();
       }
     }
+    drawConstructionFacades(state);
   };
   const syncConstructionRender=(force=false)=>{
     const state=game.world.construction;
@@ -2132,6 +2233,7 @@ function boot() {
     clearConstructionNodes();
     lotGround.enabled=buildMode;
     const raised=constructionWallMode!=='down';
+    const height=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
     const w=starterShellOffset(state,'west'),e=starterShellOffset(state,'east');
     const n=starterShellOffset(state,'north'),s=starterShellOffset(state,'south');
     const width=19.27+e-w,depth=8.65+s-n;
@@ -2144,13 +2246,13 @@ function boot() {
     starterFloorSurface.setLocalScale(19.25,.12,floorMaxZ-floorMinZ);
     // Preserve exact legacy geometry at zero offset. Resizing moves the real
     // original walls, their coping and skirting, not merely an outline.
-    legacyWallNodes[0].setPosition(widthCenter,1.40,-4.34+n);
-    legacyWallNodes[0].setLocalScale(width,2.9,.16);
-    legacyWallNodes[1].setPosition(-4.97+w,1.40,depthCenter);
-    legacyWallNodes[1].setLocalScale(.16,2.9,depth);
-    legacyWallNodes[2].setPosition(widthCenter,2.91,-4.30+n);
+    legacyWallNodes[0].setPosition(widthCenter,height/2-.05,-4.34+n);
+    legacyWallNodes[0].setLocalScale(width,height,.16);
+    legacyWallNodes[1].setPosition(-4.97+w,height/2-.05,depthCenter);
+    legacyWallNodes[1].setLocalScale(.16,height,depth);
+    legacyWallNodes[2].setPosition(widthCenter,height+.01,-4.30+n);
     legacyWallNodes[2].setLocalScale(19.35+e-w,.13,.2);
-    legacyWallNodes[3].setPosition(-4.96+w,2.91,depthCenter);
+    legacyWallNodes[3].setPosition(-4.96+w,height+.01,depthCenter);
     legacyWallNodes[3].setLocalScale(.20,.13,8.68+s-n);
     legacySkirts[0].setPosition(widthCenter,.16,-4.19+n);
     legacySkirts[0].setLocalScale(19.25+e-w,.18,.13);
@@ -2192,10 +2294,10 @@ function boot() {
           buildBox('F5-B.3 original wall cut outline',x,.135,z,
             axis==='h'?length:.14,.18,axis==='v'?length:.14,M.trim);
         }else{
-          buildBox('F5-B.3 original structural wall',x,1.4,z,
-            axis==='h'?length:.16,2.9,axis==='v'?length:.16,
+          buildBox('F5-B.3 original structural wall',x,height/2-.05,z,
+            axis==='h'?length:.16,height,axis==='v'?length:.16,
             side==='west'?M.wall2:M.wall);
-          buildBox('F5-B.3 original coping',x,2.91,z,
+          buildBox('F5-B.3 original coping',x,height+.01,z,
             axis==='h'?length:.2,.13,axis==='v'?length:.2,M.trim);
         }
         // Painted trim follows the same physical spans, never a deleted hole.
@@ -2222,10 +2324,11 @@ function boot() {
     }
     if(state.legacy){
       if(constructionWallMode==='up'){
-        buildBox('F5 starter front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
-        buildBox('F5 starter right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
+        buildBox('F5 starter front up',widthCenter,height/2-.05,4.34+s,width,height,.16,M.wall);
+        buildBox('F5 starter right up',14.25+e,height/2-.05,depthCenter,.16,height,depth,M.wall);
       }
       drawConstructionFinishes(state);
+      renderConstructionPorches(state);
       renderConstructionRoofs(state);
       return;
     }
@@ -2259,7 +2362,7 @@ function boot() {
       if(!byLine.has(line))byLine.set(line,[]);
       byLine.get(line).push(w);
     }
-    const wallHeight=raised?2.87:.19,wallY=raised?1.43:.13;
+    const wallHeight=raised?height-.03:.19,wallY=raised?height/2-.02:.13;
     const exterior=constructionWallMode==='up';
     for(const walls of byLine.values()){
       const axis=walls[0].axis;walls.sort((a,b)=>axis==='h'?a.i-b.i:a.j-b.j);
@@ -2274,7 +2377,7 @@ function boot() {
         }else{
           buildBox('F5 structural wall',x,wallY,z,axis==='h'?len*.5:.14,
             wallHeight,axis==='v'?len*.5:.14,M.wall2);
-          if(raised)buildBox('F5 wall coping',x,2.92,z,axis==='h'?len*.5:.16,.12,axis==='v'?len*.5:.16,M.trim);
+          if(raised)buildBox('F5 wall coping',x,height+.02,z,axis==='h'?len*.5:.16,.12,axis==='v'?len*.5:.16,M.trim);
         }
       };
       for(const w of walls.slice(1)){
@@ -2319,9 +2422,10 @@ function boot() {
           'window.slim':{bottom:.96,top:2.40,glassWidth:.56}
         }[variantId];
         if(!dimensions)continue;
-        const {bottom,top,glassWidth}=dimensions,glassHeight=top-bottom;
+        const {bottom,glassWidth}=dimensions;
+        const top=Math.min(dimensions.top,height-.2),glassHeight=top-bottom;
         cross('F5-B window lower solid wall',bottom/2,bottom,M.wall);
-        cross('F5-B window upper solid wall',(2.90+top)/2,2.90-top,M.wall);
+        cross('F5-B window upper solid wall',(height+top)/2,height-top,M.wall);
         if(glassWidth<width-.25){
           for(const side of [-1,1])upright('F5-B narrow window reveal',
             side*(glassWidth+(width-glassWidth)/2)/2,(bottom+top)/2,
@@ -2343,14 +2447,14 @@ function boot() {
       const isArch=design.type==='arch',frame=isArch?M.trim:
         variantId==='door.glass'?M.slate:M.paleWood;
       for(const side of [-1,1])upright('F5-B portal jamb '+variantId,
-        side*width/2,1.45,2.9,frame);
-      cross('F5-B portal lintel',2.66,.49,M.wall);
+        side*width/2,height/2,height,frame);
+      cross('F5-B portal lintel',(height+2.30)/2,height-2.30,M.wall);
       if(isArch){
         const steps=wide?5:4;
         // Concentric stepped head of original procedural masonry; the opening
         // remains body-clear at all points below 1.94m.
         for(let i=0;i<steps;i++){
-          const inset=i*.072,y=2.51-i*.10;
+          const inset=i*.072,y=Math.min(2.51,height-.16)-i*.10;
           for(const sign of [-1,1])
             upright('F5-B arch curve '+variantId,
               sign*(width/2-.11-inset),y,.20,M.trim);
@@ -2385,14 +2489,15 @@ function boot() {
       }else createLeaf(variantId,-width/2,width,1);
     }
     drawConstructionFinishes(state);
+    renderConstructionPorches(state);
     renderConstructionRoofs(state);
     // UP mode adds former open-front boundaries for an exterior view only.
     // These are cosmetic: no surprise path block in legacy saves.
     if(exterior){
       if(!solidStarter.has('south')&&!changedStarter.has('south'))
-        buildBox('F5 legacy front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
+        buildBox('F5 legacy front up',widthCenter,height/2-.05,4.34+s,width,height,.16,M.wall);
       if(!solidStarter.has('east')&&!changedStarter.has('east'))
-        buildBox('F5 legacy right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
+        buildBox('F5 legacy right up',14.25+e,height/2-.05,depthCenter,.16,height,depth,M.wall);
     }
   };
   syncConstructionRender(true);
@@ -3255,7 +3360,9 @@ function boot() {
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
-  let finishFloor='floor.oak',finishWall='wall.sage',finishCeiling='ceiling.chalk',finishSide='both';
+  let finishFloor='floor.oak',finishWall='wall.sage',finishCeiling='ceiling.chalk',
+    finishFacade='facade.brick',finishSide='both';
+  let porchMaterial='porch.stone',porchDepth=3;
   const openingChoice={door:'door.simple',window:'window.classic',arch:'arch.round'};
   let selectedBuildOpening=null,selectedBuildRoof=null;
   const roofChoice={styleId:'roof.gable',materialId:'roof.slate',pitch:.38,eaves:.4};
@@ -3982,7 +4089,19 @@ function boot() {
     'roof-overlap':'Секции крыши не должны перекрываться',
     'roof-too-complex':'Слишком сложный контур: укрой отдельными секциями',
     'roof-not-found':'Коснись существующей секции крыши',
-    'unknown-roof-style':'Выбери форму, материал, уклон и свес крыши'
+    'unknown-roof-style':'Выбери форму, материал, уклон и свес крыши',
+    'unknown-wall-height':'Выбери одну из трёх высот стен',
+    'unknown-facade':'Выбери облицовку фасада',
+    'invalid-facade-scope':'Выбери весь фасад или одну стену',
+    'not-exterior-wall':'Нужна наружная стена: включи «Стены ↑» и коснись внешнего контура',
+    'unknown-porch':'Выбери камень, дерево или кирпич',
+    'porch-needs-door':'Для крыльца нужна настоящая наружная дверь',
+    'porch-needs-exterior-door':'Дверь должна выходить наружу, на свободный участок',
+    'porch-overlap':'Здесь уже есть входная площадка',
+    'porch-exists':'У этой двери уже построено крыльцо',
+    'porch-not-found':'Коснись двери с построенным крыльцом',
+    'porch-intersects-furniture':'Крыльцо пересекает предмет мебели',
+    'too-many-porches':'На участке слишком много крылец'
   };
   const buildFeedback=(msg,invalid=false)=>{
     $('build-feedback').textContent=msg;
@@ -4124,13 +4243,51 @@ function boot() {
   $('build-wall-expand').addEventListener('click',()=>shiftSelectedBuildWall(1));
   $('build-wall-contract').addEventListener('click',()=>shiftSelectedBuildWall(-1));
   $('build-wall-deselect').addEventListener('click',resetBuildWallSelection);
-   const buildFinishPalette=$('build-finish-colors');
+   const buildHeightChoices=$('build-height-choices');
+  const refreshWallHeightChoices=()=>{
+    buildHeightChoices.replaceChildren();
+    for(const [id,option] of Object.entries(BUILD_WALL_HEIGHTS)){
+      const btn=document.createElement('button');
+      btn.type='button';btn.dataset.wallHeight=id;btn.textContent=option.label;
+      btn.setAttribute('aria-pressed',String((game.world.construction.wallHeightClass||'normal')===id));
+      btn.addEventListener('click',()=>{
+        stageBuild({type:'set-wall-height',heightClass:id});
+        refreshWallHeightChoices();
+      });
+      buildHeightChoices.appendChild(btn);
+    }
+  };
+  const porchChoices=$('build-porch-choices');
+  const refreshPorchChoices=()=>{
+    porchChoices.replaceChildren();
+    for(const [id,choice] of Object.entries(BUILD_PORCH_FINISHES)){
+      const btn=document.createElement('button');
+      btn.type='button';btn.dataset.porchFinish=id;
+      const chip=document.createElement('span');chip.className='build-roof-color';
+      chip.style.background=choice.color;
+      btn.append(chip,document.createTextNode(choice.label));
+      btn.setAttribute('aria-pressed',String(porchMaterial===id));
+      btn.addEventListener('click',()=>{
+        porchMaterial=id;refreshPorchChoices();
+        buildFeedback('Материал крыльца: '+choice.label+' · коснись двери');
+      });
+      porchChoices.appendChild(btn);
+    }
+    $('build-porch-depth').value=String(porchDepth);
+  };
+  $('build-porch-depth').addEventListener('change',event=>{
+    const v=Number(event.target.value);
+    if([2,3,4].includes(v))porchDepth=v;
+  });
+  const buildFinishPalette=$('build-finish-colors');
   const refreshBuildFinishes=()=>{
-    const kind=buildTool==='paint-wall'?'wall':
+    const kind=buildTool.startsWith('paint-facade')?'facade':
+      buildTool==='paint-wall'?'wall':
       buildTool.startsWith('paint-ceiling')?'ceiling':'floor';
-    const selected=kind==='wall'?finishWall:kind==='ceiling'?finishCeiling:finishFloor;
+    const selected=kind==='facade'?finishFacade:
+      kind==='wall'?finishWall:kind==='ceiling'?finishCeiling:finishFloor;
     buildFinishPalette.replaceChildren();
-    for(const [id,definition] of Object.entries(BUILD_FINISHES[kind])){
+    for(const [id,definition] of Object.entries(kind==='facade'?BUILD_FACADE_FINISHES:BUILD_FINISHES[kind])){
       const button=document.createElement('button');
       button.type='button';button.className='build-finish-swatch';
       button.dataset.finishId=id;
@@ -4141,17 +4298,24 @@ function boot() {
       const title=document.createElement('small');title.textContent=definition.label;
       button.append(chip,title);
       button.addEventListener('click',()=>{
-        if(kind==='wall')finishWall=id;else if(kind==='ceiling')finishCeiling=id;else finishFloor=id;
+        if(kind==='facade')finishFacade=id;
+        else if(kind==='wall')finishWall=id;
+        else if(kind==='ceiling')finishCeiling=id;
+        else finishFloor=id;
         refreshBuildFinishes();
-        buildFeedback('Материал выбран: '+definition.label+' · коснись поверхности');
+        if(kind==='facade'&&buildTool==='paint-facade-all')
+          stageBuild({type:'paint-facade',scope:'all',materialId:finishFacade});
+        else buildFeedback('Материал выбран: '+definition.label+' · коснись поверхности');
       });
       buildFinishPalette.appendChild(button);
     }
     $('build-finish-side-label').hidden=kind!=='wall';
     $('build-finish-side').value=finishSide;
-    $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':
-      kind==='ceiling'?'Покрытие потолка':'Покрытие пола';
-    $('build-finish-tip').textContent=kind==='wall'
+    $('build-finish-label').textContent=kind==='facade'?'Наружная отделка фасада':
+      kind==='wall'?'Покрытие стен':kind==='ceiling'?'Покрытие потолка':'Покрытие пола';
+    $('build-finish-tip').textContent=kind==='facade'
+      ?'Фасад независим от внутренних обоев. Рельеф — авторская процедурная геометрия.'
+      :kind==='wall'
       ?'Полосы и панели рисуются процедурно на обеих сторонах стены.'
       :kind==='ceiling'?'Для просмотра включи «Потолок».'
       :'Направление досок и мозаика — отдельные образцы.';
@@ -4254,7 +4418,8 @@ function boot() {
       syncConstructionRender(true);
     }
     $('build-editor').dataset.tool=type;
-    const finishes=['paint-floor','paint-room','paint-wall','paint-ceiling-room','paint-ceiling-tile','sample-finish'];
+    const finishes=['paint-floor','paint-room','paint-wall','paint-ceiling-room',
+      'paint-ceiling-tile','sample-finish','paint-facade','paint-facade-all'];
     $('build-finish-picker').hidden=!finishes.includes(type);
     if(finishes.includes(type))refreshBuildFinishes();
     const openings=['door','window','arch','change-opening'];
@@ -4262,6 +4427,16 @@ function boot() {
     if(openings.includes(type))refreshBuildOpenings();
     $('build-roof-picker').hidden=!type.startsWith('roof-');
     if(type.startsWith('roof-'))refreshBuildRoofs();
+    $('build-height-picker').hidden=type!=='wall-height';
+    if(type==='wall-height')refreshWallHeightChoices();
+    $('build-porch-picker').hidden=type!=='porch-add';
+    if(type==='porch-add')refreshPorchChoices();
+    if(type.startsWith('paint-facade')||type.startsWith('porch-')){
+      constructionWallMode='up';
+      document.querySelectorAll('[data-build-walls]').forEach(btn=>
+        btn.setAttribute('aria-pressed',String(btn.dataset.buildWalls==='up')));
+      syncConstructionRender(true);
+    }
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
@@ -4283,6 +4458,11 @@ function boot() {
       'paint-ceiling-room':'Выбери цвет и коснись пола комнаты — отделаем потолок над ней.',
       'paint-ceiling-tile':'Выбери цвет и коснись плитки — отделаем потолок над ней.',
       'sample-finish':'Пипетка: коснись уже отделанной поверхности, чтобы взять её покрытие.',
+      'paint-facade':'Выбери наружное покрытие и коснись секции внешней стены.',
+      'paint-facade-all':'Выбери покрытие для всего наружного фасада, затем «Применить».',
+      'wall-height':'Выбери физическую высоту стен: потолки и крыши адаптируются.',
+      'porch-add':'Выбери материал, глубину, затем коснись настоящей наружной двери.',
+      'porch-remove':'Коснись двери с крыльцом, чтобы убрать входную площадку.',
       'roof-auto':'Подберём крышу под весь дом. Выбери форму и нажми «Применить».',
       'roof-add':'Протяни прямоугольник над полом для отдельной секции крыши.',
       'roof-edit':'Коснись крыши, чтобы выбрать секцию и изменить её дизайн.',
@@ -4293,6 +4473,8 @@ function boot() {
     buildFeedback(tips[type]||'Готово');
     if(type==='roof-auto')stageBuild({type:'roof-auto',...roofChoice});
     if(type==='roof-clear')stageBuild({type:'roof-clear'});
+    if(type==='paint-facade-all')
+      stageBuild({type:'paint-facade',scope:'all',materialId:finishFacade});
   };
   document.querySelectorAll('[data-build-tool]').forEach(btn=>
     btn.addEventListener('click',()=>setBuildTool(btn.dataset.buildTool)));
@@ -4330,6 +4512,10 @@ function boot() {
   const exitBuild=()=>{
     if(!buildMode)return;
     buildMode=false;ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
+    // Wall cutaway is camera UI state, not persisted building geometry.
+    constructionWallMode='cut';
+    document.querySelectorAll('[data-build-walls]').forEach(btn=>
+      btn.setAttribute('aria-pressed',String(btn.dataset.buildWalls==='cut')));
     $('build-roof-toggle').setAttribute('aria-pressed','false');
     $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
@@ -4353,6 +4539,9 @@ function boot() {
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
     buildTool='camera';ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
+    constructionWallMode='cut';
+    document.querySelectorAll('[data-build-walls]').forEach(btn=>
+      btn.setAttribute('aria-pressed',String(btn.dataset.buildWalls==='cut')));
     $('build-roof-toggle').setAttribute('aria-pressed','false');
     $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     // Restore the previously tested camera gesture path unchanged:
@@ -4397,6 +4586,16 @@ function boot() {
     }
     return selected;
   };
+  const findBuildOpeningAt=target=>{
+    if(!target)return null;
+    const all=new Map(constructionWallSegments(game.world.construction)
+      .map(w=>[w.id,w]));
+    return game.world.construction.openings.find(opening=>opening.edgeIds.some(id=>{
+      const edge=all.get(id);
+      return id===target.id||(edge&&edge.axis===target.axis&&
+        edge.i===target.i&&edge.j===target.j);
+    }))||null;
+  };
   const endBuildDrag=event=>{
     if(!buildDrag||buildDrag.pointerId!==event.pointerId)return false;
     const {from,to,wallEdge,hit}=buildDrag;
@@ -4406,8 +4605,7 @@ function boot() {
       const target=buildWallAtScreen(gesturePoint(event))||
         nearestConstructionEdge(game.world.construction,to,.75);
       if(type==='change-opening'){
-        selectedBuildOpening=game.world.construction.openings.find(o=>
-          o.edgeIds.includes(target?.id))||null;
+        selectedBuildOpening=findBuildOpeningAt(target);
         if(selectedBuildOpening){
           selectedBuildOpening={...selectedBuildOpening,
             styleId:constructionOpeningStyle(selectedBuildOpening)};
@@ -4415,10 +4613,25 @@ function boot() {
         }else buildFeedback('Нажми на существующую дверь, окно или арку',true);
         refreshBuildOpenings();
       }else if(type==='remove-opening'){
-        const opening=game.world.construction.openings.find(o=>o.edgeIds.includes(target?.id));
+        const opening=findBuildOpeningAt(target);
         stageBuild({type:'remove-opening',id:opening?.id});
       }else stageBuild({type,edgeId:target?.id,at:to,
         ...(openingChoice[type]?{styleId:openingChoice[type]}:{})});
+    }else if(type==='porch-add'||type==='porch-remove'){
+      const target=buildWallAtScreen(gesturePoint(event))||
+        nearestConstructionEdge(game.world.construction,to,.75);
+      const found=findBuildOpeningAt(target);
+      if(type==='porch-add'){
+        stageBuild({type:'porch-add',openingId:found?.id,
+          depthSections:porchDepth,materialId:porchMaterial});
+      }else{
+        const existing=game.world.construction.porches?.find(p=>p.openingId===found?.id);
+        stageBuild({type:'porch-remove',id:existing?.id});
+      }
+    }else if(type==='paint-facade'){
+      const target=wallEdge||buildWallAtScreen(gesturePoint(event));
+      stageBuild({type:'paint-facade',edgeId:target?.id,
+        scope:'segment',materialId:finishFacade});
     }else if(type==='roof-remove'){
       stageBuild({type:'roof-remove',at:hit||from});
     }else if(type==='roof-edit'){
@@ -4618,10 +4831,13 @@ function boot() {
         cameraGesture.begin(point,now);
         return;
       }
-      if(buildTool!=='camera'&&!['roof-auto','roof-clear'].includes(buildTool)&&
+      if(buildTool!=='camera'&&!['roof-auto','roof-clear','wall-height',
+        'paint-facade-all'].includes(buildTool)&&
         cameraGesture.count()===0){
         const raw=editorFloorAt(point);
-        const pickWall=['move-wall','door','window','arch','change-opening','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
+        const pickWall=['move-wall','door','window','arch','change-opening','erase-wall',
+          'remove-opening','paint-wall','sample-finish','paint-facade',
+          'porch-add','porch-remove'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
         if(pickWall&&!wallEdge&&buildTool==='move-wall')
           buildFeedback('Коснись нужной стены или передвинь камеру свайпом по пустому участку');

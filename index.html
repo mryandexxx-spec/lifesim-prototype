@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
@@ -20,7 +20,7 @@
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
       "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3-f4f2-f4g2",
       "./src/painting.js":"./src/painting.js?v=1.2u.16-h5c",
-      "./src/construction.js":"./src/construction.js?v=1.2u-f5b3-f5b4-f5c1",
+      "./src/construction.js":"./src/construction.js?v=1.2u-f5b3-f5b4-f5c1-f5c2",
        "./src/painting-visual.js":"./src/painting-visual.js?v=1.2u-h5asafe",
        "./src/painting-gallery.js":"./src/painting-gallery.js?v=1.2u-h5b-20261117-f5a3",
        "./src/meshy-painting-runtime.js":"./src/meshy-painting-runtime.js?v=1.2u-h5asafe",
@@ -123,7 +123,7 @@
 
 
     <section id="build-editor" class="build-editor" aria-label="Строительство дома" hidden>
-      <div class="build-head"><div><small>F5-B · ОДИН ЭТАЖ · СВОБОДНАЯ СТРОЙКА</small><h2>Строительство</h2></div><button type="button" id="build-exit">✓ В жизнь</button></div>
+      <div class="build-head"><div><small>F5-C · ОДИН ЭТАЖ · СВОБОДНАЯ СТРОЙКА</small><h2>Строительство</h2></div><button type="button" id="build-exit">✓ В жизнь</button></div>
       <p id="build-instruction">Камера: свайп одним пальцем передвигает дом, двумя — поворот и масштаб. Для строительства выбери инструмент.</p>
       <div class="build-tools" role="group" aria-label="Инструменты строительства">
         <button type="button" data-build-tool="camera" aria-pressed="true">✥ Камера · свайп</button>
@@ -134,6 +134,9 @@
         <button type="button" data-build-tool="paint-room">🎨 Пол комнаты</button>
         <button type="button" data-build-tool="paint-floor">▦ Плитка пола</button>
         <button type="button" data-build-tool="paint-wall">🖌 Обои / стены</button>
+        <button type="button" data-build-tool="paint-facade-all">🏠 Фасад целиком</button>
+        <button type="button" data-build-tool="paint-facade">▥ Фасадный участок</button>
+        <button type="button" data-build-tool="wall-height">⇡ Высота стен</button>
         <button type="button" data-build-tool="paint-ceiling-room">▰ Потолок комнаты</button>
         <button type="button" data-build-tool="paint-ceiling-tile">▤ Плитка потолка</button>
         <button type="button" data-build-tool="sample-finish">◉ Пипетка</button>
@@ -149,11 +152,30 @@
         <button type="button" data-build-tool="roof-edit">✎ Изменить крышу</button>
         <button type="button" data-build-tool="roof-remove">⌫ Убрать секцию</button>
         <button type="button" data-build-tool="roof-clear">× Убрать крыши</button>
+        <button type="button" data-build-tool="porch-add">▱ Построить крыльцо</button>
+        <button type="button" data-build-tool="porch-remove">⌫ Убрать крыльцо</button>
       </div>
       <div id="build-opening-picker" class="build-opening-picker" hidden>
         <strong id="build-opening-label">Выбери вариант</strong>
         <div id="build-opening-variants" class="build-opening-variants" role="group" aria-label="Двери, окна и арки"></div>
         <small>Проём занимает 1,5 или 2 м любой стены дома. Двери и арки проходимы, окна нет.</small>
+      </div>
+      <div id="build-height-picker" class="build-roof-picker" hidden>
+        <strong>Высота всех стен одноэтажного дома</strong>
+        <div id="build-height-choices" class="build-roof-choices" role="group" aria-label="Высота стен"></div>
+        <small>Меняет настоящую геометрию стен, проёмов, потолка и кровли; не меняет режим среза.</small>
+      </div>
+      <div id="build-porch-picker" class="build-roof-picker" hidden>
+        <strong>Входная группа</strong>
+        <div id="build-porch-choices" class="build-roof-choices" role="group" aria-label="Материал крыльца"></div>
+        <label class="build-porch-depth">Глубина площадки
+          <select id="build-porch-depth" aria-label="Глубина крыльца">
+            <option value="2">1 м</option>
+            <option value="3" selected>1,5 м</option>
+            <option value="4">2 м</option>
+          </select>
+        </label>
+        <small>Коснись наружной двери. Площадка, ступени и навес создаются рядом с ней.</small>
       </div>
       <div id="build-roof-picker" class="build-roof-picker" hidden>
         <strong>Кровля · один этаж</strong>
@@ -474,7 +496,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
