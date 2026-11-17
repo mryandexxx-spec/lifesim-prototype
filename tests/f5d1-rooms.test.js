@@ -77,13 +77,20 @@ test('F5-D.1 move refuses source that shares a boundary with legacy house',()=>{
     source:{x:16,z:0},at:place,rotation:0});
   assert.equal(out.reason,'room-shared-boundary');
 });
-test('F5-D.1 never duplicates purchased items or exposes residents to demolition',()=>{
-  const world=built();
+test('F5-D.3a duplicates only structure, never purchased items, residents or artwork',()=>{
+  const world=built(),before=JSON.stringify(world);
   const furniture=[{instanceId:'f1',x:16,z:-2,location:'home'}];
-  assert.equal(proposeConstructionEdit(world,cmd(),{furniture}).reason,'room-has-furniture');
-  assert.equal(proposeConstructionEdit(world,cmd('room-relocate'),{furniture}).reason,'room-has-furniture');
-  assert.equal(proposeConstructionEdit(world,cmd(),{residents:[{x:16,z:-2}]}).reason,'room-has-resident');
-  assert.equal(proposeConstructionEdit(world,cmd(),{wallDecor:[{x:15.2,z:-3,radius:.4}]}).reason,'room-has-art');
+  const ctx={furniture,residents:[{x:16,z:-2}],wallDecor:[{x:15.2,z:-3,radius:.4}]};
+  const copy=proposeConstructionEdit(world,cmd(),ctx);
+  assert.equal(copy.ok,true,copy.reason);
+  assert.equal(copy.world.floorCells.length,world.floorCells.length+48);
+  assert.equal(JSON.stringify(world),before);
+  assert.deepEqual(furniture,[{instanceId:'f1',x:16,z:-2,location:'home'}]);
+  assert.equal(proposeConstructionEdit(world,cmd('room-relocate'),ctx).reason,'room-has-furniture');
+  assert.equal(proposeConstructionEdit(world,cmd('room-relocate'),{
+    residents:[{x:16,z:-2}]}).reason,'room-has-resident');
+  assert.equal(proposeConstructionEdit(world,cmd('room-relocate'),{
+    wallDecor:[{x:15.2,z:-3,radius:.4}]}).reason,'room-has-art');
 });
 test('F5-D.1 refuses overlap, lot overflow and malformed rotation without mutation',()=>{
   const world=built(),before=JSON.stringify(world);
