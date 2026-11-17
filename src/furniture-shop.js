@@ -24,7 +24,8 @@ const shopPrefabs=new Set(MARKET_OFFERS.map(x=>x.prefabId));
 /** F2 callers may still pass prefabId; F4b2 UI passes the stable SKU id. */
 const offerFor=id=>stock.get(id)||stock.get(legacyProductId(id));
 const safeInt=n=>Number.isSafeInteger(n)&&n>=0;
-const cap=1_000_000;
+export const SHOP_MAX_CREDITS=1_000_000_000; // Saved wages must not reset a long-running home.
+const cap=SHOP_MAX_CREDITS;
 export function newFurnitureShop(){return {schema:SHOP_SCHEMA,credits:SHOP_START_CREDITS,nextId:1};}
 export function restoreFurnitureShop(raw){
   if(raw?.schema!==SHOP_SCHEMA||!safeInt(raw.credits)||raw.credits>cap||
