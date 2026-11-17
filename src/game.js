@@ -1889,6 +1889,14 @@ function boot() {
     box('back top trim',4.625,2.91,-4.30,19.35,.13,.2,M.trim),
     box('left top trim',-4.96,2.91,0,.20,.13,8.68,M.trim)
   ];
+  const starterBackWindowNodes=[];
+  const starterBackWindowCovered=state=>{
+    const impacted=new Set([
+      ...state.openings.flatMap(o=>o.edgeIds),...(state.starterRemoved||[])
+    ]);
+    return starterShellSegments(state).some(w=>w.starterSide==='north'&&
+      impacted.has(w.id)&&w.i*.5<-1.14&&(w.i+1)*.5>-3.22);
+  };
   const legacySkirts=[
     box('baseboard back',4.625,.16,-4.19,19.25,.18,.13,M.trim),
     box('baseboard left',-4.83,.16,0,.13,.18,8.5,M.trim)
@@ -1972,33 +1980,40 @@ function boot() {
         if(i===last+1){last=i;continue;}draw();lo=i;last=i;
       }
     }
-    // Original decorated walls remain untouched. Their new finishes are
-    // thin detachable faces; H5b paintings keep their own world anchors.
-    const starter=[
-      {side:'north',axis:'h',center:-4.34+starterShellOffset(state,'north'),
-        midX:4.625+(starterShellOffset(state,'west')+starterShellOffset(state,'east'))/2,
-        midZ:0,length:19.27+starterShellOffset(state,'east')-starterShellOffset(state,'west')},
-      {side:'west',axis:'v',center:-4.97+starterShellOffset(state,'west'),
-        midX:0,midZ:(starterShellOffset(state,'north')+starterShellOffset(state,'south'))/2,
-        length:8.65+starterShellOffset(state,'south')-starterShellOffset(state,'north')},
-      {side:'east',axis:'v',center:14.25+starterShellOffset(state,'east'),
-        midX:0,midZ:(starterShellOffset(state,'north')+starterShellOffset(state,'south'))/2,
-        length:8.65+starterShellOffset(state,'south')-starterShellOffset(state,'north')},
-      {side:'south',axis:'h',center:4.34+starterShellOffset(state,'south'),
-        midX:4.625+(starterShellOffset(state,'west')+starterShellOffset(state,'east'))/2,
-        midZ:0,length:19.27+starterShellOffset(state,'east')-starterShellOffset(state,'west')}
-    ];
-    for(const wall of starter){
-      if((wall.side==='east'||wall.side==='south')&&constructionWallMode!=='up')continue;
+    // Paint on the original house uses the SAME physical wall sections.
+    // A window, doorway or demolished part must be a real hole in the paint.
+    const starterSegments=starterShellSegments(state);
+    const removed=new Set(state.starterRemoved||[]);
+    const renderLine={
+      north:-4.34+starterShellOffset(state,'north'),
+      south:4.34+starterShellOffset(state,'south'),
+      west:-4.97+starterShellOffset(state,'west'),
+      east:14.25+starterShellOffset(state,'east')
+    };
+    for(const side of ['north','west','east','south']){
+      if((side==='east'||side==='south')&&constructionWallMode!=='up')continue;
+      const segments=starterSegments.filter(w=>w.starterSide===side&&
+        !opened.has(w.id)&&!removed.has(w.id));
+      if(!segments.length)continue;
+      const axis=segments[0].axis,point=w=>axis==='h'?w.i:w.j;
+      const sorted=segments.sort((a,b)=>point(a)-point(b));
       for(const face of ['a','b']){
-        const id=finish.wall?.['starter:'+wall.side]?.[face];
+        const id=finish.wall?.['starter:'+side]?.[face];
         if(!BUILD_FINISHES.wall[id])continue;
-        const offset=(face==='a'?-1:1)*.096;
-        buildBox('F5-B original wall finish '+id,
-          wall.axis==='h'?wall.midX:wall.center+offset,1.42,
-          wall.axis==='h'?wall.center+offset:wall.midZ,
-          wall.axis==='h'?wall.length:.023,2.68,
-          wall.axis==='v'?wall.length:.023,finishMaterial(id));
+        let first=sorted[0],last=first;
+        const flush=()=>{
+          const span=(point(last)-point(first)+1)*.5;
+          const center=(point(last)+point(first)+1)*.25;
+          const offset=(face==='a'?-1:1)*.096;
+          buildBox('F5-B original wall finish '+id,
+            axis==='h'?center:renderLine[side]+offset,1.42,
+            axis==='v'?center:renderLine[side]+offset,
+            axis==='h'?span:.023,2.68,axis==='v'?span:.023,finishMaterial(id));
+        };
+        for(const next of sorted.slice(1)){
+          if(point(next)===point(last)+1){last=next;continue;}
+          flush();first=next;last=next;
+        }flush();
       }
     }
   };
@@ -2215,10 +2230,14 @@ function boot() {
   };
   syncConstructionRender(true);
   // Wall art: one picture, one shelf and one window with sky-coloured panes.
-  box('window frame',-2.18,1.87,-4.16,2.0,1.28,.1,M.paleWood,starterBackDecor);
-  box('window',-2.18,1.87,-4.06,1.77,1.08,.08,M.blue,starterBackDecor);
-  box('window cross vertical',-2.18,1.87,-3.99,.09,1.14,.13,M.cream,starterBackDecor);
-  box('window cross horizontal',-2.18,1.88,-3.99,1.84,.09,.13,M.cream,starterBackDecor);
+  starterBackWindowNodes.push(
+    box('window frame',-2.18,1.87,-4.16,2.0,1.28,.1,M.paleWood,starterBackDecor),
+    box('window',-2.18,1.87,-4.06,1.77,1.08,.08,M.blue,starterBackDecor),
+    box('window cross vertical',-2.18,1.87,-3.99,.09,1.14,.13,M.cream,starterBackDecor),
+    box('window cross horizontal',-2.18,1.88,-3.99,1.84,.09,.13,M.cream,starterBackDecor)
+  );
+  for(const node of starterBackWindowNodes)
+    node.enabled=!starterBackWindowCovered(game.world.construction);
   box('landscape',.2,2.12,-4.13,1.1,.72,.12,M.wood,starterBackDecor);
   box('landscape inside',.2,2.12,-4.03,.93,.56,.07,M.slate,starterBackDecor);
   ball('art sun',.42,2.22,-3.97,.25,.25,.04,M.yellow,starterBackDecor);
