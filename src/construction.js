@@ -76,7 +76,7 @@ export function newConstructionWorld(){
   const floorCells=[];
   for(let i=BASE.minI;i<BASE.maxI;i++)for(let j=BASE.minJ;j<BASE.maxJ;j++)floorCells.push(cell(i,j));
   return {schema:1,revision:0,lot:{...BUILD_LOT},step:BUILD_STEP,floorCells,wallEdges:[],openings:[],
-    materials:{},roofModules:[],legacy:true,nextId:1,
+    materials:{floor:{},wall:{}},roofModules:[],legacy:true,nextId:1,
     starterShell:{...STARTER_SHELL},starterOwned:[]};
 }
 export function restoreConstructionWorld(raw){
