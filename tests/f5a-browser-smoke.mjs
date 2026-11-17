@@ -152,7 +152,28 @@ try{
    'Reload cannot reset any of the initial apartment walls');
  assert.deepEqual(afterReload.world.construction.starterOwned,saved.world.construction.starterOwned,
    'Reload cannot lose the original room foundation extensions');
- console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
+ // F5-B: a real Safari-sized tap picks a floor style, stages a transaction,
+ // renders a material and survives loading the same v1 save.
+ await page.locator('#build-toggle').click();
+ await page.locator('[data-build-tool="paint-room"]').click();
+ assert.ok(await page.locator('#build-finish-picker').isVisible());
+ await page.locator('[data-finish-id="floor.slate"]').click();
+ const finishTouch=project(16,0);
+ await send('pointerdown',finishTouch,'canvas');
+ await send('pointerup',finishTouch,'window');
+ assert.ok(await page.locator('#build-pending').isVisible(),
+   'F5-B touch on room floor must stage material transaction');
+ await page.locator('#build-apply').click();
+ const finishSaved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+ assert.ok(Object.values(finishSaved.world.construction.materials.floor).includes('floor.slate'),
+   'F5-B material must persist in the same version-1 save');
+ await page.screenshot({path:'f5b-browser-finish.png'});
+ await page.locator('#build-exit').click();
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
+ const finishAfter=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+ assert.deepEqual(finishAfter.world.construction.materials,finishSaved.world.construction.materials);
+  console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));
  assert.deepEqual(errors,[],'Real PlayCanvas/ES module browser runtime must not error');
 }finally{await browser.close();}

@@ -4,6 +4,27 @@
  * The legacy floor/fixtures keep their exact transforms and save schema v1.
  */
 export const BUILD_STEP=.5;
+// F5-B: immutable, original stylized interior finishes. IDs, not colors,
+// are persisted in construction.materials so visual assets may later change.
+export const BUILD_FINISHES=Object.freeze({
+  floor:Object.freeze({
+    'floor.default':{label:'Исходный пол',color:'#e4cdb4'},
+    'floor.oak':{label:'Тёплый дуб',color:'#b58f68'},
+    'floor.ash':{label:'Светлый ясень',color:'#d6c2a4'},
+    'floor.tile':{label:'Слоновая керамика',color:'#ece7d9'},
+    'floor.slate':{label:'Графитовая плитка',color:'#788688'},
+    'floor.clay':{label:'Терракота',color:'#be8469'}
+  }),
+  wall:Object.freeze({
+    'wall.default':{label:'Исходные стены',color:'#f5ebda'},
+    'wall.cream':{label:'Тёплый лён',color:'#e4d4b7'},
+    'wall.sage':{label:'Шалфей',color:'#acc3a9'},
+    'wall.blue':{label:'Тихий голубой',color:'#a6c5cf'},
+    'wall.rose':{label:'Пудровый розовый',color:'#ddbaa9'},
+    'wall.olive':{label:'Мягкая олива',color:'#b9bc8a'},
+    'wall.sand':{label:'Песчаная штукатурка',color:'#c8b497'}
+  })
+});
 export const BUILD_LOT=Object.freeze({minX:-9,maxX:23,minZ:-12,maxZ:12});
 const BASE=Object.freeze({minI:-10,maxI:28,minJ:-9,maxJ:9});
 // Old cutaway: opaque west/north, open right/front. Preserve original geometry
@@ -55,7 +76,7 @@ export function newConstructionWorld(){
   const floorCells=[];
   for(let i=BASE.minI;i<BASE.maxI;i++)for(let j=BASE.minJ;j<BASE.maxJ;j++)floorCells.push(cell(i,j));
   return {schema:1,revision:0,lot:{...BUILD_LOT},step:BUILD_STEP,floorCells,wallEdges:[],openings:[],
-    materials:{},roofModules:[],legacy:true,nextId:1,
+    materials:{floor:{},wall:{}},roofModules:[],legacy:true,nextId:1,
     starterShell:{...STARTER_SHELL},starterOwned:[]};
 }
 export function restoreConstructionWorld(raw){
@@ -101,7 +122,24 @@ export function restoreConstructionWorld(raw){
     openingKeys.add(rawOpening.id);
     openings.push({id:rawOpening.id,type:rawOpening.type,edgeIds:[...new Set(rawOpening.edgeIds)]});
   }
-  return {...initial,revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
+  // Restore only known finite finish IDs attached to real surfaces. Unknown
+  // palette IDs or retired wall/floor coordinates must not poison a v1 save.
+  const materials={floor:{},wall:{}};
+  const rawFloor=raw.materials?.floor,rawWall=raw.materials?.wall;
+  if(rawFloor&&typeof rawFloor==='object'&&!Array.isArray(rawFloor))
+    for(const [key,id] of Object.entries(rawFloor).slice(0,4000))
+      if(floors.has(key)&&Object.hasOwn(BUILD_FINISHES.floor,id)&&id!=='floor.default')
+        materials.floor[key]=id;
+  if(rawWall&&typeof rawWall==='object'&&!Array.isArray(rawWall))
+    for(const [key,faces] of Object.entries(rawWall).slice(0,5000)){
+      if(!keys.has(key)&&!['starter:west','starter:east','starter:north','starter:south'].includes(key))continue;
+      if(!faces||typeof faces!=='object'||Array.isArray(faces))continue;
+      const stored={};
+      for(const side of ['a','b'])if(Object.hasOwn(BUILD_FINISHES.wall,faces[side])&&faces[side]!=='wall.default')
+        stored[side]=faces[side];
+      if(Object.keys(stored).length)materials.wall[key]=stored;
+    }
+  return {...initial,materials,revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
     legacy:raw.legacy===true&&walls.length===0&&floors.size===initial.floorCells.length&&
       Object.keys(STARTER_SHELL).every(k=>shell[k]===STARTER_SHELL[k]),
     starterShell:shell,starterOwned:[...owned],
@@ -199,6 +237,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   if(!command||typeof command.type!=='string')return fail('invalid-command');
   let floors=new Set(world.floorCells),walls=new Map(world.wallEdges.map(w=>[w.id,w]));
   let openings=[...world.openings],nextId=world.nextId;
+  const materials=clone(world.materials);
   let starterShell={...world.starterShell},starterOwned=new Set(world.starterOwned);
   const type=command.type;
   if(['room','floor','remove-floor'].includes(type)){
@@ -331,6 +370,48 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       }
     }
     openings=openings.map(o=>({...o,edgeIds:o.edgeIds.map(id=>replaceIds.get(id)||id)}));
+    for(const [from,to] of replaceIds)if(materials.wall[from]){
+      materials.wall[to]=materials.wall[from];delete materials.wall[from];
+    }
+  }else if(type==='paint-floor'){
+    const at=command.at;
+    if(!finite(at?.x)||!finite(at?.z))return fail('invalid-finish-target');
+    const key=cell(floorIndex(at.x),floorIndex(at.z));
+    if(!floors.has(key))return fail('finish-needs-floor');
+    if(!Object.hasOwn(BUILD_FINISHES.floor,command.materialId))return fail('unknown-finish');
+    const target=command.scope==='room'
+      ?constructionRooms(world).find(room=>room.cells.includes(key))?.cells
+      :command.scope==='tile'?[key]:null;
+    if(!target)return fail('invalid-finish-target');
+    for(const k of target)if(command.materialId==='floor.default')delete materials.floor[k];
+      else materials.floor[k]=command.materialId;
+  }else if(type==='paint-wall'){
+    const id=command.edgeId,starter=Object.hasOwn(STARTER_SIDE,starterSide(id));
+    const target=walls.get(id);
+    if(!starter&&!target)return fail('wall-not-found');
+    if(!Object.hasOwn(BUILD_FINISHES.wall,command.materialId))return fail('unknown-finish');
+    if(!['both','a','b'].includes(command.side||'both'))return fail('invalid-finish-target');
+    if(!['run','segment'].includes(command.scope||'run'))return fail('invalid-finish-target');
+    const ids=starter?[id]:[id];
+    if(target&&command.scope!=='segment'){
+      const axis=target.axis,base=axis==='h'?target.j:target.i;
+      const sequence=[...walls.values()].filter(w=>w.axis===axis&&
+        (axis==='h'?w.j:w.i)===base).sort((a,b)=>
+          (axis==='h'?a.i-b.i:a.j-b.j));
+      let low=axis==='h'?target.i:target.j,high=low;
+      const byIndex=new Map(sequence.map(w=>[axis==='h'?w.i:w.j,w.id]));
+      while(byIndex.has(low-1))low--;
+      while(byIndex.has(high+1))high++;
+      ids.splice(0,ids.length,...Array.from({length:high-low+1},(_,i)=>byIndex.get(low+i)));
+    }
+    for(const wallId of ids){
+      const faces={...(materials.wall[wallId]||{})};
+      for(const face of command.side==='both'||!command.side?['a','b']:[command.side])
+        if(command.materialId==='wall.default')delete faces[face];
+        else faces[face]=command.materialId;
+      if(Object.keys(faces).length)materials.wall[wallId]=faces;
+      else delete materials.wall[wallId];
+    }
   }else if(['erase-wall','door','window'].includes(type)){
     const found=typeof command.edgeId==='string'?walls.get(command.edgeId):
       nearestConstructionEdge(world,command.at||{});
@@ -353,9 +434,13 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     openings=openings.filter(o=>o.id!==command.id);
   }else return fail('unsupported-command');
   if(floors.size>4000||walls.size>5000)return fail('too-large');
-  const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),openings,starterShell})!==
+  for(const k of Object.keys(materials.floor))if(!floors.has(k))delete materials.floor[k];
+  for(const k of Object.keys(materials.wall))if(!walls.has(k)&&
+    !['starter:west','starter:east','starter:north','starter:south'].includes(k))
+      delete materials.wall[k];
+  const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),openings,starterShell,materials})!==
     JSON.stringify({floors:[...world.floorCells].sort(),walls:world.wallEdges.map(w=>w.id).sort(),
-      openings:world.openings,starterShell:world.starterShell});
+      openings:world.openings,starterShell:world.starterShell,materials:world.materials});
   if(!changed)return fail('unchanged');
   // A room wall is structural, never allowed through a purchased object,
   // protected kitchen fixture, painting easel or resident's occupied space.
@@ -369,7 +454,9 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       :{minX:x-thickness,minZ:z,maxX:x+thickness,maxZ:z+BUILD_STEP};
     if(furnitureBoxes.some(r=>overlap(volume,r)))return fail('wall-intersects-furniture');
   }
-  const next={...world,revision:world.revision+1,legacy:false,nextId,floorCells:[...floors],
+  const next={...world,revision:world.revision+1,
+    legacy:type==='paint-floor'||type==='paint-wall'?world.legacy:false,
+    materials,nextId,floorCells:[...floors],
     starterShell,starterOwned:[...starterOwned],wallEdges:[...walls.values()],openings};
   for(const resident of residents)if(finite(resident?.x)&&finite(resident?.z)&&
     (!constructionContains(next,resident.x,resident.z)||constructionWallAt(next,resident.x,resident.z)))return fail('resident-blocked');
