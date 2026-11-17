@@ -25,6 +25,11 @@ export const HOBBY_SKILLS=createSkillRegistry({skills:[{
   id:PAINT_SKILL_ID,label:'Живопись',group:'creative',maxLevel:10,
   xpThresholds:[35,85,155,245,360,500,675,890,1150,1460],
   practiceTags:['art.paint'],unlocks:[]
+},{
+  id:'cooking',label:'Кулинария',group:'knowledge',maxLevel:10,
+  xpThresholds:[22,56,100,165,240,335,455,610,805,1040],
+  practiceTags:['food.cook'],
+  unlocks:[{id:'cook.pasta',minLevel:2},{id:'cook.gratin',minLevel:4}]
 }]});
 export const HOBBY_CONTENT=createHobbyContentCatalog({entries:[{
   id:READING_CONTENT_ID,kind:'book',label:'Истории дальних дорог',
