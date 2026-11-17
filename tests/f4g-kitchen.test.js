@@ -9,7 +9,7 @@ import {newKitchen,restoreKitchen,replenishKitchen,kitchenRecipe,canCookRecipe,
   kitchenSummary,COOKING_SKILL_ID} from '../src/kitchen.js';
 import {FURNITURE_PRODUCTS,FURNITURE_TYPE_BY_PREFAB} from '../src/furniture-products.js';
 import {FURNITURE_CATALOG,furnitureActionApproach} from '../src/furniture-catalog.js';
-import {proceduralGeometrySignature} from '../src/furniture-procedural-library.js';
+import {proceduralGeometrySignature,proceduralFurnitureModel} from '../src/furniture-procedural-library.js';
 import {newActionQueues,enqueueAction,restoreActionQueues} from '../src/action-queue.js';
 import {HOBBY_SKILLS} from '../src/hobby-reading.js';
 import {currentSkillLevel} from '../src/skills-engine.js';
@@ -47,6 +47,25 @@ test('F4G: independent appliance models and authentic recipe roles',()=>{
  assert.equal(Object.keys(HOBBY_SKILLS.skills).includes(COOKING_SKILL_ID),true);
  assert.equal(Object.keys(kitchenRecipe('cook.soup').requires)[0],'vegetables');
  assert.equal(ACTIONS.cook.benefitPerMinute,0);
+});
+test('F4G.1: no permanent food bowl left on the kitchen worktop',()=>{
+  const oak=proceduralFurnitureModel('prep.oak');
+  const stone=proceduralFurnitureModel('prep.stone');
+  for(const model of [oak,stone]){
+    assert.ok(model);
+    assert.equal(model.parts.some(part=>/\b(bowl|meal|dish|ingredients)\b/i.test(part.name)),false,
+      'worktop geometry must be permanently clear of meal props');
+  }
+  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  assert.match(game,/const prepBowl=new pc\.Entity\('F4G prep bowl'\)/);
+  assert.match(game,/node\.addChild\(prepBowl\);prepBowl\.enabled=false/);
+  assert.match(game,/item\.prefabId==='prep'&&resident\.action\.cookStage==='preparing'/);
+  assert.match(game,/const bowl=node\.findByName\('F4G prep bowl'\);\s*if\(bowl\)bowl\.enabled=active/);
+  // Kitchen portions are a separate saved inventory; no persisted countertop food.
+  const h=home();assert.ok(finishKitchenRecipe(h.kitchen,'cook.soup',0));
+  const restored=loadHousehold(structuredClone(h));
+  assert.equal(kitchenSummary(restored.kitchen).prepared,3);
+  assert.equal(Object.hasOwn(restored.kitchen,'countertopFood'),false);
 });
 test('F4G: recipes gate by real supplies and per-resident cooking skill',()=>{
  const k=newKitchen();
