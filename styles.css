@@ -1245,3 +1245,13 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
   color:#376349;min-height:44px;flex:1;min-width:102px;padding:4px;}
 #build-roof-toggle[aria-pressed="true"]{background:#347b61;color:#fff;}
 .build-editor[data-tool^="roof-"]{max-height:min(68dvh,540px);}
+
+/* F5-C.2 — accessible external finishes, actual wall height and entrance deck. */
+#build-height-choices button{min-width:117px;min-height:50px;}
+#build-porch-choices button{min-width:126px;min-height:50px;}
+.build-porch-depth{display:flex;align-items:center;gap:9px;font-size:12px;
+  font-weight:750;color:#41634c;}
+.build-porch-depth select{min-height:44px;min-width:115px;flex:1;
+  border:1px solid #c1d3c7;border-radius:9px;padding:6px;
+  font-size:13px;color:#345f46;background:#fff;}
+#build-height-picker small,#build-porch-picker small{font-size:11px;line-height:1.4;}
