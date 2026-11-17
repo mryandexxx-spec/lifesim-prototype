@@ -22,8 +22,21 @@ function cleanWorkShift(raw,contract){
     departedAt:['working','returning'].includes(phase)?departedAt:null};
 }
 function cleanLastShift(raw,contract){
-  if(!raw||typeof raw!=='object'||typeof raw.id!=='string'||
-    !new RegExp('^'+contract.employmentId+'@[0-9]+@[0-9]+
+  if(!raw||typeof raw!=='object'||typeof raw.id!=='string')return null;
+  const parts=raw.id.split('@');
+  if(parts.length!==3||parts[0]!==contract.employmentId||
+    !parts.slice(1).every(part=>/^\d+$/.test(part))||
+    !validTime(raw.start)||!validTime(raw.end)||raw.end<=raw.start||
+    !['missed','worked'].includes(raw.outcome)||
+    !Number.isSafeInteger(raw.salary)||raw.salary<0||raw.salary>1000000000||
+    !Number.isFinite(raw.workedMinutes)||raw.workedMinutes<0||
+    !Number.isFinite(raw.lateMinutes)||raw.lateMinutes<0||
+    !validTime(raw.finishedAt))return null;
+  return {id:raw.id,start:raw.start,end:raw.end,outcome:raw.outcome,
+    salary:raw.salary,workedMinutes:raw.workedMinutes,
+    lateMinutes:raw.lateMinutes,finishedAt:raw.finishedAt};
+}
+function cleanContract(raw,id){
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.residentId!==id||
     !validEmployeeId(raw.employmentId)||!validTime(raw.hiredAt)||
     raw.status!=='employed'||!Number.isInteger(raw.level))return null;
