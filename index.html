@@ -13,15 +13,15 @@
   <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
-      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4-h5-f4f",
+      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4-h5-f4f-f4f2",
       "./src/paired-hobby.js":"./src/paired-hobby.js?v=1.2x-h3",
       "./src/gifts-leisure.js":"./src/gifts-leisure.js?v=1.2x-h3",
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
-      "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3",
+      "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3-f4f2",
       "./src/painting.js":"./src/painting.js?v=1.2u-h5",
       "./src/hobby-reading.js":"./src/hobby-reading.js?v=1.2u-h4-h5",
       "./src/skill-presentation.js":"./src/skill-presentation.js?v=1.2u-h4-h5",
-      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b-f4d-h3-f4e-h5-f4f",
+      "./src/simulation.js":"./src/simulation.js?v=1.2w-h2b-f4d-h3-f4e-h5-f4f-f4f2",
       "./src/animations.js":"./src/animations.js?v=1.2w-h2b-f4e-h5-f4f",
       "./src/music-movement.js":"./src/music-movement.js?v=1.2w-h2b-f4f",
       "./src/meshy-music-runtime.js":"./src/meshy-music-runtime.js?v=1.2w-h2b",
@@ -63,7 +63,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.9 · H4 / H5 / F4F.1</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.11 · F4F.2 / H5 / F4F.1</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><div class="time-card" aria-live="off"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></div></div>
     </header>
@@ -226,7 +226,8 @@
         </select>
       </label>
       <button type="button" class="primary-button" id="action-button">Использовать <span>↗</span></button>
-      <button type="button" class="music-dance-button" id="music-dance-button" hidden>💃 Танцевать <span>↗</span></button>
+      <button type="button" class="music-dance-button" id="fridge-lunch-button" hidden>🍽 Пообедать <span>↗</span></button>
+       <button type="button" class="music-dance-button" id="music-dance-button" hidden>💃 Танцевать <span>↗</span></button>
     </section>
 
     <section class="mind-panel" id="mind-panel" hidden aria-label="Внутренний мир Алекса">
@@ -367,7 +368,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b-f4d-h3-f4e-h4-h5-f4f1"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h2b-f4d-h3-f4e-h4-h5-f4f1-f4f2"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

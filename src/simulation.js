@@ -18,7 +18,7 @@ export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','
 export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
   bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
-  fridge: { label: 'Перекусить', need: 'hunger', duration: 26, benefitPerMinute: 1.65, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
+  fridge: { label: 'Быстро перекусить', need: 'hunger', duration: 26, benefitPerMinute: 0.80, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
   // F4D: sitting is a real physical activity, not an unearned skill or need bonus.

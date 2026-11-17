@@ -170,7 +170,7 @@ test('F4E: Safari UI, both Meshy policies, real light and Pages bundle wired',()
   assert.match(src,/new pc\.Entity\('F4E mirror highlight'\)/);
   assert.match(src,/\['sofa','seat','dining','bed','tv','hobby','music','paint',\.\.\.UTILITY_ACTION_IDS\]/);
   assert.match(src,/item\.prefabId==='wardrobe'\?2\.52/);
-  assert.match(html,/1\.2u\.9 · H4 \/ H5 \/ F4F\.1/);
+  assert.match(html,/1\.2u\.11 · F4F\.2 \/ H5 \/ F4F\.1/);
   assert.match(html,/furniture-interactions\.js\?v=1\.2u-f4e/);
   assert.match(page,/node --check src\/furniture-interactions\.js/);
   assert.match(page,/src\/furniture-interactions\.js site\/src\//);

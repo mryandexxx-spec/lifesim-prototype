@@ -69,8 +69,14 @@ test('full normal-speed recovery of core actions establishes a green buffer',()=
     arrive(sim);
     tick(sim,ACTIONS[id].duration);
     assert.equal(sim.action,null,id+' must complete');
-    assert.ok(sim.needs[need]>=75,`${id} ended below green at ${sim.needs[need]}`);
-    assert.ok(sim.needs[need]>score+30,id+' restored too little');
+    if(id==='fridge'){
+      // F4F.2: a quick snack is deliberately smaller than a complete dinner.
+      assert.ok(sim.needs[need]>score+10,id+' snack did not restore hunger');
+      assert.ok(sim.needs[need]<75,id+' snack restored a full meal');
+    }else{
+      assert.ok(sim.needs[need]>=75,`${id} ended below green at ${sim.needs[need]}`);
+      assert.ok(sim.needs[need]>score+30,id+' restored too little');
+    }
   }
 });
 test('1x vs 3x changes clock uniformly; saving, pausing, and signed mood are compatible',()=>{
