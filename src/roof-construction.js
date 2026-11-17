@@ -108,11 +108,11 @@ export const roofAutomaticModules=(floorCells,settings)=>{
 };
 /** A small flat-shaded mesh made entirely from roof planes, in world units.
  * Indices are independent per triangle for sharp roof ridges. */
-export function roofMeshGeometry(module){
+export function roofMeshGeometry(module,{wallHeight=2.9}={}){
   const {i0,i1,j0,j1,styleId,pitch,eaves}=module;
   const x0=i0*STEP-eaves,x1=i1*STEP+eaves,z0=j0*STEP-eaves,z1=j1*STEP+eaves;
   const sx=x1-x0,sz=z1-z0,mx=(x0+x1)/2,mz=(z0+z1)/2;
-  const base=3.06,crest=base+Math.min(sx,sz)*.5*pitch;
+  const base=wallHeight+.16,crest=base+Math.min(sx,sz)*.5*pitch;
   const p=(x,y,z)=>[x,y,z],A=p(x0,base,z0),B=p(x0,base,z1),
     C=p(x1,base,z1),D=p(x1,base,z0);
   const faces=[];
