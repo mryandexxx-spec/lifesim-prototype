@@ -17,7 +17,7 @@ const porchHouse=()=>{
   world=op(world,{type:'door',edgeId:'v:36,0'});
   const door=world.openings.at(-1);
   world=op(world,{type:'porch-add',openingId:door.id,depthSections:3,
-    materialId:'porch.timber'});
+    materialId:'porch.wood'});
   world=op(world,{type:'paint-floor',at:source,scope:'tile',materialId:'floor.oak'});
   world=op(world,{type:'paint-ceiling',at:source,scope:'tile',materialId:'ceiling.blue'});
   return {world,door};
