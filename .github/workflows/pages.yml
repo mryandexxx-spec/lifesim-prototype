@@ -159,7 +159,8 @@ jobs:
           cp src/plan-preview.js src/ui-layout.js src/required-choice-focus.js site/src/
           cp src/insight-presentation.js site/src/
           cp src/camera-gestures.js site/src/
-          cp src/construction.js src/roof-construction.js site/src/
+          cp src/construction.js site/src/
+          cp src/roof-construction.js site/src/
           cp src/ui-onboarding.js site/src/
           cp src/hud-panel.js site/src/
           cp src/furniture-catalog.js src/furniture-layout.js src/furniture-editor.js src/furniture-transform.js src/furniture-hold.js site/src/
