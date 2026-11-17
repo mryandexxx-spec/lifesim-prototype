@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {CAREER_CATALOG} from '../src/career-catalog.js';
-import {careerVacancies,acceptCareerOffer,leaveCareer,describeCareerShift,clockLabel}
+import {careerVacancies,acceptCareerOffer,leaveCareer,describeCareerShift,clockLabel,calendarCareerShifts}
   from '../src/career-job-board.js';
 import {nextCareerShift} from '../src/career-scheduler.js';
 
@@ -119,4 +119,40 @@ test('W1-B.2a: source and deploy graph include accessible phone, not fake payche
   assert.match(workflow,/node --check src\/career-job-board\.js/);
   assert.match(workflow,/node --check src\/career-phone-ui\.js/);
   assert.match(workflow,/cp src\/career-catalog\.js src\/career-scheduler\.js src\/career-state\.js src\/career-job-board\.js src\/career-phone-ui\.js site\/src\//);
+});
+
+test('W1-B.2a: shifts appear as read-only calendar projections, not duplicate personal events',()=>{
+ const game=fresh(),oldEvents=JSON.stringify(game.calendar.events||[]);
+ game.careerSystem=acceptCareerOffer(game,'alex','editorial').careerSystem;
+ const next=nextCareerShift(game.calendar,game.careerSystem.byResident.alex,game.minutes);
+ const entries=calendarCareerShifts(game,next.iso,next.iso);
+ assert.equal(entries.length,1);
+ assert.equal(entries[0].id,next.id);
+ assert.equal(entries[0].careerId,'editorial');
+ assert.equal(entries[0].residentId,'alex');
+ assert.equal(entries[0].iso,next.iso);
+ assert.equal(entries[0].start,next.start%1440);
+ assert.equal(entries[0].end,next.end%1440);
+ assert.equal(entries[0].work,true);
+ assert.equal(JSON.stringify(game.calendar.events||[]),oldEvents);
+ game.careerSystem=leaveCareer(game,'alex').careerSystem;
+ assert.deepEqual(calendarCareerShifts(game,next.iso,next.iso),[]);
+ assert.equal(JSON.stringify(game.calendar.events||[]),oldEvents);
+});
+test('W1-B.2a: calendar renders both persons read-only, after refresh and independent of old events',()=>{
+ const game=fresh();
+ game.careerSystem=acceptCareerOffer(game,'alex','art-studio').careerSystem;
+ game.careerSystem=acceptCareerOffer(game,'mira','editorial').careerSystem;
+ const work=calendarCareerShifts(game,'2026-11-17','2026-11-25');
+ assert.ok(work.some(x=>x.residentId==='alex'));
+ assert.ok(work.some(x=>x.residentId==='mira'));
+ assert.ok(work.every(x=>x.work&&x.id&&x.title));
+ assert.deepEqual(calendarCareerShifts(game,'1900-01-01','1900-01-04'),[]);
+ assert.deepEqual(calendarCareerShifts(game,'2026-11-17','2027-11-17'),[],'Bound lookahead');
+ const ui=read('src/calendar-ui.js');
+ assert.match(ui,/calendarCareerShifts\(root,from,to\)/);
+ assert.match(ui,/lc-readonly/);
+ assert.match(ui,/▣ Работа:/);
+ assert.match(read('index.html'),/calendar-ui\.js\?v=w1a4-20261117-w1b2a/);
+ assert.match(read('src/game.js'),/calendarUI\.refresh\(\)/);
 });
