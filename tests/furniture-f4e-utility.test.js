@@ -174,6 +174,6 @@ test('F4E: Safari UI, both Meshy policies, real light and Pages bundle wired',()
   assert.match(html,/furniture-interactions\.js\?v=1\.2u-f4e/);
   assert.match(page,/node --check src\/furniture-interactions\.js/);
   assert.match(page,/src\/furniture-interactions\.js site\/src\//);
-  assert.match(text('../src/meshy-visual-policy.js'),/\['lamp','mirror','dresser','wardrobe'\]/);
-  assert.match(text('../src/meshy-mira-policy.js'),/\['lamp','mirror','dresser','wardrobe'\]/);
+  assert.match(text('../src/meshy-visual-policy.js'),/\['lamp','mirror','dresser','wardrobe','cook','prep','wash'\]/);
+  assert.match(text('../src/meshy-mira-policy.js'),/\['lamp','mirror','dresser','wardrobe','cook','prep','wash'\]/);
 });
