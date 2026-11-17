@@ -105,6 +105,23 @@ try{
  assert.notDeepEqual(afterPan,beforePan,'One-finger swipe must actually pan the 3D camera');
  assert.ok(await page.locator('#build-pending').isHidden(),
    'A camera swipe must never change layout or stage a build');
+ // Actual starter-home regression: the old apartment's walls were procedural
+ // scene nodes absent from wallEdges, so no wall tool could resize them.
+ await page.locator('[data-build-tool="move-wall"]').click();
+ assert.ok(await page.locator('#build-starter-picker').isVisible());
+ await page.locator('[data-starter-side="north"]').click();
+ assert.match(await page.locator('#build-wall-label').innerText(),/Исходная квартира/);
+ assert.ok(await page.locator('#build-wall-expand').isEnabled());
+ await page.locator('#build-wall-expand').click();
+ assert.ok(await page.locator('#build-pending').isVisible());
+ await page.locator('#build-apply').click();
+ assert.ok(await page.locator('#build-pending').isHidden());
+ // Four explicit original boundaries remain select-able even when the initial
+ // decorative back wall is offscreen at the eastern portrait camera pose.
+ await page.locator('[data-starter-side="east"]').click();
+ await page.locator('#build-wall-expand').click();
+ await page.locator('#build-apply').click();
+ await page.locator('[data-build-walls="up"]').click();
  await page.screenshot({path:'f5a-browser-build.png'});
  await page.locator('#build-exit').click();
  assert.equal(await page.locator('#build-toggle').getAttribute('aria-pressed'),'false');
@@ -119,6 +136,12 @@ try{
  assert.equal(saved.world.construction.openings.length,1);
  assert.ok(saved.world.construction.wallEdges.some(w=>w.axis==='v'&&w.i===37&&w.j===0),
    '0.5m wall-expansion nudge moved the selected outer boundary');
+ assert.equal(saved.world.construction.starterShell.north,-10,
+   'The original solid back wall moved outward and persisted');
+ assert.equal(saved.world.construction.starterShell.east,29,
+   'The original open eastern boundary moved outward and persisted');
+ assert.ok(saved.world.construction.starterOwned.length>0,
+   'The original extension owns real saved foundation cells');
  assert.equal(saved.world.construction.schema,1);
  console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));

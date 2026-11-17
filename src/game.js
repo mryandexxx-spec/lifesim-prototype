@@ -1944,7 +1944,13 @@ function boot() {
       buildBox('F5 starter right edge',14+e,.092,depthCenter,
         .11,.12,9+s-n,M.trim);
     }
-    if(state.legacy)return;
+    if(state.legacy){
+      if(constructionWallMode==='up'){
+        buildBox('F5 starter front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
+        buildBox('F5 starter right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
+      }
+      return;
+    }
     const grid=.5,base=new Set();
     for(let i=-10;i<28;i++)for(let j=-9;j<9;j++)base.add(i+','+j);
     const addedByRow=new Map();

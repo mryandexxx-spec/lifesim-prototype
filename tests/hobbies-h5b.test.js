@@ -129,3 +129,18 @@ test('H5b: wall geometry and browser/build wiring',()=>{
   assert.match(ci,/cp src\/painting-gallery.js site\/src\//);
   assert.match(html,/painting-gallery.js\?v=1.2u-h5b-20261117/);
 });
+
+test('H5b works keep wall-slot identity and follow starter apartment wall resizing',()=>{
+ const original=newConstructionWorld();
+ const painting={kind:'artwork',location:'wall',wallSlot:0};
+ const before=artworkDisplayPose(painting,0,null,original);
+ const moved=proposeConstructionEdit(original,{type:'move-wall',
+   edgeId:'starter:north',deltaI:0,deltaJ:-1});
+ assert.equal(moved.ok,true,moved.reason);
+ const after=artworkDisplayPose(painting,0,null,moved.world);
+ assert.equal(after.x,before.x);
+ assert.equal(after.y,before.y);
+ assert.equal(after.z,before.z-.5);
+ assert.equal(painting.wallSlot,0);
+ assert.deepEqual(artworkDisplayPose(painting),before);
+});
