@@ -10,7 +10,7 @@ const setup=()=>({world:newFurnitureWorld(),shop:newFurnitureShop()});
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 test('F2.1 shop catalog has decor and two functional goods, still provisional',()=>{
   assert.deepEqual(SHOP_ITEMS.map(x=>x.prefabId),['plant','table','nightstand','tv','sofa','bed']);
-  assert.equal(marketListing().length,37);
+  assert.equal(marketListing().length,43);
   assert.equal(SHOP_START_CREDITS,5000);
   assert.equal(newFurnitureShop().schema,SHOP_SCHEMA);
 });
