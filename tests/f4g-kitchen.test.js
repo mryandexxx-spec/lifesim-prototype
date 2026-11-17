@@ -6,6 +6,7 @@ import {newHousehold,loadHousehold,chooseResidentAction,tickHousehold,
   furnitureAvailable} from '../src/household.js';
 import {newKitchen,restoreKitchen,replenishKitchen,kitchenRecipe,canCookRecipe,
   finishKitchenRecipe,takeKitchenServing,chooseKitchenPlan,
+  preparedKitchenMeals,hasKitchenServing,shouldEatFreshKitchenMeal,
   kitchenSummary,COOKING_SKILL_ID} from '../src/kitchen.js';
 import {FURNITURE_PRODUCTS,FURNITURE_TYPE_BY_PREFAB} from '../src/furniture-products.js';
 import {FURNITURE_CATALOG,furnitureActionApproach} from '../src/furniture-catalog.js';
@@ -114,6 +115,10 @@ test('F4G: true three-station path and cooked portions are only minted on comple
  h.paused=true;tickHousehold(h,100);
  assert.equal(h.skills.xpById.cooking,xp);
  h.paused=false;tickHousehold(h,13);
+ assert.equal(h.action.cookStage,'toFridgeStore');
+ assert.equal(kitchenSummary(h.kitchen).prepared,0);
+ h.position={...furnitureActionApproach(h.world,'fridge')};
+ arrive(h);h.action.cookStage='storing';tickHousehold(h,6);
  assert.equal(h.action,null);
  assert.equal(kitchenSummary(h.kitchen).prepared,3);
  assert.equal(h.kitchen.pantry.vegetables,6);
@@ -121,6 +126,56 @@ test('F4G: true three-station path and cooked portions are only minted on comple
  assert.equal(saved.kitchen.prepared[0].recipeId,'cook.soup');
  assert.equal(saved.kitchen.prepared[0].portions,3);
  assert.ok(saved.skills.xpById.cooking>=xp);
+});
+test('F4G.2: hungry cook stores meal then autonomously fetches one selected portion',()=>{
+ const h=home();h.needs.hunger=20;
+ assert.ok(chooseResidentAction(h,'cook',false,'alex','shop-stove-902',
+   null,null,null,null,'cook.pancakes'));
+ h.position={...furnitureActionApproach(h.world,'fridge')};
+ arrive(h);h.action.cookStage='taking';tickHousehold(h,5);
+ h.position={...furnitureActionApproach(h.world,'prep','shop-prep-901')};
+ arrive(h);h.action.cookStage='preparing';tickHousehold(h,8);
+ h.position={...furnitureActionApproach(h.world,'cook','shop-stove-902')};
+ arrive(h);h.action.cookStage='cooking';tickHousehold(h,23);
+ assert.equal(h.action.cookStage,'toFridgeStore');
+ assert.equal(kitchenSummary(h.kitchen).prepared,0);
+ h.position={...furnitureActionApproach(h.world,'fridge')};
+ arrive(h);h.action.cookStage='storing';tickHousehold(h,6);
+ assert.equal(kitchenSummary(h.kitchen).prepared,3);
+ assert.equal(h.action?.id,'dining');
+ assert.equal(h.action?.selectedRecipeId,'cook.pancakes');
+ assert.equal(loadHousehold(structuredClone(h)).action?.selectedRecipeId,'cook.pancakes');
+ h.position={...furnitureActionApproach(h.world,'fridge')};
+ arrive(h);h.action.diningStage='taking';tickHousehold(h,6);
+ const seat=diningSeatApproach(h.world,h.action.targetInstanceId,h.action.diningSeatInstanceId);
+ h.position={...seat};arrive(h);h.action.diningStage='eating';tickHousehold(h,5);
+ assert.equal(kitchenSummary(h.kitchen).prepared,2);
+ assert.equal(h.action.cookedRecipeId,'cook.pancakes');
+});
+test('F4G.2: fridge inventory selects exact recipe and validates v1 queue',()=>{
+ const k=newKitchen();
+ assert.ok(finishKitchenRecipe(k,'cook.soup',0));
+ assert.ok(finishKitchenRecipe(k,'cook.pancakes',0));
+ assert.deepEqual(preparedKitchenMeals(k).map(x=>[x.recipeId,x.portions]),
+   [['cook.soup',3],['cook.pancakes',3]]);
+ assert.equal(hasKitchenServing(k,'cook.pancakes'),true);
+ assert.equal(takeKitchenServing(k,'cook.pancakes'),'cook.pancakes');
+ assert.equal(takeKitchenServing(k,'cook.gratin'),null);
+ assert.equal(preparedKitchenMeals(k)[0].portions,3);
+ assert.equal(shouldEatFreshKitchenMeal(55,true),true);
+ assert.equal(shouldEatFreshKitchenMeal(56,true),false);
+ assert.equal(shouldEatFreshKitchenMeal(12,false),false);
+ const q=newActionQueues(['alex','mira']);
+ assert.ok(enqueueAction(q,'alex',{type:'object',actionId:'dining',
+   autoTable:true,recipeId:'cook.pancakes'}));
+ assert.equal(restoreActionQueues(structuredClone(q),['alex','mira'])
+   .byResident.alex[0].recipeId,'cook.pancakes');
+ assert.equal(enqueueAction(q,'alex',{type:'object',actionId:'dining',
+   autoTable:true,recipeId:'unsafe'}),null);
+ const h=home();h.kitchen.prepared.push({recipeId:'cook.pancakes',portions:1});
+ assert.ok(chooseResidentAction(h,'dining',false,'alex','shop-diningtable-904',
+   null,null,null,null,'cook.pancakes'));
+ assert.equal(h.action.selectedRecipeId,'cook.pancakes');
 });
 test('F4G: prepared food is consumed only at the seated table, then creates dirty dishes',()=>{
  const h=home();
@@ -185,6 +240,10 @@ test('F4G: Safari touch interaction, visual effects and deploy contain kitchen E
  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
  const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
  assert.match(html,/id="cooking-recipe-select"/);
+ assert.match(html,/id="fridge-prepared-select"/);
+ assert.match(html,/id="fridge-cook-button"/);
+ assert.match(game,/cookedCarry=/);
+ assert.match(game,/fridge-prepared-select/);
  assert.match(html,/src\/kitchen\.js/);
  assert.match(game,/cooking-recipe-select/);
  assert.match(game,/F4G cooking pot/);

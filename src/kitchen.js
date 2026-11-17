@@ -6,6 +6,7 @@ import {findPath} from './navigation.js';
 
 export const KITCHEN_SCHEMA=1;
 export const COOKING_SKILL_ID='cooking';
+export const FRESH_MEAL_HUNGER_THRESHOLD=55;
 export const PANTRY_START=Object.freeze({vegetables:8,grains:8,dairy:8});
 const recipe=(id,label,requires,minLevel,cookMinutes,portions,hungerFactor,color)=>
   Object.freeze({id,label,requires:Object.freeze({...requires}),minLevel,
@@ -74,10 +75,28 @@ export function finishKitchenRecipe(kitchen,recipeId,level=0){
   else kitchen.prepared.push({recipeId,portions:recipe.portions});
   return true;
 }
-/** Only a confirmed eater at a valid chair consumes a saved portion. */
-export function takeKitchenServing(kitchen){
+/** Fridge inventory: data-only rows shared by UI, selection and autonomous eating. */
+export function preparedKitchenMeals(kitchen){
+  return Array.isArray(kitchen?.prepared)?kitchen.prepared
+    .filter(item=>kitchenRecipe(item?.recipeId)&&finiteInt(item.portions)&&item.portions>0)
+    .map(item=>({recipeId:item.recipeId,label:kitchenRecipe(item.recipeId).label,
+      portions:item.portions,color:kitchenRecipe(item.recipeId).color})):[];
+}
+export function hasKitchenServing(kitchen,recipeId){
+  return Boolean(kitchenRecipe(recipeId)&&preparedKitchenMeals(kitchen)
+    .some(item=>item.recipeId===recipeId));
+}
+/** After physical storage, hungry cooks may take exactly one of their new portions. */
+export function shouldEatFreshKitchenMeal(hunger,tableAvailable){
+  return Number.isFinite(hunger)&&hunger<=FRESH_MEAL_HUNGER_THRESHOLD&&
+    tableAvailable===true;
+}
+/** Only a confirmed eater at a valid chair consumes one chosen saved portion. */
+export function takeKitchenServing(kitchen,requestedRecipeId=null){
   if(!Array.isArray(kitchen?.prepared))return null;
-  const entry=kitchen.prepared.find(x=>x.portions>0&&kitchenRecipe(x.recipeId));
+  if(requestedRecipeId!==null&&!kitchenRecipe(requestedRecipeId))return null;
+  const entry=kitchen.prepared.find(x=>x.portions>0&&kitchenRecipe(x.recipeId)&&
+    (requestedRecipeId===null||x.recipeId===requestedRecipeId));
   if(!entry)return null;
   entry.portions--;
   const id=entry.recipeId;

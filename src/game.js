@@ -25,7 +25,7 @@ import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES,canPaintContent,
   compositionForArtwork,paintingSeedFromSession} from './painting.js';
 import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
-  chooseKitchenPlan} from './kitchen.js';
+  preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from './painting-gallery.js';
@@ -363,6 +363,10 @@ function scheduleCommand(command,residentId=game.selectedSim){
         return false;
       }
     }
+    if(command.type==='object'&&actionId==='dining'&&command.recipeId&&
+      !hasKitchenServing(game.kitchen,command.recipeId)){
+      toast('Выбранное блюдо закончилось в холодильнике');return false;
+    }
     if(command.type==='object'&&actionId==='dining'&&command.autoTable===true){
       if(!nearestAvailableDiningTable(game,residentId)){
         toast('Для обеда нужны доступный обеденный стол и свободный стул');
@@ -672,8 +676,26 @@ function select(id,instanceId=null) {
       ' · Грязных тарелок: '+k.dirtyDishes+
       ' · Продукты (овощи/крупы/молоко): '+k.supplies;
   }
-  $('cooking-recipe-field').hidden=id!=='cook';
-  if(id==='cook'){
+  $('fridge-prepared-field').hidden=id!=='fridge';
+  if(id==='fridge'){
+    const menu=$('fridge-prepared-select');
+    menu.replaceChildren();
+    const meals=preparedKitchenMeals(game.kitchen);
+    for(const meal of meals){
+      const option=document.createElement('option');
+      option.value=meal.recipeId;
+      option.textContent=meal.label+' · '+meal.portions+' порц.';
+      menu.append(option);
+    }
+    if(!meals.length){
+      const empty=document.createElement('option');
+      empty.value='';empty.textContent='Готовой еды пока нет';
+      menu.append(empty);
+    }
+    $('fridge-lunch-button').disabled=!meals.length;
+  }
+  $('cooking-recipe-field').hidden=!['cook','fridge'].includes(id);
+  if(id==='cook'||id==='fridge'){
     const select=$('cooking-recipe-select');
     const level=currentSkillLevel(selectedActor().skills,HOBBY_SKILLS,COOKING_SKILL_ID);
     for(const option of select.options){
@@ -705,6 +727,7 @@ function select(id,instanceId=null) {
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
   $('fridge-lunch-button').hidden=id!=='fridge';
+  $('fridge-cook-button').hidden=id!=='fridge';
   const lampLabel=id==='lamp'
     ?(lampIsOn(game?.world,selectedFurnitureInstanceId)?'Выключить торшер':'Включить торшер')
     :ACTIONS[id].label;
@@ -779,10 +802,29 @@ $('action-button').addEventListener('click', () => {
     select(null);
   }
 });
-// F4F.2: refrigerator full lunch uses existing meal and seating choreography.
+// F4G.2: fridge pop-up lists the actual stored recipe and remaining portions.
 $('fridge-lunch-button').addEventListener('click',()=>{
   if(selected!=='fridge')return;
-  if(scheduleCommand({type:'object',actionId:'dining',autoTable:true}))select(null);
+  const recipeId=$('fridge-prepared-select').value;
+  if(!hasKitchenServing(game.kitchen,recipeId)){
+    toast('Сначала приготовь блюдо');return;
+  }
+  if(scheduleCommand({type:'object',actionId:'dining',autoTable:true,recipeId}))select(null);
+});
+// The fridge can start a full recipe too: walk fridge → prep → selected real stove.
+$('fridge-cook-button').addEventListener('click',()=>{
+  if(selected!=='fridge')return;
+  const resident=selectedActor(),recipeId=$('cooking-recipe-select').value;
+  const stove=game.world.furniture.instances
+    .filter(item=>item.prefabId==='stove'&&item.location==='home'&&
+      furnitureAvailable(game,'cook',game.selectedSim,item.instanceId)&&
+      chooseKitchenPlan(game.world,resident.position,item.instanceId))
+    .sort((a,b)=>Math.hypot(a.x-resident.position.x,a.z-resident.position.z)-
+      Math.hypot(b.x-resident.position.x,b.z-resident.position.z)||
+      a.instanceId.localeCompare(b.instanceId))[0];
+  if(!stove){toast('Для готовки купи плиту и рабочую поверхность');return;}
+  if(scheduleCommand({type:'object',actionId:'cook',recipeId,
+    targetInstanceId:stove.instanceId}))select(null);
 });
 // Dance is an independent activity queued against the same physical stereo.
 // This click also provides the genuine Safari gesture for Web Audio unlock.
@@ -1615,8 +1657,7 @@ function boot() {
     applyItemAppearance(node,itemDefinitionId);
   };
   const decorNodes=new Map();
-  // H5c: cache the 78 theme stroke entities per easel instead of repeatedly
-  // traversing the PlayCanvas child tree at every Safari animation frame.
+  // H5c: cache the 78 theme stroke entities per easel for Safari performance.
   const paintStrokeCache=new WeakMap();
   const decorTemplates=new Map();
   const f4eOriginalPositions=new WeakMap();
@@ -2184,6 +2225,13 @@ function boot() {
     plate.enabled=false;food.enabled=false;
     return [id,{plate,food}];
   }));
+  // Shared world-space carry presentation works with both character skins.
+  const cookedCarry=Object.fromEntries(HOUSEHOLD_IDS.map(id=>{
+    const tray=cylinder('F4G.2 tray '+id,0,0,0,.37,.045,.30,M.white);
+    const food=ball('F4G.2 food '+id,0,0,0,.24,.09,.22,M.yellow);
+    tray.enabled=false;food.enabled=false;
+    return [id,{tray,food}];
+  }));
   const reactionBadges=createReactionBadges($('reaction-layer'));
   const reactionRigs={alex:alexRig,mira:miraRig};
   const moodOrbit=$('mood-orbit');
@@ -2222,7 +2270,7 @@ function boot() {
           ?diningSeatApproach(game.world,game.action.targetInstanceId,game.action.diningSeatInstanceId)
           :furnitureActionApproach(game.world,'fridge')):
       game.action.id==='cook'
-        ?(['taking','toFridge'].includes(game.action.cookStage)
+        ?(['taking','toFridge','toFridgeStore','storing'].includes(game.action.cookStage)
           ?furnitureActionApproach(game.world,'fridge')
           :['toPrep','preparing'].includes(game.action.cookStage)
             ?furnitureActionApproach(game.world,'prep',game.action.prepInstanceId)
@@ -2244,7 +2292,7 @@ function boot() {
           ?diningSeatApproach(game.world,game.otherSim.action.targetInstanceId,game.otherSim.action.diningSeatInstanceId)
           :furnitureActionApproach(game.world,'fridge')):
       game.otherSim.action.id==='cook'
-        ?(['taking','toFridge'].includes(game.otherSim.action.cookStage)
+        ?(['taking','toFridge','toFridgeStore','storing'].includes(game.otherSim.action.cookStage)
           ?furnitureActionApproach(game.world,'fridge')
           :['toPrep','preparing'].includes(game.otherSim.action.cookStage)
             ?furnitureActionApproach(game.world,'prep',game.otherSim.action.prepInstanceId)
@@ -2260,9 +2308,9 @@ function boot() {
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
     alex:game.action?.phase==='using'&&(game.action.id==='fridge'||
-      (game.action.id==='cook'&&game.action.cookStage==='taking')),
+      (game.action.id==='cook'&&['taking','storing'].includes(game.action.cookStage))),
     mira:game.otherSim.action?.phase==='using'&&(game.otherSim.action.id==='fridge'||
-      (game.otherSim.action.id==='cook'&&game.otherSim.action.cookStage==='taking'))
+      (game.otherSim.action.id==='cook'&&['taking','storing'].includes(game.otherSim.action.cookStage)))
   };
   const paths={
     alex:{points:null,index:0,id:null},
@@ -2302,7 +2350,7 @@ function boot() {
       return furnitureActionApproach(game.world,'hobby',targetInstanceId);
     if(id==='cook'){
       const a=getActor(game,residentId)?.action;
-      if(!a||['toFridge','taking'].includes(a.cookStage))
+      if(!a||['toFridge','taking','toFridgeStore','storing'].includes(a.cookStage))
         return furnitureActionApproach(game.world,'fridge');
       if(['toPrep','preparing'].includes(a.cookStage))
         return furnitureActionApproach(game.world,'prep',a.prepInstanceId);
@@ -3920,6 +3968,8 @@ function boot() {
                   arrive(resident);resident.action.cookStage='preparing';
                 }else if(resident.action.cookStage==='toStove'){
                   arrive(resident);resident.action.cookStage='cooking';
+                }else if(resident.action.cookStage==='toFridgeStore'){
+                  arrive(resident);resident.action.cookStage='storing';
                 }
               }else if(resident.action?.id==='dining'){
                 if(resident.action.diningStage==='toFridge'){
@@ -3993,7 +4043,14 @@ function boot() {
             restartAutonomyWait(residentId);
           }
           const idea=residentAutonomousChoice(game,residentId);
-          if(idea && beginAction(idea,true,residentId))
+          // Like a real household: when hungry, prefer an already cooked
+          // portion over producing a new snack. The same table/chair A* applies.
+          const ready=idea==='fridge'?preparedKitchenMeals(game.kitchen):[];
+          const table=ready.length?nearestAvailableDiningTable(game,residentId):null;
+          if(table&&beginAction('dining',true,residentId,false,table.instanceId,
+              null,null,null,ready[0].recipeId)){
+            toast(getActorName(residentId)+' берёт готовое: '+ready[0].label);
+          }else if(idea && beginAction(idea,true,residentId))
             toast(getActorName(residentId)+' самостоятельно решил(а): '+ACTIONS[idea].label.toLowerCase());
         }
       }
@@ -4036,13 +4093,14 @@ function boot() {
     const pairedMusic=pairedHobby?.choiceId==='music';
     const using=game.action?.phase==='using',
       useId=using?(game.action.id==='dining'&&game.action.diningStage==='taking'
-        ?'fridge':game.action.id==='cook'&&game.action.cookStage==='taking'
+        ?'fridge':game.action.id==='cook'&&['taking','storing'].includes(game.action.cookStage)
           ?'fridge':game.action.id==='cook'&&game.action.cookStage==='preparing'
             ?'prep':game.action.id):pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const alexDining=useId==='dining'&&game.action?.diningStage==='eating';
     const alexDiningVisual=alexDining?diningVisualFor('alex',game.action):diningVisual.alex;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,
-      game.action?.id==='dining'?6:game.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
+      game.action?.id==='dining'?6:game.action?.id==='cook'&&game.action.cookStage==='storing'
+        ?6:game.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
       inverseFurniturePose(game.world,'shower',display).yaw);
@@ -4203,14 +4261,16 @@ function boot() {
     const miraUsing=game.otherSim.action?.phase==='using';
     const miraUseId=miraUsing?(game.otherSim.action.id==='dining'&&
       game.otherSim.action.diningStage==='taking'?'fridge':
-      game.otherSim.action.id==='cook'&&game.otherSim.action.cookStage==='taking'?'fridge':
+      game.otherSim.action.id==='cook'&&['taking','storing'].includes(game.otherSim.action.cookStage)?'fridge':
       game.otherSim.action.id==='cook'&&game.otherSim.action.cookStage==='preparing'?'prep':
       game.otherSim.action.id):
       pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const miraDining=miraUseId==='dining'&&game.otherSim.action?.diningStage==='eating';
     const miraDiningVisual=miraDining?diningVisualFor('mira',game.otherSim):diningVisual.mira;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,
-      game.otherSim.action?.id==='dining'?6:game.otherSim.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
+      game.otherSim.action?.id==='dining'?6:game.otherSim.action?.id==='cook'&&
+        game.otherSim.action.cookStage==='storing'?6:
+        game.otherSim.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
       game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
       inverseFurniturePose(game.world,'shower',miraDisplay).yaw);
@@ -4454,6 +4514,21 @@ function boot() {
     if(meshyShown&&(useId==='sofa'||game.action?.id==='hobby'))
       book.enabled=false;
     if(meshyShown&&pairedBooks)book.enabled=false;
+    // F4G.2: visible cooked tray travels from stove to fridge, stage-only.
+    for(const id of HOUSEHOLD_IDS){
+      const action=getActor(game,id)?.action;
+      const carrying=action?.id==='cook'&&
+        ['toFridgeStore','storing'].includes(action.cookStage)&&!furnishMode;
+      const drawn=cookedCarry[id];
+      drawn.tray.enabled=Boolean(carrying);drawn.food.enabled=Boolean(carrying);
+      if(carrying){
+        const actor=id==='alex'?display:miraDisplay;
+        const offset=rotateLocal(.26,-.03,actor.yaw);
+        const x=actor.x+offset.x,y=actor.y+1.07,z=actor.z+offset.z;
+        drawn.tray.setPosition(x,y,z);
+        drawn.food.setPosition(x,y+.075,z);
+      }
+    }
     // Plates and their portions track the chosen purchased table and real seat.
     // Cancellation, completion, storage or removal hides them immediately.
     for(const id of HOUSEHOLD_IDS){
@@ -4558,7 +4633,6 @@ function boot() {
         const painter=[game,game.otherSim].find(actor=>
           actor.action?.id==='paint'&&actor.action.targetInstanceId===item.instanceId);
         const activeAction=painter?.action;
-        // Do not paint the last completed image onto a fresh blank easel.
         // Finished paintings live in independent H5a artwork entities.
         const contentId=activeAction?.contentId;
         const stage=activeAction?.phase==='using'

@@ -29,12 +29,21 @@ export function sanitizeQueueCommand(id,raw,persons){
     if(raw.autoTable!==undefined&&
       (raw.actionId!=='dining'||raw.autoTable!==true||raw.targetInstanceId!==undefined))
       return null;
-    if(raw.autoTable===true)return {type,actionId:'dining',autoTable:true};
+    if(raw.autoTable===true){
+      if(raw.recipeId!==undefined&&!kitchenRecipe(raw.recipeId))return null;
+      return {type,actionId:'dining',autoTable:true,
+        ...(raw.recipeId?{recipeId:raw.recipeId}:{})};
+    }
     if(raw.targetInstanceId!==undefined&&!validFurnitureInstanceId(raw.targetInstanceId))
       return null;
     if(raw.actionId==='cook'){
       if(!kitchenRecipe(raw.recipeId)||!raw.targetInstanceId)return null;
       return {type,actionId:'cook',targetInstanceId:raw.targetInstanceId,recipeId:raw.recipeId};
+    }
+    if(raw.actionId==='dining'&&raw.recipeId!==undefined){
+      if(!kitchenRecipe(raw.recipeId))return null;
+      return {type,actionId:'dining',recipeId:raw.recipeId,
+        ...(raw.targetInstanceId?{targetInstanceId:raw.targetInstanceId}:{})};
     }
     // No untrusted recipe metadata may alter old object tasks.
     if(raw.recipeId!==undefined)return null;

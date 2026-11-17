@@ -155,7 +155,7 @@ test('H5c: real Safari UI uses catalog and safe deterministic 3D renderer',()=>{
   assert.match(game,/paintingSeedFromSession\(painter.activitySession.sessionId\)/);
   assert.match(game,/compositionForArtwork\(work.contentId,work.seed,work.renderVersion\)/);
   assert.match(source,/renderVersion===1/);
-  assert.match(html,/1\.2u\.16 · H5c/);
+  assert.match(html,/1\.2u\.17 · F4G\.2 \/ H5c/);
   assert.match(html,/painting.js\?v=1\.2u\.16-h5c/);
   assert.match(workflow,/cp src\/painting.js site\/src\//);
 });
