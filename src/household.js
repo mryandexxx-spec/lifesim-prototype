@@ -2,6 +2,10 @@
  * Legacy root fields remain Alex's exact v1 state; otherSim is an optional extension.
  */
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS } from './simulation.js';
+import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
+  canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
+  takeKitchenServing,recordDirtyDish,washKitchenDishes} from './kitchen.js';
+import {currentSkillLevel} from './skills-engine.js';
 import { refreshMind } from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
@@ -62,6 +66,7 @@ export function newHousehold() {
   state.otherSim=newMira(state.minutes);
   state.skills=newSkillProgress();
   state.createdWorks=[];
+  state.kitchen=newKitchen();
   state.objectOnceLedger=newObjectOnceLedger();
   state.selectedSim='alex';
   state.relationship=newRelationship(state.minutes);
@@ -87,6 +92,7 @@ export function loadHousehold(raw) {
   if (!raw || raw.version!==1) return newHousehold();
   const root=loadGame(raw,DEMO_PROFILES.first);
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture)};
+  root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.objectOnceLedger=restoreObjectOnceLedger(raw.objectOnceLedger);
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
@@ -359,7 +365,17 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(!item)return false;
   if(itemId==='bed')return bedSlotFor(root,residentId,item.instanceId)!==null;
+  if(itemId==='wash'&&!(root.kitchen?.dirtyDishes>0))return false;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
+  if(itemId==='cook'){
+    // One cooking resident owns the shared fridge/prep pipeline at a time.
+    if(['cook','fridge'].includes(other?.action?.id)||(
+      other?.action?.id==='dining'&&
+      ['toFridge','taking'].includes(other.action.diningStage)))return false;
+    return Boolean(chooseKitchenPlan(root.world,getActor(root,residentId)?.position,item.instanceId));
+  }
+  if(itemId==='fridge'&&other?.action?.id==='cook'&&
+    ['toFridge','taking'].includes(other.action.cookStage))return false;
   if(itemId==='sofa'&&other?.action?.id==='tv'&&
      other.action.watchSeatInstanceId===item.instanceId)return false;
   if(itemId==='sofa'&&readingSeatId(other?.action)===item.instanceId)return false;
@@ -433,12 +449,18 @@ function validMusicSource(root,actor){
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
-  activityId=null,contentId=null,musicPlan=null,inventoryItemId=null) {
+  activityId=null,contentId=null,musicPlan=null,inventoryItemId=null,recipeId=null) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
     !furnitureAvailable(root,itemId,residentId,item.instanceId))return false;
   const resident=getActor(root,residentId);
-  let readingSeat=null,plannedMusic=null,diningSeat=null;
+  let readingSeat=null,plannedMusic=null,diningSeat=null,kitchenPlan=null;
+  if(itemId==='cook'){
+    const level=currentSkillLevel(resident.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+    if(!canCookRecipe(root.kitchen,recipeId,level))return false;
+    kitchenPlan=chooseKitchenPlan(root.world,resident.position,item.instanceId);
+    if(!kitchenPlan)return false;
+  }
   if(itemId==='dining'){
     const other=getActor(root,residentId==='alex'?'mira':'alex');
     const taken=[other?.action?.id==='seat'?other.action.targetInstanceId:null,
@@ -513,6 +535,11 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     resident.action.contentId=contentId;
     resident.action.musicSpot={x:plannedMusic.point.x,z:plannedMusic.point.z};
     resident.activitySession=session;
+  }
+  if(chosen&&itemId==='cook'){
+    resident.action.recipeId=recipeId;
+    resident.action.prepInstanceId=kitchenPlan.prepInstanceId;
+    resident.action.cookStage='toFridge';
   }
   if(chosen&&itemId==='bed')resident.action.bedSlot=slot;
   if(chosen&&itemId==='dining'){
@@ -678,6 +705,25 @@ export function tickHousehold(root,minutes) {
   other.paused=root.paused;
   other.speed=root.speed;
   other.autonomy.enabled=root.autonomy.enabled;
+  replenishKitchen(root.kitchen,root.minutes);
+  // Kitchen preflight: a moved/stored source or an interrupted resident
+  // cannot finish a ghost dish. Check on every active simulation step.
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),action=actor?.action;
+    if(action?.id!=='cook')continue;
+    const level=currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+    const lookup=action.cookStage==='toFridge'||action.cookStage==='taking'
+      ?furnitureActionApproach(root.world,'fridge')
+      :action.cookStage==='toPrep'||action.cookStage==='preparing'
+        ?furnitureActionApproach(root.world,'prep',action.prepInstanceId)
+        :furnitureActionApproach(root.world,'cook',action.targetInstanceId);
+    if(!cookingSourceValid(root.world,action)||
+      !canCookRecipe(root.kitchen,action.recipeId,level)||!lookup||
+      (action.phase==='using'&&Math.hypot(
+        actor.position.x-lookup.x,actor.position.z-lookup.z)>.6)){
+      actor.action=null;actor.event='Готовка прервана: нет продуктов или кухонного оборудования';
+    }
+  }
   // Dining validates the real table, exact chair and serving spot before
   // any hunger reward. Invalid geometry stops the meal without a benefit.
   for(const id of HOUSEHOLD_IDS){
@@ -692,6 +738,16 @@ export function tickHousehold(root,minutes) {
        (a.diningStage==='eating'&&a.phase==='using'&&
         Math.hypot(actor.position.x-point.x,actor.position.z-point.z)>.36)){
       actor.action=null;actor.event='Стол или обеденный стул недоступен';
+    }
+  }
+  // Only physically arrived diners consume cooked portions; leaving before
+  // eating keeps inventory intact. Old table meals remain available.
+  for(const id of HOUSEHOLD_IDS){
+    const action=getActor(root,id)?.action;
+    if(action?.id==='dining'&&action.phase==='using'&&
+      action.diningStage==='eating'&&!action.portionTaken){
+      action.cookedRecipeId=takeKitchenServing(root.kitchen);
+      action.portionTaken=true;
     }
   }
   // Refuse stale/removed/stored/occupied reading sources before simulation
@@ -724,8 +780,43 @@ export function tickHousehold(root,minutes) {
   switchLampAtArrival(root.world,root);
   switchLampAtArrival(root.world,other);
   const alexUse=captureObjectUse(root),miraUse=captureObjectUse(other);
+  const kitchenBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>{
+    const actor=getActor(root,id),a=actor.action;
+    if(!a)return [id,null];
+    const recipe=a.id==='cook'?kitchenRecipe(a.recipeId):null;
+    const cookingMinutes=recipe&&a.phase==='using'&&a.cookStage==='cooking'
+      ?Math.min(minutes,Math.max(0,recipe.cookMinutes-a.elapsed)):0;
+    return [id,{action:a,id:a.id,phase:a.phase,
+      stage:a.diningStage,recipeId:recipe?.id,
+      cookingMinutes}];
+  }));
   tick(root,minutes,root.world);
   tick(other,minutes,root.world);
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),before=kitchenBefore[id];
+    if(!before)continue;
+    if(before.id==='cook'){
+      if(before.cookingMinutes>0){
+        const max=HOBBY_SKILLS.skills[COOKING_SKILL_ID].xpThresholds.at(-1);
+        actor.skills.xpById[COOKING_SKILL_ID]=Math.min(max,
+          Math.round(((actor.skills.xpById[COOKING_SKILL_ID]||0)+
+            before.cookingMinutes*1.05)*1000000)/1000000);
+      }
+      if(before.phase==='using'&&before.action.cookStage==='cooking'&&
+        !actor.action&&before.recipeId){
+        const level=currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+        if(finishKitchenRecipe(root.kitchen,before.recipeId,level))
+          actor.event='Готово блюдо «'+kitchenRecipe(before.recipeId).label+'» · порции в холодильнике';
+      }
+    }
+    if(before.id==='dining'&&before.phase==='using'&&
+      before.stage==='eating'&&!actor.action)recordDirtyDish(root.kitchen);
+    if(before.id==='wash'&&before.phase==='using'&&!actor.action){
+      const cleaned=washKitchenDishes(root.kitchen);
+      actor.event='Посуда вымыта: '+cleaned;
+    }
+  }
+  replenishKitchen(root.kitchen,root.minutes);
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),completed=readyPaint[id];
     if(completed&&!actor.action&&actor.activitySession===completed.session){
