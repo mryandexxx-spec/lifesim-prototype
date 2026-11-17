@@ -4,7 +4,8 @@
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS } from './simulation.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
-  takeKitchenServing,recordDirtyDish,washKitchenDishes} from './kitchen.js';
+  takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
+  recordDirtyDish,washKitchenDishes} from './kitchen.js';
 import {currentSkillLevel} from './skills-engine.js';
 import { refreshMind } from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
@@ -391,7 +392,7 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
     return Boolean(chooseKitchenPlan(root.world,getActor(root,residentId)?.position,item.instanceId));
   }
   if(itemId==='fridge'&&other?.action?.id==='cook'&&
-    ['toFridge','taking'].includes(other.action.cookStage))return false;
+    ['toFridge','taking','toFridgeStore','storing'].includes(other.action.cookStage))return false;
   if(itemId==='sofa'&&other?.action?.id==='tv'&&
      other.action.watchSeatInstanceId===item.instanceId)return false;
   if(itemId==='sofa'&&readingSeatId(other?.action)===item.instanceId)return false;
@@ -403,7 +404,9 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
     // Two residents can dine at the same table, but must have different
     // real chairs; collection at the single fridge happens one at a time.
     if(other?.action?.id==='fridge'||(other?.action?.id==='dining'&&
-      ['toFridge','taking'].includes(other.action.diningStage)))return false;
+      ['toFridge','taking'].includes(other.action.diningStage))||
+      (other?.action?.id==='cook'&&
+        ['toFridge','taking','toFridgeStore','storing'].includes(other.action.cookStage)))return false;
     const occupied=[other?.action?.id==='seat'?other.action.targetInstanceId:null,
       other?.action?.id==='dining'?other.action.diningSeatInstanceId:null].filter(Boolean);
     return Boolean(chooseDiningSeat(root.world,getActor(root,residentId)?.position,
@@ -478,6 +481,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     if(!kitchenPlan)return false;
   }
   if(itemId==='dining'){
+    if(recipeId!==null&&!hasKitchenServing(root.kitchen,recipeId))return false;
     const other=getActor(root,residentId==='alex'?'mira':'alex');
     const taken=[other?.action?.id==='seat'?other.action.targetInstanceId:null,
       other?.action?.id==='dining'?other.action.diningSeatInstanceId:null].filter(Boolean);
@@ -564,6 +568,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   if(chosen&&itemId==='dining'){
     resident.action.diningSeatInstanceId=diningSeat.instanceId;
     resident.action.diningStage='toFridge';
+    if(recipeId!==null)resident.action.selectedRecipeId=recipeId;
   }
   // Book the same physical sofa before walking, so an ordinary rest or a
   // second television viewer cannot sit in the occupied spot.
@@ -743,7 +748,7 @@ export function tickHousehold(root,minutes) {
     const actor=getActor(root,id),action=actor?.action;
     if(action?.id!=='cook')continue;
     const level=currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
-    const lookup=action.cookStage==='toFridge'||action.cookStage==='taking'
+    const lookup=['toFridge','taking','toFridgeStore','storing'].includes(action.cookStage)
       ?furnitureActionApproach(root.world,'fridge')
       :action.cookStage==='toPrep'||action.cookStage==='preparing'
         ?furnitureActionApproach(root.world,'prep',action.prepInstanceId)
@@ -777,7 +782,13 @@ export function tickHousehold(root,minutes) {
     const action=getActor(root,id)?.action;
     if(action?.id==='dining'&&action.phase==='using'&&
       action.diningStage==='eating'&&!action.portionTaken){
-      action.cookedRecipeId=takeKitchenServing(root.kitchen);
+      const recipeId=takeKitchenServing(root.kitchen,action.selectedRecipeId??null);
+      if(action.selectedRecipeId&&!recipeId){
+        getActor(root,id).action=null;
+        getActor(root,id).event='Выбранное готовое блюдо закончилось';
+        continue;
+      }
+      action.cookedRecipeId=recipeId;
       action.portionTaken=true;
     }
   }
@@ -818,7 +829,7 @@ export function tickHousehold(root,minutes) {
     const cookingMinutes=recipe&&a.phase==='using'&&a.cookStage==='cooking'
       ?Math.min(minutes,Math.max(0,recipe.cookMinutes-a.elapsed)):0;
     return [id,{action:a,id:a.id,phase:a.phase,
-      stage:a.diningStage,recipeId:recipe?.id,
+      stage:a.diningStage,cookStage:a.cookStage,recipeId:recipe?.id,
       cookingMinutes}];
   }));
   tick(root,minutes,root.world);
@@ -833,11 +844,20 @@ export function tickHousehold(root,minutes) {
           Math.round(((actor.skills.xpById[COOKING_SKILL_ID]||0)+
             before.cookingMinutes*1.05)*1000000)/1000000);
       }
-      if(before.phase==='using'&&before.action.cookStage==='cooking'&&
+      if(before.phase==='using'&&before.cookStage==='storing'&&
         !actor.action&&before.recipeId){
         const level=currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
-        if(finishKitchenRecipe(root.kitchen,before.recipeId,level))
-          actor.event='Готово блюдо «'+kitchenRecipe(before.recipeId).label+'» · порции в холодильнике';
+        if(finishKitchenRecipe(root.kitchen,before.recipeId,level)){
+          actor.event='Убрал «'+kitchenRecipe(before.recipeId).label+'» в холодильник';
+          // Freshly cooked food belongs to the shared fridge first. Hungry
+          // cooks can then fetch ONE real serving via the existing dining route.
+          const table=nearestAvailableDiningTable(root,id);
+          if(shouldEatFreshKitchenMeal(actor.needs.hunger,Boolean(table))&&
+            chooseResidentAction(root,'dining',false,id,table.instanceId,
+              null,null,null,null,before.recipeId))
+            actor.event='Проголодался · берёт одну порцию «'+
+              kitchenRecipe(before.recipeId).label+'»';
+        }
       }
     }
     if(before.id==='dining'&&before.phase==='using'&&
