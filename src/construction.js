@@ -25,6 +25,27 @@ export const BUILD_FINISHES=Object.freeze({
     'wall.sand':{label:'Песчаная штукатурка',color:'#c8b497'}
   })
 });
+// F5-B.2: stable, license-free procedural opening designs. The width is
+// measured in canonical .5m wall sections, not a decorative scale factor.
+export const BUILD_OPENING_STYLES=Object.freeze({
+  'door.simple':Object.freeze({type:'door',label:'Простая дверь · 1,5 м',sections:3,finish:'wood'}),
+  'door.glass':Object.freeze({type:'door',label:'Стеклянная дверь · 1,5 м',sections:3,finish:'glass'}),
+  'door.double':Object.freeze({type:'door',label:'Двустворчатая · 2 м',sections:4,finish:'double'}),
+  'arch.round':Object.freeze({type:'arch',label:'Открытая арка · 1,5 м',sections:3,finish:'round'}),
+  'arch.wide':Object.freeze({type:'arch',label:'Широкая арка · 2 м',sections:4,finish:'wide'}),
+  'window.classic':Object.freeze({type:'window',label:'Обычное окно · 1,5 м',sections:3,finish:'classic'}),
+  'window.panorama':Object.freeze({type:'window',label:'Панорамное · 2 м',sections:4,finish:'panorama'}),
+  'window.high':Object.freeze({type:'window',label:'Высокое окно · 1,5 м',sections:3,finish:'high'}),
+  'window.slim':Object.freeze({type:'window',label:'Узкое окно · 1,5 м',sections:3,finish:'slim'})
+});
+export const BUILD_DEFAULT_OPENING_STYLE=Object.freeze({
+  door:'door.simple',window:'window.classic',arch:'arch.round'
+});
+export function constructionOpeningStyle(opening){
+  const raw=BUILD_OPENING_STYLES[opening?.styleId];
+  return raw?.type===opening?.type&&raw.sections===opening?.edgeIds?.length
+    ?opening.styleId:BUILD_DEFAULT_OPENING_STYLE[opening?.type]||null;
+}
 export const BUILD_LOT=Object.freeze({minX:-9,maxX:23,minZ:-12,maxZ:12});
 const BASE=Object.freeze({minI:-10,maxI:28,minJ:-9,maxJ:9});
 // Old cutaway: opaque west/north, open right/front. Preserve original geometry
@@ -66,7 +87,7 @@ const clone=v=>JSON.parse(JSON.stringify(v));
 const topologyCache=new WeakMap();
 function topology(state){
   let found=topologyCache.get(state);
-  if(!found){found={floors:new Set(state.floorCells),doors:new Set(state.openings.filter(o=>o.type==='door').flatMap(o=>o.edgeIds))};topologyCache.set(state,found);}
+  if(!found){found={floors:new Set(state.floorCells),doors:new Set(state.openings.filter(o=>o.type==='door'||o.type==='arch').flatMap(o=>o.edgeIds))};topologyCache.set(state,found);}
   return found;
 }
 const fail=reason=>({ok:false,reason});
@@ -115,12 +136,19 @@ export function restoreConstructionWorld(raw){
   }
   const openings=[],openingKeys=new Set();
   for(const rawOpening of raw.openings){
-    if(!rawOpening||!['door','window'].includes(rawOpening.type)||
+    if(!rawOpening||!['door','window','arch'].includes(rawOpening.type)||
       typeof rawOpening.id!=='string'||openingKeys.has(rawOpening.id)||
       !Array.isArray(rawOpening.edgeIds)||rawOpening.edgeIds.length<1||
       rawOpening.edgeIds.length>4||!rawOpening.edgeIds.every(k=>keys.has(k)))return initial;
     openingKeys.add(rawOpening.id);
-    openings.push({id:rawOpening.id,type:rawOpening.type,edgeIds:[...new Set(rawOpening.edgeIds)]});
+    const ids=[...new Set(rawOpening.edgeIds)];
+    // Old F5-A door/window records intentionally keep their missing styleId,
+    // while valid new variants retain their immutable identifier.
+    const variant=BUILD_OPENING_STYLES[rawOpening.styleId];
+    const styleId=variant?.type===rawOpening.type&&variant.sections===ids.length
+      ?rawOpening.styleId:null;
+    openings.push({id:rawOpening.id,type:rawOpening.type,edgeIds:ids,
+      ...(styleId?{styleId}:{})});
   }
   // Restore only known finite finish IDs attached to real surfaces. Unknown
   // palette IDs or retired wall/floor coordinates must not poison a v1 save.
@@ -209,6 +237,18 @@ export function nearestConstructionEdge(world,point,maxDistance=.38){
     if(d<distance){best=w;distance=d;}
   }
   return distance<=maxDistance?best:null;
+}
+// Choose contiguous physical segments. A four-part opening can anchor at
+// either of its two middle sections; never leave a half-hole at a corner.
+function segmentsForOpening(walls,at,sections){
+  if(!at)return null;
+  const offsets=sections===4?[[-1,0,1,2],[-2,-1,0,1]]:[[-1,0,1]];
+  for(const sequence of offsets){
+    const ids=sequence.map(d=>edge(at.axis,at.i+(at.axis==='h'?d:0),
+      at.j+(at.axis==='v'?d:0)));
+    if(ids.every(id=>walls.has(id)))return ids;
+  }
+  return null;
 }
 const overlap=(r,a)=>r.minX<a.maxX&&r.maxX>a.minX&&r.minZ<a.maxZ&&r.maxZ>a.minZ;
 function editSegments(a,b){
@@ -412,22 +452,41 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       if(Object.keys(faces).length)materials.wall[wallId]=faces;
       else delete materials.wall[wallId];
     }
-  }else if(['erase-wall','door','window'].includes(type)){
-    const found=typeof command.edgeId==='string'?walls.get(command.edgeId):
-      nearestConstructionEdge(world,command.at||{});
-    if(!found)return fail('wall-not-found');
-    if(type==='erase-wall'){
-      const affected=openings.filter(o=>o.edgeIds.includes(found.id));
-      if(affected.length)return fail('wall-has-opening');
-      walls.delete(found.id);
+  }else if(['erase-wall','door','window','arch','change-opening'].includes(type)){
+    if(type==='change-opening'){
+      const before=openings.find(o=>o.id===command.id);
+      if(!before)return fail('opening-not-found');
+      const style=BUILD_OPENING_STYLES[command.styleId];
+      if(!style)return fail('unknown-opening-style');
+      // Editing an opening preserves its immutable ID; changing from door to
+      // window or vice versa also changes the A* portal on commit, never preview.
+      const middle=before.edgeIds[Math.floor((before.edgeIds.length-1)/2)];
+      const anchor=walls.get(middle);
+      const ids=segmentsForOpening(walls,anchor,style.sections);
+      if(!ids)return fail('opening-needs-wall-space');
+      if(openings.some(o=>o.id!==before.id&&o.edgeIds.some(k=>ids.includes(k))))
+        return fail('opening-overlap');
+      openings=openings.map(o=>o.id===before.id?{
+        ...o,type:style.type,styleId:command.styleId,edgeIds:ids
+      }:o);
     }else{
-      // Three contiguous wall sections make a 1.5m clear doorway (safe for body radius).
-      const segments=[-1,0,1].map(delta=>walls.get(edge(found.axis,
-        found.i+(found.axis==='h'?delta:0),found.j+(found.axis==='v'?delta:0)))).filter(Boolean);
-      if(segments.length<3)return fail('opening-needs-three-wall-sections');
-      const ids=segments.map(w=>w.id);
-      if(openings.some(o=>o.edgeIds.some(k=>ids.includes(k))))return fail('opening-overlap');
-      openings.push({id:'opening-'+nextId++,type,edgeIds:ids});
+      const found=typeof command.edgeId==='string'?walls.get(command.edgeId):
+        nearestConstructionEdge(world,command.at||{});
+      if(!found)return fail('wall-not-found');
+      if(type==='erase-wall'){
+        if(openings.some(o=>o.edgeIds.includes(found.id)))return fail('wall-has-opening');
+        walls.delete(found.id);
+      }else{
+        const styleId=command.styleId||BUILD_DEFAULT_OPENING_STYLE[type];
+        const style=BUILD_OPENING_STYLES[styleId];
+        if(!style||style.type!==type)return fail('unknown-opening-style');
+        const ids=segmentsForOpening(walls,found,style.sections);
+        if(!ids)return fail(style.sections===3
+          ?'opening-needs-three-wall-sections':'opening-needs-wall-space');
+        if(openings.some(o=>o.edgeIds.some(k=>ids.includes(k))))return fail('opening-overlap');
+        openings.push({id:'opening-'+nextId++,type,edgeIds:ids,
+          ...(command.styleId?{styleId}:{})});
+      }
     }
   }else if(type==='remove-opening'){
     if(!openings.some(o=>o.id===command.id))return fail('opening-not-found');

@@ -13,6 +13,7 @@ on:
       - 'styles.css'
       - 'tests/f5a-browser-smoke.mjs'
       - 'tests/f5b-finishes.test.js'
+      - 'tests/f5b2-openings.test.js'
       - '.github/workflows/f5a-browser-checks.yml'
   workflow_dispatch:
 permissions:
@@ -49,4 +50,5 @@ jobs:
           path: |
             f5a-browser-build.png
             f5b-browser-finish.png
+            f5b2-browser-openings.png
           retention-days: 7

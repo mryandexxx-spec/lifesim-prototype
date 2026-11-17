@@ -14,7 +14,8 @@ import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
-  starterShellSegments,starterShellOffset,BUILD_LOT,BUILD_FINISHES,constructionBounds} from './construction.js';
+  starterShellSegments,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
+  BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
@@ -1895,13 +1896,19 @@ function boot() {
   // F5-A render adapter: construction data is authoritative; no gameplay geometry in PlayCanvas.
   let constructionWallMode='cut',renderedConstruction=null,renderedWallMode='';
   const constructionNodes=[];
+  // Hinges are renderer-only; the navigation graph always uses the authoritative
+  // physical opening. A nearby resident gently swings a real panel open.
+  const automaticDoors=[];
   const lotGround=box('F5 lot ground',7,-.59,0,32,.12,24,mat('#9fbea0'));
   lotGround.enabled=false;
   const buildGhost=box('F5 preview',0,.05,0,.2,.06,.2,mat('#438ac4',{opacity:.25}));
   buildGhost.enabled=false;
   const buildWallMarker=box('F5 selected wall',0,.32,0,.3,.62,.3,mat('#24c8bc',{opacity:.72}));
   buildWallMarker.enabled=false;
-  const clearConstructionNodes=()=>{for(const node of constructionNodes)node.destroy();constructionNodes.length=0;};
+  const clearConstructionNodes=()=>{
+    for(const node of constructionNodes)node.destroy();
+    constructionNodes.length=0;automaticDoors.length=0;
+  };
   const buildBox=(name,x,y,z,sx,sy,sz,material)=>{
     const node=box(name,x,y,z,sx,sy,sz,material);
     constructionNodes.push(node);
@@ -2100,30 +2107,103 @@ function boot() {
         if(!sequential){draw();start=w;}prev=w;
       }draw();
     }
-    // Each 1.5m opening is one logical portal across exactly 3 construction edges.
+    // Openings are true holes in wall segments, not decals. The single
+    // variant ID chooses the procedural frame, panel and window proportions.
+    // A 2m opening is physically four .5m segments in both render and A*.
     for(const opening of state.openings){
       const edges=opening.edgeIds.map(id=>state.wallEdges.find(w=>w.id===id)).filter(Boolean);
       if(!edges.length)continue;
-      const axis=edges[0].axis;
+      const variantId=constructionOpeningStyle(opening);
+      const design=BUILD_OPENING_STYLES[variantId];
+      if(!design)continue;
+      const axis=edges[0].axis,wide=design.sections===4;
       const x=axis==='h'?edges.reduce((n,w)=>n+w.i,0)/edges.length*.5+.25:edges[0].i*.5;
       const z=axis==='v'?edges.reduce((n,w)=>n+w.j,0)/edges.length*.5+.25:edges[0].j*.5;
-      const width=edges.length*.5,window=opening.type==='window';
-      if(constructionWallMode==='down'){
-        buildBox('F5 opening sill',x,.14,z,axis==='h'?width:.12,.16,axis==='v'?width:.12,M.trim);
+      const width=edges.length*.5,window=design.type==='window';
+      const spanX=val=>axis==='h'?val:.15;
+      const spanZ=val=>axis==='v'?val:.15;
+      const cross=(name,y,height,material,widthOverride=width)=>
+        buildBox(name,x,y,z,spanX(widthOverride),height,spanZ(widthOverride),material);
+      const upright=(name,distance,y,height,material)=>
+        buildBox(name,x+(axis==='h'?distance:0),y,
+          z+(axis==='v'?distance:0),axis==='h'?.10:.16,height,
+          axis==='v'?.10:.16,material);
+      if(constructionWallMode==='down'||(constructionWallMode==='cut'&&
+        (axis==='h'?z>0:x>14))){
+        cross('F5-B opening threshold',.115,.16,M.trim);continue;
+      }
+      if(window){
+        const dimensions={
+          'window.classic':{bottom:.95,top:2.38,glassWidth:width-.18},
+          'window.panorama':{bottom:.49,top:2.55,glassWidth:width-.18},
+          'window.high':{bottom:1.52,top:2.64,glassWidth:width-.18},
+          'window.slim':{bottom:.96,top:2.40,glassWidth:.56}
+        }[variantId];
+        if(!dimensions)continue;
+        const {bottom,top,glassWidth}=dimensions,glassHeight=top-bottom;
+        cross('F5-B window lower solid wall',bottom/2,bottom,M.wall);
+        cross('F5-B window upper solid wall',(2.90+top)/2,2.90-top,M.wall);
+        if(glassWidth<width-.25){
+          for(const side of [-1,1])upright('F5-B narrow window reveal',
+            side*(glassWidth+(width-glassWidth)/2)/2,(bottom+top)/2,
+            glassHeight,M.wall2);
+        }
+        cross('F5-B window sill',bottom,.09,M.paleWood,glassWidth+.12);
+        cross('F5-B window header',top,.09,M.paleWood,glassWidth+.12);
+        for(const side of [-1,1])upright('F5-B glazed window jamb',
+          side*glassWidth/2,(bottom+top)/2,glassHeight+.12,M.paleWood);
+        buildBox('F5-B glazed pane '+variantId,x,(bottom+top)/2,z,
+          spanX(glassWidth-.08),glassHeight-.11,spanZ(glassWidth-.08),M.glass);
+        if(variantId!=='window.slim'){
+          upright('F5-B window vertical glazing bar',0,(bottom+top)/2,glassHeight,M.cream);
+          if(variantId==='window.classic')
+            cross('F5-B window horizontal glazing bar',(bottom+top)/2,.06,M.cream,glassWidth);
+        }
         continue;
       }
-      const horizontal=(name,height,heightSize,offset,size,material)=>
-        buildBox(name,x,height,z,axis==='h'?size:.17,heightSize,axis==='v'?size:.17,material);
-      const side=(name,diff)=>buildBox(name,x+(axis==='h'?diff:0),1.4,
-        z+(axis==='v'?diff:0),.15,2.8,.15,M.paleWood);
-      if(window){
-        horizontal('F5 window bottom',.52,.85,0,width,M.wall);
-        horizontal('F5 window top',2.56,.62,0,width,M.wall);
-        buildBox('F5 real window glass',x,1.67,z,axis==='h'?width-.16:.06,1.38,axis==='v'?width-.16:.06,M.glass);
-      }else{
-        horizontal('F5 door lintel',2.59,.54,0,width,M.wall);
-        side('F5 left jamb',-width/2);side('F5 right jamb',width/2);
+      const isArch=design.type==='arch',frame=isArch?M.trim:
+        variantId==='door.glass'?M.slate:M.paleWood;
+      for(const side of [-1,1])upright('F5-B portal jamb '+variantId,
+        side*width/2,1.45,2.9,frame);
+      cross('F5-B portal lintel',2.66,.49,M.wall);
+      if(isArch){
+        const steps=wide?5:4;
+        // Concentric stepped head of original procedural masonry; the opening
+        // remains body-clear at all points below 1.94m.
+        for(let i=0;i<steps;i++){
+          const inset=i*.072,y=2.51-i*.10;
+          for(const sign of [-1,1])
+            upright('F5-B arch curve '+variantId,
+              sign*(width/2-.11-inset),y,.20,M.trim);
+        }
+        continue;
       }
+      const createLeaf=(name,hingeDistance,leafWidth,direction)=>{
+        const pivot=new pc.Entity('F5-B real swinging '+name);
+        app.root.addChild(pivot);constructionNodes.push(pivot);
+        pivot.setPosition(x+(axis==='h'?hingeDistance:0),0,
+          z+(axis==='v'?hingeDistance:0));
+        const center=direction*leafWidth/2;
+        primitive('box',name+' hinged panel',
+          axis==='h'?center:0,1.12,axis==='v'?center:0,
+          axis==='h'?leafWidth-.07:.075,2.20,axis==='v'?leafWidth-.07:.075,
+          variantId==='door.glass'?M.glass:M.wood,pivot);
+        if(variantId==='door.glass'){
+          primitive('box',name+' vertical frame',
+            axis==='h'?center:0,1.12,axis==='v'?center:0,
+            axis==='h'?.065:.095,2.18,axis==='v'?.065:.095,M.slate,pivot);
+        }else{
+          primitive('box',name+' inset panel',
+            axis==='h'?center:0,1.14,axis==='v'?center:0,
+            axis==='h'?leafWidth-.20:.083,1.68,axis==='v'?leafWidth-.20:.083,
+            M.paleWood,pivot);
+        }
+        automaticDoors.push({pivot,x,z,rotation:0,sign:direction*(axis==='h'?1:-1)});
+      };
+      if(variantId==='door.double'){
+        createLeaf('double left',-width/2,width/2,1);
+        createLeaf('double right',width/2,width/2,-1);
+      }else createLeaf(variantId,-width/2,width,1);
     }
     drawConstructionFinishes(state);
     // UP mode adds former open-front boundaries for an exterior view only.
@@ -2990,6 +3070,8 @@ function boot() {
   let editSession=null,editSelectedId=null,editDrag=null;
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
   let finishFloor='floor.oak',finishWall='wall.sage',finishSide='both';
+  const openingChoice={door:'door.simple',window:'window.classic',arch:'arch.round'};
+  let selectedBuildOpening=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
@@ -3702,7 +3784,10 @@ function boot() {
     'inaccessible-essential':'После перестройки житель не дойдёт до важных предметов',
     'finish-needs-floor':'Отделку пола можно положить только на построенный пол',
     'invalid-finish-target':'Выбери нужную поверхность: пол или стену',
-    'unknown-finish':'Этот вариант покрытия недоступен'
+    'unknown-finish':'Этот вариант покрытия недоступен',
+    'unknown-opening-style':'Неизвестный вариант проёма',
+    'opening-needs-wall-space':'Для этого широкого проёма нужны четыре свободных секции стены',
+    'opening-style-unavailable':'Выбери дизайн двери, окна или арки'
   };
   const buildFeedback=(msg,invalid=false)=>{
     $('build-feedback').textContent=msg;
@@ -3871,14 +3956,54 @@ function boot() {
     $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':'Покрытие пола';
   };
   $('build-finish-side').addEventListener('change',event=>{finishSide=event.target.value;});
+  const buildOpeningPalette=$('build-opening-variants');
+  const refreshBuildOpenings=()=>{
+    const replace=buildTool==='change-opening';
+    const family=replace?'':buildTool;
+    buildOpeningPalette.replaceChildren();
+    $('build-opening-label').textContent=replace
+      ?selectedBuildOpening?'Выбери замену для проёма':'Сначала коснись существующей двери, окна или арки'
+      :family==='door'?'Выбери дверь':family==='window'?'Выбери окно':'Выбери арку';
+    for(const [id,variant] of Object.entries(BUILD_OPENING_STYLES)){
+      if(!replace&&variant.type!==family)continue;
+      const button=document.createElement('button');
+      button.type='button';button.className='build-opening-variant';
+      button.dataset.openingStyle=id;
+      button.textContent=variant.label;
+      button.disabled=replace&&!selectedBuildOpening;
+      const active=replace
+        ?selectedBuildOpening&&selectedBuildOpening.styleId===id
+        :openingChoice[family]===id;
+      button.setAttribute('aria-pressed',String(Boolean(active)));
+      button.addEventListener('click',()=>{
+        if(replace){
+          if(!selectedBuildOpening)return;
+          const candidate={type:'change-opening',id:selectedBuildOpening.id,styleId:id};
+          if(stageBuild(candidate)){
+            selectedBuildOpening={...selectedBuildOpening,styleId:id};
+            refreshBuildOpenings();
+          }
+        }else{
+          openingChoice[family]=id;
+          refreshBuildOpenings();
+          buildFeedback('Выбрано: '+variant.label+' · коснись стены для установки');
+        }
+      });
+      buildOpeningPalette.appendChild(button);
+    }
+  };
   const setBuildTool=type=>{
     clearBuildPending();resetBuildWallSelection();
+    selectedBuildOpening=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
     $('build-editor').dataset.tool=type;
     $('build-starter-picker').hidden=type!=='move-wall';
     const finishes=['paint-floor','paint-room','paint-wall','sample-finish'];
     $('build-finish-picker').hidden=!finishes.includes(type);
     if(finishes.includes(type))refreshBuildFinishes();
+    const openings=['door','window','arch','change-opening'];
+    $('build-opening-picker').hidden=!openings.includes(type);
+    if(openings.includes(type))refreshBuildOpenings();
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
@@ -3887,9 +4012,12 @@ function boot() {
       room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
       floor:'Протяни область, чтобы увеличить пол без перегородки',
       wall:'Протяни по прямой, чтобы построить стену',
-      door:'Коснись стены для установки двери',window:'Коснись стены для установки окна',
+      door:'Выбери дизайн и коснись стены для установки двери',
+      window:'Выбери дизайн и коснись стены для установки окна',
+      arch:'Выбери дизайн и коснись стены для открытой арки',
+      'change-opening':'Коснись установленного проёма, затем выбери новый дизайн',
       'erase-wall':'Коснись стены для демонтажа',
-      'remove-opening':'Коснись двери или окна для удаления',
+      'remove-opening':'Коснись двери, окна или арки для удаления',
       'remove-floor':'Протяни область пола, которую нужно убрать',
       'paint-floor':'Выбери покрытие и коснись одной плитки пола. Затем «Применить».',
       'paint-room':'Выбери покрытие и коснись комнаты — зальём весь её пол.',
@@ -3982,13 +4110,23 @@ function boot() {
     const {from,to,wallEdge,hit}=buildDrag;
     buildDrag=null;
     const type=buildTool;
-    if(['door','window','erase-wall','remove-opening'].includes(type)){
+    if(['door','window','arch','erase-wall','remove-opening','change-opening'].includes(type)){
       const target=buildWallAtScreen(gesturePoint(event))||
         nearestConstructionEdge(game.world.construction,to,.75);
-      if(type==='remove-opening'){
+      if(type==='change-opening'){
+        selectedBuildOpening=game.world.construction.openings.find(o=>
+          o.edgeIds.includes(target?.id))||null;
+        if(selectedBuildOpening){
+          selectedBuildOpening={...selectedBuildOpening,
+            styleId:constructionOpeningStyle(selectedBuildOpening)};
+          buildFeedback('Проём выбран · нажми нужный вариант в палитре');
+        }else buildFeedback('Нажми на существующую дверь, окно или арку',true);
+        refreshBuildOpenings();
+      }else if(type==='remove-opening'){
         const opening=game.world.construction.openings.find(o=>o.edgeIds.includes(target?.id));
         stageBuild({type:'remove-opening',id:opening?.id});
-      }else stageBuild({type,edgeId:target?.id,at:to});
+      }else stageBuild({type,edgeId:target?.id,at:to,
+        ...(openingChoice[type]?{styleId:openingChoice[type]}:{})});
     }else if(type==='move-wall'){
       const target=wallEdge||buildWallAtScreen(gesturePoint(event));
       if(target)selectBuildWall(target);
@@ -4172,7 +4310,7 @@ function boot() {
       }
       if(buildTool!=='camera'&&cameraGesture.count()===0){
         const raw=editorFloorAt(point);
-        const pickWall=['move-wall','door','window','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
+        const pickWall=['move-wall','door','window','arch','change-opening','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
         if(pickWall&&!wallEdge&&buildTool==='move-wall')
           buildFeedback('Выбери исходную стену кнопками ниже или коснись её; свайп по пустому месту двигает камеру');
@@ -4476,6 +4614,16 @@ function boot() {
     dt=Math.min(dt,.06);
     // Reset / reload may replace construction object; rebuild only when identity changes.
     syncConstructionRender();
+    // Visual auto-opening is deliberately non-physical: doorway clearance is
+    // controlled only by ConstructionWorld, so pause/reload cannot trap a sim.
+    for(const door of automaticDoors){
+      const nearby=!buildMode&&HOUSEHOLD_IDS.some(id=>{
+        const pos=getActor(game,id).position;
+        return Math.hypot(pos.x-door.x,pos.z-door.z)<1.72;
+      });
+      door.rotation+=(Number(nearby)-door.rotation)*Math.min(1,dt*5.5);
+      door.pivot.setLocalEulerAngles(0,door.sign*76*door.rotation,0);
+    }
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
     const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&!document.hidden;

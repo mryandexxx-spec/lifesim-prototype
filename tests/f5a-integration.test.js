@@ -37,7 +37,7 @@ test('F5-A browser graph actually exposes touch tools and runtime transaction wi
  assert.match(game,/proposeConstructionEdit\(game\.world\.construction/);
  assert.match(game,/const frameActive=active&&!buildMode/);
  assert.match(workflow,/cp src\/construction\.js site\/src\//);
- assert.match(html,/src\/construction\.js\?v=.*f5a/);
+ assert.match(html,/src\/construction\.js\?v=.*f5[ab]/);
  assert.ok(read('../src/construction.js').includes('export function constructionRooms'));
 });
 
