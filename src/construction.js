@@ -707,7 +707,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     roofModules=options?roofAutomaticModules(floors,options):null;
     if(!roofModules)return fail('roof-too-complex');
   }
-  if(roofModules.some(r=>!roofRectSupported(r,floors)))return fail('roof-needs-floor');
+  if(roofModules.some(r=>!roofRectSupported(r,floors,{minSections:r.id.startsWith('roof-auto:')?1:4})))return fail('roof-needs-floor');
   for(const k of Object.keys(materials.floor))if(!floors.has(k))delete materials.floor[k];
   if(materials.ceiling){
     for(const k of Object.keys(materials.ceiling))if(!floors.has(k))delete materials.ceiling[k];
