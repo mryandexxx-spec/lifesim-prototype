@@ -1304,3 +1304,67 @@ button.time-card:active {transform:translateY(1px);}
 @media(max-width:430px){
   .time-card #light-phase-label{font-size:9px;line-height:11px}
 }
+
+
+/* W1-A.3: touch-first calendar sheet; overlays game without altering scene. */
+.life-calendar[hidden],.lc-form[hidden],.lc-error[hidden],#lc-week[hidden],#lc-scope-box[hidden]{display:none!important}
+.life-calendar{position:fixed;inset:0;z-index:180;display:flex;justify-content:center;align-items:stretch;
+  pointer-events:auto;color:#294738;font-family:inherit}
+.lc-scrim{position:absolute;inset:0;background:rgba(16,30,24,.6)}
+.lc-sheet{position:relative;width:min(100%,620px);height:100%;max-height:100dvh;overflow-y:auto;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#f6f8f0;
+  padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 24px);
+  box-shadow:0 0 32px #13251b70;box-sizing:border-box}
+.lc-sheet h2,.lc-sheet h3{margin:0;color:#294d3b}
+.lc-sheet h2{font-size:23px}.lc-sheet h3{font-size:17px}
+.lc-sheet button{cursor:pointer;touch-action:manipulation;font:inherit;min-height:42px}
+.lc-top,.lc-controls,.lc-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lc-top{margin-bottom:14px}.lc-top small{font-size:11px;color:#6b7b70}
+#lc-close{border:0;background:#e7eee6;border-radius:50%;width:44px;font-size:20px}
+.lc-controls{margin:5px 0 10px;flex-wrap:wrap}
+.lc-controls strong{font-size:15px;text-align:center;flex:1;min-width:120px}
+.lc-controls button,.lc-tabs button{border:1px solid #c9d8cc;border-radius:11px;background:white;color:#365b46;padding:8px 12px}
+.lc-controls button:first-child,.lc-controls button:nth-child(3){font-size:24px;padding:2px 16px}
+.lc-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-bottom:12px}
+.lc-tabs button[aria-pressed=true]{background:#397759;color:white}
+.lc-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:16px}
+.lc-week-label{text-align:center;font-size:11px;font-weight:800;color:#6a796a}
+.lc-date{border:1px solid #dfe6dc;border-radius:10px;background:white;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:1px;min-width:0;padding:3px 0;color:#2f4e3d;font-size:13px}
+.lc-date small{font-size:8px;line-height:1;color:#3d9870;white-space:nowrap}
+.lc-date.lc-outside{opacity:.4}.lc-date.lc-today{outline:2px solid #b99543;outline-offset:-2px}
+.lc-date.lc-active{background:#387d62;color:#fff}.lc-date.lc-day-off:not(.lc-active){background:#f8eae0}
+.lc-month .lc-date{min-height:48px}.lc-week .lc-date{min-height:58px}
+.lc-day{display:block}.lc-day-summary{background:#fff;border-radius:14px;padding:16px;font-weight:800}
+.lc-heading{margin:15px 0 9px}.lc-heading button{border:0;border-radius:12px;padding:8px 11px;
+  background:#397759;color:white;font-size:13px;font-weight:800}
+.lc-agenda,.lc-upcoming,#lc-holidays{display:grid;gap:6px}
+.lc-agenda>p{font-size:13px;color:#6a796f;margin:4px 0 14px}
+.lc-entry{width:100%;display:flex;flex-direction:column;text-align:left;align-items:flex-start;justify-content:center;
+  gap:4px;border:1px solid #dce6da;border-radius:12px;background:#fff;padding:10px 12px;color:#294738}
+.lc-entry strong{font-size:14px}.lc-entry small{font-size:12px;color:#718274}
+.lc-entry.lc-holiday{border-left:4px solid #d9a95e}
+.lc-upcoming{margin-bottom:12px}
+.lc-settings{border-top:1px solid #d4dfd6;padding:10px 0;font-size:13px}
+.lc-settings summary{cursor:pointer;font-weight:800;min-height:40px}
+.lc-settings #lc-anchor{margin-top:10px;border:1px solid #cbd9cc;border-radius:11px;background:white;padding:8px}
+.lc-settings small{display:block;color:#698073;margin-top:6px}
+.lc-form{display:grid;gap:10px}
+.lc-form label{font-size:13px;font-weight:750;display:grid;gap:5px}
+.lc-form input:not([type=checkbox]),.lc-form select,.lc-form textarea{
+  box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:10px;border:1px solid #bacdbb;
+  border-radius:10px;background:#fff;color:#273e31;font:inherit;font-size:16px;touch-action:auto;
+  -webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+.lc-form .lc-check{display:flex;align-items:center;gap:9px;min-height:44px}
+.lc-form input[type=checkbox]{width:20px;height:20px;accent-color:#397759;flex-shrink:0}
+.lc-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.lc-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.lc-weekdays label{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px}
+.lc-weekdays input{margin:0}
+#lc-week{border:1px solid #d4dfd6;border-radius:10px;margin:0;padding:9px}
+.lc-error{color:#9b3434;font-size:13px;margin:0}
+.lc-form-actions{display:flex;gap:7px;justify-content:space-between;position:sticky;bottom:0;background:#f6f8f0;padding:10px 0}
+.lc-form-actions button{border:0;background:#e4e9e0;color:#35503f;border-radius:11px;padding:8px 12px;font-weight:800}
+.lc-form-actions button[type=submit]{background:#397759;color:#fff;flex:1}
+#lc-event-delete,#lc-holiday-delete{background:#f6d9d6;color:#913e39}
+@media(min-width:680px){.lc-sheet{height:min(96dvh,950px);margin:auto;border-radius:22px}}

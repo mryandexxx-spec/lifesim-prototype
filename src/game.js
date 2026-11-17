@@ -15,6 +15,8 @@ import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
 import {createDayNightRenderer} from './day-night-render.js';
+import {createCalendarUI} from './calendar-ui.js';
+import {consumeCalendarReminders} from './calendar-reminders.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
@@ -362,27 +364,26 @@ function save(silent = false) {
 }
 // Fix the epoch at first migration, not on some later autosave after a phone date change.
 if(calendarNeedsPersistence)save(true);
-// W1-A.1 anchor picker: date only; no real-time tick, timescale or queue mutation.
+// W1-A.3 mobile calendar: one household date and one persistence root.
 const datePanel=$('calendar-anchor-panel');
-function closeCalendarAnchorPanel(){
-  datePanel.hidden=true;
-  $('calendar-anchor-toggle').setAttribute('aria-expanded','false');
-}
+const calendarUI=createCalendarUI({
+  host:document.querySelector('.app-shell'),getRoot:()=>game,
+  setCalendar:calendar=>{game.calendar=calendar;save(true);},
+  notify:toast,
+  onAnchor:()=>{datePanel.hidden=false;$('calendar-anchor-date').value=calendarAt(game.calendar,game.minutes).iso;}
+});
+function closeCalendarAnchorPanel(){datePanel.hidden=true;}
 $('calendar-anchor-toggle').addEventListener('click',()=>{
-  const opening=datePanel.hidden;
-  datePanel.hidden=!opening;
-  $('calendar-anchor-toggle').setAttribute('aria-expanded',String(opening));
-  if(opening)$('calendar-anchor-date').value=calendarAt(game.calendar,game.minutes).iso;
+  closeCalendarAnchorPanel();calendarUI.open();
+  $('calendar-anchor-toggle').setAttribute('aria-expanded','true');
 });
 $('calendar-anchor-close').addEventListener('click',closeCalendarAnchorPanel);
 $('calendar-anchor-apply').addEventListener('click',()=>{
   try{
-    const date=$('calendar-anchor-date').value;
-    game.calendar=setCurrentCalendarDate(game.calendar,game.minutes,date);
-    save(true);
-    closeCalendarAnchorPanel();
+    game.calendar=setCurrentCalendarDate(game.calendar,game.minutes,$('calendar-anchor-date').value);
+    save(true);closeCalendarAnchorPanel();calendarUI.refresh();
     toast('Игровая дата: '+formatCalendarDay(calendarAt(game.calendar,game.minutes),{includeYear:true}));
-  }catch{toast('Не удалось установить дату. Проверьте день, месяц и год.');}
+  }catch{toast('Дату нельзя менять после планирования событий.');}
 });
 function taskLabel(task){
   if(!task)return 'Неизвестное действие';
@@ -1634,7 +1635,7 @@ $('reset-btn').addEventListener('click', () => {
   const enabled = game.autonomy.enabled;
   game = newHousehold();
   setHouseholdAutonomy(game, enabled); // Keep the player's chosen play style.
-  closeInsightPanel();resetRuntime(); restartAutonomyWait(); updateAutoButton(); updateResidentPicker();
+  closeInsightPanel();calendarUI.reset();resetRuntime(); restartAutonomyWait(); updateAutoButton(); updateResidentPicker();
   save(true); select(null); closeMindPanel(); toast('Новая игра началась');
 });
 window.addEventListener('pagehide', () => save(true));
@@ -5322,7 +5323,14 @@ function boot() {
         const socialBefore=game.socialAction?.conversation||
           game.socialAction?.shared||game.socialAction?.branchAction
           ?null:game.socialAction?.kind;
+        const priorCalendarMinute=game.minutes;
         tickHousehold(game,.30 * game.speed); // Both share the clock; no double advancement.
+        const dueReminders=consumeCalendarReminders(game.calendar,priorCalendarMinute,game.minutes);
+        if(dueReminders.messages.length){
+          game.calendar=dueReminders.calendar;save(true);
+          for(const reminder of dueReminders.messages.slice(0,3))
+            toast('📅 '+reminder.title+' · '+(reminder.offset===0?'сейчас':'напоминание'));
+        }
         // A completed job frees its own resident; planned commands start only
         // after both participant states and render transition guards allow it.
         dispatchPlannedActions();
@@ -6297,6 +6305,7 @@ function boot() {
       const t=readableTime(game.minutes);
       const date=calendarAt(game.calendar,game.minutes);
       $('day-label').textContent=formatCalendarDay(date);
+      calendarUI.tick();
       $('calendar-anchor-toggle').title=formatCalendarDay(date,{includeYear:true})+' · День '+date.gameDay+' · изменить дату';
       $('time-label').textContent=t.time;
       $('light-phase-label').textContent=daylight.phaseLabel;
