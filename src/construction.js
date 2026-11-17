@@ -86,6 +86,23 @@ export function constructionWallSegments(world){
   const removed=new Set(state?.starterRemoved||[]);
   return [...(state?.wallEdges||[]),...starterShellSegments(state).filter(w=>!removed.has(w.id))];
 }
+// One physical wall may carry both a pre-F5-A structural edge and a
+// virtual starter edge (e.g. east boundary of the old home + new room).
+// An opening cuts the SAME place through both render/collision layers.
+export function constructionOpeningEdgeIds(world,types=null){
+  const state=world?.construction||world,ids=new Set();
+  for(const opening of state?.openings||[])
+    if(!types||types.includes(opening.type))
+      for(const id of opening.edgeIds)ids.add(id);
+  if(!ids.size)return ids;
+  for(const wall of starterShellSegments(state)){
+    const physical=edge(wall.axis,wall.i,wall.j);
+    if(ids.has(wall.id)||ids.has(physical)){
+      ids.add(wall.id);ids.add(physical);
+    }
+  }
+  return ids;
+}
 export function starterShellOffset(world,side){
   const s=validStarter(world?.starterShell);
   return (s[side]-STARTER_SHELL[side])*BUILD_STEP;
@@ -100,7 +117,7 @@ const topologyCache=new WeakMap();
 function topology(state){
   let found=topologyCache.get(state);
   if(!found){found={floors:new Set(state.floorCells),
-    doors:new Set(state.openings.filter(o=>o.type==='door'||o.type==='arch').flatMap(o=>o.edgeIds)),
+    doors:constructionOpeningEdgeIds(state,['door','arch']),
     removed:new Set(state.starterRemoved||[]),solid:new Set(state.starterSolidSides||[])};
     topologyCache.set(state,found);}
   return found;
