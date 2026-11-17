@@ -17,6 +17,7 @@ import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivil
 import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
 import {consumeCalendarReminders} from './calendar-reminders.js';
+import {createCareerPhoneUI} from './career-phone-ui.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
@@ -326,6 +327,7 @@ const META = {
     icon:'♫',anchor:[0,1.1,0]}
 };
 
+let updatePhoneProps=()=>{}; // Cosmetic phone mesh is bound when the 3D rigs exist.
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
 let buildMode=false; // F5-A separate pause-on-editor; house geometry persists, UI mode does not.
 let selected = null;
@@ -1611,6 +1613,7 @@ function updateResidentPicker() {
 }
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
+    careerPhone.close({focus:false});
     selectResident(game,id);closeInsightPanel();
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
@@ -1621,6 +1624,18 @@ for (const id of HOUSEHOLD_IDS) {
   });
 }
 updateResidentPicker();
+// W1-B.2a: select a resident, take out an original phone and sign a real contract.
+// Actual work-presence and wages remain separate future W1-B slices.
+const careerPhone=createCareerPhoneUI({
+  host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
+  getRoot:()=>game,
+  setCareerSystem:state=>{game.careerSystem=state;},
+  save,notify:toast,onOpenChange:id=>updatePhoneProps(id),
+  canOpen:()=>!furnishMode&&!buildMode&&!dialogueNeedsDecision(game),
+  beforeOpen:()=>{
+    closeMindPanel();closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);
+  }
+});
 // Presentation-only HUD preference: never touches simulation or household saves.
 createHudPanel({
   panel:$('dashboard'),toggle:$('hud-toggle'),
@@ -1634,6 +1649,7 @@ createHudPanel({
 $('save-btn').addEventListener('click', () => save());
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
+  careerPhone.close({focus:false});
   const enabled = game.autonomy.enabled;
   game = newHousehold();
   setHouseholdAutonomy(game, enabled); // Keep the player's chosen play style.
@@ -2818,6 +2834,21 @@ function boot() {
   refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId,alexSeatSlot);};
   const alexRig=createCharacterRig(rigContext,'alex');
   const miraRig=createCharacterRig(rigContext,'mira');
+  // Reuse the original PlayCanvas box primitive; TWO tiny meshes per resident,
+  // attached to the existing hand pivot. No purchased asset, extra animation
+  // loop, collider, nav obstacle or persisted phone entity.
+  const phoneMeshes={};
+  for(const [id,rig] of [['alex',alexRig],['mira',miraRig]]){
+    const back=box('Phone '+id,0,-.24,.17,.145,.265,.040,M.dark,rig.elbowPivot[1]);
+    const screen=box('Phone screen '+id,0,-.24,.193,.118,.233,.012,M.mint,rig.elbowPivot[1]);
+    back.enabled=false;screen.enabled=false;
+    phoneMeshes[id]=[back,screen];
+  }
+  updatePhoneProps=id=>{
+    for(const [key,meshes] of Object.entries(phoneMeshes))
+      for(const mesh of meshes)mesh.enabled=key===id;
+  };
+  updatePhoneProps(careerPhone.isOpen()?game.selectedSim:null);
   // Visual-only experimental Alex skin. The procedural rig and every action
   // controller remain authoritative; any GLB error falls back immediately.
   const liveFridgeLayout=()=>fixtureContactLayout(game.world,'fridge',FRIDGE_LAYOUT);
