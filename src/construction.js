@@ -372,18 +372,17 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       openings=openings.filter(o=>o.edgeIds.every(k=>walls.has(k)));
     }else{
       r.cells.forEach(k=>floors.add(k));
-      if(type==='room'){
-        const existingStarter=new Set(starterEdges().map(w=>edge(w.axis,w.i,w.j)));
-        r.walls.forEach(w=>{if(!existingStarter.has(w.id))walls.set(w.id,w);});
-      }
+      // Preserve F5-A room-boundary IDs exactly for old saves and A*.
+      // A structure may abut the original cosmetic cutaway, but its
+      // shared wall remains a real, independent partition.
+      if(type==='room')r.walls.forEach(w=>walls.set(w.id,w));
     }
   }else if(type==='wall'){
     if(!command.from||!command.to||![command.from.x,command.from.z,command.to.x,command.to.z].every(finite))return fail('invalid-wall');
     const line=editSegments(command.from,command.to);
     if(!line)return fail('wall-must-be-straight');
     for(const w of line)if(!lotCell(w.i,w.j)||!floors.has(cell(w.i-(w.axis==='v'?1:0),w.j-(w.axis==='h'?1:0)))&&!floors.has(cell(w.i,w.j)))return fail('outside-floor');
-    const existingStarter=new Set(starterEdges().map(w=>edge(w.axis,w.i,w.j)));
-    line.forEach(w=>{if(!existingStarter.has(w.id))walls.set(w.id,w);});
+    line.forEach(w=>walls.set(w.id,w));
   }else if(type==='move-wall'&&Object.hasOwn(STARTER_SIDE,starterSide(command.edgeId))){
     const side=starterSide(command.edgeId);
     const shift=(side==='west'||side==='east')?command.deltaI:command.deltaJ;
@@ -634,6 +633,12 @@ export function createConstructionEditor(initial){
 export function constructionRooms(world){
   const floors=new Set(world.floorCells),seen=new Set(),rooms=[];
   const barriers=new Set(world.wallEdges.map(w=>w.id));
+  const solid=new Set(world.starterSolidSides||[]),removed=new Set(world.starterRemoved||[]);
+  for(const w of starterShellSegments(world)){
+    if(removed.has(w.id))continue;
+    if((w.starterSide==='east'||w.starterSide==='south')&&!solid.has(w.starterSide))continue;
+    barriers.add(edge(w.axis,w.i,w.j));
+  }
   for(const k of floors){
     if(seen.has(k))continue;
     const queue=[k],part=[];seen.add(k);
