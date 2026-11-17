@@ -2127,6 +2127,14 @@ function boot() {
     }
     if(id==='hobby:toShelf'||id==='hobby:returnShelf')
       return furnitureActionApproach(game.world,'hobby',targetInstanceId);
+    if(id==='cook'){
+      const a=getActor(game,residentId)?.action;
+      if(!a||['toFridge','taking'].includes(a.cookStage))
+        return furnitureActionApproach(game.world,'fridge');
+      if(['toPrep','preparing'].includes(a.cookStage))
+        return furnitureActionApproach(game.world,'prep',a.prepInstanceId);
+      return furnitureActionApproach(game.world,'cook',a.targetInstanceId);
+    }
     if(id==='dining'){
       const a=getActor(game,residentId)?.action;
       return !a||['toFridge','taking'].includes(a.diningStage)
@@ -2157,7 +2165,7 @@ function boot() {
     return true;
   }
   beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null,
-    activityId=null,contentId=null,inventoryItemId=null)=>{
+    activityId=null,contentId=null,inventoryItemId=null,recipeId=null)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
@@ -2187,7 +2195,7 @@ function boot() {
       return false;
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
-      activityId,contentId,musicPlan,inventoryItemId);
+      activityId,contentId,musicPlan,inventoryItemId,recipeId);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
@@ -2298,7 +2306,9 @@ function boot() {
               residentId,command.targetInstanceId);
         }
         if(command.type==='object')
-          return (command.autoTable===true&&command.actionId==='dining'
+          return (command.actionId!=='cook'||canCookRecipe(game.kitchen,command.recipeId,
+            currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID)))&&
+            (command.autoTable===true&&command.actionId==='dining'
             ?Boolean(nearestAvailableDiningTable(game,residentId))
             :furnitureAvailable(game,command.actionId,residentId,command.targetInstanceId))&&
             !(command.actionId==='shower'&&HOUSEHOLD_IDS.some(id=>
@@ -2346,7 +2356,8 @@ function boot() {
             ?nearestAvailableDiningTable(game,residentId)?.instanceId
             :command.targetInstanceId;
           if(target||command.autoTable!==true)
-            started=beginAction(command.actionId,false,residentId,true,target);
+            started=beginAction(command.actionId,false,residentId,true,target,
+              null,null,null,command.recipeId||null);
         }
         else if(command.type==='activity'){
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
@@ -3699,7 +3710,15 @@ function boot() {
                 arriveSocial(game);
               }else if(resident.action?.id==='hobby'&&
                 readingRouteId(resident.action))arriveReadingJourney(resident.action);
-              else if(resident.action?.id==='dining'){
+              else if(resident.action?.id==='cook'){
+                if(resident.action.cookStage==='toFridge'){
+                  arrive(resident);resident.action.cookStage='taking';
+                }else if(resident.action.cookStage==='toPrep'){
+                  arrive(resident);resident.action.cookStage='preparing';
+                }else if(resident.action.cookStage==='toStove'){
+                  arrive(resident);resident.action.cookStage='cooking';
+                }
+              }else if(resident.action?.id==='dining'){
                 if(resident.action.diningStage==='toFridge'){
                   arrive(resident);resident.action.diningStage='taking';
                 }else if(resident.action.diningStage==='toSeat'){
