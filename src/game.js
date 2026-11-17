@@ -14,7 +14,7 @@ import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
-  starterShellSegments,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
+  starterShellSegments,constructionWallSegments,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
@@ -3786,6 +3786,8 @@ function boot() {
     'invalid-finish-target':'Выбери нужную поверхность: пол или стену',
     'unknown-finish':'Этот вариант покрытия недоступен',
     'unknown-opening-style':'Неизвестный вариант проёма',
+    'wall-has-decor':'На этом участке висит картина или полка · выбери свободный участок',
+    'starter-opening-outside':'Сначала убери проём или отверстие на удаляемой полосе стены',
     'opening-needs-wall-space':'Для этого широкого проёма нужны четыре свободных секции стены',
     'opening-style-unavailable':'Выбери дизайн двери, окна или арки'
   };
@@ -3802,7 +3804,15 @@ function boot() {
   const buildContext=()=>({residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position),
     furniture:game.world.furniture.instances,
     furnitureBoxes:game.world.furniture.instances.filter(item=>item.location==='home')
-      .map(item=>instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint))});
+      .map(item=>instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint)),
+    // H5b paintings are permanent objects. Forbid placing a real opening
+    // underneath a hanging work rather than silently losing its wall anchor.
+    wallDecor:allArtwork().map((work,index)=>{
+      const item=game.world.furniture.instances.find(i=>i.instanceId===work.easelInstanceId);
+      const origin=work.origin||(item?{x:item.x,z:item.z,yaw:item.yaw}:null);
+      const pose=artworkDisplayPose(work,index,origin,game.world.construction);
+      return pose?.wall?{x:pose.x,z:pose.z,radius:.46}:null;
+    }).filter(Boolean)});
   const buildProposal=(cmd)=>proposeConstructionEdit(game.world.construction,cmd,buildContext());
   const buildCommand=(from,to)=>{
     if(buildTool!=='wall')return {type:buildTool,from,to};
@@ -3887,7 +3897,7 @@ function boot() {
   };
   const selectBuildWall=wall=>{
     resetBuildWallSelection();
-    if(!wall){buildFeedback('Выбери стену квартиры или пристройки — можно нажать сторону исходного дома в панели',true);return;}
+    if(!wall){buildFeedback('Коснись стены в 3D, чтобы выбрать и перенести её',true);return;}
     selectedBuildWall=wall.id;
     const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
     const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
@@ -3901,9 +3911,7 @@ function boot() {
       Boolean(wall.starterSide&&starterShellOffset(game.world.construction,wall.starterSide)===0);
     $('build-wall-label').textContent=outward===null
       ?'Межкомнатная стена · проведи пальцем перпендикулярно стене'
-      :wall.starterSide
-        ?'Исходная квартира · '+({west:'слева',east:'справа',north:'сзади',south:'спереди'}[wall.starterSide])
-        :'Стена выбрана · перетащи или нажми +0,5 м для расширения';
+      :'Стена выбрана · перетащи или нажми +0,5 м для расширения';
     buildFeedback(outward===null?'Это внутренняя стена. Перетащи её в нужную сторону':
       'Для увеличения комнаты нажми «+0,5 м наружу» или перетащи стену');
   };
@@ -3922,14 +3930,7 @@ function boot() {
   $('build-wall-expand').addEventListener('click',()=>shiftSelectedBuildWall(1));
   $('build-wall-contract').addEventListener('click',()=>shiftSelectedBuildWall(-1));
   $('build-wall-deselect').addEventListener('click',resetBuildWallSelection);
-  document.querySelectorAll('[data-starter-side]').forEach(button=>
-    button.addEventListener('click',()=>{
-      const side=button.dataset.starterSide;
-      const edges=starterShellSegments(game.world.construction)
-        .filter(w=>w.starterSide===side);
-      selectBuildWall(edges[Math.floor(edges.length/2)]);
-    }));
-  const buildFinishPalette=$('build-finish-colors');
+   const buildFinishPalette=$('build-finish-colors');
   const refreshBuildFinishes=()=>{
     const kind=buildTool==='paint-wall'?'wall':'floor';
     const selected=kind==='wall'?finishWall:finishFloor;
@@ -3997,7 +3998,6 @@ function boot() {
     selectedBuildOpening=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
     $('build-editor').dataset.tool=type;
-    $('build-starter-picker').hidden=type!=='move-wall';
     const finishes=['paint-floor','paint-room','paint-wall','sample-finish'];
     $('build-finish-picker').hidden=!finishes.includes(type);
     if(finishes.includes(type))refreshBuildFinishes();
@@ -4008,7 +4008,7 @@ function boot() {
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
       camera:'Свайп одним пальцем — перемещение камеры; двумя — поворот и масштаб',
-      'move-wall':'Коснись стены либо выбери сторону исходной квартиры ниже, затем «+0,5 м наружу».',
+      'move-wall':'Коснись любой стены дома — старой или новой — и перенеси её пальцем либо кнопкой +0,5 м.',
       room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
       floor:'Протяни область, чтобы увеличить пол без перегородки',
       wall:'Протяни по прямой, чтобы построить стену',
@@ -4090,11 +4090,14 @@ function boot() {
   const buildWallAtScreen=point=>{
     const rect=canvas.getBoundingClientRect();
     let selected=null,best=45;
-    for(const wall of [...game.world.construction.wallEdges,
-      ...(['move-wall','paint-wall','sample-finish'].includes(buildTool)
-        ?starterShellSegments(game.world.construction):[])]){
-      const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
-      const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
+    for(const wall of constructionWallSegments(game.world.construction)){
+      const shell=game.world.construction,side=wall.starterSide;
+      const x=side==='west'?-4.97+starterShellOffset(shell,'west')
+        :side==='east'?14.25+starterShellOffset(shell,'east')
+        :wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
+      const z=side==='north'?-4.34+starterShellOffset(shell,'north')
+        :side==='south'?4.34+starterShellOffset(shell,'south')
+        :wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
       // Screen rays hit walls above the floor. Accept taps near the base,
       // middle or top (including CUT mode) instead of only a thin 1.4m line.
       for(const height of [.12,.75,1.4,2.25]){
@@ -4142,7 +4145,8 @@ function boot() {
         side:finishSide,scope:'run'});
     }else if(type==='sample-finish'){
       const target=wallEdge||buildWallAtScreen(gesturePoint(event));
-      const value=target?.id&&game.world.construction.materials?.wall?.[target.id]?.b;
+      const materialKey=target?.starterSide?'starter:'+target.starterSide:target?.id;
+      const value=materialKey&&game.world.construction.materials?.wall?.[materialKey]?.b;
       if(value){
         finishWall=value;setBuildTool('paint-wall');
         buildFeedback('Пипетка взяла покрытие стены · коснись другой стены');
@@ -4313,7 +4317,7 @@ function boot() {
         const pickWall=['move-wall','door','window','arch','change-opening','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
         if(pickWall&&!wallEdge&&buildTool==='move-wall')
-          buildFeedback('Выбери исходную стену кнопками ниже или коснись её; свайп по пустому месту двигает камеру');
+          buildFeedback('Коснись нужной стены или передвинь камеру свайпом по пустому участку');
         // Swiping empty background pans even when a wall tool is selected.
         if(raw&&(!pickWall||wallEdge||buildTool==='sample-finish')){
           const from=buildSnap(raw);
