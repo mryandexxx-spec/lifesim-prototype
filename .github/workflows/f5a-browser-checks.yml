@@ -20,6 +20,8 @@ on:
       - 'tests/f5b4-ceilings-patterns.test.js'
       - 'tests/f5c1-roof.test.js'
       - 'tests/f5c2-exteriors.test.js'
+      - 'tests/f5d1-rooms.test.js'
+      - 'tests/f5d1-browser-smoke.mjs'
       - '.github/workflows/f5a-browser-checks.yml'
   workflow_dispatch:
 permissions:
@@ -49,7 +51,9 @@ jobs:
           cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/f5a-http.log 2>&1 &
       - name: Real WebGL touch panel, save and reload smoke
-        run: node tests/f5a-browser-smoke.mjs
+        run: |
+          node tests/f5a-browser-smoke.mjs
+          node tests/f5d1-browser-smoke.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -65,4 +69,5 @@ jobs:
             f5c1-hip-roof.png
             f5c2-tall-facade.png
             f5c2-porch.png
+            f5d1-room-copy-preview.png
           retention-days: 7

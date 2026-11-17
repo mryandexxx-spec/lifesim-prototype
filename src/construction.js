@@ -416,6 +416,33 @@ function buildRect(a,b){
   for(let j=j0;j<j1;j++)for(const i of [i0,i1])walls.push({id:edge('v',i,j),axis:'v',i,j,heightClass:'normal'});
   return {cells,walls};
 }
+/**
+ * F5-D.1: a room is selected from topology, not a persistent room index.
+ * Only a fully enclosed, rectangular, newly constructed room is eligible
+ * for atomic geometry operations. Legacy furnished shell stays immutable.
+ */
+export function constructionRoomSelection(raw,at){
+  const world=raw?.construction||raw;
+  if(!finite(at?.x)||!finite(at?.z))return fail('room-not-found');
+  const selected=constructionRooms(world).find(r=>
+    r.cells.includes(cell(floorIndex(at.x),floorIndex(at.z))));
+  if(!selected)return fail('room-not-found');
+  const coordinates=selected.cells.map(k=>k.split(',').map(Number));
+  const i0=Math.min(...coordinates.map(v=>v[0])),i1=Math.max(...coordinates.map(v=>v[0]))+1;
+  const j0=Math.min(...coordinates.map(v=>v[1])),j1=Math.max(...coordinates.map(v=>v[1]))+1;
+  if(coordinates.some(([i,j])=>isBase(i,j)||
+    (i>=world.starterShell.west&&i<world.starterShell.east&&
+      j>=world.starterShell.north&&j<world.starterShell.south)))
+    return fail('room-protected');
+  if(i1-i0<2||j1-j0<2||selected.cells.length!==(i1-i0)*(j1-j0)||
+    selected.cells.length>512)return fail('room-not-rectangular');
+  const edges=new Set(world.wallEdges.map(w=>w.id)),walls=[];
+  for(let i=i0;i<i1;i++)for(const j of [j0,j1])walls.push(edge('h',i,j));
+  for(let j=j0;j<j1;j++)for(const i of [i0,i1])walls.push(edge('v',i,j));
+  if(walls.some(id=>!edges.has(id)))return fail('room-not-enclosed');
+  return {ok:true,room:{i0,i1,j0,j1,width:i1-i0,height:j1-j0,
+    cells:selected.cells,wallIds:walls}};
+}
 /** Pure preview; no state, queue, furniture, money or localStorage mutation. */
 export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[],wallDecor=[]}={}){
   const world=restoreConstructionWorld(raw);
@@ -500,6 +527,134 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       // shared wall remains a real, independent partition.
       if(type==='room')r.walls.forEach(w=>walls.set(w.id,w));
     }
+  }else if(type==='room-duplicate'||type==='room-relocate'){
+    const selection=constructionRoomSelection(world,command.source);
+    if(!selection.ok)return selection;
+    const room=selection.room,rotation=command.rotation??0;
+    if(![0,90,180,270].includes(rotation)||
+      !finite(command.at?.x)||!finite(command.at?.z))
+      return fail('invalid-room-placement');
+    const source=new Set(room.cells),boundary=new Set(room.wallIds);
+    const rect={minX:room.i0*BUILD_STEP,minZ:room.j0*BUILD_STEP,
+      maxX:room.i1*BUILD_STEP,maxZ:room.j1*BUILD_STEP};
+    // Neither shop products nor legacy fixtures/artworks may be silently
+    // duplicated or deleted. F5-D.2 handles furniture as a separate atomic
+    // household transaction after object IDs, inventory and action locks.
+    if(furniture.some(item=>item?.location==='home'&&
+        finite(item.x)&&finite(item.z)&&item.x>=rect.minX&&item.x<rect.maxX&&
+        item.z>=rect.minZ&&item.z<rect.maxZ)||
+      furnitureBoxes.some(box=>overlap(rect,box)))
+      return fail('room-has-furniture');
+    if(wallDecor.some(item=>finite(item?.x)&&finite(item?.z)&&
+      item.x>=rect.minX-.6&&item.x<=rect.maxX+.6&&
+      item.z>=rect.minZ-.6&&item.z<=rect.maxZ+.6))
+      return fail('room-has-art');
+    if(residents.some(item=>finite(item?.x)&&finite(item?.z)&&
+      item.x>=rect.minX&&item.x<rect.maxX&&item.z>=rect.minZ&&item.z<rect.maxZ))
+      return fail('room-has-resident');
+    const openingSet=openings.filter(o=>o.edgeIds.some(id=>boundary.has(id)));
+    if(openingSet.some(o=>o.edgeIds.some(id=>!boundary.has(id))))
+      return fail('room-shared-opening');
+    if(porches.some(p=>openingSet.some(o=>o.id===p.openingId)))
+      return fail('room-has-porch');
+    if(type==='room-relocate'){
+      // Do not pull a shared wall out of an attached house; use push/pull
+      // on such a room until the full household move transaction is ready.
+      for(const id of boundary){
+        const w=walls.get(id);
+        const outside=w.axis==='h'
+          ?cell(w.i,w.j===room.j0?room.j0-1:room.j1)
+          :cell(w.i===room.i0?room.i0-1:room.i1,w.j);
+        if(floors.has(outside))return fail('room-shared-boundary');
+      }
+      if(roofModules.some(r=>!r.id.startsWith('roof-auto:')&&
+        r.i0<room.i1&&r.i1>room.i0&&r.j0<room.j1&&r.j1>room.j0))
+        return fail('room-has-manual-roof');
+    }
+    const w=room.width,h=room.height;
+    const rw=rotation%180===0?w:h,rh=rotation%180===0?h:w;
+    const ti=snap(command.at.x)-Math.floor(rw/2);
+    const tj=snap(command.at.z)-Math.floor(rh/2);
+    const transform=(x,z)=>{
+      const dx=x-room.i0,dz=z-room.j0;
+      const local=rotation===0?[dx,dz]:rotation===90?[h-dz,dx]:
+        rotation===180?[w-dx,h-dz]:[dz,w-dx];
+      return {i:ti+local[0],j:tj+local[1]};
+    };
+    const rotateNormal=(x,z)=>rotation===0?[x,z]:
+      rotation===90?[-z,x]:rotation===180?[-x,-z]:[z,-x];
+    const targetCells=new Set();
+    for(const key of room.cells){
+      const [i,j]=key.split(',').map(Number);
+      const a=transform(i,j),b=transform(i+1,j+1);
+      const ni=Math.min(a.i,b.i),nj=Math.min(a.j,b.j);
+      if(!lotCell(ni,nj))return fail('lot-bounds');
+      const target=cell(ni,nj);
+      if(floors.has(target))return fail('room-target-overlap');
+      const patch={minX:ni*BUILD_STEP,minZ:nj*BUILD_STEP,
+        maxX:(ni+1)*BUILD_STEP,maxZ:(nj+1)*BUILD_STEP};
+      if(furnitureBoxes.some(box=>overlap(patch,box))||
+        residents.some(p=>finite(p?.x)&&finite(p?.z)&&
+          p.x>=patch.minX&&p.x<patch.maxX&&p.z>=patch.minZ&&p.z<patch.maxZ))
+        return fail('room-target-occupied');
+      targetCells.add(target);
+    }
+    const wallMap=new Map(),facesMap=new Map();
+    for(const id of room.wallIds){
+      const old=walls.get(id);
+      const a=transform(old.i,old.j);
+      const b=transform(old.i+(old.axis==='h'?1:0),old.j+(old.axis==='v'?1:0));
+      const axis=a.j===b.j?'h':'v',i=Math.min(a.i,b.i),j=Math.min(a.j,b.j);
+      const newId=edge(axis,i,j);
+      if(walls.has(newId))return fail('room-target-overlap');
+      wallMap.set(id,{...old,id:newId,axis,i,j});
+      const normal=rotateNormal(old.axis==='h'?0:-1,old.axis==='h'?-1:0);
+      const targetNormal=axis==='h'?[0,-1]:[-1,0];
+      const faces=materials.wall[id];
+      if(faces){
+        const swap=normal[0]!==targetNormal[0]||normal[1]!==targetNormal[1];
+        facesMap.set(newId,swap?{...(faces.b?{a:faces.b}:{}),
+          ...(faces.a?{b:faces.a}:{})}:{...faces});
+      }
+    }
+    const copiedFloor=new Map(),copiedCeiling=new Map(),copiedFacade=new Map();
+    for(const key of room.cells){
+      const [i,j]=key.split(',').map(Number);
+      const a=transform(i,j),b=transform(i+1,j+1);
+      const dest=cell(Math.min(a.i,b.i),Math.min(a.j,b.j));
+      if(materials.floor[key])copiedFloor.set(dest,materials.floor[key]);
+      if(materials.ceiling?.[key])copiedCeiling.set(dest,materials.ceiling[key]);
+    }
+    for(const id of room.wallIds)if(materials.facade?.[id])
+      copiedFacade.set(wallMap.get(id).id,materials.facade[id]);
+    const movedOpenings=openingSet.map(o=>({...o,
+      id:type==='room-duplicate'?'opening-'+nextId++:o.id,
+      edgeIds:o.edgeIds.map(id=>wallMap.get(id).id)}));
+    if(type==='room-relocate'){
+      room.cells.forEach(key=>floors.delete(key));
+      room.wallIds.forEach(id=>{
+        walls.delete(id);delete materials.wall[id];
+        if(materials.facade)delete materials.facade[id];
+      });
+      for(const key of room.cells){
+        delete materials.floor[key];
+        if(materials.ceiling)delete materials.ceiling[key];
+      }
+      openings=openings.filter(o=>!openingSet.includes(o));
+    }
+    targetCells.forEach(key=>floors.add(key));
+    for(const wall of wallMap.values())walls.set(wall.id,wall);
+    for(const [key,value] of copiedFloor)materials.floor[key]=value;
+    if(copiedCeiling.size){
+      materials.ceiling||={};
+      for(const [key,value] of copiedCeiling)materials.ceiling[key]=value;
+    }
+    for(const [key,value] of facesMap)materials.wall[key]=value;
+    if(copiedFacade.size){
+      materials.facade||={};
+      for(const [key,value] of copiedFacade)materials.facade[key]=value;
+    }
+    openings.push(...movedOpenings);
   }else if(type==='wall'){
     if(!command.from||!command.to||![command.from.x,command.from.z,command.to.x,command.to.z].every(finite))return fail('invalid-wall');
     const line=editSegments(command.from,command.to);
