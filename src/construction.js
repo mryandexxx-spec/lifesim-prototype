@@ -629,8 +629,10 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     const candidate={...world,wallEdges:[...walls.values()],floorCells:[...floors],
       starterShell,starterRemoved:[...starterRemoved],starterSolidSides:[...starterSolidSides]};
     const exterior=constructionExteriorSegments(candidate);
+    const requested=allWalls().get(command.edgeId);
     const painted=command.scope==='all'?exterior:
-      exterior.filter(e=>e.id===command.edgeId);
+      exterior.filter(e=>e.id===command.edgeId||(requested&&
+        e.axis===requested.axis&&e.i===requested.i&&e.j===requested.j));
     if(!painted.length)return fail('not-exterior-wall');
     const facade={...(materials.facade||{})};
     for(const target of painted)
