@@ -5328,8 +5328,12 @@ function boot() {
         const dueReminders=consumeCalendarReminders(game.calendar,priorCalendarMinute,game.minutes);
         if(dueReminders.messages.length){
           game.calendar=dueReminders.calendar;save(true);
-          for(const reminder of dueReminders.messages.slice(0,3))
-            toast('📅 '+reminder.title+' · '+(reminder.offset===0?'сейчас':'напоминание'));
+          const due=dueReminders.messages;
+          if(due.length===1)
+            toast('📅 '+due[0].title+' · '+(due[0].offset===0?'сейчас':'напоминание'));
+          else
+            toast('📅 '+due.length+' напоминания: '+due.slice(0,2).map(item=>item.title).join(' · ')+
+              (due.length>2?' · ещё '+(due.length-2):''));
         }
         // A completed job frees its own resident; planned commands start only
         // after both participant states and render transition guards allow it.
