@@ -6443,6 +6443,7 @@ function boot() {
       $('light-phase-label').textContent=daylight.phaseLabel;
       const current=selectedActor();
       $('resident-name').textContent=selectedName();
+      updateCareerHud(); // Live earned wages while shift is progressing.
       const skill=getSkillDefinition(HOBBY_SKILLS,READING_SKILL_ID);
       const currentXP=current.skills?.xpById?.[READING_SKILL_ID]||0;
       const level=currentSkillLevel(current.skills,HOBBY_SKILLS,READING_SKILL_ID);
