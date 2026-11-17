@@ -15,6 +15,8 @@ const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const safeId=v=>typeof v==='string'&&/^[a-z][a-z0-9._:-]{1,95}$/.test(v);
 const stationId=v=>typeof v==='string'&&/^shop-easel-[0-9]+$/.test(v);
 const round=n=>Math.round(n*1000)/1000;
+const validOrigin=p=>record(p)&&[p.x,p.z].every(n=>Number.isFinite(n)&&Math.abs(n)<1000)&&
+  [0,90,180,270].includes(p.yaw);
 export function restoreCreatedWorks(raw,ownerId){
   if(!Array.isArray(raw))return [];
   const works=[],ids=new Set();
@@ -27,8 +29,13 @@ export function restoreCreatedWorks(raw,ownerId){
       !Number.isFinite(work.createdAt)||work.createdAt<0||
       work.createdAt>10000000)continue;
     ids.add(work.id);
+    // H5a: normalize older collection-only entries into real immutable artwork
+    // records. Null origin is accepted only for legacy paintings before H5a.
     works.push({id:work.id,ownerId,easelInstanceId:work.easelInstanceId,
-      contentId:work.contentId,seed:work.seed,quality:work.quality,createdAt:round(work.createdAt)});
+      contentId:work.contentId,seed:work.seed,quality:work.quality,
+      createdAt:round(work.createdAt),kind:'artwork',location:'studio',
+      origin:validOrigin(work.origin)?{x:work.origin.x,z:work.origin.z,
+        yaw:work.origin.yaw}:null});
     if(works.length>PAINT_WORKS_LIMIT)works.shift();
   }
   return works;
@@ -63,6 +70,8 @@ export function finishPainting({session,actor,actorId,world,at,registry,skills}=
     Math.max(-10,Math.min(10,(fun-50)*.12))+
     Math.min(10,session.elapsed/5))));
   const work={id,ownerId:actorId,easelInstanceId:item.instanceId,
-    contentId:session.contentId,seed:seedFrom(id),quality,createdAt:round(at)};
+    contentId:session.contentId,seed:seedFrom(id),quality,createdAt:round(at),
+    kind:'artwork',location:'studio',
+    origin:{x:item.x,z:item.z,yaw:item.yaw}};
   return {work,works:[...previous,work].slice(-PAINT_WORKS_LIMIT)};
 }

@@ -23,6 +23,7 @@ import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketIt
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID} from './painting.js';
+import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -1613,6 +1614,49 @@ function boot() {
   const box = (...args) => primitive('box', ...args);
   const ball = (...args) => primitive('sphere', ...args);
   const cylinder = (...args) => primitive('cylinder', ...args);
+  // H5a: each completed work is its OWN persistently identified 3D object,
+  // independent from the temporary paint preview and purchased easel node.
+  // H5b will transfer these IDs to inventory/walls without recreating art.
+  const artworkNodes=new Map();
+  const allArtwork=()=>[...(game.createdWorks||[]),...(game.otherSim.createdWorks||[])]
+    .filter(work=>work.kind==='artwork'&&work.location==='studio')
+    .sort((a,b)=>a.createdAt-b.createdAt||a.id.localeCompare(b.id));
+  const updateArtworkNodes=()=>{
+    const works=allArtwork(),keep=new Set(works.map(w=>w.id));
+    for(const [id,node] of artworkNodes)if(!keep.has(id)){
+      node.destroy();artworkNodes.delete(id);
+    }
+    for(const [index,work] of works.entries()){
+      const source=game.world.furniture.instances.find(i=>
+        i.instanceId===work.easelInstanceId&&i.prefabId==='easel');
+      const origin=work.origin||(source?{x:source.x,z:source.z,yaw:source.yaw}:null);
+      const position=studioArtworkPose({...work,origin},index);
+      if(!position)continue;
+      let node=artworkNodes.get(work.id);
+      if(!node){
+        node=new pc.Entity('H5a artwork / '+work.id);
+        app.root.addChild(node);
+        const frame=mat('#916e53'),paper=mat('#f6eacb');
+        primitive('box','H5a finished framed canvas',0,.79,0,
+          .70,.86,.062,frame,node);
+        primitive('box','H5a finished painting support',0,.79,-.037,
+          .61,.76,.018,paper,node);
+        const parts=paintingShapes[work.contentId]||[];
+        parts.forEach(([kind,x,y,sx,sy,colorIndex],i)=>{
+          const palette=PAINT_SUBJECTS[work.contentId]?.palette;
+          if(!palette)return;
+          primitive(kind,'H5a preserved brush stroke '+i,x*.73,
+            .79+(y-1.37)*.73,-.050-i*.0008,
+            sx*.73,sy*.73,.008,mat(palette[colorIndex]),node);
+        });
+        // Frame is a standalone leaning panel, not an easel texture.
+        primitive('box','H5a frame foot',0,.31,.10,.63,.10,.12,frame,node);
+        artworkNodes.set(work.id,node);
+      }
+      node.setPosition(position.x,0,position.z);
+      node.setEulerAngles(0,-position.yaw,0);
+    }
+  };
 
   // Each furniture part registers its ACTUAL authored geometry, not a hardcoded
   // circle around a label. Future furniture needs only use the same wrapper.
@@ -3439,6 +3483,15 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:1.3,z:r.maxZ}}};
       });
+    const finishedArt=allArtwork().map((work,index)=>{
+      const source=game.world.furniture.instances.find(i=>i.instanceId===work.easelInstanceId);
+      const origin=work.origin||(source?{x:source.x,z:source.z,yaw:source.yaw}:null);
+      const pos=studioArtworkPose({...work,origin},index);
+      if(!pos)return null;
+      return {kind:'artwork',id:work.id,work,
+        bounds:{min:{x:pos.x-.39,y:.25,z:pos.z-.39},
+          max:{x:pos.x+.39,y:1.23,z:pos.z+.39}}};
+    }).filter(Boolean);
     const easels=game.world.furniture.instances
       .filter(item=>item.prefabId==='easel'&&item.location==='home')
       .map(item=>{
@@ -3447,7 +3500,7 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:2.02,z:r.maxZ}}};
       });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...easels,...movedVolumes,...blockers]);
+      [...residents,...finishedArt,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...easels,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -3482,6 +3535,12 @@ function boot() {
     const target=worldTargetAt(pos);
     if(target)confirmWorldTap(pos);
     if(target?.kind==='resident')openSocialContext(pos);
+    else if(target?.kind==='artwork'){
+      closeSocialContext();select(null);
+      const work=target.work;
+      toast('Картина «'+(PAINT_SUBJECTS[work.contentId]?.label||'Картина')+
+        '» · качество '+work.quality+'/100 · отдельный предмет');
+    }
     else if(target?.kind==='object')select(target.id,target.instanceId);
     else{closeSocialContext();select(null);}
   };
@@ -3838,8 +3897,10 @@ function boot() {
       ?{...pairedTv.places.alex,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
-      ?furniturePose(game.world,useId==='lamp'?'floorlamp':useId,
-          ACTOR_POSES[useId],game.action?.id==='dining'?null:game.action?.targetInstanceId):null);
+      ?(useId==='paint'
+        ?easelPaintingPose(game.world,game.action?.targetInstanceId,game.position)
+        :furniturePose(game.world,useId==='lamp'?'floorlamp':useId,
+          ACTOR_POSES[useId],game.action?.id==='dining'?null:game.action?.targetInstanceId)):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
@@ -3993,8 +4054,10 @@ function boot() {
       ?{...pairedTv.places.mira,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
-      ?furniturePose(game.world,miraUseId==='lamp'?'floorlamp':miraUseId,
-          ACTOR_POSES[miraUseId],game.otherSim.action?.id==='dining'?null:game.otherSim.action?.targetInstanceId):null);
+      ?(miraUseId==='paint'
+        ?easelPaintingPose(game.world,game.otherSim.action?.targetInstanceId,game.otherSim.position)
+        :furniturePose(game.world,miraUseId==='lamp'?'floorlamp':miraUseId,
+          ACTOR_POSES[miraUseId],game.otherSim.action?.id==='dining'?null:game.otherSim.action?.targetInstanceId)):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
@@ -4097,6 +4160,7 @@ function boot() {
       }:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
         contentId:'music.calm',elapsed:game.socialAction.elapsed}:null,
       diningFrame:miraDining?{phase:'using',activityId:'dining.meal',elapsed:game.otherSim.action.elapsed}:null,
+      paintingFrame:miraUseId==='paint'?{phase:'using',elapsed:game.otherSim.action?.elapsed||0}:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
       bedBusy:bedStates.mira.progress>0,
@@ -4115,6 +4179,7 @@ function boot() {
     if(miraMeshShown&&pairedBooks)miraBook.enabled=false;
     // The old snack is on the hidden procedural elbow, not the Meshy hand.
     if(miraMeshShown&&(miraUseId==='fridge'||miraCarryMeal))miraSnack.enabled=false;
+    miraRig.paintbrush.enabled=Boolean(miraUseId==='paint'&&!miraMeshShown);
     // Alex stays on the same 3D rig for bed and fridge when their verified
     // skeleton controllers exist. The original simulation/root still owns
     // mattress placement, both bed slots, shower movement and opaque privacy.
@@ -4143,6 +4208,7 @@ function boot() {
       }:pairedMusic?{phase:'using',activityId:MUSIC_ACTIVITY_ID,
         contentId:'music.calm',elapsed:game.socialAction.elapsed}:null,
       diningFrame:alexDining?{phase:'using',activityId:'dining.meal',elapsed:game.action.elapsed}:null,
+      paintingFrame:useId==='paint'?{phase:'using',elapsed:game.action?.elapsed||0}:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
       seat:seatContactEnabled?(alexDiningVisual&&
@@ -4163,6 +4229,7 @@ function boot() {
     // The old snack is attached to the hidden procedural elbow; use the
     // new Meshy hand-bone prop instead, never show both at once.
     if(meshyShown&&(useId==='fridge'||alexCarryMeal))snack.enabled=false;
+    alexRig.paintbrush.enabled=Boolean(useId==='paint'&&!meshyShown);
     // The existing procedural book is attached to the old right elbow.
     // Never let it float beside the Meshy hand until a real socket exists.
     if(meshyShown&&(useId==='sofa'||game.action?.id==='hobby'))
@@ -4204,6 +4271,8 @@ function boot() {
       if(point){accent.setPosition(point.x,point.y,point.z);
         accent.setLocalScale(point.size,point.size,point.size);}
     }
+    // H5a artwork entities are independent of their source stations.
+    updateArtworkNodes();
     // F4E: interaction visuals depend only on the real targeted action.
     // Lights persist in v1, while drawers, doors and mirror highlights close
     // automatically after completion, interruption or save reload.
@@ -4225,13 +4294,12 @@ function boot() {
       if(item.prefabId==='easel'){
         const activeAction=[game.action,game.otherSim.action].find(action=>
           action?.id==='paint'&&action.targetInstanceId===item.instanceId);
-        const lastWork=[...(game.createdWorks||[]),...(game.otherSim.createdWorks||[])]
-          .filter(work=>work.easelInstanceId===item.instanceId)
-          .sort((a,b)=>b.createdAt-a.createdAt)[0];
-        const contentId=activeAction?.contentId||lastWork?.contentId;
+        // Do not paint the last completed image onto a fresh blank easel.
+        // Finished paintings live in independent H5a artwork entities.
+        const contentId=activeAction?.contentId;
         const stage=activeAction?.phase==='using'
           ?Math.floor(Math.min(1,activeAction.elapsed/ACTIONS.paint.duration)*6)
-          :activeAction?0:lastWork?6:0;
+          :0;
         for(const theme of PAINT_CONTENT_IDS)for(let i=0;i<6;i++){
           const stroke=node.findByName('H5 paint '+theme+' '+i);
           if(stroke)stroke.enabled=theme===contentId&&i<stage;
