@@ -6,7 +6,7 @@ const src=read('../src/game.js'),html=read('../index.html'),css=read('../styles.
 test('UI3 camera ray uses CSS pixels instead of projected screen ellipses',()=>{
   assert.match(src,/camera\.camera\.screenToWorld\(x,y,camera\.camera\.nearClip\)/);
   assert.match(src,/camera\.camera\.screenToWorld\(x,y,camera\.camera\.farClip\)/);
-  assert.match(src,/return pickWorldRayTarget\(near,far,\s*\[\.\.\.residents,\.\.\.sofaCopies,\.\.\.bedCopies,\.\.\.tvCopies,\.\.\.bookshelves,\.\.\.diningTables,\.\.\.chairSeats,\.\.\.musicStations,\.\.\.kitchenAppliances,\.\.\.easels,\.\.\.movedVolumes,\.\.\.blockers\]\)/);
+  assert.match(src,/return pickWorldRayTarget\(near,far,\s*\[\.\.\.residents,\.\.\.finishedArt,\.\.\.sofaCopies,\.\.\.bedCopies,\.\.\.tvCopies,\.\.\.bookshelves,\.\.\.diningTables,\.\.\.chairSeats,\.\.\.musicStations,\.\.\.kitchenAppliances,\.\.\.easels,\.\.\.movedVolumes,\.\.\.blockers\]\)/);
   assert.ok(!src.includes('const projectedObject='));
 });
 test('UI3 registers each interactive object by geometry and allows future pieces',()=>{

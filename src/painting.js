@@ -97,6 +97,7 @@ export function finishPainting({session,actor,actorId,world,at,registry,skills}=
     Math.max(-10,Math.min(10,(fun-50)*.12))+
     Math.min(10,session.elapsed/5))));
   const work={id,ownerId:actorId,easelInstanceId:item.instanceId,
-    contentId:session.contentId,seed:seedFrom(id),quality,createdAt:round(at)};
+    contentId:session.contentId,seed:seedFrom(id),quality,createdAt:round(at),
+    kind:'artwork',location:'studio',origin:{x:item.x,z:item.z,yaw:item.yaw}};
   return {work,works:[...previous,work].slice(-PAINT_WORKS_LIMIT)};
 }
