@@ -2852,7 +2852,7 @@ function boot() {
   // F1 edit mode: UI state is ephemeral; only confirmed domain transactions
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
-  let buildSession=null,buildDrag=null,buildTool='room',pendingBuild=null;
+  let buildSession=null,buildDrag=null,buildTool='room',pendingBuild=null,buildPreviousView=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
@@ -3678,6 +3678,8 @@ function boot() {
     if(!buildMode)return;
     buildMode=false;buildDrag=null;buildSession=null;clearBuildPending();
     cameraGesture.clear();setCameraBuildBounds();
+    if(buildPreviousView)setView(buildPreviousView);
+    buildPreviousView=null;
     $('build-editor').hidden=true;
     $('build-toggle').setAttribute('aria-pressed','false');
     document.querySelector('.app-shell').dataset.buildMode='false';
@@ -3692,9 +3694,11 @@ function boot() {
     }
     if(furnishMode)exitFurniture();
     buildSession=createConstructionEditor(game.world.construction);
+    buildPreviousView={...view};
     buildMode=true;setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
-    setView({...view,centerX:7,centerZ:0,distance:29,pitch:61});
+    // Show the eastern expansion area within the narrow portrait viewport.
+    setView({...view,centerX:11.5,centerZ:0,distance:36,pitch:64});
     document.querySelector('.app-shell').dataset.buildMode='true';
     $('build-editor').hidden=false;
     $('build-toggle').setAttribute('aria-pressed','true');
