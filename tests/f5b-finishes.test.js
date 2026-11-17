@@ -29,7 +29,7 @@ test('F5-B paint one tile versus whole connected room, reset to default and pres
   assert.equal(tile.legacy,true);
   assert.equal(Object.keys(tile.materials.floor).length,1);
   assert.equal(tile.materials.floor['0,0'],'floor.oak');
-  assert.deepEqual(initial.materials,{});
+  assert.deepEqual(initial.materials,{floor:{},wall:{}});
   const room=painted(tile,{type:'paint-floor',scope:'room',at:{x:0.1,z:0.1},materialId:'floor.tile'});
   assert.equal(Object.keys(room.materials.floor).length,room.floorCells.length);
   assert.equal(room.materials.floor['0,0'],'floor.tile');
