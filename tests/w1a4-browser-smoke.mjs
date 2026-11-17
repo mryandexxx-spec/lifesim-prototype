@@ -88,6 +88,7 @@ try {
  assert.equal(await page.locator('#speed-btn').innerText(),'3×');
  await page.locator('#build-toggle').click();
  assert.ok(await page.locator('#build-editor').isVisible());
+ await page.waitForTimeout(350); // Let the last pre-build HUD time sample settle.
  const buildClock=await page.locator('#time-label').innerText();
  await page.waitForTimeout(1200);
  assert.equal(await page.locator('#time-label').innerText(),buildClock,
@@ -98,6 +99,7 @@ try {
   beforeLive,{timeout:7000});
  await page.locator('#furnish-toggle').click();
  assert.ok(await page.locator('#furniture-editor').isVisible());
+ await page.waitForTimeout(350); // The HUD may be one frame behind the tick.
  const furnishClock=await page.locator('#time-label').innerText();
  await page.waitForTimeout(1100);
  assert.equal(await page.locator('#time-label').innerText(),furnishClock,
@@ -105,6 +107,7 @@ try {
  await page.locator('#furnish-exit').click();
  // Hidden Safari tab must not process simulation minutes or reminders.
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});});
+ await page.waitForTimeout(350); // Flush pending HUD refresh before measuring freeze.
  const hiddenClock=await page.locator('#time-label').innerText();
  await page.waitForTimeout(1100);
  assert.equal(await page.locator('#time-label').innerText(),hiddenClock,'Hidden tab never ticks');
