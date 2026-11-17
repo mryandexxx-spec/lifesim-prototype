@@ -24,6 +24,11 @@ export function sanitizeQueueCommand(id,raw,persons){
   const type=raw.type;
   if(!ACTION_QUEUE_TYPES.includes(type))return null;
   if(type==='object'&&known(ACTIONS,raw.actionId)){
+    // Optional v1 queue intent: fridge chooses a table when action starts.
+    if(raw.autoTable!==undefined&&
+      (raw.actionId!=='dining'||raw.autoTable!==true||raw.targetInstanceId!==undefined))
+      return null;
+    if(raw.autoTable===true)return {type,actionId:'dining',autoTable:true};
     if(raw.targetInstanceId!==undefined&&!validFurnitureInstanceId(raw.targetInstanceId))
       return null;
     return raw.targetInstanceId
