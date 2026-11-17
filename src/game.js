@@ -3745,6 +3745,7 @@ function boot() {
   const setBuildTool=type=>{
     clearBuildPending();resetBuildWallSelection();
     buildTool=type;buildDrag=null;cameraGesture.clear();
+    $('build-editor').dataset.tool=type;
     $('build-starter-picker').hidden=type!=='move-wall';
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));

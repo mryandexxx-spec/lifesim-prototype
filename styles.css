@@ -1175,3 +1175,8 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .build-starter-picker button{flex:1;min-width:65px;min-height:44px;
   padding:5px 8px;border-radius:9px;border:1px solid #ddceb5;background:#fff;
   color:#624b30;font-weight:800;font-size:12px;}
+
+/* A taller, focused tool sheet makes the original-home picker and +/- buttons
+   visible together on portrait iPhones; the rest remains scrollable. */
+.build-editor[data-tool="move-wall"]{max-height:min(54dvh,410px);}
+.build-editor[data-tool="move-wall"] #build-instruction{display:none;}

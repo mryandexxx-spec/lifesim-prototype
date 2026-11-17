@@ -143,6 +143,13 @@ try{
  assert.ok(saved.world.construction.starterOwned.length>0,
    'The original extension owns real saved foundation cells');
  assert.equal(saved.world.construction.schema,1);
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
+ const afterReload=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+ assert.deepEqual(afterReload.world.construction.starterShell,saved.world.construction.starterShell,
+   'Reload cannot reset any of the initial apartment walls');
+ assert.deepEqual(afterReload.world.construction.starterOwned,saved.world.construction.starterOwned,
+   'Reload cannot lose the original room foundation extensions');
  console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));
  assert.deepEqual(errors,[],'Real PlayCanvas/ES module browser runtime must not error');
