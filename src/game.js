@@ -3070,6 +3070,8 @@ function boot() {
   let editSession=null,editSelectedId=null,editDrag=null;
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
   let finishFloor='floor.oak',finishWall='wall.sage',finishSide='both';
+  const openingChoice={door:'door.simple',window:'window.classic',arch:'arch.round'};
+  let selectedBuildOpening=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
@@ -3782,7 +3784,10 @@ function boot() {
     'inaccessible-essential':'После перестройки житель не дойдёт до важных предметов',
     'finish-needs-floor':'Отделку пола можно положить только на построенный пол',
     'invalid-finish-target':'Выбери нужную поверхность: пол или стену',
-    'unknown-finish':'Этот вариант покрытия недоступен'
+    'unknown-finish':'Этот вариант покрытия недоступен',
+    'unknown-opening-style':'Неизвестный вариант проёма',
+    'opening-needs-wall-space':'Для этого широкого проёма нужны четыре свободных секции стены',
+    'opening-style-unavailable':'Выбери дизайн двери, окна или арки'
   };
   const buildFeedback=(msg,invalid=false)=>{
     $('build-feedback').textContent=msg;
@@ -3951,14 +3956,54 @@ function boot() {
     $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':'Покрытие пола';
   };
   $('build-finish-side').addEventListener('change',event=>{finishSide=event.target.value;});
+  const buildOpeningPalette=$('build-opening-variants');
+  const refreshBuildOpenings=()=>{
+    const replace=buildTool==='change-opening';
+    const family=replace?'':buildTool;
+    buildOpeningPalette.replaceChildren();
+    $('build-opening-label').textContent=replace
+      ?selectedBuildOpening?'Выбери замену для проёма':'Сначала коснись существующей двери, окна или арки'
+      :family==='door'?'Выбери дверь':family==='window'?'Выбери окно':'Выбери арку';
+    for(const [id,variant] of Object.entries(BUILD_OPENING_STYLES)){
+      if(!replace&&variant.type!==family)continue;
+      const button=document.createElement('button');
+      button.type='button';button.className='build-opening-variant';
+      button.dataset.openingStyle=id;
+      button.textContent=variant.label;
+      button.disabled=replace&&!selectedBuildOpening;
+      const active=replace
+        ?selectedBuildOpening&&selectedBuildOpening.styleId===id
+        :openingChoice[family]===id;
+      button.setAttribute('aria-pressed',String(Boolean(active)));
+      button.addEventListener('click',()=>{
+        if(replace){
+          if(!selectedBuildOpening)return;
+          const candidate={type:'change-opening',id:selectedBuildOpening.id,styleId:id};
+          if(stageBuild(candidate)){
+            selectedBuildOpening={...selectedBuildOpening,styleId:id};
+            refreshBuildOpenings();
+          }
+        }else{
+          openingChoice[family]=id;
+          refreshBuildOpenings();
+          buildFeedback('Выбрано: '+variant.label+' · коснись стены для установки');
+        }
+      });
+      buildOpeningPalette.appendChild(button);
+    }
+  };
   const setBuildTool=type=>{
     clearBuildPending();resetBuildWallSelection();
+    selectedBuildOpening=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
     $('build-editor').dataset.tool=type;
     $('build-starter-picker').hidden=type!=='move-wall';
     const finishes=['paint-floor','paint-room','paint-wall','sample-finish'];
     $('build-finish-picker').hidden=!finishes.includes(type);
     if(finishes.includes(type))refreshBuildFinishes();
+    const openings=['door','window','arch','change-opening'];
+    $('build-opening-picker').hidden=!openings.includes(type);
+    if(openings.includes(type))refreshBuildOpenings();
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
@@ -3967,9 +4012,12 @@ function boot() {
       room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
       floor:'Протяни область, чтобы увеличить пол без перегородки',
       wall:'Протяни по прямой, чтобы построить стену',
-      door:'Коснись стены для установки двери',window:'Коснись стены для установки окна',
+      door:'Выбери дизайн и коснись стены для установки двери',
+      window:'Выбери дизайн и коснись стены для установки окна',
+      arch:'Выбери дизайн и коснись стены для открытой арки',
+      'change-opening':'Коснись установленного проёма, затем выбери новый дизайн',
       'erase-wall':'Коснись стены для демонтажа',
-      'remove-opening':'Коснись двери или окна для удаления',
+      'remove-opening':'Коснись двери, окна или арки для удаления',
       'remove-floor':'Протяни область пола, которую нужно убрать',
       'paint-floor':'Выбери покрытие и коснись одной плитки пола. Затем «Применить».',
       'paint-room':'Выбери покрытие и коснись комнаты — зальём весь её пол.',
@@ -4062,13 +4110,23 @@ function boot() {
     const {from,to,wallEdge,hit}=buildDrag;
     buildDrag=null;
     const type=buildTool;
-    if(['door','window','erase-wall','remove-opening'].includes(type)){
+    if(['door','window','arch','erase-wall','remove-opening','change-opening'].includes(type)){
       const target=buildWallAtScreen(gesturePoint(event))||
         nearestConstructionEdge(game.world.construction,to,.75);
-      if(type==='remove-opening'){
+      if(type==='change-opening'){
+        selectedBuildOpening=game.world.construction.openings.find(o=>
+          o.edgeIds.includes(target?.id))||null;
+        if(selectedBuildOpening){
+          selectedBuildOpening={...selectedBuildOpening,
+            styleId:constructionOpeningStyle(selectedBuildOpening)};
+          buildFeedback('Проём выбран · нажми нужный вариант в палитре');
+        }else buildFeedback('Нажми на существующую дверь, окно или арку',true);
+        refreshBuildOpenings();
+      }else if(type==='remove-opening'){
         const opening=game.world.construction.openings.find(o=>o.edgeIds.includes(target?.id));
         stageBuild({type:'remove-opening',id:opening?.id});
-      }else stageBuild({type,edgeId:target?.id,at:to});
+      }else stageBuild({type,edgeId:target?.id,at:to,
+        ...(openingChoice[type]?{styleId:openingChoice[type]}:{})});
     }else if(type==='move-wall'){
       const target=wallEdge||buildWallAtScreen(gesturePoint(event));
       if(target)selectBuildWall(target);
@@ -4252,7 +4310,7 @@ function boot() {
       }
       if(buildTool!=='camera'&&cameraGesture.count()===0){
         const raw=editorFloorAt(point);
-        const pickWall=['move-wall','door','window','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
+        const pickWall=['move-wall','door','window','arch','change-opening','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
         if(pickWall&&!wallEdge&&buildTool==='move-wall')
           buildFeedback('Выбери исходную стену кнопками ниже или коснись её; свайп по пустому месту двигает камеру');
