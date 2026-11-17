@@ -122,7 +122,7 @@ test('H5b: wall geometry and browser/build wiring',()=>{
     ci=read('../.github/workflows/pages.yml');
   assert.equal(PAINT_WALL_SLOTS.length,8);
   assert.ok(PAINT_WALL_SLOTS.every((s,i)=>s.id===i&&s.x>1&&s.x<13&&s.z>-4.25));
-  assert.match(game,/artworkDisplayPose\(work,index,origin\)/);
+  assert.match(game,/artworkDisplayPose\(work,index,origin,game\.world\.construction\)/);
   assert.match(game,/transactPainting\(game,game.selectedSim,work.id/);
   assert.match(game,/foot.enabled=!position.wall/);
   assert.match(game,/setMindTab\('skills'\)/);

@@ -73,7 +73,7 @@ export function restoreConstructionWorld(raw){
   const shell=validStarter(raw.starterShell),owned=new Set();
   if(Array.isArray(raw.starterOwned)&&raw.starterOwned.length<=5000){
     for(const key of raw.starterOwned){
-      if(typeof key!=='string'||!/^[-]?\\d+,[-]?\\d+$/.test(key))continue;
+      if(typeof key!=='string'||!/^[-]?\d+,[-]?\d+$/.test(key))continue;
       const [i,j]=key.split(',').map(Number);
       if(!isBase(i,j)&&i>=shell.west&&i<shell.east&&j>=shell.north&&j<shell.south&&
         floors.has(key))owned.add(key);
