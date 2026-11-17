@@ -3360,7 +3360,9 @@ function boot() {
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
-  let finishFloor='floor.oak',finishWall='wall.sage',finishCeiling='ceiling.chalk',finishSide='both';
+  let finishFloor='floor.oak',finishWall='wall.sage',finishCeiling='ceiling.chalk',
+    finishFacade='facade.brick',finishSide='both';
+  let porchMaterial='porch.stone',porchDepth=3;
   const openingChoice={door:'door.simple',window:'window.classic',arch:'arch.round'};
   let selectedBuildOpening=null,selectedBuildRoof=null;
   const roofChoice={styleId:'roof.gable',materialId:'roof.slate',pitch:.38,eaves:.4};
@@ -4087,7 +4089,19 @@ function boot() {
     'roof-overlap':'Секции крыши не должны перекрываться',
     'roof-too-complex':'Слишком сложный контур: укрой отдельными секциями',
     'roof-not-found':'Коснись существующей секции крыши',
-    'unknown-roof-style':'Выбери форму, материал, уклон и свес крыши'
+    'unknown-roof-style':'Выбери форму, материал, уклон и свес крыши',
+    'unknown-wall-height':'Выбери одну из трёх высот стен',
+    'unknown-facade':'Выбери облицовку фасада',
+    'invalid-facade-scope':'Выбери весь фасад или одну стену',
+    'not-exterior-wall':'Нужна наружная стена: включи «Стены ↑» и коснись внешнего контура',
+    'unknown-porch':'Выбери камень, дерево или кирпич',
+    'porch-needs-door':'Для крыльца нужна настоящая наружная дверь',
+    'porch-needs-exterior-door':'Дверь должна выходить наружу, на свободный участок',
+    'porch-overlap':'Здесь уже есть входная площадка',
+    'porch-exists':'У этой двери уже построено крыльцо',
+    'porch-not-found':'Коснись двери с построенным крыльцом',
+    'porch-intersects-furniture':'Крыльцо пересекает предмет мебели',
+    'too-many-porches':'На участке слишком много крылец'
   };
   const buildFeedback=(msg,invalid=false)=>{
     $('build-feedback').textContent=msg;
@@ -4229,13 +4243,51 @@ function boot() {
   $('build-wall-expand').addEventListener('click',()=>shiftSelectedBuildWall(1));
   $('build-wall-contract').addEventListener('click',()=>shiftSelectedBuildWall(-1));
   $('build-wall-deselect').addEventListener('click',resetBuildWallSelection);
-   const buildFinishPalette=$('build-finish-colors');
+   const buildHeightChoices=$('build-height-choices');
+  const refreshWallHeightChoices=()=>{
+    buildHeightChoices.replaceChildren();
+    for(const [id,option] of Object.entries(BUILD_WALL_HEIGHTS)){
+      const btn=document.createElement('button');
+      btn.type='button';btn.dataset.wallHeight=id;btn.textContent=option.label;
+      btn.setAttribute('aria-pressed',String((game.world.construction.wallHeightClass||'normal')===id));
+      btn.addEventListener('click',()=>{
+        stageBuild({type:'set-wall-height',heightClass:id});
+        refreshWallHeightChoices();
+      });
+      buildHeightChoices.appendChild(btn);
+    }
+  };
+  const porchChoices=$('build-porch-choices');
+  const refreshPorchChoices=()=>{
+    porchChoices.replaceChildren();
+    for(const [id,choice] of Object.entries(BUILD_PORCH_FINISHES)){
+      const btn=document.createElement('button');
+      btn.type='button';btn.dataset.porchFinish=id;
+      const chip=document.createElement('span');chip.className='build-roof-color';
+      chip.style.background=choice.color;
+      btn.append(chip,document.createTextNode(choice.label));
+      btn.setAttribute('aria-pressed',String(porchMaterial===id));
+      btn.addEventListener('click',()=>{
+        porchMaterial=id;refreshPorchChoices();
+        buildFeedback('Материал крыльца: '+choice.label+' · коснись двери');
+      });
+      porchChoices.appendChild(btn);
+    }
+    $('build-porch-depth').value=String(porchDepth);
+  };
+  $('build-porch-depth').addEventListener('change',event=>{
+    const v=Number(event.target.value);
+    if([2,3,4].includes(v))porchDepth=v;
+  });
+  const buildFinishPalette=$('build-finish-colors');
   const refreshBuildFinishes=()=>{
-    const kind=buildTool==='paint-wall'?'wall':
+    const kind=buildTool.startsWith('paint-facade')?'facade':
+      buildTool==='paint-wall'?'wall':
       buildTool.startsWith('paint-ceiling')?'ceiling':'floor';
-    const selected=kind==='wall'?finishWall:kind==='ceiling'?finishCeiling:finishFloor;
+    const selected=kind==='facade'?finishFacade:
+      kind==='wall'?finishWall:kind==='ceiling'?finishCeiling:finishFloor;
     buildFinishPalette.replaceChildren();
-    for(const [id,definition] of Object.entries(BUILD_FINISHES[kind])){
+    for(const [id,definition] of Object.entries(kind==='facade'?BUILD_FACADE_FINISHES:BUILD_FINISHES[kind])){
       const button=document.createElement('button');
       button.type='button';button.className='build-finish-swatch';
       button.dataset.finishId=id;
@@ -4246,17 +4298,24 @@ function boot() {
       const title=document.createElement('small');title.textContent=definition.label;
       button.append(chip,title);
       button.addEventListener('click',()=>{
-        if(kind==='wall')finishWall=id;else if(kind==='ceiling')finishCeiling=id;else finishFloor=id;
+        if(kind==='facade')finishFacade=id;
+        else if(kind==='wall')finishWall=id;
+        else if(kind==='ceiling')finishCeiling=id;
+        else finishFloor=id;
         refreshBuildFinishes();
-        buildFeedback('Материал выбран: '+definition.label+' · коснись поверхности');
+        if(kind==='facade'&&buildTool==='paint-facade-all')
+          stageBuild({type:'paint-facade',scope:'all',materialId:finishFacade});
+        else buildFeedback('Материал выбран: '+definition.label+' · коснись поверхности');
       });
       buildFinishPalette.appendChild(button);
     }
     $('build-finish-side-label').hidden=kind!=='wall';
     $('build-finish-side').value=finishSide;
-    $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':
-      kind==='ceiling'?'Покрытие потолка':'Покрытие пола';
-    $('build-finish-tip').textContent=kind==='wall'
+    $('build-finish-label').textContent=kind==='facade'?'Наружная отделка фасада':
+      kind==='wall'?'Покрытие стен':kind==='ceiling'?'Покрытие потолка':'Покрытие пола';
+    $('build-finish-tip').textContent=kind==='facade'
+      ?'Фасад независим от внутренних обоев. Рельеф — авторская процедурная геометрия.'
+      :kind==='wall'
       ?'Полосы и панели рисуются процедурно на обеих сторонах стены.'
       :kind==='ceiling'?'Для просмотра включи «Потолок».'
       :'Направление досок и мозаика — отдельные образцы.';
