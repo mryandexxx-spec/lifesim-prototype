@@ -16,7 +16,7 @@ import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
-  constructionExteriorSegments,constructionPorches,
+  constructionExteriorSegments,constructionPorches,constructionRoomSelection,
   BUILD_WALL_HEIGHTS,BUILD_FACADE_FINISHES,BUILD_PORCH_FINISHES} from './construction.js';
 import {ROOF_STYLES,ROOF_MATERIALS,ROOF_PITCHES,ROOF_EAVES,
   roofContains,roofMeshGeometry} from './roof-construction.js';
@@ -3360,6 +3360,7 @@ function boot() {
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
+  let selectedBuildRoom=null,selectedBuildRoomInfo=null,buildRoomRotation=0;
   let finishFloor='floor.oak',finishWall='wall.sage',finishCeiling='ceiling.chalk',
     finishFacade='facade.brick',finishSide='both';
   let porchMaterial='porch.stone',porchDepth=3;
@@ -4101,7 +4102,21 @@ function boot() {
     'porch-exists':'У этой двери уже построено крыльцо',
     'porch-not-found':'Коснись двери с построенным крыльцом',
     'porch-intersects-furniture':'Крыльцо пересекает предмет мебели',
-    'too-many-porches':'На участке слишком много крылец'
+    'too-many-porches':'На участке слишком много крылец',
+    'room-not-found':'Коснись пола существующей комнаты',
+    'room-protected':'Первоначальный обставленный дом пока нельзя переносить как единый объект',
+    'room-not-rectangular':'Выбери прямоугольную комнату без выступов и внутренних перегородок',
+    'room-not-enclosed':'Нужна комната с четырьмя настоящими стенами',
+    'room-has-furniture':'Сначала убери мебель из комнаты: перенос предметов — следующий этап',
+    'room-has-art':'На стене есть картина: перенос с сохранением её привязки — следующий этап',
+    'room-has-resident':'Житель находится в комнате. Попроси его выйти перед изменением',
+    'room-shared-opening':'Проём соединяет несколько помещений — сначала измени его',
+    'room-shared-boundary':'Комната соединена с другим полом. Пока её можно копировать, переносить — только отдельную',
+    'room-has-porch':'У комнаты есть крыльцо. Его нужно убрать перед переносом',
+    'room-has-manual-roof':'Сначала убери отдельную секцию крыши над комнатой',
+    'room-target-overlap':'На новом месте уже есть пол или стены',
+    'room-target-occupied':'Новое место пересекает мебель или жителя',
+    'invalid-room-placement':'Выбери свободное место на участке для комнаты'
   };
   const buildFeedback=(msg,invalid=false)=>{
     $('build-feedback').textContent=msg;
@@ -4156,6 +4171,10 @@ function boot() {
     game.world.construction=result.world;
     // IDs of moved wall segments change, so never leave an obsolete selection.
     selectedBuildWall=null;
+    if(pendingBuild?.type==='room-relocate'){
+      selectedBuildRoom=null;selectedBuildRoomInfo=null;
+      $('build-room-label').textContent='Коснись комнаты, чтобы выбрать её';
+    }
     buildWallMarker.enabled=false;
     $('build-wall-controls').hidden=true;
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
@@ -4403,6 +4422,9 @@ function boot() {
   };
   const setBuildTool=type=>{
     clearBuildPending();resetBuildWallSelection();
+    selectedBuildRoom=null;selectedBuildRoomInfo=null;buildRoomRotation=0;
+    $('build-room-label').textContent='Коснись прямоугольной комнаты для выбора';
+    $('build-room-turn').textContent='⟳ Поворот 0°';
     selectedBuildOpening=null;selectedBuildRoof=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
     const wantRoof=type.startsWith('roof-')||(type==='camera'&&roofPreview);
@@ -4425,6 +4447,7 @@ function boot() {
     const openings=['door','window','arch','change-opening'];
     $('build-opening-picker').hidden=!openings.includes(type);
     if(openings.includes(type))refreshBuildOpenings();
+    $('build-room-controls').hidden=!['room-duplicate','room-relocate'].includes(type);
     $('build-roof-picker').hidden=!type.startsWith('roof-');
     if(type.startsWith('roof-'))refreshBuildRoofs();
     $('build-height-picker').hidden=type!=='wall-height';
@@ -4443,6 +4466,8 @@ function boot() {
       camera:'Свайп одним пальцем — перемещение камеры; двумя — поворот и масштаб',
       'move-wall':'Коснись любой стены дома — старой или новой — и перенеси её пальцем либо кнопкой +0,5 м.',
       room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
+      'room-duplicate':'Коснись пустой прямоугольной комнаты, затем свободного места для копии. Перед подтверждением можно повернуть её.',
+      'room-relocate':'Коснись отдельной пустой комнаты, затем нового места. Существующие предметы и картины защищены.',
       floor:'Протяни область, чтобы увеличить пол без перегородки',
       wall:'Протяни по прямой, чтобы построить стену',
       door:'Выбери дизайн и коснись стены для установки двери',
@@ -4476,6 +4501,17 @@ function boot() {
     if(type==='paint-facade-all')
       stageBuild({type:'paint-facade',scope:'all',materialId:finishFacade});
   };
+  $('build-room-turn').addEventListener('click',()=>{
+    buildRoomRotation=(buildRoomRotation+90)%360;
+    $('build-room-turn').textContent='⟳ Поворот '+buildRoomRotation+'°';
+    clearBuildPending();
+    buildFeedback(selectedBuildRoom?'Поворот '+buildRoomRotation+'° · коснись нового места':'Сначала выбери комнату');
+  });
+  $('build-room-reset').addEventListener('click',()=>{
+    selectedBuildRoom=null;selectedBuildRoomInfo=null;clearBuildPending();
+    $('build-room-label').textContent='Коснись прямоугольной комнаты для выбора';
+    buildFeedback('Выделение снято · выбери другую комнату');
+  });
   document.querySelectorAll('[data-build-tool]').forEach(btn=>
     btn.addEventListener('click',()=>setBuildTool(btn.dataset.buildTool)));
   document.querySelectorAll('[data-build-walls]').forEach(btn=>
@@ -4601,7 +4637,36 @@ function boot() {
     const {from,to,wallEdge,hit}=buildDrag;
     buildDrag=null;
     const type=buildTool;
-    if(['door','window','arch','erase-wall','remove-opening','change-opening'].includes(type)){
+    if(type==='room-duplicate'||type==='room-relocate'){
+      const point=hit||from;
+      if(!selectedBuildRoom){
+        const selected=constructionRoomSelection(game.world.construction,point);
+        if(!selected.ok){
+          buildFeedback(buildingReason[selected.reason]||selected.reason,true);
+        }else{
+          selectedBuildRoom={x:point.x,z:point.z};selectedBuildRoomInfo=selected.room;
+          const room=selected.room;
+          $('build-room-label').textContent='Комната '+(room.width*.5).toFixed(1)+
+            ' × '+(room.height*.5).toFixed(1)+' м · '+(room.cells.length*.25).toFixed(1)+' м²';
+          buildGhost.setPosition((room.i0+room.i1)*.25,.084,(room.j0+room.j1)*.25);
+          buildGhost.setLocalScale(room.width*.5,.09,room.height*.5);
+          buildGhost.enabled=true;
+          buildFeedback('Комната выделена · коснись нового места на участке');
+        }
+      }else{
+        const cmd={type,source:selectedBuildRoom,at:point,rotation:buildRoomRotation};
+        if(stageBuild(cmd)){
+          const room=selectedBuildRoomInfo;
+          const rw=buildRoomRotation%180===0?room.width:room.height;
+          const rh=buildRoomRotation%180===0?room.height:room.width;
+          const i=Math.round(point.x*2)-Math.floor(rw/2);
+          const j=Math.round(point.z*2)-Math.floor(rh/2);
+          buildGhost.setPosition((i+rw/2)*.5,.084,(j+rh/2)*.5);
+          buildGhost.setLocalScale(rw*.5,.09,rh*.5);
+          buildGhost.enabled=true;
+        }
+      }
+    }else if(['door','window','arch','erase-wall','remove-opening','change-opening'].includes(type)){
       const target=buildWallAtScreen(gesturePoint(event))||
         nearestConstructionEdge(game.world.construction,to,.75);
       if(type==='change-opening'){

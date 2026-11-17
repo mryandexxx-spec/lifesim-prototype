@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
@@ -20,7 +20,7 @@
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
       "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3-f4f2-f4g2",
       "./src/painting.js":"./src/painting.js?v=1.2u.16-h5c",
-      "./src/construction.js":"./src/construction.js?v=1.2u-f5b3-f5b4-f5c1-f5c2",
+      "./src/construction.js":"./src/construction.js?v=1.2u-f5b3-f5b4-f5c1-f5c2-f5d1",
        "./src/painting-visual.js":"./src/painting-visual.js?v=1.2u-h5asafe",
        "./src/painting-gallery.js":"./src/painting-gallery.js?v=1.2u-h5b-20261117-f5a3",
        "./src/meshy-painting-runtime.js":"./src/meshy-painting-runtime.js?v=1.2u-h5asafe",
@@ -123,11 +123,13 @@
 
 
     <section id="build-editor" class="build-editor" aria-label="Строительство дома" hidden>
-      <div class="build-head"><div><small>F5-C · ОДИН ЭТАЖ · СВОБОДНАЯ СТРОЙКА</small><h2>Строительство</h2></div><button type="button" id="build-exit">✓ В жизнь</button></div>
+      <div class="build-head"><div><small>F5-D.1 · ОДИН ЭТАЖ · СВОБОДНАЯ СТРОЙКА</small><h2>Строительство</h2></div><button type="button" id="build-exit">✓ В жизнь</button></div>
       <p id="build-instruction">Камера: свайп одним пальцем передвигает дом, двумя — поворот и масштаб. Для строительства выбери инструмент.</p>
       <div class="build-tools" role="group" aria-label="Инструменты строительства">
         <button type="button" data-build-tool="camera" aria-pressed="true">✥ Камера · свайп</button>
         <button type="button" data-build-tool="room">▣ Комната</button>
+        <button type="button" data-build-tool="room-duplicate">⧉ Копировать комнату</button>
+        <button type="button" data-build-tool="room-relocate">⇢ Перенести комнату</button>
         <button type="button" data-build-tool="move-wall">⇆ Перенести стену</button>
         <button type="button" data-build-tool="floor">▤ Пол</button>
         <button type="button" data-build-tool="wall">┃ Стена</button>
@@ -207,6 +209,12 @@
         </div>
         <div id="build-finish-colors" class="build-finish-colors" role="group" aria-label="Палитра отделки"></div>
         <small id="build-finish-tip">Узоры и направление досок входят в выбранное покрытие.</small>
+      </div>
+      <div id="build-room-controls" class="build-room-controls" hidden>
+        <strong id="build-room-label">Коснись прямоугольной комнаты для выбора</strong>
+        <button type="button" id="build-room-turn">⟳ Поворот 0°</button>
+        <button type="button" id="build-room-reset">Сброс выбора</button>
+        <small>Пока переносятся только пустые отдельные прямоугольные комнаты: стены, проёмы, пол, потолок и отделка. Мебель, жильцы, картины и крыльцо защищены.</small>
       </div>
       <div id="build-wall-controls" class="build-wall-controls" hidden>
         <strong id="build-wall-label">Выбрана стена</strong>
@@ -496,7 +504,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
