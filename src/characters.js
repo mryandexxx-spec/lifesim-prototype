@@ -142,6 +142,10 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   }
   const snack=ball(name+' apple',0,-.23,.12,.20,.17,.20,materials.yellow,elbowPivot[1]);
   const book=box(name+' book',0,-.23,.12,.28,.065,.29,materials.green,elbowPivot[1]);
+  // Visible original brush fallback when a Meshy skinned rig is unavailable.
+  const paintbrush=cylinder(name+' painting brush',0,-.26,.24,.028,.31,.028,
+    materials.wood||materials.dark||materials.green,elbowPivot[1]);
+  paintbrush.setLocalEulerAngles?.(65,0,0);paintbrush.enabled=false;
   snack.enabled=false;book.enabled=false;
   // The privacy costume is an opaque, fully covering bath wrap, never a nude mesh.
   // It is only activated while the resident is hidden by the privacy enclosure.
@@ -153,7 +157,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   return {
     avatar,head,torso,upperBody,pelvis,anklePivot,shoes:shoeMeshes,elbowPivot,
     leftEye:eyes[0],rightEye:eyes[1],brows,mouth:smile,
-    legPivot,kneePivot,armPivot,snack,book,selected,outfitMeshes,showerWrap
+    legPivot,kneePivot,armPivot,snack,book,paintbrush,selected,outfitMeshes,showerWrap
   };
 }
 
