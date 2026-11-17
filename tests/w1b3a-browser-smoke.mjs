@@ -69,9 +69,13 @@ try{
   await page.locator('#career-phone-panel .career-phone-x').click();
   // The touch screen promotion action is exercised after a saved eligible
   // career snapshot; earning those requirements is covered by pure tests.
-  await page.evaluate(key=>{
-    const saved=JSON.parse(localStorage.getItem(key));
+  // Inject at document startup: the live game intentionally writes an
+  // on-unload save, which otherwise replaces a manually seeded localStorage.
+  await page.addInitScript(key=>{
+    const saved=JSON.parse(localStorage.getItem(key)||'null');
+    if(!saved?.careerSystem?.byResident?.alex)return;
     const contract=saved.careerSystem.byResident.alex;
+    if(contract.level!==0||contract.workedShifts!==1)return;
     contract.currentShift=null;contract.performance=82;contract.rankShifts=3;
     saved.skills.xpById.literature=35;
     localStorage.setItem(key,JSON.stringify(saved));
