@@ -1095,3 +1095,8 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .skill-works strong{font-size:.92rem}
 .skill-works p{margin:0;font-size:.82rem;opacity:.72}
 .skill-work{font-size:.82rem;padding:7px 8px;border-radius:8px;background:rgba(138,163,141,.10)}
+
+/* H5b: touch-size gallery actions, separate from the shared gift inventory. */
+.skill-work-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px;align-items:center}
+.skill-work-actions button,.skill-work-actions select{min-height:42px;border:1px solid #a5aa91;border-radius:10px;background:#fcf8e8;color:#28392e;padding:7px 10px;font:inherit;font-size:13px;max-width:100%}
+.skill-work-actions button:active{background:#dcebd8}

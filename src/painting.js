@@ -57,10 +57,16 @@ export function restoreCreatedWorks(raw,ownerId){
     ids.add(work.id);
     const normalized={id:work.id,ownerId,easelInstanceId:work.easelInstanceId,
       contentId:work.contentId,seed:work.seed,quality:work.quality,createdAt:round(work.createdAt)};
-    if(work.kind==='artwork'&&work.location==='studio'){
-      normalized.kind='artwork';normalized.location='studio';
-      normalized.origin=validOrigin(work.origin)
-        ?{x:work.origin.x,z:work.origin.z,yaw:work.origin.yaw}:null;
+    if(work.kind==='artwork'&&['studio','inventory','wall'].includes(work.location)){
+      // H5b: a single durable work changes location; never duplicate its ID.
+      // Older studio-only saves and legacy collection entries still load.
+      if(work.location==='wall'&&(!Number.isInteger(work.wallSlot)||
+          work.wallSlot<0||work.wallSlot>7))continue;
+      normalized.kind='artwork';normalized.location=work.location;
+      if(validOrigin(work.origin))normalized.origin=
+        {x:work.origin.x,z:work.origin.z,yaw:work.origin.yaw};
+      else if(work.location==='studio')normalized.origin=null;
+      if(work.location==='wall')normalized.wallSlot=work.wallSlot;
     }
     works.push(normalized);
     if(works.length>PAINT_WORKS_LIMIT)works.shift();
