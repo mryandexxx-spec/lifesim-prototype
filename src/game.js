@@ -3661,7 +3661,7 @@ function boot() {
   };
   const selectBuildWall=wall=>{
     resetBuildWallSelection();
-    if(!wall){buildFeedback('Коснись любой построенной стены, чтобы выделить её',true);return;}
+    if(!wall){buildFeedback('Выбери стену новой комнаты. Исходные декоративные стены пока защищены; для расширения открытой стороны используй «Пол».',true);return;}
     selectedBuildWall=wall.id;
     const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
     const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
@@ -3754,7 +3754,7 @@ function boot() {
     buildMode=true;setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
     // Show the eastern expansion area within the narrow portrait viewport.
-    setView({...view,centerX:11.5,centerZ:0,distance:36,pitch:64});
+    setView({...view,centerX:14.5,centerZ:0,distance:36,pitch:64});
     document.querySelector('.app-shell').dataset.buildMode='true';
     $('build-editor').hidden=false;
     $('build-toggle').setAttribute('aria-pressed','true');
@@ -3962,6 +3962,8 @@ function boot() {
         const raw=editorFloorAt(point);
         const pickWall=['move-wall','door','window','erase-wall','remove-opening'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
+        if(pickWall&&!wallEdge&&buildTool==='move-wall')
+          buildFeedback('Нажми на стену построенной комнаты для выбора или свайпни по пустому месту для камеры');
         // Swiping empty background pans even when a wall tool is selected.
         if(raw&&(!pickWall||wallEdge)){
           const from=buildSnap(raw);
