@@ -171,7 +171,7 @@ test('Safari import map busts every modified H2 dependency, not only the game en
     const key='./src/'+name+'.js';
     assert.ok(imports[key],key+' must be independently cache-busted');
     const expected={'household':'?v=1.2w-h2b-f4d-h3-f4e-h4-h5-f4f',
-      'furniture-layout':'?v=1.2v-f4d-f4e',
+      'furniture-layout':'?v=1.2v-f4d-f4e-f4f1',
       'furniture-editor':'?v=1.2u-h2fix1-f4c',
       'furniture-shop':'?v=1.2v-f4d-f4e'};
     assert.equal(new URL(imports[key],base).search,expected[name]);
