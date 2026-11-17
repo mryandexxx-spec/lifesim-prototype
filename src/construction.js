@@ -537,26 +537,34 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     const source=new Set(room.cells),boundary=new Set(room.wallIds);
     const rect={minX:room.i0*BUILD_STEP,minZ:room.j0*BUILD_STEP,
       maxX:room.i1*BUILD_STEP,maxZ:room.j1*BUILD_STEP};
-    // Neither shop products nor legacy fixtures/artworks may be silently
-    // duplicated or deleted. F5-D.2 handles furniture as a separate atomic
-    // household transaction after object IDs, inventory and action locks.
+    // F5-D.3a: copying duplicates the *structural blueprint only*.
+    // All source furniture, paid SKU instances, paintings, queued actions,
+    // actors and porch attachments stay untouched in the original room.
+    // Relocation is different: it must transfer supported furniture in one
+    // household transaction and must never sever a porch/painting anchor.
     const carriedIds=type==='room-relocate'?new Set(movableFurnitureIds):new Set();
-    if(furniture.some(item=>!carriedIds.has(item.instanceId)&&item?.location==='home'&&
-        finite(item.x)&&finite(item.z)&&item.x>=rect.minX&&item.x<rect.maxX&&
-        item.z>=rect.minZ&&item.z<rect.maxZ)||
-      furnitureBoxes.some(box=>!carriedIds.has(box.instanceId)&&overlap(rect,box)))
-      return fail('room-has-furniture');
-    if(wallDecor.some(item=>finite(item?.x)&&finite(item?.z)&&
-      item.x>=rect.minX-.6&&item.x<=rect.maxX+.6&&
-      item.z>=rect.minZ-.6&&item.z<=rect.maxZ+.6))
-      return fail('room-has-art');
-    if(residents.some(item=>finite(item?.x)&&finite(item?.z)&&
-      item.x>=rect.minX&&item.x<rect.maxX&&item.z>=rect.minZ&&item.z<rect.maxZ))
-      return fail('room-has-resident');
+    if(type==='room-relocate'){
+      if(furniture.some(item=>!carriedIds.has(item.instanceId)&&item?.location==='home'&&
+          finite(item.x)&&finite(item.z)&&item.x>=rect.minX&&item.x<rect.maxX&&
+          item.z>=rect.minZ&&item.z<rect.maxZ)||
+        furnitureBoxes.some(box=>!carriedIds.has(box.instanceId)&&overlap(rect,box)))
+        return fail('room-has-furniture');
+      if(wallDecor.some(item=>finite(item?.x)&&finite(item?.z)&&
+        item.x>=rect.minX-.6&&item.x<=rect.maxX+.6&&
+        item.z>=rect.minZ-.6&&item.z<=rect.maxZ+.6))
+        return fail('room-has-art');
+      if(residents.some(item=>finite(item?.x)&&finite(item?.z)&&
+        item.x>=rect.minX&&item.x<rect.maxX&&
+        item.z>=rect.minZ&&item.z<rect.maxZ))
+        return fail('room-has-resident');
+    }
     const openingSet=openings.filter(o=>o.edgeIds.some(id=>boundary.has(id)));
     if(openingSet.some(o=>o.edgeIds.some(id=>!boundary.has(id))))
       return fail('room-shared-opening');
-    if(porches.some(p=>openingSet.some(o=>o.id===p.openingId)))
+    // A source porch is linked to the *old* immutable door ID. A copied
+    // opening gets a new ID and intentionally does not get a porch.
+    // For relocation, the porch must still block until it can move atomically.
+    if(type==='room-relocate'&&porches.some(p=>openingSet.some(o=>o.id===p.openingId)))
       return fail('room-has-porch');
     if(type==='room-relocate'){
       // Do not pull a shared wall out of an attached house; use push/pull
