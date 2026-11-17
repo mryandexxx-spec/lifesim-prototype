@@ -78,7 +78,7 @@ try{
   await phone.getByRole('button',{name:'Подписать договор'}).click();
   const dual=await state();
   assert.equal(dual.careerSystem.byResident.mira.careerId,'civic-service');
-  assert.equal(dual.careerSystem.byResident.alex.careerId,'editorial');
+  assert.equal(dual.careerSystem.byResident.alex.careerId,'art-studio');
   assert.notEqual(dual.careerSystem.byResident.alex.employmentId,
     dual.careerSystem.byResident.mira.employmentId);
   assert.equal(dual.shop.credits,initial.shop.credits);
@@ -87,7 +87,7 @@ try{
   await page.locator('#career-phone-toggle').click();
   assert.ok(await page.locator('#career-phone-panel').getByText(/Результативность:/).isVisible());
   const restored=await state();
-  assert.equal(restored.careerSystem.byResident.alex.careerId,'editorial');
+  assert.equal(restored.careerSystem.byResident.alex.careerId,'art-studio');
   assert.equal(restored.careerSystem.byResident.mira.careerId,'civic-service');
   assert.equal(restored.shop.credits,initial.shop.credits);
   await page.locator('#career-phone-panel .career-phone-x').click();
