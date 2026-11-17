@@ -22,7 +22,7 @@ import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js'
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
-import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID} from './painting.js';
+import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES} from './painting.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -1514,22 +1514,8 @@ function boot() {
   const decorNodes=new Map();
   const decorTemplates=new Map();
   const f4eOriginalPositions=new WeakMap();
-  // H5: three original 2D brush compositions layered onto the actual canvas.
-  // Their meshes are created once per bought easel; only visibility changes.
-  const paintingShapes={
-    'painting.hills':[
-      ['box',0,1.51,.74,.71,0],['sphere',.25,1.65,.18,.18,3],
-      ['sphere',-.23,1.29,.69,.37,1],['sphere',.24,1.20,.67,.35,4],
-      ['box',0,1.01,.73,.19,2],['box',-.12,1.06,.18,.09,3]],
-    'painting.garden':[
-      ['box',0,1.52,.73,.70,0],['box',0,1.07,.73,.24,1],
-      ['box',-.25,1.29,.055,.47,4],['sphere',-.25,1.55,.28,.25,2],
-      ['box',.22,1.32,.05,.47,4],['sphere',.22,1.53,.27,.27,3]],
-    'painting.city':[
-      ['box',0,1.54,.74,.67,0],['sphere',.25,1.69,.20,.20,3],
-      ['box',-.25,1.18,.25,.43,4],['box',0,1.25,.19,.53,2],
-      ['box',.24,1.16,.25,.40,1],['box',0,.99,.74,.14,4]]
-  };
+  // H5: bounded brush compositions come from the testable data-only catalog.
+  // Meshes are created once per bought easel; only visibility changes.
   let decorDrawing=null;
   let refreshSofaSeat=()=>{};
   const withDecor=(prefabId,render)=>{
@@ -1562,7 +1548,7 @@ function boot() {
         PROCEDURAL_DEFAULT_SKU[item.prefabId]);
       if(item.prefabId==='easel'){
         for(const contentId of PAINT_CONTENT_IDS){
-          paintingShapes[contentId].forEach(([kind,x,y,sx,sy,paletteIndex],i)=>{
+          PAINT_COMPOSITION_SHAPES[contentId].forEach(([kind,x,y,sx,sy,paletteIndex],i)=>{
             const color=PAINT_SUBJECTS[contentId].palette[paletteIndex];
             const stroke=primitive(kind,'H5 paint '+contentId+' '+i,
               x,y,-.181-i*.0007,sx,sy,.009,mat(color),node);

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {HOBBY_SKILLS,HOBBY_CONTENT,HOBBY_ACTIVITIES} from '../src/hobby-reading.js';
 import {PAINT_ACTIVITY_ID,PAINT_SKILL_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,
-  PAINT_WORKS_LIMIT,restoreCreatedWorks,finishPainting} from '../src/painting.js';
+  PAINT_WORKS_LIMIT,PAINT_CANVAS_BOUNDS,PAINT_COMPOSITION_SHAPES,
+  restoreCreatedWorks,finishPainting} from '../src/painting.js';
 import {getActivityDefinition} from '../src/activity-registry.js';
 import {getHobbyContent} from '../src/hobby-content.js';
 import {currentSkillLevel} from '../src/skills-engine.js';
@@ -35,6 +36,35 @@ function reach(root,actor,id){
   assert.ok(destination,'A* uses a real easel-local anchor');
   actor.position={...destination};arrive(actor);
 }
+test('H5.1 all authored 3D strokes stay inside the easel canvas at every yaw',()=>{
+  // Base easel.starter blank canvas: width .78, height .99 at y=1.37.
+  // Shrink by a safety margin so hill silhouettes cannot overrun frame edges.
+  const canvas={minX:-.39,maxX:.39,minY:.875,maxY:1.865};
+  assert.ok(PAINT_CANVAS_BOUNDS.minX>canvas.minX);
+  assert.ok(PAINT_CANVAS_BOUNDS.maxX<canvas.maxX);
+  assert.ok(PAINT_CANVAS_BOUNDS.minY>canvas.minY);
+  assert.ok(PAINT_CANVAS_BOUNDS.maxY<canvas.maxY);
+  assert.deepEqual(Object.keys(PAINT_COMPOSITION_SHAPES).sort(),[...PAINT_CONTENT_IDS].sort());
+  for(const id of PAINT_CONTENT_IDS){
+    const strokes=PAINT_COMPOSITION_SHAPES[id];
+    assert.ok(strokes.length>0,id);
+    for(const [kind,x,y,width,height,paletteIndex] of strokes){
+      assert.ok(['box','sphere'].includes(kind),id);
+      assert.ok([x,y,width,height].every(Number.isFinite),id);
+      assert.ok(width>0&&height>0,id);
+      assert.ok(Number.isInteger(paletteIndex)&&paletteIndex>=0&&
+        paletteIndex<PAINT_SUBJECTS[id].palette.length,id);
+      assert.ok(x-width/2>=PAINT_CANVAS_BOUNDS.minX-1e-9,id+' overflows left');
+      assert.ok(x+width/2<=PAINT_CANVAS_BOUNDS.maxX+1e-9,id+' overflows right');
+      assert.ok(y-height/2>=PAINT_CANVAS_BOUNDS.minY-1e-9,id+' overflows bottom');
+      assert.ok(y+height/2<=PAINT_CANVAS_BOUNDS.maxY+1e-9,id+' overflows top');
+    }
+  }
+  const source=file('../src/game.js');
+  assert.match(source,/PAINT_COMPOSITION_SHAPES\[contentId\]\.forEach/);
+  assert.doesNotMatch(source,/const paintingShapes=/,'avoid duplicate untested shapes');
+});
+
 test('H5 physical purchased easel, capability and original 3D model',()=>{
   const root=newHousehold();
   assert.equal(FURNITURE_CATALOG.easel.templateOnly,true);
