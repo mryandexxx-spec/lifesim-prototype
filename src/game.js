@@ -16,6 +16,8 @@ import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds} from './construction.js';
+import {ROOF_STYLES,ROOF_MATERIALS,ROOF_PITCHES,ROOF_EAVES,
+  roofContains,roofMeshGeometry} from './roof-construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
@@ -1902,8 +1904,9 @@ function boot() {
     box('baseboard left',-4.83,.16,0,.13,.18,8.5,M.trim)
   ];
   // F5-A render adapter: construction data is authoritative; no gameplay geometry in PlayCanvas.
-  let constructionWallMode='cut',renderedConstruction=null,renderedWallMode='',ceilingPreview=false;
-  const constructionNodes=[];
+  let constructionWallMode='cut',renderedConstruction=null,renderedWallMode='',
+    ceilingPreview=false,roofPreview=false,renderedRoofPreview=false;
+  const constructionNodes=[],roofMeshes=[];
   // Hinges are renderer-only; the navigation graph always uses the authoritative
   // physical opening. A nearby resident gently swings a real panel open.
   const automaticDoors=[];
@@ -1916,6 +1919,8 @@ function boot() {
   const clearConstructionNodes=()=>{
     for(const node of constructionNodes)node.destroy();
     constructionNodes.length=0;automaticDoors.length=0;
+    for(const mesh of roofMeshes)mesh.destroy();
+    roofMeshes.length=0;
   };
   const buildBox=(name,x,y,z,sx,sy,sz,material)=>{
     const node=box(name,x,y,z,sx,sy,sz,material);
@@ -1944,6 +1949,37 @@ function boot() {
     }else if(pattern==='panels'){
       detail('F5-B.4 lower panelling',.64,1.18,finishMaterial('wall.sand'));
       detail('F5-B.4 panel cornice',1.26,.076,patternTrim);
+    }
+  };
+  const roofPalette=new Map();
+  const renderConstructionRoofs=state=>{
+    if(!buildMode||!roofPreview)return;
+    for(const roof of state.roofModules||[]){
+      const color=ROOF_MATERIALS[roof.materialId]?.color;
+      if(!color)continue;
+      if(!roofPalette.has(roof.materialId)){
+        const m=mat(color);m.cull=pc.CULLFACE_NONE;m.update();
+        roofPalette.set(roof.materialId,m);
+      }
+      const shape=roofMeshGeometry(roof);
+      const mesh=new pc.Mesh(app.graphicsDevice);
+      mesh.setPositions(shape.positions);
+      mesh.setIndices(shape.indices);
+      mesh.setNormals(pc.calculateNormals(shape.positions,shape.indices));
+      mesh.update();
+      const entity=new pc.Entity('F5-C.1 '+roof.styleId+' '+roof.id);
+      entity.addComponent('render',{
+        meshInstances:[new pc.MeshInstance(mesh,roofPalette.get(roof.materialId))]
+      });
+      app.root.addChild(entity);constructionNodes.push(entity);roofMeshes.push(mesh);
+      // Fascia follows every section edge, reinforcing the roof silhouette.
+      const x0=roof.i0*.5-roof.eaves,x1=roof.i1*.5+roof.eaves;
+      const z0=roof.j0*.5-roof.eaves,z1=roof.j1*.5+roof.eaves;
+      const cx=(x0+x1)/2,cz=(z0+z1)/2;
+      for(const z of [z0,z1])
+        buildBox('F5-C roof fascia X',cx,3.025,z,x1-x0,.09,.085,M.trim);
+      for(const x of [x0,x1])
+        buildBox('F5-C roof fascia Z',x,3.025,cz,.085,.09,z1-z0,M.trim);
     }
   };
   const drawConstructionFinishes=state=>{
@@ -2089,8 +2125,10 @@ function boot() {
   };
   const syncConstructionRender=(force=false)=>{
     const state=game.world.construction;
-    if(!force&&renderedConstruction===state&&renderedWallMode===constructionWallMode)return;
+    if(!force&&renderedConstruction===state&&renderedWallMode===constructionWallMode&&
+      renderedRoofPreview===roofPreview)return;
     renderedConstruction=state;renderedWallMode=constructionWallMode;
+    renderedRoofPreview=roofPreview;
     clearConstructionNodes();
     lotGround.enabled=buildMode;
     const raised=constructionWallMode!=='down';
@@ -2188,6 +2226,7 @@ function boot() {
         buildBox('F5 starter right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
       }
       drawConstructionFinishes(state);
+      renderConstructionRoofs(state);
       return;
     }
     const grid=.5,base=new Set();
@@ -2346,6 +2385,7 @@ function boot() {
       }else createLeaf(variantId,-width/2,width,1);
     }
     drawConstructionFinishes(state);
+    renderConstructionRoofs(state);
     // UP mode adds former open-front boundaries for an exterior view only.
     // These are cosmetic: no surprise path block in legacy saves.
     if(exterior){
