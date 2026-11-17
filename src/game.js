@@ -15,7 +15,9 @@ import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, cho
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
-  BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds} from './construction.js';
+  BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
+  constructionExteriorSegments,constructionPorches,
+  BUILD_WALL_HEIGHTS,BUILD_FACADE_FINISHES,BUILD_PORCH_FINISHES} from './construction.js';
 import {ROOF_STYLES,ROOF_MATERIALS,ROOF_PITCHES,ROOF_EAVES,
   roofContains,roofMeshGeometry} from './roof-construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
@@ -1930,7 +1932,8 @@ function boot() {
   const buildFinishMaterials=new Map();
   const finishMaterial=id=>{
     if(!buildFinishMaterials.has(id)){
-      const definition=BUILD_FINISHES[id.startsWith('floor.')?'floor':id.startsWith('ceiling.')?'ceiling':'wall'][id];
+      const definition=id.startsWith('facade.')?BUILD_FACADE_FINISHES[id]:
+        BUILD_FINISHES[id.startsWith('floor.')?'floor':id.startsWith('ceiling.')?'ceiling':'wall'][id];
       buildFinishMaterials.set(id,mat(definition.color));
     }
     return buildFinishMaterials.get(id);
@@ -1952,6 +1955,101 @@ function boot() {
     }
   };
   const roofPalette=new Map();
+  // Exterior entrance platforms are traversable via the pure construction
+  // footprint, yet never included in the indoor automatic roof footprint.
+  const renderConstructionPorches=state=>{
+    for(const porch of constructionPorches(state)){
+      const r=porch.footprint,definition=BUILD_PORCH_FINISHES[porch.materialId];
+      if(!r||!definition)continue;
+      if(!buildFinishMaterials.has(porch.materialId))
+        buildFinishMaterials.set(porch.materialId,mat(definition.color));
+      const finish=buildFinishMaterials.get(porch.materialId),accent=M.trim;
+      const x0=r.i0*.5,x1=r.i1*.5,z0=r.j0*.5,z1=r.j1*.5,
+        x=(x0+x1)/2,z=(z0+z1)/2;
+      const name='F5-C.2 porch '+porch.id;
+      buildBox(name+' deck',x,-.125,z,x1-x0,.27,z1-z0,finish);
+      const end=r.axis==='h'?(r.outward>0?z1:z0):(r.outward>0?x1:x0);
+      const breadth=r.axis==='h'?x1-x0:z1-z0;
+      for(let level=0;level<2;level++){
+        const at=end+(level+.5)*r.outward*.30;
+        buildBox(name+' stairs',r.axis==='h'?x:at,-.27-level*.14,
+          r.axis==='h'?at:z,r.axis==='h'?breadth:.3,.14,
+          r.axis==='v'?breadth:.3,finish);
+      }
+      const h=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
+      const doorway=r.axis==='h'?(r.outward>0?z0:z1):
+        (r.outward>0?x0:x1);
+      const canopy=doorway+r.outward*.44;
+      buildBox(name+' entrance canopy',r.axis==='h'?x:canopy,h-.20,
+        r.axis==='h'?canopy:z,r.axis==='h'?breadth:.9,.12,
+        r.axis==='v'?breadth:.9,finish);
+      for(const sign of [-1,1]){
+        const along=r.axis==='h'?x+sign*(breadth/2-.14):z+sign*(breadth/2-.14);
+        const outer=doorway+r.outward*.81;
+        buildBox(name+' support post',r.axis==='h'?along:outer,
+          (h-.27)/2,r.axis==='v'?along:outer,.085,h-.27,.085,accent);
+      }
+    }
+  };
+  const addFacadePattern=(id,axis,center,across,span,outward,height)=>{
+    const type=BUILD_FACADE_FINISHES[id]?.pattern;
+    if(!type)return;
+    const pos=across+outward*.14,accent=M.trim;
+    const line=(y,thick)=>buildBox('F5-C.2 facade course',
+      axis==='h'?center:pos,y,axis==='v'?center:pos,
+      axis==='h'?span:.019,thick,axis==='v'?span:.019,accent);
+    if(type==='brick'||type==='clapboard'){
+      const count=type==='brick'?8:12;
+      for(let k=1;k<count;k++)line(height*k/count,.024);
+    }else if(type==='stone'){
+      for(const fract of [.27,.54,.81])line(height*fract,.032);
+    }else if(type==='timber'){
+      const count=Math.min(12,Math.max(2,Math.ceil(span/1.4)));
+      for(let k=0;k<=count;k++){
+        const along=center-span/2+span*k/count;
+        buildBox('F5-C.2 facade timber batten',
+          axis==='h'?along:pos,height/2,axis==='v'?along:pos,
+          axis==='h'?.054:.018,height-.14,axis==='v'?.054:.018,accent);
+      }
+    }
+  };
+  const drawConstructionFacades=state=>{
+    if(constructionWallMode==='down')return;
+    const coatings=state.materials?.facade||{},opened=constructionOpeningEdgeIds(state);
+    const h=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
+    const grouped=new Map();
+    for(const wall of constructionExteriorSegments(state)){
+      if(opened.has(wall.id))continue;
+      const id=coatings[wall.id];if(!BUILD_FACADE_FINISHES[id])continue;
+      const coordinate=wall.starterSide
+        ?(wall.starterSide==='north'?-4.34+starterShellOffset(state,'north')
+          :wall.starterSide==='south'?4.34+starterShellOffset(state,'south')
+          :wall.starterSide==='west'?-4.97+starterShellOffset(state,'west')
+          :14.25+starterShellOffset(state,'east'))
+        :(wall.axis==='h'?wall.j:wall.i)*.5;
+      if(constructionWallMode==='cut'&&(wall.axis==='h'?coordinate>0:coordinate>14))continue;
+      const key=wall.axis+'|'+coordinate+'|'+wall.outward+'|'+id;
+      if(!grouped.has(key))grouped.set(key,{axis:wall.axis,coordinate,
+        outward:wall.outward,id,points:[]});
+      grouped.get(key).points.push(wall.axis==='h'?wall.i:wall.j);
+    }
+    for(const {axis,coordinate,outward,id,points} of grouped.values()){
+      points.sort((a,b)=>a-b);
+      let start=points[0],prev=start;
+      const flush=()=>{
+        const span=(prev-start+1)*.5,center=(start+prev+1)*.25;
+        const face=coordinate+outward*.106;
+        buildBox('F5-C.2 real facade '+id,axis==='h'?center:face,h/2,
+          axis==='v'?center:face,axis==='h'?span:.027,h-.12,
+          axis==='v'?span:.027,finishMaterial(id));
+        addFacadePattern(id,axis,center,coordinate,span,outward,h-.12);
+      };
+      for(const next of [...points.slice(1),Infinity]){
+        if(next===prev+1){prev=next;continue;}
+        flush();start=next;prev=next;
+      }
+    }
+  };
   const renderConstructionRoofs=state=>{
     if(!buildMode||!roofPreview)return;
     for(const roof of state.roofModules||[]){
@@ -1961,7 +2059,8 @@ function boot() {
         const m=mat(color);m.cull=pc.CULLFACE_NONE;m.update();
         roofPalette.set(roof.materialId,m);
       }
-      const shape=roofMeshGeometry(roof);
+      const wallHeight=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
+      const shape=roofMeshGeometry(roof,{wallHeight});
       const mesh=new pc.Mesh(app.graphicsDevice);
       mesh.setPositions(shape.positions);
       mesh.setIndices(shape.indices);
@@ -1977,9 +2076,9 @@ function boot() {
       const z0=roof.j0*.5-roof.eaves,z1=roof.j1*.5+roof.eaves;
       const cx=(x0+x1)/2,cz=(z0+z1)/2;
       for(const z of [z0,z1])
-        buildBox('F5-C roof fascia X',cx,3.025,z,x1-x0,.09,.085,M.trim);
+        buildBox('F5-C roof fascia X',cx,wallHeight+.125,z,x1-x0,.09,.085,M.trim);
       for(const x of [x0,x1])
-        buildBox('F5-C roof fascia Z',x,3.025,cz,.085,.09,z1-z0,M.trim);
+        buildBox('F5-C roof fascia Z',x,wallHeight+.125,cz,.085,.09,z1-z0,M.trim);
     }
   };
   const drawConstructionFinishes=state=>{
