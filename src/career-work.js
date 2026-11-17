@@ -178,7 +178,7 @@ export function residentWorkStatus(root,id){
     return {phase:'pending',label:'Смена '+clockAt(shift.start)+'–'+clockAt(shift.end)+
       (at>=shift.start?' · опаздывает':' · скоро') ,end:shift.end};
   const planned=nextCareerShift(root.calendar,contract,Math.max(0,at));
-  return {phase:'idle',label:'Следующая смена: '+(planned
+  return {phase:'idle',label:'Ожидает: '+(planned
     ?planned.iso+' '+clockAt(planned.start)+'–'+clockAt(planned.end):'не назначена'),
     end:planned?.end??null};
 }
