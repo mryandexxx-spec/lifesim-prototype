@@ -173,6 +173,40 @@ try{
  await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
  const finishAfter=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
  assert.deepEqual(finishAfter.world.construction.materials,finishSaved.world.construction.materials);
+  // F5-B.2: actual touch on the published PlayCanvas opening editor, not
+ // only headless domain functions. Build entry restores the default mobile pose.
+ await page.locator('#build-toggle').click();
+ await page.locator('[data-build-tool="arch"]').click();
+ assert.ok(await page.locator('#build-opening-picker').isVisible());
+ await page.locator('[data-opening-style="arch.wide"]').click();
+ const portalTouch=project(18.5,0);
+ assert.ok(portalTouch.x>0&&portalTouch.x<390&&portalTouch.y>95&&portalTouch.y<570,
+   'F5-B.2 wall target must be inside the iPhone viewport');
+ await send('pointerdown',portalTouch,'canvas');
+ await send('pointerup',portalTouch,'window');
+ assert.ok(await page.locator('#build-pending').isVisible(),
+   'F5-B.2 arched opening must stage from an actual pointer tap');
+ await page.locator('#build-apply').click();
+ const archSaved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+ const arch=archSaved.world.construction.openings.find(o=>o.styleId==='arch.wide');
+ assert.ok(arch,'New 2m arch persists its style');
+ assert.equal(arch.edgeIds.length,4);
+ await page.locator('[data-build-tool="change-opening"]').click();
+ await send('pointerdown',portalTouch,'canvas');
+ await send('pointerup',portalTouch,'window');
+ assert.match(await page.locator('#build-opening-label').innerText(),/замену/);
+ await page.locator('[data-opening-style="door.double"]').click();
+ assert.ok(await page.locator('#build-pending').isVisible());
+ await page.locator('#build-apply').click();
+ const replacement=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+ assert.equal(replacement.world.construction.openings.find(o=>o.id===arch.id)?.styleId,'door.double');
+ await page.screenshot({path:'f5b2-browser-openings.png'});
+ await page.locator('#build-exit').click();
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
+ const restoredOpening=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+ assert.equal(restoredOpening.world.construction.openings.find(o=>o.id===arch.id)?.type,'door');
+ assert.equal(restoredOpening.world.construction.openings.find(o=>o.id===arch.id)?.styleId,'door.double');
   console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));
  assert.deepEqual(errors,[],'Real PlayCanvas/ES module browser runtime must not error');
