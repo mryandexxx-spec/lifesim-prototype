@@ -1902,7 +1902,7 @@ function boot() {
     box('baseboard left',-4.83,.16,0,.13,.18,8.5,M.trim)
   ];
   // F5-A render adapter: construction data is authoritative; no gameplay geometry in PlayCanvas.
-  let constructionWallMode='cut',renderedConstruction=null,renderedWallMode='';
+  let constructionWallMode='cut',renderedConstruction=null,renderedWallMode='',ceilingPreview=false;
   const constructionNodes=[];
   // Hinges are renderer-only; the navigation graph always uses the authoritative
   // physical opening. A nearby resident gently swings a real panel open.
@@ -1925,10 +1925,26 @@ function boot() {
   const buildFinishMaterials=new Map();
   const finishMaterial=id=>{
     if(!buildFinishMaterials.has(id)){
-      const definition=BUILD_FINISHES[id.startsWith('floor.')?'floor':'wall'][id];
+      const definition=BUILD_FINISHES[id.startsWith('floor.')?'floor':id.startsWith('ceiling.')?'ceiling':'wall'][id];
       buildFinishMaterials.set(id,mat(definition.color));
     }
     return buildFinishMaterials.get(id);
+  };
+  // Renderer-only geometry; furniture, navigation and AI remain independent.
+  const patternTrim=mat('#907966');
+  const addWallPattern=(id,axis,center,line,span,face,offset)=>{
+    const pattern=BUILD_FINISHES.wall[id]?.pattern;
+    if(!pattern)return;
+    const surface=line+(face==='a'?-1:1)*offset;
+    const detail=(name,y,height,material)=>buildBox(name,
+      axis==='h'?center:surface,y,axis==='v'?center:surface,
+      axis==='h'?span:.027,height,axis==='v'?span:.027,material);
+    if(pattern==='stripes'){
+      for(const y of [.81,1.73,2.48])detail('F5-B.4 striped wallpaper',y,.034,patternTrim);
+    }else if(pattern==='panels'){
+      detail('F5-B.4 lower panelling',.64,1.18,finishMaterial('wall.sand'));
+      detail('F5-B.4 panel cornice',1.26,.076,patternTrim);
+    }
   };
   const drawConstructionFinishes=state=>{
     const finish=state.materials||{};
@@ -1950,6 +1966,58 @@ function boot() {
         (j+.5)*.5,(last-lo+1)*.5,.026,.5,finishMaterial(id));
       for(const i of [...values.slice(1),Infinity]){
         if(i===last+1){last=i;continue;}draw();lo=i;last=i;
+      }
+    }
+    // Group pattern strokes into long runs: no one-mesh-per-tile storm.
+    const patternRows=new Map(),patternCols=new Map();
+    const register=(map,fixed,index,pattern)=>{
+      const key=fixed+'|'+pattern;
+      if(!map.has(key))map.set(key,{fixed,pattern,values:[]});
+      map.get(key).values.push(index);
+    };
+    for(const [key,id] of Object.entries(finish.floor||{})){
+      const pattern=BUILD_FINISHES.floor[id]?.pattern;
+      if(!pattern)continue;
+      const [i,j]=key.split(',').map(Number);
+      if(pattern==='planks-x'||pattern==='mosaic')register(patternRows,j,i,pattern);
+      if(pattern==='planks-z'||pattern==='mosaic')register(patternCols,i,j,pattern);
+    }
+    const patternRuns=(groups,axis)=>{
+      for(const {fixed,pattern,values} of groups.values()){
+        values.sort((a,b)=>a-b);
+        let lo=values[0],last=lo;
+        const flush=()=>{
+          const span=(last-lo+1)*.5,mid=(lo+last+1)*.25;
+          const at=(fixed+(pattern==='mosaic'?1:.5))*.5;
+          buildBox('F5-B.4 '+pattern+' '+axis,
+            axis==='x'?mid:at,.082,axis==='z'?mid:at,
+            axis==='x'?span:.016,.012,axis==='z'?span:.016,patternTrim);
+        };
+        for(const next of [...values.slice(1),Infinity]){
+          if(next===last+1){last=next;continue;}
+          flush();lo=next;last=next;
+        }
+      }
+    };
+    patternRuns(patternRows,'x');patternRuns(patternCols,'z');
+    // Ceiling is visible only on explicit request in Build; never in Life.
+    if(buildMode&&ceilingPreview){
+      const ceilings=new Map();
+      for(const [key,id] of Object.entries(finish.ceiling||{})){
+        if(!BUILD_FINISHES.ceiling[id])continue;
+        const [i,j]=key.split(',').map(Number),group=j+'|'+id;
+        if(!ceilings.has(group))ceilings.set(group,{j,id,values:[]});
+        ceilings.get(group).values.push(i);
+      }
+      for(const {j,id,values} of ceilings.values()){
+        values.sort((a,b)=>a-b);
+        let lo=values[0],last=lo;
+        const flush=()=>buildBox('F5-B.4 ceiling '+id,(lo+last+1)*.25,
+          2.835,(j+.5)*.5,(last-lo+1)*.5,.065,.5,finishMaterial(id));
+        for(const next of [...values.slice(1),Infinity]){
+          if(next===last+1){last=next;continue;}
+          flush();lo=next;last=next;
+        }
       }
     }
     if(constructionWallMode==='down')return;
@@ -1975,6 +2043,7 @@ function boot() {
           axis==='h'?mid:position*.5+side*.081,1.42,
           axis==='v'?mid:position*.5+side*.081,
           axis==='h'?span:.02,2.72,axis==='v'?span:.02,finishMaterial(id));
+         addWallPattern(id,axis,mid,position*.5,span,face,.109);
       };
       for(const i of [...values.slice(1),Infinity]){
         if(i===last+1){last=i;continue;}draw();lo=i;last=i;
@@ -2009,6 +2078,7 @@ function boot() {
             axis==='h'?center:renderLine[side]+offset,1.42,
             axis==='v'?center:renderLine[side]+offset,
             axis==='h'?span:.023,2.68,axis==='v'?span:.023,finishMaterial(id));
+           addWallPattern(id,axis,center,renderLine[side],span,face,.124);
         };
         for(const next of sorted.slice(1)){
           if(point(next)===point(last)+1){last=next;continue;}
@@ -3145,7 +3215,7 @@ function boot() {
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
-  let finishFloor='floor.oak',finishWall='wall.sage',finishSide='both';
+  let finishFloor='floor.oak',finishWall='wall.sage',finishCeiling='ceiling.chalk',finishSide='both';
   const openingChoice={door:'door.simple',window:'window.classic',arch:'arch.round'};
   let selectedBuildOpening=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
@@ -4008,8 +4078,9 @@ function boot() {
   $('build-wall-deselect').addEventListener('click',resetBuildWallSelection);
    const buildFinishPalette=$('build-finish-colors');
   const refreshBuildFinishes=()=>{
-    const kind=buildTool==='paint-wall'?'wall':'floor';
-    const selected=kind==='wall'?finishWall:finishFloor;
+    const kind=buildTool==='paint-wall'?'wall':
+      buildTool.startsWith('paint-ceiling')?'ceiling':'floor';
+    const selected=kind==='wall'?finishWall:kind==='ceiling'?finishCeiling:finishFloor;
     buildFinishPalette.replaceChildren();
     for(const [id,definition] of Object.entries(BUILD_FINISHES[kind])){
       const button=document.createElement('button');
@@ -4022,7 +4093,7 @@ function boot() {
       const title=document.createElement('small');title.textContent=definition.label;
       button.append(chip,title);
       button.addEventListener('click',()=>{
-        if(kind==='wall')finishWall=id;else finishFloor=id;
+        if(kind==='wall')finishWall=id;else if(kind==='ceiling')finishCeiling=id;else finishFloor=id;
         refreshBuildFinishes();
         buildFeedback('Материал выбран: '+definition.label+' · коснись поверхности');
       });
@@ -4030,7 +4101,12 @@ function boot() {
     }
     $('build-finish-side-label').hidden=kind!=='wall';
     $('build-finish-side').value=finishSide;
-    $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':'Покрытие пола';
+    $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':
+      kind==='ceiling'?'Покрытие потолка':'Покрытие пола';
+    $('build-finish-tip').textContent=kind==='wall'
+      ?'Полосы и панели рисуются процедурно на обеих сторонах стены.'
+      :kind==='ceiling'?'Для просмотра включи «Потолок».'
+      :'Направление досок и мозаика — отдельные образцы.';
   };
   $('build-finish-side').addEventListener('change',event=>{finishSide=event.target.value;});
   const buildOpeningPalette=$('build-opening-variants');
@@ -4073,8 +4149,14 @@ function boot() {
     clearBuildPending();resetBuildWallSelection();
     selectedBuildOpening=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
+    const wantCeiling=type.startsWith('paint-ceiling');
+    if(wantCeiling!==ceilingPreview){
+      ceilingPreview=wantCeiling;
+      $('build-ceiling-toggle').setAttribute('aria-pressed',String(ceilingPreview));
+      syncConstructionRender(true);
+    }
     $('build-editor').dataset.tool=type;
-    const finishes=['paint-floor','paint-room','paint-wall','sample-finish'];
+    const finishes=['paint-floor','paint-room','paint-wall','paint-ceiling-room','paint-ceiling-tile','sample-finish'];
     $('build-finish-picker').hidden=!finishes.includes(type);
     if(finishes.includes(type))refreshBuildFinishes();
     const openings=['door','window','arch','change-opening'];
@@ -4097,7 +4179,9 @@ function boot() {
       'remove-floor':'Протяни область пола, которую нужно убрать',
       'paint-floor':'Выбери покрытие и коснись одной плитки пола. Затем «Применить».',
       'paint-room':'Выбери покрытие и коснись комнаты — зальём весь её пол.',
-      'paint-wall':'Выбери цвет, затем коснись стены — окрасим всю непрерывную стену.',
+      'paint-wall':'Выбери обои или панели, затем коснись любой стены.',
+      'paint-ceiling-room':'Выбери цвет и коснись пола комнаты — отделаем потолок над ней.',
+      'paint-ceiling-tile':'Выбери цвет и коснись плитки — отделаем потолок над ней.',
       'sample-finish':'Пипетка: коснись уже отделанной поверхности, чтобы взять её покрытие.'
     };
     $('build-instruction').textContent=tips[type]||'Выбери инструмент';
@@ -4113,6 +4197,12 @@ function boot() {
       syncConstructionRender(true);
       buildFeedback('Видимость стен: '+btn.textContent);
     }));
+  $('build-ceiling-toggle').addEventListener('click',()=>{
+    ceilingPreview=!ceilingPreview;
+    $('build-ceiling-toggle').setAttribute('aria-pressed',String(ceilingPreview));
+    syncConstructionRender(true);
+    buildFeedback(ceilingPreview?'Потолок виден':'Потолок скрыт для обзора комнат');
+  });
   for(const type of ['undo','redo'])$('build-'+type).addEventListener('click',()=>{
     clearBuildPending();
     if(!buildSession)return;
@@ -4121,7 +4211,9 @@ function boot() {
   });
   const exitBuild=()=>{
     if(!buildMode)return;
-    buildMode=false;buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
+    buildMode=false;ceilingPreview=false;
+    $('build-ceiling-toggle').setAttribute('aria-pressed','false');
+    buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
     cameraGesture.clear();setCameraBuildBounds();
     if(buildPreviousView)setView(buildPreviousView);
     buildPreviousView=null;
@@ -4141,7 +4233,8 @@ function boot() {
     buildSession=createConstructionEditor(game.world.construction);
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
-    buildTool='camera';
+    buildTool='camera';ceilingPreview=false;
+    $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     // Restore the previously tested camera gesture path unchanged:
     // entering Build explicitly selects pan, without altering shop VM listeners.
     oneFingerMode='pan';showCameraMode();
@@ -4215,6 +4308,9 @@ function boot() {
     }else if(type==='paint-floor'||type==='paint-room'){
       stageBuild({type:'paint-floor',at:hit||from,materialId:finishFloor,
         scope:type==='paint-room'?'room':'tile'});
+    }else if(type==='paint-ceiling-room'||type==='paint-ceiling-tile'){
+      stageBuild({type:'paint-ceiling',at:hit||from,materialId:finishCeiling,
+        scope:type==='paint-ceiling-room'?'room':'tile'});
     }else if(type==='paint-wall'){
       const target=wallEdge||buildWallAtScreen(gesturePoint(event));
       stageBuild({type:'paint-wall',edgeId:target?.id,materialId:finishWall,

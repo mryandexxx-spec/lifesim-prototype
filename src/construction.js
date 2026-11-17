@@ -13,7 +13,10 @@ export const BUILD_FINISHES=Object.freeze({
     'floor.ash':{label:'Светлый ясень',color:'#d6c2a4'},
     'floor.tile':{label:'Слоновая керамика',color:'#ece7d9'},
     'floor.slate':{label:'Графитовая плитка',color:'#788688'},
-    'floor.clay':{label:'Терракота',color:'#be8469'}
+    'floor.clay':{label:'Терракота',color:'#be8469'},
+    'floor.planks-x':{label:'Доски вдоль дома',color:'#bb956e',pattern:'planks-x'},
+    'floor.planks-z':{label:'Доски поперёк',color:'#bb956e',pattern:'planks-z'},
+    'floor.mosaic':{label:'Мозаика',color:'#d6cab0',pattern:'mosaic'}
   }),
   wall:Object.freeze({
     'wall.default':{label:'Исходные стены',color:'#f5ebda'},
@@ -22,7 +25,16 @@ export const BUILD_FINISHES=Object.freeze({
     'wall.blue':{label:'Тихий голубой',color:'#a6c5cf'},
     'wall.rose':{label:'Пудровый розовый',color:'#ddbaa9'},
     'wall.olive':{label:'Мягкая олива',color:'#b9bc8a'},
-    'wall.sand':{label:'Песчаная штукатурка',color:'#c8b497'}
+    'wall.sand':{label:'Песчаная штукатурка',color:'#c8b497'},
+    'wall.stripes':{label:'Обои с полосами',color:'#d8e1d2',pattern:'stripes'},
+    'wall.panels':{label:'Стеновые панели',color:'#d7c5a9',pattern:'panels'}
+  }),
+  ceiling:Object.freeze({
+    'ceiling.default':{label:'Без отделки',color:'#f5eee0'},
+    'ceiling.chalk':{label:'Меловой белый',color:'#f4f1e7'},
+    'ceiling.cream':{label:'Сливочный',color:'#e8ddc7'},
+    'ceiling.sage':{label:'Дымчатый шалфей',color:'#c5d1bc'},
+    'ceiling.blue':{label:'Светлый небесный',color:'#d4e3e7'}
   })
 });
 // F5-B.2: stable, license-free procedural opening designs. The width is
@@ -208,6 +220,15 @@ export function restoreConstructionWorld(raw){
         stored[side]=faces[side];
       if(Object.keys(stored).length)materials.wall[key]=stored;
     }
+  // Optional F5-B.4 extension: old v1 saves retain their floor/wall shape.
+  const rawCeiling=raw.materials?.ceiling;
+  if(rawCeiling&&typeof rawCeiling==='object'&&!Array.isArray(rawCeiling)){
+    const ceiling={};
+    for(const [key,id] of Object.entries(rawCeiling).slice(0,4000))
+      if(floors.has(key)&&Object.hasOwn(BUILD_FINISHES.ceiling,id)&&
+        id!=='ceiling.default')ceiling[key]=id;
+    if(Object.keys(ceiling).length)materials.ceiling=ceiling;
+  }
   return {...initial,materials,revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
     legacy:raw.legacy===true&&walls.length===0&&openings.length===0&&starterRemoved.length===0&&
       starterSolidSides.length===0&&floors.size===initial.floorCells.length&&
@@ -537,6 +558,21 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     if(!target)return fail('invalid-finish-target');
     for(const k of target)if(command.materialId==='floor.default')delete materials.floor[k];
       else materials.floor[k]=command.materialId;
+  }else if(type==='paint-ceiling'){
+    const at=command.at;
+    if(!finite(at?.x)||!finite(at?.z))return fail('invalid-finish-target');
+    const key=cell(floorIndex(at.x),floorIndex(at.z));
+    if(!floors.has(key))return fail('finish-needs-floor');
+    if(!Object.hasOwn(BUILD_FINISHES.ceiling,command.materialId))return fail('unknown-finish');
+    const target=command.scope==='room'
+      ?constructionRooms(world).find(room=>room.cells.includes(key))?.cells
+      :command.scope==='tile'?[key]:null;
+    if(!target)return fail('invalid-finish-target');
+    const ceiling={...(materials.ceiling||{})};
+    for(const k of target)if(command.materialId==='ceiling.default')delete ceiling[k];
+      else ceiling[k]=command.materialId;
+    if(Object.keys(ceiling).length)materials.ceiling=ceiling;
+    else delete materials.ceiling;
   }else if(type==='paint-wall'){
     const id=command.edgeId,starter=Object.hasOwn(STARTER_SIDE,starterSide(id));
     const materialKey=starter?'starter:'+starterSide(id):id;
@@ -616,6 +652,10 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   }else return fail('unsupported-command');
   if(floors.size>4000||walls.size>5000)return fail('too-large');
   for(const k of Object.keys(materials.floor))if(!floors.has(k))delete materials.floor[k];
+  if(materials.ceiling){
+    for(const k of Object.keys(materials.ceiling))if(!floors.has(k))delete materials.ceiling[k];
+    if(!Object.keys(materials.ceiling).length)delete materials.ceiling;
+  }
   for(const k of Object.keys(materials.wall))if(!walls.has(k)&&
     !['starter:west','starter:east','starter:north','starter:south'].includes(k))
       delete materials.wall[k];
@@ -640,7 +680,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     if(furnitureBoxes.some(r=>overlap(volume,r)))return fail('wall-intersects-furniture');
   }
   const next={...world,revision:world.revision+1,
-    legacy:type==='paint-floor'||type==='paint-wall'?world.legacy:false,
+    legacy:['paint-floor','paint-wall','paint-ceiling'].includes(type)?world.legacy:false,
     materials,nextId,floorCells:[...floors],
     starterShell,starterOwned:[...starterOwned],starterRemoved:[...starterRemoved],
     starterSolidSides:[...starterSolidSides],wallEdges:[...walls.values()],openings};
