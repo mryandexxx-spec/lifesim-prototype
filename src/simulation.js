@@ -11,6 +11,7 @@ import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
+import {kitchenRecipe} from './kitchen.js';
 import {validReadingJourneyAction,finishReadingMinutes} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {preferenceAffinity} from './trait-catalog.js';
@@ -26,6 +27,13 @@ export const ACTIONS = Object.freeze({
   // F4F: a real fridge-to-purchased-chair dining journey; hunger only during bites.
   dining: { label:'Пообедать за столом',need:'hunger',duration:31,
     benefitPerMinute:1.55,location:[0,-1.5] },
+  // F4G: cooking never directly feeds or rewards skills in the generic tick.
+  cook: {label:'Приготовить блюдо',need:'fun',duration:32,
+    benefitPerMinute:0,location:[0,-1.08]},
+  prep: {label:'Осмотреть рабочую поверхность',need:'fun',duration:12,
+    benefitPerMinute:0,location:[0,-1.04]},
+  wash: {label:'Вымыть посуду',need:'fun',duration:14,
+    benefitPerMinute:0,location:[0,-1.05]},
   // F4E: actual nearby utility interactions, no fictional need/XP boosts.
   lamp: { label:'Переключить свет',need:'fun',duration:5,benefitPerMinute:0,location:[0,-.90] },
   mirror: { label:'Причесаться у зеркала',need:'fun',duration:17,benefitPerMinute:0,location:[0,-.88] },
@@ -92,6 +100,27 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
         if((next.action.phase==='using')!==['taking','eating'].includes(data.action.diningStage))
           next.action=null;
       }else next.action=null;
+    }
+    if(next.action&&data.action.id==='dining'&&
+      data.action.portionTaken===true&&kitchenRecipe(data.action.cookedRecipeId)){
+      next.action.portionTaken=true;
+      next.action.cookedRecipeId=data.action.cookedRecipeId;
+    }
+    // Kitchen journey is optional in the v1 save; malformed/stale state never
+    // grants a dish, XP or phantom resources when restored.
+    if(next.action&&data.action.id==='cook'){
+      if(!kitchenRecipe(data.action.recipeId)||
+        !validFurnitureInstanceId(data.action.prepInstanceId)||
+        !['toFridge','taking','toPrep','preparing','toStove','cooking']
+          .includes(data.action.cookStage)||
+        (data.action.phase==='using')!==
+          ['taking','preparing','cooking'].includes(data.action.cookStage))
+        next.action=null;
+      else{
+        next.action.recipeId=data.action.recipeId;
+        next.action.prepInstanceId=data.action.prepInstanceId;
+        next.action.cookStage=data.action.cookStage;
+      }
     }
     if(next.action&&data.action.id==='lamp'&&data.action.lampSwitched===true)
       next.action.lampSwitched=true;
@@ -193,6 +222,30 @@ export function tick(state, minutes,world=state?.world??null) {
   refreshMind(state,world);
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
+    // F4G: three physical kitchen stages. No hunger rewards while cooking,
+    // walking or preparing. Completion is committed atomically by household.
+    if(state.action.id==='cook'){
+      const stage=state.action.cookStage;
+      const recipe=kitchenRecipe(state.action.recipeId);
+      const budget=stage==='taking'?5:stage==='preparing'?8:
+        stage==='cooking'?recipe?.cookMinutes:0;
+      if(!budget){state.action=null;return;}
+      state.action.elapsed+=Math.min(minutes,Math.max(0,budget-state.action.elapsed));
+      if(state.action.elapsed>=budget){
+        if(stage==='cooking'){
+          state.event='Приготовлено: '+recipe.label;
+          rememberAction(state,'cook');
+          state.autonomy.nextAt=state.minutes+7;
+          state.action=null;
+        }else{
+          state.action.phase='walking';
+          state.action.cookStage=stage==='taking'?'toPrep':'toStove';
+          state.action.elapsed=0;
+          state.event=stage==='taking'?'Несёт продукты к столешнице':'Идёт к плите';
+        }
+      }
+      return;
+    }
     // F4F: collect a real portion at the fridge before walking to the chair.
     // No hunger reward during collection or transit.
     if(state.action.id==='dining'&&state.action.diningStage==='taking'){
@@ -212,6 +265,10 @@ export function tick(state, minutes,world=state?.world??null) {
     // Preserve the previous total benefit by concentrating it in the bite phase.
     let gained=(hobby?.needEffects.find(effect=>effect.statId==='needs.fun')?.perMinute
       ??definition.benefitPerMinute)*amount;
+    if(state.action.id==='dining'&&state.action.portionTaken===true){
+      const cooked=kitchenRecipe(state.action.cookedRecipeId);
+      if(cooked)gained*=cooked.hungerFactor;
+    }
     if(state.action.id==='fridge'){
       const eatFrom=definition.duration*FRIDGE_EAT_START;
       const before=Math.max(0,state.action.elapsed-eatFrom);
@@ -251,7 +308,7 @@ export function tick(state, minutes,world=state?.world??null) {
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
-        (!['seat','dining','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['seat','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
