@@ -54,8 +54,15 @@ export const STARTER_SHELL=Object.freeze({
   west:BASE.minI,east:BASE.maxI,north:BASE.minJ,south:BASE.maxJ
 });
 const STARTER_SIDE=Object.freeze({west:-1,east:1,north:-1,south:1});
-const starterSide=id=>typeof id==='string'&&id.startsWith('starter:')
-  ?id.slice(8):null;
+// Original-house walls have the same per-cell identity as constructed walls.
+// Stable orthogonal indices survive moving the entire starter side.
+const starterSide=id=>typeof id==='string'
+  ?(/^starter:(west|east|north|south)(?::-?[0-9]+)?$/.exec(id)?.[1]||null):null;
+const starterEdgeId=(side,index)=>'starter:'+side+':'+index;
+const starterIndex=id=>{
+  const match=/^starter:(west|east|north|south):(-?[0-9]+)$/.exec(id||'');
+  return match?Number(match[2]):null;
+};
 function validStarter(raw){
   if(!raw||!Object.keys(STARTER_SHELL).every(k=>Number.isSafeInteger(raw[k])))
     return {...STARTER_SHELL};
@@ -69,10 +76,32 @@ function validStarter(raw){
 export function starterShellSegments(world){
   const s=validStarter(world?.starterShell),segments=[];
   for(let j=s.north;j<s.south;j++)for(const [side,i] of [['west',s.west],['east',s.east]])
-    segments.push({id:'starter:'+side,axis:'v',i,j,starterSide:side});
+    segments.push({id:starterEdgeId(side,j),axis:'v',i,j,starterSide:side,sideId:'starter:'+side});
   for(let i=s.west;i<s.east;i++)for(const [side,j] of [['north',s.north],['south',s.south]])
-    segments.push({id:'starter:'+side,axis:'h',i,j,starterSide:side});
+    segments.push({id:starterEdgeId(side,i),axis:'h',i,j,starterSide:side,sideId:'starter:'+side});
   return segments;
+}
+export function constructionWallSegments(world){
+  const state=world?.construction||world;
+  const removed=new Set(state?.starterRemoved||[]);
+  return [...(state?.wallEdges||[]),...starterShellSegments(state).filter(w=>!removed.has(w.id))];
+}
+// One physical wall may carry both a pre-F5-A structural edge and a
+// virtual starter edge (e.g. east boundary of the old home + new room).
+// An opening cuts the SAME place through both render/collision layers.
+export function constructionOpeningEdgeIds(world,types=null){
+  const state=world?.construction||world,ids=new Set();
+  for(const opening of state?.openings||[])
+    if(!types||types.includes(opening.type))
+      for(const id of opening.edgeIds)ids.add(id);
+  if(!ids.size)return ids;
+  for(const wall of starterShellSegments(state)){
+    const physical=edge(wall.axis,wall.i,wall.j);
+    if(ids.has(wall.id)||ids.has(physical)){
+      ids.add(wall.id);ids.add(physical);
+    }
+  }
+  return ids;
 }
 export function starterShellOffset(world,side){
   const s=validStarter(world?.starterShell);
@@ -87,7 +116,10 @@ const clone=v=>JSON.parse(JSON.stringify(v));
 const topologyCache=new WeakMap();
 function topology(state){
   let found=topologyCache.get(state);
-  if(!found){found={floors:new Set(state.floorCells),doors:new Set(state.openings.filter(o=>o.type==='door'||o.type==='arch').flatMap(o=>o.edgeIds))};topologyCache.set(state,found);}
+  if(!found){found={floors:new Set(state.floorCells),
+    doors:constructionOpeningEdgeIds(state,['door','arch']),
+    removed:new Set(state.starterRemoved||[]),solid:new Set(state.starterSolidSides||[])};
+    topologyCache.set(state,found);}
   return found;
 }
 const fail=reason=>({ok:false,reason});
@@ -98,7 +130,7 @@ export function newConstructionWorld(){
   for(let i=BASE.minI;i<BASE.maxI;i++)for(let j=BASE.minJ;j<BASE.maxJ;j++)floorCells.push(cell(i,j));
   return {schema:1,revision:0,lot:{...BUILD_LOT},step:BUILD_STEP,floorCells,wallEdges:[],openings:[],
     materials:{floor:{},wall:{}},roofModules:[],legacy:true,nextId:1,
-    starterShell:{...STARTER_SHELL},starterOwned:[]};
+    starterShell:{...STARTER_SHELL},starterOwned:[],starterRemoved:[],starterSolidSides:[]};
 }
 export function restoreConstructionWorld(raw){
   const initial=newConstructionWorld();
@@ -126,6 +158,11 @@ export function restoreConstructionWorld(raw){
     const key=cell(i,j);
     if(!floors.has(key)){floors.add(key);if(!isBase(i,j))owned.add(key);}
   }
+  const virtual=new Set(starterShellSegments({starterShell:shell}).map(w=>w.id));
+  const starterRemoved=Array.isArray(raw.starterRemoved)&&raw.starterRemoved.length<500
+    ?[...new Set(raw.starterRemoved.filter(id=>typeof id==='string'&&virtual.has(id)))]:[];
+  const starterSolidSides=Array.isArray(raw.starterSolidSides)
+    ?[...new Set(raw.starterSolidSides.filter(side=>side==='east'||side==='south'))]:[];
   const walls=[],keys=new Set();
   for(const value of raw.wallEdges){
     if(!value||!['h','v'].includes(value.axis)||!Number.isSafeInteger(value.i)||!Number.isSafeInteger(value.j)||
@@ -139,7 +176,7 @@ export function restoreConstructionWorld(raw){
     if(!rawOpening||!['door','window','arch'].includes(rawOpening.type)||
       typeof rawOpening.id!=='string'||openingKeys.has(rawOpening.id)||
       !Array.isArray(rawOpening.edgeIds)||rawOpening.edgeIds.length<1||
-      rawOpening.edgeIds.length>4||!rawOpening.edgeIds.every(k=>keys.has(k)))return initial;
+      rawOpening.edgeIds.length>4||!rawOpening.edgeIds.every(k=>(keys.has(k)||virtual.has(k))&&!starterRemoved.includes(k)))return initial;
     openingKeys.add(rawOpening.id);
     const ids=[...new Set(rawOpening.edgeIds)];
     // Old F5-A door/window records intentionally keep their missing styleId,
@@ -149,6 +186,10 @@ export function restoreConstructionWorld(raw){
       ?rawOpening.styleId:null;
     openings.push({id:rawOpening.id,type:rawOpening.type,edgeIds:ids,
       ...(styleId?{styleId}:{})});
+  }
+  for(const o of openings)for(const id of o.edgeIds){
+    const side=starterSide(id);
+    if((side==='east'||side==='south')&&!starterSolidSides.includes(side))starterSolidSides.push(side);
   }
   // Restore only known finite finish IDs attached to real surfaces. Unknown
   // palette IDs or retired wall/floor coordinates must not poison a v1 save.
@@ -168,9 +209,10 @@ export function restoreConstructionWorld(raw){
       if(Object.keys(stored).length)materials.wall[key]=stored;
     }
   return {...initial,materials,revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
-    legacy:raw.legacy===true&&walls.length===0&&floors.size===initial.floorCells.length&&
+    legacy:raw.legacy===true&&walls.length===0&&openings.length===0&&starterRemoved.length===0&&
+      starterSolidSides.length===0&&floors.size===initial.floorCells.length&&
       Object.keys(STARTER_SHELL).every(k=>shell[k]===STARTER_SHELL[k]),
-    starterShell:shell,starterOwned:[...owned],
+    starterShell:shell,starterOwned:[...owned],starterRemoved,starterSolidSides,
     nextId:Number.isSafeInteger(raw.nextId)&&raw.nextId>=1&&raw.nextId<1e8?raw.nextId:1,
     floorCells:[...floors],wallEdges:walls,openings};
 }
@@ -185,13 +227,27 @@ export function constructionContains(world,x,z){
 export function constructionWallAt(world,x,z,radius=.26){
   const state=world?.construction||world;
   if(!state||state.legacy)return false;
-  const opened=topology(state).doors;
-  const starter=validStarter(state.starterShell);
-  const west=starter.west*BUILD_STEP,north=starter.north*BUILD_STEP;
-  if((Math.abs(x-west)<radius+.055&&
-      z>=starter.north*BUILD_STEP-radius&&z<=starter.south*BUILD_STEP+radius)||
-     (Math.abs(z-north)<radius+.055&&
-      x>=starter.west*BUILD_STEP-radius&&x<=starter.east*BUILD_STEP+radius))return true;
+  const topo=topology(state),opened=topo.doors;
+  // East/south were cosmetic cutaway in historic saves. An explicit user
+  // opening turns that side into a real wall with a proper navigation portal.
+  const shell=validStarter(state.starterShell);
+  const clear=(side,index)=>topo.removed.has(starterEdgeId(side,index))||
+    opened.has(starterEdgeId(side,index))||
+    ((side==='east'||side==='south')&&!topo.solid.has(side));
+  for(const side of ['west','east']){
+    const i=shell[side],j=floorIndex(z),xx=i*BUILD_STEP;
+    if(Math.abs(x-xx)<radius+.055)for(const at of [j-1,j,j+1])
+      if(at>=shell.north&&at<shell.south&&
+        z>=at*BUILD_STEP-radius&&z<=(at+1)*BUILD_STEP+radius&&
+        !clear(side,at))return true;
+  }
+  for(const side of ['north','south']){
+    const j=shell[side],i=floorIndex(x),zz=j*BUILD_STEP;
+    if(Math.abs(z-zz)<radius+.055)for(const at of [i-1,i,i+1])
+      if(at>=shell.west&&at<shell.east&&
+        x>=at*BUILD_STEP-radius&&x<=(at+1)*BUILD_STEP+radius&&
+        !clear(side,at))return true;
+  }
   for(const w of state.wallEdges){
     if(opened.has(w.id))continue;
     const bx=w.i*BUILD_STEP,bz=w.j*BUILD_STEP;
@@ -229,7 +285,7 @@ export function constructionWallOutward(world,edgeId){
 export function nearestConstructionEdge(world,point,maxDistance=.38){
   if(!finite(point?.x)||!finite(point?.z))return null;
   let best=null,distance=Infinity;
-  for(const w of world.wallEdges){
+  for(const w of constructionWallSegments(world)){
     const a=w.i*BUILD_STEP,b=w.j*BUILD_STEP;
     const d=w.axis==='h'
       ?Math.hypot(point.x-Math.max(a,Math.min(a+BUILD_STEP,point.x)),point.z-b)
@@ -244,8 +300,10 @@ function segmentsForOpening(walls,at,sections){
   if(!at)return null;
   const offsets=sections===4?[[-1,0,1,2],[-2,-1,0,1]]:[[-1,0,1]];
   for(const sequence of offsets){
-    const ids=sequence.map(d=>edge(at.axis,at.i+(at.axis==='h'?d:0),
-      at.j+(at.axis==='v'?d:0)));
+    const ids=sequence.map(d=>at.starterSide
+      ?starterEdgeId(at.starterSide,(at.axis==='h'?at.i:at.j)+d)
+      :edge(at.axis,at.i+(at.axis==='h'?d:0),
+        at.j+(at.axis==='v'?d:0)));
     if(ids.every(id=>walls.has(id)))return ids;
   }
   return null;
@@ -272,13 +330,56 @@ function buildRect(a,b){
   return {cells,walls};
 }
 /** Pure preview; no state, queue, furniture, money or localStorage mutation. */
-export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[]}={}){
+export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[],wallDecor=[]}={}){
   const world=restoreConstructionWorld(raw);
   if(!command||typeof command.type!=='string')return fail('invalid-command');
   let floors=new Set(world.floorCells),walls=new Map(world.wallEdges.map(w=>[w.id,w]));
   let openings=[...world.openings],nextId=world.nextId;
   const materials=clone(world.materials);
   let starterShell={...world.starterShell},starterOwned=new Set(world.starterOwned);
+  const starterRemoved=new Set(world.starterRemoved||[]);
+  const starterSolidSides=new Set(world.starterSolidSides||[]);
+  const starterEdges=()=>starterShellSegments({starterShell}).filter(w=>!starterRemoved.has(w.id));
+  const allWalls=()=>new Map([...walls,...starterEdges().map(w=>[w.id,w])]);
+  const physicalEdgeIds=ids=>{
+    const known=allWalls();
+    return new Set(ids.map(id=>{
+      const e=known.get(id);
+      return e?edge(e.axis,e.i,e.j):id;
+    }));
+  };
+  const overlapsOpening=(ids,except=null)=>{
+    const positions=physicalEdgeIds(ids);
+    return openings.some(o=>o.id!==except&&
+      [...physicalEdgeIds(o.edgeIds)].some(id=>positions.has(id)));
+  };
+  const openingFitsDecor=ids=>{
+    const records=ids.map(id=>allWalls().get(id)).filter(Boolean);
+    if(!records.length)return false;
+    // A new structural edge built on the old perimeter is still the SAME
+    // physical surface as its starter counterpart, including its artwork.
+    const side=records[0].starterSide||
+      starterEdges().find(w=>w.axis===records[0].axis&&
+        w.i===records[0].i&&w.j===records[0].j)?.starterSide;
+    if(!side)return true;
+    const first=Math.min(...records.map(e=>(e.axis==='h'?e.i:e.j)*BUILD_STEP));
+    const last=Math.max(...records.map(e=>(e.axis==='h'?e.i:e.j)*BUILD_STEP+BUILD_STEP));
+    // Authored landscape and left-wall bookshelf are not movable shop items:
+    // never delete them to create a doorway. The prebuilt window may be
+    // replaced by hiding its visual mesh, but not its data or identity.
+    if(side==='north'&&first<.92&&last>-.53)return false;
+    if(side==='west'&&first<.90&&last>-.93)return false;
+    const line=starterShell[side]*BUILD_STEP;
+    for(const decor of wallDecor){
+      if(!finite(decor?.x)||!finite(decor?.z))continue;
+      const along=(side==='north'||side==='south')?decor.x:decor.z;
+      const across=(side==='north'||side==='south')?decor.z:decor.x;
+      if(Math.abs(across-line)>.6)continue;
+      const pad=finite(decor.radius)?Math.max(.25,Math.min(1.3,decor.radius)):.43;
+      if(first<along+pad&&last>along-pad)return false;
+    }
+    return true;
+  };
   const type=command.type;
   if(['room','floor','remove-floor'].includes(type)){
     const r=buildRect(command.from,command.to);
@@ -304,6 +405,9 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       openings=openings.filter(o=>o.edgeIds.every(k=>walls.has(k)));
     }else{
       r.cells.forEach(k=>floors.add(k));
+      // Preserve F5-A room-boundary IDs exactly for old saves and A*.
+      // A structure may abut the original cosmetic cutaway, but its
+      // shared wall remains a real, independent partition.
       if(type==='room')r.walls.forEach(w=>walls.set(w.id,w));
     }
   }else if(type==='wall'){
@@ -349,6 +453,14 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
         return fail('starter-strip-occupied');
       floors.delete(k);starterOwned.delete(k);
     }
+    const available=new Set(starterEdges().map(w=>w.id));
+    if(openings.some(o=>o.edgeIds.some(id=>starterSide(id)&&!available.has(id)))||
+      [...starterRemoved].some(id=>{
+        const at=starterIndex(id),s=starterSide(id);
+        return s&&(s==='north'||s==='south'
+          ?at<starterShell.west||at>=starterShell.east
+          :at<starterShell.north||at>=starterShell.south);
+      }))return fail('starter-opening-outside');
     if(side==='west'||side==='north'){
       const line=starterShell[side]*BUILD_STEP,half=.14;
       const corridor=side==='west'
@@ -427,6 +539,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       else materials.floor[k]=command.materialId;
   }else if(type==='paint-wall'){
     const id=command.edgeId,starter=Object.hasOwn(STARTER_SIDE,starterSide(id));
+    const materialKey=starter?'starter:'+starterSide(id):id;
     const target=walls.get(id);
     if(!starter&&!target)return fail('wall-not-found');
     if(!Object.hasOwn(BUILD_FINISHES.wall,command.materialId))return fail('unknown-finish');
@@ -445,12 +558,13 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       ids.splice(0,ids.length,...Array.from({length:high-low+1},(_,i)=>byIndex.get(low+i)));
     }
     for(const wallId of ids){
-      const faces={...(materials.wall[wallId]||{})};
+      const selected=starter?materialKey:wallId;
+      const faces={...(materials.wall[selected]||{})};
       for(const face of command.side==='both'||!command.side?['a','b']:[command.side])
         if(command.materialId==='wall.default')delete faces[face];
         else faces[face]=command.materialId;
-      if(Object.keys(faces).length)materials.wall[wallId]=faces;
-      else delete materials.wall[wallId];
+      if(Object.keys(faces).length)materials.wall[selected]=faces;
+      else delete materials.wall[selected];
     }
   }else if(['erase-wall','door','window','arch','change-opening'].includes(type)){
     if(type==='change-opening'){
@@ -461,29 +575,37 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       // Editing an opening preserves its immutable ID; changing from door to
       // window or vice versa also changes the A* portal on commit, never preview.
       const middle=before.edgeIds[Math.floor((before.edgeIds.length-1)/2)];
-      const anchor=walls.get(middle);
-      const ids=segmentsForOpening(walls,anchor,style.sections);
+      const candidateWalls=allWalls();
+      const anchor=candidateWalls.get(middle);
+      const ids=segmentsForOpening(candidateWalls,anchor,style.sections);
       if(!ids)return fail('opening-needs-wall-space');
-      if(openings.some(o=>o.id!==before.id&&o.edgeIds.some(k=>ids.includes(k))))
-        return fail('opening-overlap');
+      if(overlapsOpening(ids,before.id))return fail('opening-overlap');
+      if(!openingFitsDecor(ids))return fail('wall-has-decor');
       openings=openings.map(o=>o.id===before.id?{
         ...o,type:style.type,styleId:command.styleId,edgeIds:ids
       }:o);
     }else{
-      const found=typeof command.edgeId==='string'?walls.get(command.edgeId):
+      const candidateWalls=allWalls();
+      const found=typeof command.edgeId==='string'?candidateWalls.get(command.edgeId):
         nearestConstructionEdge(world,command.at||{});
       if(!found)return fail('wall-not-found');
       if(type==='erase-wall'){
-        if(openings.some(o=>o.edgeIds.includes(found.id)))return fail('wall-has-opening');
-        walls.delete(found.id);
+        if(overlapsOpening([found.id]))return fail('wall-has-opening');
+        if(found.starterSide){
+          if(!openingFitsDecor([found.id]))return fail('wall-has-decor');
+          starterRemoved.add(found.id);
+        }else walls.delete(found.id);
       }else{
         const styleId=command.styleId||BUILD_DEFAULT_OPENING_STYLE[type];
         const style=BUILD_OPENING_STYLES[styleId];
         if(!style||style.type!==type)return fail('unknown-opening-style');
-        const ids=segmentsForOpening(walls,found,style.sections);
+        const ids=segmentsForOpening(candidateWalls,found,style.sections);
         if(!ids)return fail(style.sections===3
           ?'opening-needs-three-wall-sections':'opening-needs-wall-space');
-        if(openings.some(o=>o.edgeIds.some(k=>ids.includes(k))))return fail('opening-overlap');
+        if(overlapsOpening(ids))return fail('opening-overlap');
+        if(!openingFitsDecor(ids))return fail('wall-has-decor');
+        if(found.starterSide&&(found.starterSide==='east'||found.starterSide==='south'))
+          starterSolidSides.add(found.starterSide);
         openings.push({id:'opening-'+nextId++,type,edgeIds:ids,
           ...(command.styleId?{styleId}:{})});
       }
@@ -497,9 +619,13 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   for(const k of Object.keys(materials.wall))if(!walls.has(k)&&
     !['starter:west','starter:east','starter:north','starter:south'].includes(k))
       delete materials.wall[k];
-  const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),openings,starterShell,materials})!==
+  const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),
+      openings,starterShell,starterRemoved:[...starterRemoved].sort(),
+      starterSolidSides:[...starterSolidSides].sort(),materials})!==
     JSON.stringify({floors:[...world.floorCells].sort(),walls:world.wallEdges.map(w=>w.id).sort(),
-      openings:world.openings,starterShell:world.starterShell,materials:world.materials});
+      openings:world.openings,starterShell:world.starterShell,
+      starterRemoved:[...(world.starterRemoved||[])].sort(),
+      starterSolidSides:[...(world.starterSolidSides||[])].sort(),materials:world.materials});
   if(!changed)return fail('unchanged');
   // A room wall is structural, never allowed through a purchased object,
   // protected kitchen fixture, painting easel or resident's occupied space.
@@ -516,7 +642,8 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   const next={...world,revision:world.revision+1,
     legacy:type==='paint-floor'||type==='paint-wall'?world.legacy:false,
     materials,nextId,floorCells:[...floors],
-    starterShell,starterOwned:[...starterOwned],wallEdges:[...walls.values()],openings};
+    starterShell,starterOwned:[...starterOwned],starterRemoved:[...starterRemoved],
+    starterSolidSides:[...starterSolidSides],wallEdges:[...walls.values()],openings};
   for(const resident of residents)if(finite(resident?.x)&&finite(resident?.z)&&
     (!constructionContains(next,resident.x,resident.z)||constructionWallAt(next,resident.x,resident.z)))return fail('resident-blocked');
   return {ok:true,world:next,diff:{floorCount:next.floorCells.length-world.floorCells.length,
@@ -538,6 +665,12 @@ export function createConstructionEditor(initial){
 export function constructionRooms(world){
   const floors=new Set(world.floorCells),seen=new Set(),rooms=[];
   const barriers=new Set(world.wallEdges.map(w=>w.id));
+  const solid=new Set(world.starterSolidSides||[]),removed=new Set(world.starterRemoved||[]);
+  for(const w of starterShellSegments(world)){
+    if(removed.has(w.id))continue;
+    if((w.starterSide==='east'||w.starterSide==='south')&&!solid.has(w.starterSide))continue;
+    barriers.add(edge(w.axis,w.i,w.j));
+  }
   for(const k of floors){
     if(seen.has(k))continue;
     const queue=[k],part=[];seen.add(k);

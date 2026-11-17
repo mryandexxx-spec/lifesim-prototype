@@ -14,7 +14,7 @@ import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
-  starterShellSegments,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
+  starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
@@ -1889,6 +1889,14 @@ function boot() {
     box('back top trim',4.625,2.91,-4.30,19.35,.13,.2,M.trim),
     box('left top trim',-4.96,2.91,0,.20,.13,8.68,M.trim)
   ];
+  const starterBackWindowNodes=[];
+  const starterBackWindowCovered=state=>{
+    const impacted=new Set([
+      ...constructionOpeningEdgeIds(state),...(state.starterRemoved||[])
+    ]);
+    return starterShellSegments(state).some(w=>w.starterSide==='north'&&
+      impacted.has(w.id)&&w.i*.5<-1.14&&(w.i+1)*.5>-3.22);
+  };
   const legacySkirts=[
     box('baseboard back',4.625,.16,-4.19,19.25,.18,.13,M.trim),
     box('baseboard left',-4.83,.16,0,.13,.18,8.5,M.trim)
@@ -1945,7 +1953,7 @@ function boot() {
       }
     }
     if(constructionWallMode==='down')return;
-    const faces=new Map(),opened=new Set(state.openings.flatMap(o=>o.edgeIds));
+    const faces=new Map(),opened=constructionOpeningEdgeIds(state);
     for(const edge of state.wallEdges){
       if(opened.has(edge.id))continue;
       if(constructionWallMode==='cut'&&
@@ -1972,33 +1980,40 @@ function boot() {
         if(i===last+1){last=i;continue;}draw();lo=i;last=i;
       }
     }
-    // Original decorated walls remain untouched. Their new finishes are
-    // thin detachable faces; H5b paintings keep their own world anchors.
-    const starter=[
-      {side:'north',axis:'h',center:-4.34+starterShellOffset(state,'north'),
-        midX:4.625+(starterShellOffset(state,'west')+starterShellOffset(state,'east'))/2,
-        midZ:0,length:19.27+starterShellOffset(state,'east')-starterShellOffset(state,'west')},
-      {side:'west',axis:'v',center:-4.97+starterShellOffset(state,'west'),
-        midX:0,midZ:(starterShellOffset(state,'north')+starterShellOffset(state,'south'))/2,
-        length:8.65+starterShellOffset(state,'south')-starterShellOffset(state,'north')},
-      {side:'east',axis:'v',center:14.25+starterShellOffset(state,'east'),
-        midX:0,midZ:(starterShellOffset(state,'north')+starterShellOffset(state,'south'))/2,
-        length:8.65+starterShellOffset(state,'south')-starterShellOffset(state,'north')},
-      {side:'south',axis:'h',center:4.34+starterShellOffset(state,'south'),
-        midX:4.625+(starterShellOffset(state,'west')+starterShellOffset(state,'east'))/2,
-        midZ:0,length:19.27+starterShellOffset(state,'east')-starterShellOffset(state,'west')}
-    ];
-    for(const wall of starter){
-      if((wall.side==='east'||wall.side==='south')&&constructionWallMode!=='up')continue;
+    // Paint on the original house uses the SAME physical wall sections.
+    // A window, doorway or demolished part must be a real hole in the paint.
+    const starterSegments=starterShellSegments(state);
+    const removed=new Set(state.starterRemoved||[]);
+    const renderLine={
+      north:-4.34+starterShellOffset(state,'north'),
+      south:4.34+starterShellOffset(state,'south'),
+      west:-4.97+starterShellOffset(state,'west'),
+      east:14.25+starterShellOffset(state,'east')
+    };
+    for(const side of ['north','west','east','south']){
+      if((side==='east'||side==='south')&&constructionWallMode!=='up')continue;
+      const segments=starterSegments.filter(w=>w.starterSide===side&&
+        !opened.has(w.id)&&!removed.has(w.id));
+      if(!segments.length)continue;
+      const axis=segments[0].axis,point=w=>axis==='h'?w.i:w.j;
+      const sorted=segments.sort((a,b)=>point(a)-point(b));
       for(const face of ['a','b']){
-        const id=finish.wall?.['starter:'+wall.side]?.[face];
+        const id=finish.wall?.['starter:'+side]?.[face];
         if(!BUILD_FINISHES.wall[id])continue;
-        const offset=(face==='a'?-1:1)*.096;
-        buildBox('F5-B original wall finish '+id,
-          wall.axis==='h'?wall.midX:wall.center+offset,1.42,
-          wall.axis==='h'?wall.center+offset:wall.midZ,
-          wall.axis==='h'?wall.length:.023,2.68,
-          wall.axis==='v'?wall.length:.023,finishMaterial(id));
+        let first=sorted[0],last=first;
+        const flush=()=>{
+          const span=(point(last)-point(first)+1)*.5;
+          const center=(point(last)+point(first)+1)*.25;
+          const offset=(face==='a'?-1:1)*.096;
+          buildBox('F5-B original wall finish '+id,
+            axis==='h'?center:renderLine[side]+offset,1.42,
+            axis==='v'?center:renderLine[side]+offset,
+            axis==='h'?span:.023,2.68,axis==='v'?span:.023,finishMaterial(id));
+        };
+        for(const next of sorted.slice(1)){
+          if(point(next)===point(last)+1){last=next;continue;}
+          flush();first=next;last=next;
+        }flush();
       }
     }
   };
@@ -2035,15 +2050,67 @@ function boot() {
     legacySkirts[1].setLocalScale(.13,.18,8.5+s-n);
     starterBackDecor.setPosition(0,0,n);
     starterLeftDecor.setPosition(w,0,0);
-    for(const wall of legacyWallNodes)wall.enabled=raised;
-    for(const wall of legacySkirts)wall.enabled=true;
+    const removedStarter=new Set(state.starterRemoved||[]);
+    const openingStarter=constructionOpeningEdgeIds(state);
+    const originalSegments=starterShellSegments(state);
+    const changedStarter=new Set(originalSegments.filter(edge=>
+      removedStarter.has(edge.id)||openingStarter.has(edge.id)).map(edge=>edge.starterSide));
+    const solidStarter=new Set(state.starterSolidSides||[]);
+    // Original walls are still 100% their authored procedural material until
+    // first edit. Afterwards, rebuild only that side from physical half-meter
+    // sections: it is impossible for a long opaque box to cover a doorway.
+    legacyWallNodes[0].enabled=raised&&!changedStarter.has('north');
+    legacyWallNodes[2].enabled=raised&&!changedStarter.has('north');
+    legacyWallNodes[1].enabled=raised&&!changedStarter.has('west');
+    legacyWallNodes[3].enabled=raised&&!changedStarter.has('west');
+    legacySkirts[0].enabled=!changedStarter.has('north');
+    legacySkirts[1].enabled=!changedStarter.has('west');
+    for(const node of starterBackWindowNodes)node.enabled=!starterBackWindowCovered(state);
+    const originalLines={north:-4.34+n,west:-4.97+w,south:4.34+s,east:14.25+e};
+    const drawStarterSide=side=>{
+      const sections=originalSegments.filter(e=>e.starterSide===side&&
+        !removedStarter.has(e.id)&&!openingStarter.has(e.id));
+      if(!sections.length)return;
+      const axis=sections[0].axis,point=e=>axis==='h'?e.i:e.j;
+      sections.sort((a,b)=>point(a)-point(b));
+      let first=sections[0],last=first;
+      const flush=()=>{
+        const length=(point(last)-point(first)+1)*.5;
+        const center=(point(last)+point(first)+1)*.25;
+        const x=axis==='h'?center:originalLines[side];
+        const z=axis==='v'?center:originalLines[side];
+        const front=side==='south'||side==='east';
+        if(constructionWallMode==='down'||(front&&constructionWallMode==='cut')){
+          buildBox('F5-B.3 original wall cut outline',x,.135,z,
+            axis==='h'?length:.14,.18,axis==='v'?length:.14,M.trim);
+        }else{
+          buildBox('F5-B.3 original structural wall',x,1.4,z,
+            axis==='h'?length:.16,2.9,axis==='v'?length:.16,
+            side==='west'?M.wall2:M.wall);
+          buildBox('F5-B.3 original coping',x,2.91,z,
+            axis==='h'?length:.2,.13,axis==='v'?length:.2,M.trim);
+        }
+        // Painted trim follows the same physical spans, never a deleted hole.
+        if(!(front&&constructionWallMode==='cut'))
+          buildBox('F5-B.3 original baseboard',x,.16,z,
+            axis==='h'?length:.14,.18,axis==='v'?length:.14,M.trim);
+      };
+      for(const next of sections.slice(1)){
+        if(point(next)===point(last)+1){last=next;continue;}
+        flush();first=next;last=next;
+      }flush();
+    };
+    for(const side of ['north','west','east','south'])
+      if(changedStarter.has(side)||solidStarter.has(side))drawStarterSide(side);
     // The old apartment has an open front/right cutaway. Render their
     // editable boundary lines in Build; never create a surprise A* barrier.
     if(buildMode){
-      buildBox('F5 starter front edge',widthCenter,.092,4.5+s,
-        19+e-w,.12,.11,M.trim);
-      buildBox('F5 starter right edge',14+e,.092,depthCenter,
-        .11,.12,9+s-n,M.trim);
+      if(!solidStarter.has('south')&&!changedStarter.has('south'))
+        buildBox('F5 starter front edge',widthCenter,.092,4.5+s,
+          19+e-w,.12,.11,M.trim);
+      if(!solidStarter.has('east')&&!changedStarter.has('east'))
+        buildBox('F5 starter right edge',14+e,.092,depthCenter,
+          .11,.12,9+s-n,M.trim);
     }
     if(state.legacy){
       if(constructionWallMode==='up'){
@@ -2073,9 +2140,8 @@ function boot() {
         start=i;previous=i;
       }
     }
-    const opened=new Map();
-    for(const opening of state.openings)for(const id of opening.edgeIds)opened.set(id,opening);
-    const drawn=new Set();
+    const opened=constructionOpeningEdgeIds(state),
+      originalById=new Map(originalSegments.map(w=>[w.id,w]));
     // Solid wall runs are coalesced into a handful of draw calls per uninterrupted stretch.
     const byLine=new Map();
     for(const w of state.wallEdges){
@@ -2111,14 +2177,18 @@ function boot() {
     // variant ID chooses the procedural frame, panel and window proportions.
     // A 2m opening is physically four .5m segments in both render and A*.
     for(const opening of state.openings){
-      const edges=opening.edgeIds.map(id=>state.wallEdges.find(w=>w.id===id)).filter(Boolean);
+      const edges=opening.edgeIds.map(id=>state.wallEdges.find(w=>w.id===id)||
+        originalById.get(id)).filter(Boolean);
       if(!edges.length)continue;
       const variantId=constructionOpeningStyle(opening);
       const design=BUILD_OPENING_STYLES[variantId];
       if(!design)continue;
       const axis=edges[0].axis,wide=design.sections===4;
-      const x=axis==='h'?edges.reduce((n,w)=>n+w.i,0)/edges.length*.5+.25:edges[0].i*.5;
-      const z=axis==='v'?edges.reduce((n,w)=>n+w.j,0)/edges.length*.5+.25:edges[0].j*.5;
+      const side=edges[0].starterSide;
+      const x=side==='west'||side==='east'?originalLines[side]:
+        axis==='h'?edges.reduce((n,w)=>n+w.i,0)/edges.length*.5+.25:edges[0].i*.5;
+      const z=side==='north'||side==='south'?originalLines[side]:
+        axis==='v'?edges.reduce((n,w)=>n+w.j,0)/edges.length*.5+.25:edges[0].j*.5;
       const width=edges.length*.5,window=design.type==='window';
       const spanX=val=>axis==='h'?val:.15;
       const spanZ=val=>axis==='v'?val:.15;
@@ -2209,16 +2279,22 @@ function boot() {
     // UP mode adds former open-front boundaries for an exterior view only.
     // These are cosmetic: no surprise path block in legacy saves.
     if(exterior){
-      buildBox('F5 legacy front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
-      buildBox('F5 legacy right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
+      if(!solidStarter.has('south')&&!changedStarter.has('south'))
+        buildBox('F5 legacy front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
+      if(!solidStarter.has('east')&&!changedStarter.has('east'))
+        buildBox('F5 legacy right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
     }
   };
   syncConstructionRender(true);
   // Wall art: one picture, one shelf and one window with sky-coloured panes.
-  box('window frame',-2.18,1.87,-4.16,2.0,1.28,.1,M.paleWood,starterBackDecor);
-  box('window',-2.18,1.87,-4.06,1.77,1.08,.08,M.blue,starterBackDecor);
-  box('window cross vertical',-2.18,1.87,-3.99,.09,1.14,.13,M.cream,starterBackDecor);
-  box('window cross horizontal',-2.18,1.88,-3.99,1.84,.09,.13,M.cream,starterBackDecor);
+  starterBackWindowNodes.push(
+    box('window frame',-2.18,1.87,-4.16,2.0,1.28,.1,M.paleWood,starterBackDecor),
+    box('window',-2.18,1.87,-4.06,1.77,1.08,.08,M.blue,starterBackDecor),
+    box('window cross vertical',-2.18,1.87,-3.99,.09,1.14,.13,M.cream,starterBackDecor),
+    box('window cross horizontal',-2.18,1.88,-3.99,1.84,.09,.13,M.cream,starterBackDecor)
+  );
+  for(const node of starterBackWindowNodes)
+    node.enabled=!starterBackWindowCovered(game.world.construction);
   box('landscape',.2,2.12,-4.13,1.1,.72,.12,M.wood,starterBackDecor);
   box('landscape inside',.2,2.12,-4.03,.93,.56,.07,M.slate,starterBackDecor);
   ball('art sun',.42,2.22,-3.97,.25,.25,.04,M.yellow,starterBackDecor);
@@ -3786,6 +3862,8 @@ function boot() {
     'invalid-finish-target':'Выбери нужную поверхность: пол или стену',
     'unknown-finish':'Этот вариант покрытия недоступен',
     'unknown-opening-style':'Неизвестный вариант проёма',
+    'wall-has-decor':'На этом участке висит картина или полка · выбери свободный участок',
+    'starter-opening-outside':'Сначала убери проём или отверстие на удаляемой полосе стены',
     'opening-needs-wall-space':'Для этого широкого проёма нужны четыре свободных секции стены',
     'opening-style-unavailable':'Выбери дизайн двери, окна или арки'
   };
@@ -3802,7 +3880,15 @@ function boot() {
   const buildContext=()=>({residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position),
     furniture:game.world.furniture.instances,
     furnitureBoxes:game.world.furniture.instances.filter(item=>item.location==='home')
-      .map(item=>instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint))});
+      .map(item=>instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint)),
+    // H5b paintings are permanent objects. Forbid placing a real opening
+    // underneath a hanging work rather than silently losing its wall anchor.
+    wallDecor:allArtwork().map((work,index)=>{
+      const item=game.world.furniture.instances.find(i=>i.instanceId===work.easelInstanceId);
+      const origin=work.origin||(item?{x:item.x,z:item.z,yaw:item.yaw}:null);
+      const pose=artworkDisplayPose(work,index,origin,game.world.construction);
+      return pose?.wall?{x:pose.x,z:pose.z,radius:.46}:null;
+    }).filter(Boolean)});
   const buildProposal=(cmd)=>proposeConstructionEdit(game.world.construction,cmd,buildContext());
   const buildCommand=(from,to)=>{
     if(buildTool!=='wall')return {type:buildTool,from,to};
@@ -3887,7 +3973,7 @@ function boot() {
   };
   const selectBuildWall=wall=>{
     resetBuildWallSelection();
-    if(!wall){buildFeedback('Выбери стену квартиры или пристройки — можно нажать сторону исходного дома в панели',true);return;}
+    if(!wall){buildFeedback('Коснись стены в 3D, чтобы выбрать и перенести её',true);return;}
     selectedBuildWall=wall.id;
     const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
     const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
@@ -3901,9 +3987,7 @@ function boot() {
       Boolean(wall.starterSide&&starterShellOffset(game.world.construction,wall.starterSide)===0);
     $('build-wall-label').textContent=outward===null
       ?'Межкомнатная стена · проведи пальцем перпендикулярно стене'
-      :wall.starterSide
-        ?'Исходная квартира · '+({west:'слева',east:'справа',north:'сзади',south:'спереди'}[wall.starterSide])
-        :'Стена выбрана · перетащи или нажми +0,5 м для расширения';
+      :'Стена выбрана · перетащи или нажми +0,5 м для расширения';
     buildFeedback(outward===null?'Это внутренняя стена. Перетащи её в нужную сторону':
       'Для увеличения комнаты нажми «+0,5 м наружу» или перетащи стену');
   };
@@ -3922,14 +4006,7 @@ function boot() {
   $('build-wall-expand').addEventListener('click',()=>shiftSelectedBuildWall(1));
   $('build-wall-contract').addEventListener('click',()=>shiftSelectedBuildWall(-1));
   $('build-wall-deselect').addEventListener('click',resetBuildWallSelection);
-  document.querySelectorAll('[data-starter-side]').forEach(button=>
-    button.addEventListener('click',()=>{
-      const side=button.dataset.starterSide;
-      const edges=starterShellSegments(game.world.construction)
-        .filter(w=>w.starterSide===side);
-      selectBuildWall(edges[Math.floor(edges.length/2)]);
-    }));
-  const buildFinishPalette=$('build-finish-colors');
+   const buildFinishPalette=$('build-finish-colors');
   const refreshBuildFinishes=()=>{
     const kind=buildTool==='paint-wall'?'wall':'floor';
     const selected=kind==='wall'?finishWall:finishFloor;
@@ -3997,7 +4074,6 @@ function boot() {
     selectedBuildOpening=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
     $('build-editor').dataset.tool=type;
-    $('build-starter-picker').hidden=type!=='move-wall';
     const finishes=['paint-floor','paint-room','paint-wall','sample-finish'];
     $('build-finish-picker').hidden=!finishes.includes(type);
     if(finishes.includes(type))refreshBuildFinishes();
@@ -4008,7 +4084,7 @@ function boot() {
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
       camera:'Свайп одним пальцем — перемещение камеры; двумя — поворот и масштаб',
-      'move-wall':'Коснись стены либо выбери сторону исходной квартиры ниже, затем «+0,5 м наружу».',
+      'move-wall':'Коснись любой стены дома — старой или новой — и перенеси её пальцем либо кнопкой +0,5 м.',
       room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
       floor:'Протяни область, чтобы увеличить пол без перегородки',
       wall:'Протяни по прямой, чтобы построить стену',
@@ -4090,11 +4166,14 @@ function boot() {
   const buildWallAtScreen=point=>{
     const rect=canvas.getBoundingClientRect();
     let selected=null,best=45;
-    for(const wall of [...game.world.construction.wallEdges,
-      ...(['move-wall','paint-wall','sample-finish'].includes(buildTool)
-        ?starterShellSegments(game.world.construction):[])]){
-      const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
-      const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
+    for(const wall of constructionWallSegments(game.world.construction)){
+      const shell=game.world.construction,side=wall.starterSide;
+      const x=side==='west'?-4.97+starterShellOffset(shell,'west')
+        :side==='east'?14.25+starterShellOffset(shell,'east')
+        :wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
+      const z=side==='north'?-4.34+starterShellOffset(shell,'north')
+        :side==='south'?4.34+starterShellOffset(shell,'south')
+        :wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
       // Screen rays hit walls above the floor. Accept taps near the base,
       // middle or top (including CUT mode) instead of only a thin 1.4m line.
       for(const height of [.12,.75,1.4,2.25]){
@@ -4142,7 +4221,8 @@ function boot() {
         side:finishSide,scope:'run'});
     }else if(type==='sample-finish'){
       const target=wallEdge||buildWallAtScreen(gesturePoint(event));
-      const value=target?.id&&game.world.construction.materials?.wall?.[target.id]?.b;
+      const materialKey=target?.starterSide?'starter:'+target.starterSide:target?.id;
+      const value=materialKey&&game.world.construction.materials?.wall?.[materialKey]?.b;
       if(value){
         finishWall=value;setBuildTool('paint-wall');
         buildFeedback('Пипетка взяла покрытие стены · коснись другой стены');
@@ -4313,7 +4393,7 @@ function boot() {
         const pickWall=['move-wall','door','window','arch','change-opening','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
         if(pickWall&&!wallEdge&&buildTool==='move-wall')
-          buildFeedback('Выбери исходную стену кнопками ниже или коснись её; свайп по пустому месту двигает камеру');
+          buildFeedback('Коснись нужной стены или передвинь камеру свайпом по пустому участку');
         // Swiping empty background pans even when a wall tool is selected.
         if(raw&&(!pickWall||wallEdge||buildTool==='sample-finish')){
           const from=buildSnap(raw);

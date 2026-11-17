@@ -107,22 +107,46 @@ try{
  assert.notDeepEqual(afterPan,beforePan,'One-finger swipe must actually pan the 3D camera');
  assert.ok(await page.locator('#build-pending').isHidden(),
    'A camera swipe must never change layout or stage a build');
- // Actual starter-home regression: the old apartment's walls were procedural
- // scene nodes absent from wallEdges, so no wall tool could resize them.
+ // Native original house editing: no extra starter-side buttons. The same
+ // canvas tool selects BOTH an old back wall and a newly constructed wall.
+ await page.locator('#build-exit').click();
+ await page.locator('#build-toggle').click(); // restores the known initial build camera
+ assert.equal(await page.locator('#build-starter-picker').count(),0,
+   'The original home must not need a separate wall-side picker');
  await page.locator('[data-build-tool="move-wall"]').click();
- assert.ok(await page.locator('#build-starter-picker').isVisible());
- await page.locator('[data-starter-side="north"]').click();
- assert.match(await page.locator('#build-wall-label').innerText(),/Исходная квартира/);
+ const oldNorth=project(11,-4.34);
+ assert.ok(oldNorth.x>20&&oldNorth.x<375&&oldNorth.y>100&&oldNorth.y<540);
+ await send('pointerdown',oldNorth,'canvas');
+ await send('pointerup',oldNorth,'window');
+ assert.ok(await page.locator('#build-wall-controls').isVisible(),
+   'A touch on the OLD back wall selects it just like a new wall');
  assert.ok(await page.locator('#build-wall-expand').isEnabled());
  await page.locator('#build-wall-expand').click();
  assert.ok(await page.locator('#build-pending').isVisible());
  await page.locator('#build-apply').click();
  assert.ok(await page.locator('#build-pending').isHidden());
- // Four explicit original boundaries remain select-able even when the initial
- // decorative back wall is offscreen at the eastern portrait camera pose.
- await page.locator('[data-starter-side="east"]').click();
+ // The original east cutaway is also directly selectable, no special button.
+ const oldEast=project(14.25,-3.25);
+ await send('pointerdown',oldEast,'canvas');
+ await send('pointerup',oldEast,'window');
+ assert.ok(await page.locator('#build-wall-expand').isEnabled());
  await page.locator('#build-wall-expand').click();
+ assert.ok(await page.locator('#build-pending').isVisible());
  await page.locator('#build-apply').click();
+ // Place a real opening straight into the ORIGINAL back wall.
+ await page.locator('[data-build-tool="window"]').click();
+ const starterOpeningTouch=project(11,-4.84);
+ await send('pointerdown',starterOpeningTouch,'canvas');
+ await send('pointerup',starterOpeningTouch,'window');
+ assert.ok(await page.locator('#build-pending').isVisible(),
+   'An old wall must accept the ordinary Window tool with no other controls');
+ await page.locator('#build-apply').click();
+ const oldOpeningSaved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+ assert.ok(oldOpeningSaved.world.construction.openings.some(o=>
+   o.type==='window'&&o.edgeIds.every(id=>id.startsWith('starter:north:'))),
+   'Original-wall window creates stable saved physical segments');
+ // Real window frame must appear where the old wall was cut.
+ await page.screenshot({path:'f5b3-original-wall-openings.png'});
  await page.locator('[data-build-walls="up"]').click();
  await page.screenshot({path:'f5a-browser-build.png'});
  await page.locator('#build-exit').click();
@@ -135,7 +159,8 @@ try{
  const saved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
  assert.ok(saved.world.construction.wallEdges.length>32,'Touch-drawn room added real wall segments');
  assert.ok(saved.world.construction.revision>door.world.revision,'Dragged floor edit persisted');
- assert.equal(saved.world.construction.openings.length,1);
+ assert.equal(saved.world.construction.openings.length,2,
+   'Original-house window and new extension door are saved together');
  assert.ok(saved.world.construction.wallEdges.some(w=>w.axis==='v'&&w.i===37&&w.j===0),
    '0.5m wall-expansion nudge moved the selected outer boundary');
  assert.equal(saved.world.construction.starterShell.north,-10,
