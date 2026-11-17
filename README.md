@@ -1,3 +1,7 @@
+## F5-D.2 — portable furnished rooms (pending CI and owner iPhone QA)
+
+Build: selecting **Move room** on a newly constructed detached rectangular room now atomically moves its own eligible furniture along with floor, walls, finishes and openings. Furniture preserves its immutable instance IDs, SKU metadata, purchases, and orientation relative to the room. Locked/occupied furniture, paintings, wall-crossing objects, overlaps, residents, blocked approaches and unreachable essentials reject with an explanation, without mutating the household. Copy room remains geometry-only and refuses purchased furniture. Construction Undo/Redo now restores both construction and furniture in one history. Furnishing view and placement bounds now include the one-storey 32×24 lot. The original furnished starter shell remains protected. This does not yet implement free-form/attached-room relocation, artwork wall-slot migration, or duplication of purchased contents. Save root version 1 and key are unchanged.
+
 ## 2026-11-17 — H5c: мастерство живописи, 13 оригинальных сюжетов (1.2u.16)
 
 H5c расширяет H5b с 3 до 13 оригинальных сюжетов. Первые три доступны сразу, десять открываются по одному на уровнях живописи 1–10: «Морской бриз», «Полевые цветы», «Тёплый натюрморт», «Звёздная ночь», «Старый порт», «Снежные вершины», «Осенний парк», «Янтарные дюны», «Цветовые ритмы», «Северное сияние».

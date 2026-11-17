@@ -86,7 +86,7 @@ test('Placement retains 3D prefab and floor outline; swipe moves object without 
   assert.match(game,/oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'/);
   assert.match(game,/shopSwipeRawPose=dragShopPlacement\(view,shopSwipeRawPose\|\|shopPose/);
   assert.doesNotMatch(game,/if\(furnishMode&&shopPlacing&&!pos\)moveShopPreviewToCamera/);
-  assert.match(game,/const candidate=cameraPlacementPose\(view,shopPose\)/);
+  assert.match(game,/const candidate=cameraPlacementPose\(view,shopPose(?:,'lot')?\)/);
   assert.doesNotMatch(game,/const shopCameraAnchor=/);
   assert.match(game,/const moveShopPreviewToCamera=\(force=false\)=>\{/);
   assert.match(game,/lastShopCameraPreviewAt<100/);

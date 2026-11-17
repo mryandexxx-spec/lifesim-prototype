@@ -105,6 +105,7 @@ import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
 import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './toilet-interaction.js';
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
+import {proposeFurnishedRoomMove,createHouseholdConstructionEditor} from './furnished-room.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,bedDestinationFor,preemptAutomaticForManual,
@@ -4014,6 +4015,7 @@ function boot() {
     editDrag=null;canvas.dataset.furnitureGrab='false';
     cameraGesture.clear();
     furnishMode=false;editSelectedId=null;editSession=null;
+    setCameraBuildBounds();
     furnitureGhost.enabled=false;marketGhost.enabled=false;
     setEditorView('edit');
     updateDecorNodes();
@@ -4035,6 +4037,9 @@ function boot() {
       toast('Сначала выбери ответ или заверши разговор');return;
     }
     editSession=createFurnitureEditor(game.world.furniture,game.shop);
+    // F5-D.2: reach built rooms across the 32×24 lot while arranging items.
+    setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
+      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
     furnishMode=true;
     document.querySelector('.app-shell').dataset.furnishMode='true';
     $('furniture-editor').hidden=false;
@@ -4107,7 +4112,14 @@ function boot() {
     'room-protected':'Первоначальный обставленный дом пока нельзя переносить как единый объект',
     'room-not-rectangular':'Выбери прямоугольную комнату без выступов и внутренних перегородок',
     'room-not-enclosed':'Нужна комната с четырьмя настоящими стенами',
-    'room-has-furniture':'Сначала убери мебель из комнаты: перенос предметов — следующий этап',
+    'room-has-furniture':'Копирование допускается только без мебели: платные предметы нельзя дублировать',
+    'room-item-fixed':'Есть встроенный предмет, который нельзя перенести вместе с комнатой',
+    'room-item-busy':'Мебель используется или запланирована в очереди действий',
+    'room-item-crosses-wall':'Часть мебели выступает за пределы комнаты',
+    'room-item-bounds':'Мебель не помещается в допустимые границы участка',
+    'room-item-outside':'После поворота мебель выходит за стену комнаты',
+    'room-item-collision':'На новом месте мебель столкнётся с другим предметом',
+    'room-item-unreachable':'После переноса к одному из предметов нельзя подойти',
     'room-has-art':'На стене есть картина: перенос с сохранением её привязки — следующий этап',
     'room-has-resident':'Житель находится в комнате. Попроси его выйти перед изменением',
     'room-shared-opening':'Проём соединяет несколько помещений — сначала измени его',
@@ -4131,16 +4143,19 @@ function boot() {
   const buildContext=()=>({residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position),
     furniture:game.world.furniture.instances,
     furnitureBoxes:game.world.furniture.instances.filter(item=>item.location==='home')
-      .map(item=>instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint)),
+      .map(item=>({instanceId:item.instanceId,...instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint)})),
+    lockedInstanceIds:lockedFurnitureIds(),
     // H5b paintings are permanent objects. Forbid placing a real opening
     // underneath a hanging work rather than silently losing its wall anchor.
     wallDecor:allArtwork().map((work,index)=>{
       const item=game.world.furniture.instances.find(i=>i.instanceId===work.easelInstanceId);
       const origin=work.origin||(item?{x:item.x,z:item.z,yaw:item.yaw}:null);
       const pose=artworkDisplayPose(work,index,origin,game.world.construction);
-      return pose?.wall?{x:pose.x,z:pose.z,radius:.46}:null;
+      return pose?{x:pose.x,z:pose.z,radius:.46}:null;
     }).filter(Boolean)});
-  const buildProposal=(cmd)=>proposeConstructionEdit(game.world.construction,cmd,buildContext());
+  const buildProposal=(cmd)=>cmd?.type==='room-relocate'
+    ?proposeFurnishedRoomMove(game.world,cmd,buildContext())
+    :proposeConstructionEdit(game.world.construction,cmd,buildContext());
   const buildCommand=(from,to)=>{
     if(buildTool==='roof-add')return {type:'roof-add',from,to,...roofChoice};
     if(buildTool!=='wall')return {type:buildTool,from,to};
@@ -4169,6 +4184,11 @@ function boot() {
   const applyBuildChange=(result,label)=>{
     if(!result.ok){buildFeedback(buildingReason[result.reason]||result.reason,true);return false;}
     game.world.construction=result.world;
+    if(result.furniture){
+      game.world.furniture=result.furniture;
+      updateDecorNodes();
+      refreshMind(game,game.world);refreshMind(game.otherSim,game.world);
+    }
     // IDs of moved wall segments change, so never leave an obsolete selection.
     selectedBuildWall=null;
     if(pendingBuild?.type==='room-relocate'){
@@ -4189,7 +4209,7 @@ function boot() {
     const candidate=buildProposal(cmd);
     if(!candidate.ok){buildFeedback(buildingReason[candidate.reason]||candidate.reason,true);return false;}
     // Verify the essential pathways from BOTH residents after each transaction.
-    const candidateLayout={furniture:game.world.furniture,construction:candidate.world};
+    const candidateLayout={furniture:candidate.furniture||game.world.furniture,construction:candidate.world};
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       for(const action of ['fridge','shower','toilet','bed']){
@@ -4199,7 +4219,10 @@ function boot() {
         }
       }
     }
-    return applyBuildChange(buildSession.commit(cmd,buildContext()),'Планировка изменена · сохранено');
+    const applied=buildSession.commit(cmd,buildContext());
+    return applyBuildChange(applied,applied.movedIds?.length
+      ?'Комната и '+applied.movedIds.length+' предмет(ов) перенесены · сохранено'
+      :'Планировка изменена · сохранено');
   };
   const clearBuildPending=()=>{
     pendingBuild=null;$('build-pending').hidden=true;buildGhost.enabled=false;
@@ -4466,8 +4489,8 @@ function boot() {
       camera:'Свайп одним пальцем — перемещение камеры; двумя — поворот и масштаб',
       'move-wall':'Коснись любой стены дома — старой или новой — и перенеси её пальцем либо кнопкой +0,5 м.',
       room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
-      'room-duplicate':'Коснись пустой прямоугольной комнаты, затем свободного места для копии. Перед подтверждением можно повернуть её.',
-      'room-relocate':'Коснись отдельной пустой комнаты, затем нового места. Существующие предметы и картины защищены.',
+      'room-duplicate':'Коснись пустой прямоугольной комнаты, затем свободного места для копии. Купленная мебель не дублируется.',
+      'room-relocate':'Коснись отдельной комнаты с мебелью, затем нового места. Мебель переместится вместе со стенами. Картины на стене защищены.',
       floor:'Протяни область, чтобы увеличить пол без перегородки',
       wall:'Протяни по прямой, чтобы построить стену',
       door:'Выбери дизайн и коснись стены для установки двери',
@@ -4571,7 +4594,7 @@ function boot() {
       toast('Сначала закончи текущее взаимодействие');return;
     }
     if(furnishMode)exitFurniture();
-    buildSession=createConstructionEditor(game.world.construction);
+    buildSession=createHouseholdConstructionEditor(game.world.construction,game.world.furniture);
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
     buildTool='camera';ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
@@ -4769,7 +4792,7 @@ function boot() {
     const now=performance.now();
     if(!force&&now-lastShopCameraPreviewAt<100)return;
     lastShopCameraPreviewAt=now;
-    const candidate=cameraPlacementPose(view,shopPose);
+    const candidate=cameraPlacementPose(view,shopPose,'lot');
     if(shopPose&&shopPose.x===candidate.x&&shopPose.z===candidate.z)return;
     shopPose=candidate;shopManualPose=false;renderMarket();
   };
@@ -4967,7 +4990,7 @@ function boot() {
       const {dx,dy}=result.placementDelta;
       // Accumulate sub-grid deltas: slow swipes must not get swallowed by snap.
       shopSwipeRawPose=dragShopPlacement(view,shopSwipeRawPose||shopPose,
-        dx,dy,canvas.clientHeight);
+        dx,dy,canvas.clientHeight,'lot');
       if(shopSwipeRawPose){
         const pose={x:snapFurnitureCoordinate(shopSwipeRawPose.x),
           z:snapFurnitureCoordinate(shopSwipeRawPose.z),yaw:shopPose.yaw};

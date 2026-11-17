@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'src/construction.js'
+      - 'src/furnished-room.js'
       - 'src/roof-construction.js'
       - 'src/exterior-construction.js'
       - 'src/navigation.js'
@@ -22,6 +23,8 @@ on:
       - 'tests/f5c2-exteriors.test.js'
       - 'tests/f5d1-rooms.test.js'
       - 'tests/f5d1-browser-smoke.mjs'
+      - 'tests/f5d2-furnished-room.test.js'
+      - 'tests/f5d2-browser-smoke.mjs'
       - '.github/workflows/f5a-browser-checks.yml'
   workflow_dispatch:
 permissions:
@@ -39,6 +42,7 @@ jobs:
       - run: |
           node --check src/game.js
           node --check src/construction.js
+          node --check src/furnished-room.js
           node --check src/exterior-construction.js
           node --check src/navigation.js
           node --check src/household.js
@@ -54,6 +58,7 @@ jobs:
         run: |
           node tests/f5a-browser-smoke.mjs
           node tests/f5d1-browser-smoke.mjs
+          node tests/f5d2-browser-smoke.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -70,4 +75,5 @@ jobs:
             f5c2-tall-facade.png
             f5c2-porch.png
             f5d1-room-copy-preview.png
+            f5d2-furnished-room-move-preview.png
           retention-days: 7
