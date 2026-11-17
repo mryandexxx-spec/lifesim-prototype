@@ -151,6 +151,16 @@ test('F4G: mid-cook station removal prevents phantom dish or XP, old v1 saved ga
  assert.equal(restoreActionQueues(structuredClone(queue),['alex','mira'])
     .byResident.alex[0].recipeId,'cook.soup');
 });
+test('F4G: stored sink or remote washing cannot clear dishes after a broken route',()=>{
+ const h=home();h.kitchen.dirtyDishes=2;
+ assert.ok(chooseResidentAction(h,'wash',false,'alex','shop-sink-903'));
+ h.position={...furnitureActionApproach(h.world,'wash','shop-sink-903')};
+ arrive(h);
+ h.world.furniture.instances.find(x=>x.instanceId==='shop-sink-903').location='storage';
+ tickHousehold(h,ACTIONS.wash.duration);
+ assert.equal(h.action,null);
+ assert.equal(h.kitchen.dirtyDishes,2);
+});
 test('F4G: Safari touch interaction, visual effects and deploy contain kitchen ESM',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
