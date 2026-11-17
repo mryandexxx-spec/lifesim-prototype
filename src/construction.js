@@ -155,6 +155,14 @@ function topology(state){
 const fail=reason=>({ok:false,reason});
 function isBase(i,j){return i>=BASE.minI&&i<BASE.maxI&&j>=BASE.minJ&&j<BASE.maxJ;}
 function lotCell(i,j){return i>=BUILD_LOT.minX/BUILD_STEP&&i<BUILD_LOT.maxX/BUILD_STEP&&j>=BUILD_LOT.minZ/BUILD_STEP&&j<BUILD_LOT.maxZ/BUILD_STEP;}
+// Walls occupy the *edges* of cells, so the east/south outer boundary is
+// legal even though no floor cell may start at that maximum coordinate.
+function lotEdge(w){
+  const a=BUILD_LOT.minX/BUILD_STEP,b=BUILD_LOT.maxX/BUILD_STEP;
+  const c=BUILD_LOT.minZ/BUILD_STEP,d=BUILD_LOT.maxZ/BUILD_STEP;
+  return w.axis==='h'?w.i>=a&&w.i<b&&w.j>=c&&w.j<=d:
+    w.i>=a&&w.i<=b&&w.j>=c&&w.j<d;
+}
 export function newConstructionWorld(){
   const floorCells=[];
   for(let i=BASE.minI;i<BASE.maxI;i++)for(let j=BASE.minJ;j<BASE.maxJ;j++)floorCells.push(cell(i,j));
@@ -196,7 +204,7 @@ export function restoreConstructionWorld(raw){
   const walls=[],keys=new Set();
   for(const value of raw.wallEdges){
     if(!value||!['h','v'].includes(value.axis)||!Number.isSafeInteger(value.i)||!Number.isSafeInteger(value.j)||
-      !lotCell(value.i,value.j)||!/^([hv]):[-]?\d+,[-]?\d+$/.test(value.id||'')||
+      !lotEdge(value)||!/^([hv]):[-]?\d+,[-]?\d+$/.test(value.id||'')||
       value.id!==edge(value.axis,value.i,value.j)||keys.has(value.id))return initial;
     keys.add(value.id);
     walls.push({id:value.id,axis:value.axis,i:value.i,j:value.j,heightClass:'normal'});
@@ -681,7 +689,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     if(!command.from||!command.to||![command.from.x,command.from.z,command.to.x,command.to.z].every(finite))return fail('invalid-wall');
     const line=editSegments(command.from,command.to);
     if(!line)return fail('wall-must-be-straight');
-    for(const w of line)if(!lotCell(w.i,w.j)||!floors.has(cell(w.i-(w.axis==='v'?1:0),w.j-(w.axis==='h'?1:0)))&&!floors.has(cell(w.i,w.j)))return fail('outside-floor');
+    for(const w of line)if(!lotEdge(w)||!floors.has(cell(w.i-(w.axis==='v'?1:0),w.j-(w.axis==='h'?1:0)))&&!floors.has(cell(w.i,w.j)))return fail('outside-floor');
     line.forEach(w=>walls.set(w.id,w));
   }else if(type==='move-wall'&&Object.hasOwn(STARTER_SIDE,starterSide(command.edgeId))){
     const side=starterSide(command.edgeId);
