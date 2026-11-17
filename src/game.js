@@ -2374,6 +2374,7 @@ function boot() {
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
     for(const id of HOUSEHOLD_IDS){
       sofaStates[id]=createSofaTransition();
+      diningVisual[id]=null;
       sofaVisualTargets[id]=null;
       romanticSofaSlots[id]=null;
       bedStates[id]=createBedTransition();
@@ -2387,6 +2388,7 @@ function boot() {
     game.position=nearestWalkable(game.position,game.world);
     game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
     alexSeatInstanceId=null;
+    drawnDiningChairs.clear(); // reset returns every visual-only chair to its saved position
     updateDecorNodes();
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
