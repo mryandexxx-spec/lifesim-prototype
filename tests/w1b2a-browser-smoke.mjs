@@ -77,6 +77,11 @@ try{
   assert.equal(restored.careerSystem.byResident.alex.careerId,'editorial');
   assert.equal(restored.careerSystem.byResident.mira.careerId,'civic-service');
   assert.equal(restored.shop.credits,initial.shop.credits);
+  await page.locator('#career-phone-panel .career-phone-x').click();
+  await page.locator('#calendar-anchor-toggle').click();
+  assert.ok(await page.locator('#lc-agenda').getByText(/Работа: Редакция/).isVisible(),
+    'The existing game calendar shows the genuine accepted career shift');
+  await page.locator('#lc-close').click();
   assert.equal(errors.length,0,errors.join('\n'));
   console.log('W1-B.2a Chromium WebGL 390x844: job phone, 6 vacancies, explicit contract, Mira, reload, no wages passed');
 }finally{await browser.close();}
