@@ -8,6 +8,8 @@ export const ACTOR_RADIUS = 0.26;
 // Legacy export is generated from the same catalogue as the serializable layout.
 export const FURNITURE = Object.freeze(furnitureObstacles(newFurnitureWorld()));
 const layoutCache=new WeakMap();
+// Function declaration is hoisted before the historic static-grid initialization.
+function dynamicConstruction(layout){return layout?.construction?.schema===1&&!layout.construction.legacy;}
 function furnitureData(layout){
   return layout?.furniture?.instances?layout.furniture:layout?.instances?layout:null;
 }
@@ -169,7 +171,7 @@ export function findPath(from,to,layout=null){
 /** F5-A: no global ROOM resize, legacy A* remains byte-compatible for old saves.
  * Binary heap and layout-revision cache avoid quadratic scans on a 32×24 lot.
  */
-const dynamicConstruction=layout=>layout?.construction?.schema===1&&!layout.construction.legacy;
+
 const topologyGrids=new WeakMap();
 const DSTEP=.22;
 function dynamicGrid(layout){
