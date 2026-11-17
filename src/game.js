@@ -23,6 +23,7 @@ import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketIt
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES} from './painting.js';
+import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary} from './kitchen.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -271,6 +272,9 @@ const META = {
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] },
   seat: { title: 'Кресло или стул', category: 'Сиденья', description: 'Посидеть на выбранном предмете · без бонуса навыков', icon: '▣', anchor: [0,1.2,0] },
   dining: {title:'Обеденный стол',category:'Столовая',description:'Нужны холодильник и свободный стул лицом к столу. Житель возьмёт еду, сядет и поест.',icon:'🍽',anchor:[0,.85,0]},
+  cook: {title:'Плита',category:'Кухня',description:'Холодильник → рабочая поверхность → плита. Готовые порции хранятся для обеда за столом.',icon:'🍳',anchor:[0,1.15,0]},
+  prep: {title:'Рабочая поверхность',category:'Кухня',description:'Подготовка ингредиентов происходит здесь во время готовки.',icon:'▤',anchor:[0,1.05,0]},
+  wash: {title:'Кухонная мойка',category:'Кухня',description:'Вымыть накопившуюся после обедов посуду.',icon:'◉',anchor:[0,1.12,0]},
   lamp: { title:'Торшер',category:'Освещение',description:'Переключить настоящий свет после подхода к выбранному торшеру',icon:'☀',anchor:[0,1.3,0] },
   mirror: { title:'Зеркало',category:'Уход за собой',description:'Подойти к зеркалу и привести себя в порядок',icon:'◇',anchor:[0,1.4,0] },
   dresser: { title:'Комод',category:'Хранение',description:'Подойти и открыть ящики или дверцы комода',icon:'▤',anchor:[0,.75,0] },
@@ -343,6 +347,14 @@ function scheduleCommand(command,residentId=game.selectedSim){
       ?(definition?.requiredCapabilities.includes('music.playback')?'music':
         definition?.requiredCapabilities.includes('art.paint')?'paint':'hobby')
       :command.actionId;
+    if(command.type==='object'&&actionId==='cook'){
+      const actor=getActor(game,residentId);
+      const level=currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+      if(!canCookRecipe(game.kitchen,command.recipeId,level)){
+        toast('Недостаточно продуктов, места для порций или навыка кулинарии');
+        return false;
+      }
+    }
     if(command.type==='object'&&actionId==='dining'&&command.autoTable===true){
       if(!nearestAvailableDiningTable(game,residentId)){
         toast('Для обеда нужны доступный обеденный стол и свободный стул');
@@ -588,7 +600,7 @@ function select(id,instanceId=null) {
     queueVisible=false;renderQueuePanel(true);
   }
   selected = id;
-  selectedFurnitureInstanceId=['sofa','seat','dining','bed','tv','hobby','music','paint',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
+  selectedFurnitureInstanceId=['sofa','seat','dining','cook','prep','wash','bed','tv','hobby','music','paint',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
   $('action-sheet').hidden = !id;
@@ -599,9 +611,29 @@ function select(id,instanceId=null) {
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
       id==='tv'?'Просмотр этого телевизора · с дивана, если он свободен и экран виден':
-      id==='hobby'||id==='music'||id==='paint'||id==='seat'||id==='dining'||UTILITY_ACTION_IDS.includes(id)?META[id].description:
+      id==='hobby'||id==='music'||id==='paint'||id==='seat'||id==='dining'||id==='cook'||id==='prep'||id==='wash'||UTILITY_ACTION_IDS.includes(id)?META[id].description:
       'Отдых на выбранном диване · собственный маршрут и место посадки')
     :META[id].description;
+  if(['cook','fridge','dining','wash'].includes(id)){
+    const k=kitchenSummary(game.kitchen);
+    $('action-description').textContent+=' · Готовых порций: '+k.prepared+
+      ' · Грязных тарелок: '+k.dirtyDishes+
+      ' · Продукты (овощи/крупы/молоко): '+k.supplies;
+  }
+  $('cooking-recipe-field').hidden=id!=='cook';
+  if(id==='cook'){
+    const select=$('cooking-recipe-select');
+    const level=currentSkillLevel(selectedActor().skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+    for(const option of select.options){
+      const recipe=kitchenRecipe(option.value);
+      option.disabled=!recipe||!canCookRecipe(game.kitchen,recipe.id,level);
+      option.textContent=recipe?recipe.label+(level<recipe.minLevel
+        ?' · 🔒 уровень '+recipe.minLevel
+        :' · '+recipe.portions+' порции'):'Неизвестный рецепт';
+    }
+    if(select.selectedOptions[0]?.disabled)
+      select.value=[...select.options].find(o=>!o.disabled)?.value||'';
+  }
   $('music-style-field').hidden=id!=='music';
   $('reading-content-field').hidden=id!=='hobby';
   $('painting-theme-field').hidden=id!=='paint';
@@ -660,8 +692,11 @@ $('action-button').addEventListener('click', () => {
           contentId:PAINT_CONTENT_IDS.includes($('painting-theme-select').value)
             ?$('painting-theme-select').value:PAINT_CONTENT_IDS[0],
           ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
-      :{type:'object',actionId:selected,
-        ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
+      :selected==='cook'
+        ?{type:'object',actionId:'cook',recipeId:$('cooking-recipe-select').value,
+          ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
+        :{type:'object',actionId:selected,
+          ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})};
   // A tap on the explicit "Listen to music" action is itself an iOS user
   // gesture: unlock audio HERE rather than requiring an unrelated View menu.
   // Never re-enable after the player has deliberately selected Mute.
