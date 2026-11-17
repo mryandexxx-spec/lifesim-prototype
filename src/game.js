@@ -94,7 +94,8 @@ import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './to
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
-  residentAutonomousChoice,bedDestinationFor,preemptAutomaticForManual } from './household.js';
+  residentAutonomousChoice,bedDestinationFor,preemptAutomaticForManual,
+  nearestAvailableDiningTable } from './household.js';
 
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
@@ -264,7 +265,7 @@ window.addEventListener('resize',positionViewPanel);
 
 const META = {
   bed: { title: 'Уютная кровать', category: 'Спальня', description: 'Сон восстанавливает энергию', icon: '☾', anchor: [-2.5, 1.22, -1.48] },
-  fridge: { title: 'Холодильник', category: 'Кухня', description: 'Перекус восстанавливает сытость', icon: '◕', anchor: [3.42, 2.13, -2.79] },
+  fridge: { title: 'Холодильник', category: 'Кухня', description: 'Быстрый перекус утоляет голод немного. Полноценный обед — за ближайшим подходящим столом', icon: '◕', anchor: [3.42, 2.13, -2.79] },
   shower: { title: 'Душевая', category: 'Ванная', description: 'Душ повышает уровень гигиены', icon: '✧', anchor: [-3.65, 2.16, 2.45] },
   toilet: { title: 'Унитаз', category: 'Ванная', description: 'Приватное использование туалета восстановит потребность', icon: 'WC', anchor: [-1.65, 1.28, 3.14] },
   sofa: { title: 'Диван', category: 'Гостиная', description: 'Отдых повышает уровень досуга', icon: '♫', anchor: [1.35, 1.38, 1.54] },
@@ -342,9 +343,17 @@ function scheduleCommand(command,residentId=game.selectedSim){
       ?(definition?.requiredCapabilities.includes('music.playback')?'music':
         definition?.requiredCapabilities.includes('art.paint')?'paint':'hobby')
       :command.actionId;
-    const target=resolveActionFurniture(game.world,actionId,command.targetInstanceId);
-    if(!target){toast('Этот предмет недоступен');return false;}
-    command={...command,targetInstanceId:target.instanceId};
+    if(command.type==='object'&&actionId==='dining'&&command.autoTable===true){
+      if(!nearestAvailableDiningTable(game,residentId)){
+        toast('Для обеда нужны доступный обеденный стол и свободный стул');
+        return false;
+      }
+      // The closest table is resolved again when the queued task starts.
+    }else{
+      const target=resolveActionFurniture(game.world,actionId,command.targetInstanceId);
+      if(!target){toast('Этот предмет недоступен');return false;}
+      command={...command,targetInstanceId:target.instanceId};
+    }
     if(command.inventoryItemId&&!inventoryFor(game,residentId).some(item=>
       item.type==='book'&&item.id===command.inventoryItemId)){
       toast('Книга больше не принадлежит персонажу');return false;
@@ -599,6 +608,7 @@ function select(id,instanceId=null) {
   if(id==='paint')$('painting-theme-select').value=PAINT_CONTENT_IDS[0];
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
+  $('fridge-lunch-button').hidden=id!=='fridge';
   const lampLabel=id==='lamp'
     ?(lampIsOn(game?.world,selectedFurnitureInstanceId)?'Выключить торшер':'Включить торшер')
     :ACTIONS[id].label;
@@ -665,6 +675,11 @@ $('action-button').addEventListener('click', () => {
   if (scheduleCommand(command)) {
     select(null);
   }
+});
+// F4F.2: refrigerator full lunch uses existing meal and seating choreography.
+$('fridge-lunch-button').addEventListener('click',()=>{
+  if(selected!=='fridge')return;
+  if(scheduleCommand({type:'object',actionId:'dining',autoTable:true}))select(null);
 });
 // Dance is an independent activity queued against the same physical stereo.
 // This click also provides the genuine Safari gesture for Web Audio unlock.
@@ -2262,7 +2277,9 @@ function boot() {
               residentId,command.targetInstanceId);
         }
         if(command.type==='object')
-          return furnitureAvailable(game,command.actionId,residentId,command.targetInstanceId)&&
+          return (command.autoTable===true&&command.actionId==='dining'
+            ?Boolean(nearestAvailableDiningTable(game,residentId))
+            :furnitureAvailable(game,command.actionId,residentId,command.targetInstanceId))&&
             !(command.actionId==='shower'&&HOUSEHOLD_IDS.some(id=>
               id!==residentId&&showerStates[id].active))&&
             !(command.actionId==='toilet'&&HOUSEHOLD_IDS.some(id=>
@@ -2303,8 +2320,13 @@ function boot() {
       },
       start(residentId,command){
         let started=false;
-        if(command.type==='object')
-          started=beginAction(command.actionId,false,residentId,true,command.targetInstanceId);
+        if(command.type==='object'){
+          const target=command.autoTable===true&&command.actionId==='dining'
+            ?nearestAvailableDiningTable(game,residentId)?.instanceId
+            :command.targetInstanceId;
+          if(target||command.autoTable!==true)
+            started=beginAction(command.actionId,false,residentId,true,target);
+        }
         else if(command.type==='activity'){
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
           const actionId=activity?.requiredCapabilities.includes('music.playback')?'music':
