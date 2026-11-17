@@ -13,7 +13,8 @@ import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.j
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
-import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin} from './furniture-catalog.js';
+import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
+  rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
@@ -63,8 +64,10 @@ import {traitLabels,interestLabels} from './trait-catalog.js';
 import { createCharacterRig,applyShowerAppearance } from './characters.js';
 import {createMeshyVisual} from './meshy-visual.js?v=1.2t';
 import {createSeatSurface,seatSlot} from './interaction-anchors.js';
-import {purchasedSeatPrefab,purchasedSeatPose,purchasedSeatSurface} from './seat-furniture.js';
-import {diningSeatApproach,diningPlatePosition} from './dining.js';
+import {purchasedSeatPrefab,purchasedSeatPose,purchasedSeatSurface,
+  purchasedDiningSeatPose,purchasedDiningSeatSurface} from './seat-furniture.js';
+import {diningSeatApproach,diningPlatePosition,diningChairPullLimit,
+  diningChairPullOffset} from './dining.js';
 import {UTILITY_FURNITURE,UTILITY_ACTION_IDS,furnitureUseWeight,lampIsOn} from './furniture-interactions.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2t';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
@@ -1927,6 +1930,48 @@ function boot() {
   }});
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
+  // F4F.1: entirely cosmetic chair draw-out. Keep the selected table/seat
+  // through the reverse stand-up animation, but never persist a moved chair.
+  const diningVisual={alex:null,mira:null};
+  let drawnDiningChairs=new Set();
+  const diningVisualFor=(id,action)=>{
+    if(action?.id==='dining'&&action.phase==='using'&&action.diningStage==='eating'){
+      const previous=diningVisual[id];
+      if(!previous||previous.tableId!==action.targetInstanceId||
+         previous.chairId!==action.diningSeatInstanceId){
+        const approach=diningSeatApproach(game.world,action.targetInstanceId,
+          action.diningSeatInstanceId);
+        diningVisual[id]=approach?{
+          tableId:action.targetInstanceId,chairId:action.diningSeatInstanceId,
+          side:approach.side,
+          maxPull:diningChairPullLimit(game.world,action.targetInstanceId,
+            action.diningSeatInstanceId)
+        }:null;
+      }
+    }
+    return diningVisual[id];
+  };
+  const renderDiningChairOffsets=()=>{
+    const changed=new Set();
+    if(!furnishMode)for(const id of HOUSEHOLD_IDS){
+      const visual=diningVisual[id],progress=sofaStates[id].progress;
+      if(!visual||progress<=0)continue;
+      const item=game.world.furniture.instances.find(x=>x.instanceId===visual.chairId&&
+        x.prefabId==='chair'&&x.location==='home');
+      const node=item&&decorNodes.get(item.instanceId);
+      if(!node)continue;
+      const offset=diningChairPullOffset(progress,visual.maxPull);
+      const q=rotateLocal(0,offset,item.yaw);
+      node.setPosition(item.x+q.x,0,item.z+q.z);
+      changed.add(item.instanceId);
+    }
+    for(const id of drawnDiningChairs)if(!changed.has(id)){
+      const item=game.world.furniture.instances.find(x=>x.instanceId===id&&x.location==='home');
+      const node=decorNodes.get(id);
+      if(item&&node)node.setPosition(item.x,0,item.z);
+    }
+    drawnDiningChairs=changed;
+  };
   // R5c seat slots outlive consent while Meshy physically stands up.
   const romanticSofaSlots={alex:null,mira:null};
   // The last used sofa remains the visual target while standing up.
@@ -2329,6 +2374,7 @@ function boot() {
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
     for(const id of HOUSEHOLD_IDS){
       sofaStates[id]=createSofaTransition();
+      diningVisual[id]=null;
       sofaVisualTargets[id]=null;
       romanticSofaSlots[id]=null;
       bedStates[id]=createBedTransition();
@@ -2342,6 +2388,7 @@ function boot() {
     game.position=nearestWalkable(game.position,game.world);
     game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
     alexSeatInstanceId=null;
+    drawnDiningChairs.clear(); // reset returns every visual-only chair to its saved position
     updateDecorNodes();
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
@@ -3726,6 +3773,7 @@ function boot() {
       useId=using?(game.action.id==='dining'&&game.action.diningStage==='taking'
         ?'fridge':game.action.id):pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const alexDining=useId==='dining'&&game.action?.diningStage==='eating';
+    const alexDiningVisual=alexDining?diningVisualFor('alex',game.action):diningVisual.alex;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,
       game.action?.id==='dining'?6:ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
@@ -3759,7 +3807,10 @@ function boot() {
       alexReadingStage?animDt*game.speed:animDt);
     const alexSeatBase=sofaTransitionPose(sofaStates.alex);
     const seatPose=(purchasedSeatPrefab(game.world,sofaVisualTargets.alex)
-      ?purchasedSeatPose(game.world,sofaVisualTargets.alex,alexSeatBase)
+      ?(alexDiningVisual&&alexDiningVisual.chairId===sofaVisualTargets.alex
+        ?purchasedDiningSeatPose(game.world,sofaVisualTargets.alex,alexSeatBase,
+          sofaStates.alex.progress,alexDiningVisual.side,alexDiningVisual.maxPull)
+        :purchasedSeatPose(game.world,sofaVisualTargets.alex,alexSeatBase))
       :furniturePose(game.world,'sofa',
         romanticSofaSlots.alex===null?alexSeatBase:
           {...alexSeatBase,x:alexSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.alex)},
@@ -3767,7 +3818,7 @@ function boot() {
       {...display,sofaWeight:0};
     const seating=useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexReadingSeated||alexDining||
       sofaStates.alex.progress>0||alexDateSofa;
-    if(!seating){sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;}
+    if(!seating){sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;diningVisual.alex=null;}
     if(alexSeatInstanceId!==sofaVisualTargets.alex||
       alexSeatSlot!==romanticSofaSlots.alex){
       alexSeatInstanceId=sofaVisualTargets.alex;
@@ -3881,6 +3932,7 @@ function boot() {
       game.otherSim.action.diningStage==='taking'?'fridge':game.otherSim.action.id):
       pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const miraDining=miraUseId==='dining'&&game.otherSim.action?.diningStage==='eating';
+    const miraDiningVisual=miraDining?diningVisualFor('mira',game.otherSim):diningVisual.mira;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,
       game.otherSim.action?.id==='dining'?6:ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
@@ -3914,7 +3966,10 @@ function boot() {
       miraReadingStage?animDt*game.speed:animDt);
     const miraSeatBase=sofaTransitionPose(sofaStates.mira);
     const miraSeatPose=(purchasedSeatPrefab(game.world,sofaVisualTargets.mira)
-      ?purchasedSeatPose(game.world,sofaVisualTargets.mira,miraSeatBase)
+      ?(miraDiningVisual&&miraDiningVisual.chairId===sofaVisualTargets.mira
+        ?purchasedDiningSeatPose(game.world,sofaVisualTargets.mira,miraSeatBase,
+          sofaStates.mira.progress,miraDiningVisual.side,miraDiningVisual.maxPull)
+        :purchasedSeatPose(game.world,sofaVisualTargets.mira,miraSeatBase))
       :furniturePose(game.world,'sofa',
         romanticSofaSlots.mira===null?miraSeatBase:
           {...miraSeatBase,x:miraSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.mira)},
@@ -3922,7 +3977,9 @@ function boot() {
       {...miraDisplay,sofaWeight:0};
     const miraSeating=miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraReadingSeated||miraDining||
       sofaStates.mira.progress>0||miraDateSofa;
-    if(!miraSeating){sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;}
+    if(!miraSeating){sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;diningVisual.mira=null;}
+    // Both residents' chair roots share the same reversible animation curve.
+    renderDiningChairOffsets();
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
     bedStates.mira=advanceBedTransition(bedStates.mira,
       miraUseId==='bed'&&sofaStates.mira.progress===0&&!showerStates.mira.active,
@@ -4088,7 +4145,11 @@ function boot() {
       diningFrame:alexDining?{phase:'using',activityId:'dining.meal',elapsed:game.action.elapsed}:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
-      seat:seatContactEnabled?livingSofaSeat:null,
+      seat:seatContactEnabled?(alexDiningVisual&&
+        alexDiningVisual.chairId===sofaVisualTargets.alex
+        ?purchasedDiningSeatSurface(game.world,alexDiningVisual.chairId,
+          diningChairPullOffset(sofaStates.alex.progress,alexDiningVisual.maxPull))
+        :livingSofaSeat):null,
       seatMode,
       bedBusy:bedStates.alex.progress>0,
       bedFrame:bedPose,

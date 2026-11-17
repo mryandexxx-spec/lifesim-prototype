@@ -5,6 +5,7 @@ import {ROOM,isWalkable,findPath} from './navigation.js';
 import {BED_SLOTS} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
 import {musicListeningSpots,chooseMusicListeningSpot} from './music-listening.js';
+import {diningSeatMatches,diningSeatApproach,isPermittedDiningTuck} from './dining.js';
 
 const validPose=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&[0,90,180,270].includes(p.yaw);
 const overlap=(a,b)=>Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*
@@ -31,16 +32,28 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
     if(b.minX<ROOM.minX-.05||b.maxX>ROOM.maxX+.05||
       b.minZ<ROOM.minZ-.05||b.maxZ>ROOM.maxZ+.05)
       return {ok:false,reason:'room-bounds'};
-    if(boxes.some(other=>other.instanceId!==instanceId&&overlap(b,other)>.025))
+    if(boxes.some(other=>other.instanceId!==instanceId&&overlap(b,other)>.025&&
+      !isPermittedDiningTuck(candidate,b.instanceId,other.instanceId)))
       return {ok:false,reason:'collision'};
   }
   // Unlike H2 1.2u, a green shop preview cannot knowingly place a music
   // station against every wall/obstacle with no walkable listening side.
   if(target.prefabId==='music'&&!musicListeningSpots(candidate,instanceId).length)
     return {ok:false,reason:'unreachable-music'};
-  // Sitting needs a real clear front approach, not just a renderable mesh.
+  // A chair tucked into a dining table is reached from its walkable side.
+  // Other seating and all utility furniture preserve their ordinary front slot.
+  const diningTables=target.prefabId==='chair'
+    ?candidate.instances.filter(table=>table.prefabId==='diningtable'&&
+      table.location==='home'&&diningSeatMatches(candidate,table.instanceId,instanceId))
+    :[];
+  const diningPoint=diningTables.length
+    ?diningTables.map(t=>diningSeatApproach(candidate,t.instanceId,instanceId))
+      .find(Boolean)||null:null;
+  const targetApproach=diningTables.length?diningPoint:
+    furnitureActionApproach(candidate,FURNITURE_CATALOG[target.prefabId].actionId,instanceId);
+  // Sitting needs a real clear interaction slot, not just a renderable mesh.
   if(['chair','armchair','floorlamp','mirror','dresser','wardrobe'].includes(target.prefabId)){
-    const approach=furnitureActionApproach(candidate,FURNITURE_CATALOG[target.prefabId].actionId,instanceId);
+    const approach=targetApproach;
     if(!approach||!isWalkable(approach.x,approach.z,candidate))
       return {ok:false,reason:'unreachable-seat'};
   }
@@ -56,7 +69,7 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
     if(target.prefabId==='music'&&!chooseMusicListeningSpot(candidate,person,instanceId))
       return {ok:false,reason:'unreachable-music'};
     if(['chair','armchair','floorlamp','mirror','dresser','wardrobe'].includes(target.prefabId)){
-      const sitting=furnitureActionApproach(candidate,FURNITURE_CATALOG[target.prefabId].actionId,instanceId);
+      const sitting=targetApproach;
       if(!sitting||!findPath(person,sitting,candidate))
         return {ok:false,reason:'unreachable-seat'};
     }
