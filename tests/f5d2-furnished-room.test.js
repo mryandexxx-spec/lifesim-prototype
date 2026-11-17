@@ -21,9 +21,9 @@ const setup=()=>{
     ...root.world.furniture,revision:1,
     instances:[...root.world.furniture.instances,
       {instanceId:'shop-plant-a',prefabId:'plant',
-        x:16,z:-2,yaw:0,location:'home',purchasePriceCredits:100},
+        x:16,z:-2,yaw:0,location:'home',itemDefinitionId:'plant.amber',purchasePriceCredits:100},
       {instanceId:'shop-rug-b',prefabId:'rug',
-        x:17,z:-1,yaw:90,location:'home',purchasePriceCredits:45}]
+        x:17,z:-1,yaw:90,location:'home',itemDefinitionId:'rug.geo',purchasePriceCredits:45}]
   });
   assert.equal(root.world.furniture.instances.length,12);
   return root;
@@ -117,10 +117,10 @@ test('F5-D.2 permits purchased furniture on built floor beyond old limits, resto
   assert.equal(get(loaded.world.furniture,'shop-plant-a').yaw,90);
 });
 test('F5-D.2 shop preview uses the full lot but preserves normal initial camera center',()=>{
-  assert.deepEqual(cameraPlacementPose({centerX:18,centerZ:7}),{x:18,z:7,yaw:0});
+  assert.deepEqual(cameraPlacementPose({centerX:18,centerZ:7},null,'lot'),{x:18,z:7,yaw:0});
   assert.deepEqual(cameraPlacementPose({centerX:0,centerZ:0}),{x:0,z:0,yaw:0});
   const drag=dragShopPlacement({yaw:0,pitch:60,distance:18,centerX:10,centerZ:0},
-    {x:20,z:7,yaw:90},300,300,800);
+    {x:20,z:7,yaw:90},300,300,800,'lot');
   assert.ok(drag&&drag.x<=22.75&&drag.z<=11.75);
 });
 test('F5-D.2 browser wiring and Pages deployment includes atomic mover',()=>{
