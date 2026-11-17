@@ -67,6 +67,24 @@ try{
   await page.locator('#career-phone-toggle').click();
   await page.locator('#career-phone-panel').getByText(/Смен на должности/).waitFor();
   await page.locator('#career-phone-panel .career-phone-x').click();
+  // The touch screen promotion action is exercised after a saved eligible
+  // career snapshot; earning those requirements is covered by pure tests.
+  await page.evaluate(key=>{
+    const saved=JSON.parse(localStorage.getItem(key));
+    const contract=saved.careerSystem.byResident.alex;
+    contract.currentShift=null;contract.performance=82;contract.rankShifts=3;
+    saved.skills.xpById.literature=35;
+    localStorage.setItem(key,JSON.stringify(saved));
+  },SAVE_KEY);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:35000});
+  await page.locator('#career-phone-toggle').click();
+  await page.locator('#career-phone-panel').getByRole('button',{name:'Получить повышение'}).click();
+  const advanced=await state();
+  assert.equal(advanced.careerSystem.byResident.alex.level,1);
+  assert.equal(advanced.careerSystem.byResident.alex.rankShifts,0);
+  assert.equal(advanced.shop.credits,5112);
+  await page.locator('#career-phone-panel .career-phone-x').click();
   assert.equal(errors.length,0,errors.join('\n'));
   console.log('W1-B.3a WebGL 390x844: work status, hidden-presence model, payroll and reload: passed');
 }finally{await browser.close();}
