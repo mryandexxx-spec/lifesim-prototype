@@ -20,6 +20,7 @@ on:
       - 'tests/f5b4-ceilings-patterns.test.js'
       - 'tests/f5c1-roof.test.js'
       - 'tests/f5c2-exteriors.test.js'
+      - 'tests/f5d1-rooms.test.js'
       - '.github/workflows/f5a-browser-checks.yml'
   workflow_dispatch:
 permissions:
