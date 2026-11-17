@@ -132,7 +132,7 @@ test('F4D: runtime contract and Pages delivery expose the new action',()=>{
   assert.match(game,/actionId:\(useId==='seat'\|\|alexDining\)\?'sofa':useId/);
   assert.match(game,/actionId:\(miraUseId==='seat'\|\|miraDining\)\?'sofa':miraUseId/);
   assert.match(game,/box\('floor',4\.625,-0\.032,0,19\.25/);
-  assert.match(html,/1\.2u\.16 · H5c \/ H5b \/ F4G\.1 \/ H5a-safe \/ F4F\.2/);
+  assert.match(html,/1\.2u\.17 · F4G\.2 \/ H5c \/ H5b \/ F4F\.2/);
   assert.match(html,/seat-furniture\.js\?v=1\.2v-f4d/);
   assert.match(workflow,/node --check src\/seat-furniture\.js/);
   assert.match(workflow,/src\/seat-furniture\.js src\/dining\.js src\/furniture-interactions\.js site\/src\//);
