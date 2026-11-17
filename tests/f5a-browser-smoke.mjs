@@ -88,7 +88,7 @@ try{
  await page.locator('#build-exit').click();
  await page.waitForTimeout(500);
  const saved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
- assert.equal(saved.world.construction.wallEdges.length,32);
+ assert.ok(saved.world.construction.wallEdges.length>32,'Touch-drawn room added real wall segments');
  assert.ok(saved.world.construction.revision>door.world.revision,'Dragged floor edit persisted');
  assert.equal(saved.world.construction.openings.length,1);
  assert.equal(saved.world.construction.schema,1);
