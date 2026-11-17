@@ -42,9 +42,14 @@ export function holidaysOnDate(calendar,iso){
   const date=parseCivilDate(iso);if(!date)return [];
   return holidayDefinitions(calendar).filter(h=>h.enabled&&h.month===date.month&&h.day===date.day);
 }
-export function isCalendarDayOff(calendar,iso,{weekends=[5,6]}={}){
+export function restoreWeekendDays(raw){
+  if(!Array.isArray(raw))return [5,6];
+  return [...new Set(raw.filter(n=>Number.isInteger(n)&&n>=0&&n<=6))].sort((a,b)=>a-b);
+}
+export function isCalendarDayOff(calendar,iso,{weekends=null}={}){
+  const weekendDays=weekends??restoreWeekendDays(calendar?.weekendDays);
   const date=parseCivilDate(iso);if(!date)return false;
-  return weekends.includes(weekdayFromSerial(civilToSerial(iso)))||
+  return weekendDays.includes(weekdayFromSerial(civilToSerial(iso)))||
     holidaysOnDate(calendar,iso).some(h=>h.dayOffWork);
 }
 export function expandHolidays(calendar,fromISO,toISO){

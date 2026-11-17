@@ -4,7 +4,7 @@
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS } from './simulation.js';
 import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar} from './calendar-core.js';
 import {restoreEventRecords} from './calendar-events.js';
-import {holidayDefinitions} from './calendar-holidays.js';
+import {holidayDefinitions,restoreWeekendDays} from './calendar-holidays.js';
 import {restoreReminderReceipts} from './calendar-reminders.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
@@ -106,7 +106,8 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     holidays:Array.isArray(raw.calendar?.holidays)
       ?holidayDefinitions({holidays:raw.calendar.holidays}).filter(h=>
         raw.calendar.holidays.some(saved=>saved?.id===h.id)):[],
-    reminderReceipts:restoreReminderReceipts(raw.calendar?.reminderReceipts)};
+    reminderReceipts:restoreReminderReceipts(raw.calendar?.reminderReceipts),
+    weekendDays:restoreWeekendDays(raw.calendar?.weekendDays)};
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
     construction:restoreConstructionWorld(raw.world?.construction)};
   root.kitchen=restoreKitchen(raw.kitchen);

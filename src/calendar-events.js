@@ -96,11 +96,23 @@ function ordinal(event,serial){
   if(event.repeat==='monthly'){
     if(date.day!==anchor.day)return null;
     const months=(date.year-anchor.year)*12+date.month-anchor.month;
-    return months>=0?months+1:null; // missing month days are skipped, not shifted
+    if(months<0)return null;
+    let count=0;
+    for(let offset=0;offset<=months;offset++){
+      const total=anchor.year*12+anchor.month-1+offset;
+      const y=Math.floor(total/12),m=total%12+1;
+      if(anchor.day<=daysInMonth(y,m))count++;
+    }
+    return count; // absent 31st never consumes the recurrence count
   }
   if(event.repeat==='yearly'){
     if(date.month!==anchor.month||date.day!==anchor.day)return null;
-    return date.year-anchor.year+1; // Feb 29 skipped in normal years
+    if(anchor.month===2&&anchor.day===29){
+      let count=0;
+      for(let year=anchor.year;year<=date.year;year++)if(daysInMonth(year,2)===29)count++;
+      return count;
+    }
+    return date.year-anchor.year+1;
   }
   return null;
 }

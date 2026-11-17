@@ -21,7 +21,13 @@ const markup=`
  <div id="lc-agenda" class="lc-agenda"></div>
  <div class="lc-heading"><h3>Ближайшее</h3><button id="lc-add-holiday">+ Праздник</button></div>
  <div id="lc-upcoming" class="lc-upcoming"></div>
- <details class="lc-settings"><summary>Праздники и настройки</summary><div id="lc-holidays"></div><button id="lc-anchor">Начальная дата игры</button><small>Изменить дату можно до появления событий и пользовательских праздников.</small></details>
+ <details class="lc-settings"><summary>Праздники и настройки</summary>
+ <fieldset id="lc-weekends"><legend>Выходные дни недели</legend>
+  <div class="lc-weekdays"><label><input type="checkbox" data-weekend="0"/>Пн</label><label><input type="checkbox" data-weekend="1"/>Вт</label>
+  <label><input type="checkbox" data-weekend="2"/>Ср</label><label><input type="checkbox" data-weekend="3"/>Чт</label>
+  <label><input type="checkbox" data-weekend="4"/>Пт</label><label><input type="checkbox" data-weekend="5"/>Сб</label>
+  <label><input type="checkbox" data-weekend="6"/>Вс</label></div></fieldset>
+ <div id="lc-holidays"></div><button id="lc-anchor">Начальная дата игры</button><small>Изменить дату можно до появления событий и пользовательских праздников.</small></details>
 </div>
 <form id="lc-event-form" class="lc-form" hidden>
 <h3>Событие</h3>
@@ -129,7 +135,10 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor}){
   for(const h of holidayDefinitions(c))
     holidaysList.append(row(h.title,pad(h.day)+'.'+pad(h.month)+' · '+(h.enabled?'включён':'выключен')+
       (h.dayOffWork?' · нерабочий':''),()=>showHoliday(h),true));
-  el('lc-anchor').disabled=Boolean(c.events?.length||c.holidays?.length||c.reminderReceipts?.length);
+  wrap.querySelectorAll('[data-weekend]').forEach(box=>{
+    box.checked=(c.weekendDays??[5,6]).includes(Number(box.dataset.weekend));
+   });
+   el('lc-anchor').disabled=Boolean(c.events?.length||c.holidays?.length||c.reminderReceipts?.length);
  }
  function eventFields(){
   el('lc-week').hidden=field(eventForm,'repeat').value!=='weekly';
@@ -178,6 +187,11 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor}){
  el('lc-event-back').addEventListener('click',()=>{back();cache='';render();});
  el('lc-holiday-back').addEventListener('click',()=>{back();cache='';render();});
  el('lc-anchor').addEventListener('click',()=>{close();onAnchor();});
+ wrap.querySelectorAll('[data-weekend]').forEach(box=>box.addEventListener('change',()=>{
+   const weekendDays=[...wrap.querySelectorAll('[data-weekend]:checked')]
+     .map(node=>Number(node.dataset.weekend)).sort((a,b)=>a-b);
+   commit({...getRoot().calendar,weekendDays});render();notify('Выходные дни обновлены');
+ }));
  field(eventForm,'repeat').addEventListener('change',eventFields);
  field(eventForm,'allDay').addEventListener('change',eventFields);
  eventForm.addEventListener('submit',e=>{

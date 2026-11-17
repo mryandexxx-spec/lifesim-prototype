@@ -15,7 +15,7 @@ export function consumeCalendarReminders(calendar,previousMinutes,currentMinutes
     currentMinutes<=previousMinutes)return {calendar,messages:[]};
   const seen=new Set(restoreReminderReceipts(calendar.reminderReceipts)),messages=[];
   // Chunk event expansion into safe one-year viewports even for large simulation jumps.
-  const left=Math.floor((previousMinutes-1440)/1440),right=Math.floor(currentMinutes/1440);
+  const left=Math.floor((previousMinutes-1440)/1440),right=Math.floor((currentMinutes+1440)/1440);
   const base=civilToSerial(calendar.startCivilDate);
   let processed=0;
   for(let day=left;day<=right&&processed<730;day+=60,processed+=60){

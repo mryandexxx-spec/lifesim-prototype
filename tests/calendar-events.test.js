@@ -77,3 +77,22 @@ test('malformed saved events/overrides are rejected, bounded and sanitized',()=>
   assert.equal(restored.events[0].id,'ce-9');
   assert.equal(restored.eventSeq,10);
 });
+
+test('monthly and yearly repetition count includes only valid calendar occurrences',()=>{
+ let c=createCalendar('2024-01-01');
+ c=addCalendarEvent(c,event('2024-01-31',{repeat:'monthly',count:2}));
+ c=addCalendarEvent(c,event('2024-02-29',{repeat:'yearly',count:2}));
+ assert.deepEqual(expandCalendarEvents(c,'2024-01-01','2024-04-01').filter(e=>e.id==='ce-1').map(e=>e.iso),
+  ['2024-01-31','2024-03-31']);
+ assert.deepEqual(expandCalendarEvents(c,'2028-02-01','2028-03-01').filter(e=>e.id==='ce-2').map(e=>e.iso),
+  ['2028-02-29']);
+ assert.equal(expandCalendarEvents(c,'2032-02-01','2032-03-01').filter(e=>e.id==='ce-2').length,0);
+});
+test('customized calendar weekends retain holiday override for later career policy',()=>{
+ let c=createCalendar('2026-11-17');
+ c={...c,weekendDays:[1,3]};
+ assert.equal(isCalendarDayOff(c,'2026-11-17'),true);
+ assert.equal(isCalendarDayOff(c,'2026-11-21'),false);
+ c=saveHoliday(c,{title:'Воскресный фестиваль',month:11,day:22,dayOffWork:true});
+ assert.equal(isCalendarDayOff(c,'2026-11-22'),true);
+});
