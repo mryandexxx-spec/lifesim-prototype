@@ -31,7 +31,7 @@ test('F1 edit mode freezes sim without overwriting persisted manual pause or que
   assert.match(game,/editorContext\(\)/);
   assert.match(game,/paths\[id\]=\{points:null,index:0,id:null\}/);
   assert.doesNotMatch(game,/furnishMode=true;\s*game\.paused=true/);
-  assert.match(game,/if\(dialogueNeedsDecision\(game\)\|\|furnishMode\)return/);
+  assert.match(game,/if\(dialogueNeedsDecision\(game\)\|\|careerPhone\.interviewNeedsDecision\(\)\|\|furnishMode\)return/);
 });
 test('F1 groups real multi-part primitives under saved instance nodes and rewires table occlusion',()=>{
   for(const type of ['nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet']){

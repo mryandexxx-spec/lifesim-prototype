@@ -7,6 +7,7 @@ import {restoreEventRecords} from './calendar-events.js';
 import {holidayDefinitions,restoreWeekendDays} from './calendar-holidays.js';
 import {restoreReminderReceipts} from './calendar-reminders.js';
 import {newCareerSystem,restoreCareerSystem} from './career-state.js';
+import {newRecruitmentSystem,restoreRecruitmentSystem,progressCareerRecruitment} from './career-recruitment.js';
 import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork} from './career-work.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
@@ -74,6 +75,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   // W1-A.1: one root-only Gregorian epoch; neither resident keeps a separate calendar.
   state.calendar=createCalendar(suggestedDate);
   state.careerSystem=newCareerSystem();
+  state.recruitmentSystem=newRecruitmentSystem();
   state.otherSim=newMira(state.minutes);
   state.skills=newSkillProgress();
   state.createdWorks=[];
@@ -116,6 +118,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.careerSystem=restoreCareerSystem(raw.careerSystem);
+  root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem);
   root.objectOnceLedger=restoreObjectOnceLedger(raw.objectOnceLedger);
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
     raw.otherSim.version===1 && raw.otherSim.needs && raw.otherSim.position;
@@ -754,7 +757,8 @@ export function tickHousehold(root,minutes) {
   if (root.paused || !Number.isFinite(minutes) || minutes<=0) return;
   const other=root.otherSim;
   if (!other) return tick(root,minutes);
-  const careerEvents=progressCareerWork(root,root.minutes,root.minutes+minutes);
+  const careerEvents=[...progressCareerWork(root,root.minutes,root.minutes+minutes),
+    ...progressCareerRecruitment(root,root.minutes,root.minutes+minutes)];
   other.minutes=root.minutes;
   other.paused=root.paused;
   other.speed=root.speed;

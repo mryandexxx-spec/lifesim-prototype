@@ -1568,7 +1568,7 @@ function renderPauseButton(){
       :paused?'Продолжить':'Пауза');
 }
 $('pause-btn').addEventListener('click', () => {
-  if(dialogueNeedsDecision(game)||furnishMode)return;
+  if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||furnishMode)return;
   game.paused = !game.paused;
   renderPauseButton();
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
@@ -5367,7 +5367,8 @@ function boot() {
     }
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
-    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&!document.hidden;
+    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&
+      !careerPhone.interviewNeedsDecision()&&!document.hidden;
     const frameActive=active&&!buildMode;
     const sharedSound=frameActive&&game.socialAction?.phase==='using'&&
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
@@ -5396,6 +5397,7 @@ function boot() {
         if(careerEvents.length){
           save(true);
           updateCareerHud();
+          careerPhone.refresh();
           if(careerEvents.length===1)toast('💼 '+careerEvents[0].text);
           else toast('💼 '+careerEvents.map(entry=>entry.text).join(' · '));
         }

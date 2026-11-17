@@ -54,15 +54,15 @@ try{
   assert.ok(await phone.isVisible());
   assert.equal(await phone.getAttribute('aria-label'),'Смартфон: работа Блин’С');
   assert.equal(await phone.getByRole('button',{name:/^Вакансия /}).count(),6);
-  await phone.getByRole('button',{name:/Вакансия Редакция/}).click();
-  assert.ok(await phone.getByText('Стажёр редакции').isVisible());
+  await phone.getByRole('button',{name:/Вакансия Арт-студия/}).click();
+  assert.ok(await phone.getByText('Ассистент галереи').isVisible());
   assert.ok(await phone.getByText(/Первая смена:/).isVisible());
   assert.equal((await state()).careerSystem.byResident.alex,null,'Preview never hires');
   await phone.getByRole('button',{name:'Получить предложение'}).click();
   assert.equal((await state()).careerSystem.byResident.alex,null,'Offer page never hires');
   await phone.getByRole('button',{name:'Подписать договор'}).click();
   const hired=await state();
-  assert.equal(hired.careerSystem.byResident.alex.careerId,'editorial');
+  assert.equal(hired.careerSystem.byResident.alex.careerId,'art-studio');
   assert.equal(hired.careerSystem.byResident.mira,null);
   assert.equal(hired.shop.credits,initial.shop.credits,'No artificial wages');
   assert.ok(await phone.getByText(/Следующая смена:/).isVisible());
@@ -78,7 +78,7 @@ try{
   await phone.getByRole('button',{name:'Подписать договор'}).click();
   const dual=await state();
   assert.equal(dual.careerSystem.byResident.mira.careerId,'civic-service');
-  assert.equal(dual.careerSystem.byResident.alex.careerId,'editorial');
+  assert.equal(dual.careerSystem.byResident.alex.careerId,'art-studio');
   assert.notEqual(dual.careerSystem.byResident.alex.employmentId,
     dual.careerSystem.byResident.mira.employmentId);
   assert.equal(dual.shop.credits,initial.shop.credits);
@@ -87,12 +87,12 @@ try{
   await page.locator('#career-phone-toggle').click();
   assert.ok(await page.locator('#career-phone-panel').getByText(/Результативность:/).isVisible());
   const restored=await state();
-  assert.equal(restored.careerSystem.byResident.alex.careerId,'editorial');
+  assert.equal(restored.careerSystem.byResident.alex.careerId,'art-studio');
   assert.equal(restored.careerSystem.byResident.mira.careerId,'civic-service');
   assert.equal(restored.shop.credits,initial.shop.credits);
   await page.locator('#career-phone-panel .career-phone-x').click();
   await page.locator('#calendar-anchor-toggle').click();
-  assert.ok(await page.locator('#lc-agenda').getByText(/Работа: Редакция/).isVisible(),
+  assert.ok(await page.locator('#lc-agenda').getByText(/Работа: Арт-студия/).isVisible(),
     'The existing game calendar shows the genuine accepted career shift');
   await page.locator('#lc-close').click();
   assert.equal(errors.length,0,errors.join('\n'));
