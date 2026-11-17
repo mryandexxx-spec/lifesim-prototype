@@ -232,6 +232,36 @@ try{
  const restoredOpening=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
  assert.equal(restoredOpening.world.construction.openings.find(o=>o.id===arch.id)?.type,'door');
  assert.equal(restoredOpening.world.construction.openings.find(o=>o.id===arch.id)?.styleId,'door.double');
+  // F5-B.4: actual mobile WebGL touch on ceiling/pattern and v1 save.
+  await page.locator('#build-toggle').click();
+  await page.locator('[data-build-tool="paint-ceiling-room"]').click();
+  assert.equal(await page.locator('#build-ceiling-toggle').getAttribute('aria-pressed'),'true');
+  await page.locator('[data-finish-id="ceiling.blue"]').click();
+  const ceilingTap=project(16,0);
+  await send('pointerdown',ceilingTap,'canvas');
+  await send('pointerup',ceilingTap,'window');
+  assert.ok(await page.locator('#build-pending').isVisible(),
+    'F5-B.4 ceiling touch must stage valid preview');
+  await page.locator('#build-apply').click();
+  const ceilingSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.equal(ceilingSave.world.construction.materials.ceiling['32,0'],'ceiling.blue');
+  await page.screenshot({path:'f5b4-ceiling-preview.png'});
+  await page.locator('[data-build-tool="paint-floor"]').click();
+  assert.equal(await page.locator('#build-ceiling-toggle').getAttribute('aria-pressed'),'false');
+  await page.locator('[data-finish-id="floor.planks-z"]').click();
+  await send('pointerdown',ceilingTap,'canvas');
+  await send('pointerup',ceilingTap,'window');
+  assert.ok(await page.locator('#build-pending').isVisible());
+  await page.locator('#build-apply').click();
+  const patterned=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.equal(patterned.world.construction.materials.floor['32,0'],'floor.planks-z');
+  await page.screenshot({path:'f5b4-floor-direction.png'});
+  await page.locator('#build-exit').click();
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
+  const restoredB4=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.equal(restoredB4.world.construction.materials.ceiling['32,0'],'ceiling.blue');
+  assert.equal(restoredB4.world.construction.materials.floor['32,0'],'floor.planks-z');
   console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));
  assert.deepEqual(errors,[],'Real PlayCanvas/ES module browser runtime must not error');
