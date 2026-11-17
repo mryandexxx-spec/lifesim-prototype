@@ -1195,3 +1195,21 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .build-finish-chip{display:block;width:42px;height:26px;border-radius:6px;border:1px solid #0002;}
 .build-finish-swatch small{font-weight:800;font-size:10px;line-height:1.1;max-width:84px;text-align:center;}
 .build-editor[data-tool^="paint-"],.build-editor[data-tool="sample-finish"]{max-height:min(57dvh,445px);}
+
+/* F5-B.2 architectural opening catalogue: 44px controls, swipe-safe on iPhone. */
+.build-opening-picker{border:1px solid #bfcdbf;border-radius:12px;background:#edf4eb;
+  padding:8px;display:flex;flex-direction:column;gap:7px;}
+.build-opening-picker[hidden]{display:none!important;}
+.build-opening-picker strong{font-size:12px;color:#34634d;}
+.build-opening-picker small{font-size:10px;color:#647c6c;line-height:1.25;}
+.build-opening-variants{display:flex;gap:7px;overflow-x:auto;padding-bottom:5px;
+  touch-action:pan-x;min-height:50px;}
+.build-opening-variant{flex:none;max-width:154px;min-width:110px;min-height:48px;
+  font-size:12px;font-weight:800;color:#33674e;background:#fff;
+  border:2px solid #c6dfca;padding:8px;border-radius:11px;}
+.build-opening-variant[aria-pressed="true"]{color:#fff;background:#347d5f;border-color:#347d5f;}
+.build-opening-variant:disabled{opacity:.55;cursor:default;}
+.build-editor[data-tool="door"],.build-editor[data-tool="window"],
+.build-editor[data-tool="arch"],.build-editor[data-tool="change-opening"]{
+  max-height:min(57dvh,445px);
+}
