@@ -3866,7 +3866,7 @@ function boot() {
       });
       buildFinishPalette.appendChild(button);
     }
-    $('build-finish-side').hidden=kind!=='wall';
+    $('build-finish-side-label').hidden=kind!=='wall';
     $('build-finish-side').value=finishSide;
     $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':'Покрытие пола';
   };
