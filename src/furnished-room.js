@@ -20,7 +20,8 @@ const within=(rect,room)=>rect.minX>=room.i0*.5-.005&&
 
 /** Existing shop products retain instance IDs, variants, price, state and inventory. */
 export function proposeFurnishedRoomMove(household,command,context={}){
-  const construction=household?.construction||household?.world?.construction;
+  const construction=household?.construction||household?.world?.construction||
+    (household?.world?.schema===1?household.world:null);
   const furniture=household?.furniture||household?.world?.furniture;
   if(!construction||!furniture||command?.type!=='room-relocate')
     return fail('invalid-command');
