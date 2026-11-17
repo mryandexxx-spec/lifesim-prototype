@@ -17,15 +17,15 @@ import {diningSeatApproach} from '../src/dining.js';
 
 const instances=[
   {instanceId:'shop-prep-901',prefabId:'prep',itemDefinitionId:'prep.oak',
-    x:8,z:1.2,yaw:0,location:'home'},
+    x:9.2,z:1.5,yaw:0,location:'home'},
   {instanceId:'shop-stove-902',prefabId:'stove',itemDefinitionId:'stove.copper',
-    x:10.4,z:1.2,yaw:0,location:'home'},
+    x:11.3,z:1.5,yaw:0,location:'home'},
   {instanceId:'shop-sink-903',prefabId:'sink',itemDefinitionId:'sink.farm',
-    x:12.4,z:1.2,yaw:0,location:'home'},
+    x:13.0,z:1.5,yaw:0,location:'home'},
   {instanceId:'shop-diningtable-904',prefabId:'diningtable',
-    itemDefinitionId:'diningtable.farm',x:8,z:-1.45,yaw:0,location:'home'},
+    itemDefinitionId:'diningtable.farm',x:6.8,z:-1.5,yaw:0,location:'home'},
   {instanceId:'shop-chair-905',prefabId:'chair',itemDefinitionId:'chair.loft',
-    x:8,z:.8,yaw:0,location:'home'}
+    x:6.8,z:.75,yaw:0,location:'home'}
 ];
 function home(){
  const h=newHousehold();h.autonomy.enabled=false;h.otherSim.autonomy.enabled=false;
