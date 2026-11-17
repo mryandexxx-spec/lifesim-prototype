@@ -13,7 +13,8 @@ import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.j
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
-import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,BUILD_LOT,constructionBounds} from './construction.js';
+import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
+  starterShellSegments,starterShellOffset,BUILD_LOT,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
@@ -1815,7 +1816,7 @@ function boot() {
       const source=game.world.furniture.instances.find(i=>
         i.instanceId===work.easelInstanceId&&i.prefabId==='easel');
       const origin=work.origin||(source?{x:source.x,z:source.z,yaw:source.yaw}:null);
-      const position=artworkDisplayPose(work,index,origin);
+      const position=artworkDisplayPose(work,index,origin,game.world.construction);
       if(!position)continue;
       let node=artworkNodes.get(work.id);
       if(!node){
@@ -1878,6 +1879,9 @@ function boot() {
   box('floor',4.625,-0.032,0,19.25,.12,8.65,M.floor);
   for (let i=0;i<19;i++) box('floor plank',-4.45+i*.99,.034,0,.021,.008,8.6,M.line);
 
+  const starterBackDecor=new pc.Entity('Starter back-wall art anchor');
+  const starterLeftDecor=new pc.Entity('Starter left-wall shelf anchor');
+  app.root.addChild(starterBackDecor);app.root.addChild(starterLeftDecor);
   const legacyWallNodes=[
     box('back wall',4.625,1.40,-4.34,19.27,2.9,.16,M.wall),
     box('left wall',-4.97,1.40,0,.16,2.9,8.65,M.wall2),
@@ -1910,8 +1914,36 @@ function boot() {
     clearConstructionNodes();
     lotGround.enabled=buildMode;
     const raised=constructionWallMode!=='down';
-    for(const w of legacyWallNodes)w.enabled=raised;
-    for(const w of legacySkirts)w.enabled=true;
+    const w=starterShellOffset(state,'west'),e=starterShellOffset(state,'east');
+    const n=starterShellOffset(state,'north'),s=starterShellOffset(state,'south');
+    const width=19.27+e-w,depth=8.65+s-n;
+    const widthCenter=4.625+(w+e)/2,depthCenter=(n+s)/2;
+    // Preserve exact legacy geometry at zero offset. Resizing moves the real
+    // original walls, their coping and skirting, not merely an outline.
+    legacyWallNodes[0].setPosition(widthCenter,1.40,-4.34+n);
+    legacyWallNodes[0].setLocalScale(width,2.9,.16);
+    legacyWallNodes[1].setPosition(-4.97+w,1.40,depthCenter);
+    legacyWallNodes[1].setLocalScale(.16,2.9,depth);
+    legacyWallNodes[2].setPosition(widthCenter,2.91,-4.30+n);
+    legacyWallNodes[2].setLocalScale(19.35+e-w,.13,.2);
+    legacyWallNodes[3].setPosition(-4.96+w,2.91,depthCenter);
+    legacyWallNodes[3].setLocalScale(.20,.13,8.68+s-n);
+    legacySkirts[0].setPosition(widthCenter,.16,-4.19+n);
+    legacySkirts[0].setLocalScale(19.25+e-w,.18,.13);
+    legacySkirts[1].setPosition(-4.83+w,.16,depthCenter);
+    legacySkirts[1].setLocalScale(.13,.18,8.5+s-n);
+    starterBackDecor.setPosition(0,0,n);
+    starterLeftDecor.setPosition(w,0,0);
+    for(const wall of legacyWallNodes)wall.enabled=raised;
+    for(const wall of legacySkirts)wall.enabled=true;
+    // The old apartment has an open front/right cutaway. Render their
+    // editable boundary lines in Build; never create a surprise A* barrier.
+    if(buildMode){
+      buildBox('F5 starter front edge',widthCenter,.092,4.5+s,
+        19+e-w,.12,.11,M.trim);
+      buildBox('F5 starter right edge',14+e,.092,depthCenter,
+        .11,.12,9+s-n,M.trim);
+    }
     if(state.legacy)return;
     const grid=.5,base=new Set();
     for(let i=-10;i<28;i++)for(let j=-9;j<9;j++)base.add(i+','+j);
@@ -1995,21 +2027,21 @@ function boot() {
     // UP mode adds former open-front boundaries for an exterior view only.
     // These are cosmetic: no surprise path block in legacy saves.
     if(exterior){
-      buildBox('F5 legacy front up',4.625,1.4,4.34,19.27,2.9,.16,M.wall);
-      buildBox('F5 legacy right up',14.25,1.4,0,.16,2.9,8.65,M.wall);
+      buildBox('F5 legacy front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
+      buildBox('F5 legacy right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
     }
   };
   syncConstructionRender(true);
   // Wall art: one picture, one shelf and one window with sky-coloured panes.
-  box('window frame',-2.18,1.87,-4.16,2.0,1.28,.1,M.paleWood);
-  box('window',-2.18,1.87,-4.06,1.77,1.08,.08,M.blue);
-  box('window cross vertical',-2.18,1.87,-3.99,.09,1.14,.13,M.cream);
-  box('window cross horizontal',-2.18,1.88,-3.99,1.84,.09,.13,M.cream);
-  box('landscape',.2,2.12,-4.13,1.1,.72,.12,M.wood);
-  box('landscape inside',.2,2.12,-4.03,.93,.56,.07,M.slate);
-  ball('art sun',.42,2.22,-3.97,.25,.25,.04,M.yellow);
-  box('shelf on left wall',-4.72,1.74,.15,.27,.1,1.2,M.paleWood);
-  for (let i=0;i<3;i++) box('books',-4.69,1.91,-.25+i*.22,.21,.32,.13,[M.pink,M.cream,M.green][i]);
+  box('window frame',-2.18,1.87,-4.16,2.0,1.28,.1,M.paleWood,starterBackDecor);
+  box('window',-2.18,1.87,-4.06,1.77,1.08,.08,M.blue,starterBackDecor);
+  box('window cross vertical',-2.18,1.87,-3.99,.09,1.14,.13,M.cream,starterBackDecor);
+  box('window cross horizontal',-2.18,1.88,-3.99,1.84,.09,.13,M.cream,starterBackDecor);
+  box('landscape',.2,2.12,-4.13,1.1,.72,.12,M.wood,starterBackDecor);
+  box('landscape inside',.2,2.12,-4.03,.93,.56,.07,M.slate,starterBackDecor);
+  ball('art sun',.42,2.22,-3.97,.25,.25,.04,M.yellow,starterBackDecor);
+  box('shelf on left wall',-4.72,1.74,.15,.27,.1,1.2,M.paleWood,starterLeftDecor);
+  for (let i=0;i<3;i++) box('books',-4.69,1.91,-.25+i*.22,.21,.32,.13,[M.pink,M.cream,M.green][i],starterLeftDecor);
 
   // A physical bed is a single transform, including two separately reserved quilts.
   const quilts={};
@@ -3558,6 +3590,8 @@ function boot() {
     'wall-intersects-furniture':'Стена пересекает мебель. Сначала переставь предмет',
     'furniture-on-floor':'Сперва убери мебель с участка',
     'invalid-wall-move':'Перетащи выбранную стену перпендикулярно от неё',
+    'starter-minimum':'Исходную стену можно сужать только до первоначального размера комнаты',
+    'starter-strip-occupied':'Пол пристройки занят новой стеной: сначала убери её',
     'wall-already-exists':'Здесь уже есть другая стена',
     'empty-history':'Нет изменений для отмены',
     'unchanged':'Здесь уже всё построено',
@@ -3661,7 +3695,7 @@ function boot() {
   };
   const selectBuildWall=wall=>{
     resetBuildWallSelection();
-    if(!wall){buildFeedback('Выбери стену новой комнаты. Исходные декоративные стены пока защищены; для расширения открытой стороны используй «Пол».',true);return;}
+    if(!wall){buildFeedback('Выбери стену квартиры или пристройки — можно нажать сторону исходного дома в панели',true);return;}
     selectedBuildWall=wall.id;
     const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
     const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
@@ -3674,13 +3708,16 @@ function boot() {
     $('build-wall-contract').disabled=outward===null;
     $('build-wall-label').textContent=outward===null
       ?'Межкомнатная стена · проведи пальцем перпендикулярно стене'
-      :'Стена выбрана · перетащи или нажми +0,5 м для расширения';
+      :wall.starterSide
+        ?'Исходная квартира · '+({west:'слева',east:'справа',north:'сзади',south:'спереди'}[wall.starterSide])
+        :'Стена выбрана · перетащи или нажми +0,5 м для расширения';
     buildFeedback(outward===null?'Это внутренняя стена. Перетащи её в нужную сторону':
       'Для увеличения комнаты нажми «+0,5 м наружу» или перетащи стену');
   };
   const shiftSelectedBuildWall=(sign)=>{
     if(!selectedBuildWall)return;
-    const wall=game.world.construction.wallEdges.find(w=>w.id===selectedBuildWall);
+    const wall=game.world.construction.wallEdges.find(w=>w.id===selectedBuildWall)||
+      starterShellSegments(game.world.construction).find(w=>w.id===selectedBuildWall);
     if(!wall){resetBuildWallSelection();return;}
     const outward=constructionWallOutward(game.world.construction,wall.id);
     if(outward===null){buildFeedback('У межкомнатной стены нет внешней стороны: используй перетаскивание',true);return;}
@@ -3692,14 +3729,22 @@ function boot() {
   $('build-wall-expand').addEventListener('click',()=>shiftSelectedBuildWall(1));
   $('build-wall-contract').addEventListener('click',()=>shiftSelectedBuildWall(-1));
   $('build-wall-deselect').addEventListener('click',resetBuildWallSelection);
+  document.querySelectorAll('[data-starter-side]').forEach(button=>
+    button.addEventListener('click',()=>{
+      const side=button.dataset.starterSide;
+      const edges=starterShellSegments(game.world.construction)
+        .filter(w=>w.starterSide===side);
+      selectBuildWall(edges[Math.floor(edges.length/2)]);
+    }));
   const setBuildTool=type=>{
     clearBuildPending();resetBuildWallSelection();
     buildTool=type;buildDrag=null;cameraGesture.clear();
+    $('build-starter-picker').hidden=type!=='move-wall';
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
       camera:'Свайп одним пальцем — перемещение камеры; двумя — поворот и масштаб',
-      'move-wall':'Коснись построенной стены: появятся кнопки «+0,5 м» и «−0,5 м». Можно перетащить стену.',
+      'move-wall':'Коснись стены либо выбери сторону исходной квартиры ниже, затем «+0,5 м наружу».',
       room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
       floor:'Протяни область, чтобы увеличить пол без перегородки',
       wall:'Протяни по прямой, чтобы построить стену',
@@ -3774,7 +3819,8 @@ function boot() {
   const buildWallAtScreen=point=>{
     const rect=canvas.getBoundingClientRect();
     let selected=null,best=45;
-    for(const wall of game.world.construction.wallEdges){
+    for(const wall of [...game.world.construction.wallEdges,
+      ...(buildTool==='move-wall'?starterShellSegments(game.world.construction):[])]){
       const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
       const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
       // Screen rays hit walls above the floor. Accept taps near the base,
@@ -3966,7 +4012,7 @@ function boot() {
         const pickWall=['move-wall','door','window','erase-wall','remove-opening'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
         if(pickWall&&!wallEdge&&buildTool==='move-wall')
-          buildFeedback('Нажми на стену построенной комнаты для выбора или свайпни по пустому месту для камеры');
+          buildFeedback('Выбери исходную стену кнопками ниже или коснись её; свайп по пустому месту двигает камеру');
         // Swiping empty background pans even when a wall tool is selected.
         if(raw&&(!pickWall||wallEdge)){
           const from=buildSnap(raw);
@@ -4151,7 +4197,7 @@ function boot() {
     const finishedArt=allArtwork().map((work,index)=>{
       const source=game.world.furniture.instances.find(i=>i.instanceId===work.easelInstanceId);
       const origin=work.origin||(source?{x:source.x,z:source.z,yaw:source.yaw}:null);
-      const pos=artworkDisplayPose(work,index,origin);
+      const pos=artworkDisplayPose(work,index,origin,game.world.construction);
       if(!pos)return null;
       return {kind:'artwork',id:work.id,work,
         bounds:pos.wall
