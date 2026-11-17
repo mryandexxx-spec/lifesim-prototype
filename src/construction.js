@@ -417,11 +417,12 @@ function buildRect(a,b){
   return {cells,walls};
 }
 /**
- * F5-D.1: a room is selected from topology, not a persistent room index.
- * Only a fully enclosed, rectangular, newly constructed room is eligible
- * for atomic geometry operations. Legacy furnished shell stays immutable.
+ * A room is derived from floor and wall topology, never a persistent index.
+ * A starter room is selectable ONLY as a geometry-only duplicate blueprint:
+ * legacy fixtures, purchased furniture, wall art and actors cannot be moved
+ * with it or duplicated, and the source starter shell stays untouched.
  */
-export function constructionRoomSelection(raw,at){
+export function constructionRoomSelection(raw,at,{allowStarter=false}={}){
   const world=raw?.construction||raw;
   if(!finite(at?.x)||!finite(at?.z))return fail('room-not-found');
   const selected=constructionRooms(world).find(r=>
@@ -430,18 +431,24 @@ export function constructionRoomSelection(raw,at){
   const coordinates=selected.cells.map(k=>k.split(',').map(Number));
   const i0=Math.min(...coordinates.map(v=>v[0])),i1=Math.max(...coordinates.map(v=>v[0]))+1;
   const j0=Math.min(...coordinates.map(v=>v[1])),j1=Math.max(...coordinates.map(v=>v[1]))+1;
-  if(coordinates.some(([i,j])=>isBase(i,j)||
+  const usesStarter=coordinates.some(([i,j])=>isBase(i,j)||
     (i>=world.starterShell.west&&i<world.starterShell.east&&
-      j>=world.starterShell.north&&j<world.starterShell.south)))
-    return fail('room-protected');
+      j>=world.starterShell.north&&j<world.starterShell.south));
+  if(usesStarter&&!allowStarter)return fail('room-protected');
   if(i1-i0<2||j1-j0<2||selected.cells.length!==(i1-i0)*(j1-j0)||
-    selected.cells.length>512)return fail('room-not-rectangular');
-  const edges=new Set(world.wallEdges.map(w=>w.id)),walls=[];
-  for(let i=i0;i<i1;i++)for(const j of [j0,j1])walls.push(edge('h',i,j));
-  for(let j=j0;j<j1;j++)for(const i of [i0,i1])walls.push(edge('v',i,j));
-  if(walls.some(id=>!edges.has(id)))return fail('room-not-enclosed');
+    selected.cells.length>(usesStarter?1200:512))return fail('room-not-rectangular');
+  const explicit=new Map(world.wallEdges.map(w=>[w.id,w]));
+  const virtual=new Map(starterShellSegments(world)
+    .filter(w=>!(world.starterRemoved||[]).includes(w.id))
+    .map(w=>[edge(w.axis,w.i,w.j),w.id]));
+  const boundary=[];
+  for(let i=i0;i<i1;i++)for(const j of [j0,j1])boundary.push(edge('h',i,j));
+  for(let j=j0;j<j1;j++)for(const i of [i0,i1])boundary.push(edge('v',i,j));
+  const walls=boundary.map(id=>explicit.has(id)?id:
+    allowStarter&&virtual.has(id)?virtual.get(id):null);
+  if(walls.some(id=>!id))return fail('room-not-enclosed');
   return {ok:true,room:{i0,i1,j0,j1,width:i1-i0,height:j1-j0,
-    cells:selected.cells,wallIds:walls}};
+    cells:selected.cells,wallIds:walls,...(usesStarter?{starter:true}:{})}};
 }
 /** Pure preview; no state, queue, furniture, money or localStorage mutation. */
 export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes=[],residents=[],wallDecor=[],movableFurnitureIds=[]}={}){
@@ -528,7 +535,8 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       if(type==='room')r.walls.forEach(w=>walls.set(w.id,w));
     }
   }else if(type==='room-duplicate'||type==='room-relocate'){
-    const selection=constructionRoomSelection(world,command.source);
+    const selection=constructionRoomSelection(world,command.source,
+      {allowStarter:type==='room-duplicate'});
     if(!selection.ok)return selection;
     const room=selection.room,rotation=command.rotation??0;
     if(![0,90,180,270].includes(rotation)||
@@ -610,16 +618,21 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     }
     const wallMap=new Map(),facesMap=new Map();
     for(const id of room.wallIds){
-      const old=walls.get(id);
+      const old=allWalls().get(id);
       const a=transform(old.i,old.j);
       const b=transform(old.i+(old.axis==='h'?1:0),old.j+(old.axis==='v'?1:0));
       const axis=a.j===b.j?'h':'v',i=Math.min(a.i,b.i),j=Math.min(a.j,b.j);
       const newId=edge(axis,i,j);
       if(walls.has(newId))return fail('room-target-overlap');
-      wallMap.set(id,{...old,id:newId,axis,i,j});
+      // Legacy starter edges are source-only virtual surfaces. A copied wall
+      // must be a normal independent structural edge with no starter metadata.
+      const {starterSide:_starterSide,sideId:_sideId,...physical}=old;
+      wallMap.set(id,{...physical,id:newId,axis,i,j,
+        heightClass:old.heightClass||'normal'});
       const normal=rotateNormal(old.axis==='h'?0:-1,old.axis==='h'?-1:0);
       const targetNormal=axis==='h'?[0,-1]:[-1,0];
-      const faces=materials.wall[id];
+      const faces=materials.wall[id]||
+        (old.starterSide?materials.wall['starter:'+old.starterSide]:null);
       if(faces){
         const swap=normal[0]!==targetNormal[0]||normal[1]!==targetNormal[1];
         facesMap.set(newId,swap?{...(faces.b?{a:faces.b}:{}),
