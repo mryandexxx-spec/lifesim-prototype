@@ -347,6 +347,9 @@ function scheduleCommand(command,residentId=game.selectedSim){
       ?(definition?.requiredCapabilities.includes('music.playback')?'music':
         definition?.requiredCapabilities.includes('art.paint')?'paint':'hobby')
       :command.actionId;
+    if(command.type==='object'&&actionId==='wash'&&!(game.kitchen?.dirtyDishes>0)){
+      toast('Грязной посуды пока нет');return false;
+    }
     if(command.type==='object'&&actionId==='cook'){
       const actor=getActor(game,residentId);
       const level=currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
