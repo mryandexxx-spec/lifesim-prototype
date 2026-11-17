@@ -12,6 +12,11 @@ on:
       - 'src/navigation.js'
       - 'src/household.js'
       - 'src/game.js'
+      - 'src/calendar-ui.js'
+      - 'src/calendar-events.js'
+      - 'src/calendar-reminders.js'
+      - 'src/calendar-holidays.js'
+      - 'tests/w1a3-browser-smoke.mjs'
       - 'index.html'
       - 'styles.css'
       - 'tests/f5a-browser-smoke.mjs'
@@ -57,6 +62,7 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/f5a-http.log 2>&1 &
       - name: Real WebGL touch panel, save and reload smoke
         run: |
+          node tests/w1a3-browser-smoke.mjs
           node tests/f5a-browser-smoke.mjs
           node tests/f5d1-browser-smoke.mjs
           node tests/f5d2-browser-smoke.mjs
@@ -66,6 +72,7 @@ jobs:
         with:
           name: f5a-browser-screenshot
           path: |
+            w1a3-mobile-calendar.png
             f5a-browser-build.png
             f5b-browser-finish.png
             f5b2-browser-openings.png
