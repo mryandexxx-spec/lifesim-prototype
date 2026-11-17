@@ -4418,7 +4418,8 @@ function boot() {
       syncConstructionRender(true);
     }
     $('build-editor').dataset.tool=type;
-    const finishes=['paint-floor','paint-room','paint-wall','paint-ceiling-room','paint-ceiling-tile','sample-finish'];
+    const finishes=['paint-floor','paint-room','paint-wall','paint-ceiling-room',
+      'paint-ceiling-tile','sample-finish','paint-facade','paint-facade-all'];
     $('build-finish-picker').hidden=!finishes.includes(type);
     if(finishes.includes(type))refreshBuildFinishes();
     const openings=['door','window','arch','change-opening'];
@@ -4426,6 +4427,16 @@ function boot() {
     if(openings.includes(type))refreshBuildOpenings();
     $('build-roof-picker').hidden=!type.startsWith('roof-');
     if(type.startsWith('roof-'))refreshBuildRoofs();
+    $('build-height-picker').hidden=type!=='wall-height';
+    if(type==='wall-height')refreshWallHeightChoices();
+    $('build-porch-picker').hidden=type!=='porch-add';
+    if(type==='porch-add')refreshPorchChoices();
+    if(type.startsWith('paint-facade')||type.startsWith('porch-')){
+      constructionWallMode='up';
+      document.querySelectorAll('[data-build-walls]').forEach(btn=>
+        btn.setAttribute('aria-pressed',String(btn.dataset.buildWalls==='up')));
+      syncConstructionRender(true);
+    }
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
     const tips={
@@ -4447,6 +4458,11 @@ function boot() {
       'paint-ceiling-room':'Выбери цвет и коснись пола комнаты — отделаем потолок над ней.',
       'paint-ceiling-tile':'Выбери цвет и коснись плитки — отделаем потолок над ней.',
       'sample-finish':'Пипетка: коснись уже отделанной поверхности, чтобы взять её покрытие.',
+      'paint-facade':'Выбери наружное покрытие и коснись секции внешней стены.',
+      'paint-facade-all':'Выбери покрытие для всего наружного фасада, затем «Применить».',
+      'wall-height':'Выбери физическую высоту стен: потолки и крыши адаптируются.',
+      'porch-add':'Выбери материал, глубину, затем коснись настоящей наружной двери.',
+      'porch-remove':'Коснись двери с крыльцом, чтобы убрать входную площадку.',
       'roof-auto':'Подберём крышу под весь дом. Выбери форму и нажми «Применить».',
       'roof-add':'Протяни прямоугольник над полом для отдельной секции крыши.',
       'roof-edit':'Коснись крыши, чтобы выбрать секцию и изменить её дизайн.',
@@ -4457,6 +4473,8 @@ function boot() {
     buildFeedback(tips[type]||'Готово');
     if(type==='roof-auto')stageBuild({type:'roof-auto',...roofChoice});
     if(type==='roof-clear')stageBuild({type:'roof-clear'});
+    if(type==='paint-facade-all')
+      stageBuild({type:'paint-facade',scope:'all',materialId:finishFacade});
   };
   document.querySelectorAll('[data-build-tool]').forEach(btn=>
     btn.addEventListener('click',()=>setBuildTool(btn.dataset.buildTool)));
@@ -4494,6 +4512,10 @@ function boot() {
   const exitBuild=()=>{
     if(!buildMode)return;
     buildMode=false;ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
+    // Wall cutaway is camera UI state, not persisted building geometry.
+    constructionWallMode='cut';
+    document.querySelectorAll('[data-build-walls]').forEach(btn=>
+      btn.setAttribute('aria-pressed',String(btn.dataset.buildWalls==='cut')));
     $('build-roof-toggle').setAttribute('aria-pressed','false');
     $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
@@ -4517,6 +4539,9 @@ function boot() {
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
     buildTool='camera';ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
+    constructionWallMode='cut';
+    document.querySelectorAll('[data-build-walls]').forEach(btn=>
+      btn.setAttribute('aria-pressed',String(btn.dataset.buildWalls==='cut')));
     $('build-roof-toggle').setAttribute('aria-pressed','false');
     $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     // Restore the previously tested camera gesture path unchanged:
@@ -4561,6 +4586,16 @@ function boot() {
     }
     return selected;
   };
+  const findBuildOpeningAt=target=>{
+    if(!target)return null;
+    const all=new Map(constructionWallSegments(game.world.construction)
+      .map(w=>[w.id,w]));
+    return game.world.construction.openings.find(opening=>opening.edgeIds.some(id=>{
+      const edge=all.get(id);
+      return id===target.id||(edge&&edge.axis===target.axis&&
+        edge.i===target.i&&edge.j===target.j);
+    }))||null;
+  };
   const endBuildDrag=event=>{
     if(!buildDrag||buildDrag.pointerId!==event.pointerId)return false;
     const {from,to,wallEdge,hit}=buildDrag;
@@ -4570,8 +4605,7 @@ function boot() {
       const target=buildWallAtScreen(gesturePoint(event))||
         nearestConstructionEdge(game.world.construction,to,.75);
       if(type==='change-opening'){
-        selectedBuildOpening=game.world.construction.openings.find(o=>
-          o.edgeIds.includes(target?.id))||null;
+        selectedBuildOpening=findBuildOpeningAt(target);
         if(selectedBuildOpening){
           selectedBuildOpening={...selectedBuildOpening,
             styleId:constructionOpeningStyle(selectedBuildOpening)};
@@ -4579,10 +4613,25 @@ function boot() {
         }else buildFeedback('Нажми на существующую дверь, окно или арку',true);
         refreshBuildOpenings();
       }else if(type==='remove-opening'){
-        const opening=game.world.construction.openings.find(o=>o.edgeIds.includes(target?.id));
+        const opening=findBuildOpeningAt(target);
         stageBuild({type:'remove-opening',id:opening?.id});
       }else stageBuild({type,edgeId:target?.id,at:to,
         ...(openingChoice[type]?{styleId:openingChoice[type]}:{})});
+    }else if(type==='porch-add'||type==='porch-remove'){
+      const target=buildWallAtScreen(gesturePoint(event))||
+        nearestConstructionEdge(game.world.construction,to,.75);
+      const found=findBuildOpeningAt(target);
+      if(type==='porch-add'){
+        stageBuild({type:'porch-add',openingId:found?.id,
+          depthSections:porchDepth,materialId:porchMaterial});
+      }else{
+        const existing=game.world.construction.porches?.find(p=>p.openingId===found?.id);
+        stageBuild({type:'porch-remove',id:existing?.id});
+      }
+    }else if(type==='paint-facade'){
+      const target=wallEdge||buildWallAtScreen(gesturePoint(event));
+      stageBuild({type:'paint-facade',edgeId:target?.id,
+        scope:'segment',materialId:finishFacade});
     }else if(type==='roof-remove'){
       stageBuild({type:'roof-remove',at:hit||from});
     }else if(type==='roof-edit'){
@@ -4782,10 +4831,13 @@ function boot() {
         cameraGesture.begin(point,now);
         return;
       }
-      if(buildTool!=='camera'&&!['roof-auto','roof-clear'].includes(buildTool)&&
+      if(buildTool!=='camera'&&!['roof-auto','roof-clear','wall-height',
+        'paint-facade-all'].includes(buildTool)&&
         cameraGesture.count()===0){
         const raw=editorFloorAt(point);
-        const pickWall=['move-wall','door','window','arch','change-opening','erase-wall','remove-opening','paint-wall','sample-finish'].includes(buildTool);
+        const pickWall=['move-wall','door','window','arch','change-opening','erase-wall',
+          'remove-opening','paint-wall','sample-finish','paint-facade',
+          'porch-add','porch-remove'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
         if(pickWall&&!wallEdge&&buildTool==='move-wall')
           buildFeedback('Коснись нужной стены или передвинь камеру свайпом по пустому участку');
