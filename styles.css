@@ -1213,3 +1213,7 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .build-editor[data-tool="arch"],.build-editor[data-tool="change-opening"]{
   max-height:min(57dvh,445px);
 }
+
+/* F5-B.3: no special starter-house wall-selection panel. Both old and new
+   walls are picked directly on the same PlayCanvas canvas. */
+.build-starter-picker,[data-starter-side]{display:none!important;}
