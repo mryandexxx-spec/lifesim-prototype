@@ -7,7 +7,7 @@ import {civilToSerial} from '../src/calendar-core.js';
 import {SAVE_KEY} from '../src/simulation.js';
 
 const seed=newHousehold('2024-02-28');
-seed.paused=true;seed.speed=3;seed.minutes=1439.7;
+seed.paused=false;seed.speed=1;seed.minutes=1400;
 seed.otherSim.minutes=seed.minutes;
 seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
 seed.calendar=addCalendarEvent(seed.calendar,{title:'Полночный праздник',date:'2024-02-29',
@@ -34,14 +34,19 @@ try {
  const start=async()=>{await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
    await page.locator('#loading').waitFor({state:'hidden',timeout:30000});};
  await start();
+ // Legacy v1 loader intentionally restores at speed ×1 and unpaused. Freeze explicitly
+ // before testing W1-A.4, rather than assuming pause/speed persisted in a save.
+ await page.locator('#pause-btn').click();
  assert.match(await page.locator('#day-label').innerText(),/28 фев/);
  assert.equal(await page.locator('#light-phase-label').innerText(),'Ночь');
  const pausedTime=await page.locator('#time-label').innerText();
  await page.waitForTimeout(750);
  assert.equal(await page.locator('#time-label').innerText(),pausedTime,'Pause freezes game clock and lighting');
  const winterNight=await page.locator('#game-canvas').screenshot();
+ await page.locator('#speed-btn').click();
+ assert.equal(await page.locator('#speed-btn').innerText(),'3×');
  await page.locator('#pause-btn').click();
- await page.waitForFunction(()=>document.querySelector('#day-label')?.textContent?.includes('29 фев'),null,{timeout:8000});
+ await page.waitForFunction(()=>document.querySelector('#day-label')?.textContent?.includes('29 фев'),null,{timeout:18000});
  await page.waitForFunction(key=>{
   const c=JSON.parse(localStorage.getItem(key)||'null')?.calendar;
   return c?.reminderReceipts?.length===1;
@@ -72,8 +77,9 @@ try {
  const summerCanvas=await page.locator('#game-canvas').screenshot();
  assert.notDeepEqual(summerCanvas,winterNight,'Seasonal sun changes the actual canvas');
  await page.screenshot({path:'w1a4-calendar-summer-day.png'});
- // Running with speed x3 must advance, but scene editing freezes this same clock.
- await page.locator('#pause-btn').click();
+ // Legacy save resets to unpaused ×1; choose x3 again for visible movement.
+ await page.locator('#speed-btn').click();
+ assert.equal(await page.locator('#speed-btn').innerText(),'3×');
  await page.locator('#build-toggle').click();
  assert.ok(await page.locator('#build-editor').isVisible());
  const buildClock=await page.locator('#time-label').innerText();
