@@ -195,7 +195,8 @@ const schemes={
     ...[-.37,0,.37].map(x=>
       b('oak shelf divider '+x,x,.40,.06,.06,.36,.56,p.walnut)),
     b('cutting board',-.18,.97,-.13,.51,.035,.36,p.birch),
-    c('prep bowl',.32,.98,.13,.28,.12,.28,p.cream)
+    // Mixing dishes are transient activity props, not permanent geometry.
+    b('under-counter utensil rail',.32,.49,.15,.41,.045,.06,p.brass)
   ]},
   'prep.stone':{parts:[
     b('stone counter cabinet',0,.43,.01,1.20,.83,.74,p.sage),
