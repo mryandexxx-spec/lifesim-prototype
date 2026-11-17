@@ -10,16 +10,17 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5a" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
-      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4-h5-f4f-f4f2-f4g2-h5c",
+      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4-h5-f4f-f4f2-f4g2-h5c-f5a",
       "./src/paired-hobby.js":"./src/paired-hobby.js?v=1.2x-h3",
       "./src/gifts-leisure.js":"./src/gifts-leisure.js?v=1.2x-h3",
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
       "./src/action-queue.js":"./src/action-queue.js?v=1.2x-h3-f4f2-f4g2",
       "./src/painting.js":"./src/painting.js?v=1.2u.16-h5c",
+      "./src/construction.js":"./src/construction.js?v=1.2u-f5a",
        "./src/painting-visual.js":"./src/painting-visual.js?v=1.2u-h5asafe",
        "./src/painting-gallery.js":"./src/painting-gallery.js?v=1.2u-h5b-20261117",
        "./src/meshy-painting-runtime.js":"./src/meshy-painting-runtime.js?v=1.2u-h5asafe",
@@ -31,9 +32,9 @@
       "./src/meshy-music-runtime.js":"./src/meshy-music-runtime.js?v=1.2w-h2b",
       "./src/meshy-visual.js":"./src/meshy-visual.js?v=1.2w-h2b-f4e-h5-f4f-h5asafe-f4g",
       "./src/meshy-mira-visual.js":"./src/meshy-mira-visual.js?v=1.2w-h2b-f4e-h5-f4f-h5asafe-f4g",
-      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2v-f4d-f4e-f4f1",
+      "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2v-f4d-f4e-f4f1-f5a",
       "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1-f4c-f4g",
-      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d-f4e",
+      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d-f4e-f5a",
       "./src/furniture-products.js":"./src/furniture-products.js?v=1.2v-f4d-f4e-h5-f4f-f4g",
       "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2v-f4d-f4e-h5-f4f-f4g",
       "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2v-f4d-f4e",
@@ -42,8 +43,8 @@
       "./src/furniture-procedural-library.js":"./src/furniture-procedural-library.js?v=1.2u-f4c-h5-f4g1",
       "./src/furniture-thumbnails.js":"./src/furniture-thumbnails.js?v=1.2u-f4c",
       "./src/furniture-transform.js":"./src/furniture-transform.js?v=1.2v-f4d",
-      "./src/navigation.js":"./src/navigation.js?v=1.2v-f4d",
-      "./src/camera-controls.js":"./src/camera-controls.js?v=1.2v-f4d",
+      "./src/navigation.js":"./src/navigation.js?v=1.2v-f4d-f5a",
+      "./src/camera-controls.js":"./src/camera-controls.js?v=1.2v-f4d-f5a",
       "./src/furniture-placement-preview.js":"./src/furniture-placement-preview.js?v=1.2v-f4d",
       "./src/seat-furniture.js":"./src/seat-furniture.js?v=1.2v-f4d-f4f1",
       "./src/dining.js":"./src/dining.js?v=1.2u-f4f1",
@@ -88,6 +89,7 @@
     <aside class="control-tray" aria-label="Управление временем">
       <button id="pause-btn" class="round-control" type="button" aria-label="Пауза"><span id="pause-icon">Ⅱ</span></button>
       <button id="furnish-toggle" class="furnish-toggle" type="button" aria-pressed="false" aria-controls="furniture-editor" aria-label="Войти в режим обстановки"><span aria-hidden="true">▦</span><small aria-hidden="true">ДОМ</small></button>
+      <button id="build-toggle" class="furnish-toggle build-toggle" type="button" aria-pressed="false" aria-controls="build-editor" aria-label="Войти в строительство"><span aria-hidden="true">⌂</span><small aria-hidden="true">СТРОИТЬ</small></button>
       <button id="speed-btn" class="speed-control" type="button" aria-label="Скорость симуляции">1×</button>
       <button id="auto-btn" class="auto-control" type="button" aria-pressed="true" aria-label="Автономность включена. Нажмите, чтобы отключить"><span>Авто</span><small id="auto-state">ВКЛ</small></button>
       <button id="rotate-camera-btn" class="rotate-control" type="button" aria-pressed="false" aria-label="Включить вращение камеры одним пальцем" title="Вращать одним пальцем"><span aria-hidden="true">⟳</span><small aria-hidden="true">ПОВОРОТ</small></button>
@@ -118,6 +120,29 @@
       <strong>📍 Размещаем: <span id="furnish-placing-name">Предмет</span></strong>
       <small id="furnish-placing-status">Свайпни по комнате или коснись пола</small>
     </div>
+
+
+    <section id="build-editor" class="build-editor" aria-label="Строительство дома" hidden>
+      <div class="build-head"><div><small>F5-A · ОДИН ЭТАЖ · СВОБОДНАЯ СТРОЙКА</small><h2>Строительство</h2></div><button type="button" id="build-exit">✓ В жизнь</button></div>
+      <p>Выбери инструмент, затем протяни по земле. Для дверей и окон коснись стены. Двумя пальцами управляй камерой.</p>
+      <div class="build-tools" role="group" aria-label="Инструменты строительства">
+        <button type="button" data-build-tool="room" aria-pressed="true">▣ Комната</button>
+        <button type="button" data-build-tool="floor">▤ Пол</button>
+        <button type="button" data-build-tool="wall">┃ Стена</button>
+        <button type="button" data-build-tool="door">🚪 Дверь</button>
+        <button type="button" data-build-tool="window">▥ Окно</button>
+        <button type="button" data-build-tool="erase-wall">⌫ Убрать стену</button>
+        <button type="button" data-build-tool="remove-floor">− Убрать пол</button>
+        <button type="button" data-build-tool="camera">✥ Камера</button>
+      </div>
+      <div class="build-bottom"><div class="build-walls" role="group" aria-label="Видимость стен">
+        <button type="button" data-build-walls="up">Стены ↑</button>
+        <button type="button" data-build-walls="cut" aria-pressed="true">Срез</button>
+        <button type="button" data-build-walls="down">Стены ↓</button>
+      </div><button type="button" id="build-undo" aria-label="Отменить строительство" disabled>↶</button>
+      <button type="button" id="build-redo" aria-label="Вернуть строительство" disabled>↷</button></div>
+      <output id="build-feedback" class="build-feedback" role="status" aria-live="polite">Выбери инструмент и коснись участка</output>
+    </section>
 
     <section id="furniture-editor" class="furniture-editor" aria-labelledby="furnish-title" hidden>
       <div class="furnish-header">
@@ -389,7 +414,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5a"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

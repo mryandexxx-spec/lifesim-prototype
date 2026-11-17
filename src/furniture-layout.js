@@ -85,8 +85,9 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
         return {ok:false,reason:'unreachable-tv'};
     }
     // Either sleeping side must remain reachable for essential self-care.
-    if(!Object.values(BED_SLOTS).some(slot=>
-      findPath(person,furniturePoint(candidate,'bed',slot.approach),nav)))
+    if(!Object.values(BED_SLOTS).some(slot=>construction
+      ?findPath(person,furniturePoint(candidate,'bed',slot.approach),nav)
+      :findPath(person,furniturePoint(candidate,'bed',slot.approach),candidate)))
       return {ok:false,reason:'unreachable-bed'};
     for(const action of ['fridge','shower','toilet','sofa']){
       const goal=furnitureActionApproach(candidate,action);

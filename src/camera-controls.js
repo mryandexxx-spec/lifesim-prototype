@@ -12,6 +12,11 @@ export const CAMERA_BOUNDS=Object.freeze({
   minX:-3.4,maxX:12.6,minZ:-2.9,maxZ:2.9
 });
 const valid=Number.isFinite;
+const panBounds={...CAMERA_BOUNDS};
+/** Expand only presentation camera for F5 build lots; reset when leaving build. */
+export function setCameraBuildBounds(bounds=null){
+  Object.assign(panBounds,bounds||CAMERA_BOUNDS);
+}
 const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
 
 /** Convert finger movement in CSS pixels into camera-oriented ground movement.
@@ -33,8 +38,8 @@ export function screenFloorDragDelta(view,dx,dy,height,fov=41){
 export function panCamera(view,dx,dy,height,fov=41){
   if(!valid(dx)||!valid(dy)||!valid(height)||height<=0)return {...view};
   const delta=screenFloorDragDelta(view,dx,dy,height,fov);
-  return {...view,centerX:clamp(view.centerX-delta.x,CAMERA_BOUNDS.minX,CAMERA_BOUNDS.maxX),
-    centerZ:clamp(view.centerZ-delta.z,CAMERA_BOUNDS.minZ,CAMERA_BOUNDS.maxZ)};
+  return {...view,centerX:clamp(view.centerX-delta.x,panBounds.minX,panBounds.maxX),
+    centerZ:clamp(view.centerZ-delta.z,panBounds.minZ,panBounds.maxZ)};
 }
 export function orbitCamera(view,dx,dy,gain=1){
   if(!valid(dx)||!valid(dy)||!valid(gain)||gain<=0)return {...view};

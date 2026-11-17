@@ -19,6 +19,6 @@ test('F5-A after building, a walled room is isolated until a real door is insert
 test('F5-A invalid/legacy construction cannot change historic route semantics',()=>{
  const world={furniture:newFurnitureWorld(),construction:newConstructionWorld()};
  assert.equal(isWalkable(20,0,world),false);
- assert.ok(findPath({x:0,z:0},{x:0.5,z:0},world)?.length);
+ assert.ok(findPath({x:12,z:2.5},{x:12.2,z:2.5},world)?.length);
  assert.ok(nearestWalkable({x:0,z:0},world));
 });

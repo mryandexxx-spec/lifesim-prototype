@@ -7,12 +7,13 @@ import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
-import {CAMERA_INITIAL,wheelCamera} from './camera-controls.js';
+import {CAMERA_INITIAL,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
+import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,BUILD_LOT,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
@@ -295,6 +296,7 @@ const META = {
 };
 
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
+let buildMode=false; // F5-A separate pause-on-editor; house geometry persists, UI mode does not.
 let selected = null;
 let selectedFurnitureInstanceId=null; // action-specific target, never in household save
 let beginAction = () => false;
@@ -1512,7 +1514,7 @@ $('pause-btn').addEventListener('click', () => {
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
 });
 $('speed-btn').addEventListener('click', () => {
-  if(furnishMode)return;
+  if(furnishMode||buildMode)return;
   game.speed = game.speed === 1 ? 3 : 1;
   $('speed-btn').textContent = `${game.speed}×`;
   toast(game.speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
@@ -1526,7 +1528,7 @@ function updateAutoButton() {
   $('auto-state').textContent = enabled ? 'ВКЛ' : 'ВЫКЛ';
 }
 $('auto-btn').addEventListener('click', () => {
-  if(furnishMode)return;
+  if(furnishMode||buildMode)return;
   const enabled = setHouseholdAutonomy(game, !game.autonomy.enabled);
   restartAutonomyWait();
   if (enabled) game.event = 'Свободное время';
@@ -2810,6 +2812,7 @@ function boot() {
   };
   const editorContext=(allowQueuedReposition=false)=>({
     lockedInstanceIds:lockedFurnitureIds(!allowQueuedReposition),
+    construction:game.world.construction,
     residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)
   });
   const editorLabel=instanceId=>{
@@ -3829,11 +3832,11 @@ function boot() {
     dt=Math.min(dt,.06);
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
-    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&!document.hidden;
+    const active=!game.paused&&!furnishMode&&!buildMode&&!dialogueNeedsDecision(game)&&!document.hidden;
     const sharedSound=active&&game.socialAction?.phase==='using'&&
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
     musicAudio.update(audibleMusicStyle([game,game.otherSim],{
-      paused:!active,hidden:document.hidden,editing:furnishMode})||sharedSound);
+      paused:!active,hidden:document.hidden,editing:furnishMode||buildMode})||sharedSound);
     const animDt=active?dt:0;
     if(active){
       accumulator+=dt;
