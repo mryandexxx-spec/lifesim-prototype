@@ -138,6 +138,19 @@ test('H5 saved queue, invalid themes and corrupted sessions fail closed',()=>{
   assert.ok(loaded.world.furniture.instances.some(x=>x.instanceId===id));
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
 });
+test('H5 rollback keeps optional authored artwork location across autosave',()=>{
+  const old={id:'work:painting:alex:1:480000',ownerId:'alex',
+    easelInstanceId:'shop-easel-1',contentId:PAINT_CONTENT_IDS[0],
+    seed:1234,quality:35,createdAt:480};
+  const incoming={...old,kind:'artwork',location:'studio',
+    origin:{x:3.25,z:-1.5,yaw:90}};
+  const state=newHousehold();state.createdWorks=[incoming];
+  const loaded=loadHousehold(copy(state));
+  assert.deepEqual(loaded.createdWorks,[incoming]);
+  assert.deepEqual(loadHousehold(copy(loaded)).createdWorks,[incoming]);
+  assert.deepEqual(restoreCreatedWorks([old],'alex'),[old]);
+  assert.equal(restoreCreatedWorks([{...incoming,origin:{x:Infinity,z:0,yaw:90}}],'alex')[0].origin,null);
+});
 test('H5 old v1 saves load without fictional works; invalid works are rejected and capped',()=>{
   const initial=newHousehold();
   const old=copy(initial);

@@ -15,6 +15,10 @@ const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const safeId=v=>typeof v==='string'&&/^[a-z][a-z0-9._:-]{1,95}$/.test(v);
 const stationId=v=>typeof v==='string'&&/^shop-easel-[0-9]+$/.test(v);
 const round=n=>Math.round(n*1000)/1000;
+// Preserve optional finished-work metadata from the reverted H5a renderer.
+// Unsupported positions are normalized rather than trusting arbitrary saves.
+const validOrigin=p=>record(p)&&[p.x,p.z].every(v=>Number.isFinite(v)&&Math.abs(v)<1000)&&
+  [0,90,180,270].includes(p.yaw);
 export function restoreCreatedWorks(raw,ownerId){
   if(!Array.isArray(raw))return [];
   const works=[],ids=new Set();
@@ -27,8 +31,14 @@ export function restoreCreatedWorks(raw,ownerId){
       !Number.isFinite(work.createdAt)||work.createdAt<0||
       work.createdAt>10000000)continue;
     ids.add(work.id);
-    works.push({id:work.id,ownerId,easelInstanceId:work.easelInstanceId,
-      contentId:work.contentId,seed:work.seed,quality:work.quality,createdAt:round(work.createdAt)});
+    const normalized={id:work.id,ownerId,easelInstanceId:work.easelInstanceId,
+      contentId:work.contentId,seed:work.seed,quality:work.quality,createdAt:round(work.createdAt)};
+    if(work.kind==='artwork'&&work.location==='studio'){
+      normalized.kind='artwork';normalized.location='studio';
+      normalized.origin=validOrigin(work.origin)
+        ?{x:work.origin.x,z:work.origin.z,yaw:work.origin.yaw}:null;
+    }
+    works.push(normalized);
     if(works.length>PAINT_WORKS_LIMIT)works.shift();
   }
   return works;
