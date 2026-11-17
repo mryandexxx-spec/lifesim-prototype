@@ -370,9 +370,11 @@ const calendarUI=createCalendarUI({
   host:document.querySelector('.app-shell'),getRoot:()=>game,
   setCalendar:calendar=>{game.calendar=calendar;save(true);},
   notify:toast,
-  onAnchor:()=>{datePanel.hidden=false;$('calendar-anchor-date').value=calendarAt(game.calendar,game.minutes).iso;}
+  onClose:()=>$('calendar-anchor-toggle').setAttribute('aria-expanded','false'),
+  onAnchor:()=>{datePanel.hidden=false;$('calendar-anchor-date').value=calendarAt(game.calendar,game.minutes).iso;
+    $('calendar-anchor-toggle').setAttribute('aria-expanded','true');}
 });
-function closeCalendarAnchorPanel(){datePanel.hidden=true;}
+function closeCalendarAnchorPanel(){datePanel.hidden=true;$('calendar-anchor-toggle').setAttribute('aria-expanded','false');}
 $('calendar-anchor-toggle').addEventListener('click',()=>{
   closeCalendarAnchorPanel();calendarUI.open();
   $('calendar-anchor-toggle').setAttribute('aria-expanded','true');
@@ -5328,8 +5330,12 @@ function boot() {
         const dueReminders=consumeCalendarReminders(game.calendar,priorCalendarMinute,game.minutes);
         if(dueReminders.messages.length){
           game.calendar=dueReminders.calendar;save(true);
-          for(const reminder of dueReminders.messages.slice(0,3))
-            toast('📅 '+reminder.title+' · '+(reminder.offset===0?'сейчас':'напоминание'));
+          const due=dueReminders.messages;
+          if(due.length===1)
+            toast('📅 '+due[0].title+' · '+(due[0].offset===0?'сейчас':'напоминание'));
+          else
+            toast('📅 '+due.length+' напоминания: '+due.slice(0,2).map(item=>item.title).join(' · ')+
+              (due.length>2?' · ещё '+(due.length-2):''));
         }
         // A completed job frees its own resident; planned commands start only
         // after both participant states and render transition guards allow it.
@@ -6306,7 +6312,7 @@ function boot() {
       const date=calendarAt(game.calendar,game.minutes);
       $('day-label').textContent=formatCalendarDay(date);
       calendarUI.tick();
-      $('calendar-anchor-toggle').title=formatCalendarDay(date,{includeYear:true})+' · День '+date.gameDay+' · изменить дату';
+      $('calendar-anchor-toggle').title=formatCalendarDay(date,{includeYear:true})+' · День '+date.gameDay+' · открыть календарь и события';
       $('time-label').textContent=t.time;
       $('light-phase-label').textContent=daylight.phaseLabel;
       const current=selectedActor();

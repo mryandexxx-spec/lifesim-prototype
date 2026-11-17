@@ -17,6 +17,9 @@ on:
       - 'src/calendar-reminders.js'
       - 'src/calendar-holidays.js'
       - 'tests/w1a3-browser-smoke.mjs'
+      - 'tests/w1a4-browser-smoke.mjs'
+      - 'tests/w1a4-calendar-integration.test.js'
+      - 'src/calendar-core.js'
       - 'index.html'
       - 'styles.css'
       - 'tests/f5a-browser-smoke.mjs'
@@ -47,6 +50,9 @@ jobs:
       - run: npm ci
       - run: |
           node --check src/game.js
+          node --check src/calendar-ui.js
+          node --check src/calendar-core.js
+          node --check src/calendar-events.js
           node --check src/construction.js
           node --check src/furnished-room.js
           node --check src/exterior-construction.js
@@ -62,6 +68,7 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/f5a-http.log 2>&1 &
       - name: Real WebGL touch panel, save and reload smoke
         run: |
+          node tests/w1a4-browser-smoke.mjs
           node tests/w1a3-browser-smoke.mjs
           node tests/f5a-browser-smoke.mjs
           node tests/f5d1-browser-smoke.mjs
@@ -72,6 +79,7 @@ jobs:
         with:
           name: f5a-browser-screenshot
           path: |
+            w1a4-calendar-summer-day.png
             w1a3-mobile-calendar.png
             f5a-browser-build.png
             f5b-browser-finish.png

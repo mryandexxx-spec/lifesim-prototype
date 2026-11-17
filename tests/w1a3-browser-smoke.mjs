@@ -54,6 +54,31 @@ try {
  await page.locator('#lc-holiday-form button[type=submit]').click();
  assert.ok(await page.locator('#lc-agenda').getByText('Семейный выходной').isVisible());
  await page.screenshot({path:'w1a3-mobile-calendar.png'});
+ // W1-A.4: editing a FUTURE occurrence as a SERIES must keep the original anchor.
+ await page.locator('[data-lc-view="week"]').click();
+ await page.locator('#lc-next').click(); // Nov 24, one week after first occurrence.
+ assert.ok(await page.locator('#lc-agenda').getByText('Встреча Алекса').isVisible());
+ await page.locator('#lc-agenda').getByText('Встреча Алекса').click();
+ assert.equal(await page.locator('#lc-event-form [name="date"]').inputValue(),'2026-11-17');
+ await page.locator('#lc-event-form [name="title"]').fill('Еженедельная встреча');
+ await page.locator('#lc-event-form button[type=submit]').click();
+ const seriesSaved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+ assert.equal(seriesSaved.calendar.events[0].date,'2026-11-17',
+   'Editing a future occurrence must not move the series anchor');
+ assert.ok(await page.locator('#lc-agenda').getByText('Еженедельная встреча').isVisible());
+ // Single occurrence can have its own participants while the next week keeps Alex.
+ await page.locator('#lc-agenda').getByText('Еженедельная встреча').click();
+ await page.locator('#lc-event-form [name="scope"]').selectOption('one');
+ assert.equal(await page.locator('#lc-event-form [name="date"]').inputValue(),'2026-11-24');
+ await page.locator('#lc-event-form [name="participants"]').selectOption('mira');
+ await page.locator('#lc-event-form [name="title"]').fill('Только для Миры');
+ await page.locator('#lc-event-form button[type=submit]').click();
+ assert.ok(await page.locator('#lc-agenda').getByText('Только для Миры').isVisible());
+ const oneSaved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+ assert.equal(oneSaved.calendar.events[0].date,'2026-11-17');
+ assert.deepEqual(oneSaved.calendar.events[0].participants,['alex']);
+ assert.deepEqual(oneSaved.calendar.occurrenceOverrides.find(x=>x.date==='2026-11-24').participants,['mira']);
+
  const before=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
  assert.equal(before.version,1);
  assert.equal(before.otherSim.minutes,before.minutes);
@@ -67,6 +92,7 @@ try {
  assert.ok(await page.locator('#game-canvas').isVisible());
  await page.locator('#lc-close').click();
  assert.ok(await page.locator('#life-calendar').isHidden());
+ assert.equal(await page.locator('#calendar-anchor-toggle').getAttribute('aria-expanded'),'false');
  assert.equal(errors.length,0,errors.join('\n'));
  console.log('W1-A.3 WebGL mobile calendar CRUD/week/day/reload succeeded');
 }finally{await browser.close();}
