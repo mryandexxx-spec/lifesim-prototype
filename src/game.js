@@ -2834,21 +2834,6 @@ function boot() {
   refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId,alexSeatSlot);};
   const alexRig=createCharacterRig(rigContext,'alex');
   const miraRig=createCharacterRig(rigContext,'mira');
-  // Reuse the original PlayCanvas box primitive; TWO tiny meshes per resident,
-  // attached to the existing hand pivot. No purchased asset, extra animation
-  // loop, collider, nav obstacle or persisted phone entity.
-  const phoneMeshes={};
-  for(const [id,rig] of [['alex',alexRig],['mira',miraRig]]){
-    const back=box('Phone '+id,0,-.24,.17,.145,.265,.040,M.dark,rig.elbowPivot[1]);
-    const screen=box('Phone screen '+id,0,-.24,.193,.118,.233,.012,M.mint,rig.elbowPivot[1]);
-    back.enabled=false;screen.enabled=false;
-    phoneMeshes[id]=[back,screen];
-  }
-  updatePhoneProps=id=>{
-    for(const [key,meshes] of Object.entries(phoneMeshes))
-      for(const mesh of meshes)mesh.enabled=key===id;
-  };
-  updatePhoneProps(careerPhone.isOpen()?game.selectedSim:null);
   // Visual-only experimental Alex skin. The procedural rig and every action
   // controller remain authoritative; any GLB error falls back immediately.
   const liveFridgeLayout=()=>fixtureContactLayout(game.world,'fridge',FRIDGE_LAYOUT);
@@ -2865,6 +2850,21 @@ function boot() {
     if(status==='ready'||status==='error')loadingProgress.finish('mira',status==='ready');
     if(error)console.warn('Meshy Mira visual unavailable',error);
   }});
+  // Reuse the original PlayCanvas box primitive; TWO tiny meshes per resident,
+  // attached to the existing hand pivot. No purchased asset, extra animation
+  // loop, collider, nav obstacle or persisted phone entity.
+  const phoneMeshes={};
+  for(const [id,rig] of [['alex',alexRig],['mira',miraRig]]){
+    const back=box('Phone '+id,0,-.24,.17,.145,.265,.040,M.dark,rig.elbowPivot[1]);
+    const screen=box('Phone screen '+id,0,-.24,.193,.118,.233,.012,M.mint,rig.elbowPivot[1]);
+    back.enabled=false;screen.enabled=false;
+    phoneMeshes[id]=[back,screen];
+  }
+  updatePhoneProps=id=>{
+    for(const [key,meshes] of Object.entries(phoneMeshes))
+      for(const mesh of meshes)mesh.enabled=key===id;
+  };
+  updatePhoneProps(careerPhone.isOpen()?game.selectedSim:null);
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
   // F4F.1: entirely cosmetic chair draw-out. Keep the selected table/seat
