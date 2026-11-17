@@ -4,6 +4,7 @@ import {calendarAt,civilToSerial,serialToCivil,toISODate,parseCivilDate,monthCel
 import {addCalendarEvent,editCalendarEvent,removeCalendarEvent,changeEventOccurrence,
  expandCalendarEvents,findEventConflicts} from './calendar-events.js';
 import {holidayDefinitions,expandHolidays,saveHoliday,removeHoliday,isCalendarDayOff} from './calendar-holidays.js';
+import {calendarCareerShifts,clockLabel} from './career-job-board.js';
 const pad=n=>String(n).padStart(2,'0'),time=n=>pad(Math.floor(n/60))+':'+pad(n%60);
 const fromTime=s=>/^\d{2}:\d{2}$/.test(s)?Number(s.slice(0,2))*60+Number(s.slice(3,5)):NaN;
 const addDays=(iso,n)=>toISODate(serialToCivil(civilToSerial(iso)+n));
@@ -76,16 +77,19 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
   cache='';render();
  }
  function row(title,detail,callback,holiday=false){
-  const b=document.createElement('button');b.type='button';b.className='lc-entry'+(holiday?' lc-holiday':'');
+  const b=document.createElement(callback?'button':'div');if(callback)b.type='button';
+  b.className='lc-entry'+(holiday?' lc-holiday':'')+(!callback?' lc-readonly':'');
   const name=document.createElement('strong');name.textContent=title;
-  const note=document.createElement('small');note.textContent=detail;b.append(name,note);b.addEventListener('click',callback);return b;
+  const note=document.createElement('small');note.textContent=detail;b.append(name,note);
+  if(callback)b.addEventListener('click',callback);
+  return b;
  }
  function render(){
   if(wrap.hidden||!eventForm.hidden||!holidayForm.hidden)return;
-  const now=today(),d=parseCivilDate(selected),c=getRoot().calendar;
+  const root=getRoot(),now=today(),d=parseCivilDate(selected),c=root.calendar;
   if(!d)return;
   const key=[view,selected,now,JSON.stringify(c.events||[]),JSON.stringify(c.holidays||[]),
-   JSON.stringify(c.occurrenceOverrides||[])].join('|');
+   JSON.stringify(c.occurrenceOverrides||[]),JSON.stringify(root.careerSystem?.byResident||{})].join('|');
   if(cache===key)return;cache=key;
   wrap.querySelectorAll('[data-lc-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lcView===view)));
   const from=view==='month'?toISODate({year:d.year,month:d.month,day:1}):
@@ -95,6 +99,7 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
   el('lc-period').textContent=view==='month'?monthNames[d.month-1]+' '+d.year:
     view==='week'?showDate(from)+' — '+showDate(to):showDate(selected);
   const events=expandCalendarEvents(c,from,to),holidays=expandHolidays(c,from,to);
+  const work=calendarCareerShifts(root,from,to);
   const grid=el('lc-days');grid.replaceChildren();grid.className='lc-days lc-'+view;
   if(view!=='day'){
    for(const s of WEEKDAYS_RU){const tag=document.createElement('span');tag.textContent=s;tag.className='lc-week-label';grid.append(tag);}
@@ -106,11 +111,12 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
     if(day.iso===selected)b.classList.add('lc-active');
     if(day.iso===now)b.classList.add('lc-today');
     if(isCalendarDayOff(c,day.iso))b.classList.add('lc-day-off');
-    const n=events.filter(e=>e.iso===day.iso).length,h=holidays.filter(x=>x.iso===day.iso).length;
-    b.setAttribute('aria-label',showDate(day.iso)+(day.iso===now?' сегодня':'')+(n?' событий '+n:'')+(h?' праздников '+h:''));
+    const n=events.filter(e=>e.iso===day.iso).length,h=holidays.filter(x=>x.iso===day.iso).length,
+      w=work.filter(x=>x.iso===day.iso).length;
+    b.setAttribute('aria-label',showDate(day.iso)+(day.iso===now?' сегодня':'')+(n?' событий '+n:'')+(h?' праздников '+h:'')+(w?' рабочих смен '+w:''));
     b.setAttribute('aria-pressed',String(day.iso===selected));
     const span=document.createElement('span');span.textContent=String(day.day);b.append(span);
-    if(n||h){const mark=document.createElement('small');mark.textContent=(n?'●'.repeat(Math.min(3,n)):'')+(h?' ✦':'');b.append(mark);}
+    if(n||h||w){const mark=document.createElement('small');mark.textContent=(n?'●'.repeat(Math.min(3,n)):'')+(h?' ✦':'')+(w?' ▣':'');b.append(mark);}
     b.addEventListener('click',()=>{selected=day.iso;cache='';render();});grid.append(b);
    }
   }else{const p=document.createElement('p');p.className='lc-day-summary';p.textContent=showDate(selected)+' · '+WEEKDAYS_RU[weekdayFromSerial(civilToSerial(selected))];grid.append(p);}
@@ -122,13 +128,18 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
    agenda.append(row(e.title,(e.allDay?'Весь день':time(e.start)+'–'+time(e.end))+' · '+
     (e.participants.length===2?'Алекс и Мира':e.participants[0]==='alex'?'Алекс':'Мира')+
     (e.repeat!=='none'?' · ↻':''),()=>showEvent(e)));
+  for(const w of work.filter(w=>w.iso===selected))
+    agenda.append(row('▣ Работа: '+w.title,
+      clockLabel(w.start)+'–'+clockLabel(w.end)+' · '+
+      (w.residentId==='alex'?'Алекс':'Мира')+' · '+w.rankTitle,null));
   if(!agenda.childNodes.length){const p=document.createElement('p');p.textContent='На эту дату событий нет.';agenda.append(p);}
   const upcoming=el('lc-upcoming');upcoming.replaceChildren();
-  const future=[...expandCalendarEvents(c,now,addDays(now,30)),...expandHolidays(c,now,addDays(now,30))]
+  const future=[...expandCalendarEvents(c,now,addDays(now,30)),...expandHolidays(c,now,addDays(now,30)),
+    ...calendarCareerShifts(root,now,addDays(now,30))]
    .sort((a,b)=>a.iso.localeCompare(b.iso)||a.start-b.start).slice(0,8);
   for(const x of future){const holiday=x.id.startsWith('h-');
-    upcoming.append(row((holiday?'✦ ':'')+x.title,showDate(x.iso)+' · '+
-     (holiday||x.allDay?'весь день':time(x.start)),
+    upcoming.append(row((holiday?'✦ ':x.work?'▣ ':'')+x.title,showDate(x.iso)+' · '+
+     (holiday||x.allDay?'весь день':x.work?clockLabel(x.start):time(x.start)),
      ()=>{selected=x.iso;cache='';render();},holiday));}
   if(!future.length)upcoming.textContent='На ближайший месяц событий нет.';
   const holidaysList=el('lc-holidays');holidaysList.replaceChildren();
