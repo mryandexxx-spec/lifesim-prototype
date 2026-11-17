@@ -19,7 +19,9 @@ const browser=await chromium.launch({headless:true,args:[
 try{
  const ctx=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,hasTouch:true,isMobile:true});
  await ctx.addInitScript(({key,value})=>{
-   localStorage.setItem(key,JSON.stringify(value));
+   // Seed only the first page load: a reload must exercise the REAL saved
+   // construction world rather than replace it with the test fixture.
+   if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(value));
    localStorage.setItem('lifesim.uiTour.v1','done');
  },{key:SAVE_KEY,value:state});
  const page=await ctx.newPage(),errors=[];
