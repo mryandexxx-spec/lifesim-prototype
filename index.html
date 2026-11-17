@@ -10,11 +10,13 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
       "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4-h5-f4f-f4f2-f4g2-h5c-f5a-w1a1",
+      "./src/day-night-render.js":"./src/day-night-render.js?v=w1a2-20261117",
+      "./src/day-night-cycle.js":"./src/day-night-cycle.js?v=w1a2-20261117",
       "./src/paired-hobby.js":"./src/paired-hobby.js?v=1.2x-h3",
       "./src/gifts-leisure.js":"./src/gifts-leisure.js?v=1.2x-h3",
       "./src/relationships.js":"./src/relationships.js?v=1.2x-h3",
@@ -70,7 +72,7 @@
         <span class="brand-mark" aria-hidden="true">✦</span>
         <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.17 · F4G.2 / H5c / H5b / F4F.2</small></div>
       </div>
-      <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><button id="calendar-anchor-toggle" class="time-card" type="button" aria-live="off" aria-controls="calendar-anchor-panel" aria-expanded="false" aria-label="Игровой календарь: посмотреть дату и настроить начало"><span id="day-label">День 1</span><strong id="time-label">08:00</strong></button></div>
+      <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><button id="calendar-anchor-toggle" class="time-card" type="button" aria-live="off" aria-controls="calendar-anchor-panel" aria-expanded="false" aria-label="Игровой календарь: посмотреть дату и настроить начало"><span id="day-label">День 1</span><strong id="time-label">08:00</strong><small id="light-phase-label">День</small></button></div>
     </header>
     <section id="calendar-anchor-panel" class="calendar-anchor-panel" hidden aria-label="Начальная дата игрового календаря">
       <div class="calendar-anchor-head"><strong>Дата в Блин’С</strong><button id="calendar-anchor-close" type="button" aria-label="Закрыть выбор даты">×</button></div>
@@ -513,7 +515,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
