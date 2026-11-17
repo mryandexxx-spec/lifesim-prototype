@@ -60,7 +60,7 @@ try{
   await page.locator('#career-phone-toggle').click();
   assert.equal(await phone.getByRole('button',{name:/^Вакансия /}).count(),6);
   await phone.getByRole('button',{name:/Вакансия Общественная служба/}).click();
-  assert.ok(await phone.getByText(/20:00–04:00/).isVisible());
+  assert.ok(await phone.getByText('Часы: 20:00–04:00').isVisible());
   await phone.getByRole('button',{name:'Получить предложение'}).click();
   await phone.getByRole('button',{name:'Подписать договор'}).click();
   const dual=await state();
