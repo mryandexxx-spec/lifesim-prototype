@@ -1642,6 +1642,11 @@ function boot() {
         chopped.setLocalScale(.36,.095,.25);
         chopped.setLocalPosition(-.17,1.0,-.12);
         node.addChild(chopped);chopped.enabled=false;
+        const prepBowl=new pc.Entity('F4G prep bowl');
+        prepBowl.addComponent('render',{type:'cylinder',material:mat('#e6dfcb')});
+        prepBowl.setLocalScale(.27,.10,.27);
+        prepBowl.setLocalPosition(.26,1.035,-.21);
+        node.addChild(prepBowl);prepBowl.enabled=false;
       }
       if(item.prefabId==='sink'){
         const plate=new pc.Entity('F4G dirty plate');
@@ -4427,8 +4432,12 @@ function boot() {
             1.32+i*.13+Math.sin(effectTime*1.8+i)*.065,-.10);
         }
       }else if(item.prefabId==='prep'){
+        // Never leave a cooked dish on the worktop: props exist only during
+        // the real preparation stage, then disappear on walk/finish/cancel.
         const chopped=node.findByName('F4G chopped ingredients');
         if(chopped)chopped.enabled=active;
+        const bowl=node.findByName('F4G prep bowl');
+        if(bowl)bowl.enabled=active;
       }else{
         const dish=node.findByName('F4G dirty plate');
         if(dish)dish.enabled=item.location==='home'&&game.kitchen?.dirtyDishes>0;
