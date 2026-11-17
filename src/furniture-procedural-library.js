@@ -164,6 +164,68 @@ const schemes={
     ...[-.11,.11].map(x=>b('long brass handle '+x,x,1.22,-.512,.055,.40,.05,p.brass)),
     b('ornamental top crown',0,2.45,0,1.90,.19,.94,p.birch),
     b('wardrobe plinth',0,.10,0,1.82,.16,.92,p.ink)]},
+  // F4G: six authored, clearly different silhouettes. Replace by Meshy per
+  // modelKey later without changing SKU, collision or kitchen state.
+  'stove.copper':{parts:[
+    b('copper range body',0,.47,0,1.08,.90,.77,p.walnut),
+    b('copper faceplate',0,.51,-.402,1.00,.82,.035,p.terracotta),
+    b('oven window',0,.46,-.430,.75,.46,.033,p.ink),
+    b('oven handle',0,.75,-.472,.80,.04,.06,p.brass),
+    b('range iron top',0,.935,0,1.13,.085,.86,p.ink),
+    ...[-.31,.31].flatMap(x=>[-.22,.22].map(z=>
+      c('copper burner '+x+','+z,x,1.00,z,.25,.027,.25,p.brass))),
+    ...[-.36,-.12,.12,.36].map((x,i)=>
+      c('brass knob '+i,x,.83,-.466,.075,.068,.075,p.brass,[90,0,0]))
+  ]},
+  'stove.modern':{parts:[
+    b('modern white cooker',0,.49,0,1.09,.94,.81,p.cream),
+    b('modern dark door',0,.44,-.427,.91,.60,.025,p.ink),
+    b('oven glass reflection',0,.46,-.445,.68,.39,.012,p.blue),
+    b('minimal steel handle',0,.77,-.472,.69,.035,.04,p.brass),
+    b('black glass cooking top',0,.965,0,1.12,.055,.85,p.ink),
+    ...[-.32,.32].flatMap(x=>[-.23,.23].map(z=>
+      c('ceramic ring '+x+','+z,x,1.003,z,.27,.008,.27,p.glass))),
+    b('display',.34,.89,-.452,.28,.075,.018,p.blue)
+  ]},
+  'prep.oak':{parts:[
+    b('butcher block top',0,.87,0,1.24,.15,.75,p.oak),
+    ...[-.51,.51].flatMap(x=>[-.28,.28].map(z=>
+      b('oak counter post '+x+','+z,x,.44,z,.11,.77,.11,p.walnut))),
+    b('open slatted shelf',0,.24,0,1.11,.07,.65,p.birch),
+    ...[-.37,0,.37].map(x=>
+      b('oak shelf divider '+x,x,.40,.06,.06,.36,.56,p.walnut)),
+    b('cutting board',-.18,.97,-.13,.51,.035,.36,p.birch),
+    c('prep bowl',.32,.98,.13,.28,.12,.28,p.cream)
+  ]},
+  'prep.stone':{parts:[
+    b('stone counter cabinet',0,.43,.01,1.20,.83,.74,p.sage),
+    b('thick stone worktop',0,.91,-.01,1.29,.13,.84,p.glass),
+    ...[-.31,.31].map(x=>
+      b('stone drawer '+x,x,.59,-.383,.54,.33,.035,p.cream)),
+    ...[-.31,.31].map(x=>
+      b('drawer pull '+x,x,.65,-.415,.26,.038,.025,p.brass)),
+    b('stone toe recess',0,.13,-.38,1.09,.11,.09,p.ink),
+    c('knife holder',.40,1.06,.18,.19,.23,.19,p.walnut)
+  ]},
+  'sink.farm':{parts:[
+    b('farm sink cabinet',0,.45,.04,1.13,.82,.78,p.oak),
+    b('white farmhouse basin',0,.85,-.06,1.21,.24,.77,p.cream),
+    b('water well',0,.96,-.09,.85,.018,.52,p.glass),
+    b('pipe stand',.34,1.12,.22,.075,.37,.075,p.brass),
+    b('tap spout',.12,1.30,.22,.47,.075,.075,p.brass),
+    c('tap lip',-.10,1.23,.20,.10,.12,.10,p.brass),
+    ...[-.32,.32].map(x=>b('cupboard panel '+x,x,.48,-.392,.49,.54,.035,p.birch))
+  ]},
+  'sink.steel':{parts:[
+    b('steel kitchen cabinet',0,.43,0,1.11,.83,.78,p.ink),
+    b('brushed metal top',0,.89,0,1.23,.13,.85,p.blue),
+    b('deep rectangular sink',-.05,.959,-.11,.85,.035,.56,p.ink),
+    b('sink clean water',-.05,.975,-.11,.70,.018,.40,p.glass),
+    b('tall stainless stem',.32,1.20,.20,.07,.46,.07,p.brass),
+    b('tall arch overhead',.16,1.44,.19,.42,.07,.07,p.brass),
+    b('tap outlet',-.06,1.31,.18,.065,.24,.065,p.brass),
+    b('steel drawer',0,.49,-.425,.97,.41,.035,p.blue)
+  ]},
   'wardrobe.open':{parts:[
     ...[-.79,.79].map(x=>b('open wardrobe wall '+x,x,1.13,0,.085,2.18,.79,p.birch)),
     b('wardrobe top plank',0,2.21,0,1.66,.09,.85,p.oak),
