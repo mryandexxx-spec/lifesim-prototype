@@ -14,7 +14,7 @@ import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
-  starterShellSegments,starterShellOffset,BUILD_LOT,constructionBounds} from './construction.js';
+  starterShellSegments,starterShellOffset,BUILD_LOT,BUILD_FINISHES,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
@@ -1907,6 +1907,94 @@ function boot() {
     constructionNodes.push(node);
     return node;
   };
+  const buildFinishMaterials=new Map();
+  const finishMaterial=id=>{
+    if(!buildFinishMaterials.has(id)){
+      const definition=BUILD_FINISHES[id.startsWith('floor.')?'floor':'wall'][id];
+      buildFinishMaterials.set(id,mat(definition.color));
+    }
+    return buildFinishMaterials.get(id);
+  };
+  const drawConstructionFinishes=state=>{
+    const finish=state.materials||{};
+    // Group floor paint by material + row; a recolored room costs one slab
+    // per material run rather than a fresh PlayCanvas entity for every tile.
+    const rows=new Map();
+    for(const [key,id] of Object.entries(finish.floor||{})){
+      if(!BUILD_FINISHES.floor[id])continue;
+      const [i,j]=key.split(',').map(Number);
+      if(!Number.isSafeInteger(i)||!Number.isSafeInteger(j))continue;
+      const group=j+'|'+id;
+      if(!rows.has(group))rows.set(group,{j,id,values:[]});
+      rows.get(group).values.push(i);
+    }
+    for(const {j,id,values} of rows.values()){
+      values.sort((a,b)=>a-b);
+      let lo=values[0],last=lo;
+      const draw=()=>buildBox('F5-B finished floor '+id,(lo+last+1)*.25,.053,
+        (j+.5)*.5,(last-lo+1)*.5,.026,.5,finishMaterial(id));
+      for(const i of [...values.slice(1),Infinity]){
+        if(i===last+1){last=i;continue;}draw();lo=i;last=i;
+      }
+    }
+    if(constructionWallMode==='down')return;
+    const faces=new Map(),opened=new Set(state.openings.flatMap(o=>o.edgeIds));
+    for(const edge of state.wallEdges){
+      if(opened.has(edge.id))continue;
+      if(constructionWallMode==='cut'&&
+        (edge.axis==='h'?edge.j*.5>0:edge.i*.5>14))continue;
+      for(const face of ['a','b']){
+        const id=finish.wall?.[edge.id]?.[face];
+        if(!BUILD_FINISHES.wall[id])continue;
+        const group=edge.axis+'|'+(edge.axis==='h'?edge.j:edge.i)+'|'+face+'|'+id;
+        if(!faces.has(group))faces.set(group,{axis:edge.axis,position:edge.axis==='h'?edge.j:edge.i,face,id,values:[]});
+        faces.get(group).values.push(edge.axis==='h'?edge.i:edge.j);
+      }
+    }
+    for(const {axis,position,face,id,values} of faces.values()){
+      values.sort((a,b)=>a-b);
+      let lo=values[0],last=lo;
+      const draw=()=>{
+        const span=(last-lo+1)*.5,mid=(lo+last+1)*.25,side=face==='a'?-1:1;
+        buildBox('F5-B wall finish '+id,
+          axis==='h'?mid:position*.5+side*.081,1.42,
+          axis==='v'?mid:position*.5+side*.081,
+          axis==='h'?span:.02,2.72,axis==='v'?span:.02,finishMaterial(id));
+      };
+      for(const i of [...values.slice(1),Infinity]){
+        if(i===last+1){last=i;continue;}draw();lo=i;last=i;
+      }
+    }
+    // Original decorated walls remain untouched. Their new finishes are
+    // thin detachable faces; H5b paintings keep their own world anchors.
+    const starter=[
+      {side:'north',axis:'h',center:-4.34+starterShellOffset(state,'north'),
+        midX:4.625+(starterShellOffset(state,'west')+starterShellOffset(state,'east'))/2,
+        midZ:0,length:19.27+starterShellOffset(state,'east')-starterShellOffset(state,'west')},
+      {side:'west',axis:'v',center:-4.97+starterShellOffset(state,'west'),
+        midX:0,midZ:(starterShellOffset(state,'north')+starterShellOffset(state,'south'))/2,
+        length:8.65+starterShellOffset(state,'south')-starterShellOffset(state,'north')},
+      {side:'east',axis:'v',center:14.25+starterShellOffset(state,'east'),
+        midX:0,midZ:(starterShellOffset(state,'north')+starterShellOffset(state,'south'))/2,
+        length:8.65+starterShellOffset(state,'south')-starterShellOffset(state,'north')},
+      {side:'south',axis:'h',center:4.34+starterShellOffset(state,'south'),
+        midX:4.625+(starterShellOffset(state,'west')+starterShellOffset(state,'east'))/2,
+        midZ:0,length:19.27+starterShellOffset(state,'east')-starterShellOffset(state,'west')}
+    ];
+    for(const wall of starter){
+      if((wall.side==='east'||wall.side==='south')&&constructionWallMode!=='up')continue;
+      for(const face of ['a','b']){
+        const id=finish.wall?.['starter:'+wall.side]?.[face];
+        if(!BUILD_FINISHES.wall[id])continue;
+        const offset=(face==='a'?-1:1)*.096;
+        buildBox('F5-B original wall finish '+id,
+          wall.axis==='h'?wall.midX:wall.center+offset,1.42,
+          wall.axis==='h'?wall.center+offset:wall.midZ,
+          wall.axis==='h'?wall.length:.023,2.68,
+          wall.axis==='v'?wall.length:.023,finishMaterial(id));
+      }
+    }
+  };
   const syncConstructionRender=(force=false)=>{
     const state=game.world.construction;
     if(!force&&renderedConstruction===state&&renderedWallMode===constructionWallMode)return;
@@ -1955,6 +2043,7 @@ function boot() {
         buildBox('F5 starter front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
         buildBox('F5 starter right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
       }
+      drawConstructionFinishes(state);
       return;
     }
     const grid=.5,base=new Set();
@@ -2036,6 +2125,7 @@ function boot() {
         side('F5 left jamb',-width/2);side('F5 right jamb',width/2);
       }
     }
+    drawConstructionFinishes(state);
     // UP mode adds former open-front boundaries for an exterior view only.
     // These are cosmetic: no surprise path block in legacy saves.
     if(exterior){
