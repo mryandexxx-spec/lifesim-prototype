@@ -23,7 +23,8 @@ import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketIt
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES} from './painting.js';
-import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary} from './kitchen.js';
+import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
+  chooseKitchenPlan} from './kitchen.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -368,6 +369,11 @@ function scheduleCommand(command,residentId=game.selectedSim){
       const target=resolveActionFurniture(game.world,actionId,command.targetInstanceId);
       if(!target){toast('Этот предмет недоступен');return false;}
       command={...command,targetInstanceId:target.instanceId};
+      if(command.type==='object'&&actionId==='cook'&&
+        !chooseKitchenPlan(game.world,getActor(game,residentId).position,target.instanceId)){
+        toast('Для готовки нужны доступные холодильник, рабочая поверхность и плита');
+        return false;
+      }
     }
     if(command.inventoryItemId&&!inventoryFor(game,residentId).some(item=>
       item.type==='book'&&item.id===command.inventoryItemId)){
