@@ -1165,3 +1165,18 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .build-wall-controls button{min-height:44px;flex:1;border:1px solid #b7d7c3;background:#fff;color:#266044;
   border-radius:10px;font-size:12px;font-weight:850;padding:6px 9px;white-space:nowrap;}
 .build-wall-controls #build-wall-deselect{flex:0;min-width:44px;}
+
+/* F5-A.3: original apartment perimeter can be selected even when off-screen
+   by accessible 44px directional targets under the resize-wall tool. */
+.build-starter-picker{display:flex;flex-wrap:wrap;gap:6px;border:1px solid #d7c7a8;
+  background:#f8f1e3;border-radius:12px;padding:7px;}
+.build-starter-picker[hidden]{display:none!important;}
+.build-starter-picker strong{flex:1;min-width:100%;font-size:12px;color:#66543b;}
+.build-starter-picker button{flex:1;min-width:65px;min-height:44px;
+  padding:5px 8px;border-radius:9px;border:1px solid #ddceb5;background:#fff;
+  color:#624b30;font-weight:800;font-size:12px;}
+
+/* A taller, focused tool sheet makes the original-home picker and +/- buttons
+   visible together on portrait iPhones; the rest remains scrollable. */
+.build-editor[data-tool="move-wall"]{max-height:min(54dvh,410px);}
+.build-editor[data-tool="move-wall"] #build-instruction{display:none;}

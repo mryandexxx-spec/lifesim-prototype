@@ -7,6 +7,7 @@ import {findMarketPlacement,buyMarketItem} from '../src/furniture-shop.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from '../src/painting-gallery.js';
 import {SAVE_KEY} from '../src/simulation.js';
+import {newConstructionWorld,proposeConstructionEdit} from '../src/construction.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 function work(id,ownerId='alex',location='studio'){
@@ -122,10 +123,25 @@ test('H5b: wall geometry and browser/build wiring',()=>{
     ci=read('../.github/workflows/pages.yml');
   assert.equal(PAINT_WALL_SLOTS.length,8);
   assert.ok(PAINT_WALL_SLOTS.every((s,i)=>s.id===i&&s.x>1&&s.x<13&&s.z>-4.25));
-  assert.match(game,/artworkDisplayPose\(work,index,origin\)/);
+  assert.match(game,/artworkDisplayPose\(work,index,origin,game\.world\.construction\)/);
   assert.match(game,/transactPainting\(game,game.selectedSim,work.id/);
   assert.match(game,/foot.enabled=!position.wall/);
   assert.match(game,/setMindTab\('skills'\)/);
   assert.match(ci,/cp src\/painting-gallery.js site\/src\//);
   assert.match(html,/painting-gallery.js\?v=1.2u-h5b-20261117/);
+});
+
+test('H5b works keep wall-slot identity and follow starter apartment wall resizing',()=>{
+ const original=newConstructionWorld();
+ const painting={kind:'artwork',location:'wall',wallSlot:0};
+ const before=artworkDisplayPose(painting,0,null,original);
+ const moved=proposeConstructionEdit(original,{type:'move-wall',
+   edgeId:'starter:north',deltaI:0,deltaJ:-1});
+ assert.equal(moved.ok,true,moved.reason);
+ const after=artworkDisplayPose(painting,0,null,moved.world);
+ assert.equal(after.x,before.x);
+ assert.equal(after.y,before.y);
+ assert.equal(after.z,before.z-.5);
+ assert.equal(painting.wallSlot,0);
+ assert.deepEqual(artworkDisplayPose(painting),before);
 });

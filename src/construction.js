@@ -6,6 +6,36 @@
 export const BUILD_STEP=.5;
 export const BUILD_LOT=Object.freeze({minX:-9,maxX:23,minZ:-12,maxZ:12});
 const BASE=Object.freeze({minI:-10,maxI:28,minJ:-9,maxJ:9});
+// Old cutaway: opaque west/north, open right/front. Preserve original geometry
+// while making all four extents a serializable, editable construction entity.
+export const STARTER_SHELL=Object.freeze({
+  west:BASE.minI,east:BASE.maxI,north:BASE.minJ,south:BASE.maxJ
+});
+const STARTER_SIDE=Object.freeze({west:-1,east:1,north:-1,south:1});
+const starterSide=id=>typeof id==='string'&&id.startsWith('starter:')
+  ?id.slice(8):null;
+function validStarter(raw){
+  if(!raw||!Object.keys(STARTER_SHELL).every(k=>Number.isSafeInteger(raw[k])))
+    return {...STARTER_SHELL};
+  const s={west:raw.west,east:raw.east,north:raw.north,south:raw.south};
+  if(s.west>STARTER_SHELL.west||s.east<STARTER_SHELL.east||
+    s.north>STARTER_SHELL.north||s.south<STARTER_SHELL.south||
+    s.west<BUILD_LOT.minX/BUILD_STEP||s.east>BUILD_LOT.maxX/BUILD_STEP||
+    s.north<BUILD_LOT.minZ/BUILD_STEP||s.south>BUILD_LOT.maxZ/BUILD_STEP)return {...STARTER_SHELL};
+  return s;
+}
+export function starterShellSegments(world){
+  const s=validStarter(world?.starterShell),segments=[];
+  for(let j=s.north;j<s.south;j++)for(const [side,i] of [['west',s.west],['east',s.east]])
+    segments.push({id:'starter:'+side,axis:'v',i,j,starterSide:side});
+  for(let i=s.west;i<s.east;i++)for(const [side,j] of [['north',s.north],['south',s.south]])
+    segments.push({id:'starter:'+side,axis:'h',i,j,starterSide:side});
+  return segments;
+}
+export function starterShellOffset(world,side){
+  const s=validStarter(world?.starterShell);
+  return (s[side]-STARTER_SHELL[side])*BUILD_STEP;
+}
 const finite=Number.isFinite;
 const cell=(i,j)=>i+','+j;
 const edge=(axis,i,j)=>axis+':'+i+','+j;
@@ -25,7 +55,8 @@ export function newConstructionWorld(){
   const floorCells=[];
   for(let i=BASE.minI;i<BASE.maxI;i++)for(let j=BASE.minJ;j<BASE.maxJ;j++)floorCells.push(cell(i,j));
   return {schema:1,revision:0,lot:{...BUILD_LOT},step:BUILD_STEP,floorCells,wallEdges:[],openings:[],
-    materials:{},roofModules:[],legacy:true,nextId:1};
+    materials:{},roofModules:[],legacy:true,nextId:1,
+    starterShell:{...STARTER_SHELL},starterOwned:[]};
 }
 export function restoreConstructionWorld(raw){
   const initial=newConstructionWorld();
@@ -38,6 +69,20 @@ export function restoreConstructionWorld(raw){
     const [i,j]=key.split(',').map(Number);
     if(!Number.isSafeInteger(i)||!Number.isSafeInteger(j)||!lotCell(i,j))return initial;
     floors.add(cell(i,j));
+  }
+  const shell=validStarter(raw.starterShell),owned=new Set();
+  if(Array.isArray(raw.starterOwned)&&raw.starterOwned.length<=5000){
+    for(const key of raw.starterOwned){
+      if(typeof key!=='string'||!/^[-]?\d+,[-]?\d+$/.test(key))continue;
+      const [i,j]=key.split(',').map(Number);
+      if(!isBase(i,j)&&i>=shell.west&&i<shell.east&&j>=shell.north&&j<shell.south&&
+        floors.has(key))owned.add(key);
+    }
+  }
+  // Defensive recovery: partial saves may contain shell bounds without strips.
+  for(let i=shell.west;i<shell.east;i++)for(let j=shell.north;j<shell.south;j++){
+    const key=cell(i,j);
+    if(!floors.has(key)){floors.add(key);if(!isBase(i,j))owned.add(key);}
   }
   const walls=[],keys=new Set();
   for(const value of raw.wallEdges){
@@ -57,7 +102,9 @@ export function restoreConstructionWorld(raw){
     openings.push({id:rawOpening.id,type:rawOpening.type,edgeIds:[...new Set(rawOpening.edgeIds)]});
   }
   return {...initial,revision:Number.isSafeInteger(raw.revision)?Math.min(raw.revision,1e8):0,
-    legacy:raw.legacy===true&&walls.length===0&&floors.size===initial.floorCells.length,
+    legacy:raw.legacy===true&&walls.length===0&&floors.size===initial.floorCells.length&&
+      Object.keys(STARTER_SHELL).every(k=>shell[k]===STARTER_SHELL[k]),
+    starterShell:shell,starterOwned:[...owned],
     nextId:Number.isSafeInteger(raw.nextId)&&raw.nextId>=1&&raw.nextId<1e8?raw.nextId:1,
     floorCells:[...floors],wallEdges:walls,openings};
 }
@@ -73,6 +120,12 @@ export function constructionWallAt(world,x,z,radius=.26){
   const state=world?.construction||world;
   if(!state||state.legacy)return false;
   const opened=topology(state).doors;
+  const starter=validStarter(state.starterShell);
+  const west=starter.west*BUILD_STEP,north=starter.north*BUILD_STEP;
+  if((Math.abs(x-west)<radius+.055&&
+      z>=starter.north*BUILD_STEP-radius&&z<=starter.south*BUILD_STEP+radius)||
+     (Math.abs(z-north)<radius+.055&&
+      x>=starter.west*BUILD_STEP-radius&&x<=starter.east*BUILD_STEP+radius))return true;
   for(const w of state.wallEdges){
     if(opened.has(w.id))continue;
     const bx=w.i*BUILD_STEP,bz=w.j*BUILD_STEP;
@@ -95,6 +148,8 @@ export function constructionBounds(world){
  * no room ownership can be inferred from a single shared wall.
  */
 export function constructionWallOutward(world,edgeId){
+  const side=starterSide(edgeId);
+  if(Object.hasOwn(STARTER_SIDE,side))return STARTER_SIDE[side];
   const w=world?.wallEdges?.find(w=>w.id===edgeId);
   if(!w)return null;
   const floors=topology(world).floors;
@@ -144,6 +199,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   if(!command||typeof command.type!=='string')return fail('invalid-command');
   let floors=new Set(world.floorCells),walls=new Map(world.wallEdges.map(w=>[w.id,w]));
   let openings=[...world.openings],nextId=world.nextId;
+  let starterShell={...world.starterShell},starterOwned=new Set(world.starterOwned);
   const type=command.type;
   if(['room','floor','remove-floor'].includes(type)){
     const r=buildRect(command.from,command.to);
@@ -151,6 +207,8 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     for(const key of r.cells){const [i,j]=key.split(',').map(Number);
       if(!lotCell(i,j))return fail('lot-bounds');
       if(type==='remove-floor'&&isBase(i,j))return fail('protected-legacy-floor');
+      if(type==='remove-floor'&&i>=starterShell.west&&i<starterShell.east&&
+        j>=starterShell.north&&j<starterShell.south)return fail('protected-starter-floor');
     }
     if(type==='remove-floor'){
       const removed=new Set(r.cells);
@@ -175,6 +233,54 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     if(!line)return fail('wall-must-be-straight');
     for(const w of line)if(!lotCell(w.i,w.j)||!floors.has(cell(w.i-(w.axis==='v'?1:0),w.j-(w.axis==='h'?1:0)))&&!floors.has(cell(w.i,w.j)))return fail('outside-floor');
     line.forEach(w=>walls.set(w.id,w));
+  }else if(type==='move-wall'&&Object.hasOwn(STARTER_SIDE,starterSide(command.edgeId))){
+    const side=starterSide(command.edgeId);
+    const shift=(side==='west'||side==='east')?command.deltaI:command.deltaJ;
+    const orth=(side==='west'||side==='east')?command.deltaJ:command.deltaI;
+    if(!Number.isSafeInteger(shift)||shift===0||Math.abs(shift)>8||orth!==0)
+      return fail('invalid-wall-move');
+    const next=starterShell[side]+shift;
+    // Never eat into the original furnished floor without a separate
+    // furniture migration. Retract only strips previously added by building.
+    if((side==='west'&&next>STARTER_SHELL.west)||
+       (side==='east'&&next<STARTER_SHELL.east)||
+       (side==='north'&&next>STARTER_SHELL.north)||
+       (side==='south'&&next<STARTER_SHELL.south))return fail('starter-minimum');
+    if((side==='west'&&next<BUILD_LOT.minX/BUILD_STEP)||
+       (side==='east'&&next>BUILD_LOT.maxX/BUILD_STEP)||
+       (side==='north'&&next<BUILD_LOT.minZ/BUILD_STEP)||
+       (side==='south'&&next>BUILD_LOT.maxZ/BUILD_STEP))return fail('lot-bounds');
+    starterShell={...starterShell,[side]:next};
+    for(let i=starterShell.west;i<starterShell.east;i++)
+      for(let j=starterShell.north;j<starterShell.south;j++){
+        const k=cell(i,j);
+        if(!floors.has(k)){floors.add(k);starterOwned.add(k);}
+      }
+    for(const k of [...starterOwned]){
+      const [i,j]=k.split(',').map(Number);
+      if(i>=starterShell.west&&i<starterShell.east&&
+        j>=starterShell.north&&j<starterShell.south)continue;
+      const patch={minX:i*BUILD_STEP,minZ:j*BUILD_STEP,
+        maxX:(i+1)*BUILD_STEP,maxZ:(j+1)*BUILD_STEP};
+      if(furnitureBoxes.some(r=>overlap(patch,r))||
+        residents.some(p=>finite(p?.x)&&finite(p?.z)&&
+          p.x>=patch.minX&&p.x<patch.maxX&&p.z>=patch.minZ&&p.z<patch.maxZ))
+        return fail('furniture-on-floor');
+      if([...walls.values()].some(w=>Math.abs(w.i-i)<=1&&Math.abs(w.j-j)<=1))
+        return fail('starter-strip-occupied');
+      floors.delete(k);starterOwned.delete(k);
+    }
+    if(side==='west'||side==='north'){
+      const line=starterShell[side]*BUILD_STEP,half=.14;
+      const corridor=side==='west'
+        ?{minX:line-half,maxX:line+half,
+          minZ:starterShell.north*BUILD_STEP,
+          maxZ:starterShell.south*BUILD_STEP}
+        :{minZ:line-half,maxZ:line+half,
+          minX:starterShell.west*BUILD_STEP,
+          maxX:starterShell.east*BUILD_STEP};
+      if(furnitureBoxes.some(r=>overlap(corridor,r)))return fail('wall-intersects-furniture');
+    }
   }else if(type==='move-wall'){
     const selected=walls.get(command.edgeId);
     if(!selected)return fail('wall-not-found');
@@ -247,8 +353,9 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     openings=openings.filter(o=>o.id!==command.id);
   }else return fail('unsupported-command');
   if(floors.size>4000||walls.size>5000)return fail('too-large');
-  const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),openings})!==
-    JSON.stringify({floors:[...world.floorCells].sort(),walls:world.wallEdges.map(w=>w.id).sort(),openings:world.openings});
+  const changed=JSON.stringify({floors:[...floors].sort(),walls:[...walls.keys()].sort(),openings,starterShell})!==
+    JSON.stringify({floors:[...world.floorCells].sort(),walls:world.wallEdges.map(w=>w.id).sort(),
+      openings:world.openings,starterShell:world.starterShell});
   if(!changed)return fail('unchanged');
   // A room wall is structural, never allowed through a purchased object,
   // protected kitchen fixture, painting easel or resident's occupied space.
@@ -263,7 +370,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
     if(furnitureBoxes.some(r=>overlap(volume,r)))return fail('wall-intersects-furniture');
   }
   const next={...world,revision:world.revision+1,legacy:false,nextId,floorCells:[...floors],
-    wallEdges:[...walls.values()],openings};
+    starterShell,starterOwned:[...starterOwned],wallEdges:[...walls.values()],openings};
   for(const resident of residents)if(finite(resident?.x)&&finite(resident?.z)&&
     (!constructionContains(next,resident.x,resident.z)||constructionWallAt(next,resident.x,resident.z)))return fail('resident-blocked');
   return {ok:true,world:next,diff:{floorCount:next.floorCells.length-world.floorCells.length,

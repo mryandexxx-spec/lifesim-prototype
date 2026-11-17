@@ -19,7 +19,9 @@ const browser=await chromium.launch({headless:true,args:[
 try{
  const ctx=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,hasTouch:true,isMobile:true});
  await ctx.addInitScript(({key,value})=>{
-   localStorage.setItem(key,JSON.stringify(value));
+   // Seed only the first page load: a reload must exercise the REAL saved
+   // construction world rather than replace it with the test fixture.
+   if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(value));
    localStorage.setItem('lifesim.uiTour.v1','done');
  },{key:SAVE_KEY,value:state});
  const page=await ctx.newPage(),errors=[];
@@ -105,6 +107,23 @@ try{
  assert.notDeepEqual(afterPan,beforePan,'One-finger swipe must actually pan the 3D camera');
  assert.ok(await page.locator('#build-pending').isHidden(),
    'A camera swipe must never change layout or stage a build');
+ // Actual starter-home regression: the old apartment's walls were procedural
+ // scene nodes absent from wallEdges, so no wall tool could resize them.
+ await page.locator('[data-build-tool="move-wall"]').click();
+ assert.ok(await page.locator('#build-starter-picker').isVisible());
+ await page.locator('[data-starter-side="north"]').click();
+ assert.match(await page.locator('#build-wall-label').innerText(),/Исходная квартира/);
+ assert.ok(await page.locator('#build-wall-expand').isEnabled());
+ await page.locator('#build-wall-expand').click();
+ assert.ok(await page.locator('#build-pending').isVisible());
+ await page.locator('#build-apply').click();
+ assert.ok(await page.locator('#build-pending').isHidden());
+ // Four explicit original boundaries remain select-able even when the initial
+ // decorative back wall is offscreen at the eastern portrait camera pose.
+ await page.locator('[data-starter-side="east"]').click();
+ await page.locator('#build-wall-expand').click();
+ await page.locator('#build-apply').click();
+ await page.locator('[data-build-walls="up"]').click();
  await page.screenshot({path:'f5a-browser-build.png'});
  await page.locator('#build-exit').click();
  assert.equal(await page.locator('#build-toggle').getAttribute('aria-pressed'),'false');
@@ -119,7 +138,20 @@ try{
  assert.equal(saved.world.construction.openings.length,1);
  assert.ok(saved.world.construction.wallEdges.some(w=>w.axis==='v'&&w.i===37&&w.j===0),
    '0.5m wall-expansion nudge moved the selected outer boundary');
+ assert.equal(saved.world.construction.starterShell.north,-10,
+   'The original solid back wall moved outward and persisted');
+ assert.equal(saved.world.construction.starterShell.east,29,
+   'The original open eastern boundary moved outward and persisted');
+ assert.ok(saved.world.construction.starterOwned.length>0,
+   'The original extension owns real saved foundation cells');
  assert.equal(saved.world.construction.schema,1);
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
+ const afterReload=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+ assert.deepEqual(afterReload.world.construction.starterShell,saved.world.construction.starterShell,
+   'Reload cannot reset any of the initial apartment walls');
+ assert.deepEqual(afterReload.world.construction.starterOwned,saved.world.construction.starterOwned,
+   'Reload cannot lose the original room foundation extensions');
  console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));
  assert.deepEqual(errors,[],'Real PlayCanvas/ES module browser runtime must not error');
