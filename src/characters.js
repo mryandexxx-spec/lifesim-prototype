@@ -145,7 +145,7 @@ export function createCharacterRig({pc,root,ball,box,cylinder,mat,materials},id)
   // Visible original brush fallback when a Meshy skinned rig is unavailable.
   const paintbrush=cylinder(name+' painting brush',0,-.26,.24,.028,.31,.028,
     materials.wood||materials.dark||materials.green,elbowPivot[1]);
-  paintbrush.setLocalEulerAngles(65,0,0);paintbrush.enabled=false;
+  paintbrush.setLocalEulerAngles?.(65,0,0);paintbrush.enabled=false;
   snack.enabled=false;book.enabled=false;
   // The privacy costume is an opaque, fully covering bath wrap, never a nude mesh.
   // It is only activated while the resident is hidden by the privacy enclosure.

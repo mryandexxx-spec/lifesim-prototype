@@ -82,7 +82,7 @@ test('3D ray selects the exact purchased sofa instance, unlike the default sofa'
  assert.match(game,/\?\{targetInstanceId:selectedFurnitureInstanceId\}:\{\}/);
  assert.match(game,/sofaCopies=game.world.furniture.instances/);
  assert.match(game,/instanceId:item.instanceId/);
- assert.match(game,/return pickWorldRayTarget\(near,far,\s*\[\.\.\.residents,\.\.\.sofaCopies,/);
+ assert.match(game,/return pickWorldRayTarget\(near,far,\s*\[\.\.\.residents,\.\.\.finishedArt,\.\.\.sofaCopies,/);
 });
 test('visual sit and exit stay bound to action target; Meshy seat contact is per instance',()=>{
  assert.match(game,/sofaVisualTargets=\{alex:null,mira:null\}/);

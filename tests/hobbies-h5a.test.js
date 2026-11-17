@@ -138,7 +138,8 @@ test('H5a: Safari artwork pick, brush, cached imports and Pages deploy are conne
   assert.match(mira,/createMeshyPaintingController/);
   assert.match(alex,/paintingRuntime\?\.setFrame/);
   assert.match(mira,/paintingRuntime\?\.setFrame/);
-  assert.match(yml,/cp src\/painting\.js src\/painting-visual\.js src\/meshy-painting-runtime\.js site\/src\//);
+  assert.match(yml,/cp src\/painting\.js site\/src\//);
+  assert.match(yml,/cp src\/painting-visual\.js src\/meshy-painting-runtime\.js site\/src\//);
   assert.ok(html.includes('1.2u.9 · H4 / H5a / F4F'));
   assert.ok(html.includes('painting-visual.js?v=1.2u-h5a'));
 });

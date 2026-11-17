@@ -167,7 +167,8 @@ jobs:
           cp src/hobby-content.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/
-          cp src/painting.js src/painting-visual.js src/meshy-painting-runtime.js site/src/
+          cp src/painting.js site/src/
+          cp src/painting-visual.js src/meshy-painting-runtime.js site/src/
           cp src/hobby-reading.js site/src/
           cp src/music-audio.js site/src/
           cp src/music-listening.js site/src/
