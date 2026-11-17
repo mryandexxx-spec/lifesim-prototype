@@ -3215,7 +3215,7 @@ function boot() {
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
   let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
-  let finishFloor='floor.oak',finishWall='wall.sage',finishSide='both';
+  let finishFloor='floor.oak',finishWall='wall.sage',finishCeiling='ceiling.chalk',finishSide='both';
   const openingChoice={door:'door.simple',window:'window.classic',arch:'arch.round'};
   let selectedBuildOpening=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
@@ -4078,8 +4078,9 @@ function boot() {
   $('build-wall-deselect').addEventListener('click',resetBuildWallSelection);
    const buildFinishPalette=$('build-finish-colors');
   const refreshBuildFinishes=()=>{
-    const kind=buildTool==='paint-wall'?'wall':'floor';
-    const selected=kind==='wall'?finishWall:finishFloor;
+    const kind=buildTool==='paint-wall'?'wall':
+      buildTool.startsWith('paint-ceiling')?'ceiling':'floor';
+    const selected=kind==='wall'?finishWall:kind==='ceiling'?finishCeiling:finishFloor;
     buildFinishPalette.replaceChildren();
     for(const [id,definition] of Object.entries(BUILD_FINISHES[kind])){
       const button=document.createElement('button');
@@ -4092,7 +4093,7 @@ function boot() {
       const title=document.createElement('small');title.textContent=definition.label;
       button.append(chip,title);
       button.addEventListener('click',()=>{
-        if(kind==='wall')finishWall=id;else finishFloor=id;
+        if(kind==='wall')finishWall=id;else if(kind==='ceiling')finishCeiling=id;else finishFloor=id;
         refreshBuildFinishes();
         buildFeedback('Материал выбран: '+definition.label+' · коснись поверхности');
       });
@@ -4100,7 +4101,12 @@ function boot() {
     }
     $('build-finish-side-label').hidden=kind!=='wall';
     $('build-finish-side').value=finishSide;
-    $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':'Покрытие пола';
+    $('build-finish-label').textContent=kind==='wall'?'Покрытие стен':
+      kind==='ceiling'?'Покрытие потолка':'Покрытие пола';
+    $('build-finish-tip').textContent=kind==='wall'
+      ?'Полосы и панели рисуются процедурно на обеих сторонах стены.'
+      :kind==='ceiling'?'Для просмотра включи «Потолок».'
+      :'Направление досок и мозаика — отдельные образцы.';
   };
   $('build-finish-side').addEventListener('change',event=>{finishSide=event.target.value;});
   const buildOpeningPalette=$('build-opening-variants');
@@ -4143,8 +4149,13 @@ function boot() {
     clearBuildPending();resetBuildWallSelection();
     selectedBuildOpening=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
+    if(type.startsWith('paint-ceiling')&&!ceilingPreview){
+      ceilingPreview=true;
+      $('build-ceiling-toggle').setAttribute('aria-pressed','true');
+      syncConstructionRender(true);
+    }
     $('build-editor').dataset.tool=type;
-    const finishes=['paint-floor','paint-room','paint-wall','sample-finish'];
+    const finishes=['paint-floor','paint-room','paint-wall','paint-ceiling-room','paint-ceiling-tile','sample-finish'];
     $('build-finish-picker').hidden=!finishes.includes(type);
     if(finishes.includes(type))refreshBuildFinishes();
     const openings=['door','window','arch','change-opening'];
@@ -4167,7 +4178,9 @@ function boot() {
       'remove-floor':'Протяни область пола, которую нужно убрать',
       'paint-floor':'Выбери покрытие и коснись одной плитки пола. Затем «Применить».',
       'paint-room':'Выбери покрытие и коснись комнаты — зальём весь её пол.',
-      'paint-wall':'Выбери цвет, затем коснись стены — окрасим всю непрерывную стену.',
+      'paint-wall':'Выбери обои или панели, затем коснись любой стены.',
+      'paint-ceiling-room':'Выбери цвет и коснись пола комнаты — отделаем потолок над ней.',
+      'paint-ceiling-tile':'Выбери цвет и коснись плитки — отделаем потолок над ней.',
       'sample-finish':'Пипетка: коснись уже отделанной поверхности, чтобы взять её покрытие.'
     };
     $('build-instruction').textContent=tips[type]||'Выбери инструмент';
@@ -4183,6 +4196,12 @@ function boot() {
       syncConstructionRender(true);
       buildFeedback('Видимость стен: '+btn.textContent);
     }));
+  $('build-ceiling-toggle').addEventListener('click',()=>{
+    ceilingPreview=!ceilingPreview;
+    $('build-ceiling-toggle').setAttribute('aria-pressed',String(ceilingPreview));
+    syncConstructionRender(true);
+    buildFeedback(ceilingPreview?'Потолок виден':'Потолок скрыт для обзора комнат');
+  });
   for(const type of ['undo','redo'])$('build-'+type).addEventListener('click',()=>{
     clearBuildPending();
     if(!buildSession)return;
@@ -4191,7 +4210,9 @@ function boot() {
   });
   const exitBuild=()=>{
     if(!buildMode)return;
-    buildMode=false;buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
+    buildMode=false;ceilingPreview=false;
+    $('build-ceiling-toggle').setAttribute('aria-pressed','false');
+    buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
     cameraGesture.clear();setCameraBuildBounds();
     if(buildPreviousView)setView(buildPreviousView);
     buildPreviousView=null;
@@ -4211,7 +4232,8 @@ function boot() {
     buildSession=createConstructionEditor(game.world.construction);
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
-    buildTool='camera';
+    buildTool='camera';ceilingPreview=false;
+    $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     // Restore the previously tested camera gesture path unchanged:
     // entering Build explicitly selects pan, without altering shop VM listeners.
     oneFingerMode='pan';showCameraMode();
@@ -4285,6 +4307,9 @@ function boot() {
     }else if(type==='paint-floor'||type==='paint-room'){
       stageBuild({type:'paint-floor',at:hit||from,materialId:finishFloor,
         scope:type==='paint-room'?'room':'tile'});
+    }else if(type==='paint-ceiling-room'||type==='paint-ceiling-tile'){
+      stageBuild({type:'paint-ceiling',at:hit||from,materialId:finishCeiling,
+        scope:type==='paint-ceiling-room'?'room':'tile'});
     }else if(type==='paint-wall'){
       const target=wallEdge||buildWallAtScreen(gesturePoint(event));
       stageBuild({type:'paint-wall',edgeId:target?.id,materialId:finishWall,
