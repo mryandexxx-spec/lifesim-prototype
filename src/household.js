@@ -16,6 +16,7 @@ import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
+import {newConstructionWorld,restoreConstructionWorld} from './construction.js';
 import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './furniture-catalog.js';
 import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {furniturePoint} from './furniture-transform.js';
@@ -80,7 +81,7 @@ export function newHousehold() {
   state.inventory=starterInventory();
   state.actionQueues=newActionQueues(HOUSEHOLD_IDS);
   // F0 optional v1 extension; each piece has its own immutable instanceId.
-  state.world={furniture:newFurnitureWorld()};
+  state.world={furniture:newFurnitureWorld(),construction:newConstructionWorld()};
   // F2.1 optional root-v1 extension. Old households get test credits only once.
   state.shop=newFurnitureShop();
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
@@ -92,7 +93,8 @@ export function newHousehold() {
 export function loadHousehold(raw) {
   if (!raw || raw.version!==1) return newHousehold();
   const root=loadGame(raw,DEMO_PROFILES.first);
-  root.world={furniture:restoreFurnitureWorld(raw.world?.furniture)};
+  root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
+    construction:restoreConstructionWorld(raw.world?.construction)};
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.objectOnceLedger=restoreObjectOnceLedger(raw.objectOnceLedger);

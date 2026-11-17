@@ -174,7 +174,12 @@ test('Safari import map busts every modified H2 dependency, not only the game en
       'furniture-layout':'?v=1.2v-f4d-f4e-f4f1',
       'furniture-editor':'?v=1.2u-h2fix1-f4c-f4g',
       'furniture-shop':'?v=1.2v-f4d-f4e'};
-    assert.equal(new URL(imports[key],base).search,expected[name]);
+    // A newer building release is allowed to extend the cache identity, but
+    // it must preserve all the prior dependency tokens (and update the URL).
+    assert.ok(new URL(imports[key],base).search.startsWith(expected[name]),
+      key+' must retain its established cache history');
+    if(['household','furniture-layout','furniture-shop'].includes(name))
+      assert.match(new URL(imports[key],base).search,/-f5a$/);
     // A nested ./foo.js import in an ES module beneath src/ resolves to
     // precisely this import-map key, irrespective of the parent module URL.
     assert.equal(new URL(key,base).href,

@@ -41,8 +41,8 @@ export function marketListing(){
   }));
 }
 function reject(reason){return {ok:false,reason};}
-function context({lockedInstanceIds=[],residents=[]}={}){
-  return {lockedInstanceIds, residents};
+function context({lockedInstanceIds=[],residents=[],construction=null}={}){
+  return {lockedInstanceIds,residents,construction};
 }
 function normalized(world,shop){
   return {world:restoreFurnitureWorld(world),shop:restoreFurnitureShop(shop)};
@@ -107,7 +107,7 @@ function sofaReachable(world,instanceId,opts={},actionId='sofa'){
   if(!at)return false;
   return (opts.residents||[]).every(pos=>!pos||
     !Number.isFinite(pos.x)||!Number.isFinite(pos.z)||
-    Boolean(findPath(pos,at,world)));
+    Boolean(findPath(pos,at,opts.construction?{furniture:world,construction:opts.construction}:world)));
 }
 /** Both entry sides must be reachable to make a purchase useful. */
 function bedReachable(world,instanceId,opts={}){
@@ -116,7 +116,7 @@ function bedReachable(world,instanceId,opts={}){
   if(goals.some(p=>!p))return false;
   return (opts.residents||[]).every(pos=>!pos||
     !Number.isFinite(pos.x)||!Number.isFinite(pos.z)||
-    goals.every(goal=>Boolean(findPath(pos,goal,world))));
+    goals.every(goal=>Boolean(findPath(pos,goal,opts.construction?{furniture:world,construction:opts.construction}:world))));
 }
 export function storeMarketItem(world,shop,instanceId,opts={}){
   const current=normalized(world,shop),item=tradeable(current.world,instanceId);

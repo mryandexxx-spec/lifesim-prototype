@@ -7,12 +7,13 @@ import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
-import {CAMERA_INITIAL,wheelCamera} from './camera-controls.js';
+import {CAMERA_INITIAL,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
+import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,BUILD_LOT,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
@@ -295,6 +296,7 @@ const META = {
 };
 
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
+let buildMode=false; // F5-A separate pause-on-editor; house geometry persists, UI mode does not.
 let selected = null;
 let selectedFurnitureInstanceId=null; // action-specific target, never in household save
 let beginAction = () => false;
@@ -1512,7 +1514,7 @@ $('pause-btn').addEventListener('click', () => {
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
 });
 $('speed-btn').addEventListener('click', () => {
-  if(furnishMode)return;
+  if(furnishMode||buildMode)return;
   game.speed = game.speed === 1 ? 3 : 1;
   $('speed-btn').textContent = `${game.speed}×`;
   toast(game.speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
@@ -1526,7 +1528,7 @@ function updateAutoButton() {
   $('auto-state').textContent = enabled ? 'ВКЛ' : 'ВЫКЛ';
 }
 $('auto-btn').addEventListener('click', () => {
-  if(furnishMode)return;
+  if(furnishMode||buildMode)return;
   const enabled = setHouseholdAutonomy(game, !game.autonomy.enabled);
   restartAutonomyWait();
   if (enabled) game.event = 'Свободное время';
@@ -1872,16 +1874,130 @@ function boot() {
 
   // Room platform: visible cutaway walls, planks, and sunlight accents.
   // F4D: double the navigable area eastward; never move legacy furnishings.
-  // Old floor starts at x=-5; the new wing ends at x=14.25.
-  box('foundation',4.65,-0.28,0,19.8,.47,9.2,M.edge);
+  // Old floor starts at x=-5; the new wing ends at x=14.25.  box('foundation',4.65,-0.28,0,19.8,.47,9.2,M.edge);
   box('floor',4.625,-0.032,0,19.25,.12,8.65,M.floor);
   for (let i=0;i<19;i++) box('floor plank',-4.45+i*.99,.034,0,.021,.008,8.6,M.line);
-  box('back wall',4.625,1.40,-4.34,19.27,2.9,.16,M.wall);
-  box('left wall',-4.97,1.40,0,.16,2.9,8.65,M.wall2);
-  box('back top trim',4.625,2.91,-4.30,19.35,.13,.2,M.trim);
-  box('left top trim',-4.96,2.91,0,.20,.13,8.68,M.trim);
-  box('baseboard back',4.625,.16,-4.19,19.25,.18,.13,M.trim);
-  box('baseboard left',-4.83,.16,0,.13,.18,8.5,M.trim);
+
+  const legacyWallNodes=[
+    box('back wall',4.625,1.40,-4.34,19.27,2.9,.16,M.wall),
+    box('left wall',-4.97,1.40,0,.16,2.9,8.65,M.wall2),
+    box('back top trim',4.625,2.91,-4.30,19.35,.13,.2,M.trim),
+    box('left top trim',-4.96,2.91,0,.20,.13,8.68,M.trim)
+  ];
+  const legacySkirts=[
+    box('baseboard back',4.625,.16,-4.19,19.25,.18,.13,M.trim),
+    box('baseboard left',-4.83,.16,0,.13,.18,8.5,M.trim)
+  ];
+  // F5-A render adapter: construction data is authoritative; no gameplay geometry in PlayCanvas.
+  let constructionWallMode='cut',renderedConstruction=null,renderedWallMode='';
+  const constructionNodes=[];
+  const lotGround=box('F5 lot ground',7,-.59,0,32,.12,24,mat('#9fbea0'));
+  lotGround.enabled=false;
+  const buildGhost=box('F5 preview',0,.05,0,.2,.06,.2,mat('#438ac4',{opacity:.25}));
+  buildGhost.enabled=false;
+  const clearConstructionNodes=()=>{for(const node of constructionNodes)node.destroy();constructionNodes.length=0;};
+  const buildBox=(name,x,y,z,sx,sy,sz,material)=>{
+    const node=box(name,x,y,z,sx,sy,sz,material);
+    constructionNodes.push(node);
+    return node;
+  };
+  const syncConstructionRender=(force=false)=>{
+    const state=game.world.construction;
+    if(!force&&renderedConstruction===state&&renderedWallMode===constructionWallMode)return;
+    renderedConstruction=state;renderedWallMode=constructionWallMode;
+    clearConstructionNodes();
+    lotGround.enabled=buildMode;
+    const raised=constructionWallMode!=='down';
+    for(const w of legacyWallNodes)w.enabled=raised;
+    for(const w of legacySkirts)w.enabled=true;
+    if(state.legacy)return;
+    const grid=.5,base=new Set();
+    for(let i=-10;i<28;i++)for(let j=-9;j<9;j++)base.add(i+','+j);
+    const addedByRow=new Map();
+    for(const key of state.floorCells){
+      if(base.has(key))continue;
+      const [i,j]=key.split(',').map(Number);
+      if(!addedByRow.has(j))addedByRow.set(j,[]);
+      addedByRow.get(j).push(i);
+    }
+    for(const [j,values] of addedByRow){
+      values.sort((a,b)=>a-b);
+      let start=values[0],previous=values[0];
+      for(const i of [...values.slice(1),Infinity]){
+        if(i===previous+1){previous=i;continue;}
+        const span=previous-start+1,x=(start+(previous+1))*.25,z=(j+.5)*.5;
+        buildBox('F5 floor foundation',x,-.28,z,span*.5,.45,.5,M.edge);
+        buildBox('F5 floor surface',x,-.031,z,span*.5,.12,.5,M.floor);
+        start=i;previous=i;
+      }
+    }
+    const opened=new Map();
+    for(const opening of state.openings)for(const id of opening.edgeIds)opened.set(id,opening);
+    const drawn=new Set();
+    // Solid wall runs are coalesced into a handful of draw calls per uninterrupted stretch.
+    const byLine=new Map();
+    for(const w of state.wallEdges){
+      if(opened.has(w.id))continue;
+      const line=w.axis+':'+(w.axis==='h'?w.j:w.i);
+      if(!byLine.has(line))byLine.set(line,[]);
+      byLine.get(line).push(w);
+    }
+    const wallHeight=raised?2.87:.19,wallY=raised?1.43:.13;
+    const exterior=constructionWallMode==='up';
+    for(const walls of byLine.values()){
+      const axis=walls[0].axis;walls.sort((a,b)=>axis==='h'?a.i-b.i:a.j-b.j);
+      let start=walls[0],prev=walls[0];
+      const draw=()=>{
+        const len=(axis==='h'?prev.i-start.i:prev.j-start.j)+1;
+        const x=axis==='h'?(start.i+prev.i+1)*.25:start.i*.5;
+        const z=axis==='v'?(start.j+prev.j+1)*.25:start.j*.5;
+        const faceCamera=axis==='h'?z>0:x>14;
+        if(constructionWallMode==='cut'&&faceCamera){
+          buildBox('F5 cutaway outline',x,.13,z,axis==='h'?len*.5:.14,.19,axis==='v'?len*.5:.14,M.trim);
+        }else{
+          buildBox('F5 structural wall',x,wallY,z,axis==='h'?len*.5:.14,
+            wallHeight,axis==='v'?len*.5:.14,M.wall2);
+          if(raised)buildBox('F5 wall coping',x,2.92,z,axis==='h'?len*.5:.16,.12,axis==='v'?len*.5:.16,M.trim);
+        }
+      };
+      for(const w of walls.slice(1)){
+        const sequential=axis==='h'?w.i===prev.i+1:w.j===prev.j+1;
+        if(!sequential){draw();start=w;}prev=w;
+      }draw();
+    }
+    // Each 1.5m opening is one logical portal across exactly 3 construction edges.
+    for(const opening of state.openings){
+      const edges=opening.edgeIds.map(id=>state.wallEdges.find(w=>w.id===id)).filter(Boolean);
+      if(!edges.length)continue;
+      const axis=edges[0].axis;
+      const x=axis==='h'?edges.reduce((n,w)=>n+w.i,0)/edges.length*.5+.25:edges[0].i*.5;
+      const z=axis==='v'?edges.reduce((n,w)=>n+w.j,0)/edges.length*.5+.25:edges[0].j*.5;
+      const width=edges.length*.5,window=opening.type==='window';
+      if(constructionWallMode==='down'){
+        buildBox('F5 opening sill',x,.14,z,axis==='h'?width:.12,.16,axis==='v'?width:.12,M.trim);
+        continue;
+      }
+      const horizontal=(name,height,heightSize,offset,size,material)=>
+        buildBox(name,x,height,z,axis==='h'?size:.17,heightSize,axis==='v'?size:.17,material);
+      const side=(name,diff)=>buildBox(name,x+(axis==='h'?diff:0),1.4,
+        z+(axis==='v'?diff:0),.15,2.8,.15,M.paleWood);
+      if(window){
+        horizontal('F5 window bottom',.52,.85,0,width,M.wall);
+        horizontal('F5 window top',2.56,.62,0,width,M.wall);
+        buildBox('F5 real window glass',x,1.67,z,axis==='h'?width-.16:.06,1.38,axis==='v'?width-.16:.06,M.glass);
+      }else{
+        horizontal('F5 door lintel',2.59,.54,0,width,M.wall);
+        side('F5 left jamb',-width/2);side('F5 right jamb',width/2);
+      }
+    }
+    // UP mode adds former open-front boundaries for an exterior view only.
+    // These are cosmetic: no surprise path block in legacy saves.
+    if(exterior){
+      buildBox('F5 legacy front up',4.625,1.4,4.34,19.27,2.9,.16,M.wall);
+      buildBox('F5 legacy right up',14.25,1.4,0,.16,2.9,8.65,M.wall);
+    }
+  };
+  syncConstructionRender(true);
   // Wall art: one picture, one shelf and one window with sky-coloured panes.
   box('window frame',-2.18,1.87,-4.16,2.0,1.28,.1,M.paleWood);
   box('window',-2.18,1.87,-4.06,1.77,1.08,.08,M.blue);
@@ -2731,10 +2847,12 @@ function boot() {
   // Pure session separates a deliberate tap from any rotation/pan/pinch.
   // A second pointer disqualifies the whole touch until BOTH are released.
   const cameraGesture=createCameraGestureSession();
+  // User may view the entire lot from the same camera in touch Build mode.
   const gesturePoint=e=>({id:e.pointerId,x:e.clientX,y:e.clientY});
   // F1 edit mode: UI state is ephemeral; only confirmed domain transactions
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
+  let buildSession=null,buildDrag=null,buildTool='room',pendingBuild=null,buildPreviousView=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
@@ -2810,6 +2928,7 @@ function boot() {
   };
   const editorContext=(allowQueuedReposition=false)=>({
     lockedInstanceIds:lockedFurnitureIds(!allowQueuedReposition),
+    construction:game.world.construction,
     residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)
   });
   const editorLabel=instanceId=>{
@@ -3418,7 +3537,219 @@ function boot() {
     renderPauseButton();
     editorFeedback('Выбери мебель в списке или коснись её в 3D, затем нажми «Повернуть 90°». Для переноса удерживай палец 0,5 секунды.');
   };
-  $('furnish-toggle').addEventListener('click',()=>furnishMode?exitFurniture():enterFurniture());
+
+  // F5-A construction editor: separate transaction history, no change to Buy mode.
+  const buildingReason={
+    'invalid-rectangle':'Протяни прямоугольник хотя бы 1×1 м',
+    'wall-must-be-straight':'Стена должна идти по прямой оси сетки',
+    'outside-floor':'Строить стены можно по контуру построенного пола',
+    'lot-bounds':'За границами участка 32×24',
+    'protected-legacy-floor':'Исходный пол защищён: пристройку удалять можно',
+    'resident-on-floor':'На этом месте стоит житель',
+    'furniture-on-floor':'На этом месте стоит мебель',
+    'resident-blocked':'Стена задевает жителя',
+    'wall-not-found':'Нажми на стену, а не на пустой участок',
+    'opening-needs-three-wall-sections':'Для проёма нужны три соседние секции стены',
+    'opening-overlap':'На выбранном участке уже есть дверь или окно',
+    'wall-has-opening':'Сначала убери проём, затем стену',
+    'opening-not-found':'Здесь нет двери или окна',
+    'wall-intersects-furniture':'Стена пересекает мебель. Сначала переставь предмет',
+    'furniture-on-floor':'Сперва убери мебель с участка',
+    'invalid-wall-move':'Перетащи выбранную стену перпендикулярно от неё',
+    'wall-already-exists':'Здесь уже есть другая стена',
+    'empty-history':'Нет изменений для отмены',
+    'unchanged':'Здесь уже всё построено',
+    'inaccessible-essential':'После перестройки житель не дойдёт до важных предметов'
+  };
+  const buildFeedback=(msg,invalid=false)=>{
+    $('build-feedback').textContent=msg;
+    $('build-feedback').dataset.invalid=String(invalid);
+  };
+  const buildHistoryButtons=()=>{
+    const state=buildSession?.state();
+    $('build-undo').disabled=!state?.canUndo;
+    $('build-redo').disabled=!state?.canRedo;
+  };
+  const buildSnap=pt=>({x:Math.round(pt.x*2)/2,z:Math.round(pt.z*2)/2});
+  const buildContext=()=>({residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position),
+    furniture:game.world.furniture.instances,
+    furnitureBoxes:game.world.furniture.instances.filter(item=>item.location==='home')
+      .map(item=>instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint))});
+  const buildProposal=(cmd)=>proposeConstructionEdit(game.world.construction,cmd,buildContext());
+  const buildCommand=(from,to)=>{
+    if(buildTool!=='wall')return {type:buildTool,from,to};
+    // Deliberate axis lock: imperfect diagonal touch still draws a straight wall.
+    const straight=Math.abs(to.x-from.x)>=Math.abs(to.z-from.z)
+      ?{x:to.x,z:from.z}:{x:from.x,z:to.z};
+    return {type:'wall',from,to:straight};
+  };
+  const showBuildGhost=(from,to)=>{
+    if(!from||!to||!['room','floor','wall','remove-floor','move-wall'].includes(buildTool)){
+      buildGhost.enabled=false;return;
+    }
+    const command=buildTool==='move-wall'
+      ?{type:'move-wall',edgeId:buildDrag?.wallEdge?.id,
+        deltaI:buildDrag?.wallEdge?.axis==='v'?Math.round((to.x-from.x)*2):0,
+        deltaJ:buildDrag?.wallEdge?.axis==='h'?Math.round((to.z-from.z)*2):0}
+      :buildCommand(from,to);
+    const result=buildProposal(command);
+    const x=(from.x+to.x)/2,z=(from.z+to.z)/2;
+    buildGhost.enabled=true;
+    buildGhost.setPosition(x,.084,z);
+    const dx=Math.abs(to.x-from.x),dz=Math.abs(to.z-from.z);
+    buildGhost.setLocalScale(Math.max(.12,dx),.09,Math.max(.12,dz));
+    buildFeedback(result.ok?'Отпусти палец для предварительного просмотра':buildingReason[result.reason]||result.reason,!result.ok);
+  };
+  const applyBuildChange=(result,label)=>{
+    if(!result.ok){buildFeedback(buildingReason[result.reason]||result.reason,true);return false;}
+    game.world.construction=result.world;
+    const furniture=game.world.furniture;
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    syncConstructionRender(true);
+    buildHistoryButtons();
+    save(true);
+    buildFeedback(label);
+    return true;
+  };
+  const buildEdit=cmd=>{
+    if(!buildSession)return false;
+    const candidate=buildProposal(cmd);
+    if(!candidate.ok){buildFeedback(buildingReason[candidate.reason]||candidate.reason,true);return false;}
+    // Verify the essential pathways from BOTH residents after each transaction.
+    const candidateLayout={furniture:game.world.furniture,construction:candidate.world};
+    for(const id of HOUSEHOLD_IDS){
+      const actor=getActor(game,id);
+      for(const action of ['fridge','shower','toilet','bed']){
+        const point=furnitureActionApproach(game.world,action);
+        if(point&&!findPath(actor.position,point,candidateLayout)){
+          buildFeedback(buildingReason['inaccessible-essential'],true);return false;
+        }
+      }
+    }
+    return applyBuildChange(buildSession.commit(cmd,buildContext()),'Планировка изменена · сохранено');
+  };
+  const clearBuildPending=()=>{
+    pendingBuild=null;$('build-pending').hidden=true;buildGhost.enabled=false;
+  };
+  const stageBuild=cmd=>{
+    const preview=buildProposal(cmd);
+    if(!preview.ok){
+      buildFeedback(buildingReason[preview.reason]||preview.reason,true);
+      return false;
+    }
+    pendingBuild=cmd;$('build-pending').hidden=false;
+    buildFeedback('Предварительный просмотр готов · нажми «Применить»');
+    return true;
+  };
+  $('build-apply').addEventListener('click',()=>{
+    if(!pendingBuild)return;
+    const committed=buildEdit(pendingBuild);
+    if(committed)clearBuildPending();
+  });
+  $('build-cancel').addEventListener('click',()=>{
+    clearBuildPending();buildFeedback('Изменение отменено · сохранение не затронуто');
+  });
+  const setBuildTool=type=>{
+    clearBuildPending();buildTool=type;buildDrag=null;
+    document.querySelectorAll('[data-build-tool]').forEach(btn=>
+      btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
+    buildFeedback(type==='camera'?'Один палец двигает камеру, два — вращают':
+      ['door','window','erase-wall','remove-opening'].includes(type)?'Коснись линии стены для выбора':
+      type==='move-wall'?'Коснись стены и перетащи её в сторону':
+        'Протяни по участку, чтобы задать размеры');
+  };
+  document.querySelectorAll('[data-build-tool]').forEach(btn=>
+    btn.addEventListener('click',()=>setBuildTool(btn.dataset.buildTool)));
+  document.querySelectorAll('[data-build-walls]').forEach(btn=>
+    btn.addEventListener('click',()=>{
+      constructionWallMode=btn.dataset.buildWalls;
+      document.querySelectorAll('[data-build-walls]').forEach(element=>
+        element.setAttribute('aria-pressed',String(element===btn)));
+      syncConstructionRender(true);
+      buildFeedback('Видимость стен: '+btn.textContent);
+    }));
+  for(const type of ['undo','redo'])$('build-'+type).addEventListener('click',()=>{
+    clearBuildPending();
+    if(!buildSession)return;
+    const result=buildSession[type]();
+    applyBuildChange(result,type==='undo'?'Стройка отменена':'Стройка возвращена');
+  });
+  const exitBuild=()=>{
+    if(!buildMode)return;
+    buildMode=false;buildDrag=null;buildSession=null;clearBuildPending();
+    cameraGesture.clear();setCameraBuildBounds();
+    if(buildPreviousView)setView(buildPreviousView);
+    buildPreviousView=null;
+    $('build-editor').hidden=true;
+    $('build-toggle').setAttribute('aria-pressed','false');
+    document.querySelector('.app-shell').dataset.buildMode='false';
+    lotGround.enabled=false;
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    syncConstructionRender(true);renderPauseButton();save(true);
+  };
+  const enterBuild=()=>{
+    if(buildMode)return;
+    if(intimacyFrame(game.socialAction).active||dialogueNeedsDecision(game)){
+      toast('Сначала закончи текущее взаимодействие');return;
+    }
+    if(furnishMode)exitFurniture();
+    buildSession=createConstructionEditor(game.world.construction);
+    buildPreviousView={...view};
+    buildMode=true;setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
+      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
+    // Show the eastern expansion area within the narrow portrait viewport.
+    setView({...view,centerX:11.5,centerZ:0,distance:36,pitch:64});
+    document.querySelector('.app-shell').dataset.buildMode='true';
+    $('build-editor').hidden=false;
+    $('build-toggle').setAttribute('aria-pressed','true');
+    closeTour();closeMindPanel();closeInsightPanel();closeSocialContext();
+    select(null);setViewOpen(false);renderQueuePanel(true);
+    buildHistoryButtons();setBuildTool(buildTool);
+    syncConstructionRender(true);renderPauseButton();
+  };
+  $('build-toggle').addEventListener('click',()=>buildMode?exitBuild():enterBuild());
+  $('build-exit').addEventListener('click',exitBuild);
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&buildMode){event.preventDefault();exitBuild();}
+  },true);
+  const buildWallAtScreen=point=>{
+    const rect=canvas.getBoundingClientRect();
+    let selected=null,best=55;
+    for(const wall of game.world.construction.wallEdges){
+      const center=wall.axis==='h'
+        ?new pc.Vec3((wall.i+.5)*.5,1.4,wall.j*.5)
+        :new pc.Vec3(wall.i*.5,1.4,(wall.j+.5)*.5);
+      const screen=camera.camera.worldToScreen(center);
+      const dist=Math.hypot(screen.x-(point.x-rect.left),screen.y-(point.y-rect.top));
+      if(dist<best){best=dist;selected=wall;}
+    }
+    return selected;
+  };
+  const endBuildDrag=event=>{
+    if(!buildDrag||buildDrag.pointerId!==event.pointerId)return false;
+    const {from,to,wallEdge}=buildDrag;
+    buildDrag=null;
+    const type=buildTool;
+    if(['door','window','erase-wall','remove-opening'].includes(type)){
+      const target=buildWallAtScreen(gesturePoint(event))||
+        nearestConstructionEdge(game.world.construction,to,.75);
+      if(type==='remove-opening'){
+        const opening=game.world.construction.openings.find(o=>o.edgeIds.includes(target?.id));
+        stageBuild({type:'remove-opening',id:opening?.id});
+      }else stageBuild({type,edgeId:target?.id,at:to});
+    }else if(type==='move-wall'){
+      const target=wallEdge||buildWallAtScreen(gesturePoint(event));
+      stageBuild({type:'move-wall',edgeId:target?.id,
+        deltaI:target?.axis==='v'?Math.round((to.x-from.x)*2):0,
+        deltaJ:target?.axis==='h'?Math.round((to.z-from.z)*2):0});
+    }else if(type!=='camera'){
+      stageBuild(buildCommand(from,to));
+    }
+    if(!pendingBuild)buildGhost.enabled=false;
+    return true;
+  };
+
+  $('furnish-toggle').addEventListener('click',()=>{if(buildMode)exitBuild();furnishMode?exitFurniture():enterFurniture();});
   $('furnish-exit').addEventListener('click',exitFurniture);
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&furnishMode){event.preventDefault();exitFurniture();}
@@ -3558,6 +3889,27 @@ function boot() {
     if(event.cancelable)event.preventDefault();
     try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
     const point=gesturePoint(event),now=performance.now();
+    if(buildMode){
+      clearBuildPending();
+      if(buildDrag){
+        const last=buildDrag.last;
+        buildDrag=null;buildGhost.enabled=false;cameraGesture.clear();
+        if(last&&last.id!==point.id)cameraGesture.begin(last,now);
+        cameraGesture.begin(point,now);
+        return;
+      }
+      if(buildTool!=='camera'&&cameraGesture.count()===0){
+        const raw=editorFloorAt(point);
+        if(raw){
+          const from=buildSnap(raw);
+          const wallEdge=buildTool==='move-wall'?buildWallAtScreen(point)||
+            nearestConstructionEdge(game.world.construction,from,.75):null;
+          buildDrag={pointerId:event.pointerId,from,to:from,last:point,wallEdge};
+          showBuildGhost(from,from);return;
+        }
+      }
+      cameraGesture.begin(point,now);return;
+    }
     if(furnishMode&&editDrag){
       // Two fingers always win over furniture. Re-seed the original
       // captured touch before adding the second for seamless pinch/pan.
@@ -3572,6 +3924,20 @@ function boot() {
     armFurnitureHold(event,now);
   });
   // Global listeners survive canvas leaving the viewport on iOS Safari.
+  // Separate capture listener preserves the furniture VM touch contract.
+  window.addEventListener('pointermove',event=>{
+    if(!buildMode||buildDrag?.pointerId!==event.pointerId)return;
+    if(event.cancelable)event.preventDefault();
+    const raw=editorFloorAt(gesturePoint(event));
+    buildDrag.last=gesturePoint(event);
+    if(raw){
+      const next=buildSnap(raw);
+      if(next.x!==buildDrag.to.x||next.z!==buildDrag.to.z){
+        buildDrag.to=next;showBuildGhost(buildDrag.from,next);
+      }
+    }
+    event.stopImmediatePropagation?.();
+  },true);
   window.addEventListener('pointermove',event=>{
     if(furnishMode&&editDrag?.pointerId===event.pointerId){
       if(event.cancelable)event.preventDefault();
@@ -3757,6 +4123,8 @@ function boot() {
     tapCueTimeout=setTimeout(()=>{cue.hidden=true;},450);
   };
   const endPointer=event=>{
+    if(buildMode&&endBuildDrag(event))return;
+    if(buildMode){cameraGesture.end(gesturePoint(event),performance.now());return;}
     if(furnishMode&&endEditorDrag(event))return;
     if(furnishMode&&holdGesture.pointerId===event.pointerId)
       cancelPendingGrab();
@@ -3792,6 +4160,7 @@ function boot() {
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
+    if(buildDrag?.pointerId===event.pointerId){buildDrag=null;buildGhost.enabled=false;}
     if(holdGesture.pointerId===event.pointerId)cancelPendingGrab();
     if(editDrag?.pointerId===event.pointerId){
       cancelEditorDrag();holdGesture.cancel();
@@ -3800,15 +4169,18 @@ function boot() {
     shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
-    cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
+    cancelPendingGrab();
+    buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
   // Safari may suspend a background tab without a matching pointerup/blur.
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
+      buildDrag=null;buildGhost.enabled=false;
       cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
     }
   });
   canvas.addEventListener('lostpointercapture',event=>{
+    if(buildDrag?.pointerId===event.pointerId){buildDrag=null;buildGhost.enabled=false;}
     if(holdGesture.pointerId===event.pointerId)cancelPendingGrab();
     if(editDrag?.pointerId===event.pointerId){
       cancelEditorDrag();holdGesture.cancel();
@@ -3827,15 +4199,19 @@ function boot() {
   const approachAngle=(a,b,rate,dt)=>a+((((b-a+540)%360)+360)%360-180)*(1-Math.exp(-rate*dt));
   app.on('update',dt=>{
     dt=Math.min(dt,.06);
+    // Reset / reload may replace construction object; rebuild only when identity changes.
+    syncConstructionRender();
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
     const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&!document.hidden;
-    const sharedSound=active&&game.socialAction?.phase==='using'&&
+    const frameActive=active&&!buildMode;
+    const sharedSound=frameActive&&game.socialAction?.phase==='using'&&
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
     musicAudio.update(audibleMusicStyle([game,game.otherSim],{
-      paused:!active,hidden:document.hidden,editing:furnishMode})||sharedSound);
+      paused:!frameActive,hidden:document.hidden,editing:furnishMode||buildMode})||sharedSound);
     const animDt=active?dt:0;
-    if(active){
+    const frameAnimDt=buildMode?0:animDt;
+    if(frameActive){
       accumulator+=dt;
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
@@ -4102,18 +4478,18 @@ function boot() {
       game.action?.id==='dining'?6:game.action?.id==='cook'&&game.action.cookStage==='storing'
         ?6:game.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
-      game.action?.elapsed||0,ACTIONS.shower.duration,animDt,
+      game.action?.elapsed||0,ACTIONS.shower.duration,frameAnimDt,
       inverseFurniturePose(game.world,'shower',display).yaw);
     const alexShower=showerStates.alex.frame?{...showerStates.alex.frame,
       pose:furniturePose(game.world,'shower',showerStates.alex.frame.pose)}:null;
     toiletStates.alex=advanceToiletTransition(toiletStates.alex,useId==='toilet',
-      game.action?.elapsed||0,ACTIONS.toilet.duration,animDt,
+      game.action?.elapsed||0,ACTIONS.toilet.duration,frameAnimDt,
       inverseFurniturePose(game.world,'toilet',display).yaw);
     const alexToilet=toiletStates.alex.frame?{...toiletStates.alex.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
     const alexReadingStage=readingStage(game.action);
     const alexReadingSeated=readingIsSeated(game.action);
-    const walking=active&&((game.action?.phase==='walking'&&
+    const walking=frameActive&&((game.action?.phase==='walking'&&
       (game.action.id!=='hobby'||Boolean(readingRouteId(game.action))))||
       socialWalkingFor('alex'));
     const alexWatchSeat=useId==='tv'
@@ -4129,7 +4505,7 @@ function boot() {
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
       (useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated||alexDining)&&
         bedStates.alex.progress===0&&!showerStates.alex.active,
-      alexReadingStage?animDt*game.speed:animDt);
+      alexReadingStage?frameAnimDt*game.speed:frameAnimDt);
     const alexSeatBase=sofaTransitionPose(sofaStates.alex);
     const seatPose=(purchasedSeatPrefab(game.world,sofaVisualTargets.alex)
       ?(alexDiningVisual&&alexDiningVisual.chairId===sofaVisualTargets.alex
@@ -4153,7 +4529,7 @@ function boot() {
     if(useId==='bed')bedVisualTargets.alex=game.action?.targetInstanceId??'home-bed-1';
     bedStates.alex=advanceBedTransition(bedStates.alex,
       useId==='bed'&&sofaStates.alex.progress===0&&!showerStates.alex.active,
-      game.action?.bedSlot,animDt,
+      game.action?.bedSlot,frameAnimDt,
       inverseFurniturePose(game.world,'bed',display,bedVisualTargets.alex));
     const bedPose=bedStates.alex.progress>0
       ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.alex),bedVisualTargets.alex):null;
@@ -4188,12 +4564,12 @@ function boot() {
     }else if(bedding){
       Object.assign(display,bedPose);facing=bedPose.yaw;
     }else{
-      display.x=approach(display.x,desired.x,seating||pose?10:11,animDt);
-      display.y=approach(display.y,desired.y,seating||pose?10:10,animDt);
-      display.z=approach(display.z,desired.z,seating||pose?10:11,animDt);
-      display.pitch=approach(display.pitch,desired.pitch,3.8,animDt);
-      display.yaw=approachAngle(display.yaw,desired.yaw,10,animDt);
-      display.roll=approach(display.roll,0,12,animDt);
+      display.x=approach(display.x,desired.x,seating||pose?10:11,frameAnimDt);
+      display.y=approach(display.y,desired.y,seating||pose?10:10,frameAnimDt);
+      display.z=approach(display.z,desired.z,seating||pose?10:11,frameAnimDt);
+      display.pitch=approach(display.pitch,desired.pitch,3.8,frameAnimDt);
+      display.yaw=approachAngle(display.yaw,desired.yaw,10,frameAnimDt);
+      display.roll=approach(display.roll,0,12,frameAnimDt);
     }
     // Drive the stride from the ACTUAL onscreen movement, after x/z easing.
     // At tight A* bends the visible motion direction leads the character;
@@ -4202,10 +4578,10 @@ function boot() {
       walking&&!seating&&!bedding&&!pose&&!alexShower&&!alexToilet);
     gait=alexMotion.phase;
     if(alexMotion.heading!==null)
-      display.yaw=approachAngle(display.yaw,alexMotion.heading,13,animDt);
+      display.yaw=approachAngle(display.yaw,alexMotion.heading,13,frameAnimDt);
     avatar.setPosition(display.x,display.y,display.z);
     avatar.setEulerAngles(display.pitch,display.yaw,display.roll);
-    if(active)effectTime+=dt*game.speed;
+    if(frameActive)effectTime+=dt*game.speed;
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
@@ -4237,7 +4613,7 @@ function boot() {
       fridgeChew:alexFridge?.chew||0,
       gait:alexShower?alexShower.gaitMeters*WALK_PHASE_PER_METER:gait,
       mood:game.mind?.mood?.value,energy:game.needs.energy
-    },animDt);
+    },frameAnimDt);
     // Contact gait is phase-accurate only when the root dip is applied in
     // the SAME frame as its ankle joints; the old display spring lagged one.
     // Never override the directly controlled bed/sofa/shower interaction root.
@@ -4272,18 +4648,18 @@ function boot() {
         game.otherSim.action.cookStage==='storing'?6:
         game.otherSim.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
-      game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,animDt,
+      game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,frameAnimDt,
       inverseFurniturePose(game.world,'shower',miraDisplay).yaw);
     const miraShower=showerStates.mira.frame?{...showerStates.mira.frame,
       pose:furniturePose(game.world,'shower',showerStates.mira.frame.pose)}:null;
     toiletStates.mira=advanceToiletTransition(toiletStates.mira,miraUseId==='toilet',
-      game.otherSim.action?.elapsed||0,ACTIONS.toilet.duration,animDt,
+      game.otherSim.action?.elapsed||0,ACTIONS.toilet.duration,frameAnimDt,
       inverseFurniturePose(game.world,'toilet',miraDisplay).yaw);
     const miraToilet=toiletStates.mira.frame?{...toiletStates.mira.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
     const miraReadingStage=readingStage(game.otherSim.action);
     const miraReadingSeated=readingIsSeated(game.otherSim.action);
-    const miraWalking=active&&((game.otherSim.action?.phase==='walking'&&
+    const miraWalking=frameActive&&((game.otherSim.action?.phase==='walking'&&
       (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
       socialWalkingFor('mira'));
     const miraWatchSeat=miraUseId==='tv'
@@ -4299,7 +4675,7 @@ function boot() {
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
       (miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated||miraDining)&&
         bedStates.mira.progress===0&&!showerStates.mira.active,
-      miraReadingStage?animDt*game.speed:animDt);
+      miraReadingStage?frameAnimDt*game.speed:frameAnimDt);
     const miraSeatBase=sofaTransitionPose(sofaStates.mira);
     const miraSeatPose=(purchasedSeatPrefab(game.world,sofaVisualTargets.mira)
       ?(miraDiningVisual&&miraDiningVisual.chairId===sofaVisualTargets.mira
@@ -4319,7 +4695,7 @@ function boot() {
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
     bedStates.mira=advanceBedTransition(bedStates.mira,
       miraUseId==='bed'&&sofaStates.mira.progress===0&&!showerStates.mira.active,
-      game.otherSim.action?.bedSlot,animDt,
+      game.otherSim.action?.bedSlot,frameAnimDt,
       inverseFurniturePose(game.world,'bed',miraDisplay,bedVisualTargets.mira));
     const miraBedPose=bedStates.mira.progress>0
       ?furniturePose(game.world,'bed',bedTransitionPose(bedStates.mira),bedVisualTargets.mira):null;
@@ -4354,18 +4730,18 @@ function boot() {
     }else if(miraBedding){
       Object.assign(miraDisplay,miraBedPose);miraFacing=miraBedPose.yaw;
     }else{
-      miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraSeating||miraPose?10:11,animDt);
-      miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraSeating||miraPose?10:10,animDt);
-      miraDisplay.z=approach(miraDisplay.z,miraDesired.z,miraSeating||miraPose?10:11,animDt);
-      miraDisplay.pitch=approach(miraDisplay.pitch,miraDesired.pitch,3.8,animDt);
-      miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,animDt);
-      miraDisplay.roll=approach(miraDisplay.roll,0,12,animDt);
+      miraDisplay.x=approach(miraDisplay.x,miraDesired.x,miraSeating||miraPose?10:11,frameAnimDt);
+      miraDisplay.y=approach(miraDisplay.y,miraDesired.y,miraSeating||miraPose?10:10,frameAnimDt);
+      miraDisplay.z=approach(miraDisplay.z,miraDesired.z,miraSeating||miraPose?10:11,frameAnimDt);
+      miraDisplay.pitch=approach(miraDisplay.pitch,miraDesired.pitch,3.8,frameAnimDt);
+      miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraDesired.yaw,10,frameAnimDt);
+      miraDisplay.roll=approach(miraDisplay.roll,0,12,frameAnimDt);
     }
     const miraMotion=advanceVisualGait(miraGait,previousMiraXZ,miraDisplay,
       miraWalking&&!miraSeating&&!miraBedding&&!miraPose&&!miraShower&&!miraToilet);
     miraGait=miraMotion.phase;
     if(miraMotion.heading!==null)
-      miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraMotion.heading,13,animDt);
+      miraDisplay.yaw=approachAngle(miraDisplay.yaw,miraMotion.heading,13,frameAnimDt);
     miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
     miraAvatar.setEulerAngles(miraDisplay.pitch,miraDisplay.yaw,miraDisplay.roll);
     animationStates.mira=stepAnimation(animationStates.mira,{
@@ -4399,7 +4775,7 @@ function boot() {
       fridgeChew:miraFridge?.chew||0,
       gait:miraShower?miraShower.gaitMeters*WALK_PHASE_PER_METER:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
-    },animDt);
+    },frameAnimDt);
     if(!miraShower&&!miraToilet&&!miraBedding&&!miraSeating&&!miraPose&&!socialUsing){
       miraDisplay.y=animationStates.mira.walkBob;
       miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
@@ -4420,7 +4796,7 @@ function boot() {
     // entry/exit. The original game owns shower water, cover, full avatar
     // privacy and all simulation/save state; no private body is visible.
     const miraMeshShown=meshyMira.update({
-      preferred:meshyPreferred,paused:!active,dt:animDt,
+      preferred:meshyPreferred,paused:!frameActive,dt:frameAnimDt,
       walking:((game.otherSim.action?.phase==='walking'&&
         (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
         socialWalkingFor('mira'))&&
@@ -4463,7 +4839,7 @@ function boot() {
     // skeleton controllers exist. The original simulation/root still owns
     // mattress placement, both bed slots, shower movement and opaque privacy.
     const meshyShown=meshyAlex.update({
-      preferred:meshyPreferred,paused:!active,dt:animDt,
+      preferred:meshyPreferred,paused:!frameActive,dt:frameAnimDt,
       // Preserve the Walking clip on pause: playback freezes but the
       // resident has not arrived at the destination.
       walking:((game.action?.phase==='walking'&&
@@ -4746,7 +5122,7 @@ function boot() {
       }
     }
     const activeFridge=alexFridge||miraFridge;
-    fridgeOpen=activeFridge?activeFridge.doorOpen:closeFridgeDoor(fridgeOpen,animDt);
+    fridgeOpen=activeFridge?activeFridge.doorOpen:closeFridgeDoor(fridgeOpen,frameAnimDt);
     fridgeHinge.setLocalEulerAngles(0,FRIDGE_LAYOUT.doorAngle*fridgeOpen,0);
     const shelfFood=activeFridge?.shelfFood||0;
     fridgeFood.enabled=shelfFood>.012;
