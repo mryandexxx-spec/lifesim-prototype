@@ -55,11 +55,9 @@ test('F5-A iPhone build defaults to camera pan, wall tool has direct resize affo
 
 test('F5-A.3 legacy walls are editable with independent H5b wall gallery anchors',()=>{
  const html=read('../index.html'),game=read('../src/game.js');
- assert.match(html,/data-starter-side="north"/);
- assert.match(html,/data-starter-side="west"/);
- assert.match(html,/data-starter-side="east"/);
- assert.match(html,/data-starter-side="south"/);
- assert.match(game,/starterShellSegments\(game\.world\.construction\)/);
+ assert.doesNotMatch(html,/data-starter-side="/,
+   'The original house is edited on the same canvas, with no side picker');
+ assert.match(game,/constructionWallSegments\(game\.world\.construction\)/);
  assert.match(game,/starterBackDecor\.setPosition\(0,0,n\)/);
  assert.match(game,/starterLeftDecor\.setPosition\(w,0,0\)/);
  assert.match(game,/artworkDisplayPose\(work,index,origin,game\.world\.construction\)/);
