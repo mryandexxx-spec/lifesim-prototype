@@ -12,6 +12,12 @@ const edge=(axis,i,j)=>axis+':'+i+','+j;
 const floorIndex=p=>Math.floor(p/BUILD_STEP);
 const snap=p=>Math.round(p/BUILD_STEP);
 const clone=v=>JSON.parse(JSON.stringify(v));
+const topologyCache=new WeakMap();
+function topology(state){
+  let found=topologyCache.get(state);
+  if(!found){found={floors:new Set(state.floorCells),doors:new Set(state.openings.filter(o=>o.type==='door').flatMap(o=>o.edgeIds))};topologyCache.set(state,found);}
+  return found;
+}
 const fail=reason=>({ok:false,reason});
 function isBase(i,j){return i>=BASE.minI&&i<BASE.maxI&&j>=BASE.minJ&&j<BASE.maxJ;}
 function lotCell(i,j){return i>=BUILD_LOT.minX/BUILD_STEP&&i<BUILD_LOT.maxX/BUILD_STEP&&j>=BUILD_LOT.minZ/BUILD_STEP&&j<BUILD_LOT.maxZ/BUILD_STEP;}
@@ -60,13 +66,13 @@ export function constructionContains(world,x,z){
   const state=world?.construction||world;
   if(!state||state.schema!==1)return x>=-4.62&&x<=13.86&&z>=-3.96&&z<=3.98;
   if(state.legacy)return x>=-4.62&&x<=13.86&&z>=-3.96&&z<=3.98;
-  return state.floorCells.includes(cell(floorIndex(x),floorIndex(z)));
+  return topology(state).floors.has(cell(floorIndex(x),floorIndex(z)));
 }
 /** A full wall can never be traversed, windows never act as doors. */
 export function constructionWallAt(world,x,z,radius=.26){
   const state=world?.construction||world;
   if(!state||state.legacy)return false;
-  const opened=new Set(state.openings.filter(o=>o.type==='door').flatMap(o=>o.edgeIds));
+  const opened=topology(state).doors;
   for(const w of state.wallEdges){
     if(opened.has(w.id))continue;
     const bx=w.i*BUILD_STEP,bz=w.j*BUILD_STEP;
