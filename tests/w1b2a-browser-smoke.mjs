@@ -53,7 +53,7 @@ try{
   assert.equal(hired.shop.credits,initial.shop.credits,'No artificial wages');
   assert.ok(await phone.getByText(/Следующая смена:/).isVisible());
   await page.screenshot({path:'w1b2a-phone-smoke.png'});
-  await phone.getByRole('button',{name:'Закрыть смартфон'}).click();
+  await phone.locator('.career-phone-x').click();
   assert.equal(await phone.isVisible(),false);
   await page.locator('#pick-mira').click();
   await page.locator('#career-phone-toggle').click();
