@@ -341,10 +341,26 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
   const starterSolidSides=new Set(world.starterSolidSides||[]);
   const starterEdges=()=>starterShellSegments({starterShell}).filter(w=>!starterRemoved.has(w.id));
   const allWalls=()=>new Map([...walls,...starterEdges().map(w=>[w.id,w])]);
+  const physicalEdgeIds=ids=>{
+    const known=allWalls();
+    return new Set(ids.map(id=>{
+      const e=known.get(id);
+      return e?edge(e.axis,e.i,e.j):id;
+    }));
+  };
+  const overlapsOpening=(ids,except=null)=>{
+    const positions=physicalEdgeIds(ids);
+    return openings.some(o=>o.id!==except&&
+      [...physicalEdgeIds(o.edgeIds)].some(id=>positions.has(id)));
+  };
   const openingFitsDecor=ids=>{
     const records=ids.map(id=>allWalls().get(id)).filter(Boolean);
     if(!records.length)return false;
-    const side=records[0].starterSide;
+    // A new structural edge built on the old perimeter is still the SAME
+    // physical surface as its starter counterpart, including its artwork.
+    const side=records[0].starterSide||
+      starterEdges().find(w=>w.axis===records[0].axis&&
+        w.i===records[0].i&&w.j===records[0].j)?.starterSide;
     if(!side)return true;
     const first=Math.min(...records.map(e=>(e.axis==='h'?e.i:e.j)*BUILD_STEP));
     const last=Math.max(...records.map(e=>(e.axis==='h'?e.i:e.j)*BUILD_STEP+BUILD_STEP));
@@ -563,8 +579,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
       const anchor=candidateWalls.get(middle);
       const ids=segmentsForOpening(candidateWalls,anchor,style.sections);
       if(!ids)return fail('opening-needs-wall-space');
-      if(openings.some(o=>o.id!==before.id&&o.edgeIds.some(k=>ids.includes(k))))
-        return fail('opening-overlap');
+      if(overlapsOpening(ids,before.id))return fail('opening-overlap');
       if(!openingFitsDecor(ids))return fail('wall-has-decor');
       openings=openings.map(o=>o.id===before.id?{
         ...o,type:style.type,styleId:command.styleId,edgeIds:ids
@@ -575,7 +590,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
         nearestConstructionEdge(world,command.at||{});
       if(!found)return fail('wall-not-found');
       if(type==='erase-wall'){
-        if(openings.some(o=>o.edgeIds.includes(found.id)))return fail('wall-has-opening');
+        if(overlapsOpening([found.id]))return fail('wall-has-opening');
         if(found.starterSide){
           if(!openingFitsDecor([found.id]))return fail('wall-has-decor');
           starterRemoved.add(found.id);
@@ -587,7 +602,7 @@ export function proposeConstructionEdit(raw,command,{furniture=[],furnitureBoxes
         const ids=segmentsForOpening(candidateWalls,found,style.sections);
         if(!ids)return fail(style.sections===3
           ?'opening-needs-three-wall-sections':'opening-needs-wall-space');
-        if(openings.some(o=>o.edgeIds.some(k=>ids.includes(k))))return fail('opening-overlap');
+        if(overlapsOpening(ids))return fail('opening-overlap');
         if(!openingFitsDecor(ids))return fail('wall-has-decor');
         if(found.starterSide&&(found.starterSide==='east'||found.starterSide==='south'))
           starterSolidSides.add(found.starterSide);
