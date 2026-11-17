@@ -2591,7 +2591,9 @@ function boot() {
         busy.add(actor.action.readingSeatInstanceId);
       if(actor?.action?.id==='tv'&&actor.action.watchSeatInstanceId)
         busy.add(actor.action.watchSeatInstanceId);
-      if(actor?.action?.id==='dining'&&actor.action.diningSeatInstanceId)
+      if(actor?.action?.id==='cook'&&actor.action.prepInstanceId)
+      busy.add(actor.action.prepInstanceId);
+    if(actor?.action?.id==='dining'&&actor.action.diningSeatInstanceId)
         busy.add(actor.action.diningSeatInstanceId);
       // Pending commands identify the same durable instance ID after moving
       // or rotating it, so allow repositioning to repair a blocked approach.
@@ -3510,6 +3512,14 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:1.3,z:r.maxZ}}};
       });
+    const kitchenAppliances=game.world.furniture.instances
+      .filter(item=>['stove','prep','sink'].includes(item.prefabId)&&item.location==='home')
+      .map(item=>{
+        const r=instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint);
+        return {kind:'object',id:FURNITURE_CATALOG[item.prefabId].actionId,
+          instanceId:item.instanceId,bounds:{min:{x:r.minX,y:0,z:r.minZ},
+            max:{x:r.maxX,y:1.66,z:r.maxZ}}};
+      });
     const easels=game.world.furniture.instances
       .filter(item=>item.prefabId==='easel'&&item.location==='home')
       .map(item=>{
@@ -3518,7 +3528,7 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:2.02,z:r.maxZ}}};
       });
     return pickWorldRayTarget(near,far,
-      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...easels,...movedVolumes,...blockers]);
+      [...residents,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...kitchenAppliances,...easels,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -3919,8 +3929,12 @@ function boot() {
       ?{...pairedTv.places.alex,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
-      ?furniturePose(game.world,useId==='lamp'?'floorlamp':useId,
-          ACTOR_POSES[useId],game.action?.id==='dining'?null:game.action?.targetInstanceId):null);
+      ?furniturePose(game.world,useId==='lamp'?'floorlamp':
+          useId==='cook'?'stove':useId==='wash'?'sink':useId,
+          ACTOR_POSES[useId],game.action?.id==='dining'||
+            (game.action?.id==='cook'&&useId==='fridge')?null:
+            (game.action?.id==='cook'&&useId==='prep')
+              ?game.action.prepInstanceId:game.action?.targetInstanceId):null);
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
@@ -4077,8 +4091,12 @@ function boot() {
       ?{...pairedTv.places.mira,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
-      ?furniturePose(game.world,miraUseId==='lamp'?'floorlamp':miraUseId,
-          ACTOR_POSES[miraUseId],game.otherSim.action?.id==='dining'?null:game.otherSim.action?.targetInstanceId):null);
+      ?furniturePose(game.world,miraUseId==='lamp'?'floorlamp':
+          miraUseId==='cook'?'stove':miraUseId==='wash'?'sink':miraUseId,
+          ACTOR_POSES[miraUseId],game.otherSim.action?.id==='dining'||
+            (game.otherSim.action?.id==='cook'&&miraUseId==='fridge')?null:
+            (game.otherSim.action?.id==='cook'&&miraUseId==='prep')
+              ?game.otherSim.action.prepInstanceId:game.otherSim.action?.targetInstanceId):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
