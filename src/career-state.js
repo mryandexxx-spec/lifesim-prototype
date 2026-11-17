@@ -2,8 +2,7 @@
 import {careerDefinition} from './career-catalog.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
-const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
-const validTime=n=>Number.isSafeInteger(n)&&n>=0&&n<=5256000000;
+const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
 const validEmployeeId=id=>typeof id==='string'&&/^e[1-9]\d{0,8}$/.test(id);
 function cleanContract(raw,id){
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.residentId!==id||

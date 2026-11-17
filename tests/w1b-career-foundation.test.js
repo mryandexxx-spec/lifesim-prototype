@@ -26,14 +26,14 @@ test('W1-B.1 legacy and new household saves remain v1; money, house, people and 
   assert.equal(root.version,1);assert.equal(SAVE_KEY,'lifesim.room01.v1');
   assert.deepEqual(root.careerSystem,newCareerSystem());
   root.shop.credits=341;root.needs.hunger=21;root.otherSim.needs.energy=28;
-  root.skills.xpById.reading=44;
+  root.skills.xpById.literature=44;
   const old=copy(root);delete old.careerSystem;
   const reloaded=loadHousehold(old,'2027-02-02');
   assert.deepEqual(reloaded.careerSystem,newCareerSystem());
   assert.equal(reloaded.shop.credits,341);
   assert.equal(reloaded.needs.hunger,21);
   assert.equal(reloaded.otherSim.needs.energy,28);
-  assert.equal(reloaded.skills.xpById.reading,44);
+  assert.equal(reloaded.skills.xpById.literature,44);
   assert.deepEqual(reloaded.world,root.world);
   assert.deepEqual(reloaded.inventory,root.inventory);
   assert.equal(reloaded.calendar.startCivilDate,'2026-11-16');
@@ -53,6 +53,10 @@ test('W1-B.1 contracts independent per resident, old-clock synchronized and vali
   const reload=loadHousehold(copy(s));
   assert.deepEqual(reload.careerSystem,s.careerSystem);
   assert.equal(reload.otherSim.minutes,reload.minutes);
+  // In-game simulation ticks in fractional minutes (0.3 at x1).
+  const afterFractional=hireCareer(newCareerSystem(),'mira','editorial',480.3);
+  assert.equal(restoreCareerSystem(copy(afterFractional)).byResident.mira.hiredAt,480.3);
+  assert.equal(plannedCareerShift(s.calendar,afterFractional.byResident.mira,0)?.start,540);
   reload.careerSystem=resignCareer(reload.careerSystem,'alex');
   assert.equal(reload.careerSystem.byResident.alex,null);
   assert.equal(reload.careerSystem.byResident.mira.employmentId,'e2');
@@ -87,7 +91,7 @@ test('W1-B.1 Monday from Gregorian anchor; weekends do not create phantom shifts
   assert.equal(plannedCareerShift(cal,s,6),null);
   assert.equal(plannedCareerShift(cal,s,7).iso,'2026-11-23');
   assert.equal(nextCareerShift(cal,s,1020)?.dayIndex,1);
-  assert.equal(nextCareerShift(cal,s,7*1440+480)?.id,'e1@7@10140');
+  assert.equal(nextCareerShift(cal,s,7*1440+480)?.id,'e1@7@10620');
   assert.deepEqual(careerShiftsInWindow(cal,s,540,540),[]);
 });
 test('W1-B.1 leap-year, holiday exemption, calendar override, and employer weekly mask',()=>{

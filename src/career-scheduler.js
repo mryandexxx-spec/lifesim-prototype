@@ -8,7 +8,7 @@ function contractSchedule(contract){
   if(!contract||typeof contract!=='object'||!/^e[1-9]\d{0,8}$/.test(contract.employmentId))return null;
   const career=careerDefinition(contract.careerId);
   if(!career||!Number.isInteger(contract.level)||contract.level<0||contract.level>=career.ranks.length||
-    !Number.isSafeInteger(contract.hiredAt)||contract.hiredAt<0)return null;
+    !Number.isFinite(contract.hiredAt)||contract.hiredAt<0)return null;
   return {career,schedule:career.schedule};
 }
 /** Stable IDs are derived from contract + game day, never Date.now or frame count. */
