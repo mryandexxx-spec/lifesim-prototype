@@ -1608,6 +1608,37 @@ function boot() {
         light.addChild(glow);node.addChild(light);
         light.light.enabled=false;glow.enabled=false;
       }
+      // F4G cookware is attached to the specific purchased appliance, never to the room.
+      if(item.prefabId==='stove'){
+        const pot=new pc.Entity('F4G cooking pot');
+        pot.addComponent('render',{type:'cylinder',material:mat('#796f68')});
+        pot.setLocalPosition(0,1.075,-.09);
+        pot.setLocalScale(.51,.18,.47);node.addChild(pot);pot.enabled=false;
+        for(let i=0;i<3;i++){
+          const steam=new pc.Entity('F4G cooking steam '+i);
+          steam.addComponent('render',{type:'sphere',material:mat('#e8f4ee',{opacity:.50})});
+          steam.setLocalScale(.09+i*.025,.18+i*.02,.09+i*.025);
+          steam.setLocalPosition((i-1)*.12,1.32+i*.13,-.10);
+          node.addChild(steam);steam.enabled=false;
+        }
+        const spoon=new pc.Entity('F4G stirring spoon');
+        spoon.addComponent('render',{type:'box',material:mat('#bd8b54')});
+        spoon.setLocalScale(.035,.40,.04);spoon.setLocalPosition(.14,1.27,-.05);
+        node.addChild(spoon);spoon.enabled=false;
+      }
+      if(item.prefabId==='prep'){
+        const chopped=new pc.Entity('F4G chopped ingredients');
+        chopped.addComponent('render',{type:'sphere',material:mat('#91ae67')});
+        chopped.setLocalScale(.36,.095,.25);
+        chopped.setLocalPosition(-.17,1.0,-.12);
+        node.addChild(chopped);chopped.enabled=false;
+      }
+      if(item.prefabId==='sink'){
+        const plate=new pc.Entity('F4G dirty plate');
+        plate.addComponent('render',{type:'cylinder',material:mat('#c8bb9c')});
+        plate.setLocalScale(.40,.055,.36);plate.setLocalPosition(.05,1.03,-.12);
+        node.addChild(plate);plate.enabled=false;
+      }
       if(item.prefabId==='mirror'){
         const glint=new pc.Entity('F4E mirror highlight');
         glint.addComponent('render',{type:'sphere',
@@ -4287,6 +4318,46 @@ function boot() {
     }
     alexSelected.enabled=game.selectedSim==='alex' && !using;
     miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
+    // F4G appliance animation is visual-only; only the domain mints meals and XP.
+    for(const item of game.world.furniture.instances){
+      if(!['stove','prep','sink'].includes(item.prefabId))continue;
+      const node=decorNodes.get(item.instanceId);
+      if(!node)continue;
+      const actor=HOUSEHOLD_IDS.map(id=>getActor(game,id)).find(resident=>
+        resident?.action?.id==='cook'&&resident.action.phase==='using'&&
+        (item.prefabId==='stove'&&resident.action.cookStage==='cooking'&&
+          resident.action.targetInstanceId===item.instanceId||
+         item.prefabId==='prep'&&resident.action.cookStage==='preparing'&&
+          resident.action.prepInstanceId===item.instanceId));
+      const active=Boolean(actor)&&item.location==='home'&&!furnishMode;
+      if(item.prefabId==='stove'){
+        const pot=node.findByName('F4G cooking pot');
+        if(pot)pot.enabled=active;
+        const spoon=node.findByName('F4G stirring spoon');
+        if(spoon){
+          spoon.enabled=active;
+          if(active){
+            spoon.setLocalPosition(.12+Math.sin(effectTime*4)*.075,
+              1.26+Math.sin(effectTime*6)*.03,-.05);
+            spoon.setLocalEulerAngles(0,0,Math.sin(effectTime*5)*24);
+          }
+        }
+        for(let i=0;i<3;i++){
+          const steam=node.findByName('F4G cooking steam '+i);
+          if(!steam)continue;
+          steam.enabled=active;
+          if(active)steam.setLocalPosition((i-1)*.12+
+            Math.sin(effectTime*2.0+i)*.035,
+            1.32+i*.13+Math.sin(effectTime*1.8+i)*.065,-.10);
+        }
+      }else if(item.prefabId==='prep'){
+        const chopped=node.findByName('F4G chopped ingredients');
+        if(chopped)chopped.enabled=active;
+      }else{
+        const dish=node.findByName('F4G dirty plate');
+        if(dish)dish.enabled=item.location==='home'&&game.kitchen?.dirtyDishes>0;
+      }
+    }
     // R5b never writes to the simulator. Tableware only follows existing
     // home furniture and vanishes instantly on refusal, exit or furnishing.
     for(const item of game.world.furniture.instances){
