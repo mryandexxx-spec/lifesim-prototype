@@ -22,6 +22,14 @@ try {
   hasTouch:true,isMobile:true});
  await context.addInitScript(({key,record})=>{
   if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
+  // Apply scenario overrides only AFTER the outgoing pagehide handler has saved.
+  const future=Number(sessionStorage.getItem('w1a4.next-minute'));
+  if(Number.isFinite(future)&&future>0){
+    const state=JSON.parse(localStorage.getItem(key));
+    state.minutes=future;state.otherSim.minutes=future;state.paused=true;
+    localStorage.setItem(key,JSON.stringify(state));
+    sessionStorage.removeItem('w1a4.next-minute');
+  }
   localStorage.setItem('lifesim.uiTour.v1','done');
  },{key:SAVE_KEY,record:seed});
  const page=await context.newPage();
@@ -65,11 +73,9 @@ try {
  await page.locator('#lc-close').click();
  // Summer snapshot from a TEST seed only: both day/night still use stored root.minutes.
  const summerDay=(civilToSerial('2024-06-21')-civilToSerial('2024-02-28'))*1440+780;
- await page.evaluate(({key,minutes})=>{
-  const state=JSON.parse(localStorage.getItem(key));
-  state.minutes=minutes;state.otherSim.minutes=minutes;state.paused=true;
-  localStorage.setItem(key,JSON.stringify(state));
- },{key:SAVE_KEY,minutes:summerDay});
+ await page.evaluate(minutes=>{
+  sessionStorage.setItem('w1a4.next-minute',String(minutes));
+ },summerDay);
  await page.reload({waitUntil:'domcontentloaded'});
  await page.locator('#loading').waitFor({state:'hidden',timeout:30000});
  assert.match(await page.locator('#day-label').innerText(),/21 июн/);
