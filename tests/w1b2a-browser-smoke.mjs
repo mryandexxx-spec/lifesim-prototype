@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {newHousehold} from '../src/household.js';
 import {SAVE_KEY} from '../src/simulation.js';
+import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 
 const seed=newHousehold('2026-11-17');
 seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
@@ -14,10 +15,10 @@ const errors=[];
 try{
   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,
     hasTouch:true,isMobile:true});
-  await context.addInitScript(({key,record})=>{
+  await context.addInitScript(({key,record,tourKey})=>{
     if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
-    localStorage.setItem('lifesim.uiTour.v1','done');
-  },{key:SAVE_KEY,record:seed});
+    localStorage.setItem(tourKey,'done');
+  },{key:SAVE_KEY,record:seed,tourKey:UI_TOUR_STORAGE_KEY});
   const page=await context.newPage();
   page.on('pageerror',e=>errors.push('PAGE '+e.stack));
   page.on('crash',()=>errors.push('CRASH'));
