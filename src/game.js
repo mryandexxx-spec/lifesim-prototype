@@ -4043,7 +4043,14 @@ function boot() {
             restartAutonomyWait(residentId);
           }
           const idea=residentAutonomousChoice(game,residentId);
-          if(idea && beginAction(idea,true,residentId))
+          // Like a real household: when hungry, prefer an already cooked
+          // portion over producing a new snack. The same table/chair A* applies.
+          const ready=idea==='fridge'?preparedKitchenMeals(game.kitchen):[];
+          const table=ready.length?nearestAvailableDiningTable(game,residentId):null;
+          if(table&&beginAction('dining',true,residentId,false,table.instanceId,
+              null,null,null,ready[0].recipeId)){
+            toast(getActorName(residentId)+' берёт готовое: '+ready[0].label);
+          }else if(idea && beginAction(idea,true,residentId))
             toast(getActorName(residentId)+' самостоятельно решил(а): '+ACTIONS[idea].label.toLowerCase());
         }
       }
