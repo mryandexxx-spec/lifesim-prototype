@@ -2083,6 +2083,7 @@ function boot() {
   };
   const drawConstructionFinishes=state=>{
     const finish=state.materials||{};
+    const height=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
     // Group floor paint by material + row; a recolored room costs one slab
     // per material run rather than a fresh PlayCanvas entity for every tile.
     const rows=new Map();
@@ -2148,7 +2149,7 @@ function boot() {
         values.sort((a,b)=>a-b);
         let lo=values[0],last=lo;
         const flush=()=>buildBox('F5-B.4 ceiling '+id,(lo+last+1)*.25,
-          2.835,(j+.5)*.5,(last-lo+1)*.5,.065,.5,finishMaterial(id));
+          height-.065,(j+.5)*.5,(last-lo+1)*.5,.065,.5,finishMaterial(id));
         for(const next of [...values.slice(1),Infinity]){
           if(next===last+1){last=next;continue;}
           flush();lo=next;last=next;
@@ -2175,9 +2176,9 @@ function boot() {
       const draw=()=>{
         const span=(last-lo+1)*.5,mid=(lo+last+1)*.25,side=face==='a'?-1:1;
         buildBox('F5-B wall finish '+id,
-          axis==='h'?mid:position*.5+side*.081,1.42,
+          axis==='h'?mid:position*.5+side*.081,height/2,
           axis==='v'?mid:position*.5+side*.081,
-          axis==='h'?span:.02,2.72,axis==='v'?span:.02,finishMaterial(id));
+          axis==='h'?span:.02,height-.18,axis==='v'?span:.02,finishMaterial(id));
          addWallPattern(id,axis,mid,position*.5,span,face,.109);
       };
       for(const i of [...values.slice(1),Infinity]){
@@ -2210,9 +2211,9 @@ function boot() {
           const center=(point(last)+point(first)+1)*.25;
           const offset=(face==='a'?-1:1)*.096;
           buildBox('F5-B original wall finish '+id,
-            axis==='h'?center:renderLine[side]+offset,1.42,
+            axis==='h'?center:renderLine[side]+offset,height/2,
             axis==='v'?center:renderLine[side]+offset,
-            axis==='h'?span:.023,2.68,axis==='v'?span:.023,finishMaterial(id));
+            axis==='h'?span:.023,height-.22,axis==='v'?span:.023,finishMaterial(id));
            addWallPattern(id,axis,center,renderLine[side],span,face,.124);
         };
         for(const next of sorted.slice(1)){
@@ -2221,6 +2222,7 @@ function boot() {
         }flush();
       }
     }
+    drawConstructionFacades(state);
   };
   const syncConstructionRender=(force=false)=>{
     const state=game.world.construction;
@@ -2231,6 +2233,7 @@ function boot() {
     clearConstructionNodes();
     lotGround.enabled=buildMode;
     const raised=constructionWallMode!=='down';
+    const height=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
     const w=starterShellOffset(state,'west'),e=starterShellOffset(state,'east');
     const n=starterShellOffset(state,'north'),s=starterShellOffset(state,'south');
     const width=19.27+e-w,depth=8.65+s-n;
@@ -2243,13 +2246,13 @@ function boot() {
     starterFloorSurface.setLocalScale(19.25,.12,floorMaxZ-floorMinZ);
     // Preserve exact legacy geometry at zero offset. Resizing moves the real
     // original walls, their coping and skirting, not merely an outline.
-    legacyWallNodes[0].setPosition(widthCenter,1.40,-4.34+n);
-    legacyWallNodes[0].setLocalScale(width,2.9,.16);
-    legacyWallNodes[1].setPosition(-4.97+w,1.40,depthCenter);
-    legacyWallNodes[1].setLocalScale(.16,2.9,depth);
-    legacyWallNodes[2].setPosition(widthCenter,2.91,-4.30+n);
+    legacyWallNodes[0].setPosition(widthCenter,height/2-.05,-4.34+n);
+    legacyWallNodes[0].setLocalScale(width,height,.16);
+    legacyWallNodes[1].setPosition(-4.97+w,height/2-.05,depthCenter);
+    legacyWallNodes[1].setLocalScale(.16,height,depth);
+    legacyWallNodes[2].setPosition(widthCenter,height+.01,-4.30+n);
     legacyWallNodes[2].setLocalScale(19.35+e-w,.13,.2);
-    legacyWallNodes[3].setPosition(-4.96+w,2.91,depthCenter);
+    legacyWallNodes[3].setPosition(-4.96+w,height+.01,depthCenter);
     legacyWallNodes[3].setLocalScale(.20,.13,8.68+s-n);
     legacySkirts[0].setPosition(widthCenter,.16,-4.19+n);
     legacySkirts[0].setLocalScale(19.25+e-w,.18,.13);
@@ -2291,10 +2294,10 @@ function boot() {
           buildBox('F5-B.3 original wall cut outline',x,.135,z,
             axis==='h'?length:.14,.18,axis==='v'?length:.14,M.trim);
         }else{
-          buildBox('F5-B.3 original structural wall',x,1.4,z,
-            axis==='h'?length:.16,2.9,axis==='v'?length:.16,
+          buildBox('F5-B.3 original structural wall',x,height/2-.05,z,
+            axis==='h'?length:.16,height,axis==='v'?length:.16,
             side==='west'?M.wall2:M.wall);
-          buildBox('F5-B.3 original coping',x,2.91,z,
+          buildBox('F5-B.3 original coping',x,height+.01,z,
             axis==='h'?length:.2,.13,axis==='v'?length:.2,M.trim);
         }
         // Painted trim follows the same physical spans, never a deleted hole.
@@ -2321,10 +2324,11 @@ function boot() {
     }
     if(state.legacy){
       if(constructionWallMode==='up'){
-        buildBox('F5 starter front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
-        buildBox('F5 starter right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
+        buildBox('F5 starter front up',widthCenter,height/2-.05,4.34+s,width,height,.16,M.wall);
+        buildBox('F5 starter right up',14.25+e,height/2-.05,depthCenter,.16,height,depth,M.wall);
       }
       drawConstructionFinishes(state);
+      renderConstructionPorches(state);
       renderConstructionRoofs(state);
       return;
     }
@@ -2358,7 +2362,7 @@ function boot() {
       if(!byLine.has(line))byLine.set(line,[]);
       byLine.get(line).push(w);
     }
-    const wallHeight=raised?2.87:.19,wallY=raised?1.43:.13;
+    const wallHeight=raised?height-.03:.19,wallY=raised?height/2-.02:.13;
     const exterior=constructionWallMode==='up';
     for(const walls of byLine.values()){
       const axis=walls[0].axis;walls.sort((a,b)=>axis==='h'?a.i-b.i:a.j-b.j);
@@ -2373,7 +2377,7 @@ function boot() {
         }else{
           buildBox('F5 structural wall',x,wallY,z,axis==='h'?len*.5:.14,
             wallHeight,axis==='v'?len*.5:.14,M.wall2);
-          if(raised)buildBox('F5 wall coping',x,2.92,z,axis==='h'?len*.5:.16,.12,axis==='v'?len*.5:.16,M.trim);
+          if(raised)buildBox('F5 wall coping',x,height+.02,z,axis==='h'?len*.5:.16,.12,axis==='v'?len*.5:.16,M.trim);
         }
       };
       for(const w of walls.slice(1)){
@@ -2418,9 +2422,10 @@ function boot() {
           'window.slim':{bottom:.96,top:2.40,glassWidth:.56}
         }[variantId];
         if(!dimensions)continue;
-        const {bottom,top,glassWidth}=dimensions,glassHeight=top-bottom;
+        const {bottom,glassWidth}=dimensions;
+        const top=Math.min(dimensions.top,height-.2),glassHeight=top-bottom;
         cross('F5-B window lower solid wall',bottom/2,bottom,M.wall);
-        cross('F5-B window upper solid wall',(2.90+top)/2,2.90-top,M.wall);
+        cross('F5-B window upper solid wall',(height+top)/2,height-top,M.wall);
         if(glassWidth<width-.25){
           for(const side of [-1,1])upright('F5-B narrow window reveal',
             side*(glassWidth+(width-glassWidth)/2)/2,(bottom+top)/2,
@@ -2442,14 +2447,14 @@ function boot() {
       const isArch=design.type==='arch',frame=isArch?M.trim:
         variantId==='door.glass'?M.slate:M.paleWood;
       for(const side of [-1,1])upright('F5-B portal jamb '+variantId,
-        side*width/2,1.45,2.9,frame);
-      cross('F5-B portal lintel',2.66,.49,M.wall);
+        side*width/2,height/2,height,frame);
+      cross('F5-B portal lintel',(height+2.30)/2,height-2.30,M.wall);
       if(isArch){
         const steps=wide?5:4;
         // Concentric stepped head of original procedural masonry; the opening
         // remains body-clear at all points below 1.94m.
         for(let i=0;i<steps;i++){
-          const inset=i*.072,y=2.51-i*.10;
+          const inset=i*.072,y=Math.min(2.51,height-.16)-i*.10;
           for(const sign of [-1,1])
             upright('F5-B arch curve '+variantId,
               sign*(width/2-.11-inset),y,.20,M.trim);
@@ -2484,14 +2489,15 @@ function boot() {
       }else createLeaf(variantId,-width/2,width,1);
     }
     drawConstructionFinishes(state);
+    renderConstructionPorches(state);
     renderConstructionRoofs(state);
     // UP mode adds former open-front boundaries for an exterior view only.
     // These are cosmetic: no surprise path block in legacy saves.
     if(exterior){
       if(!solidStarter.has('south')&&!changedStarter.has('south'))
-        buildBox('F5 legacy front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
+        buildBox('F5 legacy front up',widthCenter,height/2-.05,4.34+s,width,height,.16,M.wall);
       if(!solidStarter.has('east')&&!changedStarter.has('east'))
-        buildBox('F5 legacy right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
+        buildBox('F5 legacy right up',14.25+e,height/2-.05,depthCenter,.16,height,depth,M.wall);
     }
   };
   syncConstructionRender(true);
