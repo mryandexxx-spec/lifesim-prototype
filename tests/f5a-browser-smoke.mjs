@@ -296,6 +296,52 @@ try{
   await page.locator('#build-toggle').click();
   assert.equal(await page.locator('#build-roof-toggle').getAttribute('aria-pressed'),'false',
     'A roof never covers the life view or starts visible by default');
+  // F5-C.2: real wall/roof-height, facade and outdoor porch UI in Chromium WebGL.
+  await page.locator('[data-build-tool="paint-facade-all"]').click();
+  assert.ok(await page.locator('#build-finish-picker').isVisible());
+  await page.locator('[data-finish-id="facade.brick"]').click();
+  assert.ok(await page.locator('#build-pending').isVisible());
+  await page.locator('#build-apply').click();
+  const facadeSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.ok(Object.values(facadeSave.world.construction.materials.facade)
+    .includes('facade.brick'),'Exterior facade must save independently of wallpaper');
+  await page.locator('[data-build-tool="wall-height"]').click();
+  assert.ok(await page.locator('#build-height-picker').isVisible());
+  await page.locator('[data-wall-height="tall"]').click();
+  assert.ok(await page.locator('#build-pending').isVisible());
+  await page.locator('#build-apply').click();
+  const heightSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.equal(heightSave.world.construction.wallHeightClass,'tall');
+  await page.screenshot({path:'f5c2-tall-facade.png'});
+  await page.locator('[data-build-tool="porch-add"]').click();
+  assert.ok(await page.locator('#build-porch-picker').isVisible());
+  await page.locator('[data-porch-finish="porch.wood"]').click();
+  const frontDoor=project(18.5,0);
+  await send('pointerdown',frontDoor,'canvas');
+  await send('pointerup',frontDoor,'window');
+  assert.ok(await page.locator('#build-pending').isVisible(),
+    'True external door must accept a porch touch');
+  await page.locator('#build-apply').click();
+  const porchSaved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.equal(porchSaved.world.construction.porches?.length,1);
+  assert.equal(porchSaved.world.construction.porches[0].materialId,'porch.wood');
+  assert.equal(porchSaved.world.construction.floorCells.length,
+    facadeSave.world.construction.floorCells.length,
+    'Outdoor porch must not extend indoor roof floor');
+  await page.screenshot({path:'f5c2-porch.png'});
+  await page.locator('#build-exit').click();
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
+  const afterExteriorReload=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.deepEqual(afterExteriorReload.world.construction.porches,
+    porchSaved.world.construction.porches);
+  assert.equal(afterExteriorReload.world.construction.wallHeightClass,'tall');
+  assert.deepEqual(afterExteriorReload.world.construction.materials.facade,
+    porchSaved.world.construction.materials.facade);
+  await page.locator('#build-toggle').click();
+  await page.locator('[data-build-walls="cut"]').waitFor();
+  assert.equal(await page.locator('[data-build-walls="cut"]').getAttribute('aria-pressed'),'true',
+    'Entering a new build session must reset camera cutaway without changing wall height');
   await page.locator('#build-exit').click();
   console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));
