@@ -40,7 +40,7 @@ import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
 import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
 import {switchLampAtArrival} from './furniture-interactions.js';
-import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_WORKS_LIMIT,restoreCreatedWorks,finishPainting} from './painting.js';
+import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_WORKS_LIMIT,canPaintContent,restoreCreatedWorks,finishPainting} from './painting.js';
 import {chooseDiningSeat,diningSeatApproach} from './dining.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
@@ -452,7 +452,7 @@ function validPaintingSource(root,actor){
     ?resolveActionFurniture(root.world,'paint',action.targetInstanceId):null;
   const activity=getActivityDefinition(HOBBY_ACTIVITIES,action?.activityId);
   return Boolean(item&&activity?.id===PAINT_ACTIVITY_ID&&
-    PAINT_CONTENT_IDS.includes(action.contentId)&&
+    canPaintContent(actor.skills,HOBBY_SKILLS,action.contentId)&&
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
 function validMusicSource(root,actor){
@@ -500,7 +500,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     // those on a wall or in inventory, must not disappear on a 25th painting.
     if((resident.createdWorks?.length||0)>=PAINT_WORKS_LIMIT)return false;
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
-    if(activity?.id!==PAINT_ACTIVITY_ID||!PAINT_CONTENT_IDS.includes(contentId)||
+    if(activity?.id!==PAINT_ACTIVITY_ID||!canPaintContent(resident.skills,HOBBY_SKILLS,contentId)||
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;
   }
   if(itemId==='music'){
