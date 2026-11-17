@@ -113,6 +113,26 @@ const offered=[
   {itemId:'wardrobe.open',prefabId:'wardrobe',price:540,name:'Гардероб «Открытый»',
     typeCategoryId:'type.storage.wardrobes',modelKey:'wardrobe.open',
     description:'Открытые полки с одеждой · можно разобрать гардероб'},
+  // F4G: kitchen appliances are sold as real independent products. Prices are
+  // experimental Build/Buy tokens; no grocery costs, salaries or job economy.
+  {itemId:'stove.copper',prefabId:'stove',price:540,name:'Плита «Медь»',
+    typeCategoryId:'type.kitchen.stoves',modelKey:'stove.copper',
+    description:'Четыре конфорки и медная духовка · приготовление рецептов'},
+  {itemId:'stove.modern',prefabId:'stove',price:610,name:'Плита «Модерн»',
+    typeCategoryId:'type.kitchen.stoves',modelKey:'stove.modern',
+    description:'Стеклокерамика и светлая духовка · готовка'},
+  {itemId:'prep.oak',prefabId:'prep',price:240,name:'Столешница «Дуб»',
+    typeCategoryId:'type.kitchen.counters',modelKey:'prep.oak',
+    description:'Деревянная рабочая поверхность · подготовка ингредиентов'},
+  {itemId:'prep.stone',prefabId:'prep',price:280,name:'Столешница «Камень»',
+    typeCategoryId:'type.kitchen.counters',modelKey:'prep.stone',
+    description:'Каменная поверхность с ящиками · подготовка продуктов'},
+  {itemId:'sink.farm',prefabId:'sink',price:250,name:'Мойка «Ферма»',
+    typeCategoryId:'type.kitchen.sinks',modelKey:'sink.farm',
+    description:'Керамическая чаша и смеситель · мыть грязную посуду'},
+  {itemId:'sink.steel',prefabId:'sink',price:310,name:'Мойка «Сталь»',
+    typeCategoryId:'type.kitchen.sinks',modelKey:'sink.steel',
+    description:'Стальная чаша и высокая дуга · мыть посуду'},
   // H5: real creative station, distinct from decorative art; no sales or wages.
   {itemId:'easel.starter',prefabId:'easel',price:460,
     name:'Мольберт «Мастерская»',modelKey:'easel.starter',
@@ -159,6 +179,10 @@ export function legacyProductId(prefabId){return 'legacy.'+prefabId;}
  * This describes discoverability, not guaranteed interactions.
  */
 export const FURNITURE_SHOP_TYPES=Object.freeze([
+  {id:'type.kitchen',label:'Кухня',icon:'🍳'},
+  {id:'type.kitchen.stoves',label:'Плиты',parentId:'type.kitchen'},
+  {id:'type.kitchen.counters',label:'Рабочие поверхности',parentId:'type.kitchen'},
+  {id:'type.kitchen.sinks',label:'Мойки',parentId:'type.kitchen'},
   {id:'type.seating',label:'Сиденья',icon:'🛋'},
   {id:'type.seating.sofas',label:'Диваны',parentId:'type.seating'},
   {id:'type.seating.armchairs',label:'Кресла',parentId:'type.seating'},
@@ -194,11 +218,12 @@ export const FURNITURE_TYPE_BY_PREFAB=Object.freeze({
   rug:'type.decor.rugs',mirror:'type.decor.mirrors',
   sculpture:'type.decor.art',floorlamp:'type.lighting.floor',
   tv:'type.electronics.tv',music:'type.electronics.music',
-  easel:'type.creative.painting'
+  easel:'type.creative.painting',
+  stove:'type.kitchen.stoves',prep:'type.kitchen.counters',sink:'type.kitchen.sinks'
 });
 export const PROCEDURAL_NEW_PREFABS=Object.freeze([
   'armchair','chair','diningtable','floorlamp','rug',
-  'dresser','mirror','sculpture','wardrobe','easel'
+  'dresser','mirror','sculpture','wardrobe','easel','stove','prep','sink'
 ]);
 export const PROCEDURAL_DEFAULT_SKU=Object.freeze(Object.fromEntries(
   PROCEDURAL_NEW_PREFABS.map(prefabId=>[
