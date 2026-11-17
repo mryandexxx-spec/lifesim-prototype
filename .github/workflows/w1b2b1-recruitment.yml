@@ -1,4 +1,4 @@
-name: W1-B.2b.1 recruitment interview iPhone-size PlayCanvas QA
+name: W1-B.2b recruitment all-career iPhone-size PlayCanvas QA
 on:
   pull_request:
   workflow_dispatch:
@@ -21,19 +21,23 @@ jobs:
       - name: Validate saved recruitment and mobile WebGL flow
         run: |
           node --check src/career-recruitment.js
+          node --check src/career-interview-content.js
           node --check src/career-phone-ui.js
           node --check src/household.js
           node --check src/game.js
-          node --test tests/w1b2b1-recruitment.test.js
+          node --test tests/w1b2b1-recruitment.test.js tests/w1b2b2-recruitment.test.js
           mkdir -p vendor
           cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/w1b2b1-http.log 2>&1 &
           sleep 2
           node tests/w1b2b1-browser-smoke.mjs
+          node tests/w1b2b2-browser-smoke.mjs
       - name: Save browser snapshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: w1b2b1-recruitment-iphone-screenshots
-          path: w1b2b1-*-iphone.png
+          name: w1b2b-all-interviews-iphone-screenshots
+          path: |
+            w1b2b1-*-iphone.png
+            w1b2b2-*-iphone.png
           if-no-files-found: ignore

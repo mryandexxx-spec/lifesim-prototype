@@ -31,8 +31,8 @@ const offerEditorial=(root,id='alex',answers=['verify','research','correct'])=>{
   return root.recruitmentSystem.byResident[id];
 };
 
-test('W1-B.2b.1: two new recruitment routes; four unchanged careers still have real catalog contracts',()=>{
-  assert.deepEqual(RECRUITMENT_CAREERS,['city-services','editorial']);
+test('W1-B.2b: all six careers share the saved application route and real catalog contracts',()=>{
+  assert.deepEqual(new Set(RECRUITMENT_CAREERS),new Set(CAREER_CATALOG.map(c=>c.id)));
   assert.equal(CAREER_CATALOG.length,6);
   assert.equal(EDITORIAL_QUESTIONS.length,3);
   for(const q of EDITORIAL_QUESTIONS){

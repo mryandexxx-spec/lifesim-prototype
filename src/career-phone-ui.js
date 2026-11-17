@@ -1,13 +1,13 @@
 /** W1-B.2a — accessible touch-first in-game smartphone and authentic job feed.
  * It is presentation only: game state changes solely through explicit contract actions.
  */
-import {careerVacancies,acceptCareerOffer,leaveCareer,describeCareerShift} from './career-job-board.js';
+import {careerVacancies,leaveCareer,describeCareerShift} from './career-job-board.js';
 import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
-import {RECRUITMENT_CAREERS,EDITORIAL_QUESTIONS,submitCareerApplication,
+import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
   startCareerInterview,answerCareerInterview,markRecruitmentRead,
   finishRecruitmentApplication,interviewScore} from './career-recruitment.js';
 
@@ -190,7 +190,8 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     }
     if(app.phase==='interview_invited'){
       body.append(element('p','career-phone-muted',
-        'Три профессиональных вопроса. Ответы, характер, настроение и литературная эрудиция влияют на результат.'));
+        'Три профессиональные ситуации. Ответы, характер и настроение влияют на решение работодателя.'+
+        (CAREER_SKILL_LABELS[app.careerId]?' Учитывается реальный навык: '+CAREER_SKILL_LABELS[app.careerId]+'.':'')));
       body.append(action('Начать собеседование',()=>{
         const live=personRoot();if(!live)return;
         const result=startCareerInterview(live,who);
@@ -200,10 +201,12 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     }
     if(app.phase==='interview_active'){
       const index=app.interview?.answers?.length||0;
-      const question=EDITORIAL_QUESTIONS[index];
+      const question=INTERVIEW_QUESTIONS_BY_CAREER[app.careerId]?.[index];
       body.append(element('p','career-phone-muted','Вопрос '+(index+1)+' из 3 · игровое время остановлено, пока открыт экран ответа.'));
-      if(lastInterviewFeedback)
-        body.append(element('p','career-phone-notice',lastInterviewFeedback));
+      const preceding=index>0?INTERVIEW_QUESTIONS_BY_CAREER[app.careerId]?.[index-1]
+        ?.answers.find(a=>a.id===app.interview.answers[index-1])?.feedback:null;
+      if(lastInterviewFeedback||preceding)
+        body.append(element('p','career-phone-notice',lastInterviewFeedback||preceding));
       body.append(element('h3','career-phone-section-title',question.text));
       for(const option of question.answers){
         body.append(action(option.text,()=>{
@@ -219,15 +222,24 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       const score=interviewScore(app);
       const facts=element('div','career-phone-facts');
       facts.append(element('span',null,'Ответы: '+(score>=45?'Убедительные':score>=25?'Смешанные':'Неубедительные')));
-      facts.append(element('span',null,'Литературная эрудиция: уровень '+app.interview.skill));
+      if(CAREER_SKILL_LABELS[app.careerId])facts.append(element('span',null,
+        CAREER_SKILL_LABELS[app.careerId]+': уровень '+app.interview.skill));
       facts.append(element('span',null,'Настроение на собеседовании: '+app.interview.mood+'/100'));
-      facts.append(element('span',null,'Подходящие особенности характера: '+
+      const traitFocus={editorial:'Собранность и устойчивость',
+        'art-studio':'Творческий и практичный подход',
+        'business-center':'Организованность и практичность',
+        'civic-service':'Эмпатия и самообладание'};
+      facts.append(element('span',null,(traitFocus[app.careerId]||'Особенности характера')+': '+
         (app.interview.traitBoost>0?'помогли':app.interview.traitBoost<0?'потребовали усилий':'нейтральны')));
       body.append(facts);
     }
     if(app.phase==='offer_ready'){
+      if(app.careerId==='kitchen-studio')body.append(element('p','career-phone-notice',
+        'Мастерская оценила ваш реальный навык кулинарии: уровень '+(app.kitchenSkill||0)+
+        '. '+(app.kitchenSkill>=2?'Подготовка пригодится на кухне.':
+          'Для начальной должности предусмотрено обучение на сменах.')));
       body.append(element('p','career-phone-muted',
-        'Вакансия подтверждена работодателем. Смены и зарплата начнутся только после подписания договора.'));
+        'Вакансия подтверждена работодателем. Смены начнутся после подписания договора. Зарплата начисляется в конце фактически отработанной смены.'));
       body.append(action('Подписать договор',()=>{
         const live=personRoot();if(!live)return;
         const result=finishRecruitmentApplication(live,who,'accept');
@@ -270,31 +282,16 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       'Первая смена: '+offer.firstShiftLabel
     ])facts.append(element('span',null,label));
     body.append(facts);
-    if(view==='details'&&RECRUITMENT_CAREERS.includes(chosen)){
-      body.append(element('p','career-phone-notice',
-        'Сначала отправь отклик. Работодатель ответит через несколько игровых часов.'));
-      body.append(action('Отправить отклик',()=>{
-        const live=personRoot();if(!live)return;
-        const result=submitCareerApplication(live,who,chosen);
-        if(!result.ok){notify(result.reason);render();return;}
-        save(true);notify(NAMES[who]+': отклик отправлен · '+offer.title);
-        view='application';render();
-      },'career-phone-primary'));
-    }else if(view==='contract'){
-      body.append(element('p','career-phone-notice',
-        'Подписание закрепит эту работу за '+NAMES[who]+'. Первая смена рассчитана по игровому календарю. Зарплата начисляется в конце фактически отработанной смены.'));
-      body.append(action('Подписать договор',()=>{
-        const live=personRoot();if(!live)return;
-        const result=acceptCareerOffer(live,who,chosen);
-        if(!result.ok){notify(result.reason);render();return;}
-        setCareerSystem(result.careerSystem);
-        save(true);
-        notify(NAMES[who]+': работа оформлена · '+offer.title);
-        view='list';chosen=null;render();
-      },'career-phone-primary'));
-    }else{
-      body.append(action('Получить предложение',()=>{view='contract';render();},'career-phone-primary'));
-    }
+    if(view!=='details'||!RECRUITMENT_CAREERS.includes(chosen))return;
+    body.append(element('p','career-phone-notice',
+      'Сначала отправь отклик. Работодатель ответит через несколько игровых часов.'));
+    body.append(action('Отправить отклик',()=>{
+      const live=personRoot();if(!live)return;
+      const result=submitCareerApplication(live,who,chosen);
+      if(!result.ok){notify(result.reason);render();return;}
+      save(true);notify(NAMES[who]+': отклик отправлен · '+offer.title);
+      view='application';render();
+    },'career-phone-primary'));
   }
   function renderList(root){
     top('📱 '+NAMES[who]+' · открытые вакансии');

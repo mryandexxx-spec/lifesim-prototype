@@ -7,9 +7,13 @@ import {acceptCareerOffer} from './career-job-board.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {deriveAxes} from './trait-catalog.js';
+import {ADDITIONAL_INTERVIEW_QUESTIONS} from './career-interview-content.js';
 
 export const RECRUITMENT_SCHEMA=1;
-export const RECRUITMENT_CAREERS=Object.freeze(['city-services','editorial']);
+export const FAST_OFFER_CAREERS=Object.freeze(['city-services','kitchen-studio']);
+export const INTERVIEW_CAREERS=Object.freeze(['editorial','art-studio','business-center','civic-service']);
+export const RECRUITMENT_CAREERS=Object.freeze([...FAST_OFFER_CAREERS,...INTERVIEW_CAREERS]);
+export const CAREER_SKILL_LABELS=Object.freeze({editorial:'Литературная эрудиция','art-studio':'Живопись'});
 export const EDITORIAL_QUESTIONS=Object.freeze([
   {text:'Перед выпуском статьи источник просит проверить его слова. Что сделаете?',
     answers:[
@@ -26,7 +30,10 @@ export const EDITORIAL_QUESTIONS=Object.freeze([
       {id:'correct',text:'Поблагодарю и исправлю текст после проверки.',score:20,feedback:'Готовность исправлять ошибки — важное профессиональное качество.'},
       {id:'review',text:'Предложу вместе сравнить наши варианты.',score:10,feedback:'Вы открыты к диалогу, но не откладывайте исправление.'},
       {id:'ignore',text:'Оставлю первоначальную версию без изменений.',score:0,feedback:'Игнорирование замечаний снизило доверие редактора.'}]}
-]);
+]); 
+export const INTERVIEW_QUESTIONS_BY_CAREER=Object.freeze({
+  editorial:EDITORIAL_QUESTIONS,...ADDITIONAL_INTERVIEW_QUESTIONS
+});
 const PHASES=new Set(['waiting_reply','interview_invited','interview_active',
   'waiting_decision','offer_ready','rejected']);
 const TMAX=5256000000;
@@ -41,8 +48,18 @@ function hashRoll(str){
   for(const char of str){h=Math.imul(h^char.charCodeAt(0),16777619);}
   return (h>>>0)%100;
 }
-function skillFor(root,id){
-  return currentSkillLevel(actor(root,id)?.skills,HOBBY_SKILLS,'literature');
+function skillFor(root,id,careerId){
+  const skillId=careerId==='editorial'?'literature':careerId==='art-studio'?'painting':
+    careerId==='kitchen-studio'?'cooking':null;
+  return skillId?currentSkillLevel(actor(root,id)?.skills,HOBBY_SKILLS,skillId):0;
+}
+function traitBoostFor(axes,careerId){
+  // Preserve the exact legacy editorial formula for in-progress Safari saves.
+  if(careerId==='editorial')return clamp(Math.round((axes.organization+axes.resilience-1)*8),-4,4);
+  const focus=careerId==='art-studio'?['creativity','coordination','practicality']:
+    careerId==='business-center'?['organization','practicality','resilience']:
+    ['empathy','resilience','sociability'];
+  return clamp(Math.round((focus.reduce((sum,key)=>sum+axes[key],0)/focus.length-.5)*16),-4,4);
 }
 function getApp(root,id){return root?.recruitmentSystem?.byResident?.[id]??null;}
 export function newRecruitmentSystem(){
@@ -52,7 +69,8 @@ export function newRecruitmentSystem(){
 export function interviewScore(app){
   const answers=app?.interview?.answers;
   if(!Array.isArray(answers))return 0;
-  return answers.reduce((sum,id,i)=>sum+(EDITORIAL_QUESTIONS[i]?.answers.find(a=>a.id===id)?.score??0),0);
+  const questions=INTERVIEW_QUESTIONS_BY_CAREER[app?.careerId];
+  return answers.reduce((sum,id,i)=>sum+(questions?.[i]?.answers.find(a=>a.id===id)?.score??0),0);
 }
 export function hiringChance(app){
   const interview=app?.interview;
@@ -72,13 +90,16 @@ function cleanApplication(raw,id){
     !RECRUITMENT_CAREERS.includes(raw.careerId)||!PHASES.has(raw.phase)||
     !time(raw.appliedAt)||!time(raw.replyDueAt)||raw.replyDueAt<raw.appliedAt||
     raw.replyDueAt>raw.appliedAt+1440)return null;
-  if(raw.careerId==='city-services'&&
+  if(FAST_OFFER_CAREERS.includes(raw.careerId)&&
     !['waiting_reply','offer_ready'].includes(raw.phase))return null;
   const app={id:raw.id,residentId:id,careerId:raw.careerId,
     appliedAt:raw.appliedAt,replyDueAt:raw.replyDueAt,phase:raw.phase,
     unread:raw.unread===true,interview:null,decisionDueAt:null};
+  if(raw.careerId==='kitchen-studio')
+    app.kitchenSkill=Number.isInteger(raw.kitchenSkill)&&raw.kitchenSkill>=0&&raw.kitchenSkill<=10
+      ?raw.kitchenSkill:0;
   if(['interview_active','waiting_decision','offer_ready','rejected'].includes(raw.phase)&&
-    raw.careerId==='editorial'){
+    INTERVIEW_CAREERS.includes(raw.careerId)){
     if(['waiting_decision','offer_ready','rejected'].includes(raw.phase)&&!raw.interview)
       return null;
     if(raw.interview){
@@ -88,7 +109,7 @@ function cleanApplication(raw,id){
         !Number.isInteger(i.traitBoost)||Math.abs(i.traitBoost)>4||
         !Number.isInteger(i.mood)||i.mood<0||i.mood>100||
         !Array.isArray(i.answers)||i.answers.length>3||
-        !i.answers.every((choice,j)=>EDITORIAL_QUESTIONS[j].answers.some(a=>a.id===choice)))
+        !i.answers.every((choice,j)=>INTERVIEW_QUESTIONS_BY_CAREER[raw.careerId][j].answers.some(a=>a.id===choice)))
         return null;
       if(raw.phase==='interview_active'&&i.answers.length>=3)return null;
       if(['waiting_decision','offer_ready','rejected'].includes(raw.phase)&&i.answers.length!==3)return null;
@@ -102,6 +123,8 @@ function cleanApplication(raw,id){
     }
   }
   if(raw.phase==='interview_active'&&!app.interview)return null;
+  if(INTERVIEW_CAREERS.includes(raw.careerId)&&
+    ['waiting_decision','offer_ready','rejected'].includes(raw.phase)&&!app.interview)return null;
   return app;
 }
 export function restoreRecruitmentSystem(raw,careerSystem){
@@ -132,8 +155,9 @@ export function submitCareerApplication(root,id,careerId){
   const next=root.recruitmentSystem.nextApplicationId;
   if(!Number.isSafeInteger(next)||next<1||next>999999999)return reason('Лимит заявок');
   const app={id:'a'+next,residentId:id,careerId,appliedAt:root.minutes,
-    replyDueAt:Math.ceil(root.minutes+(careerId==='city-services'?180:360)),
+    replyDueAt:Math.ceil(root.minutes+(FAST_OFFER_CAREERS.includes(careerId)?180:360)),
     phase:'waiting_reply',unread:false,interview:null,decisionDueAt:null};
+  if(careerId==='kitchen-studio')app.kitchenSkill=clamp(skillFor(root,id,careerId),0,10);
   root.recruitmentSystem.nextApplicationId++;
   root.recruitmentSystem.byResident[id]=app;
   return {ok:true,app};
@@ -146,15 +170,17 @@ export function progressCareerRecruitment(root,before,after){
     if(!app||root.careerSystem?.byResident?.[id])continue;
     let text=null;
     if(app.phase==='waiting_reply'&&after>=app.replyDueAt){
-      app.phase=app.careerId==='city-services'?'offer_ready':'interview_invited';
-      text=app.phase==='offer_ready'?'работодатель прислал предложение · Городские сервисы':
-        'Редакция приглашает на собеседование';
+      app.phase=FAST_OFFER_CAREERS.includes(app.careerId)?'offer_ready':'interview_invited';
+      const title=careerDefinition(app.careerId).title;
+      text=app.phase==='offer_ready'?title+': предложение о работе готово':
+        title+': приглашение на собеседование';
     }else if(app.phase==='waiting_decision'&&after>=app.decisionDueAt){
       const chance=hiringChance(app);
-      const roll=hashRoll(app.id+'@'+app.appliedAt+'@'+app.residentId+'@editorial');
+      const roll=hashRoll(app.id+'@'+app.appliedAt+'@'+app.residentId+'@'+app.careerId);
       app.phase=roll<chance?'offer_ready':'rejected';
-      text=app.phase==='offer_ready'?'Редакция предлагает работу':
-        'Редакция отказала после собеседования. Можно выбрать другую вакансию';
+      const title=careerDefinition(app.careerId).title;
+      text=app.phase==='offer_ready'?title+': предложение работы после собеседования':
+        title+': отказ после собеседования. Можно выбрать другую вакансию';
     }
     if(text){
       app.unread=true;
@@ -168,9 +194,10 @@ export function startCareerInterview(root,id){
   if(app?.phase!=='interview_invited'||root.careerSystem?.byResident?.[id])
     return reason('Приглашение недоступно');
   const person=actor(root,id),axes=deriveAxes(person.personality);
+  if(!INTERVIEW_CAREERS.includes(app.careerId))return reason('Эта профессия не проводит собеседование');
   app.interview={startedAt:root.minutes,mood:bounded(person.mind?.mood?.value),
-    skill:clamp(skillFor(root,id),0,10),
-    traitBoost:clamp(Math.round((axes.organization+axes.resilience-1)*8),-4,4),
+    skill:clamp(skillFor(root,id,app.careerId),0,10),
+    traitBoost:traitBoostFor(axes,app.careerId),
     answers:[]};
   app.phase='interview_active';app.unread=false;
   return {ok:true,app};
@@ -180,9 +207,9 @@ export function answerCareerInterview(root,id,choiceId){
   if(app?.phase!=='interview_active'||!app.interview||root.careerSystem?.byResident?.[id])
     return reason('Собеседование неактивно');
   const index=app.interview.answers.length;
-  if(!EDITORIAL_QUESTIONS[index]?.answers.some(a=>a.id===choiceId))
-    return reason('Ответ недоступен');
-  const answer=EDITORIAL_QUESTIONS[index].answers.find(a=>a.id===choiceId);
+  const question=INTERVIEW_QUESTIONS_BY_CAREER[app.careerId]?.[index];
+  if(!question?.answers.some(a=>a.id===choiceId))return reason('Ответ недоступен');
+  const answer=question.answers.find(a=>a.id===choiceId);
   app.interview.answers.push(choiceId);
   if(app.interview.answers.length===3){
     app.phase='waiting_decision';
