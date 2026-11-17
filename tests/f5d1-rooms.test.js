@@ -130,6 +130,6 @@ test('F5-D.1 mobile controls and Pages source syntax are present',()=>{
   assert.match(html,/data-build-tool="room-duplicate"/);
   assert.match(html,/data-build-tool="room-relocate"/);
   assert.match(html,/id="build-room-turn"/);
-  assert.match(game,/constructionRoomSelection\(game\.world\.construction,point\)/);
+  assert.match(game,/constructionRoomSelection\(game\.world\.construction,point,/);
   assert.match(css,/\.build-room-controls\[hidden\]/);
 });
