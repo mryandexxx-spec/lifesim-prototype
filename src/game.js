@@ -24,7 +24,7 @@ import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_
 import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES} from './painting.js';
 import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
-  chooseKitchenPlan} from './kitchen.js';
+  preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from './painting-gallery.js';
@@ -362,6 +362,10 @@ function scheduleCommand(command,residentId=game.selectedSim){
         return false;
       }
     }
+    if(command.type==='object'&&actionId==='dining'&&command.recipeId&&
+      !hasKitchenServing(game.kitchen,command.recipeId)){
+      toast('Выбранное блюдо закончилось в холодильнике');return false;
+    }
     if(command.type==='object'&&actionId==='dining'&&command.autoTable===true){
       if(!nearestAvailableDiningTable(game,residentId)){
         toast('Для обеда нужны доступный обеденный стол и свободный стул');
@@ -671,8 +675,26 @@ function select(id,instanceId=null) {
       ' · Грязных тарелок: '+k.dirtyDishes+
       ' · Продукты (овощи/крупы/молоко): '+k.supplies;
   }
-  $('cooking-recipe-field').hidden=id!=='cook';
-  if(id==='cook'){
+  $('fridge-prepared-field').hidden=id!=='fridge';
+  if(id==='fridge'){
+    const menu=$('fridge-prepared-select');
+    menu.replaceChildren();
+    const meals=preparedKitchenMeals(game.kitchen);
+    for(const meal of meals){
+      const option=document.createElement('option');
+      option.value=meal.recipeId;
+      option.textContent=meal.label+' · '+meal.portions+' порц.';
+      menu.append(option);
+    }
+    if(!meals.length){
+      const empty=document.createElement('option');
+      empty.value='';empty.textContent='Готовой еды пока нет';
+      menu.append(empty);
+    }
+    $('fridge-lunch-button').disabled=!meals.length;
+  }
+  $('cooking-recipe-field').hidden=!['cook','fridge'].includes(id);
+  if(id==='cook'||id==='fridge'){
     const select=$('cooking-recipe-select');
     const level=currentSkillLevel(selectedActor().skills,HOBBY_SKILLS,COOKING_SKILL_ID);
     for(const option of select.options){
@@ -692,6 +714,7 @@ function select(id,instanceId=null) {
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
   $('fridge-lunch-button').hidden=id!=='fridge';
+  $('fridge-cook-button').hidden=id!=='fridge';
   const lampLabel=id==='lamp'
     ?(lampIsOn(game?.world,selectedFurnitureInstanceId)?'Выключить торшер':'Включить торшер')
     :ACTIONS[id].label;
@@ -762,10 +785,29 @@ $('action-button').addEventListener('click', () => {
     select(null);
   }
 });
-// F4F.2: refrigerator full lunch uses existing meal and seating choreography.
+// F4G.2: fridge pop-up lists the actual stored recipe and remaining portions.
 $('fridge-lunch-button').addEventListener('click',()=>{
   if(selected!=='fridge')return;
-  if(scheduleCommand({type:'object',actionId:'dining',autoTable:true}))select(null);
+  const recipeId=$('fridge-prepared-select').value;
+  if(!hasKitchenServing(game.kitchen,recipeId)){
+    toast('Сначала приготовь блюдо');return;
+  }
+  if(scheduleCommand({type:'object',actionId:'dining',autoTable:true,recipeId}))select(null);
+});
+// The fridge can start a full recipe too: walk fridge → prep → selected real stove.
+$('fridge-cook-button').addEventListener('click',()=>{
+  if(selected!=='fridge')return;
+  const resident=selectedActor(),recipeId=$('cooking-recipe-select').value;
+  const stove=game.world.furniture.instances
+    .filter(item=>item.prefabId==='stove'&&item.location==='home'&&
+      furnitureAvailable(game,'cook',game.selectedSim,item.instanceId)&&
+      chooseKitchenPlan(game.world,resident.position,item.instanceId))
+    .sort((a,b)=>Math.hypot(a.x-resident.position.x,a.z-resident.position.z)-
+      Math.hypot(b.x-resident.position.x,b.z-resident.position.z)||
+      a.instanceId.localeCompare(b.instanceId))[0];
+  if(!stove){toast('Для готовки купи плиту и рабочую поверхность');return;}
+  if(scheduleCommand({type:'object',actionId:'cook',recipeId,
+    targetInstanceId:stove.instanceId}))select(null);
 });
 // Dance is an independent activity queued against the same physical stereo.
 // This click also provides the genuine Safari gesture for Web Audio unlock.
