@@ -4,6 +4,8 @@ import {newConstructionWorld,restoreConstructionWorld,starterShellSegments,
  constructionWallSegments,nearestConstructionEdge,constructionWallAt,
  proposeConstructionEdit,createConstructionEditor,constructionWallOutward} from '../src/construction.js';
 
+import {isClearLine} from '../src/navigation.js';
+
 const w=()=>newConstructionWorld();
 const segment=(world,side,index)=>starterShellSegments(world).find(edge=>
  edge.starterSide===side&&(edge.axis==='h'?edge.i:edge.j)===index);
@@ -136,4 +138,26 @@ test('F5-B.3 old schema sanitizes out-of-range starter holes and invalid sides',
  assert.deepEqual(older.starterRemoved,[]);
  assert.deepEqual(older.starterSolidSides,[]);
  assert.equal(older.legacy,true);
+});
+
+test('F5-B.3 original east doorway pierces overlapping F5-A extension wall too',()=>{
+ const base=edit(w(),{type:'room',from:{x:14,z:-2},to:{x:18,z:2}});
+ const starter=segment(base,'east',0),built=base.wallEdges.find(e=>e.id==='v:28,0');
+ assert.ok(starter&&built);
+ const through=edit(base,{type:'door',edgeId:starter.id,styleId:'door.glass'});
+ assert.equal(constructionWallAt(through,14,0),false);
+ assert.equal(isClearLine({x:13.4,z:0},{x:14.6,z:0},{construction:through}),true);
+ assert.equal(proposeConstructionEdit(through,{type:'window',edgeId:built.id}).reason,'opening-overlap');
+ assert.equal(proposeConstructionEdit(through,{type:'erase-wall',edgeId:built.id}).reason,'wall-has-opening');
+ assert.equal(proposeConstructionEdit(through,{type:'erase-wall',edgeId:starter.id}).reason,'wall-has-opening');
+ assert.equal(restoreConstructionWorld(through).openings[0].id,through.openings[0].id);
+});
+
+test('F5-B.3 opening in structural edge on old boundary also cuts the starter visual',()=>{
+ const base=edit(w(),{type:'room',from:{x:14,z:-2},to:{x:18,z:2}});
+ const original=segment(base,'east',0);
+ const structural=edit(base,{type:'arch',edgeId:'v:28,0',styleId:'arch.round'});
+ assert.equal(constructionWallAt(structural,14,0),false);
+ assert.equal(proposeConstructionEdit(structural,{type:'door',edgeId:original.id}).reason,'opening-overlap');
+ assert.equal(proposeConstructionEdit(structural,{type:'erase-wall',edgeId:original.id}).reason,'wall-has-opening');
 });
