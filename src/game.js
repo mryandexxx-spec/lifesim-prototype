@@ -4126,6 +4126,13 @@ function boot() {
     'room-shared-boundary':'Комната соединена с другим полом. Пока её можно копировать, переносить — только отдельную',
     'room-has-porch':'Для переноса комнаты сначала убери крыльцо; при копировании оно остаётся у исходной двери',
     'room-has-manual-roof':'Сначала убери отдельную секцию крыши над комнатой',
+    'partition-wall-not-found':'Коснись настоящей общей стены двух соседних комнат',
+    'partition-needs-two-rooms':'Здесь наружная стена. Для объединения нужна стена между комнатами',
+    'partition-already-connected':'Это уже одно помещение: перегородка не разделяет две комнаты',
+    'partition-legacy-wall':'Эта часть исходного дома имеет старую стену и декор. Пока объединяй через новые общие стены',
+    'partition-partial-opening':'Проём пересекает границу выбранной стены; сначала измени его',
+    'partition-has-porch':'Сначала убери крыльцо с затронутой двери',
+    'partition-has-art':'На перегородке картина: сначала сними её в инвентарь',
     'room-target-overlap':'На новом месте уже есть пол или стены',
     'room-target-occupied':'Новое место пересекает мебель или жителя',
     'invalid-room-placement':'Выбери свободное место на участке для комнаты'
@@ -4491,6 +4498,7 @@ function boot() {
       room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
       'room-duplicate':'Выбери даже исходную комнату, затем место для копии. Для большой исходной комнаты поверни копию на 90° и ставь справа от дома; мебель, картины и крыльцо остаются в оригинале.',
       'room-relocate':'Коснись отдельной комнаты с мебелью, затем нового места. Мебель переместится вместе со стенами. Картины на стене защищены.',
+      'room-join':'Коснись общей стены двух соседних помещений: целая непрерывная перегородка будет убрана одним действием. Картину сначала сними; дверь или окно на перегородке исчезнет вместе с ней. Для разделения пользуйся инструментом «Стена».',
       floor:'Протяни область, чтобы увеличить пол без перегородки',
       wall:'Протяни по прямой, чтобы построить стену',
       door:'Выбери дизайн и коснись стены для установки двери',
@@ -4690,7 +4698,7 @@ function boot() {
           buildGhost.enabled=true;
         }
       }
-    }else if(['door','window','arch','erase-wall','remove-opening','change-opening'].includes(type)){
+    }else if(['door','window','arch','erase-wall','room-join','remove-opening','change-opening'].includes(type)){
       const target=buildWallAtScreen(gesturePoint(event))||
         nearestConstructionEdge(game.world.construction,to,.75);
       if(type==='change-opening'){
@@ -4924,7 +4932,7 @@ function boot() {
         'paint-facade-all'].includes(buildTool)&&
         cameraGesture.count()===0){
         const raw=editorFloorAt(point);
-        const pickWall=['move-wall','door','window','arch','change-opening','erase-wall',
+        const pickWall=['move-wall','door','window','arch','change-opening','erase-wall','room-join',
           'remove-opening','paint-wall','sample-finish','paint-facade',
           'porch-add','porch-remove'].includes(buildTool);
         const wallEdge=pickWall?buildWallAtScreen(point):null;
