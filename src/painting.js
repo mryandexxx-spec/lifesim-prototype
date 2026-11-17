@@ -60,13 +60,14 @@ export function restoreCreatedWorks(raw,ownerId){
     if(work.kind==='artwork'&&['studio','inventory','wall'].includes(work.location)){
       // H5b: a single durable work changes location; never duplicate its ID.
       // Older studio-only saves and legacy collection entries still load.
-      if(work.location==='wall'&&(!Number.isInteger(work.wallSlot)||
-          work.wallSlot<0||work.wallSlot>7))continue;
-      normalized.kind='artwork';normalized.location=work.location;
+      const badSlot=work.location==='wall'&&(!Number.isInteger(work.wallSlot)||
+          work.wallSlot<0||work.wallSlot>7);
+      // Malformed wall metadata becomes safely stored art, never lost art.
+      normalized.kind='artwork';normalized.location=badSlot?'inventory':work.location;
       if(validOrigin(work.origin))normalized.origin=
         {x:work.origin.x,z:work.origin.z,yaw:work.origin.yaw};
       else if(work.location==='studio')normalized.origin=null;
-      if(work.location==='wall')normalized.wallSlot=work.wallSlot;
+      if(work.location==='wall'&&!badSlot)normalized.wallSlot=work.wallSlot;
     }
     works.push(normalized);
     if(works.length>PAINT_WORKS_LIMIT)works.shift();

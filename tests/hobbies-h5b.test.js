@@ -82,6 +82,19 @@ test('H5b: legacy H5 collection-only works can be recovered into inventory',()=>
   assert.equal(root.createdWorks[0].location,'inventory');
   assert.deepEqual(loadHousehold(copy(root)).createdWorks,root.createdWorks);
 });
+test('H5b: corrupt wall slots and conflicting saved mounts never lose art',()=>{
+  const root=setup(),a=root.createdWorks[0],b=root.otherSim.createdWorks[0];
+  root.createdWorks=[{...a,location:'wall',wallSlot:2}];
+  root.otherSim.createdWorks=[{...b,location:'wall',wallSlot:2}];
+  const loaded=loadHousehold(copy(root));
+  assert.equal(loaded.createdWorks[0].location,'wall');
+  assert.equal(loaded.otherSim.createdWorks[0].location,'inventory');
+  assert.equal(loaded.otherSim.createdWorks[0].id,b.id);
+  root.createdWorks=[{...a,location:'wall',wallSlot:99}];
+  const migrated=loadHousehold(copy(root));
+  assert.equal(migrated.createdWorks[0].location,'inventory');
+  assert.equal(migrated.createdWorks[0].id,a.id);
+});
 test('H5b: wall geometry and browser/build wiring',()=>{
   const game=read('../src/game.js'),html=read('../index.html'),
     ci=read('../.github/workflows/pages.yml');
@@ -91,6 +104,6 @@ test('H5b: wall geometry and browser/build wiring',()=>{
   assert.match(game,/transactPainting\(game,game.selectedSim,work.id/);
   assert.match(game,/foot.enabled=!position.wall/);
   assert.match(game,/setMindTab\('skills'\)/);
-  assert.match(ci,/cp src\/painting.js src\/painting-gallery.js site\/src\//);
+  assert.match(ci,/cp src\/painting-gallery.js site\/src\//);
   assert.match(html,/painting-gallery.js\?v=1.2u-h5b-20261117/);
 });

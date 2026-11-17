@@ -204,6 +204,22 @@ export function loadHousehold(raw) {
     }
     actor.activitySession=restored;
   }
+  // H5b: malicious or partially restored saved walls cannot overlap.
+  // The second claimant keeps the original painting in their own inventory.
+  const usedWallSlots=new Set();
+  for(const id of HOUSEHOLD_IDS){
+    const person=getActor(root,id);
+    person.createdWorks=person.createdWorks.map(work=>{
+      if(work.location!=='wall')return work;
+      if(usedWallSlots.has(work.wallSlot)){
+        const fixed={...work,location:'inventory'};
+        delete fixed.wallSlot;
+        return fixed;
+      }
+      usedWallSlots.add(work.wallSlot);
+      return work;
+    });
+  }
   root.relationship=loadRelationship(raw.relationship,root.minutes,{
     alex:root.mind.memories,mira:mira.mind.memories
   });
