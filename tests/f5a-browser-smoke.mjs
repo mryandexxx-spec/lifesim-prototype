@@ -39,6 +39,8 @@ try{
  await page.locator('[data-build-walls="down"]').click();
  assert.equal(await page.locator('[data-build-walls="down"]').getAttribute('aria-pressed'),'true');
  await page.locator('[data-build-walls="cut"]').click();
+ await page.locator('[data-build-tool="remove-opening"]').click();
+ await page.locator('[data-build-tool="move-wall"]').click();
  await page.locator('[data-build-tool="room"]').click();
  await page.screenshot({path:'f5a-browser-build.png'});
  await page.locator('#build-exit').click();

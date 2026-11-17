@@ -29,9 +29,9 @@ test('F5-A lot camera bounds are transient and old camera behavior restores on e
 test('F5-A browser graph actually exposes touch tools and runtime transaction wiring',()=>{
  const html=read('../index.html'),game=read('../src/game.js');
  const workflow=read('../.github/workflows/pages.yml');
- for(const id of ['build-toggle','build-editor','build-exit','build-undo','build-redo'])
+ for(const id of ['build-toggle','build-editor','build-exit','build-undo','build-redo','build-apply','build-cancel'])
    assert.ok(html.includes('id="'+id+'"'),id);
- for(const mode of ['room','floor','wall','door','window','erase-wall','remove-floor','camera'])
+ for(const mode of ['room','floor','wall','move-wall','door','window','erase-wall','remove-opening','remove-floor','camera'])
    assert.ok(html.includes('data-build-tool="'+mode+'"'),mode);
  assert.match(game,/createConstructionEditor\(game\.world\.construction\)/);
  assert.match(game,/proposeConstructionEdit\(game\.world\.construction/);

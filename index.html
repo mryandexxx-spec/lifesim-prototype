@@ -129,12 +129,15 @@
         <button type="button" data-build-tool="room" aria-pressed="true">▣ Комната</button>
         <button type="button" data-build-tool="floor">▤ Пол</button>
         <button type="button" data-build-tool="wall">┃ Стена</button>
+        <button type="button" data-build-tool="move-wall">⇆ Перенести стену</button>
         <button type="button" data-build-tool="door">🚪 Дверь</button>
         <button type="button" data-build-tool="window">▥ Окно</button>
         <button type="button" data-build-tool="erase-wall">⌫ Убрать стену</button>
+        <button type="button" data-build-tool="remove-opening">× Снять проём</button>
         <button type="button" data-build-tool="remove-floor">− Убрать пол</button>
         <button type="button" data-build-tool="camera">✥ Камера</button>
       </div>
+      <div id="build-pending" class="build-pending" hidden><strong>Подтвердить строительство?</strong><button id="build-apply" type="button">✓ Применить</button><button id="build-cancel" type="button">× Отмена</button></div>
       <div class="build-bottom"><div class="build-walls" role="group" aria-label="Видимость стен">
         <button type="button" data-build-walls="up">Стены ↑</button>
         <button type="button" data-build-walls="cut" aria-pressed="true">Срез</button>

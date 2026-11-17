@@ -1145,3 +1145,11 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .build-feedback{font-size:12px;color:#356853;min-height:18px;font-weight:700;}
 .build-feedback[data-invalid="true"]{color:#a94848;}
 @media(max-height:570px) and (orientation:landscape){.build-editor{max-height:54dvh;padding-top:6px;gap:5px;}.build-editor p{display:none;}}
+
+/* Explicit commit/cancel means pointerup can never silently destroy a plan. */
+.build-pending{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:7px;border:1px solid #b8d9c4;border-radius:12px;background:#eff8e9;}
+.build-pending[hidden]{display:none!important;}
+.build-pending strong{flex:1;min-width:110px;font-size:12px;color:#336e50;}
+.build-pending button{min-height:44px;border-radius:11px;border:1px solid #c4dacc;background:#f8fbf5;
+  padding:8px 10px;font-size:12px;font-weight:850;color:#336e50;}
+.build-pending #build-apply{background:#348063;border-color:#348063;color:#fff;}
