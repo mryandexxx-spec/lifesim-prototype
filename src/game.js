@@ -4792,7 +4792,7 @@ function boot() {
     const now=performance.now();
     if(!force&&now-lastShopCameraPreviewAt<100)return;
     lastShopCameraPreviewAt=now;
-    const candidate=cameraPlacementPose(view,shopPose);
+    const candidate=cameraPlacementPose(view,shopPose,'lot');
     if(shopPose&&shopPose.x===candidate.x&&shopPose.z===candidate.z)return;
     shopPose=candidate;shopManualPose=false;renderMarket();
   };
@@ -4990,7 +4990,7 @@ function boot() {
       const {dx,dy}=result.placementDelta;
       // Accumulate sub-grid deltas: slow swipes must not get swallowed by snap.
       shopSwipeRawPose=dragShopPlacement(view,shopSwipeRawPose||shopPose,
-        dx,dy,canvas.clientHeight);
+        dx,dy,canvas.clientHeight,'lot');
       if(shopSwipeRawPose){
         const pose={x:snapFurnitureCoordinate(shopSwipeRawPose.x),
           z:snapFurnitureCoordinate(shopSwipeRawPose.z),yaw:shopPose.yaw};
