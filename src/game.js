@@ -14,7 +14,7 @@ import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
-  starterShellSegments,constructionWallSegments,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
+  starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
@@ -1892,7 +1892,7 @@ function boot() {
   const starterBackWindowNodes=[];
   const starterBackWindowCovered=state=>{
     const impacted=new Set([
-      ...state.openings.flatMap(o=>o.edgeIds),...(state.starterRemoved||[])
+      ...constructionOpeningEdgeIds(state),...(state.starterRemoved||[])
     ]);
     return starterShellSegments(state).some(w=>w.starterSide==='north'&&
       impacted.has(w.id)&&w.i*.5<-1.14&&(w.i+1)*.5>-3.22);
@@ -1953,7 +1953,7 @@ function boot() {
       }
     }
     if(constructionWallMode==='down')return;
-    const faces=new Map(),opened=new Set(state.openings.flatMap(o=>o.edgeIds));
+    const faces=new Map(),opened=constructionOpeningEdgeIds(state);
     for(const edge of state.wallEdges){
       if(opened.has(edge.id))continue;
       if(constructionWallMode==='cut'&&
@@ -2051,7 +2051,7 @@ function boot() {
     starterBackDecor.setPosition(0,0,n);
     starterLeftDecor.setPosition(w,0,0);
     const removedStarter=new Set(state.starterRemoved||[]);
-    const openingStarter=new Set(state.openings.flatMap(o=>o.edgeIds));
+    const openingStarter=constructionOpeningEdgeIds(state);
     const originalSegments=starterShellSegments(state);
     const changedStarter=new Set(originalSegments.filter(edge=>
       removedStarter.has(edge.id)||openingStarter.has(edge.id)).map(edge=>edge.starterSide));
@@ -2105,10 +2105,10 @@ function boot() {
     // The old apartment has an open front/right cutaway. Render their
     // editable boundary lines in Build; never create a surprise A* barrier.
     if(buildMode){
-      if(!solidStarter.has('south'))
+      if(!solidStarter.has('south')&&!changedStarter.has('south'))
         buildBox('F5 starter front edge',widthCenter,.092,4.5+s,
           19+e-w,.12,.11,M.trim);
-      if(!solidStarter.has('east'))
+      if(!solidStarter.has('east')&&!changedStarter.has('east'))
         buildBox('F5 starter right edge',14+e,.092,depthCenter,
           .11,.12,9+s-n,M.trim);
     }
@@ -2140,8 +2140,8 @@ function boot() {
         start=i;previous=i;
       }
     }
-    const opened=new Map(),originalById=new Map(originalSegments.map(w=>[w.id,w]));
-    for(const opening of state.openings)for(const id of opening.edgeIds)opened.set(id,opening);
+    const opened=constructionOpeningEdgeIds(state),
+      originalById=new Map(originalSegments.map(w=>[w.id,w]));
     // Solid wall runs are coalesced into a handful of draw calls per uninterrupted stretch.
     const byLine=new Map();
     for(const w of state.wallEdges){
@@ -2279,9 +2279,9 @@ function boot() {
     // UP mode adds former open-front boundaries for an exterior view only.
     // These are cosmetic: no surprise path block in legacy saves.
     if(exterior){
-      if(!solidStarter.has('south'))
+      if(!solidStarter.has('south')&&!changedStarter.has('south'))
         buildBox('F5 legacy front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
-      if(!solidStarter.has('east'))
+      if(!solidStarter.has('east')&&!changedStarter.has('east'))
         buildBox('F5 legacy right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
     }
   };
