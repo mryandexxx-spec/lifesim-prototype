@@ -10,11 +10,11 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
-      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4-h5-f4f-f4f2-f4g2-h5c-f5a-w1a1-w1a3-w1b1",
+      "./src/household.js":"./src/household.js?v=1.2w-h2b-f4d-h3-f4e-h4-h5-f4f-f4f2-f4g2-h5c-f5a-w1a1-w1a3-w1b1-w1b3a-work",
       "./src/calendar-core.js":"./src/calendar-core.js?v=w1a4-20261117",
       "./src/calendar-ui.js":"./src/calendar-ui.js?v=w1a4-20261117-w1b2a-career",
       "./src/calendar-events.js":"./src/calendar-events.js?v=w1a4-20261117",
@@ -41,7 +41,11 @@
       "./src/meshy-mira-visual.js":"./src/meshy-mira-visual.js?v=1.2w-h2b-f4e-h5-f4f-h5asafe-f4g",
       "./src/furniture-layout.js":"./src/furniture-layout.js?v=1.2v-f4d-f4e-f4f1-f5a",
       "./src/furniture-editor.js":"./src/furniture-editor.js?v=1.2u-h2fix1-f4c-f4g",
-      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d-f4e-f5a",
+      "./src/furniture-shop.js":"./src/furniture-shop.js?v=1.2v-f4d-f4e-f5a-w1b3a",
+      "./src/career-state.js":"./src/career-state.js?v=w1b3a",
+      "./src/career-job-board.js":"./src/career-job-board.js?v=w1b3a",
+      "./src/career-phone-ui.js":"./src/career-phone-ui.js?v=w1b3a",
+      "./src/career-work.js":"./src/career-work.js?v=w1b3a",
       "./src/furniture-products.js":"./src/furniture-products.js?v=1.2v-f4d-f4e-h5-f4f-f4g",
       "./src/furniture-catalog.js":"./src/furniture-catalog.js?v=1.2v-f4d-f4e-h5-f4f-f4g",
       "./src/object-legacy-adapter.js":"./src/object-legacy-adapter.js?v=1.2v-f4d-f4e",
@@ -75,7 +79,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.17 · F4G.2 / H5c / H5b / F4F.2</small></div>
+        <div><b>Блин<span>’С</span></b><small>сборка / W1-B.3a · рабочие смены</small></div>
       </div>
       <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><button id="calendar-anchor-toggle" class="time-card" type="button" aria-live="off" aria-controls="calendar-anchor-panel" aria-expanded="false" aria-label="Открыть полный игровой календарь"><span id="day-label">День 1</span><strong id="time-label">08:00</strong><small id="light-phase-label">День</small></button></div>
     </header>
@@ -102,7 +106,7 @@
     </div>
 
     <aside class="control-tray" aria-label="Управление временем">
-      <button id="career-phone-toggle" class="career-phone-toggle" type="button" aria-controls="career-phone-panel" aria-expanded="false" aria-label="Достать смартфон выбранного жителя и открыть вакансии"><span aria-hidden="true">▣</span><small aria-hidden="true">РАБОТА</small></button>
+      <button id="career-phone-toggle" class="career-phone-toggle" type="button" aria-controls="career-phone-panel" aria-expanded="false" aria-label="Открыть работу и график выбранного жителя"><span aria-hidden="true">▣</span><small aria-hidden="true">РАБОТА</small></button>
       <button id="pause-btn" class="round-control" type="button" aria-label="Пауза"><span id="pause-icon">Ⅱ</span></button>
       <button id="furnish-toggle" class="furnish-toggle" type="button" aria-pressed="false" aria-controls="furniture-editor" aria-label="Войти в режим обстановки"><span aria-hidden="true">▦</span><small aria-hidden="true">ДОМ</small></button>
       <button id="build-toggle" class="furnish-toggle build-toggle" type="button" aria-pressed="false" aria-controls="build-editor" aria-label="Войти в строительство"><span aria-hidden="true">⌂</span><small aria-hidden="true">СТРОИТЬ</small></button>
@@ -521,7 +525,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
