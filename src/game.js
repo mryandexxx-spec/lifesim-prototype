@@ -13,7 +13,7 @@ import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.j
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import { findPath, nearestWalkable } from './navigation.js';
-import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,BUILD_LOT,constructionBounds} from './construction.js';
+import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,BUILD_LOT,constructionBounds} from './construction.js';
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
   rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
@@ -1895,6 +1895,8 @@ function boot() {
   lotGround.enabled=false;
   const buildGhost=box('F5 preview',0,.05,0,.2,.06,.2,mat('#438ac4',{opacity:.25}));
   buildGhost.enabled=false;
+  const buildWallMarker=box('F5 selected wall',0,.32,0,.3,.62,.3,mat('#24c8bc',{opacity:.72}));
+  buildWallMarker.enabled=false;
   const clearConstructionNodes=()=>{for(const node of constructionNodes)node.destroy();constructionNodes.length=0;};
   const buildBox=(name,x,y,z,sx,sy,sz,material)=>{
     const node=box(name,x,y,z,sx,sy,sz,material);
@@ -2852,7 +2854,7 @@ function boot() {
   // F1 edit mode: UI state is ephemeral; only confirmed domain transactions
   // change the optional v1 world.furniture save extension. No action is consumed.
   let editSession=null,editSelectedId=null,editDrag=null;
-  let buildSession=null,buildDrag=null,buildTool='room',pendingBuild=null,buildPreviousView=null;
+  let buildSession=null,buildDrag=null,buildTool='camera',pendingBuild=null,buildPreviousView=null,selectedBuildWall=null;
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
   let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
@@ -3603,7 +3605,10 @@ function boot() {
   const applyBuildChange=(result,label)=>{
     if(!result.ok){buildFeedback(buildingReason[result.reason]||result.reason,true);return false;}
     game.world.construction=result.world;
-    const furniture=game.world.furniture;
+    // IDs of moved wall segments change, so never leave an obsolete selection.
+    selectedBuildWall=null;
+    buildWallMarker.enabled=false;
+    $('build-wall-controls').hidden=true;
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     syncConstructionRender(true);
     buildHistoryButtons();
@@ -3649,14 +3654,62 @@ function boot() {
   $('build-cancel').addEventListener('click',()=>{
     clearBuildPending();buildFeedback('Изменение отменено · сохранение не затронуто');
   });
+  const resetBuildWallSelection=()=>{
+    selectedBuildWall=null;
+    buildWallMarker.enabled=false;
+    $('build-wall-controls').hidden=true;
+  };
+  const selectBuildWall=wall=>{
+    resetBuildWallSelection();
+    if(!wall){buildFeedback('Выбери стену новой комнаты. Исходные декоративные стены пока защищены; для расширения открытой стороны используй «Пол».',true);return;}
+    selectedBuildWall=wall.id;
+    const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
+    const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
+    buildWallMarker.setPosition(x,.30,z);
+    buildWallMarker.setLocalScale(wall.axis==='h'?.55:.19,.56,wall.axis==='v'?.55:.19);
+    buildWallMarker.enabled=true;
+    $('build-wall-controls').hidden=false;
+    const outward=constructionWallOutward(game.world.construction,wall.id);
+    $('build-wall-expand').disabled=outward===null;
+    $('build-wall-contract').disabled=outward===null;
+    $('build-wall-label').textContent=outward===null
+      ?'Межкомнатная стена · проведи пальцем перпендикулярно стене'
+      :'Стена выбрана · перетащи или нажми +0,5 м для расширения';
+    buildFeedback(outward===null?'Это внутренняя стена. Перетащи её в нужную сторону':
+      'Для увеличения комнаты нажми «+0,5 м наружу» или перетащи стену');
+  };
+  const shiftSelectedBuildWall=(sign)=>{
+    if(!selectedBuildWall)return;
+    const wall=game.world.construction.wallEdges.find(w=>w.id===selectedBuildWall);
+    if(!wall){resetBuildWallSelection();return;}
+    const outward=constructionWallOutward(game.world.construction,wall.id);
+    if(outward===null){buildFeedback('У межкомнатной стены нет внешней стороны: используй перетаскивание',true);return;}
+    const delta=outward*sign;
+    stageBuild({type:'move-wall',edgeId:wall.id,
+      deltaI:wall.axis==='v'?delta:0,
+      deltaJ:wall.axis==='h'?delta:0});
+  };
+  $('build-wall-expand').addEventListener('click',()=>shiftSelectedBuildWall(1));
+  $('build-wall-contract').addEventListener('click',()=>shiftSelectedBuildWall(-1));
+  $('build-wall-deselect').addEventListener('click',resetBuildWallSelection);
   const setBuildTool=type=>{
-    clearBuildPending();buildTool=type;buildDrag=null;
+    clearBuildPending();resetBuildWallSelection();
+    buildTool=type;buildDrag=null;cameraGesture.clear();
     document.querySelectorAll('[data-build-tool]').forEach(btn=>
       btn.setAttribute('aria-pressed',String(btn.dataset.buildTool===type)));
-    buildFeedback(type==='camera'?'Один палец двигает камеру, два — вращают':
-      ['door','window','erase-wall','remove-opening'].includes(type)?'Коснись линии стены для выбора':
-      type==='move-wall'?'Коснись стены и перетащи её в сторону':
-        'Протяни по участку, чтобы задать размеры');
+    const tips={
+      camera:'Свайп одним пальцем — перемещение камеры; двумя — поворот и масштаб',
+      'move-wall':'Коснись построенной стены: появятся кнопки «+0,5 м» и «−0,5 м». Можно перетащить стену.',
+      room:'Протяни прямоугольник новой комнаты и нажми «Применить»',
+      floor:'Протяни область, чтобы увеличить пол без перегородки',
+      wall:'Протяни по прямой, чтобы построить стену',
+      door:'Коснись стены для установки двери',window:'Коснись стены для установки окна',
+      'erase-wall':'Коснись стены для демонтажа',
+      'remove-opening':'Коснись двери или окна для удаления',
+      'remove-floor':'Протяни область пола, которую нужно убрать'
+    };
+    $('build-instruction').textContent=tips[type]||'Выбери инструмент';
+    buildFeedback(tips[type]||'Готово');
   };
   document.querySelectorAll('[data-build-tool]').forEach(btn=>
     btn.addEventListener('click',()=>setBuildTool(btn.dataset.buildTool)));
@@ -3676,7 +3729,7 @@ function boot() {
   });
   const exitBuild=()=>{
     if(!buildMode)return;
-    buildMode=false;buildDrag=null;buildSession=null;clearBuildPending();
+    buildMode=false;buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
     cameraGesture.clear();setCameraBuildBounds();
     if(buildPreviousView)setView(buildPreviousView);
     buildPreviousView=null;
@@ -3694,11 +3747,17 @@ function boot() {
     }
     if(furnishMode)exitFurniture();
     buildSession=createConstructionEditor(game.world.construction);
+    // Never retain the previously selected drawing tool between sessions:
+    // one-finger swipes must always pan when Build first opens.
+    buildTool='camera';
+    // Restore the previously tested camera gesture path unchanged:
+    // entering Build explicitly selects pan, without altering shop VM listeners.
+    oneFingerMode='pan';showCameraMode();
     buildPreviousView={...view};
     buildMode=true;setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
     // Show the eastern expansion area within the narrow portrait viewport.
-    setView({...view,centerX:11.5,centerZ:0,distance:36,pitch:64});
+    setView({...view,centerX:14.5,centerZ:0,distance:36,pitch:64});
     document.querySelector('.app-shell').dataset.buildMode='true';
     $('build-editor').hidden=false;
     $('build-toggle').setAttribute('aria-pressed','true');
@@ -3714,14 +3773,17 @@ function boot() {
   },true);
   const buildWallAtScreen=point=>{
     const rect=canvas.getBoundingClientRect();
-    let selected=null,best=55;
+    let selected=null,best=45;
     for(const wall of game.world.construction.wallEdges){
-      const center=wall.axis==='h'
-        ?new pc.Vec3((wall.i+.5)*.5,1.4,wall.j*.5)
-        :new pc.Vec3(wall.i*.5,1.4,(wall.j+.5)*.5);
-      const screen=camera.camera.worldToScreen(center);
-      const dist=Math.hypot(screen.x-(point.x-rect.left),screen.y-(point.y-rect.top));
-      if(dist<best){best=dist;selected=wall;}
+      const x=wall.axis==='h'?(wall.i+.5)*.5:wall.i*.5;
+      const z=wall.axis==='v'?(wall.j+.5)*.5:wall.j*.5;
+      // Screen rays hit walls above the floor. Accept taps near the base,
+      // middle or top (including CUT mode) instead of only a thin 1.4m line.
+      for(const height of [.12,.75,1.4,2.25]){
+        const p=camera.camera.worldToScreen(new pc.Vec3(x,height,z));
+        const dist=Math.hypot(p.x-(point.x-rect.left),p.y-(point.y-rect.top));
+        if(dist<best){best=dist;selected=wall;}
+      }
     }
     return selected;
   };
@@ -3739,9 +3801,10 @@ function boot() {
       }else stageBuild({type,edgeId:target?.id,at:to});
     }else if(type==='move-wall'){
       const target=wallEdge||buildWallAtScreen(gesturePoint(event));
-      stageBuild({type:'move-wall',edgeId:target?.id,
-        deltaI:target?.axis==='v'?Math.round((to.x-from.x)*2):0,
-        deltaJ:target?.axis==='h'?Math.round((to.z-from.z)*2):0});
+      if(target)selectBuildWall(target);
+      const dI=target?.axis==='v'?Math.round((to.x-from.x)*2):0;
+      const dJ=target?.axis==='h'?Math.round((to.z-from.z)*2):0;
+      if(dI||dJ)stageBuild({type:'move-wall',edgeId:target?.id,deltaI:dI,deltaJ:dJ});
     }else if(type!=='camera'){
       stageBuild(buildCommand(from,to));
     }
@@ -3900,10 +3963,13 @@ function boot() {
       }
       if(buildTool!=='camera'&&cameraGesture.count()===0){
         const raw=editorFloorAt(point);
-        if(raw){
+        const pickWall=['move-wall','door','window','erase-wall','remove-opening'].includes(buildTool);
+        const wallEdge=pickWall?buildWallAtScreen(point):null;
+        if(pickWall&&!wallEdge&&buildTool==='move-wall')
+          buildFeedback('Нажми на стену построенной комнаты для выбора или свайпни по пустому месту для камеры');
+        // Swiping empty background pans even when a wall tool is selected.
+        if(raw&&(!pickWall||wallEdge)){
           const from=buildSnap(raw);
-          const wallEdge=buildTool==='move-wall'?buildWallAtScreen(point)||
-            nearestConstructionEdge(game.world.construction,from,.75):null;
           buildDrag={pointerId:event.pointerId,from,to:from,last:point,wallEdge};
           showBuildGhost(from,from);return;
         }

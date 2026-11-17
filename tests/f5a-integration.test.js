@@ -40,3 +40,15 @@ test('F5-A browser graph actually exposes touch tools and runtime transaction wi
  assert.match(html,/src\/construction\.js\?v=.*f5a/);
  assert.ok(read('../src/construction.js').includes('export function constructionRooms'));
 });
+
+test('F5-A iPhone build defaults to camera pan, wall tool has direct resize affordances',()=>{
+ const html=read('../index.html'),game=read('../src/game.js'),css=read('../styles.css');
+ assert.match(html,/data-build-tool="camera" aria-pressed="true"/);
+ assert.match(html,/id="build-wall-expand"/);
+ assert.match(html,/id="build-wall-contract"/);
+ assert.match(game,/buildTool='camera'/);
+ assert.match(game,/oneFingerMode='pan';showCameraMode\(\)/);
+ assert.match(game,/selectBuildWall\(target\)/);
+ assert.match(game,/constructionWallOutward\(game\.world\.construction/);
+ assert.match(css,/\.build-wall-controls\[hidden\]/);
+});

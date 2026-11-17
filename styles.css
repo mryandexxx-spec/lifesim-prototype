@@ -1153,3 +1153,15 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 .build-pending button{min-height:44px;border-radius:11px;border:1px solid #c4dacc;background:#f8fbf5;
   padding:8px 10px;font-size:12px;font-weight:850;color:#336e50;}
 .build-pending #build-apply{background:#348063;border-color:#348063;color:#fff;}
+
+/* F5-A touch QA: camera first. Wall selection stays visible without requiring
+   millimetre-precise dragging at 390px portrait width. */
+.build-tools [data-build-tool="camera"]{background:#e5eef9;border-color:#b4cbeb;color:#285a82;}
+.build-tools [data-build-tool="camera"][aria-pressed="true"]{background:#286789;border-color:#286789;color:#fff;}
+.build-wall-controls{display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  border:1px solid #a9d2bf;background:#e9f6eb;border-radius:12px;padding:6px;}
+.build-wall-controls[hidden]{display:none!important;}
+.build-wall-controls strong{font-size:12px;color:#266044;flex:1;min-width:100%;line-height:1.2;}
+.build-wall-controls button{min-height:44px;flex:1;border:1px solid #b7d7c3;background:#fff;color:#266044;
+  border-radius:10px;font-size:12px;font-weight:850;padding:6px 9px;white-space:nowrap;}
+.build-wall-controls #build-wall-deselect{flex:0;min-width:44px;}

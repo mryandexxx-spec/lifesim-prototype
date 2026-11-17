@@ -90,6 +90,21 @@ export function constructionBounds(world){
   for(const k of cs){const [i,j]=k.split(',').map(Number);minI=Math.min(i,minI);maxI=Math.max(i+1,maxI);minJ=Math.min(j,minJ);maxJ=Math.max(j+1,maxJ);}
   return {minX:minI*BUILD_STEP,maxX:maxI*BUILD_STEP,minZ:minJ*BUILD_STEP,maxZ:maxJ*BUILD_STEP};
 }
+
+/** Direction of a room's outward-facing wall. For interior partitions returns null:
+ * no room ownership can be inferred from a single shared wall.
+ */
+export function constructionWallOutward(world,edgeId){
+  const w=world?.wallEdges?.find(w=>w.id===edgeId);
+  if(!w)return null;
+  const floors=topology(world).floors;
+  const sideA=w.axis==='v'?floors.has(cell(w.i-1,w.j)):floors.has(cell(w.i,w.j-1));
+  const sideB=floors.has(cell(w.i,w.j));
+  if(sideA===sideB)return null;
+  // A is west/north, B is east/south; move away from the occupied cell.
+  return sideA?1:-1;
+}
+
 export function nearestConstructionEdge(world,point,maxDistance=.38){
   if(!finite(point?.x)||!finite(point?.z))return null;
   let best=null,distance=Infinity;

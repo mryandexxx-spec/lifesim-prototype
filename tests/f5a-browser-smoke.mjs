@@ -46,7 +46,7 @@ try{
  // The projection uses the exact initial camera pose set by the build editor.
  const project=(x,z)=>{
    const yaw=42*Math.PI/180,pitch=64*Math.PI/180,distance=36;
-   const cx=11.5,cy=.62,cz=0,w=390,h=844;
+   const cx=14.5,cy=.62,cz=0,w=390,h=844;
    const px=cx+Math.sin(yaw)*Math.cos(pitch)*distance;
    const py=cy+Math.sin(pitch)*distance;
    const pz=cz+Math.cos(yaw)*Math.cos(pitch)*distance;
@@ -79,6 +79,32 @@ try{
    'Dragging an empty floor rectangle must stage an explicit build transaction');
  await page.locator('#build-apply').click();
  assert.ok(await page.locator('#build-pending').isHidden());
+ const wallTouch=project(18,0,1.4);
+ assert.ok(wallTouch.x>10&&wallTouch.x<380&&wallTouch.y>120&&wallTouch.y<565,
+   'Exterior wall must be reachable above the iPhone build panel');
+ await page.locator('[data-build-tool="move-wall"]').click();
+ await send('pointerdown',wallTouch,'canvas');
+ await send('pointerup',wallTouch,'window');
+ assert.ok(await page.locator('#build-wall-controls').isVisible(),
+   'A tap selects the physical outer wall and reveals resize controls');
+ assert.equal(await page.locator('#build-wall-expand').isDisabled(),false);
+ await page.locator('#build-wall-expand').click();
+ assert.ok(await page.locator('#build-pending').isVisible(),
+   'Expand stages a wall movement for explicit confirmation');
+ await page.locator('#build-apply').click();
+ assert.ok(await page.locator('#build-wall-controls').isHidden(),
+   'The selected edge ID must be cleared after wall geometry changes');
+ await page.locator('[data-build-tool="camera"]').click();
+ assert.equal(await page.locator('[data-build-tool="camera"]').getAttribute('aria-pressed'),'true');
+ const beforePan=await page.locator('#game-canvas').screenshot();
+ await send('pointerdown',{x:175,y:275},'canvas');
+ await send('pointermove',{x:245,y:305},'window');
+ await send('pointerup',{x:245,y:305},'window');
+ await page.waitForTimeout(250);
+ const afterPan=await page.locator('#game-canvas').screenshot();
+ assert.notDeepEqual(afterPan,beforePan,'One-finger swipe must actually pan the 3D camera');
+ assert.ok(await page.locator('#build-pending').isHidden(),
+   'A camera swipe must never change layout or stage a build');
  await page.screenshot({path:'f5a-browser-build.png'});
  await page.locator('#build-exit').click();
  assert.equal(await page.locator('#build-toggle').getAttribute('aria-pressed'),'false');
@@ -91,6 +117,8 @@ try{
  assert.ok(saved.world.construction.wallEdges.length>32,'Touch-drawn room added real wall segments');
  assert.ok(saved.world.construction.revision>door.world.revision,'Dragged floor edit persisted');
  assert.equal(saved.world.construction.openings.length,1);
+ assert.ok(saved.world.construction.wallEdges.some(w=>w.axis==='v'&&w.i===37&&w.j===0),
+   '0.5m wall-expansion nudge moved the selected outer boundary');
  assert.equal(saved.world.construction.schema,1);
  console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));
