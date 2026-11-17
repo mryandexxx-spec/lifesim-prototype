@@ -18,6 +18,8 @@ import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
 import {consumeCalendarReminders} from './calendar-reminders.js';
 import {createCareerPhoneUI} from './career-phone-ui.js';
+import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
+  residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
@@ -1596,11 +1598,23 @@ $('auto-btn').addEventListener('click', () => {
     : 'Автономность выключена. Оба жителя ждут твоих команд.');
 });
 updateAutoButton();
+// The compact career line follows the selected person, even while the avatar
+// is physically away. It does not create a second work clock or state.
+const workHud=document.createElement('small');
+workHud.id='career-work-hud';
+workHud.className='career-work-hud';
+$('resident-name').insertAdjacentElement('afterend',workHud);
+function updateCareerHud(){
+  const status=residentWorkStatus(game,game.selectedSim);
+  workHud.hidden=!status;
+  workHud.textContent=status?.label||'';
+}
 function updateResidentPicker() {
   for (const id of HOUSEHOLD_IDS) {
     $('pick-'+id).setAttribute('aria-pressed',String(game.selectedSim===id));
   }
   $('resident-name').textContent=selectedName();
+  updateCareerHud();
   $('avatar-symbol').textContent=game.selectedSim==='alex' ? '☺' : '✿';
   $('mind-panel').setAttribute('aria-label','Внутренний мир: '+selectedName());
   $('mind-person').textContent=selectedName().toUpperCase()+' / ВНУТРЕННИЙ МИР';
@@ -1624,8 +1638,7 @@ for (const id of HOUSEHOLD_IDS) {
   });
 }
 updateResidentPicker();
-// W1-B.2a: select a resident, take out an original phone and sign a real contract.
-// Actual work-presence and wages remain separate future W1-B slices.
+// W1-B.3a: the existing phone now shows live shift presence, pay and attendance.
 const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
   getRoot:()=>game,
@@ -3133,6 +3146,11 @@ function boot() {
 
   // Meet beside the other resident at a walkable, reachable point.
   beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null,branchId=null,fromQueue=false)=>{
+    if(residentUnavailableForHome(game,actorId)||
+       residentUnavailableForHome(game,actorId==='alex'?'mira':'alex')){
+      if(!automatic&&!fromQueue)toast('Один из жителей сейчас на работе');
+      return false;
+    }
     if(!canStartSocial(game,kind,actorId,automatic)){
       if(!automatic&&!fromQueue)toast('Собеседник занят или разговор уже идёт');
       return false;
@@ -3221,7 +3239,8 @@ function boot() {
     const refused=[];
     const started=dispatchActionQueues(game.actionQueues,{
       canStart(residentId,command){
-        if(!HOUSEHOLD_IDS.includes(residentId)||game.socialAction)return false;
+        if(!HOUSEHOLD_IDS.includes(residentId)||game.socialAction||
+           residentUnavailableForHome(game,residentId))return false;
         if((routeRetryAt.get(command.seq)||0)>performance.now())return false;
         const actor=getActor(game,residentId);
         if(actor.action||sofaStates[residentId].progress>0||
@@ -3251,7 +3270,8 @@ function boot() {
         if(!HOUSEHOLD_IDS.includes(partnerId)||partnerId===residentId||
           (residentId==='alex'?'mira':'alex')!==partnerId)return false;
         const partner=getActor(game,partnerId);
-        if(partner.action||sofaStates[partnerId].progress>0||
+        if(residentUnavailableForHome(game,partnerId)||
+           partner.action||sofaStates[partnerId].progress>0||
           bedStates[partnerId].progress>0||showerStates[partnerId].active||
           toiletStates[partnerId].active||fridgeLeaving[partnerId])return false;
         // Older personal plans of the invitee take priority over new invites.
@@ -5338,6 +5358,7 @@ function boot() {
     // controlled only by ConstructionWorld, so pause/reload cannot trap a sim.
     for(const door of automaticDoors){
       const nearby=!buildMode&&HOUSEHOLD_IDS.some(id=>{
+        if(residentAwayAtWork(game,id))return false;
         const pos=getActor(game,id).position;
         return Math.hypot(pos.x-door.x,pos.z-door.z)<1.72;
       });
@@ -5369,7 +5390,15 @@ function boot() {
           game.socialAction?.shared||game.socialAction?.branchAction
           ?null:game.socialAction?.kind;
         const priorCalendarMinute=game.minutes;
-        tickHousehold(game,.30 * game.speed); // Both share the clock; no double advancement.
+        const careerEvents=tickHousehold(game,.30 * game.speed)||[];
+        // Persistent shift state, credited money and receipts must share one
+        // localStorage snapshot; never wait for the eight-second autosave.
+        if(careerEvents.length){
+          save(true);
+          updateCareerHud();
+          if(careerEvents.length===1)toast('💼 '+careerEvents[0].text);
+          else toast('💼 '+careerEvents.map(entry=>entry.text).join(' · '));
+        }
         const dueReminders=consumeCalendarReminders(game.calendar,priorCalendarMinute,game.minutes);
         if(dueReminders.messages.length){
           game.calendar=dueReminders.calendar;save(true);
@@ -5409,6 +5438,52 @@ function boot() {
         if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0||
           showerStates[residentId].active||toiletStates[residentId].active||
           fridgeLeaving[residentId])continue;
+        // Career travel uses the SAME pathfinder and same walking animation
+        // as household actions. No imaginary second scene or game timer.
+        const work=game.careerSystem?.byResident?.[residentId]?.currentShift;
+        if(work?.phase==='returning'){
+          resident.position=nearestWalkable({x:-.65,z:3.45},game.world);
+          finishCareerReturn(game,residentId);
+          paths[residentId]={points:null,index:0,id:null};
+          restartAutonomyWait(residentId);
+          save(true);updateCareerHud();
+          toast(getActorName(residentId)+' вернулся домой');
+          continue;
+        }
+        if(work?.phase==='departing'){
+          const goal=nearestWalkable({x:-.65,z:3.45},game.world);
+          const routeId='career-exit:'+work.id;
+          let route=paths[residentId];
+          if(route.id!==routeId||!route.points){
+            const points=findPath(resident.position,goal,game.world);
+            route=paths[residentId]={points:points||[],index:0,id:routeId};
+          }
+          let remaining=dt*1.65*game.speed,hops=0;
+          while(route.index<route.points.length&&remaining>0&&hops++<12){
+            const next=route.points[route.index];
+            const dx=next.x-resident.position.x,dz=next.z-resident.position.z;
+            const distance=Math.hypot(dx,dz);
+            if(distance<.0001){route.index++;continue;}
+            const heading=Math.atan2(dx,dz)*180/Math.PI;
+            if(residentId==='alex')facing=heading;else miraFacing=heading;
+            const step=Math.min(distance,remaining);
+            resident.position.x+=dx/distance*step;
+            resident.position.z+=dz/distance*step;
+            remaining-=step;
+            if(distance-step<.0001){resident.position={...next};route.index++;}
+          }
+          if(route.index>=route.points.length){
+            const fallback=route.points.length===0;
+            if(arriveCareerPortal(game,residentId,game.minutes)){
+              paths[residentId]={points:null,index:0,id:null};
+              save(true);updateCareerHud();
+              toast(getActorName(residentId)+(fallback?' отправился на работу (путь недоступен)':
+                ' вышел через вход и отправился на работу'));
+            }
+          }
+          continue;
+        }
+        if(work?.phase==='working')continue;
         const socialWalking=Boolean(socialWalkingFor(residentId));
         const pairedPlan=socialWalking
           ?game.socialAction?.shared?.tvPlan||game.socialAction?.shared?.pairPlan:null;
@@ -5645,7 +5720,7 @@ function boot() {
     const alexReadingSeated=readingIsSeated(game.action);
     const walking=frameActive&&((game.action?.phase==='walking'&&
       (game.action.id!=='hobby'||Boolean(readingRouteId(game.action))))||
-      socialWalkingFor('alex'));
+      socialWalkingFor('alex')||residentWorkPhase(game,'alex')==='departing');
     const alexWatchSeat=useId==='tv'
       ?(pairedTv?.places?.alex?.seatId||game.action?.watchSeatInstanceId):null;
     const alexDateSofa=romanticSofa.active;
@@ -5815,7 +5890,7 @@ function boot() {
     const miraReadingSeated=readingIsSeated(game.otherSim.action);
     const miraWalking=frameActive&&((game.otherSim.action?.phase==='walking'&&
       (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
-      socialWalkingFor('mira'));
+      socialWalkingFor('mira')||residentWorkPhase(game,'mira')==='departing');
     const miraWatchSeat=miraUseId==='tv'
       ?(pairedTv?.places?.mira?.seatId||game.otherSim.action?.watchSeatInstanceId):null;
     const miraDateSofa=romanticSofa.active;
@@ -5950,7 +6025,8 @@ function boot() {
     // entry/exit. The original game owns shower water, cover, full avatar
     // privacy and all simulation/save state; no private body is visible.
     const miraMeshShown=meshyMira.update({
-      preferred:meshyPreferred,paused:!frameActive,dt:frameAnimDt,
+      preferred:meshyPreferred&&!residentAwayAtWork(game,'mira'),
+      paused:!frameActive,dt:frameAnimDt,
       walking:((game.otherSim.action?.phase==='walking'&&
         (game.otherSim.action.id!=='hobby'||Boolean(readingRouteId(game.otherSim.action))))||
         socialWalkingFor('mira'))&&
@@ -5993,7 +6069,8 @@ function boot() {
     // skeleton controllers exist. The original simulation/root still owns
     // mattress placement, both bed slots, shower movement and opaque privacy.
     const meshyShown=meshyAlex.update({
-      preferred:meshyPreferred,paused:!frameActive,dt:frameAnimDt,
+      preferred:meshyPreferred&&!residentAwayAtWork(game,'alex'),
+      paused:!frameActive,dt:frameAnimDt,
       // Preserve the Walking clip on pause: playback freezes but the
       // resident has not arrived at the destination.
       walking:((game.action?.phase==='walking'&&
@@ -6074,8 +6151,14 @@ function boot() {
         dish.food.setLocalScale(.23*size,.075,.18*size);
       }
     }
-    alexSelected.enabled=game.selectedSim==='alex' && !using;
-    miraSelected.enabled=game.selectedSim==='mira' && !miraUsing;
+    // Imported GLB roots are outside the legacy avatar hierarchy, hence
+    // BOTH the skin preference and the procedural rig must hide off-lot sims.
+    avatar.enabled=!residentAwayAtWork(game,'alex');
+    miraAvatar.enabled=!residentAwayAtWork(game,'mira');
+    alexSelected.enabled=game.selectedSim==='alex' && !using &&
+      !residentAwayAtWork(game,'alex');
+    miraSelected.enabled=game.selectedSim==='mira' && !miraUsing &&
+      !residentAwayAtWork(game,'mira');
     // F4G appliance animation is visual-only; only the domain mints meals and XP.
     for(const item of game.world.furniture.instances){
       if(!['stove','prep','sink'].includes(item.prefabId))continue;
