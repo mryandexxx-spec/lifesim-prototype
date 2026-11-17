@@ -706,6 +706,18 @@ export function tickHousehold(root,minutes) {
   other.speed=root.speed;
   other.autonomy.enabled=root.autonomy.enabled;
   replenishKitchen(root.kitchen,root.minutes);
+  // A removed/moved sink cannot clean dishes from afar or from storage.
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),action=actor?.action;
+    if(action?.id!=='wash')continue;
+    const target=furnitureActionApproach(root.world,'wash',action.targetInstanceId);
+    if(!target||root.kitchen.dirtyDishes===0||
+      (action.phase==='using'&&Math.hypot(
+        actor.position.x-target.x,actor.position.z-target.z)>.5)){
+      actor.action=null;
+      actor.event='Мойка недоступна или посуды больше нет';
+    }
+  }
   // Kitchen preflight: a moved/stored source or an interrupted resident
   // cannot finish a ghost dish. Check on every active simulation step.
   for(const id of HOUSEHOLD_IDS){
