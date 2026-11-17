@@ -57,14 +57,14 @@ const markup=`
 <p id="lc-holiday-error" class="lc-error" role="alert" hidden></p>
 <div class="lc-form-actions"><button type="button" id="lc-holiday-back">Назад</button><button type="button" id="lc-holiday-delete">Удалить</button><button type="submit">Сохранить</button></div>
 </form></div>`;
-export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor}){
+export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClose=()=>{}}){
  const wrap=document.createElement('section');wrap.id='life-calendar';wrap.className='life-calendar';wrap.hidden=true;wrap.innerHTML=markup;host.append(wrap);
  const el=id=>wrap.querySelector('#'+id),eventForm=el('lc-event-form'),holidayForm=el('lc-holiday-form');
  const field=(f,name)=>f.elements.namedItem(name),browse=el('lc-browse');
  let view='month',selected=null,editing=null,holidayEditing=null,cache='';
  const today=()=>calendarAt(getRoot().calendar,getRoot().minutes).iso;
  function commit(calendar){setCalendar(calendar);cache='';}
- function close(){wrap.hidden=true;eventForm.hidden=true;holidayForm.hidden=true;editing=null;holidayEditing=null;}
+ function close(){wrap.hidden=true;eventForm.hidden=true;holidayForm.hidden=true;editing=null;holidayEditing=null;onClose();}
  function back(){browse.hidden=false;eventForm.hidden=true;holidayForm.hidden=true;editing=null;holidayEditing=null;}
  function open(){selected=selected||today();wrap.hidden=false;back();cache='';render();el('lc-close').focus({preventScroll:true});}
  function move(n){

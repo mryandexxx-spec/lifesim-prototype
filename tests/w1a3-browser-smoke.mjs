@@ -92,6 +92,7 @@ try {
  assert.ok(await page.locator('#game-canvas').isVisible());
  await page.locator('#lc-close').click();
  assert.ok(await page.locator('#life-calendar').isHidden());
+ assert.equal(await page.locator('#calendar-anchor-toggle').getAttribute('aria-expanded'),'false');
  assert.equal(errors.length,0,errors.join('\n'));
  console.log('W1-A.3 WebGL mobile calendar CRUD/week/day/reload succeeded');
 }finally{await browser.close();}
