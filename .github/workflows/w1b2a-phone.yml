@@ -1,0 +1,37 @@
+name: W1-B.2a career phone PlayCanvas browser QA
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  career-phone-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install deterministic dependencies
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Validate JS and run 390x844 PlayCanvas/WebGL career phone flow
+        run: |
+          node --check src/game.js
+          node --check src/career-job-board.js
+          node --check src/career-phone-ui.js
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/w1b2a-http.log 2>&1 &
+          sleep 2
+          node tests/w1b2a-browser-smoke.mjs
+      - name: Save visual snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w1b2a-career-phone-screenshot
+          path: w1b2a-phone-smoke.png
+          if-no-files-found: ignore

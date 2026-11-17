@@ -17,6 +17,7 @@ import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivil
 import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
 import {consumeCalendarReminders} from './calendar-reminders.js';
+import {createCareerPhoneUI} from './career-phone-ui.js';
 import { findPath, nearestWalkable } from './navigation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
@@ -326,6 +327,7 @@ const META = {
     icon:'♫',anchor:[0,1.1,0]}
 };
 
+let updatePhoneProps=()=>{}; // Cosmetic phone mesh is bound when the 3D rigs exist.
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
 let buildMode=false; // F5-A separate pause-on-editor; house geometry persists, UI mode does not.
 let selected = null;
@@ -1611,6 +1613,7 @@ function updateResidentPicker() {
 }
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
+    careerPhone.close({focus:false});
     selectResident(game,id);closeInsightPanel();
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
@@ -1621,6 +1624,19 @@ for (const id of HOUSEHOLD_IDS) {
   });
 }
 updateResidentPicker();
+// W1-B.2a: select a resident, take out an original phone and sign a real contract.
+// Actual work-presence and wages remain separate future W1-B slices.
+const careerPhone=createCareerPhoneUI({
+  host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
+  getRoot:()=>game,
+  setCareerSystem:state=>{game.careerSystem=state;calendarUI.refresh();},
+  save,notify:toast,onOpenChange:id=>updatePhoneProps(id),
+  canOpen:()=>!furnishMode&&!buildMode&&!dialogueNeedsDecision(game),
+  beforeOpen:()=>{
+    calendarUI.close();closeCalendarAnchorPanel();
+    closeMindPanel();closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);
+  }
+});
 // Presentation-only HUD preference: never touches simulation or household saves.
 createHudPanel({
   panel:$('dashboard'),toggle:$('hud-toggle'),
@@ -1634,6 +1650,7 @@ createHudPanel({
 $('save-btn').addEventListener('click', () => save());
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
+  careerPhone.close({focus:false});
   const enabled = game.autonomy.enabled;
   game = newHousehold();
   setHouseholdAutonomy(game, enabled); // Keep the player's chosen play style.
@@ -2834,6 +2851,26 @@ function boot() {
     if(status==='ready'||status==='error')loadingProgress.finish('mira',status==='ready');
     if(error)console.warn('Meshy Mira visual unavailable',error);
   }});
+  // A small original 3D smartphone is held near the existing right-hand pivot.
+  // Create it AFTER Meshy captures legacy renderers, so it stays visible even
+  // with imported skinned visuals; no collider or gameplay state is introduced.
+  const phoneMeshes={},phoneReveal={alex:0,mira:0};
+  for(const [id,rig] of [['alex',alexRig],['mira',miraRig]]){
+    const phone=new pc.Entity('Phone held by '+id);
+    rig.elbowPivot[1].addChild(phone);
+    phone.setLocalPosition(0,-.245,.17);
+    phone.setLocalEulerAngles(-24,0,14);
+    box('Phone back '+id,0,0,0,.145,.265,.040,M.dark,phone);
+    box('Phone lit screen '+id,0,0,.025,.118,.231,.012,M.mint,phone);
+    phone.enabled=false;phoneMeshes[id]=phone;
+  }
+  updatePhoneProps=id=>{
+    for(const [key,phone] of Object.entries(phoneMeshes)){
+      phone.enabled=key===id;phoneReveal[key]=0;
+      phone.setLocalScale(.06,.06,.06);
+    }
+  };
+  updatePhoneProps(careerPhone.isOpen()?game.selectedSim:null);
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
   // F4F.1: entirely cosmetic chair draw-out. Keep the selected table/seat
@@ -5289,6 +5326,12 @@ function boot() {
   const approachAngle=(a,b,rate,dt)=>a+((((b-a+540)%360)+360)%360-180)*(1-Math.exp(-rate*dt));
   app.on('update',dt=>{
     dt=Math.min(dt,.06);
+    // Cosmetic 0.3s phone raise/reveal; never affects animation controller or clock.
+    for(const [id,phone] of Object.entries(phoneMeshes))if(phone.enabled&&phoneReveal[id]<1){
+      phoneReveal[id]=Math.min(1,phoneReveal[id]+dt*3.8);
+      const eased=1-Math.pow(1-phoneReveal[id],3);
+      phone.setLocalScale(eased,eased,eased);
+    }
     // Reset / reload may replace construction object; rebuild only when identity changes.
     syncConstructionRender();
     // Visual auto-opening is deliberately non-physical: doorway clearance is
