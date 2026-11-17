@@ -1,0 +1,49 @@
+name: F5-A construction WebGL Safari-size smoke
+on:
+  push:
+    branches:
+      - feature/f5a-construction-20261117
+  pull_request:
+    paths:
+      - 'src/construction.js'
+      - 'src/navigation.js'
+      - 'src/household.js'
+      - 'src/game.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'tests/f5a-browser-smoke.mjs'
+      - '.github/workflows/f5a-browser-checks.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  construction-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: |
+          node --check src/game.js
+          node --check src/construction.js
+          node --check src/navigation.js
+          node --check src/household.js
+          npm test
+      - run: npm install --no-save playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - name: Serve production module graph with pinned PlayCanvas
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/f5a-http.log 2>&1 &
+      - name: Real WebGL touch panel, save and reload smoke
+        run: node tests/f5a-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: f5a-browser-screenshot
+          path: f5a-browser-build.png
+          retention-days: 7
