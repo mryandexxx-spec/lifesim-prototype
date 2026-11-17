@@ -262,6 +262,41 @@ try{
   const restoredB4=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
   assert.equal(restoredB4.world.construction.materials.ceiling['32,0'],'ceiling.blue');
   assert.equal(restoredB4.world.construction.materials.floor['32,0'],'floor.planks-z');
+  // F5-C.1: author a real roof, change its shape and reload with PlayCanvas.
+  await page.locator('#build-toggle').click();
+  await page.locator('[data-build-tool="roof-auto"]').click();
+  assert.ok(await page.locator('#build-roof-picker').isVisible());
+  assert.ok(await page.locator('#build-pending').isVisible(),
+    'Auto roof must stage rather than commit immediately');
+  await page.locator('#build-apply').click();
+  const roofSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.equal(roofSave.world.construction.roofAuto,true);
+  assert.ok(roofSave.world.construction.roofModules.length>=1);
+  assert.equal(await page.locator('#build-roof-toggle').getAttribute('aria-pressed'),'true');
+  await page.screenshot({path:'f5c1-auto-roof.png'});
+  await page.locator('[data-build-tool="roof-edit"]').click();
+  const roofTap=project(16,0);
+  await send('pointerdown',roofTap,'canvas');
+  await send('pointerup',roofTap,'window');
+  assert.match(await page.locator('#build-roof-tip').innerText(),/Секция выбрана/);
+  await page.locator('[data-roof-choice="roof.hip"]').click();
+  assert.ok(await page.locator('#build-pending').isVisible());
+  await page.locator('#build-apply').click();
+  const hipSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.ok(hipSave.world.construction.roofModules.some(m=>m.styleId==='roof.hip'));
+  await page.screenshot({path:'f5c1-hip-roof.png'});
+  await page.locator('#build-roof-toggle').click();
+  assert.equal(await page.locator('#build-roof-toggle').getAttribute('aria-pressed'),'false');
+  await page.locator('#build-exit').click();
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
+  const afterRoofReload=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  assert.deepEqual(afterRoofReload.world.construction.roofModules,
+    hipSave.world.construction.roofModules);
+  await page.locator('#build-toggle').click();
+  assert.equal(await page.locator('#build-roof-toggle').getAttribute('aria-pressed'),'false',
+    'A roof never covers the life view or starts visible by default');
+  await page.locator('#build-exit').click();
   console.log(JSON.stringify({errors,wallEdges:saved.world.construction.wallEdges.length,
   openings:saved.world.construction.openings.length,buildModeToggle:'ok'},null,2));
  assert.deepEqual(errors,[],'Real PlayCanvas/ES module browser runtime must not error');
