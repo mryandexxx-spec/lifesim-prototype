@@ -1217,3 +1217,9 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 /* F5-B.3: no special starter-house wall-selection panel. Both old and new
    walls are picked directly on the same PlayCanvas canvas. */
 .build-starter-picker,[data-starter-side]{display:none!important;}
+
+/* F5-B.4: ceiling visibility and pattern palette stay usable on iPhone. */
+#build-finish-tip{font-size:10px;line-height:1.3;color:#526f5f;}
+.build-walls{flex-wrap:wrap;min-width:0;}
+.build-walls button{flex:1 1 65px;min-width:58px;}
+#build-ceiling-toggle[aria-pressed="true"]{background:#347b61;color:#fff;}
