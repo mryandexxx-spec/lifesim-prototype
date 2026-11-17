@@ -77,7 +77,7 @@ test('F5-B.2 replace keeps opening ID while changing width, type and A* access',
 
 test('F5-B.2 replacement rejects adjacent overlapping openings and invalid styles',()=>{
  const base=room(),first=edit(base,{type:'door',edgeId:'v:36,-2'});
- const second=edit(first,{type:'window',edgeId:'v:36,2'});
+ const second=edit(first,{type:'window',edgeId:'v:36,1'});
  assert.equal(second.openings.length,2);
  assert.equal(proposeConstructionEdit(second,{type:'change-opening',
    id:first.openings[0].id,styleId:'door.double'}).reason,'opening-overlap');
