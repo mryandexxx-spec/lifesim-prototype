@@ -9,7 +9,7 @@ import {describeFurnitureValue} from '../src/furniture-value.js';
 
 test('F4a shop shows one honest use description for each of the six items',()=>{
   const listing=marketListing().slice(0,10);
-  assert.equal(marketListing().length,37);
+  assert.equal(marketListing().length,43);
   assert.equal(listing.length,SHOP_ITEMS.length+4);
   for(const item of listing){
     assert.equal(typeof item.effectText,'string');
