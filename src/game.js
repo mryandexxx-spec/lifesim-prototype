@@ -2050,15 +2050,67 @@ function boot() {
     legacySkirts[1].setLocalScale(.13,.18,8.5+s-n);
     starterBackDecor.setPosition(0,0,n);
     starterLeftDecor.setPosition(w,0,0);
-    for(const wall of legacyWallNodes)wall.enabled=raised;
-    for(const wall of legacySkirts)wall.enabled=true;
+    const removedStarter=new Set(state.starterRemoved||[]);
+    const openingStarter=new Set(state.openings.flatMap(o=>o.edgeIds));
+    const originalSegments=starterShellSegments(state);
+    const changedStarter=new Set(originalSegments.filter(edge=>
+      removedStarter.has(edge.id)||openingStarter.has(edge.id)).map(edge=>edge.starterSide));
+    const solidStarter=new Set(state.starterSolidSides||[]);
+    // Original walls are still 100% their authored procedural material until
+    // first edit. Afterwards, rebuild only that side from physical half-meter
+    // sections: it is impossible for a long opaque box to cover a doorway.
+    legacyWallNodes[0].enabled=raised&&!changedStarter.has('north');
+    legacyWallNodes[2].enabled=raised&&!changedStarter.has('north');
+    legacyWallNodes[1].enabled=raised&&!changedStarter.has('west');
+    legacyWallNodes[3].enabled=raised&&!changedStarter.has('west');
+    legacySkirts[0].enabled=!changedStarter.has('north');
+    legacySkirts[1].enabled=!changedStarter.has('west');
+    for(const node of starterBackWindowNodes)node.enabled=!starterBackWindowCovered(state);
+    const originalLines={north:-4.34+n,west:-4.97+w,south:4.34+s,east:14.25+e};
+    const drawStarterSide=side=>{
+      const sections=originalSegments.filter(e=>e.starterSide===side&&
+        !removedStarter.has(e.id)&&!openingStarter.has(e.id));
+      if(!sections.length)return;
+      const axis=sections[0].axis,point=e=>axis==='h'?e.i:e.j;
+      sections.sort((a,b)=>point(a)-point(b));
+      let first=sections[0],last=first;
+      const flush=()=>{
+        const length=(point(last)-point(first)+1)*.5;
+        const center=(point(last)+point(first)+1)*.25;
+        const x=axis==='h'?center:originalLines[side];
+        const z=axis==='v'?center:originalLines[side];
+        const front=side==='south'||side==='east';
+        if(constructionWallMode==='down'||(front&&constructionWallMode==='cut')){
+          buildBox('F5-B.3 original wall cut outline',x,.135,z,
+            axis==='h'?length:.14,.18,axis==='v'?length:.14,M.trim);
+        }else{
+          buildBox('F5-B.3 original structural wall',x,1.4,z,
+            axis==='h'?length:.16,2.9,axis==='v'?length:.16,
+            side==='west'?M.wall2:M.wall);
+          buildBox('F5-B.3 original coping',x,2.91,z,
+            axis==='h'?length:.2,.13,axis==='v'?length:.2,M.trim);
+        }
+        // Painted trim follows the same physical spans, never a deleted hole.
+        if(!(front&&constructionWallMode==='cut'))
+          buildBox('F5-B.3 original baseboard',x,.16,z,
+            axis==='h'?length:.14,.18,axis==='v'?length:.14,M.trim);
+      };
+      for(const next of sections.slice(1)){
+        if(point(next)===point(last)+1){last=next;continue;}
+        flush();first=next;last=next;
+      }flush();
+    };
+    for(const side of ['north','west','east','south'])
+      if(changedStarter.has(side)||solidStarter.has(side))drawStarterSide(side);
     // The old apartment has an open front/right cutaway. Render their
     // editable boundary lines in Build; never create a surprise A* barrier.
     if(buildMode){
-      buildBox('F5 starter front edge',widthCenter,.092,4.5+s,
-        19+e-w,.12,.11,M.trim);
-      buildBox('F5 starter right edge',14+e,.092,depthCenter,
-        .11,.12,9+s-n,M.trim);
+      if(!solidStarter.has('south'))
+        buildBox('F5 starter front edge',widthCenter,.092,4.5+s,
+          19+e-w,.12,.11,M.trim);
+      if(!solidStarter.has('east'))
+        buildBox('F5 starter right edge',14+e,.092,depthCenter,
+          .11,.12,9+s-n,M.trim);
     }
     if(state.legacy){
       if(constructionWallMode==='up'){
@@ -2088,9 +2140,8 @@ function boot() {
         start=i;previous=i;
       }
     }
-    const opened=new Map();
+    const opened=new Map(),originalById=new Map(originalSegments.map(w=>[w.id,w]));
     for(const opening of state.openings)for(const id of opening.edgeIds)opened.set(id,opening);
-    const drawn=new Set();
     // Solid wall runs are coalesced into a handful of draw calls per uninterrupted stretch.
     const byLine=new Map();
     for(const w of state.wallEdges){
@@ -2126,14 +2177,18 @@ function boot() {
     // variant ID chooses the procedural frame, panel and window proportions.
     // A 2m opening is physically four .5m segments in both render and A*.
     for(const opening of state.openings){
-      const edges=opening.edgeIds.map(id=>state.wallEdges.find(w=>w.id===id)).filter(Boolean);
+      const edges=opening.edgeIds.map(id=>state.wallEdges.find(w=>w.id===id)||
+        originalById.get(id)).filter(Boolean);
       if(!edges.length)continue;
       const variantId=constructionOpeningStyle(opening);
       const design=BUILD_OPENING_STYLES[variantId];
       if(!design)continue;
       const axis=edges[0].axis,wide=design.sections===4;
-      const x=axis==='h'?edges.reduce((n,w)=>n+w.i,0)/edges.length*.5+.25:edges[0].i*.5;
-      const z=axis==='v'?edges.reduce((n,w)=>n+w.j,0)/edges.length*.5+.25:edges[0].j*.5;
+      const side=edges[0].starterSide;
+      const x=side==='west'||side==='east'?originalLines[side]:
+        axis==='h'?edges.reduce((n,w)=>n+w.i,0)/edges.length*.5+.25:edges[0].i*.5;
+      const z=side==='north'||side==='south'?originalLines[side]:
+        axis==='v'?edges.reduce((n,w)=>n+w.j,0)/edges.length*.5+.25:edges[0].j*.5;
       const width=edges.length*.5,window=design.type==='window';
       const spanX=val=>axis==='h'?val:.15;
       const spanZ=val=>axis==='v'?val:.15;
@@ -2224,8 +2279,10 @@ function boot() {
     // UP mode adds former open-front boundaries for an exterior view only.
     // These are cosmetic: no surprise path block in legacy saves.
     if(exterior){
-      buildBox('F5 legacy front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
-      buildBox('F5 legacy right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
+      if(!solidStarter.has('south'))
+        buildBox('F5 legacy front up',widthCenter,1.4,4.34+s,width,2.9,.16,M.wall);
+      if(!solidStarter.has('east'))
+        buildBox('F5 legacy right up',14.25+e,1.4,depthCenter,.16,2.9,depth,M.wall);
     }
   };
   syncConstructionRender(true);
