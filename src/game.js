@@ -1629,10 +1629,11 @@ updateResidentPicker();
 const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
   getRoot:()=>game,
-  setCareerSystem:state=>{game.careerSystem=state;},
+  setCareerSystem:state=>{game.careerSystem=state;calendarUI.refresh();},
   save,notify:toast,onOpenChange:id=>updatePhoneProps(id),
   canOpen:()=>!furnishMode&&!buildMode&&!dialogueNeedsDecision(game),
   beforeOpen:()=>{
+    calendarUI.close();closeCalendarAnchorPanel();
     closeMindPanel();closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);
   }
 });
