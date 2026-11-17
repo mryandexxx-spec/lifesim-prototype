@@ -179,7 +179,7 @@ test('Safari import map busts every modified H2 dependency, not only the game en
     assert.ok(new URL(imports[key],base).search.startsWith(expected[name]),
       key+' must retain its established cache history');
     if(['household','furniture-layout','furniture-shop'].includes(name))
-      assert.match(new URL(imports[key],base).search,/-f5a$/);
+      assert.match(new URL(imports[key],base).search,/-f5a(?:-|$)/); // later features may extend cache history
     // A nested ./foo.js import in an ES module beneath src/ resolves to
     // precisely this import-map key, irrespective of the parent module URL.
     assert.equal(new URL(key,base).href,
