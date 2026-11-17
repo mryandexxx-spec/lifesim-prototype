@@ -118,7 +118,8 @@ test('F5-B.3 explicit view remains free of duplicate preexisting walls',()=>{
  const newRoom=edit(world,{type:'room',from:{x:12,z:4.5},to:{x:16,z:6.5}});
  assert.ok(newRoom.wallEdges.some(w=>w.axis==='h'&&w.j===13));
  const matching=[...newRoom.wallEdges].filter(w=>w.id==='h:24,9');
- assert.equal(matching.length,0,'the baseline south shell segment is reused');
+ assert.equal(matching.length,1,
+   'F5-A shared structural partition IDs survive even alongside the starter cutaway');
 });
 test('F5-B.3 old schema sanitizes out-of-range starter holes and invalid sides',()=>{
  const base=edit(w(),{type:'window',edgeId:segment(w(),'north',21).id});
