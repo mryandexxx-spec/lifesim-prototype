@@ -34,9 +34,9 @@ export function roofRect(from,to){
   if(i1-i0<4||j1-j0<4)return null;
   return {i0,i1,j0,j1};
 }
-export function roofRectSupported(rect,floorCells){
+export function roofRectSupported(rect,floorCells,{minSections=4}={}){
   if(!rect||!['i0','i1','j0','j1'].every(k=>isInt(rect[k])))return false;
-  if(rect.i1-rect.i0<4||rect.j1-rect.j0<4||
+  if(rect.i1-rect.i0<minSections||rect.j1-rect.j0<minSections||
     rect.i0< -18||rect.i1>46||rect.j0< -24||rect.j1>24)return false;
   if((rect.i1-rect.i0)*(rect.j1-rect.j0)>4000)return false;
   const floors=floorCells instanceof Set?floorCells:new Set(floorCells);
@@ -53,7 +53,7 @@ export function validRoofSettings(raw){
 }
 export function validRoofModule(raw,floors,usedIds=new Set(),accepted=[]){
   if(!raw||typeof raw.id!=='string'||!/^roof-(?:[0-9]+|auto:-?[0-9]+:-?[0-9]+:-?[0-9]+:-?[0-9]+)$/.test(raw.id)||
-    usedIds.has(raw.id)||!roofRectSupported(raw,floors)||
+    usedIds.has(raw.id)||!roofRectSupported(raw,floors,{minSections:raw.id.startsWith('roof-auto:')?1:4})||
     accepted.some(other=>roofsOverlap(other,raw)))return null;
   const settings=validRoofSettings(raw);
   if(!settings)return null;
@@ -100,8 +100,7 @@ export const roofAutomaticModules=(floorCells,settings)=>{
   if(!validRoofSettings(settings))return null;
   const rectangles=automaticRoofRects(floorCells);
   if(!rectangles.length||rectangles.length>ROOF_MAX_MODULES||
-    rectangles.some(rect=>!roofRectSupported(rect,floorCells)||
-      rect.i1-rect.i0<4||rect.j1-rect.j0<4))return null;
+    rectangles.some(rect=>!roofRectSupported(rect,floorCells,{minSections:1})))return null;
   return rectangles.map(rect=>({
     id:'roof-auto:'+rect.i0+':'+rect.j0+':'+rect.i1+':'+rect.j1,
     ...rect,...validRoofSettings(settings)
