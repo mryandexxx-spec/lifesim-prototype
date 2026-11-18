@@ -1439,3 +1439,9 @@ button.time-card:active {transform:translateY(1px);}
   .career-phone-frame{height:calc(100dvh - 24px);}
   .career-phone-header{padding:10px 14px;}
 }
+
+/* W1-B.3b.2: large thumb-safe options and readable consequences, no Safari selection. */
+.career-phone-body .career-work-option{width:100%;display:flex;flex-direction:column;
+  align-items:flex-start;gap:5px;min-height:60px;padding:12px 14px;
+  text-align:left;touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.career-work-option-effect{font-size:12px;line-height:1.4;font-weight:500;opacity:.85;white-space:normal}
