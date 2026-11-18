@@ -1,5 +1,6 @@
 /** W1-B.3a: additive root-v1 career save contract and sanitized work receipts. */
 import {careerDefinition} from './career-catalog.js';
+import {restoreWorkIncident,WORK_INCIDENTS} from './career-incidents.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -17,10 +18,12 @@ function cleanWorkShift(raw,contract){
     raw.careerId!==contract.careerId||hourlyCredits!==expectedRate||
     (['working','returning'].includes(phase)&&
       (!validTime(departedAt)||departedAt<start||departedAt>end)))return null;
-  return {id,employmentId:contract.employmentId,careerId:contract.careerId,
+  const shift={id,employmentId:contract.employmentId,careerId:contract.careerId,
     start,end,hourlyCredits,phase,warn60:raw.warn60===true,warn15:raw.warn15===true,
     departedAt:['working','returning'].includes(phase)?departedAt:null,
     readiness:Number.isFinite(raw.readiness)?Math.max(0,Math.min(100,Math.round(raw.readiness))):null};
+  shift.incident=restoreWorkIncident(shift,raw.incident);
+  return shift;
 }
 function cleanLastShift(raw,contract){
   if(!raw||typeof raw!=='object'||typeof raw.id!=='string')return null;
@@ -38,7 +41,11 @@ function cleanLastShift(raw,contract){
     lateMinutes:raw.lateMinutes,finishedAt:raw.finishedAt,
     grade:['удачный день','обычная смена','сложный день','пропуск'].includes(raw.grade)?raw.grade:null,
     performanceDelta:Number.isInteger(raw.performanceDelta)&&raw.performanceDelta>=-10&&raw.performanceDelta<=12
-      ?raw.performanceDelta:null};
+      ?raw.performanceDelta:null,
+    incident:raw.incident&&WORK_INCIDENTS[contract.careerId]?.options.some(x=>x.id===raw.incident.choiceId)&&
+      Number.isInteger(raw.incident.performanceDelta)&&raw.incident.performanceDelta>=-5&&raw.incident.performanceDelta<=10
+        ?{choiceId:raw.incident.choiceId,auto:raw.incident.auto===true,
+          performanceDelta:raw.incident.performanceDelta}:null};
 }
 function cleanContract(raw,id){
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.residentId!==id||
@@ -59,7 +66,7 @@ function cleanContract(raw,id){
   return contract;
 }
 export function newCareerSystem(){
-  return {schema:CAREER_SCHEMA,nextEmploymentId:1,byResident:{alex:null,mira:null},settlementIds:[]};
+  return {schema:CAREER_SCHEMA,nextEmploymentId:1,byResident:{alex:null,mira:null},settlementIds:[],incidentIds:[]};
 }
 export function restoreCareerSystem(raw){
   const state=newCareerSystem();
@@ -79,6 +86,8 @@ export function restoreCareerSystem(raw){
     state.settlementIds=[...new Set(raw.settlementIds.filter(x=>
       typeof x==='string'&&x.length<=96&&/^e[1-9]\d{0,8}@[0-9]+@[0-9]+$/.test(x)))].slice(-256);
   }
+  if(Array.isArray(raw.incidentIds))state.incidentIds=[...new Set(raw.incidentIds.filter(x=>
+    typeof x==='string'&&x.length<=102&&/^e[1-9]\\d{0,8}@[0-9]+@[0-9]+#work$/.test(x)))].slice(-256);
   return state;
 }
 /** Pure hire transition. Gameplay/UI and attendance will call this adapter in W1-B.2. */
