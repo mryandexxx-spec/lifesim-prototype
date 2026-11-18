@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
@@ -50,11 +50,13 @@
       "./src/career-state.js":"./src/career-state.js?v=w1b3a-w1b3b1-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4",
       "./src/career-progression.js":"./src/career-progression.js?v=w1b3b1-w2a1-w2a3-w2a4",
       "./src/career-job-board.js":"./src/career-job-board.js?v=w1b3a",
-      "./src/career-phone-ui.js":"./src/career-phone-ui.js?v=w1b3a-w1b3b1-w1b2b2-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4",
+      "./src/career-phone-ui.js":"./src/career-phone-ui.js?v=w1b3a-w1b3b1-w1b2b2-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-w4b",
       "./src/career-recruitment.js":"./src/career-recruitment.js?v=w1b2b2-w1b2b3",
       "./src/career-interview-content.js":"./src/career-interview-content.js?v=w1b2b2",
       "./src/career-work.js":"./src/career-work.js?v=w1b3a-w1b3b1-w1b3b2-w1b3b3-w2a2-w4a",
       "./src/finance-ledger.js":"./src/finance-ledger.js?v=w4a-20261118",
+      "./src/finance-presentation.js":"./src/finance-presentation.js?v=w4b-20261118",
+      "./src/finance-phone-ui.js":"./src/finance-phone-ui.js?v=w4b-20261118",
       "./src/career-incidents.js":"./src/career-incidents.js?v=w1b3b2-w1b3b3-w2a2-w2a3-w2a4",
       "./src/psychology.js":"./src/psychology.js?v=w1b3b2",
       "./src/emotion-engine.js":"./src/emotion-engine.js?v=w1b3b2",
@@ -506,6 +508,9 @@
           <button id="pick-mira" type="button" aria-pressed="false">Мира</button>
         </div>
         <button id="mind-toggle" class="character-tag" type="button" aria-controls="mind-panel" aria-expanded="false"><span id="avatar-symbol" class="avatar-icon">☺</span><div><strong id="resident-name">Алекс</strong><small id="mood-label">Спокоен</small><small id="wish-label">♫ Хочет отдохнуть</small></div><span class="mind-indicator" aria-hidden="true">⌄</span></button>
+        <button id="family-balance-chip" class="family-balance-chip" type="button"
+          aria-controls="career-phone-panel" aria-expanded="false"
+          aria-label="Общий баланс семьи. Открыть финансы">Семья · 5000 кр.</button>
       </div>
       <output id="urgent-needs" class="urgent-needs" aria-label="Важные потребности">Потребности в норме</output>
       <div class="needs" aria-label="Потребности персонажа">
@@ -553,7 +558,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
