@@ -40,7 +40,7 @@ try{
   const {context,page,phone,saved}=await scene(root);
   await page.locator('#career-phone-toggle').tap();
   assert.equal(await phone.locator('.career-ladder-step').count(),5);
-  await phone.getByText('Руководитель службы',{exact:false}).waitFor();
+  await phone.getByText('Руководитель службы',{exact:true}).waitFor();
   await phone.getByText('Директор городских сервисов',{exact:false}).first().waitFor();
   await phone.getByText(/Новая ставка: 91 кр.\/час/).waitFor();
   assert.equal(await phone.locator('.career-goal-progress').count(),2);
