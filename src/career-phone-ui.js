@@ -7,6 +7,7 @@ import {nextCareerShift} from './career-scheduler.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
+import {WORK_INCIDENTS,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
   startCareerInterview,answerCareerInterview,markRecruitmentRead,
   finishRecruitmentApplication,interviewScore,recruitmentRetry} from './career-recruitment.js';
@@ -99,6 +100,15 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       ' · на должности: '+(current.rankShifts||0)));
     facts.append(element('span',null,'Опозданий: '+(current.lateShifts||0)+
       ' · пропусков: '+(current.missedShifts||0)));
+    if(current.lastShift?.incident){
+      const outcome=WORK_INCIDENTS[current.careerId]?.options.find(
+        option=>option.id===current.lastShift.incident.choiceId);
+      if(outcome)facts.append(element('span',null,
+        'Рабочая ситуация: '+(current.lastShift.incident.auto?'автономно · ':'твой выбор · ')+
+        outcome.feedback+' · рейтинг '+
+        (current.lastShift.incident.performanceDelta>=0?'+':'')+
+        current.lastShift.incident.performanceDelta));
+    }
     if(current.lastShift)facts.append(element('span',null,'Прошлая смена: '+
       (current.lastShift.outcome==='worked'?'отработано':'пропущено')+
       ' · +'+current.lastShift.salary+' кр.'+
@@ -107,7 +117,35 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         ' · результат '+(current.lastShift.performanceDelta>=0?'+':'')+
           current.lastShift.performanceDelta:'')+
       (current.lastShift.lateMinutes?' · опоздание '+current.lastShift.lateMinutes+' мин.':'')));
+
     body.append(facts);
+    // Work events stay within the existing job screen, even after reload.
+    const incident=active?.incident,scenario=WORK_INCIDENTS[current.careerId];
+    if(active?.phase==='working'&&incident&&scenario){
+      body.append(element('h3','career-phone-section-title','📩 Ситуация на смене'));
+      body.append(element('p','career-phone-notice',scenario.title+' · '+scenario.text));
+      if(incident.choiceId===null){
+        body.append(element('p','career-phone-muted',
+          'Можно закрыть смартфон и вернуться. Если смена закончится, персонаж решит сам.'));
+        for(const option of scenario.options){
+          const button=action(option.text,()=>{
+            const live=personRoot();if(!live)return;
+            const result=decideWorkIncident(live,who,option.id);
+            if(!result.ok){notify(result.reason);render();return;}
+            save(true);notify(NAMES[who]+': '+result.feedback);render();
+          },'career-phone-secondary career-work-option');
+          button.append(element('small','career-work-option-effect',
+            workIncidentChoiceDescription(root,who,option)));
+          body.append(button);
+        }
+      }else{
+        const chosen=scenario.options.find(o=>o.id===incident.choiceId);
+        body.append(element('p','career-phone-notice',
+          (incident.auto?'Решил самостоятельно: ':'Твой выбор: ')+(chosen?.text||'')+
+          ' · '+(chosen?.feedback||'')+' · рейтинг '+
+          (incident.performanceDelta>=0?'+':'')+incident.performanceDelta));
+      }
+    }
     const growth=promotionReadiness(root,who);
     if(growth?.maxLevel){
       body.append(element('p','career-phone-notice','Высшая должность этой карьерной ветки достигнута.'));
