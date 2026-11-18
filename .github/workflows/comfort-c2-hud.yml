@@ -1,0 +1,54 @@
+name: Comfort C2 compact HUD — WebGL viewport and touch QA
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compact-hud:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 42
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install runtime and real browser
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Validate UI migration, all regression tests and browser script
+        run: |
+          node --check src/game.js
+          node --check src/hud-panel.js
+          node --check tests/comfort-c2-browser-smoke.mjs
+          node --test tests/comfort-c2-hud.test.js tests/hud-panel.test.js
+          npm test
+      - name: Assemble baseline C1 and current real WebGL servers
+        run: |
+          mkdir -p vendor baseline/vendor baseline/src
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          cp vendor/playcanvas.mjs baseline/vendor/playcanvas.mjs
+          cp -r assets baseline/assets
+          cp -r src/. baseline/src/
+          cp index.html styles.css favicon.svg manifest.webmanifest sw.js baseline/
+          git show 5f8f3372ad461f95049cd619dfbc6df283424f5b:index.html > baseline/index.html
+          git show 5f8f3372ad461f95049cd619dfbc6df283424f5b:styles.css > baseline/styles.css
+          git show 5f8f3372ad461f95049cd619dfbc6df283424f5b:src/game.js > baseline/src/game.js
+          git show 5f8f3372ad461f95049cd619dfbc6df283424f5b:src/hud-panel.js > baseline/src/hud-panel.js
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/comfort-c2-current.log 2>&1 &
+          python3 -m http.server 8766 --directory baseline --bind 127.0.0.1 > /tmp/comfort-c2-baseline.log 2>&1 &
+          sleep 3
+          node tests/comfort-c2-browser-smoke.mjs
+      - name: Upload actual screenshots and DOM measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comfort-c2-before-after-4-viewports
+          path: |
+            comfort-c2-*.png
+            comfort-c2-areas.json
+          if-no-files-found: ignore
