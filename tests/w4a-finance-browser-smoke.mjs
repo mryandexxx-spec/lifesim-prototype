@@ -21,7 +21,8 @@ try{
     const ctx=await browser.newContext({viewport:{width,height},isMobile:true,
       hasTouch:true,deviceScaleFactor:1});
     await ctx.addInitScript(({key,root})=>{
-      localStorage.setItem(key,JSON.stringify(root));
+      // Only seed the first navigation: reload must retain the game's own save.
+      if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(root));
       localStorage.setItem('lifesim.uiTour.v1','done');
     },{key:SAVE_KEY,root:seed});
     const page=await ctx.newPage();
