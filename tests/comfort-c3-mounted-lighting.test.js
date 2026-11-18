@@ -7,7 +7,7 @@ import {proposeFurnitureMove} from '../src/furniture-layout.js';
 import {createFurnitureEditor} from '../src/furniture-editor.js';
 import {createCalendar} from '../src/calendar-core.js';
 import {MOUNTED_LIGHTS,lightingMountPose,lightingRoomAt,mountedLightIsOn,
-  setMountedLightMode,mountedFixturesSurviveEdit} from '../src/mounted-lighting.js';
+  setMountedLightMode,mountedFixturesSurviveEdit,prioritizeVisibleLights} from '../src/mounted-lighting.js';
 
 const c=()=>newConstructionWorld();
 const calendar=createCalendar('2026-11-18');
@@ -115,4 +115,16 @@ test('C3 floor navigation remains unchanged by mounted fixtures; no free purchas
   const update=edit.commit(bought.instanceId,{x:2,z:0,yaw:0},{construction});
   assert.equal(update.ok,true);
   assert.equal(edit.undo().ok,true);assert.equal(edit.redo().ok,true);
+});
+
+test('C3 nearest five lamp sources share GPU budget without mutating saved switches',()=>{
+  const lights=Array.from({length:8},(_,i)=>({instanceId:'light-'+i,
+    x:i,z:0,on:true}));
+  lights[0].on=false;
+  const ids=prioritizeVisibleLights(lights,[{x:7,z:0}],5);
+  assert.deepEqual(ids,['light-7','light-6','light-5','light-4','light-3']);
+  assert.equal(lights[0].on,false);
+  assert.deepEqual(prioritizeVisibleLights(lights,[{x:1,z:0,away:true}],2),
+    ['light-1','light-2']);
+  assert.deepEqual(prioritizeVisibleLights(lights,[{x:7,z:0}],0),[]);
 });
