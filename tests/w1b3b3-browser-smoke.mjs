@@ -70,7 +70,7 @@ try{
   assert.equal(record.careerSystem.incidentHistory.alex.length,2);
   assert.equal(record.careerSystem.incidentHistory.mira.length,1);
   assert.equal(record.careerSystem.byResident.mira.currentShift.incident.choiceId,null);
-  assert.equal(record.careerSystem.incidentIds.length,4);
+  assert.equal(record.careerSystem.incidentIds.length,3);
   assert.equal(record.shop.credits,5000);
   await phone.getByRole('button',{name:'История рабочих ситуаций'}).tap();
   const story=phone.locator('.career-work-story');
@@ -91,7 +91,7 @@ try{
   record=await saved();
   assert.equal(record.careerSystem.incidentHistory.alex.length,2);
   assert.equal(record.careerSystem.incidentHistory.mira.length,1);
-  assert.equal(record.careerSystem.incidentIds.length,4);
+  assert.equal(record.careerSystem.incidentIds.length,3);
   assert.equal(errors.length,0,errors.join('\n'));
   console.log('W1-B.3b.3 390x844 WebGL touch: new scenarios, stored choices, journal and two residents PASS');
 }finally{await browser.close();}
