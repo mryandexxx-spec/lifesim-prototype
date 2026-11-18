@@ -146,14 +146,17 @@ function suggestedGameDate(){
 const calendarSuggestion=suggestedGameDate();
 let game;
 let calendarNeedsPersistence=false;
+let billsNeedsPersistence=false;
 try {
   const stored=JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+  billsNeedsPersistence=stored?.householdBills?.schema!==1;
   calendarNeedsPersistence=stored?.calendar?.schema!==1||
     !parseCivilDate(stored.calendar.startCivilDate);
   game=loadHousehold(stored,calendarSuggestion);
 } catch {
   game=newHousehold(calendarSuggestion);
   calendarNeedsPersistence=true;
+  billsNeedsPersistence=true;
 }
 const musicAudio=createMusicAudio();
 let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
@@ -408,7 +411,7 @@ function save(silent = false) {
   catch { if (!silent) toast('Не удалось сохранить: браузер запретил хранилище'); }
 }
 // Fix the epoch at first migration, not on some later autosave after a phone date change.
-if(calendarNeedsPersistence)save(true);
+if(calendarNeedsPersistence||billsNeedsPersistence)save(true);
 // W1-A.3 mobile calendar: one household date and one persistence root.
 const datePanel=$('calendar-anchor-panel');
 const calendarUI=createCalendarUI({
@@ -1705,7 +1708,8 @@ const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
   financeTrigger:$('family-balance-chip'),getRoot:()=>game,
   setCareerSystem:state=>{game.careerSystem=state;calendarUI.refresh();},
-  save,notify:toast,onOpenChange:id=>updatePhoneProps(id),
+  save,notify:toast,onFundsChanged:updateFamilyBalance,
+  onOpenChange:id=>updatePhoneProps(id),
   canOpen:()=>!furnishMode&&!buildMode&&!dialogueNeedsDecision(game),
   beforeOpen:()=>{
     calendarUI.close();closeCalendarAnchorPanel();setHomeOpen(false);
@@ -5534,8 +5538,9 @@ function boot() {
           save(true);updateFamilyBalance();
           updateCareerHud();
           careerPhone.refresh();
-          if(careerEvents.length===1)toast('💼 '+careerEvents[0].text);
-          else toast('💼 '+careerEvents.map(entry=>entry.text).join(' · '));
+          if(careerEvents.length===1)
+            toast((careerEvents[0].type?.startsWith('bill')?'🧾 ':'💼 ')+careerEvents[0].text);
+          else toast('🧾 '+careerEvents.map(entry=>entry.text).join(' · '));
         }
         const dueReminders=consumeCalendarReminders(game.calendar,priorCalendarMinute,game.minutes);
         if(dueReminders.messages.length){
