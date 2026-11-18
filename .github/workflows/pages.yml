@@ -40,6 +40,7 @@ jobs:
           node --check src/career-work.js
           node --check src/career-incidents.js
           node --check src/career-progression.js
+          node --check src/career-specializations.js
           node --check src/calendar-core.js
           node --check src/calendar-events.js
           node --check src/calendar-holidays.js
@@ -213,7 +214,7 @@ jobs:
           cp src/furniture-placement-preview.js site/src/
           cp src/career-catalog.js src/career-scheduler.js src/career-state.js src/career-job-board.js src/career-phone-ui.js site/src/
           cp src/career-work.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js site/src/
-          cp src/career-goals.js site/src/
+          cp src/career-goals.js src/career-specializations.js site/src/
           cp src/calendar-core.js src/calendar-events.js src/calendar-holidays.js src/calendar-reminders.js src/calendar-ui.js site/src/
           cp src/day-night-cycle.js src/day-night-render.js site/src/
           cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/trait-catalog.js src/sim-events.js src/emotion-engine.js src/mood-presentation.js src/social-perspective.js src/social-graph.js src/action-queue.js src/conversation-engine.js src/dialogue-decision.js src/world-interactions.js src/gifts-leisure.js src/household.js src/relationships.js src/social-reactions.js src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js src/interaction-anchors.js src/meshy-seat-runtime.js src/meshy-fridge-runtime.js src/meshy-bed-runtime.js src/meshy-shower-runtime.js src/loading-progress.js src/model-cache.js src/meshy-mira-visual.js src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js site/src/
