@@ -157,6 +157,20 @@ test('W4-A: painting sale returns the existing credits only once and has a dated
   assert.equal(transactPainting(root,'alex','paint-test','sell').ok,false);
 });
 
+test('W4-A: art sales share the same 1e9 credit cap as wages and store',()=>{
+  const root=newHousehold();
+  root.shop.credits=1_000_001;
+  root.createdWorks=[{id:'paint-high',ownerId:'alex',kind:'artwork',
+    location:'inventory',quality:100}];
+  const sold=transactPainting(root,'alex','paint-high','sell');
+  assert.equal(sold.ok,true);
+  const booked=money(root,sold.shop,'art-sale','paint-high',{actorId:'alex'});
+  assert.equal(booked.ok,true);
+  assert.equal(booked.shop.credits,1_000_326);
+  root.shop.credits=SHOP_MAX_CREDITS;
+  assert.equal(transactPainting(root,'alex','paint-high','sell').reason,'wallet-limit');
+});
+
 test('W4-A: bounded sanitized history, monotonic ids and old malformed data safe',()=>{
   const root=newHousehold();
   for(let i=0;i<FINANCE_HISTORY_LIMIT+35;i++){
