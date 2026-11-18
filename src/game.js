@@ -4415,6 +4415,8 @@ function boot() {
     $('build-wall-controls').hidden=true;
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     syncConstructionRender(true);
+    // C3 mount heights follow the actual wall profile after edits and undo/redo.
+    updateDecorNodes();
     buildHistoryButtons();
     save(true);
     buildFeedback(label);
