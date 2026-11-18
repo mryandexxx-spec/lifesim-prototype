@@ -1649,3 +1649,52 @@ button.time-card:active {transform:translateY(1px);}
 .furnish-light-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;font-size:13px}
 .furnish-light-control[hidden]{display:none!important}
 .furnish-light-control select{min-height:44px;min-width:112px;max-width:100%;font:inherit;border-radius:9px;padding:8px;background:#f8f5e9;color:#24352f}
+
+
+/* W1-B follow-up: real post-shift results, one small touch-first modal. */
+.career-shift-summary-overlay[hidden]{display:none!important}
+.career-shift-summary-overlay{
+  position:fixed;inset:0;z-index:190;display:flex;align-items:center;justify-content:center;
+  padding:calc(16px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right))
+    calc(16px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
+  box-sizing:border-box;
+}
+.career-shift-summary-shade{
+  position:absolute;inset:0;background:#1c3025a8;
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+  touch-action:manipulation;
+}
+.career-shift-summary-card{
+  position:relative;box-sizing:border-box;width:min(100%,385px);max-height:100%;
+  overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  background:#fffdf7;color:#283f35;border-radius:22px;border:1px solid #f0ebdb;
+  padding:22px 20px 18px;box-shadow:0 24px 80px #14221d75;
+  display:flex;flex-direction:column;gap:8px;
+}
+.career-shift-summary-kicker{font-size:11px;font-weight:800;letter-spacing:.12em;color:#648473}
+.career-shift-summary-title{margin:0;font-size:24px;line-height:1.2;color:#284b3a}
+.career-shift-summary-subtitle{margin:0 0 4px;font-size:13px;line-height:1.45;color:#667569}
+.career-shift-summary-money{font-size:35px;line-height:1.1;color:#2f7751;letter-spacing:-.025em}
+.career-shift-summary-money-label{font-size:12px;color:#667569}
+.career-shift-summary-details{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:9px 10px;
+  margin:12px 0 2px;padding:12px 0;border-top:1px solid #e2e9dc;border-bottom:1px solid #e2e9dc;
+  font-size:13px;line-height:1.35;
+}
+.career-shift-summary-details dt{color:#697c70}
+.career-shift-summary-details dd{margin:0;text-align:right;font-weight:750;color:#2c4539}
+.career-shift-summary-note{margin:2px 0 8px;color:#526d5f;font-size:12px;line-height:1.45}
+.career-shift-summary-done{
+  width:100%;min-height:48px;border:0;border-radius:13px;background:#39795c;
+  color:white;font:inherit;font-weight:800;font-size:15px;touch-action:manipulation;
+}
+.career-shift-summary-done:focus-visible{outline:3px solid #b6d59f;outline-offset:2px}
+@media(max-height:540px){
+  .career-shift-summary-card{padding:14px 18px;gap:5px}
+  .career-shift-summary-title{font-size:20px}
+  .career-shift-summary-money{font-size:27px}
+  .career-shift-summary-details{margin:3px 0;padding:6px 0;gap:5px 10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .career-shift-summary-shade{-webkit-backdrop-filter:none;backdrop-filter:none}
+}
