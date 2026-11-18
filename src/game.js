@@ -4284,6 +4284,7 @@ function boot() {
     'unknown-finish':'Этот вариант покрытия недоступен',
     'unknown-opening-style':'Неизвестный вариант проёма',
     'wall-has-decor':'На этом участке висит картина или полка · выбери свободный участок',
+      'mounted-light-blocks-construction':'Сначала перенеси или убери светильник с изменяемой стены',
     'starter-opening-outside':'Сначала убери проём или отверстие на удаляемой полосе стены',
     'opening-needs-wall-space':'Для этого широкого проёма нужны четыре свободных секции стены',
     'opening-style-unavailable':'Выбери дизайн двери, окна или арки',
@@ -6326,7 +6327,7 @@ function boot() {
     let litUtilityCount=0;
     const c3Residents=HOUSEHOLD_IDS.map(id=>({
       ...getActor(game,id).position,
-      away:residentAwayAtWork(game,id)}));
+      away:residentUnavailableForHome(game,id)}));
     for(const item of game.world.furniture.instances){
       if(item.location!=='home')continue;
       const node=decorNodes.get(item.instanceId);
