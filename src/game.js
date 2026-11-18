@@ -313,7 +313,7 @@ const positionViewPanel=()=>{
   panel.style.setProperty('--view-y',pos.y+'px');
 };
 function setViewOpen(open,{restoreFocus=false}={}){
-  if(open&&dialogueNeedsDecision(game))return;
+  if(open&&(dialogueNeedsDecision(game)||furnishMode||buildMode))return;
   viewOpen=Boolean(open);
   $('view-panel').hidden=!viewOpen;
   $('view-toggle').setAttribute('aria-expanded',String(viewOpen));
@@ -321,7 +321,7 @@ function setViewOpen(open,{restoreFocus=false}={}){
     setHomeOpen(false);closeTour();closeInsightPanel();queueVisible=false;renderQueuePanel(true);
     closeSocialContext();
     select(null);
-    requestAnimationFrame(positionViewPanel);
+    requestAnimationFrame(()=>{positionViewPanel();$('view-panel').focus({preventScroll:true});});
   }else if(restoreFocus){
     $('view-toggle').focus({preventScroll:true});
   }
@@ -1228,7 +1228,7 @@ function renderPlanPeek(){
 }
 $('plan-peek').addEventListener('click',()=>{
   if(dialogueNeedsDecision(game))return;
-  closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);closeMindPanel();
+  setHomeOpen(false);closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);closeMindPanel();
   queueVisible=!queueVisible;
   renderQueuePanel(true);
 });
@@ -1510,7 +1510,7 @@ function renderConversationPanel(force=true){
     closeTour();
     // A required answer supersedes every optional popover without cancelling
     // its REAL underlying FIFO action or affecting manual pause state.
-    setViewOpen(false);closeInsightPanel();
+    setHomeOpen(false);setViewOpen(false);closeInsightPanel();
     socialContextVisible=false;socialAnchor=null;socialMenuCategory=null;
     sharedPicker=false;branchPicker=false;
     renderSocialContext();renderSocialMenu();renderSharedPanel();renderBranchPanel();
