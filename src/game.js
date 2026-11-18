@@ -260,6 +260,42 @@ document.addEventListener('pointerdown',event=>{
   closeTour({remember:true});
 },true);
 
+// Comfort C2: UI-only house tool picker. All editor mutations stay in
+// the existing, tested Build/Furnish handlers.
+let homeOpen=false;
+function setHomeOpen(open,{restoreFocus=false}={}){
+  if(open&&(dialogueNeedsDecision(game)||furnishMode||buildMode))return;
+  homeOpen=Boolean(open);
+  $('home-panel').hidden=!homeOpen;
+  $('home-open').setAttribute('aria-expanded',String(homeOpen));
+  if(homeOpen){
+    setViewOpen(false);
+    closeTour();closeInsightPanel();closeMindPanel();closeSocialContext();select(null);
+    queueVisible=false;renderQueuePanel(true);
+    requestAnimationFrame(()=>$('home-furnish').focus({preventScroll:true}));
+  }else if(restoreFocus)$('home-open').focus({preventScroll:true});
+}
+$('home-open').addEventListener('click',()=>setHomeOpen(!homeOpen));
+$('home-close').addEventListener('click',()=>setHomeOpen(false,{restoreFocus:true}));
+$('home-furnish').addEventListener('click',()=>{setHomeOpen(false);$('furnish-toggle').click();});
+$('home-build').addEventListener('click',()=>{setHomeOpen(false);$('build-toggle').click();});
+$('menu-rotate-btn').addEventListener('click',()=>$('rotate-camera-btn').click());
+$('menu-reset-camera-btn').addEventListener('click',()=>$('reset-camera-btn').click());
+const syncCameraMenu=()=>{
+  const rotating=$('rotate-camera-btn').getAttribute('aria-pressed')==='true';
+  $('menu-rotate-btn').setAttribute('aria-pressed',String(rotating));
+  $('menu-rotate-btn').textContent=rotating?'⟳ Камера: вращение одним пальцем':'⟳ Камера: перемещение одним пальцем';
+};
+new MutationObserver(syncCameraMenu).observe($('rotate-camera-btn'),{
+  attributes:true,attributeFilter:['aria-pressed']
+});
+syncCameraMenu();
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&homeOpen&&!dialogueNeedsDecision(game)){
+    event.preventDefault();setHomeOpen(false,{restoreFocus:true});
+  }
+},true);
+
 // View is a presentation-only popover: both existing preferences remain wired
 // to their original IDs and neither value enters the saved household schema.
 let viewOpen=false;
@@ -282,7 +318,7 @@ function setViewOpen(open,{restoreFocus=false}={}){
   $('view-panel').hidden=!viewOpen;
   $('view-toggle').setAttribute('aria-expanded',String(viewOpen));
   if(viewOpen){
-    closeTour();closeInsightPanel();queueVisible=false;renderQueuePanel(true);
+    setHomeOpen(false);closeTour();closeInsightPanel();queueVisible=false;renderQueuePanel(true);
     closeSocialContext();
     select(null);
     requestAnimationFrame(positionViewPanel);
@@ -1628,7 +1664,7 @@ function updateResidentPicker() {
 }
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
-    careerPhone.close({focus:false});
+    careerPhone.close({focus:false});setHomeOpen(false);setViewOpen(false);
     selectResident(game,id);closeInsightPanel();
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
@@ -1647,7 +1683,7 @@ const careerPhone=createCareerPhoneUI({
   save,notify:toast,onOpenChange:id=>updatePhoneProps(id),
   canOpen:()=>!furnishMode&&!buildMode&&!dialogueNeedsDecision(game),
   beforeOpen:()=>{
-    calendarUI.close();closeCalendarAnchorPanel();
+    calendarUI.close();closeCalendarAnchorPanel();setHomeOpen(false);
     closeMindPanel();closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);
   }
 });
@@ -6493,6 +6529,14 @@ function boot() {
         renderConversationPanel(false);
       if(sharedPicker||game.socialAction?.shared||!$('shared-panel').hidden)
         renderSharedPanel(false);
+      const needNames={hunger:'Сытость',energy:'Энергия',hygiene:'Гигиена',
+        fun:'Досуг',social:'Общение',bladder:'Туалет'};
+      const urgent=NEEDS.map(need=>({need,value:Math.round(current.needs[need])}))
+        .filter(item=>item.value<55).sort((a,b)=>a.value-b.value).slice(0,2);
+      $('urgent-needs').textContent=urgent.length
+        ?urgent.map(item=>needNames[item.need]+' '+item.value).join(' · ')
+        :'Потребности в норме';
+      $('urgent-needs').dataset.critical=String(urgent.some(item=>item.value<30));
       for(const need of NEEDS){
         const val=Math.round(current.needs[need]);
         const band=needPresentation(val);
