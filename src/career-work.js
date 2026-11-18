@@ -6,6 +6,7 @@ import {nextCareerShift} from './career-scheduler.js';
 import {CAREER_RESIDENT_IDS} from './career-state.js';
 import {SHOP_MAX_CREDITS} from './furniture-shop.js';
 import {careerReadiness,recordCompletedCareerShift,recordMissedCareerShift,promotionReadiness} from './career-progression.js';
+import {startWorkIncident,automaticWorkIncident} from './career-incidents.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 const ACTIVE=new Set(['departing','working','returning']);
@@ -58,7 +59,9 @@ function settle(root,contract,id,at){
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
     outcome:'worked',salary:already?0:salary,
     workedMinutes:Math.round(worked),lateMinutes,finishedAt:at,
-    grade:result?.grade??null,performanceDelta:result?.delta??null};
+    grade:result?.grade??null,performanceDelta:result?.delta??null,
+    incident:shift.incident?.choiceId?{choiceId:shift.incident.choiceId,
+      auto:shift.incident.auto,performanceDelta:shift.incident.performanceDelta}:null};
   shift.phase='returning';
   return {salary,result};
 }
@@ -83,7 +86,10 @@ export function progressCareerWork(root,before,after){
     }
     if(shift.phase==='returning')continue;
     if(shift.phase==='working'){
+      if(startWorkIncident(root,id,after)&&after<shift.end)
+        emit(messages,id,'incident','новая ситуация на работе · открой смартфон, чтобы выбрать решение');
       if(after>=shift.end){
+        automaticWorkIncident(root,id);
         const {salary,result}=settle(root,contract,id,shift.end);
         const growth=result?' · '+result.grade+' · результативность '+contract.performance+'/100':'';
         const ready=promotionReadiness(root,id);
