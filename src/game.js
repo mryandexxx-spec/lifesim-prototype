@@ -1607,7 +1607,8 @@ $('resident-name').insertAdjacentElement('afterend',workHud);
 function updateCareerHud(){
   const status=residentWorkStatus(game,game.selectedSim);
   workHud.hidden=!status;
-  workHud.textContent=status?.label||'';
+  const pending=game.careerSystem?.byResident?.[game.selectedSim]?.currentShift?.incident;
+  workHud.textContent=(pending?.choiceId===null?'📩 Рабочая ситуация · ':'')+(status?.label||'');
 }
 function updateResidentPicker() {
   for (const id of HOUSEHOLD_IDS) {
