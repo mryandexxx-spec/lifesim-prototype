@@ -698,7 +698,7 @@ function renderSkillsTab(force=false){
         selectedActor().createdWorks=result.works;
         if(result.shop)game.shop=finance?.shop||result.shop;
         if(finance)game.financialHistory=finance.financialHistory;
-        save(true);renderSkillsTab(true);
+        updateFamilyBalance();save(true);renderSkillsTab(true);
         toast(operation==='sell'?'Картина продана · +'+result.amount+' кредитов':
           operation==='hang'?'Картина на стене':
           'Картина в личном инвентаре');
@@ -1648,6 +1648,17 @@ $('auto-btn').addEventListener('click', () => {
     : 'Автономность выключена. Оба жителя ждут твоих команд.');
 });
 updateAutoButton();
+// W4-B: no second wallet, only a presentation of the single family credits balance.
+const familyFunds=$('family-balance-chip');
+let shownFamilyCredits=null;
+function updateFamilyBalance(){
+  const amount=game.shop?.credits??0;
+  if(amount===shownFamilyCredits)return;
+  shownFamilyCredits=amount;
+  familyFunds.textContent='Семья · '+amount.toLocaleString('ru-RU')+' кр.';
+  familyFunds.setAttribute('aria-label',
+    'Общий баланс семьи '+amount+' кредитов. Открыть финансы');
+}
 // The compact career line follows the selected person, even while the avatar
 // is physically away. It does not create a second work clock or state.
 const workHud=document.createElement('small');
@@ -1665,7 +1676,7 @@ function updateResidentPicker() {
     $('pick-'+id).setAttribute('aria-pressed',String(game.selectedSim===id));
   }
   $('resident-name').textContent=selectedName();
-  updateCareerHud();
+  updateCareerHud();updateFamilyBalance();
   $('avatar-symbol').textContent=game.selectedSim==='alex' ? '☺' : '✿';
   $('mind-panel').setAttribute('aria-label','Внутренний мир: '+selectedName());
   $('mind-person').textContent=selectedName().toUpperCase()+' / ВНУТРЕННИЙ МИР';
@@ -1692,7 +1703,7 @@ updateResidentPicker();
 // W1-B.3a: the existing phone now shows live shift presence, pay and attendance.
 const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
-  getRoot:()=>game,
+  financeTrigger:$('family-balance-chip'),getRoot:()=>game,
   setCareerSystem:state=>{game.careerSystem=state;calendarUI.refresh();},
   save,notify:toast,onOpenChange:id=>updatePhoneProps(id),
   canOpen:()=>!furnishMode&&!buildMode&&!dialogueNeedsDecision(game),
@@ -4114,7 +4125,7 @@ function boot() {
     if(!result.ok){editorFeedback(editorMessage(result.reason),true);return false;}
     game.world.furniture=result.world;game.shop=finance.shop;
     game.financialHistory=finance.financialHistory;
-    refreshMind(game,game.world);refreshMind(game.otherSim,game.world);
+    updateFamilyBalance();refreshMind(game,game.world);refreshMind(game.otherSim,game.world);
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     updateDecorNodes();renderWarehouse();
     editSelectedId=result.world.instances.some(i=>i.instanceId===result.instanceId)
@@ -4214,7 +4225,7 @@ function boot() {
     game.world.furniture=result.world;
     if(result.shop)game.shop=finance.shop;
     game.financialHistory=finance.financialHistory;
-    renderWarehouse();
+    updateFamilyBalance();renderWarehouse();
     // M5 is causal: moving an instance recalculates both residents' live mood.
     refreshMind(game,game.world);
     refreshMind(game.otherSim,game.world);
@@ -5520,7 +5531,7 @@ function boot() {
         // Persistent shift state, credited money and receipts must share one
         // localStorage snapshot; never wait for the eight-second autosave.
         if(careerEvents.length){
-          save(true);
+          save(true);updateFamilyBalance();
           updateCareerHud();
           careerPhone.refresh();
           if(careerEvents.length===1)toast('💼 '+careerEvents[0].text);
@@ -6595,6 +6606,7 @@ function boot() {
       $('light-phase-label').textContent=daylight.phaseLabel;
       const current=selectedActor();
       $('resident-name').textContent=selectedName();
+      updateFamilyBalance();
       updateCareerHud(); // Live earned wages while shift is progressing.
       const skill=getSkillDefinition(HOBBY_SKILLS,READING_SKILL_ID);
       const currentXP=current.skills?.xpById?.[READING_SKILL_ID]||0;
