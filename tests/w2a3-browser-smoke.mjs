@@ -32,6 +32,8 @@ async function open(seed){
 }
 try{
   const family=newHousehold('2026-11-16');
+  // Load before today's shift: selecting a track during pending work is correctly blocked.
+  family.minutes=0;family.otherSim.minutes=0;
   family.careerSystem=hireCareer(family.careerSystem,'alex','city-services',480);
   family.careerSystem=hireCareer(family.careerSystem,'mira','editorial',480);
   for(const id of ['alex','mira']){
