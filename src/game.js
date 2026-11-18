@@ -90,6 +90,8 @@ import {purchasedSeatPrefab,purchasedSeatPose,purchasedSeatSurface,
 import {diningSeatApproach,diningPlatePosition,diningChairPullLimit,
   diningChairPullOffset} from './dining.js';
 import {UTILITY_FURNITURE,UTILITY_ACTION_IDS,furnitureUseWeight,lampIsOn} from './furniture-interactions.js';
+import {MOUNTED_LIGHTS,lightingMountPose,mountedLightIsOn,setMountedLightMode,
+  mountedFixturesSurviveEdit} from './mounted-lighting.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2t';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
@@ -1848,6 +1850,19 @@ function boot() {
         light.addChild(glow);node.addChild(light);
         light.light.enabled=false;glow.enabled=false;
       }
+      // C3: one cached, shadow-free warm light per actual mounted paid fixture.
+      if(MOUNTED_LIGHTS[item.itemDefinitionId]){
+        const light=new pc.Entity('C3 mounted lamp light');
+        light.setLocalPosition(0,-.24,item.prefabId==='walllight' ? -.24 : 0);
+        light.addComponent('light',{type:'omni',color:new pc.Color(1,.84,.61),
+          intensity:item.prefabId==='walllight'?.70:.91,
+          range:item.prefabId==='walllight'?3.1:4.2,castShadows:false});
+        const bulb=new pc.Entity('C3 mounted bulb');
+        bulb.addComponent('render',{type:'sphere',material:mat('#fff4d0',{emissive:1.1})});
+        bulb.setLocalScale(.11,.11,.11);
+        light.addChild(bulb);node.addChild(light);
+        light.light.enabled=false;bulb.enabled=false;
+      }
       // F4G cookware is attached to the specific purchased appliance, never to the room.
       if(item.prefabId==='stove'){
         const pot=new pc.Entity('F4G cooking pot');
@@ -1905,8 +1920,10 @@ function boot() {
       node.enabled=item.location==='home';
       if(!node.enabled)continue;
       const pose=instanceId===previewId&&previewPose?previewPose:item;
-      node.setPosition(pose.x,0,pose.z);
-      node.setEulerAngles(0,-pose.yaw,0);
+      const mounted=MOUNTED_LIGHTS[item.itemDefinitionId]
+        ?lightingMountPose(game.world.construction,item.itemDefinitionId,item.mount):null;
+      node.setPosition(mounted?.x??pose.x,mounted?.y??0,mounted?.z??pose.z);
+      node.setEulerAngles(0,-(mounted?.yaw??pose.yaw),0);
     }
     refreshSofaSeat();
   };
@@ -3624,6 +3641,9 @@ function boot() {
       'unreachable-utility':'К этой мебели нельзя подойти · освободи место перед ней',
       'insufficient-credits':'Недостаточно пробных кредитов',
       'full-household':'Слишком много предметов',
+      'missing-light-mount':'Нужна настоящая стена рядом или пол внутри комнаты',
+      'light-mount-occupied':'На этом креплении уже есть светильник',
+      'mounted-light-blocks-construction':'Сначала перенеси или убери светильник с изменяемой стены',
       'already-stored':'Предмет уже на складе',
       'not-stored':'Предмет не на складе',
       'duplicate-id':'Конфликт идентификатора покупки',
@@ -3649,9 +3669,36 @@ function boot() {
     furnitureGhost.render.material=valid?ghostValid:ghostInvalid;
     furnitureGhost.enabled=furnishMode;
   };
+  const lightControl=document.createElement('label');
+  lightControl.textContent='Режим света ';
+  lightControl.className='furnish-light-control';
+  const lightModeSelect=document.createElement('select');
+  lightModeSelect.id='furnish-light-mode';
+  lightModeSelect.setAttribute('aria-label','Режим настенного или потолочного светильника');
+  for(const [value,label] of [['auto','Авто'],['on','Вкл'],['off','Выкл']]){
+    const option=document.createElement('option');option.value=value;option.textContent=label;
+    lightModeSelect.append(option);
+  }
+  lightControl.append(lightModeSelect);
+  $('furnish-commands').append(lightControl);
+  lightModeSelect.addEventListener('change',()=>{
+    if(!furnishMode||!editSession)return;
+    const item=game.world.furniture.instances.find(x=>x.instanceId===editSelectedId);
+    if(!item||!MOUNTED_LIGHTS[item.itemDefinitionId])return;
+    const changed=setMountedLightMode(game.world.furniture,item.instanceId,lightModeSelect.value);
+    if(!changed.ok)return;
+    const done=editSession.transactMarket({...changed,shop:game.shop,
+      instanceId:item.instanceId,amount:0});
+    if(!done.ok)return;
+    game.world.furniture=done.world;game.shop=done.shop;
+    updateDecorNodes();renderFurnitureSelection();save(true);
+    editorFeedback('Режим света сохранён');
+  });
   const renderFurnitureSelection=()=>{
     const item=editorItem(editSelectedId);
     const selectable=!!item&&item.location==='home';
+    lightControl.hidden=!selectable||!MOUNTED_LIGHTS[item?.itemDefinitionId];
+    if(!lightControl.hidden)lightModeSelect.value=item.lightMode||'auto';
     $('furnish-commands').hidden=!furnishMode||shopOpen||warehouseOpen||!selectable;
     // Unlike the former hidden selection-only turn button, this room toolbar
     // is always present. A native picker lets Safari users select items even
@@ -4299,7 +4346,8 @@ function boot() {
   const buildSnap=pt=>({x:Math.round(pt.x*2)/2,z:Math.round(pt.z*2)/2});
   const buildContext=()=>({residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position),
     furniture:game.world.furniture.instances,
-    furnitureBoxes:game.world.furniture.instances.filter(item=>item.location==='home')
+    furnitureBoxes:game.world.furniture.instances.filter(item=>item.location==='home'&&
+      !FURNITURE_CATALOG[item.prefabId].walkThrough)
       .map(item=>({instanceId:item.instanceId,...instanceRect(item,FURNITURE_CATALOG[item.prefabId].footprint)})),
     lockedInstanceIds:lockedFurnitureIds(),
     // H5b paintings are permanent objects. Forbid placing a real opening
@@ -4310,9 +4358,15 @@ function boot() {
       const pose=artworkDisplayPose(work,index,origin,game.world.construction);
       return pose?{x:pose.x,z:pose.z,radius:.46}:null;
     }).filter(Boolean)});
-  const buildProposal=(cmd)=>cmd?.type==='room-relocate'
-    ?proposeFurnishedRoomMove(game.world,cmd,buildContext())
-    :proposeConstructionEdit(game.world.construction,cmd,buildContext());
+  const buildProposal=cmd=>{
+    const candidate=cmd?.type==='room-relocate'
+      ?proposeFurnishedRoomMove(game.world,cmd,buildContext())
+      :proposeConstructionEdit(game.world.construction,cmd,buildContext());
+    if(!candidate.ok)return candidate;
+    const guard=mountedFixturesSurviveEdit(game.world.construction,candidate.world,
+      candidate.furniture||game.world.furniture);
+    return guard.ok?candidate:guard;
+  };
   const buildCommand=(from,to)=>{
     if(buildTool==='roof-add')return {type:'roof-add',from,to,...roofChoice};
     if(buildTool!=='wall')return {type:buildTool,from,to};
@@ -6270,6 +6324,9 @@ function boot() {
     // Lights persist in v1, while drawers, doors and mirror highlights close
     // automatically after completion, interruption or save reload.
     let litUtilityCount=0;
+    const c3Residents=HOUSEHOLD_IDS.map(id=>({
+      ...getActor(game,id).position,
+      away:residentAwayAtWork(game,id)}));
     for(const item of game.world.furniture.instances){
       if(item.location!=='home')continue;
       const node=decorNodes.get(item.instanceId);
@@ -6281,6 +6338,19 @@ function boot() {
           light.light.enabled=on&&litUtilityCount<5;
           if(on)litUtilityCount++;
           const bulb=light.findByName('F4E lamp bulb');
+          if(bulb)bulb.enabled=on;
+        }
+      }
+      if(MOUNTED_LIGHTS[item.itemDefinitionId]){
+        const light=node.findByName('C3 mounted lamp light');
+        if(light?.light){
+          const previous=light.light.enabled;
+          const on=mountedLightIsOn({fixture:item,
+            construction:game.world.construction,calendar:game.calendar,
+            minutes:game.minutes,residents:c3Residents,previous});
+          light.light.enabled=on&&litUtilityCount<5;
+          if(light.light.enabled)litUtilityCount++;
+          const bulb=light.findByName('C3 mounted bulb');
           if(bulb)bulb.enabled=on;
         }
       }
