@@ -1413,6 +1413,22 @@ button.time-card:active {transform:translateY(1px);}
 .career-phone-facts{display:flex;flex-direction:column;gap:8px;padding:14px 13px;background:#ebf2ec;
   border-radius:15px;color:#38564a;font-size:13px;line-height:1.4;}
 .career-phone-facts span+span{border-top:1px solid #d6e6dc;padding-top:8px;}
+/* W1-B.2b.3: thumb-sized section tabs and scroll-safe, no double-tap page zoom. */
+.career-phone-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;
+  margin:8px 0 15px;position:sticky;top:-14px;z-index:2;background:#f8f6ee;padding:6px 0;}
+.career-phone-body .career-phone-tabs .career-phone-tab{min-height:48px;text-align:center;
+  font-size:12px;line-height:1.2;padding:8px 4px;touch-action:manipulation;}
+.career-phone-body .career-phone-tabs .career-phone-tab-active{background:#377e69;color:#fff;
+  border-color:#377e69;}
+.career-phone-body button,.career-phone-header button{touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;}
+.career-phone-answer{padding:12px;margin:10px 0;border-radius:13px;
+  border:1px solid #d6e5dc;background:#fff;color:#294b40;font-size:13px;line-height:1.4;}
+.career-phone-answer strong{font-size:13px;}
+.career-phone-answer p{margin:8px 0;}
+.career-phone-answer small{color:#506d5e;font-size:12px;line-height:1.45;}
+.career-phone-subtitle{margin:14px 0 8px;color:#284c40;font-size:17px;}
+.career-phone-cooldown{font-weight:800;color:#8e5e3d!important;}
 /* W1-B.3a: compact attendance line in the touch-friendly resident control. */
 .career-work-hud{display:block;max-width:155px;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;color:#23544b;font-size:10px;font-weight:700;line-height:1.3}
