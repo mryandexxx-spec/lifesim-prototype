@@ -98,7 +98,7 @@ export function restoreProfessionalGoals(raw,system){
       const contract=system.byResident?.[id];
       const stories=system.incidentHistory?.[id]||[];
       const relevant=stories.some(h=>h.careerId===career.id&&h.performanceDelta>0);
-      if(!old&&!(contract?.careerId===career.id)&&!relevant)continue;
+      if(!old&&!(legacy&&contract?.careerId===career.id&&contract.workedShifts>0)&&!relevant)continue;
       const item=cleanCareer(old,career.id);
       if(legacy&&contract?.careerId===career.id)
         item.shifts=Math.min(MAX_SHIFTS,Math.max(0,contract.workedShifts||0));

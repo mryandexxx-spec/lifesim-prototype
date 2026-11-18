@@ -173,6 +173,7 @@ test('recognition survives 12-story journal eviction and a rank change',()=>{
 test('Alex and Mira professional states stay separate, retain recognition across resign/re-hire',()=>{
   const st=setup();
   st.root.careerSystem=hireCareer(st.root.careerSystem,'mira','editorial',480);
+  st.contract=st.root.careerSystem.byResident.alex;
   const first=work(st,{day:0,scenario:'legacy',option:1});
   work(st,{day:first.day+1});
   const mira=professionalGoalsView(st.root,'mira');
