@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {writeFileSync} from 'node:fs';
 import {chromium} from 'playwright';
 import {newHousehold} from '../src/household.js';
+import {startConversation,arriveSocial} from '../src/relationships.js';
 import {SAVE_KEY} from '../src/simulation.js';
 
 const sizes=[[390,844],[375,667],[320,568],[844,390]];
@@ -144,6 +145,36 @@ async function exercise(page){
  assert.equal(await page.locator('#pick-alex').getAttribute('aria-pressed'),'true');
  assert.equal(failures.length,0,failures.join('\n'));
 }
+
+async function verifyRequiredChoice(){
+ const seed=newHousehold('2026-11-16');
+ assert.equal(startConversation(seed,'alex',{x:-.2,z:1.85},'daily'),true);
+ assert.equal(arriveSocial(seed),true);
+ const ctx=await browser.newContext({viewport:{width:390,height:844},
+   isMobile:true,hasTouch:true,deviceScaleFactor:1});
+ await ctx.addInitScript(({key,root})=>{
+  localStorage.setItem(key,JSON.stringify(root));
+  localStorage.setItem('lifesim.uiTour.v1','done');
+ },{key:SAVE_KEY,root:seed});
+ try{
+  const page=await ctx.newPage();
+  page.on('pageerror',e=>failures.push('MANDATORY '+e.message));
+  await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:55000});
+  await page.locator('#conversation-panel.dialogue-required').waitFor({state:'visible'});
+  assert.equal(await page.locator('#conversation-panel').getAttribute('aria-modal'),'true');
+  assert.equal(await page.locator('#conversation-close').isVisible(),false);
+  assert.equal(await page.locator('#dialogue-backdrop').isVisible(),true);
+  const before=await page.locator('#time-label').innerText();
+  await page.waitForTimeout(550);
+  assert.equal(await page.locator('#time-label').innerText(),before,'mandatory choice freezes time');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#conversation-panel').isVisible(),true);
+  await page.locator('#conversation-options button').first().tap();
+  assert.equal(await page.locator('#conversation-panel').isVisible(),true);
+  await page.screenshot({path:'comfort-c2-required-decision-390x844.png'});
+ }finally{await ctx.close();}
+}
 try{
  for(const [w,h] of sizes){
   const before=await visit(w,h,'before');
@@ -162,6 +193,7 @@ try{
   if(w===390)await exercise(after.page);
   await after.ctx.close();
  }
+ await verifyRequiredChoice();
  writeFileSync('comfort-c2-areas.json',JSON.stringify(report,null,2)+'\n');
  assert.equal(failures.length,0,failures.join('\n'));
  console.log('Comfort C2 real PlayCanvas/WebGL HUD screens, touch, saves:',JSON.stringify(report));

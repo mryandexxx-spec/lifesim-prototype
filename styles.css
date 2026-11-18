@@ -1631,3 +1631,6 @@ button.time-card:active {transform:translateY(1px);}
  .home-panel{bottom:calc(env(safe-area-inset-bottom) + 59px)}
  #plan-peek.plan-peek{top:calc(env(safe-area-inset-top) + 57px);max-width:205px}
 }
+
+/* C2: secondary-panel dismiss controls are comfortably touch-sized. */
+.queue-head button,.action-header button{min-width:44px;min-height:44px;}

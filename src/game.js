@@ -270,6 +270,7 @@ function setHomeOpen(open,{restoreFocus=false}={}){
   $('home-open').setAttribute('aria-expanded',String(homeOpen));
   if(homeOpen){
     setViewOpen(false);
+    calendarUI.close();closeCalendarAnchorPanel();
     closeTour();closeInsightPanel();closeMindPanel();closeSocialContext();select(null);
     queueVisible=false;renderQueuePanel(true);
     requestAnimationFrame(()=>$('home-furnish').focus({preventScroll:true}));
@@ -318,7 +319,8 @@ function setViewOpen(open,{restoreFocus=false}={}){
   $('view-panel').hidden=!viewOpen;
   $('view-toggle').setAttribute('aria-expanded',String(viewOpen));
   if(viewOpen){
-    setHomeOpen(false);closeTour();closeInsightPanel();queueVisible=false;renderQueuePanel(true);
+    setHomeOpen(false);calendarUI.close();closeCalendarAnchorPanel();
+    closeTour();closeMindPanel();closeInsightPanel();queueVisible=false;renderQueuePanel(true);
     closeSocialContext();
     select(null);
     requestAnimationFrame(()=>{positionViewPanel();$('view-panel').focus({preventScroll:true});});
@@ -416,6 +418,7 @@ const calendarUI=createCalendarUI({
 });
 function closeCalendarAnchorPanel(){datePanel.hidden=true;$('calendar-anchor-toggle').setAttribute('aria-expanded','false');}
 $('calendar-anchor-toggle').addEventListener('click',()=>{
+  setHomeOpen(false);setViewOpen(false);closeMindPanel();
   closeCalendarAnchorPanel();calendarUI.open();
   $('calendar-anchor-toggle').setAttribute('aria-expanded','true');
 });
@@ -593,7 +596,7 @@ $('insight-toggle').addEventListener('click',()=>{
   if(dialogueNeedsDecision(game))return;
   const open=!insightOpen;
   if(open){
-    setViewOpen(false);closeSocialContext();closeMindPanel();select(null);
+    setHomeOpen(false);setViewOpen(false);closeSocialContext();closeMindPanel();select(null);
     queueVisible=false;renderQueuePanel(true);
   }
   insightOpen=open;
@@ -736,7 +739,7 @@ $('mind-toggle').addEventListener('click', () => {
   $('mind-panel').hidden = !open;
   $('mind-toggle').setAttribute('aria-expanded', String(open));
   if (open){
-    closeInsightPanel();setViewOpen(false);closeSocialContext();
+    setHomeOpen(false);closeInsightPanel();setViewOpen(false);closeSocialContext();
     queueVisible=false;renderQueuePanel(true);select(null);
   }
 });
@@ -988,7 +991,7 @@ function closeSocialContext(){
 }
 function openSocialContext(pos){
   if(dialogueNeedsDecision(game))return;
-  closeInsightPanel();queueVisible=false;renderQueuePanel(true);
+  setHomeOpen(false);closeInsightPanel();queueVisible=false;renderQueuePanel(true);
   select(null);closeMindPanel();closeSocialPickers();setViewOpen(false);
   const rect=canvas.getBoundingClientRect();
   socialAnchor=pos?{x:pos.x-rect.left,y:pos.y-rect.top}:null;
