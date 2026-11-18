@@ -4,13 +4,13 @@ import {chromium} from 'playwright';
 import {newHousehold,tickHousehold} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
 import {progressCareerWork,arriveCareerPortal} from '../src/career-work.js';
-import {plannedCareerShift} from '../src/career-scheduler.js';
+import {nextCareerShift} from '../src/career-scheduler.js';
 import {SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 
 const seed=newHousehold('2026-11-16');
 seed.careerSystem=hireCareer(seed.careerSystem,'alex','editorial',seed.minutes);
-const planned=plannedCareerShift(seed.calendar,seed.careerSystem.byResident.alex,1);
+const planned=nextCareerShift(seed.calendar,seed.careerSystem.byResident.alex,seed.minutes);
 seed.minutes=planned.start;seed.otherSim.minutes=planned.start;
 progressCareerWork(seed,planned.start-1,planned.start);
 assert.equal(arriveCareerPortal(seed,'alex',seed.minutes),true);

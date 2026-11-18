@@ -28,7 +28,7 @@ export function restoreWorkNeeds(raw,shift){
     appliedThrough:minute,
     mealUsed:raw.mealUsed===true,
     toiletCount:safeInt(raw.toiletCount,0,2,0),
-    lastToiletMinute:safeInt(raw.lastToiletMinute,from,end,from),
+    lastToiletMinute:safeInt(raw.lastToiletMinute,from-720,end,from-150),
     socialMinutes:safeInt(raw.socialMinutes,0,720,0),
     modeScore:Number.isFinite(raw.modeScore)&&Math.abs(raw.modeScore)<=2160?raw.modeScore:0,
     strain:Number.isFinite(raw.strain)&&raw.strain>=0&&raw.strain<=100?raw.strain:0
@@ -75,15 +75,16 @@ export function progressWorkNeeds(root,before,after){
       needs.fun=clamp(needs.fun-.0085*mode.fun);
       // Ordinary unnamed ambient conversations, diminishing near the comfort cap.
       const talk=Math.max(0,Math.min(1,(88-needs.social)/35))*
-        (.056+(axes.sociability-.5)*.024)*mode.social;
+        (.082+(axes.sociability-.5)*.024)*mode.social;
       const nextSocial=clamp(needs.social-socialDecay+talk);
       if(nextSocial>needs.social)state.socialMinutes=Math.min(720,state.socialMinutes+1);
       needs.social=nextSocial;
-      if(!state.mealUsed&&duration>=300&&minute>=shift.start+duration*.5){
+      if(!state.mealUsed&&duration>=300&&shift.end-shift.departedAt>=300&&
+        minute>=Math.max(shift.start+duration*.5,shift.departedAt+120)){
         state.mealUsed=true;
         needs.hunger=Math.min(80,needs.hunger+33);
       }
-      const maxToilets=duration>=420?2:1;
+      const maxToilets=shift.end-shift.departedAt>=420?2:1;
       if(needs.bladder<=39&&state.toiletCount<maxToilets&&
         minute-state.lastToiletMinute>=120){
         needs.bladder=Math.min(79,needs.bladder+43);

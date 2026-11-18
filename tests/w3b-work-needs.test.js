@@ -4,7 +4,7 @@ import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
 import {progressCareerWork,arriveCareerPortal,selectCareerWorkMode,finishCareerReturn} from '../src/career-work.js';
 import {progressWorkNeeds,workNeedsReport} from '../src/career-work-needs.js';
-import {plannedCareerShift} from '../src/career-scheduler.js';
+import {nextCareerShift} from '../src/career-scheduler.js';
 
 const clone=x=>JSON.parse(JSON.stringify(x));
 const get=(root,id='alex')=>id==='alex'?root:root.otherSim;
@@ -14,8 +14,7 @@ function started(mode='normal',id='alex',career='editorial'){
   root.careerSystem=hireCareer(root.careerSystem,id,career,root.minutes);
   assert.equal(selectCareerWorkMode(root,id,mode).ok,true);
   // Weekday shift starts at 09:00; jobs may have a different first start.
-  const planned=plannedCareerShift(root.calendar,root.careerSystem.byResident[id],
-    Math.floor(root.minutes/1440)+1);
+  const planned=nextCareerShift(root.calendar,root.careerSystem.byResident[id],root.minutes);
   assert.ok(planned);
   root.minutes=planned.start;root.otherSim.minutes=root.minutes;
   progressCareerWork(root,planned.start-1,planned.start);
