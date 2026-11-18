@@ -4,6 +4,7 @@
  */
 import {constructionRooms,constructionWallSegments,BUILD_STEP,constructionContains} from './construction.js';
 import {sampleWorldLighting} from './day-night-cycle.js';
+import {BUILD_WALL_HEIGHTS} from './exterior-construction.js';
 
 export const MOUNTED_LIGHTS=Object.freeze({
   'sconce.halo':Object.freeze({itemId:'sconce.halo',prefabId:'walllight',modelKey:'walllight.halo',mount:'wall',price:185,radius:3,name:'Бра «Ореол»'}),
@@ -35,7 +36,7 @@ export function lightingMountPose(construction,productId,anchor){
     if(!valid(anchor.x)||!valid(anchor.z)||!constructionContains(construction,anchor.x,anchor.z))return null;
     const room=lightingRoomAt(construction,anchor.x,anchor.z);
     if(room===null)return null;
-    const height=Number(construction.wallHeightMeters)||2.8;
+    const height=BUILD_WALL_HEIGHTS[construction.wallHeightClass]?.value||2.9;
     return {x:anchor.x,y:height-.12,z:anchor.z,yaw:0,roomId:room};
   }
   if(typeof anchor.edgeId!=='string'||![1,-1].includes(anchor.side))return null;
@@ -48,7 +49,7 @@ export function lightingMountPose(construction,productId,anchor){
   const z=w.axis==='h'?w.j*BUILD_STEP+shift:(w.j+t)*BUILD_STEP;
   const room=lightingRoomAt(construction,x,z);
   if(room===null)return null;
-  const height=Number(construction.wallHeightMeters)||2.8;
+  const height=BUILD_WALL_HEIGHTS[construction.wallHeightClass]?.value||2.9;
   return {x,y:Math.max(1.5,height-.60),z,yaw:w.axis==='v'?(anchor.side>0?90:270):(anchor.side>0?0:180),roomId:room};
 }
 /** A touch on the room floor picks a real nearby wall segment or room ceiling.
