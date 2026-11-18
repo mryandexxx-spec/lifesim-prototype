@@ -18,6 +18,7 @@ import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
 import {consumeCalendarReminders} from './calendar-reminders.js';
 import {createCareerPhoneUI} from './career-phone-ui.js';
+import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
 import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
   residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
 import { findPath, nearestWalkable } from './navigation.js';
@@ -1692,6 +1693,11 @@ const careerPhone=createCareerPhoneUI({
     closeMindPanel();closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);
   }
 });
+const shiftSummary=createCareerShiftSummaryUI({
+  host:document.querySelector('.app-shell'),getRoot:()=>game,
+  shouldDefer:()=>dialogueNeedsDecision(game)||careerPhone.isOpen()||
+    document.querySelector('.life-calendar:not([hidden])')!==null
+});
 // Presentation-only HUD preference: never touches simulation or household saves.
 createHudPanel({
   panel:$('dashboard'),toggle:$('hud-toggle'),
@@ -1705,7 +1711,7 @@ createHudPanel({
 $('save-btn').addEventListener('click', () => save());
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
-  careerPhone.close({focus:false});
+  careerPhone.close({focus:false});shiftSummary.clear();
   const enabled = game.autonomy.enabled;
   game = newHousehold();
   setHouseholdAutonomy(game, enabled); // Keep the player's chosen play style.
@@ -5468,8 +5474,9 @@ function boot() {
     }
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
+    shiftSummary.flush();
     const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&
-      !careerPhone.interviewNeedsDecision()&&!document.hidden;
+      !careerPhone.interviewNeedsDecision()&&!shiftSummary.isOpen()&&!document.hidden;
     const frameActive=active&&!buildMode;
     const sharedSound=frameActive&&game.socialAction?.phase==='using'&&
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
@@ -5499,8 +5506,10 @@ function boot() {
           save(true);
           updateCareerHud();
           careerPhone.refresh();
-          if(careerEvents.length===1)toast('💼 '+careerEvents[0].text);
-          else toast('💼 '+careerEvents.map(entry=>entry.text).join(' · '));
+          shiftSummary.enqueue(careerEvents);
+          const otherEvents=careerEvents.filter(entry=>entry.type!=='salary'&&entry.type!=='missed');
+          if(otherEvents.length===1)toast('💼 '+otherEvents[0].text);
+          else if(otherEvents.length)toast('💼 '+otherEvents.map(entry=>entry.text).join(' · '));
         }
         const dueReminders=consumeCalendarReminders(game.calendar,priorCalendarMinute,game.minutes);
         if(dueReminders.messages.length){
@@ -5523,6 +5532,7 @@ function boot() {
       if(branchBefore&&!game.socialAction)
         toast('Завершено: '+BRANCH_ACTIONS[branchBefore].label);
         accumulator-=.10;
+        if(shiftSummary.isOpen()){accumulator=0;break;}
       }
       // On cancellation, finish closing before the former fridge user departs.
       for(const residentId of HOUSEHOLD_IDS){
