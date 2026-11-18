@@ -32,7 +32,11 @@ try{
  });
  await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
  await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
- await page.locator('#build-toggle').click();
+ const clickBuild=async()=>{
+    if(await page.locator('#build-toggle').isVisible())await page.locator('#build-toggle').click();
+    else{await page.locator('#home-open').click();await page.locator('#home-build').click();}
+  };
+  await clickBuild();
  await page.locator('[data-build-tool="room-relocate"]').click();
  assert.ok(await page.locator('#build-room-controls').isVisible());
  const project=(x,z)=>{
