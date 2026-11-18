@@ -1,3 +1,8 @@
+## W4-A · единый финансовый журнал (PR / проверка, не опубликовано)
+W4-A сохраняет **один** семейный баланс `shop.credits`, добавляя опциональную в корневой v1-сейв историю `financialHistory.schema=1` (не более 120 фактически новых операций, без выдуманной истории старых сейвов). Подключены реальные зарплаты `career-work.js` (исходный settlement receipt остаётся авторитетным), покупка/продажа мебели с учитываемыми возвратами editor Undo/Redo, продажи собственных картин; отмена предварительного размещения, склад, движение мебели ничего не списывают. Операции происходят вместе с изменением кошелька и приобретёнными/проданными предметами до единого сохранения, не создавая другого денежного баланса. Старые credits/покупки/рабочие контракты/персонажи и фиксированные пробные цены сохраняются. В W4-A **нет** новых счетов, новых цен, долгов и нового раздела UI — это W4-B/C/D. Автоматическая проверка: `tests/w4a-finance.test.js` и настоящий 390×844/844×390 PlayCanvas/WebGL touch sale в `tests/w4a-finance-browser-smoke.mjs`.
+
+**C3** уже опубликован и принят владельцем 2026-11-18; историческую пометку WIP ниже следует читать как старый pre-release checkpoint.
+
 ## Comfort C3 · mounted lighting — PUBLIC PR #96 (WIP, NOT RELEASED)
 Owner accepted Comfort C2 on iPhone and authorized C3. Development PR https://github.com/mryandexxx-spec/lifesim-prototype/pull/96 is intentionally draft until **all** PR checks complete successfully, including real mobile PlayCanvas/WebGL; the public Pages version remains C2 in the meantime.
 
