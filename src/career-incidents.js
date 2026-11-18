@@ -6,6 +6,7 @@ import {refreshMind} from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
 import {recordProfessionalIncident} from './career-goals.js';
 import {specializationDefinition,recordSpecializationIncident} from './career-specializations.js';
+import {seniorMissingScenes,recordSeniorIncident} from './career-seniority.js';
 
 const O=(id,text,feedback,performance,energy,fun,axis,memory,skill=null)=>
   Object.freeze({id,text,feedback,performance,energy,fun,axis,memory,skill});
@@ -139,7 +140,8 @@ export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?
     const repetition=recent.reduce((sum,h)=>sum+(h.scenarioId===scene.id?8:0),0);
     const focus=track?.scenarioId===scene.id?
       (contract.specialization.focusReceiptId?3:100):0;
-    return variety+trait+condition+rank+skill-repetition+focus-(last===scene.id?1000:0);
+    const senior=seniorMissingScenes(contract).includes(scene.id)?70:0;
+    return variety+trait+condition+rank+skill-repetition+focus+senior-(last===scene.id?1000:0);
   });
   const order=bank.map((_,index)=>index).sort((a,b)=>scores[b]-scores[a]||a-b);
   return bank[order[0]].id;
@@ -235,8 +237,9 @@ export function decideWorkIncident(root,id,choiceId,{automatic=false}={}){
   }
   const badges=recordProfessionalIncident(root,id,incident);
   const specializationEvidence=recordSpecializationIncident(root,id,incident);
+  const seniorEvidence=recordSeniorIncident(root,id,incident);
   return {ok:true,incident,option,performanceDelta:change,feedback:option.feedback,
-    badges,specializationEvidence};
+    badges,specializationEvidence,seniorEvidence};
 }
 export function automaticWorkIncident(root,id){
   return pendingWorkIncident(root,id)?

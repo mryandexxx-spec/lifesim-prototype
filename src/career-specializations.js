@@ -4,6 +4,7 @@
 import {careerDefinition} from './career-catalog.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
+import {seniorRank,seniorTrack,resetSeniorProof} from './career-seniority.js';
 
 const validTime=n=>Number.isSafeInteger(n)&&n>=0&&n<=5256000000;
 const validCount=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000;
@@ -42,6 +43,7 @@ export function careerRankForContract(contract){
   if(!career||!Number.isInteger(contract?.level))return null;
   if(contract.level>=0&&contract.level<career.ranks.length)return career.ranks[contract.level];
   if(contract.level===5)return specializationDefinition(career.id,contract.specialization?.id)?.rank||null;
+  if(contract.level===6||contract.level===7)return seniorRank(career.id,contract.specialization?.id,contract.level);
   return null;
 }
 /** One optional field inside the existing schema-1 contract. Never invalidate a
@@ -89,7 +91,7 @@ export function specializationReadiness(root,residentId){
       target:1,met:!!contract.specialization.focusReceiptId});
     return needs;
   })():[];
-  return {tracks,selected,unlocked:contract.level>=4,atTop:contract.level===5,
+  return {tracks,selected,unlocked:contract.level>=4,atTop:contract.level>=5,
     active,since,canSwitch:contract.level>=4&&!active&&(!selected||since===0||since>=2),
     requirements:progress,ready:!!selected&&progress.every(x=>x.met)};
 }
@@ -99,7 +101,7 @@ export function chooseCareerSpecialization(root,residentId,trackId){
   const target=specializationDefinition(contract?.careerId,trackId);
   if(!['alex','mira'].includes(residentId)||!contract||!target)
     return {ok:false,reason:'Недоступная специализация'};
-  if(contract.level<4||contract.level>5)
+  if(contract.level<4||contract.level>7)
     return {ok:false,reason:'Выбор открывается после пятой карьерной ступени'};
   if(contract.currentShift)
     return {ok:false,reason:'Выбор доступен только между сменами'};
@@ -108,15 +110,19 @@ export function chooseCareerSpecialization(root,residentId,trackId){
   const progress=specializationReadiness(root,residentId);
   if(!progress?.canSwitch)
     return {ok:false,reason:'Для смены направления нужны две завершённые смены после предыдущего выбора'};
-  if(contract.level===5&&target.requirements.skill){
-    const level=currentSkillLevel(residentActor(root,residentId)?.skills,HOBBY_SKILLS,target.requirements.skill);
-    if(level<target.requirements.level)
-      return {ok:false,reason:'Для перехода на эту должность необходим навык '+
-        target.requirements.skill+' уровня '+target.requirements.level};
+  if(contract.level>=5){
+    const targetRule=contract.level===5?target.requirements:
+      seniorTrack(contract.careerId,trackId)?.ranks.find(r=>r.index===contract.level)?.requirements;
+    if(targetRule?.skill){
+      const level=currentSkillLevel(residentActor(root,residentId)?.skills,HOBBY_SKILLS,targetRule.skill);
+      if(level<targetRule.level)return {ok:false,reason:'Для перевода необходим навык '+targetRule.skill+
+        ' уровня '+targetRule.level};
+    }
   }
   contract.specialization={schema:1,id:target.id,chosenAt:validTime(root.minutes)?root.minutes:0,
     workedShiftsAtChoice:contract.workedShifts,
     focusReceiptId:null,focusScenarioId:null,focusAt:null};
+  if(contract.level>=5)contract.seniorProofs=resetSeniorProof(contract,root.minutes);
   const actor=residentActor(root,residentId);
   if(actor)actor.event='Новый профессиональный путь: '+target.title;
   return {ok:true,track:target,rank:careerRankForContract(contract)};

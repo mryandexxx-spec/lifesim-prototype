@@ -7,6 +7,7 @@ import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {refreshMind} from './psychology.js';
 import {careerRankForContract,specializationReadiness} from './career-specializations.js';
+import {seniorPromotionReadiness,resetSeniorProof} from './career-seniority.js';
 
 const clip=(v,lo=0,hi=100)=>Math.max(lo,Math.min(hi,v));
 const count=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000?n:0;
@@ -47,7 +48,9 @@ export function promotionReadiness(root,residentId){
   if(contract.level===4&&!branch?.selected)return {
     maxLevel:false,ready:false,needsSpecialization:true,rank:'Выбери специализацию',
     requirements:[]};
-  const rule=contract.level===4?branch.selected.requirements:PLAN[career.id]?.[contract.level];
+  const senior=contract.level>=5?seniorPromotionReadiness(root,residentId):null;
+  const rule=contract.level===4?branch.selected.requirements:
+    senior?.rule||PLAN[career.id]?.[contract.level];
   if(!rule)return {maxLevel:true,ready:false,
     rank:careerRankForContract(contract)?.title||'',requirements:[]};
   const actor=actorFor(root,residentId);
@@ -62,8 +65,10 @@ export function promotionReadiness(root,residentId){
     target:rule.level,met:currentSkill>=rule.level});
   if(branch?.selected)requirements.push(...branch.requirements.filter(item=>
     item.label==='Профильная рабочая ситуация'));
+  if(senior)requirements.push(...senior.requirements.filter(item=>
+    item.label.startsWith('Успешная ситуация')));
   return {maxLevel:false,ready:requirements.every(item=>item.met),
-    rank:branch?.selected?.rank.title||career.ranks[contract.level+1]?.title||'',requirements};
+    rank:senior?.rank.title||branch?.selected?.rank.title||career.ranks[contract.level+1]?.title||'',requirements};
 }
 export function promoteCareer(root,residentId){
   const contract=root?.careerSystem?.byResident?.[residentId];
@@ -74,6 +79,7 @@ export function promoteCareer(root,residentId){
   if(!goal.ready)return {ok:false,reason:'Не выполнены условия повышения'};
   contract.level++;
   contract.rankShifts=0;
+  if(contract.level>=5)contract.seniorProofs=resetSeniorProof(contract,root.minutes);
   // Progress is earned separately at the next rank, never wiped to zero.
   contract.performance=Math.max(55,clip(contract.performance-18));
   const actor=actorFor(root,residentId);
