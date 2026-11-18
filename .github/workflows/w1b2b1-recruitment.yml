@@ -26,6 +26,7 @@ jobs:
           node --check src/household.js
           node --check src/game.js
           node --test tests/w1b2b1-recruitment.test.js tests/w1b2b2-recruitment.test.js tests/w1b2b3-recruitment.test.js
+          npm test
           mkdir -p vendor
           cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/w1b2b1-http.log 2>&1 &
