@@ -6,10 +6,11 @@ const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const html=read('../index.html'),css=read('../styles.css'),src=read('../src/game.js');
 const pages=read('../.github/workflows/pages.yml');
 test('UI4: View exposes old controls in a single optional popover, not permanently on the tray',()=>{
- const tray=html.slice(html.indexOf('<aside class="control-tray"'),html.indexOf('</aside>')+8);
- assert.match(tray,/id="view-toggle"[^>]*aria-controls="view-panel"[^>]*aria-expanded="false"/);
- assert.doesNotMatch(tray,/id="item-labels-btn"/);
- assert.doesNotMatch(tray,/id="mesh-model-btn"/);
+ const nav=html.slice(html.indexOf('<nav class="life-nav"'),html.indexOf('</nav>')+6);
+ assert.match(nav,/id="view-toggle"[^>]*aria-controls="view-panel"[^>]*aria-expanded="false"/);
+ assert.doesNotMatch(nav,/id="item-labels-btn"/);
+ assert.doesNotMatch(nav,/id="mesh-model-btn"/);
+ assert.match(css,/\.app-shell:not\(\[data-build-mode="true"\]\):not\(\[data-furnish-mode="true"\]\) \.control-tray\{display:none!important\}/);
  assert.match(html,/<section id="view-panel" class="view-panel" hidden /);
  assert.match(html,/id="item-labels-btn"[^>]*aria-pressed="false"/);
  assert.match(html,/id="mesh-model-btn"[^>]*aria-pressed="true"/);
