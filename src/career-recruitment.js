@@ -1,4 +1,4 @@
-/** W1-B.2b.1: saved applications and playable editorial interviews.
+/** W1-B.2b.3: saved applications, interview archive and safe retries.
  * Pure game data. One household clock; never touches salary, renderer or browser time.
  */
 import {careerDefinition} from './career-catalog.js';
@@ -10,6 +10,8 @@ import {deriveAxes} from './trait-catalog.js';
 import {ADDITIONAL_INTERVIEW_QUESTIONS} from './career-interview-content.js';
 
 export const RECRUITMENT_SCHEMA=1;
+export const RECRUITMENT_RETRY_MINUTES=2880;
+export const RECRUITMENT_HISTORY_LIMIT=8;
 export const FAST_OFFER_CAREERS=Object.freeze(['city-services','kitchen-studio']);
 export const INTERVIEW_CAREERS=Object.freeze(['editorial','art-studio','business-center','civic-service']);
 export const RECRUITMENT_CAREERS=Object.freeze([...FAST_OFFER_CAREERS,...INTERVIEW_CAREERS]);
@@ -64,7 +66,7 @@ function traitBoostFor(axes,careerId){
 function getApp(root,id){return root?.recruitmentSystem?.byResident?.[id]??null;}
 export function newRecruitmentSystem(){
   return {schema:RECRUITMENT_SCHEMA,nextApplicationId:1,
-    byResident:{alex:null,mira:null},history:{alex:[],mira:[]}};
+    byResident:{alex:null,mira:null},history:{alex:[],mira:[]},cooldowns:{alex:{},mira:{}}};
 }
 export function interviewScore(app){
   const answers=app?.interview?.answers;
@@ -78,12 +80,59 @@ export function hiringChance(app){
   return clamp(25+interviewScore(app)+Math.min(12,interview.skill*3)+
     clamp(interview.traitBoost,-4,4)+clamp(Math.round((interview.mood-55)/12),-4,4),15,95);
 }
-function cleanHistory(raw){
+/** Only known catalog IDs and bounded primitives enter the saved archive. */
+function cleanHistory(raw,now=TMAX){
   if(!Array.isArray(raw))return [];
-  return raw.slice(-8).filter(x=>validId(x?.id)&&
+  return raw.slice(-RECRUITMENT_HISTORY_LIMIT).filter(x=>validId(x?.id)&&
     RECRUITMENT_CAREERS.includes(x.careerId)&&
-    ['hired','rejected','declined'].includes(x.outcome)&&time(x.at))
-    .map(x=>({id:x.id,careerId:x.careerId,outcome:x.outcome,at:x.at}));
+    ['hired','rejected','declined'].includes(x.outcome)&&time(x.at)&&x.at<=now)
+    .map(x=>{
+      // Old history only stored completion time: do not invent an application date.
+      const appliedAt=time(x.appliedAt)&&x.appliedAt<=x.at?x.appliedAt:null;
+      const resolvedAt=time(x.resolvedAt)&&x.resolvedAt>=(appliedAt??0)&&x.resolvedAt<=x.at
+        ?x.resolvedAt:x.at;
+      const entry={id:x.id,careerId:x.careerId,outcome:x.outcome,at:x.at,resolvedAt};
+      if(appliedAt!==null)entry.appliedAt=appliedAt;
+      const questions=INTERVIEW_QUESTIONS_BY_CAREER[x.careerId],i=x.interview;
+      if(questions&&i&&typeof i==='object'&&!Array.isArray(i)&&
+        time(i.startedAt)&&i.startedAt>=(appliedAt??0)&&i.startedAt<=x.at&&
+        Number.isInteger(i.skill)&&i.skill>=0&&i.skill<=10&&
+        Number.isInteger(i.traitBoost)&&Math.abs(i.traitBoost)<=4&&
+        Number.isInteger(i.mood)&&i.mood>=0&&i.mood<=100&&
+        Array.isArray(i.answers)&&i.answers.length===3&&
+        i.answers.every((choice,j)=>questions[j].answers.some(a=>a.id===choice))){
+        entry.interview={startedAt:i.startedAt,skill:i.skill,
+          traitBoost:i.traitBoost,mood:i.mood,answers:[...i.answers]};
+      }
+      if(x.careerId==='kitchen-studio'&&Number.isInteger(x.kitchenSkill)&&
+        x.kitchenSkill>=0&&x.kitchenSkill<=10)entry.kitchenSkill=x.kitchenSkill;
+      return entry;
+    });
+}
+function cleanCooldowns(raw,now){
+  const result={};
+  for(const careerId of RECRUITMENT_CAREERS){
+    const deadline=raw?.[careerId];
+    if(time(deadline)&&deadline<=now+RECRUITMENT_RETRY_MINUTES)
+      result[careerId]=deadline;
+  }
+  return result;
+}
+/** No mutation: consult durable receipts as well as the bounded history. */
+export function recruitmentRetry(root,id,careerId){
+  if(!CAREER_RESIDENT_IDS.includes(id)||!RECRUITMENT_CAREERS.includes(careerId))
+    return {retryAt:0,remaining:0,blocked:false};
+  const now=time(root?.minutes)?root.minutes:0,system=root?.recruitmentSystem;
+  let retryAt=time(system?.cooldowns?.[id]?.[careerId])
+    ?system.cooldowns[id][careerId]:0;
+  for(const item of system?.history?.[id]??[]){
+    if(item.careerId===careerId&&item.outcome==='rejected'&&time(item.resolvedAt??item.at))
+      retryAt=Math.max(retryAt,Math.min(TMAX,(item.resolvedAt??item.at)+RECRUITMENT_RETRY_MINUTES));
+  }
+  const app=system?.byResident?.[id];
+  if(app?.careerId===careerId&&app.phase==='rejected'&&time(app.resolvedAt??app.decisionDueAt))
+    retryAt=Math.max(retryAt,Math.min(TMAX,(app.resolvedAt??app.decisionDueAt)+RECRUITMENT_RETRY_MINUTES));
+  return {retryAt,remaining:Math.max(0,Math.ceil(retryAt-now)),blocked:retryAt>now};
 }
 function cleanApplication(raw,id){
   if(!raw||typeof raw!=='object'||!validId(raw.id)||raw.residentId!==id||
@@ -95,6 +144,8 @@ function cleanApplication(raw,id){
   const app={id:raw.id,residentId:id,careerId:raw.careerId,
     appliedAt:raw.appliedAt,replyDueAt:raw.replyDueAt,phase:raw.phase,
     unread:raw.unread===true,interview:null,decisionDueAt:null};
+  if(raw.phase==='rejected'&&time(raw.resolvedAt)&&raw.resolvedAt>=raw.appliedAt)
+    app.resolvedAt=raw.resolvedAt;
   if(raw.careerId==='kitchen-studio')
     app.kitchenSkill=Number.isInteger(raw.kitchenSkill)&&raw.kitchenSkill>=0&&raw.kitchenSkill<=10
       ?raw.kitchenSkill:0;
@@ -127,11 +178,21 @@ function cleanApplication(raw,id){
     ['waiting_decision','offer_ready','rejected'].includes(raw.phase)&&!app.interview)return null;
   return app;
 }
-export function restoreRecruitmentSystem(raw,careerSystem){
+export function restoreRecruitmentSystem(raw,careerSystem,now=TMAX){
   const state=newRecruitmentSystem();
   if(raw?.schema!==RECRUITMENT_SCHEMA||!raw.byResident)return state;
-  state.history.alex=cleanHistory(raw.history?.alex);
-  state.history.mira=cleanHistory(raw.history?.mira);
+  const current=time(now)?now:TMAX;
+  state.history.alex=cleanHistory(raw.history?.alex,current);
+  state.history.mira=cleanHistory(raw.history?.mira,current);
+  for(const id of CAREER_RESIDENT_IDS){
+    state.cooldowns[id]=cleanCooldowns(raw.cooldowns?.[id],current);
+    for(const item of state.history[id]){
+      if(item.outcome!=='rejected')continue;
+      const deadline=Math.min(TMAX,item.resolvedAt+RECRUITMENT_RETRY_MINUTES);
+      if(deadline<=current+RECRUITMENT_RETRY_MINUTES)
+        state.cooldowns[id][item.careerId]=Math.max(state.cooldowns[id][item.careerId]||0,deadline);
+    }
+  }
   const seen=new Set();
   for(const id of CAREER_RESIDENT_IDS){
     const app=cleanApplication(raw.byResident[id],id);
@@ -152,6 +213,8 @@ export function submitCareerApplication(root,id,careerId){
     return reason('Недоступная вакансия');
   if(root.careerSystem?.byResident?.[id])return reason('У персонажа уже есть работа');
   if(getApp(root,id))return reason('Сначала завершите текущий отклик');
+  const retry=recruitmentRetry(root,id,careerId);
+  if(retry.blocked)return reason('Повторный отклик доступен через '+retry.remaining+' игровых мин.');
   const next=root.recruitmentSystem.nextApplicationId;
   if(!Number.isSafeInteger(next)||next<1||next>999999999)return reason('Лимит заявок');
   const app={id:'a'+next,residentId:id,careerId,appliedAt:root.minutes,
@@ -178,6 +241,12 @@ export function progressCareerRecruitment(root,before,after){
       const chance=hiringChance(app);
       const roll=hashRoll(app.id+'@'+app.appliedAt+'@'+app.residentId+'@'+app.careerId);
       app.phase=roll<chance?'offer_ready':'rejected';
+      if(app.phase==='rejected'){
+        app.resolvedAt=app.decisionDueAt; // verdict time, not dismiss/reload time
+        const retryAt=Math.min(TMAX,app.resolvedAt+RECRUITMENT_RETRY_MINUTES);
+        root.recruitmentSystem.cooldowns[id][app.careerId]=
+          Math.max(root.recruitmentSystem.cooldowns[id][app.careerId]||0,retryAt);
+      }
       const title=careerDefinition(app.careerId).title;
       text=app.phase==='offer_ready'?title+': предложение работы после собеседования':
         title+': отказ после собеседования. Можно выбрать другую вакансию';
@@ -244,6 +313,18 @@ export function finishRecruitmentApplication(root,id,operation){
 }
 function addHistory(root,id,app,outcome){
   const hist=root.recruitmentSystem.history[id];
-  hist.push({id:app.id,careerId:app.careerId,outcome,at:root.minutes});
-  if(hist.length>8)hist.splice(0,hist.length-8);
+  if(hist.some(item=>item.id===app.id))return; // idempotent receipt
+  const raw={id:app.id,careerId:app.careerId,outcome,at:root.minutes,
+    appliedAt:app.appliedAt,resolvedAt:app.resolvedAt??root.minutes,
+    interview:app.interview,kitchenSkill:app.kitchenSkill};
+  const entry=cleanHistory([raw],root.minutes)[0];
+  if(!entry)return;
+  hist.push(entry);
+  if(hist.length>RECRUITMENT_HISTORY_LIMIT)
+    hist.splice(0,hist.length-RECRUITMENT_HISTORY_LIMIT);
+  if(outcome==='rejected'){
+    const deadline=Math.min(TMAX,entry.resolvedAt+RECRUITMENT_RETRY_MINUTES);
+    root.recruitmentSystem.cooldowns[id][app.careerId]=
+      Math.max(root.recruitmentSystem.cooldowns[id][app.careerId]||0,deadline);
+  }
 }
