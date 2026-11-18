@@ -9,7 +9,7 @@ import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from 
 import {calendarAt} from './calendar-core.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
   startCareerInterview,answerCareerInterview,markRecruitmentRead,
-  finishRecruitmentApplication,interviewScore} from './career-recruitment.js';
+  finishRecruitmentApplication,interviewScore,recruitmentRetry} from './career-recruitment.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 function element(tag,className,text){
@@ -46,12 +46,15 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
   const body=element('div','career-phone-body');
   frame.append(header,body);overlay.append(shade,frame);host.append(overlay);
   let who=null,view='list',chosen=null,lastFocus=null,lastInterviewFeedback='';
+  let section='vacancies',historyId=null;
+  const contexts={alex:null,mira:null};
   const opened=()=>!overlay.hidden;
   function close({focus=true}={}){
     if(!opened())return;
     overlay.hidden=true;trigger.setAttribute('aria-expanded','false');
+    if(who)contexts[who]={section,view,chosen,historyId,scrollTop:body.scrollTop};
     onOpenChange(null);
-    who=null;view='list';chosen=null;lastInterviewFeedback='';
+    who=null;lastInterviewFeedback='';
     if(focus)(lastFocus?.isConnected?lastFocus:trigger).focus({preventScroll:true});
   }
   shade.addEventListener('click',()=>close());
@@ -246,13 +249,13 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         if(!result.ok){notify(result.reason);render();return;}
         setCareerSystem(live.careerSystem);save(true);
         notify(NAMES[who]+': подписан договор · '+careerDefinition(result.contract.careerId).title);
-        lastInterviewFeedback='';render();
+        lastInterviewFeedback='';section='vacancies';render();
       },'career-phone-primary'));
       body.append(action('Отклонить предложение',()=>{
         const live=personRoot();if(!live)return;
         const result=finishRecruitmentApplication(live,who,'dismiss');
         if(!result.ok){notify(result.reason);return;}
-        save(true);view='list';lastInterviewFeedback='';render();
+        save(true);section='vacancies';view='list';lastInterviewFeedback='';render();
       },'career-phone-secondary'));
     }
     if(app.phase==='rejected'){
@@ -260,7 +263,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         const live=personRoot();if(!live)return;
         const result=finishRecruitmentApplication(live,who,'dismiss');
         if(!result.ok){notify(result.reason);return;}
-        save(true);view='list';lastInterviewFeedback='';render();
+        save(true);section='vacancies';view='list';lastInterviewFeedback='';render();
       },'career-phone-primary'));
     }
     if(markRecruitmentRead(root,who))save(true);
@@ -290,7 +293,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       const result=submitCareerApplication(live,who,chosen);
       if(!result.ok){notify(result.reason);render();return;}
       save(true);notify(NAMES[who]+': отклик отправлен · '+offer.title);
-      view='application';render();
+      section='applications';view='list';render();
     },'career-phone-primary'));
   }
   function renderList(root){
@@ -310,14 +313,92 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     }
     body.append(list);
   }
-  function render(){
+  const HISTORY_LABELS={hired:'Подписанный договор',
+    rejected:'Отказ работодателя',declined:'Предложение отклонено'};
+  function renderHistory(root){
+    const entries=root.recruitmentSystem?.history?.[who]??[];
+    top('🗂 '+NAMES[who]+' · ИСТОРИЯ');
+    const selected=entries.find(item=>item.id===historyId);
+    if(selected){
+      body.append(action('‹ Ко всей истории',()=>{historyId=null;render();},'career-phone-back'));
+      body.append(element('h2','career-phone-section-title',careerDefinition(selected.careerId)?.title||'Вакансия'));
+      body.append(element('p','career-phone-notice',HISTORY_LABELS[selected.outcome]));
+      const facts=element('div','career-phone-facts');
+      facts.append(element('span',null,'Отклик: '+gameDueLabel(root,selected.appliedAt??selected.at)));
+      facts.append(element('span',null,'Результат: '+gameDueLabel(root,selected.at)));
+      body.append(facts);
+      if(selected.interview)renderHistoryInterview(selected);
+      else if(Number.isInteger(selected.kitchenSkill))
+        body.append(element('p','career-phone-muted','Навык кулинарии при отклике: '+selected.kitchenSkill));
+      else body.append(element('p','career-phone-muted',
+        'Собеседования не было или детали не сохранялись в прежней версии.'));
+      const retry=recruitmentRetry(root,who,selected.careerId);
+      if(selected.outcome==='rejected'&&retry.blocked)
+        body.append(element('p','career-phone-notice','Следующая попытка: '+gameDueLabel(root,retry.retryAt)));
+      return;
+    }
+    body.append(element('h2','career-phone-section-title','Завершённые отклики'));
+    if(!entries.length){
+      body.append(element('p','career-phone-muted','История появится после решения по отклику.'));
+      return;
+    }
+    const list=element('div','career-phone-list');
+    for(const entry of [...entries].reverse()){
+      const card=action('',()=>{historyId=entry.id;render();},'career-phone-card');
+      card.replaceChildren();
+      card.append(element('strong',null,careerDefinition(entry.careerId)?.title||'Вакансия'));
+      card.append(element('span',null,HISTORY_LABELS[entry.outcome]));
+      card.append(element('small',null,'Отклик: '+gameDueLabel(root,entry.appliedAt??entry.at)));
+      card.setAttribute('aria-label','История '+(careerDefinition(entry.careerId)?.title||'Вакансия')+
+        ': '+HISTORY_LABELS[entry.outcome]);
+      list.append(card);
+    }
+    body.append(list);
+  }
+  function renderApplications(root){
+    if(root.recruitmentSystem?.byResident?.[who])return renderRecruitment(root);
+    top('📨 '+NAMES[who]+' · МОИ ОТКЛИКИ');
+    body.append(element('h2','career-phone-section-title','Активных откликов нет'));
+    body.append(element('p','career-phone-muted','Завершённые отклики находятся в «Истории».'));
+    body.append(action('Посмотреть вакансии',()=>{section='vacancies';view='list';render();},'career-phone-primary'));
+  }
+  function renderHistoryInterview(app){
+    const bank=INTERVIEW_QUESTIONS_BY_CAREER[app.careerId];
+    if(!bank||!app.interview||app.interview.answers.length!==3)return;
+    renderInterviewFactors(app);
+    body.append(element('h3','career-phone-subtitle','Решения на собеседовании'));
+    for(let index=0;index<3;index++){
+      const answer=bank[index].answers.find(a=>a.id===app.interview.answers[index]);
+      if(!answer)continue;
+      const row=element('div','career-phone-answer');
+      row.append(element('strong',null,(index+1)+'. '+bank[index].text));
+      row.append(element('p',null,'Ваш ответ: '+answer.text));
+      row.append(element('small',null,answer.feedback));
+      body.append(row);
+    }
+  }
+  function render({preserveScroll=false}={}){
     if(!opened())return;
     const root=personRoot();if(!root)return;
-    if(root.careerSystem?.byResident?.[who])renderEmployed(root);
-    else if(root.recruitmentSystem?.byResident?.[who])renderRecruitment(root);
+    const oldScroll=body.scrollTop;
+    if(section==='history')renderHistory(root);
+    else if(section==='applications')renderApplications(root);
+    else if(root.careerSystem?.byResident?.[who])renderEmployed(root);
     else if(view==='details'||view==='contract')renderOffer(root);
     else renderList(root);
-    body.scrollTop=0;
+    const nav=element('nav','career-phone-tabs');
+    nav.setAttribute('aria-label','Разделы смартфона');
+    const unread=Boolean(root.recruitmentSystem?.byResident?.[who]?.unread);
+    for(const [id,label] of [['vacancies','Вакансии'],['applications','Мои отклики'],['history','История']]){
+      const button=action(label+(id==='applications'&&unread?' ●':''),()=>{
+        section=id;historyId=null;if(id==='vacancies')view='list';render();
+      },'career-phone-tab'+(section===id?' career-phone-tab-active':''));
+      button.setAttribute('aria-pressed',String(section===id));
+      if(id==='applications'&&unread)button.setAttribute('aria-label','Мои отклики: непрочитанный ответ');
+      nav.append(button);
+    }
+    body.insertBefore(nav,body.children[1]??null);
+    body.scrollTop=preserveScroll?oldScroll:0;
   }
   function open(){
     if(opened()){close();return;}
@@ -325,13 +406,18 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     const root=getRoot();
     if(!NAMES[root?.selectedSim])return;
     beforeOpen();
-    who=root.selectedSim;view='list';chosen=null;
+    who=root.selectedSim;
+    const remembered=contexts[who];
+    section=remembered?.section||(root.recruitmentSystem?.byResident?.[who]?'applications':'vacancies');
+    view=remembered?.view||'list';chosen=remembered?.chosen??null;
+    historyId=remembered?.historyId??null;
     lastFocus=document.activeElement;
     overlay.hidden=false;trigger.setAttribute('aria-expanded','true');
-    render();onOpenChange(who);closeButton.focus({preventScroll:true});
+    render();if(remembered)body.scrollTop=remembered.scrollTop||0;
+    onOpenChange(who);closeButton.focus({preventScroll:true});
   }
   trigger.addEventListener('click',open);
-  return {open,close,refresh:render,isOpen:opened,
+  return {open,close,refresh:()=>render({preserveScroll:true}),isOpen:opened,
     interviewNeedsDecision:()=>opened()&&
       getRoot()?.recruitmentSystem?.byResident?.[who]?.phase==='interview_active'};
 }
