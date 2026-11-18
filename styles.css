@@ -1662,9 +1662,16 @@ button.time-card:active {transform:translateY(1px);}
 #dashboard .character-tag #resident-name,
 #dashboard .character-tag #mood-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:370px){
-  #dashboard .resident-column{flex-wrap:wrap}
-  #dashboard .character-tag{flex:1 1 80px}
-  #dashboard .family-balance-chip{min-width:98px;flex:0 0 auto;font-size:11px}
+  /* All three pieces stay on ONE row at 320px. No third compact HUD row. */
+  #dashboard .resident-column{flex-wrap:nowrap;gap:5px;min-height:44px}
+  #dashboard .resident-switch{gap:3px}
+  #dashboard .resident-switch button{min-width:44px;padding:4px 3px}
+  #dashboard .character-tag{flex:1 1 0;min-width:0;max-height:44px;
+    overflow:hidden;padding:2px 3px}
+  #dashboard .character-tag>div{width:100%;min-width:0;overflow:hidden}
+  #dashboard .family-balance-chip{width:94px;min-width:94px;max-width:94px;
+    flex:0 0 94px;font-size:10px;padding:4px 2px;overflow:hidden;
+    text-overflow:clip}
 }
 @media(max-height:560px) and (orientation:landscape){
   #dashboard .family-balance-chip{min-width:94px}

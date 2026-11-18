@@ -98,7 +98,10 @@ async function testPhone(page,w,h){
     hud:document.querySelector('#dashboard').getBoundingClientRect().height,
     bottom:document.querySelector('.life-nav').getBoundingClientRect().height
   }));
-  assert.ok(physical.available>0&&physical.hud<180,'C2 HUD stays compact '+w+'x'+h);
+  console.log('W4-B viewport',w,h,'dashboard px',physical.hud,
+    'bottom nav px',physical.bottom);
+  assert.ok(physical.available>0&&physical.hud<180,
+    'C2 HUD stays compact '+w+'x'+h+' (actual '+physical.hud+'px)');
 }
 try{
   for(const [w,h] of [[390,844],[375,667],[320,568],[844,390]]){
