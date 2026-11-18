@@ -60,7 +60,8 @@ function settle(root,contract,id,at){
     outcome:'worked',salary:already?0:salary,
     workedMinutes:Math.round(worked),lateMinutes,finishedAt:at,
     grade:result?.grade??null,performanceDelta:result?.delta??null,
-    incident:shift.incident?.choiceId?{choiceId:shift.incident.choiceId,
+    incident:shift.incident?.choiceId?{
+      scenarioId:shift.incident.scenarioId||'legacy',choiceId:shift.incident.choiceId,
       auto:shift.incident.auto,performanceDelta:shift.incident.performanceDelta}:null};
   shift.phase='returning';
   return {salary,result};
