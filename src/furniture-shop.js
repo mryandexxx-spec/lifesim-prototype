@@ -70,6 +70,10 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
   if(sku&&!mount)return reject('missing-light-mount');
   const mountedPose=sku?lightingMountPose(opts.construction,item.itemId,mount):null;
   if(sku&&!mountedPose)return reject('missing-light-mount');
+  if(sku&&current.world.instances.some(x=>x.location==='home'&&
+    MOUNTED_LIGHTS[x.itemDefinitionId]&&
+    Math.hypot(x.x-mountedPose.x,x.z-mountedPose.z)<.55))
+    return reject('light-mount-occupied');
   const added={instanceId:id,prefabId:productPrefabId,
     x:mountedPose?.x??pose.x,z:mountedPose?.z??pose.z,
     yaw:mountedPose?.yaw??pose.yaw,location:'home',
@@ -147,6 +151,10 @@ export function restoreMarketItem(world,shop,instanceId,pose,opts={}){
   const mount=sku?mountedAnchorAt(opts.construction,item.itemDefinitionId,pose.x,pose.z):null;
   if(sku&&!mount)return reject('missing-light-mount');
   const mountedPose=sku?lightingMountPose(opts.construction,item.itemDefinitionId,mount):null;
+  if(sku&&current.world.instances.some(x=>x.location==='home'&&x.instanceId!==instanceId&&
+    MOUNTED_LIGHTS[x.itemDefinitionId]&&
+    Math.hypot(x.x-mountedPose.x,x.z-mountedPose.z)<.55))
+    return reject('light-mount-occupied');
   const candidate={...current.world,
     instances:current.world.instances.map(x=>x.instanceId===instanceId
       ?{...x,location:'home',...(sku?{
