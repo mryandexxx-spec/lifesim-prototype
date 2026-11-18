@@ -1,6 +1,6 @@
 /** W1-B.3a: additive root-v1 career save contract and sanitized work receipts. */
 import {careerDefinition} from './career-catalog.js';
-import {restoreWorkIncident,WORK_INCIDENTS} from './career-incidents.js';
+import {restoreWorkIncident,workScenario,INCIDENT_HISTORY_LIMIT} from './career-incidents.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -42,9 +42,10 @@ function cleanLastShift(raw,contract){
     grade:['удачный день','обычная смена','сложный день','пропуск'].includes(raw.grade)?raw.grade:null,
     performanceDelta:Number.isInteger(raw.performanceDelta)&&raw.performanceDelta>=-10&&raw.performanceDelta<=12
       ?raw.performanceDelta:null,
-    incident:raw.incident&&WORK_INCIDENTS[contract.careerId]?.options.some(x=>x.id===raw.incident.choiceId)&&
+    incident:raw.incident&&workScenario(contract.careerId,raw.incident.scenarioId===undefined?'legacy':raw.incident.scenarioId)?.options.some(x=>x.id===raw.incident.choiceId)&&
       Number.isInteger(raw.incident.performanceDelta)&&raw.incident.performanceDelta>=-5&&raw.incident.performanceDelta<=10
-        ?{choiceId:raw.incident.choiceId,auto:raw.incident.auto===true,
+        ?{scenarioId:raw.incident.scenarioId===undefined?'legacy':raw.incident.scenarioId,
+          choiceId:raw.incident.choiceId,auto:raw.incident.auto===true,
           performanceDelta:raw.incident.performanceDelta}:null};
 }
 function cleanContract(raw,id){
@@ -65,8 +66,38 @@ function cleanContract(raw,id){
   if(last)contract.lastShift=last;
   return contract;
 }
+/** Only authored decisions enter per-resident work memory; no arbitrary save text. */
+function cleanWorkHistory(raw){
+  if(!Array.isArray(raw))return [];
+  const entries=[];
+  for(const item of raw.slice(-128)){
+    if(!item||typeof item!=='object'||Array.isArray(item)||
+      typeof item.id!=='string'||item.id.length>102||
+      !/^e[1-9]\d{0,8}@[0-9]+@[0-9]+#work$/.test(item.id)||
+      !careerDefinition(item.careerId)||typeof item.scenarioId!=='string')continue;
+    const scene=workScenario(item.careerId,item.scenarioId);
+    if(!scene?.options.some(o=>o.id===item.choiceId)||
+      !validTime(item.shiftStart)||!validTime(item.at)||item.at<item.shiftStart||
+      !Number.isInteger(item.rank)||item.rank<0||item.rank>2||
+      !Number.isInteger(item.performanceDelta)||item.performanceDelta< -5||
+        item.performanceDelta>10||
+      !Number.isInteger(item.performanceAfter)||item.performanceAfter<0||
+        item.performanceAfter>100||
+      !Number.isInteger(item.energyDelta)||item.energyDelta< -20||item.energyDelta>5||
+      !Number.isInteger(item.funDelta)||item.funDelta< -10||item.funDelta>10||
+      !item.id.endsWith('@'+item.shiftStart+'#work')||
+      entries.some(x=>x.id===item.id))continue;
+    entries.push({id:item.id,careerId:item.careerId,scenarioId:item.scenarioId,
+      shiftStart:item.shiftStart,at:item.at,rank:item.rank,choiceId:item.choiceId,
+      auto:item.auto===true,performanceDelta:item.performanceDelta,
+      performanceAfter:item.performanceAfter,energyDelta:item.energyDelta,
+      funDelta:item.funDelta});
+  }
+  return entries.slice(-INCIDENT_HISTORY_LIMIT);
+}
 export function newCareerSystem(){
-  return {schema:CAREER_SCHEMA,nextEmploymentId:1,byResident:{alex:null,mira:null},settlementIds:[],incidentIds:[]};
+  return {schema:CAREER_SCHEMA,nextEmploymentId:1,byResident:{alex:null,mira:null},
+    settlementIds:[],incidentIds:[],incidentHistory:{alex:[],mira:[]}};
 }
 export function restoreCareerSystem(raw){
   const state=newCareerSystem();
@@ -88,6 +119,7 @@ export function restoreCareerSystem(raw){
   }
   if(Array.isArray(raw.incidentIds))state.incidentIds=[...new Set(raw.incidentIds.filter(x=>
     typeof x==='string'&&x.length<=102&&/^e[1-9]\d{0,8}@[0-9]+@[0-9]+#work$/.test(x)))].slice(-256);
+  for(const id of CAREER_RESIDENT_IDS)state.incidentHistory[id]=cleanWorkHistory(raw.incidentHistory?.[id]);
   return state;
 }
 /** Pure hire transition. Gameplay/UI and attendance will call this adapter in W1-B.2. */
