@@ -6,6 +6,7 @@ import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {professionalGoalsView} from './career-goals.js';
+import {careerRankForContract,specializationReadiness,chooseCareerSpecialization} from './career-specializations.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
 import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
@@ -87,12 +88,12 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     if(!career)return;
     top('💼 '+NAMES[who]+' · трудовой договор');
     body.append(element('h2','career-phone-section-title',career.title));
-    body.append(element('p','career-phone-muted',career.ranks[current.level]?.title||'Должность'));
+    body.append(element('p','career-phone-muted',careerRankForContract(current)?.title||'Должность'));
     const shift=nextCareerShift(root.calendar,current,root.minutes);
     const status=residentWorkStatus(root,who);
     const active=current.currentShift;
     const facts=element('div','career-phone-facts');
-    facts.append(element('span',null,'Ставка: '+career.ranks[current.level]?.hourlyCredits+' кр./час'));
+    facts.append(element('span',null,'Ставка: '+careerRankForContract(current)?.hourlyCredits+' кр./час'));
     facts.append(element('span',null,'Следующая смена: '+describeCareerShift(shift)));
     facts.append(element('span',null,'Статус: '+status.label));
     facts.append(element('span',null,'Баланс семьи: '+root.shop.credits+' кр.'));
@@ -198,11 +199,72 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       }
       body.append(details);
     }
+
+    // W2-A.3: specialization belongs to the existing in-game smartphone.
+    const branch=specializationReadiness(root,who);
+    if(branch){
+      const details=element('details','career-specialization');
+      details.open=branch.unlocked;
+      details.append(element('summary','career-specialization-summary',
+        '🧭 Специализация · '+(branch.selected?.title||'выбери направление')));
+      details.append(element('p','career-phone-muted',branch.unlocked?
+        'Специализация определяет следующую должность и профильную задачу. Смена направления не сбрасывает должность, деньги или достижения.':
+        'Два направления откроются после пятой карьерной ступени.'));
+      if(branch.selected){
+        details.append(element('p','career-phone-notice',
+          'Текущий путь: '+branch.selected.title+' · '+branch.selected.description));
+        if(!branch.atTop){
+          const list=element('ul','career-specialization-requirements');
+          for(const item of branch.requirements)list.append(element('li',null,
+            (item.met?'✓ ':'○ ')+item.label+': '+item.current+' / '+item.target));
+          details.append(list);
+        }
+      }
+      for(const track of branch.tracks){
+        const card=element('div','career-specialization-card');
+        card.append(element('strong',null,track.title));
+        card.append(element('p','career-phone-muted',track.description));
+        card.append(element('p','career-phone-muted',
+          '6-я должность: '+track.rank.title+' · '+track.rank.hourlyCredits+' кр./ч'));
+        const rule=track.requirements;
+        card.append(element('small','career-specialization-gate',
+          'Нужно: '+rule.shifts+' смен на 5-й ступени, рейтинг '+
+          rule.performance+(rule.skill?', навык '+
+            ({cooking:'Кулинария',painting:'Живопись',literature:'Литература'})[rule.skill]+
+            ' '+rule.level:'')+' и успешная профильная ситуация'));
+        if(branch.selected?.id===track.id){
+          card.append(element('small','career-specialization-chosen','✓ Выбранный путь'));
+        }else if(branch.unlocked){
+          const button=action(branch.selected?'Перейти в «'+track.title+'»':
+            'Выбрать «'+track.title+'»',()=>{
+            const live=personRoot();if(!live)return;
+            const currentBranch=specializationReadiness(live,who);
+            if(!currentBranch?.canSwitch){
+              notify('Для перевода нужны две завершённые смены после выбора.');
+              render();return;
+            }
+            if(!window.confirm('Выбрать «'+track.title+
+              '»? Уже заработанные деньги и карьерный уровень сохраняются.'))return;
+            const result=chooseCareerSpecialization(live,who,track.id);
+            if(!result.ok){notify(result.reason);render();return;}
+            save(true);notify(NAMES[who]+': выбран путь «'+track.title+'»');
+            render();
+          },'career-phone-secondary career-specialization-select');
+          button.disabled=!branch.canSwitch;
+          card.append(button);
+          if(!branch.canSwitch)card.append(element('small','career-phone-muted',
+            'Для перевода нужно 2 завершённые смены: '+branch.since+' / 2'));
+        }
+        details.append(card);
+      }
+      body.append(details);
+    }
     // The career route is presentation-only; stable catalog rank IDs drive it.
+    const ranks=[...career.ranks,...(branch?.selected?[branch.selected.rank]:[])];
     body.append(element('h3','career-phone-subtitle',
-      'Карьерный путь · '+(current.level+1)+' из '+career.ranks.length));
+      'Карьерный путь · '+(current.level+1)+' из '+ranks.length));
     const ladder=element('ol','career-ladder');
-    career.ranks.forEach((rank,index)=>{
+    ranks.forEach((rank,index)=>{
       const status=index<current.level?'passed':index===current.level?'current':'future';
       const item=element('li','career-ladder-step career-ladder-'+status);
       item.append(element('span','career-ladder-marker',
@@ -220,13 +282,16 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     const growth=promotionReadiness(root,who);
     if(growth?.maxLevel){
       body.append(element('p','career-phone-notice','Высшая должность этой карьерной ветки достигнута.'));
+    }else if(growth?.needsSpecialization){
+      body.append(element('p','career-phone-notice',
+        'Для следующего повышения сначала выбери специализацию.'));
     }else if(growth){
-      const next=career.ranks[current.level+1];
+      const next=careerRankForContract({...current,level:current.level+1});
       body.append(element('h3','career-phone-subtitle',
         'Повышение: '+growth.rank+' · следующая цель'));
       body.append(element('p','career-phone-notice',
         'Новая ставка: '+next.hourlyCredits+' кр./час · +'+
-        (next.hourlyCredits-career.ranks[current.level].hourlyCredits)+' кр./час к текущей'));
+        (next.hourlyCredits-careerRankForContract(current).hourlyCredits)+' кр./час к текущей'));
       const requirements=element('div','career-goal-requirements');
       const missing=[];
       for(const req of growth.requirements){
