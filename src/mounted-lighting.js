@@ -119,3 +119,18 @@ export function mountedFixturesSurviveEdit(before,after,furniture){
   }
   return {ok:true};
 }
+
+/** Shared shadow-free lighting budget. Closest occupied zones win; manual
+ * switches remain saved and never mutate merely because GPU budget is full.
+ */
+export function prioritizeVisibleLights(lights,residents=[],limit=5){
+  const present=residents.filter(r=>r&&!r.away&&r.home!==false&&
+    valid(r.x)&&valid(r.z));
+  return lights.filter(l=>l?.on&&typeof l.instanceId==='string'&&
+      valid(l.x)&&valid(l.z))
+    .map((l,i)=>({id:l.instanceId,i,d:present.length
+      ?Math.min(...present.map(r=>Math.hypot(r.x-l.x,r.z-l.z))):Infinity}))
+    .sort((a,b)=>a.d-b.d||a.i-b.i)
+    .slice(0,Math.max(0,Math.min(5,Math.floor(limit))))
+    .map(l=>l.id);
+}
