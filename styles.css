@@ -1813,3 +1813,9 @@ button.time-card:active {transform:translateY(1px);}
 @media(prefers-reduced-motion:reduce){
   .career-shift-summary-shade{-webkit-backdrop-filter:none;backdrop-filter:none}
 }
+
+/* W3-A: leave dates remain touch accessible inside the existing career phone. */
+.career-phone-leave{margin:8px 0 14px;border:1px solid #dbe5d9;border-radius:12px;padding:5px 9px}
+.career-phone-leave summary{min-height:44px;display:flex;align-items:center;cursor:pointer;touch-action:manipulation;font-weight:700;line-height:1.35}
+.career-phone-leave summary:focus-visible{outline:3px solid #3e865c;outline-offset:2px}
+.career-phone-leave .career-phone-action{min-height:44px;margin:5px 0}
