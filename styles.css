@@ -1649,3 +1649,100 @@ button.time-card:active {transform:translateY(1px);}
 .furnish-light-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;font-size:13px}
 .furnish-light-control[hidden]{display:none!important}
 .furnish-light-control select{min-height:44px;min-width:112px;max-width:100%;font:inherit;border-radius:9px;padding:8px;background:#f8f5e9;color:#24352f}
+
+
+/* W4-B: one compact family balance alongside Alex / Mira in the current C2 HUD. */
+#dashboard .family-balance-chip{flex:0 0 auto;min-height:44px;min-width:96px;
+  padding:5px 9px;border-radius:11px;border:1px solid #bed9c7;
+  background:#e5f3e7;color:#235e49;font-size:12px;font-weight:800;
+  text-align:center;white-space:nowrap;touch-action:manipulation}
+#dashboard .family-balance-chip[aria-expanded="true"]{background:#c7e8d0}
+#dashboard .character-tag{overflow:hidden}
+#dashboard .character-tag>div{min-width:0;overflow:hidden}
+#dashboard .character-tag #resident-name,
+#dashboard .character-tag #mood-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:370px){
+  #dashboard .resident-column{flex-wrap:wrap}
+  #dashboard .character-tag{flex:1 1 80px}
+  #dashboard .family-balance-chip{min-width:98px;flex:0 0 auto;font-size:11px}
+}
+@media(max-height:560px) and (orientation:landscape){
+  #dashboard .family-balance-chip{min-width:94px}
+}
+/* The existing career dialog hosts two apps without losing career subnavigation. */
+.career-phone-apps{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:9px 12px;
+  background:#eaf4ec;border-bottom:1px solid #d1dfd4;flex-shrink:0}
+.career-phone-app-tab{min-height:44px;border-radius:11px;border:1px solid #b6d3c4;
+  background:#fff;color:#2b5a46;font:800 13px 'DM Sans',sans-serif;
+  touch-action:manipulation}
+.career-phone-app-active{background:#367d66;color:#fff;border-color:#367d66}
+.finance-tabs,.finance-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:5px;margin-bottom:12px}
+.finance-tabs{position:sticky;top:-14px;z-index:3;background:#f8f6ee;padding:6px 0}
+.finance-action{min-height:44px;padding:8px;border-radius:11px;
+  background:#fff;border:1px solid #cbdcd0;color:#315844;
+  font:700 12px 'DM Sans',sans-serif;touch-action:manipulation}
+.finance-tab-active,.finance-filter-active,.finance-preset-active,.finance-apply{
+  background:#367d66;border-color:#367d66;color:white}
+.finance-title{font-size:20px;line-height:1.24;color:#294c3e;margin:8px 0 14px}
+.finance-wallet{display:flex;flex-direction:column;gap:5px;background:#e0efe6;
+  border:1px solid #b3d6bf;padding:17px;border-radius:15px;color:#225b46}
+.finance-wallet small{font-size:10px;font-weight:800;letter-spacing:.6px}
+.finance-wallet strong{font-size:27px;line-height:1.2;overflow-wrap:anywhere}
+.finance-wallet span{font-size:12px}
+.finance-note{font-size:12px;line-height:1.5;color:#667a6d;margin:10px 0 15px}
+.finance-quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.finance-receipt-day{font-size:12px;color:#466e57;margin:15px 0 8px}
+.finance-receipt{display:flex;justify-content:space-between;gap:9px;padding:12px 8px;
+  border-top:1px solid #dce6df;background:#fff}
+.finance-receipt-left,.finance-receipt-right{display:flex;flex-direction:column;gap:5px;min-width:0}
+.finance-receipt-left{flex:1}
+.finance-receipt-left strong{font-size:13px;line-height:1.25;overflow-wrap:anywhere}
+.finance-receipt-left span{font-size:11px;color:#627d6a}
+.finance-receipt-right{align-items:flex-end;text-align:right;flex:0 1 auto}
+.finance-receipt-right strong{font-size:13px;white-space:nowrap}
+.finance-receipt-right small{font-size:10px;color:#506f61;white-space:nowrap}
+.finance-positive{color:#247c50}
+.finance-negative{color:#ac6047}
+.finance-more{width:100%;margin-top:10px}
+.finance-period-presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px;margin-bottom:12px}
+.finance-dates{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.finance-date-field{min-width:0;display:flex;flex-direction:column;gap:6px;
+  color:#315948;font-size:12px;font-weight:700}
+.finance-date-field input{font:600 12px 'DM Sans',sans-serif;width:100%;min-width:0;
+  min-height:44px;box-sizing:border-box;background:white;color:#294c3e;
+  border-radius:9px;border:1px solid #aac8b9;padding:5px 4px}
+.finance-apply{width:100%;margin-top:10px}
+.finance-error{color:#9b3e37;font-weight:700}
+.finance-period-range{color:#315844;font-weight:800;font-size:13px}
+.finance-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.finance-kpi{background:#eaf3ed;padding:11px 9px;border-radius:12px;min-width:0;
+  display:flex;flex-direction:column;gap:6px;color:#24553d}
+.finance-kpi small{font-size:10px}
+.finance-kpi strong{font-size:17px;overflow-wrap:anywhere}
+.finance-chart{background:#fff;border:1px solid #deebe2;border-radius:13px;
+  margin:13px 0;padding:10px;min-width:0}
+.finance-chart-heading{font-size:14px;line-height:1.3;color:#284e3e;margin:6px 0 11px}
+.finance-svg{display:block;width:100%;height:auto;max-height:150px}
+.finance-svg g[role=button]{cursor:pointer;outline-offset:2px}
+.finance-chart-detail{margin:7px 0 0}
+.finance-legend{display:flex;gap:13px;font-size:11px;margin:0}
+.finance-green{color:#367d66}.finance-orange{color:#af6545}
+.finance-breakdown-item{margin:13px 0}
+.finance-breakdown-label{display:flex;gap:7px;justify-content:space-between;
+  font-size:12px;margin-bottom:5px;align-items:center}
+.finance-breakdown-label span{text-align:right;font-size:11px}
+.finance-breakdown-track{height:12px;background:#e2ebe2;border-radius:9px;overflow:hidden}
+.finance-breakdown-fill{height:100%;background:#42896d;border-radius:9px}
+.finance-assessment{background:#f0f4ec;border:1px solid #c7dec8;
+  padding:12px;border-radius:12px;margin:14px 0}
+.finance-assessment h3{margin:7px 0;font-size:14px;color:#28543e}
+.finance-assessment strong{font-size:14px}
+.finance-assessment p,.finance-assessment li{font-size:12px;line-height:1.5}
+.finance-assessment ul{padding-left:18px;margin:7px 0}
+.finance-coverage{background:#fff3d9;padding:10px;border-radius:10px;color:#745d35}
+@media(max-height:600px){
+  .career-phone-apps{padding:5px 10px}
+  .career-phone-app-tab{min-height:44px}
+}
