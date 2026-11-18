@@ -33,7 +33,10 @@ export const EMOTION_SOURCES=Object.freeze({
   'leisure.music':Object.freeze({kind:'enthusiasm',cause:'Музыка вместе',mood:11}),
   'leisure.books':Object.freeze({kind:'inspiration',cause:'Совместное чтение',mood:11}),
   'leisure.games':Object.freeze({kind:'joy',cause:'Совместная игра',mood:11}),
-  'leisure.refused':Object.freeze({kind:'sadness',cause:'Не удалось провести время вместе',mood:-5})
+  'leisure.refused':Object.freeze({kind:'sadness',cause:'Не удалось провести время вместе',mood:-5}),
+  'work.pride':Object.freeze({kind:'inspiration',cause:'Профессиональная гордость',mood:8}),
+  'work.pressure':Object.freeze({kind:'anxiety',cause:'Напряжённая смена',mood:-7}),
+  'work.relief':Object.freeze({kind:'calm',cause:'Справился с рабочей ситуацией',mood:4})
 });
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const isRecord=v=>Boolean(v)&&typeof v==='object'&&!Array.isArray(v);
