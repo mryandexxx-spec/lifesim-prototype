@@ -34,7 +34,10 @@ export const MEMORY_TEXT = Object.freeze({
   'leisure.music':'Послушали музыку вместе',
   'leisure.books':'Вместе читали и обсуждали книги',
   'leisure.games':'Играли вместе',
-  'leisure.refused':'Совместный досуг не сложился'
+  'leisure.refused':'Совместный досуг не сложился',
+  'work.pride':'Гордится решением на работе',
+  'work.pressure':'Переживает напряжённую смену',
+  'work.relief':'Нашёл спокойный выход из рабочей ситуации'
 });
 const IDS = Object.keys(WISHES);
 const LIMIT = 12;
@@ -63,7 +66,8 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
     const socialEffect={argue:-18,regret:-13,hurt:-22,talk:11,reconcile:18,
       'gift.given':7,'gift.liked':14,'gift.neutral':5,'gift.rejected':-9,
       'gift.refused':-5,'leisure.music':11,'leisure.books':11,
-      'leisure.games':11,'leisure.refused':-5};
+      'leisure.games':11,'leisure.refused':-5,
+      'work.pride':8,'work.pressure':-7,'work.relief':4};
     const effect=Object.hasOwn(socialEffect,memory.id)
       ?socialEffect[memory.id]:memory.fulfilled?12:5;
     return sum+effect*strength;
