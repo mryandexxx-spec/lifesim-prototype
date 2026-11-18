@@ -2,7 +2,8 @@
  * The visible game/shop adapter must only expose fixtures after the whole
  * wall/ceiling placement, refund and editing lifecycle is integrated.
  */
-import {constructionRooms,constructionWallSegments,BUILD_STEP,constructionContains} from './construction.js';
+import {constructionRooms,constructionWallSegments,constructionOpeningEdgeIds,
+  BUILD_STEP,constructionContains} from './construction.js';
 import {sampleWorldLighting} from './day-night-cycle.js';
 import {BUILD_WALL_HEIGHTS} from './exterior-construction.js';
 
@@ -42,6 +43,7 @@ export function lightingMountPose(construction,productId,anchor){
   if(typeof anchor.edgeId!=='string'||![1,-1].includes(anchor.side))return null;
   const w=constructionWallSegments(construction).find(w=>w.id===anchor.edgeId);
   if(!w)return null;
+  if(constructionOpeningEdgeIds(construction).has(w.id))return null;
   const t=valid(anchor.t)?anchor.t:.5;
   if(t<.15||t>.85)return null;
   const shift=anchor.side*.16;
@@ -60,7 +62,9 @@ export function mountedAnchorAt(construction,productId,x,z){
   if(!sku||!valid(x)||!valid(z)||!constructionContains(construction,x,z))return null;
   if(sku.mount==='ceiling')return {x,z};
   const candidates=[];
+  const openings=constructionOpeningEdgeIds(construction);
   for(const wall of constructionWallSegments(construction)){
+    if(openings.has(wall.id))continue;
     const along=wall.axis==='v'?z:x;
     const base=(wall.axis==='v'?wall.j:wall.i)*BUILD_STEP;
     const t=(along-base)/BUILD_STEP;
