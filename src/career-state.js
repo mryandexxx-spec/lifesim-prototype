@@ -4,6 +4,7 @@ import {restoreWorkIncident,workScenario,INCIDENT_HISTORY_LIMIT} from './career-
 import {newProfessionalGoals,restoreProfessionalGoals} from './career-goals.js';
 import {careerRankForContract,restoreCareerSpecialization} from './career-specializations.js';
 import {restoreSeniorProof} from './career-seniority.js';
+import {restoreCareerTimeOff} from './career-timeoff.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -71,6 +72,7 @@ function cleanContract(raw,id){
   if(specialization)contract.specialization=specialization;
   const seniorProof=restoreSeniorProof(raw.seniorProofs,contract);
   if(seniorProof)contract.seniorProofs=seniorProof;
+  contract.timeOff=restoreCareerTimeOff(raw.timeOff,contract.employmentId);
   contract.currentShift=cleanWorkShift(raw.currentShift,contract);
   const last=cleanLastShift(raw.lastShift,contract);
   if(last)contract.lastShift=last;
@@ -145,7 +147,8 @@ export function hireCareer(system,residentId,careerId,atMinute){
   const id='e'+state.nextEmploymentId++;
   state.byResident[residentId]={residentId,employmentId:id,careerId,level:0,
     hiredAt:atMinute,status:'employed',performance:50,currentShift:null,
-    workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0};
+    workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0,
+    timeOff:restoreCareerTimeOff(null,id)};
   return state;
 }
 export function resignCareer(system,residentId){
