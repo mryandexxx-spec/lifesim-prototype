@@ -87,7 +87,7 @@ export function restoreCareerSystem(raw){
       typeof x==='string'&&x.length<=96&&/^e[1-9]\d{0,8}@[0-9]+@[0-9]+$/.test(x)))].slice(-256);
   }
   if(Array.isArray(raw.incidentIds))state.incidentIds=[...new Set(raw.incidentIds.filter(x=>
-    typeof x==='string'&&x.length<=102&&/^e[1-9]\\d{0,8}@[0-9]+@[0-9]+#work$/.test(x)))].slice(-256);
+    typeof x==='string'&&x.length<=102&&/^e[1-9]\d{0,8}@[0-9]+@[0-9]+#work$/.test(x)))].slice(-256);
   return state;
 }
 /** Pure hire transition. Gameplay/UI and attendance will call this adapter in W1-B.2. */
