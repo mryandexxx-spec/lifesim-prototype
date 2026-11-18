@@ -11,6 +11,7 @@ import {seniorTrack} from './career-seniority.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
 import {createFinancePhoneUI} from './finance-phone-ui.js';
+import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff} from './career-timeoff.js';
 import {payHouseholdBill} from './household-bills.js';
 import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
@@ -149,6 +150,44 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       (current.lastShift.lateMinutes?' · опоздание '+current.lastShift.lateMinutes+' мин.':'')));
 
     body.append(facts);
+    body.append(element('h3','career-phone-section-title','🏖 Отдых от работы'));
+    const leave=current.timeOff||{balance:0,progress:0};
+    body.append(element('p','career-phone-muted',
+      'Оплачиваемых дней: '+leave.balance+'/3 · до следующего: '+
+      (5-leave.progress)+' отработанных смен. Отгул без оплаты не считается прогулом.'));
+    const leaveDetails=element('details','career-phone-leave');
+    leaveDetails.append(element('summary','career-phone-notice',
+      'Выбрать дату отдыха (ближайшие смены)'));
+    const dates=upcomingCareerTimeOff(root,who,6);
+    if(!dates.length)leaveDetails.append(element('p','career-phone-muted',
+      'В ближайшие игровые дни доступных смен нет.'));
+    for(const {shift:planned,booking} of dates){
+      leaveDetails.append(element('p','career-phone-muted',planned.iso+' · '+
+        clockAt(planned.start)+'–'+clockAt(planned.end)+
+        (booking?' · '+(booking.type==='paid'?'Оплачиваемый отпуск':'Отгул'):' · Рабочая смена')));
+      if(booking){
+        if(!booking.settled)leaveDetails.append(action('Отменить отдых '+planned.iso,()=>{
+          const live=personRoot();if(!live)return;
+          const result=cancelCareerTimeOff(live,who,planned.id);
+          if(!result.ok){notify(result.reason);return;}
+          save(true);notify('Отдых отменён');render();
+        },'career-phone-secondary'));
+        continue;
+      }
+      for(const kind of ['paid','unpaid']){
+        if(kind==='paid'&&leave.balance===0)continue;
+        const label=kind==='paid'?'Оплачиваемый отпуск':'Неоплачиваемый отгул';
+        leaveDetails.append(action(label+' · '+planned.iso,()=>{
+          const live=personRoot();if(!live)return;
+          if(!window.confirm(label+' на смену '+planned.iso+
+            '? Прогул не засчитывается.'))return;
+          const result=bookCareerTimeOff(live,who,planned.id,kind);
+          if(!result.ok){notify(result.reason);render();return;}
+          save(true);notify(NAMES[who]+': '+label.toLowerCase()+' назначен');render();
+        },'career-phone-secondary'));
+      }
+    }
+    body.append(leaveDetails);
     // Work events stay within the existing job screen, even after reload.
     const incident=active?.incident,scenario=workScenario(current.careerId,incident?.scenarioId||'legacy');
     if(active?.phase==='working'&&incident&&scenario){
