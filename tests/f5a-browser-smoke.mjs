@@ -33,7 +33,11 @@ try{
  });
  await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
  await page.locator('#loading').waitFor({state:'hidden',timeout:25000});
- await page.locator('#build-toggle').click();
+ const clickBuild=async()=>{
+    if(await page.locator('#build-toggle').isVisible())await page.locator('#build-toggle').click();
+    else{await page.locator('#home-open').click();await page.locator('#home-build').click();}
+  };
+  await clickBuild();
  assert.equal(await page.locator('#build-toggle').getAttribute('aria-pressed'),'true');
  assert.ok(await page.locator('#build-editor').isVisible());
  await page.locator('[data-build-tool="wall"]').click();
@@ -110,7 +114,7 @@ try{
  // Native original house editing: no extra starter-side buttons. The same
  // canvas tool selects BOTH an old back wall and a newly constructed wall.
  await page.locator('#build-exit').click();
- await page.locator('#build-toggle').click(); // restores the known initial build camera
+ await clickBuild(); // restores the known initial build camera
  assert.equal(await page.locator('#build-starter-picker').count(),0,
    'The original home must not need a separate wall-side picker');
  await page.locator('[data-build-tool="move-wall"]').click();
@@ -152,7 +156,7 @@ try{
  await page.locator('#build-exit').click();
  assert.equal(await page.locator('#build-toggle').getAttribute('aria-pressed'),'false');
  assert.ok(await page.locator('#build-editor').isHidden());
- await page.locator('#build-toggle').click();
+ await clickBuild();
  assert.ok(await page.locator('#build-editor').isVisible());
  await page.locator('#build-exit').click();
  await page.waitForTimeout(500);
@@ -179,7 +183,7 @@ try{
    'Reload cannot lose the original room foundation extensions');
  // F5-B: a real Safari-sized tap picks a floor style, stages a transaction,
  // renders a material and survives loading the same v1 save.
- await page.locator('#build-toggle').click();
+ await clickBuild();
  await page.locator('[data-build-tool="paint-room"]').click();
  assert.ok(await page.locator('#build-finish-picker').isVisible());
  await page.locator('[data-finish-id="floor.slate"]').click();
@@ -200,7 +204,7 @@ try{
  assert.deepEqual(finishAfter.world.construction.materials,finishSaved.world.construction.materials);
   // F5-B.2: actual touch on the published PlayCanvas opening editor, not
  // only headless domain functions. Build entry restores the default mobile pose.
- await page.locator('#build-toggle').click();
+ await clickBuild();
  await page.locator('[data-build-tool="arch"]').click();
  assert.ok(await page.locator('#build-opening-picker').isVisible());
  await page.locator('[data-opening-style="arch.wide"]').click();
@@ -233,7 +237,7 @@ try{
  assert.equal(restoredOpening.world.construction.openings.find(o=>o.id===arch.id)?.type,'door');
  assert.equal(restoredOpening.world.construction.openings.find(o=>o.id===arch.id)?.styleId,'door.double');
   // F5-B.4: actual mobile WebGL touch on ceiling/pattern and v1 save.
-  await page.locator('#build-toggle').click();
+  await clickBuild();
   await page.locator('[data-build-tool="paint-ceiling-room"]').click();
   assert.equal(await page.locator('#build-ceiling-toggle').getAttribute('aria-pressed'),'true');
   await page.locator('[data-finish-id="ceiling.blue"]').click();
@@ -263,7 +267,7 @@ try{
   assert.equal(restoredB4.world.construction.materials.ceiling['32,0'],'ceiling.blue');
   assert.equal(restoredB4.world.construction.materials.floor['32,0'],'floor.planks-z');
   // F5-C.1: author a real roof, change its shape and reload with PlayCanvas.
-  await page.locator('#build-toggle').click();
+  await clickBuild();
   await page.locator('[data-build-tool="roof-auto"]').click();
   assert.ok(await page.locator('#build-roof-picker').isVisible());
   assert.ok(await page.locator('#build-pending').isVisible(),
@@ -293,7 +297,7 @@ try{
   const afterRoofReload=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
   assert.deepEqual(afterRoofReload.world.construction.roofModules,
     hipSave.world.construction.roofModules);
-  await page.locator('#build-toggle').click();
+  await clickBuild();
   assert.equal(await page.locator('#build-roof-toggle').getAttribute('aria-pressed'),'false',
     'A roof never covers the life view or starts visible by default');
   // F5-C.2: real wall/roof-height, facade and outdoor porch UI in Chromium WebGL.
@@ -338,7 +342,7 @@ try{
   assert.equal(afterExteriorReload.world.construction.wallHeightClass,'tall');
   assert.deepEqual(afterExteriorReload.world.construction.materials.facade,
     porchSaved.world.construction.materials.facade);
-  await page.locator('#build-toggle').click();
+  await clickBuild();
   await page.locator('[data-build-walls="cut"]').waitFor();
   assert.equal(await page.locator('[data-build-walls="cut"]').getAttribute('aria-pressed'),'true',
     'Entering a new build session must reset camera cutaway without changing wall height');
