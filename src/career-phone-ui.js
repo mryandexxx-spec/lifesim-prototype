@@ -10,6 +10,7 @@ import {careerRankForContract,specializationReadiness,chooseCareerSpecialization
 import {seniorTrack} from './career-seniority.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
+import {createFinancePhoneUI} from './finance-phone-ui.js';
 import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
   startCareerInterview,answerCareerInterview,markRecruitmentRead,
@@ -27,7 +28,7 @@ function action(label,callback,kind=''){
   el.type='button';el.addEventListener('click',callback);
   return el;
 }
-export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
+export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,setCareerSystem,
   save,notify,onOpenChange=()=>{},beforeOpen=()=>{},canOpen=()=>true}){
   const overlay=element('section','career-phone-overlay');
   overlay.id='career-phone-panel';overlay.hidden=true;
@@ -48,7 +49,21 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
   closeButton.setAttribute('aria-label','Закрыть смартфон');
   header.append(heading,closeButton);
   const body=element('div','career-phone-body');
-  frame.append(header,body);overlay.append(shade,frame);host.append(overlay);
+  const appTabs=element('nav','career-phone-apps');
+  appTabs.setAttribute('aria-label','Приложения смартфона');
+  for(const [id,label] of [['work','Работа'],['finance','Финансы']]){
+    const tab=action(label,()=>{
+      const root=personRoot();if(!root)return;
+      if(id==='finance'&&root.recruitmentSystem?.byResident?.[who]?.phase==='interview_active'){
+        notify('Сначала ответь на вопросы собеседования');return;
+      }
+      app=id;render();
+    },'career-phone-app-tab');
+    tab.dataset.app=id;appTabs.append(tab);
+  }
+  frame.append(header,appTabs,body);overlay.append(shade,frame);host.append(overlay);
+  const financeUI=createFinancePhoneUI({body});
+  let app='work';
   let who=null,view='list',chosen=null,lastFocus=null,lastInterviewFeedback='';
   let section='vacancies',historyId=null;
   const contexts={alex:null,mira:null};
@@ -56,6 +71,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
   function close({focus=true}={}){
     if(!opened())return;
     overlay.hidden=true;trigger.setAttribute('aria-expanded','false');
+    financeTrigger?.setAttribute('aria-expanded','false');
     if(who)contexts[who]={section,view,chosen,historyId,scrollTop:body.scrollTop};
     onOpenChange(null);
     who=null;lastInterviewFeedback='';
@@ -662,6 +678,20 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     if(!opened())return;
     const root=personRoot();if(!root)return;
     const oldScroll=body.scrollTop;
+    if(root.recruitmentSystem?.byResident?.[who]?.phase==='interview_active')app='work';
+    title.textContent=app==='finance'?'Финансы семьи':'Работа Блин’С';
+    overlay.setAttribute('aria-label',app==='finance'?
+      'Смартфон: финансы семьи':'Смартфон: работа Блин’С');
+    for(const b of appTabs.querySelectorAll('button')){
+      const selected=b.dataset.app===app;
+      b.setAttribute('aria-pressed',String(selected));
+      b.classList.toggle('career-phone-app-active',selected);
+    }
+    if(app==='finance'){
+      financeUI.render(root);
+      body.scrollTop=preserveScroll?oldScroll:0;
+      return;
+    }
     if(section==='worklog')renderWorklog(root);
     else if(section==='history')renderHistory(root);
     else if(section==='applications')renderApplications(root);
@@ -682,24 +712,32 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     body.insertBefore(nav,body.children[1]??null);
     body.scrollTop=preserveScroll?oldScroll:0;
   }
-  function open(){
-    if(opened()){close();return;}
+  function open(target='work'){
+    if(opened()){
+      if(target==='finance'&&app!=='finance'){app='finance';render();return;}
+      if(target==='work'&&app!=='work'){app='work';render();return;}
+      close();return;
+    }
     if(!canOpen()){notify('Сначала заверши текущий режим или обязательный диалог');return;}
     const root=getRoot();
     if(!NAMES[root?.selectedSim])return;
     beforeOpen();
     who=root.selectedSim;
+    app=target==='finance'?'finance':'work';
     const remembered=contexts[who];
     section=remembered?.section||(root.recruitmentSystem?.byResident?.[who]?'applications':'vacancies');
     view=remembered?.view||'list';chosen=remembered?.chosen??null;
     historyId=remembered?.historyId??null;
     lastFocus=document.activeElement;
     overlay.hidden=false;trigger.setAttribute('aria-expanded','true');
+    financeTrigger?.setAttribute('aria-expanded','true');
     render();if(remembered)body.scrollTop=remembered.scrollTop||0;
     onOpenChange(who);closeButton.focus({preventScroll:true});
   }
-  trigger.addEventListener('click',open);
-  return {open,close,refresh:()=>render({preserveScroll:true}),isOpen:opened,
+  trigger.addEventListener('click',()=>open('work'));
+  financeTrigger?.addEventListener('click',()=>open('finance'));
+  return {open:()=>open('work'),openFinance:()=>open('finance'),close,
+    refresh:()=>render({preserveScroll:true}),isOpen:opened,
     interviewNeedsDecision:()=>opened()&&
       getRoot()?.recruitmentSystem?.byResident?.[who]?.phase==='interview_active'};
 }
