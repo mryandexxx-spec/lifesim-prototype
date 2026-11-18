@@ -23,7 +23,7 @@ test('F4C: original shop assortment plus the H5 functional easel',()=>{
   assert.equal(FURNITURE_PRODUCTS.length,47);
   assert.equal(offers.length,47);
   assert.equal(FURNITURE_LEGACY_OFFERS.length,6);
-  assert.equal(PROCEDURAL_NEW_PREFABS.length,13);
+  assert.equal(PROCEDURAL_NEW_PREFABS.length,15);
   assert.equal(ORIGINAL_FURNITURE.length,10);
   assert.equal(marketListing().length,47);
   assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,47);
@@ -64,7 +64,7 @@ test('F4C: all 35 crafted modelKeys are visually different by actual dimensions/
   const authored=FURNITURE_PRODUCTS.filter(x=>x.modelKey);
   assert.equal(authored.length,39);
   assert.equal(Object.keys(PROCEDURAL_FURNITURE_MODELS).length,39);
-  assert.equal(new Set(authored.map(x=>x.modelKey)).size,35);
+  assert.equal(new Set(authored.map(x=>x.modelKey)).size,39);
   const geometry=new Map();
   for(const offer of authored){
     const shape=proceduralFurnitureModel(offer.modelKey);
