@@ -113,5 +113,8 @@ export function settleCareerTimeOff(root,residentId,after){
       text:booking.type==='paid'?'отпуск завершён · начислено '+amount+' кр.'
         :'отгул завершён · без штрафа за пропуск'});
   }
+  // A paid/approved past shift cannot recur; trim completed history to keep
+  // a long-lived save able to request future leave without a growing array.
+  state.bookings=state.bookings.filter(b=>!b.settled||b.end>=after-30*DAY);
   return events;
 }
