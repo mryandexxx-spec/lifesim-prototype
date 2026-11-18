@@ -116,7 +116,7 @@ test('W4-B: large journal bounded to 120; many dates use limited chart columns',
     id:'fin-'+(i+1),kind:'purchase',delta:-1,
     atGameMinute:100+i*D,balanceAfter:15000-i,actorId:null,sourceId:'object-'+i
   });
-  r.minutes=(200+D*200);
+  r.minutes=D*280+200;
   r.financialHistory={schema:1,nextId:rows.length+1,entries:rows};
   const a=financeAnalytics(r,{mode:'all'});
   assert.equal(a.entries.length,FINANCE_HISTORY_LIMIT);
