@@ -129,7 +129,8 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
     (e.participants.length===2?'Алекс и Мира':e.participants[0]==='alex'?'Алекс':'Мира')+
     (e.repeat!=='none'?' · ↻':''),()=>showEvent(e)));
   for(const w of work.filter(w=>w.iso===selected))
-    agenda.append(row('▣ Работа: '+w.title,
+    agenda.append(row(w.timeOff==='paid'?'🌴 Оплачиваемый отпуск':
+      w.timeOff==='unpaid'?'🏖 Отгул':'▣ Работа: '+w.title,
       clockLabel(w.start)+'–'+clockLabel(w.end)+' · '+
       (w.residentId==='alex'?'Алекс':'Мира')+' · '+w.rankTitle,null));
   if(!agenda.childNodes.length){const p=document.createElement('p');p.textContent='На эту дату событий нет.';agenda.append(p);}

@@ -9,6 +9,7 @@ import {recordFinanceChange} from './finance-ledger.js';
 import {careerReadiness,recordCompletedCareerShift,recordMissedCareerShift,promotionReadiness} from './career-progression.js';
 import {startWorkIncident,automaticWorkIncident} from './career-incidents.js';
 import {recordProfessionalShift} from './career-goals.js';
+import {creditCareerPaidLeave,careerTimeOffForShift,settleCareerTimeOff} from './career-timeoff.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 const ACTIVE=new Set(['departing','working','returning']);
@@ -64,6 +65,7 @@ function settle(root,contract,id,at){
     if(ledger.length>256)ledger.splice(0,ledger.length-256);
     // Salary, performance, fatigue and receipt belong to ONE saved snapshot.
     result=recordCompletedCareerShift(contract,actorFor(root,id),shift,worked,lateMinutes);
+    creditCareerPaidLeave(contract);
     badges=recordProfessionalShift(root,id,shift);
   }
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
@@ -88,10 +90,13 @@ export function progressCareerWork(root,before,after){
     const contract=root.careerSystem.byResident?.[id];
     const actor=actorFor(root,id);
     if(!contract||!actor)continue;
+    for(const leave of settleCareerTimeOff(root,id,after))
+      emit(messages,id,leave.type,leave.text);
     let shift=contract.currentShift;
     if(!shift){
       const planned=nextCareerShift(root.calendar,contract,Math.max(0,before-.001));
-      if(!planned||after<planned.start-60||contract.lastShift?.id===planned.id||
+      if(!planned||careerTimeOffForShift(contract,planned.id)||
+        after<planned.start-60||contract.lastShift?.id===planned.id||
         root.careerSystem.settlementIds.includes(planned.id))continue;
       shift=contract.currentShift=shiftSnapshot(planned);
     }
@@ -208,7 +213,10 @@ export function residentWorkStatus(root,id){
     return {phase:'pending',label:'Смена '+clockAt(shift.start)+'–'+clockAt(shift.end)+
       (at>=shift.start?' · опаздывает':' · скоро') ,end:shift.end};
   const planned=nextCareerShift(root.calendar,contract,Math.max(0,at));
-  return {phase:'idle',label:'Ожидает: '+(planned
+  const leave=planned&&careerTimeOffForShift(contract,planned.id);
+  return {phase:'idle',label:leave?
+    (leave.type==='paid'?'Оплачиваемый отпуск':'Отгул')+' · '+clockAt(leave.start)+'–'+clockAt(leave.end):
+    'Ожидает: '+(planned
     ?planned.iso+' '+clockAt(planned.start)+'–'+clockAt(planned.end):'не назначена'),
     end:planned?.end??null};
 }

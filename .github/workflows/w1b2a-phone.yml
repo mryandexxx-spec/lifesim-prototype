@@ -23,15 +23,20 @@ jobs:
           node --check src/game.js
           node --check src/career-job-board.js
           node --check src/career-phone-ui.js
+          node --check src/career-timeoff.js
+          node --check tests/w3a-browser-smoke.mjs
           mkdir -p vendor
           cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/w1b2a-http.log 2>&1 &
           sleep 2
           node tests/w1b2a-browser-smoke.mjs
+          node tests/w3a-browser-smoke.mjs
       - name: Save visual snapshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: w1b2a-career-phone-screenshot
-          path: w1b2a-phone-smoke.png
+          path: |
+            w1b2a-phone-smoke.png
+            w3a-timeoff-*.png
           if-no-files-found: ignore
