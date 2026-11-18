@@ -50,7 +50,7 @@ export function lightingMountPose(construction,productId,anchor){
   const room=lightingRoomAt(construction,x,z);
   if(room===null)return null;
   const height=BUILD_WALL_HEIGHTS[construction.wallHeightClass]?.value||2.9;
-  return {x,y:Math.max(1.5,height-.60),z,yaw:w.axis==='v'?(anchor.side>0?90:270):(anchor.side>0?0:180),roomId:room};
+  return {x,y:Math.max(1.5,height-.60),z,yaw:w.axis==='v'?(anchor.side>0?90:270):(anchor.side>0?180:0),roomId:room};
 }
 /** A touch on the room floor picks a real nearby wall segment or room ceiling.
  * Never create floating mounts where there is no physical supporting surface.
