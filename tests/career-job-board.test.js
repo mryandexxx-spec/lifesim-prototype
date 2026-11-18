@@ -118,7 +118,7 @@ test('W1-B.2a: source and deploy graph include accessible phone, not fake payche
   assert.match(css,/career-phone-body.*?overflow-y:auto/s);
   assert.match(workflow,/node --check src\/career-job-board\.js/);
   assert.match(workflow,/node --check src\/career-phone-ui\.js/);
-  assert.match(workflow,/cp src\/career-catalog\.js src\/career-scheduler\.js src\/career-state\.js src\/career-job-board\.js src\/career-phone-ui\.js site\/src\//);
+  assert.match(workflow,/cp src\/career-catalog\.js src\/career-scheduler\.js src\/career-state\.js src\/career-job-board\.js src\/career-phone-ui\.js src\/career-shift-summary-ui\.js site\/src\//);
 });
 
 test('W1-B.2a: shifts appear as read-only calendar projections, not duplicate personal events',()=>{
