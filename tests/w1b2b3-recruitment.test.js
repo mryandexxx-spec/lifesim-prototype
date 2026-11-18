@@ -114,7 +114,7 @@ test('W1-B.2b.3: legacy journals migrate, invalid snapshots and future cooldowns
   root.recruitmentSystem.cooldowns={alex:{editorial:9999999,'business-center':root.minutes+30},mira:'bad'};
   const loaded=loadHousehold(copy(root));
   assert.equal(loaded.recruitmentSystem.history.alex.length,2);
-  assert.equal(loaded.recruitmentSystem.history.alex[0].appliedAt,root.minutes);
+  assert.equal(loaded.recruitmentSystem.history.alex[0].appliedAt,undefined,'old saves cannot reconstruct application date');
   assert.equal(loaded.recruitmentSystem.history.alex[1].interview,undefined);
   assert.equal(loaded.recruitmentSystem.cooldowns.alex.editorial,root.minutes+2880);
   assert.equal(loaded.recruitmentSystem.cooldowns.alex['business-center'],root.minutes+30);
