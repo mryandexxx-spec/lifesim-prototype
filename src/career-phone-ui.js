@@ -171,10 +171,40 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     const d=calendarAt(root.calendar,minute);
     return d.iso+' · '+d.time;
   }
+  function renderInterviewFactors(app){
+    const i=app.interview,bank=INTERVIEW_QUESTIONS_BY_CAREER[app.careerId];
+    if(!i||!bank)return;
+    const score=interviewScore(app);
+    const low=bank.reduce((sum,q)=>sum+Math.min(...q.answers.map(a=>a.score)),0);
+    const high=bank.reduce((sum,q)=>sum+Math.max(...q.answers.map(a=>a.score)),0);
+    const strength=high>low?(score-low)/(high-low):.5;
+    const facts=element('div','career-phone-facts');
+    facts.append(element('span',null,'Ответы: '+(strength>=.7?'Убедительные':strength>=.4?'Смешанные':'Спорные решения')));
+    if(CAREER_SKILL_LABELS[app.careerId])facts.append(element('span',null,
+      CAREER_SKILL_LABELS[app.careerId]+': уровень '+i.skill+
+      (i.skill>=2?' · помог':' · можно развить')));
+    facts.append(element('span',null,'Настроение на собеседовании: '+i.mood+'/100'+
+      (i.mood>=67?' · поддержало':i.mood<45?' · снизило уверенность':' · без сильного эффекта')));
+    const focus={editorial:'Собранность и устойчивость',
+      'art-studio':'Творческий и практичный подход',
+      'business-center':'Организованность и практичность',
+      'civic-service':'Эмпатия и самообладание'};
+    facts.append(element('span',null,(focus[app.careerId]||'Особенности характера')+': '+
+      (i.traitBoost>0?'помогли':i.traitBoost<0?'потребовали усилий':'нейтральны')));
+    body.append(facts);
+    body.append(element('p','career-phone-muted',
+      app.phase==='rejected'||app.outcome==='rejected'
+        ?'Почему отказали: ответы, состояние и характер повлияли на шансы, но конкуренция сохраняется. Перед новой попыткой можно улучшить спорные решения, настроение и настоящий профильный навык.'
+        :'Работодатель учёл решения, характер и опыт. Даже убедительное интервью не гарантирует приглашение.'));
+    if(i.answers.length===3&&app.phase!=='waiting_decision') {
+      body.append(element('p','career-phone-muted','Подробные ответы доступны в истории после завершения отклика.'));
+    }
+  }
   function renderRecruitment(root){
     const app=root.recruitmentSystem?.byResident?.[who];
     if(!app)return render();
     top('📨 '+NAMES[who]+' · МОЙ ОТКЛИК');
+    body.append(element('p','career-phone-muted','Отправлен: '+gameDueLabel(root,app.appliedAt)));
     body.append(element('h2','career-phone-section-title',
       careerDefinition(app.careerId)?.title||'Работа'));
     const labels={
@@ -221,21 +251,8 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         },'career-phone-secondary'));
       }
     }
-    if(['offer_ready','rejected'].includes(app.phase)&&app.interview){
-      const score=interviewScore(app);
-      const facts=element('div','career-phone-facts');
-      facts.append(element('span',null,'Ответы: '+(score>=45?'Убедительные':score>=25?'Смешанные':'Неубедительные')));
-      if(CAREER_SKILL_LABELS[app.careerId])facts.append(element('span',null,
-        CAREER_SKILL_LABELS[app.careerId]+': уровень '+app.interview.skill));
-      facts.append(element('span',null,'Настроение на собеседовании: '+app.interview.mood+'/100'));
-      const traitFocus={editorial:'Собранность и устойчивость',
-        'art-studio':'Творческий и практичный подход',
-        'business-center':'Организованность и практичность',
-        'civic-service':'Эмпатия и самообладание'};
-      facts.append(element('span',null,(traitFocus[app.careerId]||'Особенности характера')+': '+
-        (app.interview.traitBoost>0?'помогли':app.interview.traitBoost<0?'потребовали усилий':'нейтральны')));
-      body.append(facts);
-    }
+    if(['offer_ready','rejected'].includes(app.phase)&&app.interview)
+      renderInterviewFactors(app);
     if(app.phase==='offer_ready'){
       if(app.careerId==='kitchen-studio')body.append(element('p','career-phone-notice',
         'Мастерская оценила ваш реальный навык кулинарии: уровень '+(app.kitchenSkill||0)+
@@ -259,6 +276,10 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       },'career-phone-secondary'));
     }
     if(app.phase==='rejected'){
+      const retry=recruitmentRetry(root,who,app.careerId);
+      if(retry.blocked)body.append(element('p','career-phone-muted',
+        'Повторно в эту организацию: '+gameDueLabel(root,retry.retryAt)+
+        '. Другие вакансии доступны после закрытия заявки.'));
       body.append(action('Вернуться к поиску',()=>{
         const live=personRoot();if(!live)return;
         const result=finishRecruitmentApplication(live,who,'dismiss');
@@ -286,6 +307,18 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     ])facts.append(element('span',null,label));
     body.append(facts);
     if(view!=='details'||!RECRUITMENT_CAREERS.includes(chosen))return;
+    const retry=recruitmentRetry(root,who,chosen);
+    if(retry.blocked){
+      body.append(element('p','career-phone-notice',
+        'После отказа повторный отклик доступен '+gameDueLabel(root,retry.retryAt)+
+        '. Осталось '+Math.ceil(retry.remaining/60)+' игровых ч. Другие вакансии открыты.'));
+      return;
+    }
+    if(root.recruitmentSystem?.byResident?.[who]){
+      body.append(element('p','career-phone-notice','Завершите текущий отклик в разделе «Мои отклики».'));
+      body.append(action('Мои отклики',()=>{section='applications';render();},'career-phone-primary'));
+      return;
+    }
     body.append(element('p','career-phone-notice',
       'Сначала отправь отклик. Работодатель ответит через несколько игровых часов.'));
     body.append(action('Отправить отклик',()=>{
@@ -308,6 +341,9 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       card.append(element('strong',null,offer.title));
       card.append(element('span',null,offer.rank+' · '+offer.hourlyCredits+' кр./час'));
       card.append(element('small',null,offer.workdays+' · '+offer.hours));
+      const retry=recruitmentRetry(root,who,offer.id);
+      if(retry.blocked)card.append(element('small','career-phone-cooldown',
+        'Повторный отклик: '+gameDueLabel(root,retry.retryAt)));
       card.setAttribute('aria-label','Вакансия '+offer.title+', '+offer.rank+', '+offer.hourlyCredits+' кредитов в час');
       list.append(card);
     }
