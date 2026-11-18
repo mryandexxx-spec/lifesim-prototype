@@ -4,6 +4,7 @@ import {hireCareer,resignCareer,CAREER_RESIDENT_IDS} from './career-state.js';
 import {nextCareerShift,plannedCareerShift} from './career-scheduler.js';
 import {civilToSerial} from './calendar-core.js';
 import {canResignNow} from './career-work.js';
+import {careerTimeOffForShift} from './career-timeoff.js';
 
 const DAY_NAMES=Object.freeze(['Пн','Вт','Ср','Чт','Пт','Сб','Вс']);
 export function clockLabel(minute){
@@ -89,7 +90,8 @@ export function calendarCareerShifts(root,fromIso,toIso){
         id:shift.id,iso:shift.iso,careerId:career.id,residentId,
         title:career.title,rankTitle:career.ranks[contract.level].title,
         start:shift.start%1440,end:shift.end%1440,
-        work:true,shiftId:shift.id
+        work:true,shiftId:shift.id,
+        timeOff:careerTimeOffForShift(contract,shift.id)?.type??null
       }));
     }
   }
