@@ -96,7 +96,7 @@ test('touch modal defers behind blocking overlay, queues two results and restore
     assert.equal(ui.flush(),true);assert.equal(ui.isOpen(),true);
     const overlay=host.children[0],card=overlay.children[1];
     assert.equal(card.attributes['aria-modal'],'true');
-    const [,,title,subtitle,money,,,,done]=card.children;
+    const [,title,subtitle,money,,,,done]=card.children;
     assert.equal(title.textContent,'Смена завершена');
     assert.match(subtitle.textContent,/Алекс/);
     assert.equal(money.textContent,'+112 кр.');
