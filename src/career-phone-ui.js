@@ -169,7 +169,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         progress.append(element('strong',null,
           currentGoal.shifts+' / '+currentGoal.requiredShifts));
         card.append(progress);
-        const bar=element('progress','career-goal-progress');
+        const bar=element('progress','career-professional-bar');
         bar.max=currentGoal.requiredShifts;
         bar.value=Math.min(currentGoal.shifts,currentGoal.requiredShifts);
         bar.setAttribute('aria-label','Смены для цели '+currentGoal.title);
