@@ -10,9 +10,10 @@ const TWO_PI=2*Math.PI;
 export const DAY_NIGHT_PHASES=Object.freeze({
   dawn:'Рассвет',day:'День',sunset:'Закат',dusk:'Сумерки',night:'Ночь'
 });
-const NIGHT_AMBIENT=Object.freeze([0.23,0.27,0.36]);
+// Comfort C1: legible moonlit interiors without making night look like day.
+const NIGHT_AMBIENT=Object.freeze([0.29,0.32,0.40]);
 const DAY_AMBIENT=Object.freeze([0.69,0.70,0.70]);
-const NIGHT_SKY=Object.freeze([0.065,0.096,0.185]);
+const NIGHT_SKY=Object.freeze([0.09,0.12,0.20]);
 const DAY_SKY=Object.freeze([0.85,0.91,0.86]);
 const NIGHT_FILL=Object.freeze([0.52,0.64,0.9]);
 const DAY_FILL=Object.freeze([0.76,0.87,1]);
@@ -80,7 +81,7 @@ export function sampleDaylight(civilDate,minuteOfDay){
     sunriseMinute:rise,sunsetMinute:set,twilightSpan:twilight,
     normalizedDaylight,solarElevationVisual:sunHeight,
     sunlightIntensity,sunlightColor:sunColor,
-    fillIntensity:mix(0.30,0.60,normalizedDaylight),fillColor,
+    fillIntensity:mix(0.38,0.60,normalizedDaylight),fillColor,
     ambientColor,backdropColor,sunPitch,sunYaw,
     artificialLightSuggestion:normalizedDaylight<0.26
   });
