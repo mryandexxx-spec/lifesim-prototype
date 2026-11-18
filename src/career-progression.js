@@ -1,4 +1,4 @@
-/** W1-B.3b.1: deterministic attendance, work quality and promotions.
+/** W2-A.1: append-only promotion gates built on original real work and skills.
  * Pure domain rules only: no real-world clock, DOM, currency mint or second XP.
  */
 import {careerDefinition} from './career-catalog.js';
@@ -10,15 +10,24 @@ import {refreshMind} from './psychology.js';
 const clip=(v,lo=0,hi=100)=>Math.max(lo,Math.min(hi,v));
 const count=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000?n:0;
 const PLAN=Object.freeze({
-  'city-services':[{shifts:3,performance:68},{shifts:6,performance:80}],
+  'city-services':[{shifts:3,performance:68},{shifts:6,performance:80},
+    {shifts:7,performance:83},{shifts:9,performance:87}],
   'kitchen-studio':[{shifts:3,performance:68,skill:'cooking',level:1},
-    {shifts:5,performance:80,skill:'cooking',level:3}],
+    {shifts:5,performance:80,skill:'cooking',level:3},
+    {shifts:7,performance:83,skill:'cooking',level:4},
+    {shifts:9,performance:88,skill:'cooking',level:5}],
   'art-studio':[{shifts:3,performance:68,skill:'painting',level:1},
-    {shifts:5,performance:80,skill:'painting',level:3}],
+    {shifts:5,performance:80,skill:'painting',level:3},
+    {shifts:7,performance:83,skill:'painting',level:4},
+    {shifts:9,performance:88,skill:'painting',level:5}],
   editorial:[{shifts:3,performance:68,skill:'literature',level:1},
-    {shifts:5,performance:80,skill:'literature',level:3}],
-  'business-center':[{shifts:4,performance:68},{shifts:6,performance:80}],
-  'civic-service':[{shifts:4,performance:68},{shifts:6,performance:80}]
+    {shifts:5,performance:80,skill:'literature',level:3},
+    {shifts:7,performance:83,skill:'literature',level:4},
+    {shifts:9,performance:88,skill:'literature',level:5}],
+  'business-center':[{shifts:4,performance:68},{shifts:6,performance:80},
+    {shifts:8,performance:83},{shifts:10,performance:88}],
+  'civic-service':[{shifts:4,performance:68},{shifts:6,performance:80},
+    {shifts:8,performance:83},{shifts:10,performance:88}]
 });
 const SKILL_LABEL={cooking:'Кулинария',painting:'Живопись',literature:'Литературная эрудиция'};
 const actorFor=(root,id)=>id==='mira'?root?.otherSim:root;
