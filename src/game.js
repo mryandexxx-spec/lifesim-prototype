@@ -35,6 +35,7 @@ import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
+import {recordFinanceChange} from './finance-ledger.js';
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES,canPaintContent,
@@ -687,8 +688,16 @@ function renderSkillsTab(force=false){
         const result=transactPainting(game,game.selectedSim,work.id,operation,slot===null
           ?null:Number(slot.value));
         if(!result.ok){toast('Картина: действие недоступно ('+result.reason+')');return;}
+        const finance=operation==='sell'
+          ?recordFinanceChange(game,result.shop,{kind:'art-sale',
+            sourceId:work.id,actorId:game.selectedSim,
+            atGameMinute:Math.floor(game.minutes),
+            receiptId:'art:'+game.selectedSim+':'+work.id})
+          :null;
+        if(finance&&!finance.ok){toast('Не удалось записать доход от картины');return;}
         selectedActor().createdWorks=result.works;
-        if(result.shop)game.shop=result.shop;
+        if(result.shop)game.shop=finance?.shop||result.shop;
+        if(finance)game.financialHistory=finance.financialHistory;
         save(true);renderSkillsTab(true);
         toast(operation==='sell'?'Картина продана · +'+result.amount+' кредитов':
           operation==='hang'?'Картина на стене':
@@ -4096,9 +4105,15 @@ function boot() {
   });
   const applyMarketTransaction=(transaction,success)=>{
     if(!transaction.ok){editorFeedback(editorMessage(transaction.reason),true);return false;}
+    const finance=recordFinanceChange(game,transaction.shop,{
+      kind:transaction.amount<0?'purchase':transaction.amount>0?'sale':'undo',
+      sourceId:transaction.instanceId||'furniture',
+      atGameMinute:Math.floor(game.minutes)});
+    if(!finance.ok){editorFeedback('Финансовая операция отклонена',true);return false;}
     const result=editSession.transactMarket(transaction);
     if(!result.ok){editorFeedback(editorMessage(result.reason),true);return false;}
-    game.world.furniture=result.world;game.shop=result.shop;
+    game.world.furniture=result.world;game.shop=finance.shop;
+    game.financialHistory=finance.financialHistory;
     refreshMind(game,game.world);refreshMind(game.otherSim,game.world);
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     updateDecorNodes();renderWarehouse();
@@ -4188,8 +4203,17 @@ function boot() {
     if(!editSession||!furnishMode)return;
     const result=type==='undo'?editSession.undo():editSession.redo();
     if(!result.ok){editorFeedback(editorMessage(result.reason),true);return;}
+    const finance=recordFinanceChange(game,result.shop,{
+      kind:type,sourceId:'furniture-revision-'+result.world.revision,
+      atGameMinute:Math.floor(game.minutes)});
+    if(!finance.ok){
+      // Editor history already moved; return to its previous snapshot.
+      if(type==='undo')editSession.redo();else editSession.undo();
+      editorFeedback('Не удалось сохранить финансовое изменение',true);return;
+    }
     game.world.furniture=result.world;
-    if(result.shop)game.shop=result.shop;
+    if(result.shop)game.shop=finance.shop;
+    game.financialHistory=finance.financialHistory;
     renderWarehouse();
     // M5 is causal: moving an instance recalculates both residents' live mood.
     refreshMind(game,game.world);

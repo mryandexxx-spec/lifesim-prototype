@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {newHousehold,loadHousehold,chooseResidentAction} from '../src/household.js';
 import {restoreCreatedWorks,PAINT_CONTENT_IDS,PAINT_ACTIVITY_ID,PAINT_WORKS_LIMIT} from '../src/painting.js';
-import {findMarketPlacement,buyMarketItem} from '../src/furniture-shop.js';
+import {findMarketPlacement,buyMarketItem,SHOP_MAX_CREDITS} from '../src/furniture-shop.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from '../src/painting-gallery.js';
 import {SAVE_KEY} from '../src/simulation.js';
@@ -71,7 +71,7 @@ test('H5b: sell only owned inventory for playtest credits, never twice',()=>{
 test('H5b: fails closed at credit cap and keeps state untouched',()=>{
   const root=setup(),id=root.createdWorks[0].id;
   commit(root,'alex',transactPainting(root,'alex',id,'store'));
-  root.shop.credits=1000000;
+  root.shop.credits=SHOP_MAX_CREDITS;
   const snapshot=copy(root);
   assert.equal(transactPainting(root,'alex',id,'sell').reason,'wallet-limit');
   assert.deepEqual(root,snapshot);

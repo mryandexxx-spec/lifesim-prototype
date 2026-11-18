@@ -1,6 +1,7 @@
 /** H5b: one painting ID has one location. No PlayCanvas/DOM, no new save schema. */
 import {studioArtworkPose} from './painting-visual.js';
 import {starterShellOffset} from './construction.js';
+import {SHOP_MAX_CREDITS} from './furniture-shop.js';
 
 export const PAINT_WALL_SLOTS=Object.freeze(
   Array.from({length:8},(_,i)=>Object.freeze({
@@ -64,7 +65,7 @@ export function transactPainting(root,ownerId,workId,operation,wallSlot=null){
       return {ok:false,reason:'not-in-inventory'};
     const amount=paintingResaleCredits(work);
     if(!Number.isSafeInteger(root?.shop?.credits)||root.shop.credits<0||
-      root.shop.credits+amount>1000000)return {ok:false,reason:'wallet-limit'};
+      root.shop.credits+amount>SHOP_MAX_CREDITS)return {ok:false,reason:'wallet-limit'};
     return {ok:true,works:works.filter((_,i)=>i!==index),
       shop:{...root.shop,credits:root.shop.credits+amount},amount};
   }

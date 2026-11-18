@@ -5,6 +5,7 @@
 import {nextCareerShift} from './career-scheduler.js';
 import {CAREER_RESIDENT_IDS} from './career-state.js';
 import {SHOP_MAX_CREDITS} from './furniture-shop.js';
+import {recordFinanceChange} from './finance-ledger.js';
 import {careerReadiness,recordCompletedCareerShift,recordMissedCareerShift,promotionReadiness} from './career-progression.js';
 import {startWorkIncident,automaticWorkIncident} from './career-incidents.js';
 import {recordProfessionalShift} from './career-goals.js';
@@ -52,7 +53,13 @@ function settle(root,contract,id,at){
   let result=null;
   let badges=[];
   if(!already){
-    root.shop.credits+=salary;
+    const payment=recordFinanceChange(root,
+      {...root.shop,credits:root.shop.credits+salary},
+      {kind:'salary',sourceId:shift.id,actorId:id,atGameMinute:at,
+        receiptId:'salary:'+shift.id});
+    if(!payment.ok)return {salary:0,result:null,badges:[],failed:true};
+    root.shop=payment.shop;
+    root.financialHistory=payment.financialHistory;
     ledger.push(shift.id);
     if(ledger.length>256)ledger.splice(0,ledger.length-256);
     // Salary, performance, fatigue and receipt belong to ONE saved snapshot.
@@ -94,7 +101,8 @@ export function progressCareerWork(root,before,after){
         emit(messages,id,'incident','новая ситуация на работе · открой смартфон, чтобы выбрать решение');
       if(after>=shift.end){
         automaticWorkIncident(root,id);
-        const {salary,result,badges}=settle(root,contract,id,shift.end);
+        const {salary,result,badges,failed}=settle(root,contract,id,shift.end);
+        if(failed)continue; // Never mark a shift paid without an atomic wallet receipt.
         const growth=result?' · '+result.grade+' · результативность '+contract.performance+'/100':'';
         const ready=promotionReadiness(root,id);
         actor.event='Смена завершена · заработано '+salary+' кр.'+growth;
