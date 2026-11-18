@@ -120,7 +120,8 @@ test('senior promotions need earned rank-shifts, real rating and genuine profile
     assert.equal(promotionReadiness(root,'alex').ready,true);
     assert.equal(promoteCareer(root,'alex').ok,true);
     assert.equal(contract.level,4);
-    assert.equal(promotionReadiness(root,'alex').maxLevel,true);
+    assert.equal(promotionReadiness(root,'alex').needsSpecialization,true,
+      'W2-A.3 preserves the fifth job, and opens the optional branch choice');
   }
 });
 test('only new completed full shifts pay senior rates once; old snapshots are immutable',()=>{

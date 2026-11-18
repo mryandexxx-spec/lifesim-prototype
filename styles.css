@@ -1494,3 +1494,50 @@ button.time-card:active {transform:translateY(1px);}
   border:1px solid #d1e2d1;border-radius:9px;}
 
 .career-professional-bar {width:100%;height:8px;display:block;accent-color:#398b70;margin:8px 0;}
+
+
+/* W2-A.3: two thumb-readable specialization paths inside the existing smartphone. */
+.career-specialization {
+  margin: 12px 0;
+  padding: 11px;
+  border: 1px solid rgba(68,92,86,.24);
+  border-radius: 13px;
+  background: rgba(238,248,241,.78);
+}
+.career-specialization-summary {
+  cursor: pointer;
+  font-weight: 750;
+  line-height: 1.4;
+  padding: 5px 0;
+  touch-action: manipulation;
+}
+.career-specialization-card {
+  padding: 12px;
+  margin-top: 9px;
+  background: rgba(255,255,255,.89);
+  border: 1px solid rgba(63,95,76,.18);
+  border-radius: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.career-specialization-card > p { margin: 0; }
+.career-specialization-card .career-specialization-select {
+  width: 100%;
+  min-height: 46px;
+  touch-action: manipulation;
+  margin: 6px 0 0;
+}
+.career-specialization-gate, .career-specialization-chosen {
+  display: block;
+  line-height: 1.5;
+  font-size: 12px;
+}
+.career-specialization-chosen { color: #32684b; font-weight: 750; }
+.career-specialization-requirements {
+  margin: 8px 0;
+  padding-left: 21px;
+  font-size: 12px;
+  line-height: 1.6;
+}

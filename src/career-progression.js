@@ -6,6 +6,7 @@ import {CAREER_RESIDENT_IDS} from './career-state.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {refreshMind} from './psychology.js';
+import {careerRankForContract,specializationReadiness} from './career-specializations.js';
 
 const clip=(v,lo=0,hi=100)=>Math.max(lo,Math.min(hi,v));
 const count=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000?n:0;
@@ -42,9 +43,13 @@ export function promotionReadiness(root,residentId){
   const contract=root?.careerSystem?.byResident?.[residentId];
   const career=careerDefinition(contract?.careerId);
   if(!CAREER_RESIDENT_IDS.includes(residentId)||!contract||!career)return null;
-  const rule=PLAN[career.id]?.[contract.level];
-  if(!rule)return {maxLevel:true,ready:false,rank:career.ranks[contract.level]?.title||'',
+  const branch=contract.level===4?specializationReadiness(root,residentId):null;
+  if(contract.level===4&&!branch?.selected)return {
+    maxLevel:false,ready:false,needsSpecialization:true,rank:'Выбери специализацию',
     requirements:[]};
+  const rule=contract.level===4?branch.selected.requirements:PLAN[career.id]?.[contract.level];
+  if(!rule)return {maxLevel:true,ready:false,
+    rank:careerRankForContract(contract)?.title||'',requirements:[]};
   const actor=actorFor(root,residentId);
   const currentSkill=rule.skill?currentSkillLevel(actor?.skills,HOBBY_SKILLS,rule.skill):null;
   const performance=clip(contract.performance),shifts=count(contract.rankShifts);
@@ -55,8 +60,10 @@ export function promotionReadiness(root,residentId){
   ];
   if(rule.skill)requirements.push({label:SKILL_LABEL[rule.skill],current:currentSkill,
     target:rule.level,met:currentSkill>=rule.level});
+  if(branch?.selected)requirements.push(...branch.requirements.filter(item=>
+    item.label==='Профильная рабочая ситуация'));
   return {maxLevel:false,ready:requirements.every(item=>item.met),
-    rank:career.ranks[contract.level+1]?.title||'',requirements};
+    rank:branch?.selected?.rank.title||career.ranks[contract.level+1]?.title||'',requirements};
 }
 export function promoteCareer(root,residentId){
   const contract=root?.careerSystem?.byResident?.[residentId];
@@ -71,7 +78,7 @@ export function promoteCareer(root,residentId){
   contract.performance=Math.max(55,clip(contract.performance-18));
   const actor=actorFor(root,residentId);
   if(actor)actor.event='Повышение: '+goal.rank;
-  return {ok:true,rank:goal.rank,rate:careerDefinition(contract.careerId).ranks[contract.level].hourlyCredits};
+  return {ok:true,rank:goal.rank,rate:careerRankForContract(contract).hourlyCredits};
 }
 /** Called ONCE from idempotent salary settlement, never from presentation. */
 export function recordCompletedCareerShift(contract,actor,shift,workedMinutes,lateMinutes){
