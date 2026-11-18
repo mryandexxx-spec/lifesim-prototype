@@ -9,6 +9,7 @@ import {BED_SLOTS} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
 import {describeFurnitureValue} from './furniture-value.js';
+import {MOUNTED_LIGHTS,mountedAnchorAt,lightingMountPose} from './mounted-lighting.js';
 import {FURNITURE_PRODUCTS,FURNITURE_LEGACY_OFFERS,
   compatibleFurnitureProduct,legacyProductId} from './furniture-products.js';
 
@@ -64,10 +65,19 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
   if(current.world.instances.length>=128)return reject('full-household');
   const id='shop-'+productPrefabId+'-'+current.shop.nextId;
   if(current.world.instances.some(x=>x.instanceId===id))return reject('duplicate-id');
-  const added={instanceId:id,prefabId:productPrefabId,x:pose.x,z:pose.z,yaw:pose.yaw,
-    location:'home',itemDefinitionId:item.itemId,purchasePriceCredits:item.price};
+  const sku=MOUNTED_LIGHTS[item.itemId];
+  const mount=sku?mountedAnchorAt(opts.construction,item.itemId,pose.x,pose.z):null;
+  if(sku&&!mount)return reject('missing-light-mount');
+  const mountedPose=sku?lightingMountPose(opts.construction,item.itemId,mount):null;
+  if(sku&&!mountedPose)return reject('missing-light-mount');
+  const added={instanceId:id,prefabId:productPrefabId,
+    x:mountedPose?.x??pose.x,z:mountedPose?.z??pose.z,
+    yaw:mountedPose?.yaw??pose.yaw,location:'home',
+    itemDefinitionId:item.itemId,purchasePriceCredits:item.price,
+    ...(sku?{mount,lightMode:'auto'}:{})};
   const candidate={...current.world,instances:[...current.world.instances,added]};
-  const valid=placement(candidate,id,pose,opts);
+  const valid=sku?{ok:true,world:restoreFurnitureWorld({...candidate,revision:candidate.revision+1})}
+    :placement(candidate,id,pose,opts);
   if(!valid.ok)return valid;
   if(productPrefabId==='sofa'&&!sofaReachable(valid.world,id,opts))
     return reject('unreachable-sofa');
@@ -133,10 +143,16 @@ export function restoreMarketItem(world,shop,instanceId,pose,opts={}){
   if(!item)return reject('protected-item');
   if(item.location!=='storage')return reject('not-stored');
   if(!validPosition(pose))return reject('invalid-pose');
+  const sku=MOUNTED_LIGHTS[item.itemDefinitionId];
+  const mount=sku?mountedAnchorAt(opts.construction,item.itemDefinitionId,pose.x,pose.z):null;
+  if(sku&&!mount)return reject('missing-light-mount');
+  const mountedPose=sku?lightingMountPose(opts.construction,item.itemDefinitionId,mount):null;
   const candidate={...current.world,
     instances:current.world.instances.map(x=>x.instanceId===instanceId
-      ?{...x,location:'home'}:x)};
-  const valid=placement(candidate,instanceId,pose,opts);
+      ?{...x,location:'home',...(sku?{
+        x:mountedPose.x,z:mountedPose.z,yaw:mountedPose.yaw,mount}:{} )}:x)};
+  const valid=sku?{ok:true,world:restoreFurnitureWorld({...candidate,revision:candidate.revision+1})}
+    :placement(candidate,instanceId,pose,opts);
   if(!valid.ok)return valid;
   if(item.prefabId==='sofa'&&!sofaReachable(valid.world,instanceId,opts))
     return reject('unreachable-sofa');
