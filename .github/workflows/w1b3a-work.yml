@@ -33,5 +33,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: w1b3a-work-390x844
-          path: w1b3a-working-iphone.png
+          path: |
+            w1b3a-working-iphone.png
+            w1b3a-shift-results-iphone.png
           if-no-files-found: ignore

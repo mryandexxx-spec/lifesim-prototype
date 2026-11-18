@@ -57,6 +57,15 @@ try{
   assert.equal(paid.careerSystem.byResident.alex.workedShifts,1);
   assert.ok(paid.careerSystem.byResident.alex.performance>50);
   assert.ok(paid.needs.energy<seed.needs.energy,'Real post-shift fatigue');
+  const results=page.locator('#career-shift-summary');
+  await results.waitFor({state:'visible',timeout:10000});
+  assert.match(await results.locator('.career-shift-summary-title').innerText(),/Смена завершена/);
+  assert.match(await results.locator('.career-shift-summary-subtitle').innerText(),/Алекс/);
+  assert.equal(await results.locator('.career-shift-summary-money').innerText(),'+112 кр.');
+  assert.match(await results.locator('.career-shift-summary-details').innerText(),/Отработано/);
+  await page.screenshot({path:'w1b3a-shift-results-iphone.png'});
+  await results.locator('.career-shift-summary-done').tap();
+  await results.waitFor({state:'hidden'});
   await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:35000});
   await page.waitForTimeout(1800);
