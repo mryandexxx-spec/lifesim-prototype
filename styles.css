@@ -1753,3 +1753,14 @@ button.time-card:active {transform:translateY(1px);}
   .career-phone-apps{padding:5px 10px}
   .career-phone-app-tab{min-height:44px}
 }
+
+/* W4-C: bills live INSIDE Finance Overview, without consuming game viewport/HUD. */
+.finance-bills{margin:13px 0;padding:13px;border:1px solid #c8dacc;
+  background:#f5f8ee;border-radius:14px;color:#2c5844;min-width:0}
+.finance-bills h3{font-size:15px;margin:0 0 7px}
+.finance-bills .finance-note{margin:6px 0 9px}
+.finance-bills-total,.finance-bills-clear{display:block;font-size:15px;line-height:1.35}
+.finance-bill-pay{width:100%;min-height:48px;background:#367d66;color:white;
+  border-color:#367d66;margin-top:5px;font-weight:800}
+.finance-bill-pay:disabled{opacity:.55;background:#d9e1da;
+  color:#355645;border-color:#c5d6c7}
