@@ -7,7 +7,7 @@ import {nextCareerShift} from './career-scheduler.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
-import {WORK_INCIDENTS,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
+import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
   startCareerInterview,answerCareerInterview,markRecruitmentRead,
   finishRecruitmentApplication,interviewScore,recruitmentRetry} from './career-recruitment.js';
@@ -101,8 +101,9 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     facts.append(element('span',null,'Опозданий: '+(current.lateShifts||0)+
       ' · пропусков: '+(current.missedShifts||0)));
     if(current.lastShift?.incident){
-      const outcome=WORK_INCIDENTS[current.careerId]?.options.find(
-        option=>option.id===current.lastShift.incident.choiceId);
+      const outcome=workScenario(current.careerId,
+        current.lastShift.incident.scenarioId||'legacy')?.options.find(
+          option=>option.id===current.lastShift.incident.choiceId);
       if(outcome)facts.append(element('span',null,
         'Рабочая ситуация: '+(current.lastShift.incident.auto?'автономно · ':'твой выбор · ')+
         outcome.feedback+' · рейтинг '+
@@ -120,7 +121,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
 
     body.append(facts);
     // Work events stay within the existing job screen, even after reload.
-    const incident=active?.incident,scenario=WORK_INCIDENTS[current.careerId];
+    const incident=active?.incident,scenario=workScenario(current.careerId,incident?.scenarioId||'legacy');
     if(active?.phase==='working'&&incident&&scenario){
       body.append(element('h3','career-phone-section-title','📩 Ситуация на смене'));
       body.append(element('p','career-phone-notice',scenario.title+' · '+scenario.text));
@@ -146,6 +147,9 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
           (incident.performanceDelta>=0?'+':'')+incident.performanceDelta));
       }
     }
+    body.append(action('📖 История рабочих ситуаций',()=>{
+      section='worklog';render();
+    },'career-phone-secondary'));
     const growth=promotionReadiness(root,who);
     if(growth?.maxLevel){
       body.append(element('p','career-phone-notice','Высшая должность этой карьерной ветки достигнута.'));
@@ -413,6 +417,9 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         body.append(element('p','career-phone-notice','Следующая попытка: '+gameDueLabel(root,retry.retryAt)));
       return;
     }
+    body.append(action('📖 История рабочих ситуаций',()=>{
+      section='worklog';render();
+    },'career-phone-secondary'));
     body.append(element('h2','career-phone-section-title','Завершённые отклики'));
     if(!entries.length){
       body.append(element('p','career-phone-muted','История появится после решения по отклику.'));
@@ -429,6 +436,43 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       card.append(element('small',null,'Отклик: '+(entry.appliedAt===undefined?'дата не сохранена':gameDueLabel(root,entry.appliedAt))));
       card.setAttribute('aria-label','История '+(careerDefinition(entry.careerId)?.title||'Вакансия')+
         ': '+HISTORY_LABELS[entry.outcome]);
+      list.append(card);
+    }
+    body.append(list);
+  }
+  function renderWorklog(root){
+    top('📖 '+NAMES[who]+' · ИСТОРИЯ РАБОЧИХ СИТУАЦИЙ');
+    body.append(action('‹ Назад',()=>{
+      section=root.careerSystem?.byResident?.[who]?'vacancies':'history';render();
+    },'career-phone-back'));
+    body.append(element('h2','career-phone-section-title','Решения на сменах'));
+    body.append(element('p','career-phone-muted',
+      'Последние 12 ситуаций. Это отдельная история решений, не история собеседований или начислений зарплаты.'));
+    const entries=root.careerSystem?.incidentHistory?.[who]||[];
+    if(!entries.length){
+      body.append(element('p','career-phone-notice',
+        'История появится после первого решения на рабочей смене. Старые ситуации не пересчитываются.'));
+      return;
+    }
+    const list=element('div','career-phone-list');
+    for(const record of [...entries].reverse()){
+      const scenario=workScenario(record.careerId,record.scenarioId);
+      const option=scenario?.options.find(o=>o.id===record.choiceId);
+      if(!scenario||!option)continue;
+      const card=element('article','career-phone-answer career-work-story');
+      card.append(element('strong',null,scenario.title));
+      card.append(element('small',null,(careerDefinition(record.careerId)?.title||'Работа')+
+        ' · '+gameDueLabel(root,record.at)+
+        ' · '+(record.auto?'Решил самостоятельно':'Выбор игрока')));
+      card.append(element('p',null,scenario.text));
+      card.append(element('p',null,'Решение: '+option.text));
+      card.append(element('small',null,'Итог: '+option.feedback));
+      card.append(element('small',null,'Карьера: рейтинг '+
+        (record.performanceDelta>=0?'+':'')+record.performanceDelta+
+        ' · после решения '+record.performanceAfter+'/100'));
+      card.append(element('small',null,'Потребности: энергия '+
+        (record.energyDelta>=0?'+':'')+record.energyDelta+
+        ' · досуг '+(record.funDelta>=0?'+':'')+record.funDelta));
       list.append(card);
     }
     body.append(list);
@@ -459,7 +503,8 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     if(!opened())return;
     const root=personRoot();if(!root)return;
     const oldScroll=body.scrollTop;
-    if(section==='history')renderHistory(root);
+    if(section==='worklog')renderWorklog(root);
+    else if(section==='history')renderHistory(root);
     else if(section==='applications')renderApplications(root);
     else if(root.careerSystem?.byResident?.[who])renderEmployed(root);
     else if(view==='details'||view==='contract')renderOffer(root);
