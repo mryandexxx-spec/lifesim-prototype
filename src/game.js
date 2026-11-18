@@ -91,7 +91,7 @@ import {diningSeatApproach,diningPlatePosition,diningChairPullLimit,
   diningChairPullOffset} from './dining.js';
 import {UTILITY_FURNITURE,UTILITY_ACTION_IDS,furnitureUseWeight,lampIsOn} from './furniture-interactions.js';
 import {MOUNTED_LIGHTS,lightingMountPose,mountedLightIsOn,setMountedLightMode,
-  mountedFixturesSurviveEdit} from './mounted-lighting.js';
+  mountedFixturesSurviveEdit,prioritizeVisibleLights} from './mounted-lighting.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2t';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
 import {kissMotion,kissPairTarget} from './romantic-kiss.js';
@@ -6328,10 +6328,26 @@ function boot() {
     // F4E: interaction visuals depend only on the real targeted action.
     // Lights persist in v1, while drawers, doors and mirror highlights close
     // automatically after completion, interruption or save reload.
-    let litUtilityCount=0;
     const c3Residents=HOUSEHOLD_IDS.map(id=>({
       ...getActor(game,id).position,
       away:residentUnavailableForHome(game,id)}));
+    const lightingStates=new Map();
+    for(const item of game.world.furniture.instances){
+      if(item.location!=='home')continue;
+      const node=decorNodes.get(item.instanceId);
+      if(!node?.enabled)continue;
+      if(item.prefabId==='floorlamp')
+        lightingStates.set(item.instanceId,lampIsOn(game.world,item.instanceId));
+      if(MOUNTED_LIGHTS[item.itemDefinitionId]){
+        const previous=node.findByName('C3 mounted lamp light')?.light?.enabled||false;
+        lightingStates.set(item.instanceId,mountedLightIsOn({fixture:item,
+          construction:game.world.construction,calendar:game.calendar,
+          minutes:game.minutes,residents:c3Residents,previous}));
+      }
+    }
+    const litIds=new Set(prioritizeVisibleLights(
+      game.world.furniture.instances.map(item=>({...item,
+        on:lightingStates.get(item.instanceId)===true})),c3Residents,5));
     for(const item of game.world.furniture.instances){
       if(item.location!=='home')continue;
       const node=decorNodes.get(item.instanceId);
@@ -6339,24 +6355,17 @@ function boot() {
       if(item.prefabId==='floorlamp'){
         const light=node.findByName('F4E lamp light');
         if(light?.light){
-          const on=lampIsOn(game.world,item.instanceId);
-          light.light.enabled=on&&litUtilityCount<5;
-          if(on)litUtilityCount++;
+          light.light.enabled=litIds.has(item.instanceId);
           const bulb=light.findByName('F4E lamp bulb');
-          if(bulb)bulb.enabled=on;
+          if(bulb)bulb.enabled=light.light.enabled;
         }
       }
       if(MOUNTED_LIGHTS[item.itemDefinitionId]){
         const light=node.findByName('C3 mounted lamp light');
         if(light?.light){
-          const previous=light.light.enabled;
-          const on=mountedLightIsOn({fixture:item,
-            construction:game.world.construction,calendar:game.calendar,
-            minutes:game.minutes,residents:c3Residents,previous});
-          light.light.enabled=on&&litUtilityCount<5;
-          if(light.light.enabled)litUtilityCount++;
+          light.light.enabled=litIds.has(item.instanceId);
           const bulb=light.findByName('C3 mounted bulb');
-          if(bulb)bulb.enabled=on;
+          if(bulb)bulb.enabled=light.light.enabled;
         }
       }
       if(item.prefabId==='easel'){
