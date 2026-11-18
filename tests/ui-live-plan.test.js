@@ -54,7 +54,7 @@ test('live preview re-renders across residents and opens existing queue without 
     planPreview,
     planTaskIcon:()=> '•',
     dialogueNeedsDecision:()=>false,
-    closeInsightPanel:()=>{},setViewOpen:()=>{},closeSocialContext:()=>{},
+    closeInsightPanel:()=>{},setViewOpen:()=>{},setHomeOpen:()=>{},closeSocialContext:()=>{},
     select:()=>{},closeMindPanel:()=>{},
     ACTIONS:{},
     renderQueuePanel:()=>{scope.fullOpened=true;}
