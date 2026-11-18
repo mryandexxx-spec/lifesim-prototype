@@ -50,7 +50,7 @@ try{
   let root=await saved();
   assert.equal(root.careerSystem.byResident.alex.specialization.id,'logistics');
   assert.equal(root.careerSystem.byResident.mira.specialization,undefined);
-  assert.equal(await phone.locator('.career-ladder-step').count(),6);
+  assert.equal(await phone.locator('.career-ladder-step').count(),8);
   assert.equal(await phone.locator('.career-specialization-chosen').count(),1);
   await page.screenshot({path:'w2a3-branch-choice-iphone.png'});
   await phone.locator('.career-phone-x').tap();
@@ -97,7 +97,7 @@ try{
   assert.equal(data.careerSystem.byResident.alex.level,5);
   assert.equal(data.shop.credits,originalCredits);
   assert.equal(data.careerSystem.settlementIds.length,1);
-  assert.equal(await ph.locator('.career-ladder-step').count(),6);
+  assert.equal(await ph.locator('.career-ladder-step').count(),8);
   await pg.screenshot({path:'w2a3-sixth-rank-iphone.png'});
   await ph.locator('.career-phone-x').tap();
   await pg.reload({waitUntil:'domcontentloaded'});

@@ -7,6 +7,7 @@ import {nextCareerShift} from './career-scheduler.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {professionalGoalsView} from './career-goals.js';
 import {careerRankForContract,specializationReadiness,chooseCareerSpecialization} from './career-specializations.js';
+import {seniorTrack} from './career-seniority.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
 import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
@@ -204,7 +205,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     const branch=specializationReadiness(root,who);
     if(branch){
       const details=element('details','career-specialization');
-      details.open=branch.unlocked;
+      details.open=branch.unlocked&&current.level<=5;
       details.append(element('summary','career-specialization-summary',
         '🧭 Специализация · '+(branch.selected?.title||'выбери направление')));
       details.append(element('p','career-phone-muted',branch.unlocked?
@@ -226,6 +227,9 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         card.append(element('p','career-phone-muted',track.description));
         card.append(element('p','career-phone-muted',
           '6-я должность: '+track.rank.title+' · '+track.rank.hourlyCredits+' кр./ч'));
+        const nextRoles=seniorTrack(career.id,track.id)?.ranks||[];
+        for(const role of nextRoles)card.append(element('small','career-specialization-senior',
+          (role.index+1)+'-я должность: '+role.title+' · '+role.hourlyCredits+' кр./ч'));
         const rule=track.requirements;
         card.append(element('small','career-specialization-gate',
           'Нужно: '+rule.shifts+' смен на 5-й ступени, рейтинг '+
@@ -260,9 +264,12 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       body.append(details);
     }
     // The career route is presentation-only; stable catalog rank IDs drive it.
-    const ranks=[...career.ranks,...(branch?.selected?[branch.selected.rank]:[])];
-    body.append(element('h3','career-phone-subtitle',
-      'Карьерный путь · '+(current.level+1)+' из '+ranks.length));
+    const seniorRoles=branch?.selected?seniorTrack(career.id,branch.selected.id)?.ranks||[]:[];
+    const ranks=[...career.ranks,...(branch?.selected?[branch.selected.rank,...seniorRoles]:[])];
+    const ladderDetails=element('details','career-ladder-details');
+    ladderDetails.open=current.level<5;
+    ladderDetails.append(element('summary','career-ladder-summary',
+      'Карьерный путь · '+(current.level+1)+' из '+ranks.length+' · показать ступени'));
     const ladder=element('ol','career-ladder');
     ranks.forEach((rank,index)=>{
       const status=index<current.level?'passed':index===current.level?'current':'future';
@@ -275,7 +282,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         (index===current.level?' · текущая должность':'')));
       item.append(content);ladder.append(item);
     });
-    body.append(ladder);
+    ladderDetails.append(ladder);body.append(ladderDetails);
     body.append(action('📖 История рабочих ситуаций',()=>{
       section='worklog';render();
     },'career-phone-secondary'));

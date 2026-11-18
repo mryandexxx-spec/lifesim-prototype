@@ -3,6 +3,7 @@ import {careerDefinition} from './career-catalog.js';
 import {restoreWorkIncident,workScenario,INCIDENT_HISTORY_LIMIT} from './career-incidents.js';
 import {newProfessionalGoals,restoreProfessionalGoals} from './career-goals.js';
 import {careerRankForContract,restoreCareerSpecialization} from './career-specializations.js';
+import {restoreSeniorProof} from './career-seniority.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -54,13 +55,13 @@ function cleanContract(raw,id){
     !validEmployeeId(raw.employmentId)||!validTime(raw.hiredAt)||
     raw.status!=='employed'||!Number.isInteger(raw.level))return null;
   const career=careerDefinition(raw.careerId);
-  if(!career||raw.level<0||raw.level>5)return null;
+  if(!career||raw.level<0||raw.level>7)return null;
   const validCount=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000?n:0;
   const specialization=restoreCareerSpecialization(raw.specialization,career.id,
     raw.employmentId,raw.level,validCount(raw.workedShifts));
   // A malformed new extension must not destroy an existing contract.
   // Level 5 with missing branch falls back to its original level-4 title/rate.
-  const level=raw.level===5&&!specialization?4:raw.level;
+  const level=raw.level>=5&&!specialization?4:raw.level;
   const contract={residentId:id,employmentId:raw.employmentId,careerId:career.id,level,
     workedShifts:validCount(raw.workedShifts),rankShifts:validCount(raw.rankShifts),
     missedShifts:validCount(raw.missedShifts),lateShifts:validCount(raw.lateShifts),
@@ -68,6 +69,8 @@ function cleanContract(raw,id){
       Math.max(0,Math.min(100,Math.round(raw.performance))):50,
     currentShift:null};
   if(specialization)contract.specialization=specialization;
+  const seniorProof=restoreSeniorProof(raw.seniorProofs,contract);
+  if(seniorProof)contract.seniorProofs=seniorProof;
   contract.currentShift=cleanWorkShift(raw.currentShift,contract);
   const last=cleanLastShift(raw.lastShift,contract);
   if(last)contract.lastShift=last;
@@ -86,7 +89,7 @@ function cleanWorkHistory(raw){
     if(!scene?.options.some(o=>o.id===item.choiceId)||
       !validTime(item.shiftStart)||!validTime(item.at)||item.at<item.shiftStart||
       !Number.isInteger(item.rank)||item.rank<0||
-      item.rank>5||
+      item.rank>7||
       !Number.isInteger(item.performanceDelta)||item.performanceDelta< -5||
         item.performanceDelta>10||
       !Number.isInteger(item.performanceAfter)||item.performanceAfter<0||

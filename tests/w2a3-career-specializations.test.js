@@ -134,7 +134,8 @@ test('selected focus is earned only from actual post-choice positive incident re
     assert.equal(promoteCareer(st.root,'alex').ok,true);
     assert.equal(st.contract.level,5);
     assert.equal(careerRankForContract(st.contract).title,track.rank.title);
-    assert.equal(promotionReadiness(st.root,'alex').maxLevel,true);
+    assert.equal(promotionReadiness(st.root,'alex').maxLevel,false,
+      'W2-A.4 extends the selected path to the seventh and eighth ranks');
     assert.equal(st.root.shop.credits,before,'Promotion cannot pay an extra salary');
     const restored=loadHousehold(copy(st.root));
     assert.equal(restored.careerSystem.byResident.alex.level,5);
