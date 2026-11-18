@@ -358,6 +358,8 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     if(selected){
       body.append(action('‹ Ко всей истории',()=>{historyId=null;render();},'career-phone-back'));
       body.append(element('h2','career-phone-section-title',careerDefinition(selected.careerId)?.title||'Вакансия'));
+      body.append(element('p','career-phone-muted','Профессия: '+
+        (careerDefinition(selected.careerId)?.ranks[0]?.title||'Начальная должность')));
       body.append(element('p','career-phone-notice',HISTORY_LABELS[selected.outcome]));
       const facts=element('div','career-phone-facts');
       facts.append(element('span',null,'Отклик: '+(selected.appliedAt===undefined?'не сохранена в старой записи':gameDueLabel(root,selected.appliedAt))));
@@ -384,6 +386,8 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
       card.replaceChildren();
       card.append(element('strong',null,careerDefinition(entry.careerId)?.title||'Вакансия'));
       card.append(element('span',null,HISTORY_LABELS[entry.outcome]));
+      card.append(element('small',null,'Профессия: '+
+        (careerDefinition(entry.careerId)?.ranks[0]?.title||'Начальная должность')));
       card.append(element('small',null,'Отклик: '+(entry.appliedAt===undefined?'дата не сохранена':gameDueLabel(root,entry.appliedAt))));
       card.setAttribute('aria-label','История '+(careerDefinition(entry.careerId)?.title||'Вакансия')+
         ': '+HISTORY_LABELS[entry.outcome]);
