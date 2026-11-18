@@ -183,7 +183,7 @@ export function restoreFurnitureWorld(raw){
       const m=item.mount;
       if(m&&typeof m==='object'&&!Array.isArray(m)){
         if(item.prefabId==='walllight'&&typeof m.edgeId==='string'&&
-          /^[a-z0-9:-]{1,80}$/.test(m.edgeId)&&[-1,1].includes(m.side)&&
+          /^[a-z0-9:,.-]{1,80}$/.test(m.edgeId)&&[-1,1].includes(m.side)&&
           finite(m.t)&&m.t>=.15&&m.t<=.85)
           restored.mount={edgeId:m.edgeId,side:m.side,t:m.t};
         if(item.prefabId==='ceilinglight'&&finite(m.x)&&finite(m.z))
