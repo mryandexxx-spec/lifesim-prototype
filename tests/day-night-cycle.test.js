@@ -148,3 +148,40 @@ test('W1-A.2 mobile HUD and Pages include the render bridge, no costly new scene
   assert.doesNotMatch(game,/dayNightRenderer\..*new pc\.Entity/);
   assert.match(game,/if\(on\)litUtilityCount\+\+/); // preserve manual lamp cap
 });
+
+test('Comfort C1: moonlit 00:00 and 03:00 are brighter, day stays intact, and lamps are not controlled',()=>{
+  for(const date of ['2026-06-21','2026-12-21','2024-02-29']){
+    for(const minute of [0,180,1439]){
+      const scene=sampleDaylight(date,minute);
+      assert.equal(scene.phase,'night');
+      assert.equal(scene.sunlightIntensity,0);
+      assert.deepEqual(scene.ambientColor,[.29,.32,.40]);
+      assert.equal(scene.fillIntensity,.38);
+      assert.deepEqual(scene.backdropColor,[.09,.12,.20]);
+      assert.equal(scene.artificialLightSuggestion,true);
+    }
+    const day=sampleDaylight(date,12*60);
+    assert.equal(day.phase,'day');
+    assert.deepEqual(day.ambientColor,[.69,.70,.70]);
+    assert.equal(day.fillIntensity,.60);
+    assert.equal(day.sunlightIntensity>1.0,true);
+  }
+  const source=readFileSync(new URL('../src/day-night-render.js',import.meta.url),'utf8');
+  assert.match(source,/Do not mutate floor-lamp on\/off states/);
+  assert.doesNotMatch(source,/lampOn\s*=/);
+});
+
+test('Comfort C1: every twilight transition stays smooth and monotonic in scene brightness',()=>{
+  for(const date of ['2026-06-21','2026-12-21','2026-03-20']){
+    const {sunriseMinute,sunsetMinute}=sunSchedule(date);
+    for(const around of [sunriseMinute,sunsetMinute]){
+      const samples=Array.from({length:241},(_,i)=>sampleDaylight(date,around-120+i));
+      for(let i=1;i<samples.length;i++){
+        const before=samples[i-1],after=samples[i];
+        assert.ok(Math.abs(sum(after.ambientColor)-sum(before.ambientColor))<.04);
+        assert.ok(Math.abs(after.fillIntensity-before.fillIntensity)<.01);
+        assert.ok(Math.abs(sum(after.backdropColor)-sum(before.backdropColor))<.07);
+      }
+    }
+  }
+});
