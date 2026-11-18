@@ -7,7 +7,7 @@ import {SHOP_MAX_CREDITS,SHOP_SCHEMA} from './furniture-shop.js';
 export const FINANCE_SCHEMA=1;
 export const FINANCE_HISTORY_LIMIT=120;
 const MAX_SEQUENCE=1_000_000_000;
-const KINDS=new Set(['salary','purchase','sale','art-sale','undo','redo']);
+const KINDS=new Set(['salary','purchase','sale','art-sale','undo','redo','bill-payment']);
 const safeMoney=n=>Number.isSafeInteger(n)&&n>=0&&n<=SHOP_MAX_CREDITS;
 const safeText=(s,max=160)=>typeof s==='string'&&s.length>0&&s.length<=max&&
   !/[\u0000-\u001f]/.test(s);
@@ -60,7 +60,7 @@ export function recordFinanceChange(root,nextShop,{
   // Free storage/movement, or a zero-hour shift, creates no phantom entry.
   if(delta===0)return {ok:true,shop:nextShop,financialHistory:history,recorded:false};
   if((['salary','sale','art-sale'].includes(kind)&&delta<0)||
-     (kind==='purchase'&&delta>0))
+     ((kind==='purchase'&&delta>0)||(kind==='bill-payment'&&delta>0)))
     return {ok:false,reason:'wrong-finance-sign'};
   if(history.nextId>=MAX_SEQUENCE)return {ok:false,reason:'history-id-limit'};
   const id=receiptId??'fin-'+history.nextId;

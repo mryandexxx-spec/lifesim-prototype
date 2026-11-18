@@ -14,7 +14,8 @@ const KIND={
   sale:['Продажа мебели','Мебель'],
   'art-sale':['Продажа картины','Творчество'],
   undo:['Отмена действия с мебелью','Корректировка'],
-  redo:['Повтор действия с мебелью','Корректировка']
+  redo:['Повтор действия с мебелью','Корректировка'],
+  'bill-payment':['Оплата семейного счёта','Коммунальные услуги']
 };
 export const credits=n=>Number(n||0).toLocaleString('ru-RU')+' кр.';
 const stamp=(root,e)=>calendarAt(root.calendar,e.atGameMinute);
@@ -91,11 +92,12 @@ export function financeAnalytics(root,selection={mode:'7'}){
   }).sort((a,b)=>a.atGameMinute-b.atGameMinute);
   const income=dated.reduce((n,e)=>n+(e.delta>0?e.delta:0),0);
   const expense=dated.reduce((n,e)=>n+(e.delta<0?-e.delta:0),0);
-  const expenses={Мебель:0,Корректировки:0,Другое:0};
+  const expenses={Мебель:0,Корректировки:0,Счета:0,Другое:0};
   const sources={salary:0,art:0,corrections:0,other:0};
   for(const e of dated){
     if(e.delta<0){
       if(e.kind==='purchase')expenses.Мебель-=e.delta;
+      else if(e.kind==='bill-payment')expenses.Счета-=e.delta;
       else if(e.kind==='undo'||e.kind==='redo')expenses.Корректировки-=e.delta;
       else expenses.Другое-=e.delta;
     }else if(e.kind==='salary')sources.salary+=e.delta;
@@ -131,6 +133,9 @@ export function financeAssessment(a){
   if(a.expense>0&&a.expenses.Мебель/a.expense>=.5)
     tips.push('Мебель — '+Math.round(a.expenses.Мебель/a.expense*100)+
       '% записанных расходов. Перед новой обстановкой оцени бюджет.');
+  if(a.expenses.Счета>0&&tips.length<3)
+    tips.push('Оплаченные счета за период — '+credits(a.expenses.Счета)+
+      '. Они включены в записанные расходы.');
   if(a.sources.salary===0)
     tips.push('За выбранный период зарплат не записано. Можно проверить график смен.');
   if(a.net>0&&tips.length<2)

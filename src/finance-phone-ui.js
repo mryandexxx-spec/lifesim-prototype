@@ -4,6 +4,7 @@
 import {financeAnalytics,financeAssessment,financeRows,financePeriod,
   FINANCE_PAGE_SIZE,credits} from './finance-presentation.js';
 import {calendarAt} from './calendar-core.js';
+import {householdBillView} from './household-bills.js';
 
 const NS='http://www.w3.org/2000/svg';
 function el(tag,cls,text){
@@ -129,9 +130,10 @@ function renderBreakdown(a,box){
     track.append(fill);wrap.append(label,track);box.append(wrap);
   }
 }
-export function createFinancePhoneUI({body}){
+export function createFinancePhoneUI({body,payBill=()=>({ok:false,reason:'unavailable'})}){
   let section='overview',filter='all',shown=FINANCE_PAGE_SIZE;
   let mode='7',customStart='',customEnd='',applied={mode:'7'},error='';
+  let billError='';
   const getSection=()=>section;
   const setSection=id=>{section=id;};
   function render(root){
@@ -155,6 +157,33 @@ export function createFinancePhoneUI({body}){
         el('strong',null,credits(root.shop.credits)),
         el('span',null,'Общие деньги Алекса и Миры'));
       body.append(wallet);
+      const bill=householdBillView(root);
+      const invoice=el('section','finance-bills');
+      invoice.append(el('h3',null,'Счета за дом'),
+        note('180 кр. каждые 7 игровых дней. Оплата вручную, без штрафов.'));
+      if(bill.ok){
+        if(bill.unpaidCount){
+          invoice.append(el('strong','finance-bills-total',
+            'Неоплачено: '+bill.unpaidCount+' · '+credits(bill.totalDue)));
+          invoice.append(note((bill.overdueCount?'Просрочено: '+bill.overdueCount+'. ':'')+
+            'Срок старейшего счёта: '+(bill.oldestDueDate||'игровой день '+bill.oldestDueDay)+
+            ' (включительно).'));
+          const pay=btn('Оплатить '+credits(bill.amount),()=>{
+            const response=payBill(root);
+            billError=response.ok?'':response.reason==='insufficient-credits'?
+              'Недостаточно кредитов для оплаты.':response.reason==='no-bill'?
+              'Неоплаченных счетов нет.':'Не удалось провести платёж.';
+            render(root);
+          },'finance-bill-pay');
+          pay.disabled=!bill.canPay;
+          invoice.append(pay);
+          if(!bill.canPay)invoice.append(note('Недостаточно средств для оплаты.'));
+        }else invoice.append(el('strong','finance-bills-clear','Неоплаченных счетов нет'));
+        invoice.append(note('Следующий счёт: '+(bill.nextIssueDate||'через '+bill.daysToIssue+
+          ' игровых дней')+'.'));
+      }else invoice.append(note('Счета временно недоступны.'));
+      if(billError)invoice.append(note(billError,'finance-error'));
+      body.append(invoice);
       body.append(note('Баланс текущий. История содержит только последние записанные операции.'));
       const quick=el('div','finance-quick-actions');
       quick.append(btn('История операций',()=>{section='operations';render(root);},

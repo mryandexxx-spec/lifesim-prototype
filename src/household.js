@@ -27,6 +27,7 @@ import {newConstructionWorld,restoreConstructionWorld} from './construction.js';
 import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './furniture-catalog.js';
 import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {newFinancialHistory,restoreFinancialHistory} from './finance-ledger.js';
+import {newHouseholdBills,restoreHouseholdBills,progressHouseholdBills} from './household-bills.js';
 import {furniturePoint} from './furniture-transform.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {chooseReadingSeat,readingSeatId,readingStage,readingRouteId,
@@ -97,6 +98,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   // F2.1 optional root-v1 extension. Old households get test credits only once.
   state.shop=newFurnitureShop();
   state.financialHistory=newFinancialHistory();
+  state.householdBills=newHouseholdBills(state.minutes);
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
   return state;
@@ -120,6 +122,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.financialHistory=restoreFinancialHistory(raw.financialHistory);
+  root.householdBills=restoreHouseholdBills(raw.householdBills,root.minutes);
   root.careerSystem=restoreCareerSystem(raw.careerSystem);
   root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem,root.minutes);
   root.objectOnceLedger=restoreObjectOnceLedger(raw.objectOnceLedger);
@@ -976,7 +979,9 @@ export function tickHousehold(root,minutes) {
   // Both clocks remain identical (including when paused).
   other.minutes=root.minutes;
   tickSocial(root,minutes);
-  return careerEvents;
+  // One family calendar, one weekly bill cycle, never one charge per resident.
+  const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
+  return [...careerEvents,...billEvents];
 }
 
 export function residentAutonomousChoice(root,id='alex') {
