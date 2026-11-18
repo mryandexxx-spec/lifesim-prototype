@@ -5,6 +5,7 @@ import {HOBBY_SKILLS} from './hobby-reading.js';
 import {refreshMind} from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
 import {recordProfessionalIncident} from './career-goals.js';
+import {specializationDefinition,recordSpecializationIncident} from './career-specializations.js';
 
 const O=(id,text,feedback,performance,energy,fun,axis,memory,skill=null)=>
   Object.freeze({id,text,feedback,performance,energy,fun,axis,memory,skill});
@@ -126,6 +127,7 @@ export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?
   const mood=clip(actor?.mind?.mood?.value),energy=clip(actor?.needs?.energy);
   const recent=history.slice(-4);
   const last=recent.at(-1)?.scenarioId;
+  const track=specializationDefinition(contract?.careerId,contract?.specialization?.id);
   const scores=bank.map((scene,index)=>{
     const variety=(hash(shift.id+'|'+scene.id+'|'+id)%100)/20;
     const trait=(axes[scene.focus]-.5)*6;
@@ -135,7 +137,9 @@ export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?
     const skill=scene.options.some(o=>o.skill&&currentSkillLevel(
       actor?.skills,HOBBY_SKILLS,o.skill)>=2)?1.5:0;
     const repetition=recent.reduce((sum,h)=>sum+(h.scenarioId===scene.id?8:0),0);
-    return variety+trait+condition+rank+skill-repetition-(last===scene.id?100:0);
+    const focus=track?.scenarioId===scene.id?
+      (contract.specialization.focusReceiptId?3:100):0;
+    return variety+trait+condition+rank+skill-repetition+focus-(last===scene.id?1000:0);
   });
   const order=bank.map((_,index)=>index).sort((a,b)=>scores[b]-scores[a]||a-b);
   return bank[order[0]].id;
@@ -230,7 +234,9 @@ export function decideWorkIncident(root,id,choiceId,{automatic=false}={}){
       journal.splice(0,journal.length-INCIDENT_HISTORY_LIMIT);
   }
   const badges=recordProfessionalIncident(root,id,incident);
-  return {ok:true,incident,option,performanceDelta:change,feedback:option.feedback,badges};
+  const specializationEvidence=recordSpecializationIncident(root,id,incident);
+  return {ok:true,incident,option,performanceDelta:change,feedback:option.feedback,
+    badges,specializationEvidence};
 }
 export function automaticWorkIncident(root,id){
   return pendingWorkIncident(root,id)?
