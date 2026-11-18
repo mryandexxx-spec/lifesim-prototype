@@ -39,6 +39,7 @@ jobs:
           node --check src/career-recruitment.js
           node --check src/career-interview-content.js
           node --check src/career-work.js
+          node --check src/finance-ledger.js
           node --check src/career-incidents.js
           node --check src/career-progression.js
           node --check src/career-specializations.js
@@ -217,7 +218,7 @@ jobs:
           cp src/tv-together.js site/src/
           cp src/furniture-placement-preview.js site/src/
           cp src/career-catalog.js src/career-scheduler.js src/career-state.js src/career-job-board.js src/career-phone-ui.js src/career-shift-summary-ui.js site/src/
-          cp src/career-work.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js site/src/
+          cp src/career-work.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js src/finance-ledger.js site/src/
           cp src/career-goals.js src/career-specializations.js src/career-seniority.js site/src/
           cp src/calendar-core.js src/calendar-events.js src/calendar-holidays.js src/calendar-reminders.js src/calendar-ui.js site/src/
           cp src/day-night-cycle.js src/day-night-render.js site/src/
