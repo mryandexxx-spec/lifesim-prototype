@@ -14,11 +14,16 @@ export const MOUNTED_LIGHTS=Object.freeze({
 export const LIGHT_MODES=Object.freeze(['auto','on','off']);
 const valid=n=>typeof n==='number'&&Number.isFinite(n);
 const cell=(x,z)=>Math.floor(x/BUILD_STEP)+','+Math.floor(z/BUILD_STEP);
+const roomCache=new WeakMap();
+function roomsFor(world){
+  if(!roomCache.has(world))roomCache.set(world,constructionRooms(world));
+  return roomCache.get(world);
+}
 /** Canonical topology membership: wall barriers, not Euclidean distance. */
 export function lightingRoomAt(construction,x,z){
   if(!valid(x)||!valid(z)||!construction||!constructionContains(construction,x,z))return null;
   const key=cell(x,z);
-  return constructionRooms(construction).find(r=>r.cells.includes(key))?.id??null;
+  return roomsFor(construction).find(r=>r.cells.includes(key))?.id??null;
 }
 /** Position and identity derive from an actual saved structural segment.
  * side +/-1 disambiguates the two sides of a shared internal wall.
