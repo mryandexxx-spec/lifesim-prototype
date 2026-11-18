@@ -30,6 +30,7 @@ export function shiftSummaryForEvent(root,event){
     duration:duration(last.workedMinutes),
     period:clockAt(last.start)+'–'+clockAt(last.end),
     grade:last.grade||null,
+    workReport:last.workReport||null,
     lateMinutes:Math.max(0,last.lateMinutes||0),
     performance:contract.performance,
     performanceDelta:Number.isInteger(last.performanceDelta)?last.performanceDelta:null,
@@ -117,6 +118,9 @@ export function createCareerShiftSummaryUI({host,getRoot,shouldDefer=()=>false})
     if(next.performanceDelta!==null)
       addRow('Результативность',signed(next.performanceDelta)+' · теперь '+next.performance+'/100');
     if(next.lateMinutes)addRow('Опоздание',duration(next.lateMinutes));
+    if(next.workReport&&!next.missed)addRow('На работе',
+      'Обед '+(next.workReport.meal?'✓':'—')+' · туалет '+next.workReport.toilet+
+      ' · разговоры '+next.workReport.socialMinutes+' мин.');
     note.textContent=next.missed?'Смена не оплачена. Следующую можно посетить по графику.':
       'Зарплата уже начислена. '+next.name+' возвращается домой.';
     overlay.hidden=false;

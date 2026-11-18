@@ -5,6 +5,7 @@ import {newProfessionalGoals,restoreProfessionalGoals} from './career-goals.js';
 import {careerRankForContract,restoreCareerSpecialization} from './career-specializations.js';
 import {restoreSeniorProof} from './career-seniority.js';
 import {restoreCareerTimeOff} from './career-timeoff.js';
+import {cleanWorkMode,restoreWorkNeeds} from './career-work-needs.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -25,6 +26,8 @@ function cleanWorkShift(raw,contract){
     start,end,hourlyCredits,phase,warn60:raw.warn60===true,warn15:raw.warn15===true,
     departedAt:['working','returning'].includes(phase)?departedAt:null,
     readiness:Number.isFinite(raw.readiness)?Math.max(0,Math.min(100,Math.round(raw.readiness))):null};
+  shift.workMode=cleanWorkMode(raw.workMode??contract.workMode);
+  if(phase==='working'||phase==='returning')shift.workNeeds=restoreWorkNeeds(raw.workNeeds,shift);
   shift.incident=restoreWorkIncident(shift,raw.incident);
   return shift;
 }
@@ -45,6 +48,12 @@ function cleanLastShift(raw,contract){
     grade:['удачный день','обычная смена','сложный день','пропуск'].includes(raw.grade)?raw.grade:null,
     performanceDelta:Number.isInteger(raw.performanceDelta)&&raw.performanceDelta>=-10&&raw.performanceDelta<=12
       ?raw.performanceDelta:null,
+    workMode:cleanWorkMode(raw.workMode),
+    workReport:raw.workReport&&typeof raw.workReport==='object'?{
+      meal:raw.workReport.meal===true,
+      toilet:Number.isInteger(raw.workReport.toilet)&&raw.workReport.toilet>=0&&raw.workReport.toilet<=2?raw.workReport.toilet:0,
+      socialMinutes:Number.isInteger(raw.workReport.socialMinutes)&&raw.workReport.socialMinutes>=0&&raw.workReport.socialMinutes<=720?raw.workReport.socialMinutes:0,
+      strain:Number.isInteger(raw.workReport.strain)&&raw.workReport.strain>=0&&raw.workReport.strain<=100?raw.workReport.strain:0}:null,
     incident:raw.incident&&workScenario(contract.careerId,raw.incident.scenarioId===undefined?'legacy':raw.incident.scenarioId)?.options.some(x=>x.id===raw.incident.choiceId)&&
       Number.isInteger(raw.incident.performanceDelta)&&raw.incident.performanceDelta>=-5&&raw.incident.performanceDelta<=10
         ?{scenarioId:raw.incident.scenarioId===undefined?'legacy':raw.incident.scenarioId,
@@ -68,7 +77,7 @@ function cleanContract(raw,id){
     missedShifts:validCount(raw.missedShifts),lateShifts:validCount(raw.lateShifts),
     hiredAt:raw.hiredAt,status:'employed',performance:Number.isFinite(raw.performance)?
       Math.max(0,Math.min(100,Math.round(raw.performance))):50,
-    currentShift:null};
+    currentShift:null,workMode:cleanWorkMode(raw.workMode)};
   if(specialization)contract.specialization=specialization;
   const seniorProof=restoreSeniorProof(raw.seniorProofs,contract);
   if(seniorProof)contract.seniorProofs=seniorProof;
@@ -148,7 +157,7 @@ export function hireCareer(system,residentId,careerId,atMinute){
   state.byResident[residentId]={residentId,employmentId:id,careerId,level:0,
     hiredAt:atMinute,status:'employed',performance:50,currentShift:null,
     workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0,
-    timeOff:restoreCareerTimeOff(null,id)};
+    timeOff:restoreCareerTimeOff(null,id),workMode:'normal'};
   return state;
 }
 export function resignCareer(system,residentId){

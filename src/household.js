@@ -9,6 +9,7 @@ import {restoreReminderReceipts} from './calendar-reminders.js';
 import {newCareerSystem,restoreCareerSystem} from './career-state.js';
 import {newRecruitmentSystem,restoreRecruitmentSystem,progressCareerRecruitment} from './career-recruitment.js';
 import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork} from './career-work.js';
+import {progressWorkNeeds} from './career-work-needs.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
@@ -763,6 +764,8 @@ export function tickHousehold(root,minutes) {
   if (root.paused || !Number.isFinite(minutes) || minutes<=0) return;
   const other=root.otherSim;
   if (!other) return tick(root,minutes);
+  // Care must run BEFORE settlement if this tick crosses the end of a shift.
+  progressWorkNeeds(root,root.minutes,root.minutes+minutes);
   const careerEvents=[...progressCareerWork(root,root.minutes,root.minutes+minutes),
     ...progressCareerRecruitment(root,root.minutes,root.minutes+minutes)];
   other.minutes=root.minutes;
@@ -978,6 +981,8 @@ export function tickHousehold(root,minutes) {
   }
   // Both clocks remain identical (including when paused).
   other.minutes=root.minutes;
+  for(const id of HOUSEHOLD_IDS)if(residentAwayAtWork(root,id))
+    refreshMind(getActor(root,id),root.world);
   tickSocial(root,minutes);
   // One family calendar, one weekly bill cycle, never one charge per resident.
   const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
