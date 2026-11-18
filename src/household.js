@@ -118,7 +118,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.careerSystem=restoreCareerSystem(raw.careerSystem);
-  root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem);
+  root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem,root.minutes);
   root.objectOnceLedger=restoreObjectOnceLedger(raw.objectOnceLedger);
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
     raw.otherSim.version===1 && raw.otherSim.needs && raw.otherSim.position;
