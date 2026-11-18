@@ -96,7 +96,8 @@ export function payHouseholdBill(root){
   const result=recordFinanceChange(root,
     {...root.shop,credits:root.shop.credits-BILL_AMOUNT},
     {kind:'bill-payment',sourceId,receiptId:sourceId,
-      atGameMinute:root.minutes});
+      // The game clock advances in fractional minutes; journal times are whole minutes.
+      atGameMinute:Math.max(0,Math.round(root.minutes))});
   if(!result.ok)return {ok:false,reason:result.reason};
   return {ok:true,amount:BILL_AMOUNT,cycle,
     shop:result.shop,financialHistory:result.financialHistory,

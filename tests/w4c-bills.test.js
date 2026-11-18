@@ -192,3 +192,12 @@ test('W4-C: static Pages and touch interface contain the new bill module',()=>{
   assert.match(phone,/Счета за дом/);
   assert.match(game,/billsNeedsPersistence/);
 });
+
+test('W4-C: manual payment uses a whole-minute journal stamp during live fractional ticks',()=>{
+  const r=family();day(r,7);
+  r.minutes+=.31; // Actual PlayCanvas fixed step advances the one household clock fractionally.
+  const payment=payHouseholdBill(r);
+  assert.equal(payment.ok,true);
+  assert.equal(payment.entry.atGameMinute,Math.round(r.minutes));
+  assert.equal(payment.entry.delta,-BILL_AMOUNT);
+});
