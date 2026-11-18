@@ -8,7 +8,7 @@ import {restoreFurnitureShop} from './furniture-shop.js';
 
 export const F1_MOVEABLE_PREFABS=Object.freeze([
   'nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet','bookcase','music',
-  'armchair','chair','diningtable','floorlamp','rug','dresser','mirror','sculpture','wardrobe','easel',
+  'armchair','chair','diningtable','floorlamp','walllight','ceilinglight','rug','dresser','mirror','sculpture','wardrobe','easel',
   'stove','prep','sink'
 ]);
 export const F1_GRID_STEP=.25;

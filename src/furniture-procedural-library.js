@@ -18,6 +18,31 @@ const palette=Object.freeze({
 });
 const p=palette;
 const schemes={
+  // C3: each authored mounted fixture has a distinct local silhouette.
+  // Geometry is centered around the wall/ceiling mount pivot, never floor Y=0.
+  'walllight.halo':{parts:[
+    b('brass wall plate',0,0,.05,.36,.36,.10,p.brass),
+    c('halo glass disc',0,-.12,-.22,.54,.14,.54,p.chalk,[90,0,0]),
+    b('halo support',0,-.05,-.08,.08,.14,.26,p.walnut)
+  ]},
+  'walllight.leaf':{parts:[
+    b('leaf wall socket',0,0,.05,.22,.34,.10,p.walnut),
+    b('leaf branch',0,-.14,-.12,.08,.40,.22,p.brass,[0,0,24]),
+    s('glass leaf left',-.15,-.28,-.18,.28,.48,.18,p.sage),
+    s('glass leaf right',.15,-.27,-.18,.27,.41,.18,p.cream)
+  ]},
+  'ceilinglight.globe':{parts:[
+    c('ceiling round plate',0,.07,0,.48,.10,.48,p.brass),
+    c('short hanging stem',0,-.18,0,.07,.41,.07,p.walnut),
+    s('opal glowing globe',0,-.51,0,.70,.70,.70,p.chalk)
+  ]},
+  'ceilinglight.ring':{parts:[
+    c('ceiling cup',0,.06,0,.38,.12,.38,p.brass),
+    ...[-.30,.30].map(x=>b('ring cable '+x,x,-.33,0,.035,.65,.035,p.ink)),
+    c('wide hanging ring',0,-.69,0,1.15,.12,1.15,p.brass),
+    c('inner light diffuser',0,-.76,0,.81,.11,.81,p.chalk)
+  ]},
+
   'sofa.tufted':{
     parts:[b('tall tufted pillow a',-.75,.92,.46,.75,.60,.18,p.sage),
       b('tall tufted pillow b',0,.92,.46,.75,.60,.18,p.cream),

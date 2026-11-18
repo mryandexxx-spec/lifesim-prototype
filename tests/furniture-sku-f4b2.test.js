@@ -15,11 +15,11 @@ const copy=value=>JSON.parse(JSON.stringify(value));
 const src=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
 test('F4b2 canonical products preserve six old SKU prices plus a same-price plant colorway',()=>{
-  assert.equal(FURNITURE_PRODUCTS.length,43);
+  assert.equal(FURNITURE_PRODUCTS.length,47);
   assert.deepEqual(FURNITURE_LEGACY_OFFERS.map(x=>x.prefabId),
     ['plant','table','nightstand','tv','sofa','bed']);
   assert.deepEqual(SHOP_ITEMS.map(x=>x.price),[130,250,170,650,550,850]);
-  assert.equal(MARKET_OFFERS.length,43);
+  assert.equal(MARKET_OFFERS.length,47);
   const amber=furnitureProduct('plant.amber');
   assert.equal(amber.prefabId,'plant');
   assert.equal(amber.price,130);
@@ -39,7 +39,7 @@ test('F4b2 registry and UI expose two distinct plant SKU with shared renderer/ne
   assert.deepEqual(amber.effects,[]);
   assert.equal(amber.appearanceId,'foliage.amber');
   const offers=selectShopCatalog();
-  assert.equal(offers.length,43);
+  assert.equal(offers.length,47);
   assert.equal(offers.filter(x=>x.prefabId==='plant').length,3);
   assert.deepEqual(offers.filter(x=>x.prefabId==='plant').map(x=>x.itemId).slice(0,2),
     ['legacy.plant','plant.amber']);
@@ -188,7 +188,7 @@ test('F4b2 product appearance is applied only on the bought clone, not every pla
       location:'home',x:0,z:0,yaw:0}]}}},
     decorNodes:nodes,decorTemplates:new Map([['plant',{clone(){clones++;return node();}}]]),
     MARKET_OFFERS:[{prefabId:'plant'}],app:{root:{addChild(){}}},
-    applySkuModel:(node,id)=>style.push(id),PROCEDURAL_DEFAULT_SKU:{},refreshSofaSeat(){}};
+    applySkuModel:(node,id)=>style.push(id),PROCEDURAL_DEFAULT_SKU:{},MOUNTED_LIGHTS:{},refreshSofaSeat(){}};
   runInNewContext('(()=>{'+game.slice(start,end)+'\nupdateDecorNodes();})()',ctx,{timeout:1200});
   assert.equal(clones,1);
   assert.deepEqual(style,['plant.amber']);

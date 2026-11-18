@@ -39,7 +39,7 @@ test('F1 groups real multi-part primitives under saved instance nodes and rewire
     assert.ok(game.includes("withDecor('"+type+"'"),type);
   }
   assert.match(game,/entity\.setLocalPosition\(grouped\?x-decorDrawing\.origin\.x:x,y,/);
-  assert.match(game,/node\.setEulerAngles\(0,-pose\.yaw,0\)/);
+  assert.match(game,/node\.setEulerAngles\(0,-\(mounted\?\.yaw\?\?pose\.yaw\),0\)/);
   assert.match(game,/const table=game\.world\.furniture\.instances\.find\(i=>i\.prefabId==='table'\)/);
   assert.match(game,/kind:'blocker',id:'coffee-table'/);
   assert.match(game,/furnitureFloorPoint\(near,far\)/);

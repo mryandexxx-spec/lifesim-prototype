@@ -13,7 +13,7 @@ import {createObjectRegistry} from './object-definition-registry.js';
 const historicalRooms=Object.freeze({
   'Спальня':'room.bedroom','Гостиная':'room.living',
   'Кухня':'room.kitchen','Ванная':'room.bathroom','Декор':'room.decor',
-  'Столовая':'room.dining','Кабинет':'room.study'
+  'Столовая':'room.dining','Кабинет':'room.study','Освещение':'room.lighting'
 });
 const shop=new Map(SHOP_ITEMS.map(({prefabId,price})=>[prefabId,price]));
 const defs=Object.values(FURNITURE_CATALOG);
@@ -24,7 +24,8 @@ const capabilityLabels=Object.freeze({
   'tv.watch':'Телевизоры','food.take':'Приём пищи',
   'hygiene.shower':'Гигиена','bladder.toilet':'Туалет',
   'books.borrow':'Книги и чтение','music.playback':'Музыка и прослушивание',
-  'light.switch':'Освещение','appearance.groom':'Уход за собой',
+  'light.switch':'Освещение','light.automatic':'Автоматический свет',
+  'appearance.groom':'Уход за собой',
   'storage.inspect':'Комоды','clothing.organize':'Гардеробы'
 });
 const categories=[

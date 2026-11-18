@@ -91,7 +91,7 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
     game:{world:{furniture:newFurnitureWorld()},shop:newFurnitureShop()},
     buyMarketItem,editorContext:()=>({residents:[]}),editorMessage:r=>r,
     shopPreviewEntity:{enabled:true},syncShopPreviewEntity(){},
-    marketGhost:visual,instanceRect,FURNITURE_CATALOG,
+    marketGhost:visual,instanceRect,FURNITURE_CATALOG,MOUNTED_LIGHTS:{},
     ghostValid:{kind:'valid'},ghostInvalid:{kind:'invalid'},furnishMode:true,
     shopRoomCategory:null,shopFunctionCategory:null,
     shopTypeCategory:null,shopSearchText:'',

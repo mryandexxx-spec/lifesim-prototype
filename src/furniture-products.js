@@ -83,6 +83,18 @@ const offered=[
   {itemId:'floorlamp.tripod',prefabId:'floorlamp',price:210,name:'Торшер «Тренога»',
     typeCategoryId:'type.lighting.floor',modelKey:'floorlamp.tripod',
     description:'Три опоры и тканевый абажур · включаемое освещение'},
+  {itemId:'sconce.halo',prefabId:'walllight',price:185,name:'Бра «Ореол»',
+    typeCategoryId:'type.lighting.wall',modelKey:'walllight.halo',
+    description:'Тёплый свет · авто, включено или выключено'},
+  {itemId:'sconce.leaf',prefabId:'walllight',price:215,name:'Бра «Лист»',
+    typeCategoryId:'type.lighting.wall',modelKey:'walllight.leaf',
+    description:'Тёплый свет · авто, включено или выключено'},
+  {itemId:'ceiling.globe',prefabId:'ceilinglight',price:340,name:'Плафон «Сфера»',
+    typeCategoryId:'type.lighting.ceiling',modelKey:'ceilinglight.globe',
+    description:'Тёплый свет · авто, включено или выключено'},
+  {itemId:'ceiling.ring',prefabId:'ceilinglight',price:430,name:'Люстра «Кольцо»',
+    typeCategoryId:'type.lighting.ceiling',modelKey:'ceilinglight.ring',
+    description:'Тёплый свет · авто, включено или выключено'},
   {itemId:'rug.geo',prefabId:'rug',price:145,name:'Ковёр «Геометрия»',
     typeCategoryId:'type.decor.rugs',modelKey:'rug.geo',
     description:'Плоский ковёр с крупным геометрическим узором · проходной'},
@@ -198,6 +210,8 @@ export const FURNITURE_SHOP_TYPES=Object.freeze([
   {id:'type.storage.wardrobes',label:'Шкафы',parentId:'type.storage'},
   {id:'type.lighting',label:'Свет',icon:'☀'},
   {id:'type.lighting.floor',label:'Торшеры',parentId:'type.lighting'},
+  {id:'type.lighting.wall',label:'Настенный свет',parentId:'type.lighting'},
+  {id:'type.lighting.ceiling',label:'Потолочный свет',parentId:'type.lighting'},
   {id:'type.decor',label:'Декор',icon:'✿'},
   {id:'type.decor.plants',label:'Растения',parentId:'type.decor'},
   {id:'type.decor.rugs',label:'Ковры',parentId:'type.decor'},
@@ -217,12 +231,13 @@ export const FURNITURE_TYPE_BY_PREFAB=Object.freeze({
   bookcase:'type.storage.books',plant:'type.decor.plants',
   rug:'type.decor.rugs',mirror:'type.decor.mirrors',
   sculpture:'type.decor.art',floorlamp:'type.lighting.floor',
+  walllight:'type.lighting.wall',ceilinglight:'type.lighting.ceiling',
   tv:'type.electronics.tv',music:'type.electronics.music',
   easel:'type.creative.painting',
   stove:'type.kitchen.stoves',prep:'type.kitchen.counters',sink:'type.kitchen.sinks'
 });
 export const PROCEDURAL_NEW_PREFABS=Object.freeze([
-  'armchair','chair','diningtable','floorlamp','rug',
+  'armchair','chair','diningtable','floorlamp','walllight','ceilinglight','rug',
   'dresser','mirror','sculpture','wardrobe','easel','stove','prep','sink'
 ]);
 export const PROCEDURAL_DEFAULT_SKU=Object.freeze(Object.fromEntries(

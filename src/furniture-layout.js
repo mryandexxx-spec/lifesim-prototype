@@ -7,6 +7,7 @@ import {BED_SLOTS} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
 import {musicListeningSpots,chooseMusicListeningSpot} from './music-listening.js';
 import {diningSeatMatches,diningSeatApproach,isPermittedDiningTuck} from './dining.js';
+import {MOUNTED_LIGHTS,mountedAnchorAt,lightingMountPose} from './mounted-lighting.js';
 
 const validPose=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&[0,90,180,270].includes(p.yaw);
 const overlap=(a,b)=>Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*
@@ -19,6 +20,19 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
   const index=source.instances.findIndex(i=>i.instanceId===instanceId&&i.location==='home');
   if(index<0)return {ok:false,reason:'missing-instance'};
   if(lockedInstanceIds.includes(instanceId))return {ok:false,reason:'reserved'};
+  const original=source.instances[index];
+  if(MOUNTED_LIGHTS[original.itemDefinitionId]){
+    const mount=mountedAnchorAt(construction,original.itemDefinitionId,pose.x,pose.z);
+    const lightPose=mount&&lightingMountPose(construction,original.itemDefinitionId,mount);
+    if(!lightPose)return {ok:false,reason:'missing-light-mount'};
+    if(source.instances.some(x=>x.instanceId!==instanceId&&x.location==='home'&&
+      MOUNTED_LIGHTS[x.itemDefinitionId]&&
+      Math.hypot(x.x-lightPose.x,x.z-lightPose.z)<.55))
+      return {ok:false,reason:'light-mount-occupied'};
+    return {ok:true,world:restoreFurnitureWorld({...source,revision:source.revision+1,
+      instances:source.instances.map((x,i)=>i===index?{...x,mount,
+        x:lightPose.x,z:lightPose.z,yaw:lightPose.yaw}:x)})};
+  }
   const candidate=restoreFurnitureWorld({...source,revision:source.revision+1,
     instances:source.instances.map((item,i)=>i===index
       ?{...item,x:pose.x,z:pose.z,yaw:pose.yaw}:item)});

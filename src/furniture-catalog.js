@@ -62,6 +62,12 @@ const original=[
   {prefabId:'floorlamp',instanceId:'template-floorlamp-1',name:'Торшер',
     category:'Гостиная',actionId:'lamp',capabilities:['light.switch'],templateOnly:true,
     x:0,z:0,rect:[-.36,.36,-.36,.36],approach:[0,-.90]},
+  {prefabId:'walllight',instanceId:'template-walllight-1',name:'Настенный светильник',
+    category:'Освещение',capabilities:['light.automatic'],templateOnly:true,walkThrough:true,
+    x:0,z:0,rect:[-.20,.20,-.12,.12]},
+  {prefabId:'ceilinglight',instanceId:'template-ceilinglight-1',name:'Потолочный светильник',
+    category:'Освещение',capabilities:['light.automatic'],templateOnly:true,walkThrough:true,
+    x:0,z:0,rect:[-.22,.22,-.22,.22]},
   {prefabId:'rug',instanceId:'template-rug-1',name:'Ковёр',
     category:'Декор',capabilities:['decor'],templateOnly:true,walkThrough:true,
     x:0,z:0,rect:[-1.22,1.22,-.90,.90]},
@@ -173,6 +179,18 @@ export function restoreFurnitureWorld(raw){
     // F4E: validated optional lamp state; the v1 schema stays unchanged.
     if(item.prefabId==='floorlamp'&&typeof item.lampOn==='boolean')
       restored.lampOn=item.lampOn;
+    if(['walllight','ceilinglight'].includes(item.prefabId)){
+      const m=item.mount;
+      if(m&&typeof m==='object'&&!Array.isArray(m)){
+        if(item.prefabId==='walllight'&&typeof m.edgeId==='string'&&
+          /^[a-z0-9:,.-]{1,80}$/.test(m.edgeId)&&[-1,1].includes(m.side)&&
+          finite(m.t)&&m.t>=.15&&m.t<=.85)
+          restored.mount={edgeId:m.edgeId,side:m.side,t:m.t};
+        if(item.prefabId==='ceilinglight'&&finite(m.x)&&finite(m.z))
+          restored.mount={x:m.x,z:m.z};
+      }
+      restored.lightMode=['auto','on','off'].includes(item.lightMode)?item.lightMode:'auto';
+    }
     instances.push(restored);
   }
   return {schema:FURNITURE_SCHEMA,
@@ -203,6 +221,7 @@ export function furnitureObstacles(world){
   for(const item of data.instances){
     if(item.location!=='home')continue;
     const definition=FURNITURE_CATALOG[item.prefabId];
+    if(definition.walkThrough)continue;
     if(!definition||definition.walkThrough)continue;
     result.push({id:item.prefabId,instanceId:item.instanceId,
       ...instanceRect(item,definition.footprint)});

@@ -1644,3 +1644,8 @@ button.time-card:active {transform:translateY(1px);}
  .life-nav{left:max(8px,env(safe-area-inset-left));right:auto;
    width:min(390px,calc(100vw - 40px));border-radius:17px 17px 0 0;}
 }
+
+/* C3 · touch-friendly manual mode for genuine wall/ceiling fixtures. */
+.furnish-light-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;font-size:13px}
+.furnish-light-control[hidden]{display:none!important}
+.furnish-light-control select{min-height:44px;min-width:112px;max-width:100%;font:inherit;border-radius:9px;padding:8px;background:#f8f5e9;color:#24352f}

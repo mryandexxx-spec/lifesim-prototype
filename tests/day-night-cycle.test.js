@@ -146,7 +146,8 @@ test('W1-A.2 mobile HUD and Pages include the render bridge, no costly new scene
   assert.match(pages,/node --check src\/day-night-render\.js/);
   assert.match(pages,/cp src\/day-night-cycle\.js src\/day-night-render\.js site\/src\//);
   assert.doesNotMatch(game,/dayNightRenderer\..*new pc\.Entity/);
-  assert.match(game,/if\(on\)litUtilityCount\+\+/); // preserve manual lamp cap
+  assert.match(game,/litIds\.has\(item\.instanceId\)/); // C3 shared light budget preserves manual state
+  assert.match(game,/prioritizeVisibleLights\(/);
 });
 
 test('Comfort C1: moonlit 00:00 and 03:00 are brighter, day stays intact, and lamps are not controlled',()=>{
