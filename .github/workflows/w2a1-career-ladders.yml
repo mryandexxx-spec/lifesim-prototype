@@ -1,0 +1,45 @@
+name: W2-A.1 five-rank career progression iPhone-size PlayCanvas QA
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  career-ladders:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install original game runtime and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Node legacy save, salary, incidents and all six senior ladders
+        run: |
+          node --check src/career-catalog.js
+          node --check src/career-progression.js
+          node --check src/career-state.js
+          node --check src/career-work.js
+          node --check src/career-phone-ui.js
+          node --check src/game.js
+          node --check tests/w2a1-browser-smoke.mjs
+          node --test tests/w2a1-career-ladders.test.js tests/w1b3b3-work-stories.test.js tests/w1b3b2-work-incidents.test.js tests/w1b3b1-career-growth.test.js tests/w1b3a-real-work.test.js tests/w1b2b3-recruitment.test.js
+          npm test
+      - name: PlayCanvas WebGL 390x844 touch, two ranks and reload
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/w2a1-http.log 2>&1 &
+          sleep 2
+          node tests/w2a1-browser-smoke.mjs
+      - name: Upload mobile screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w2a1-career-ladders-390x844
+          path: w2a1-*-iphone.png
+          if-no-files-found: ignore
