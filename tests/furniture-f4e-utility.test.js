@@ -165,7 +165,8 @@ test('F4E: Safari UI, both Meshy policies, real light and Pages bundle wired',()
   const src=text('../src/game.js'),html=text('../index.html');
   const page=text('../.github/workflows/pages.yml');
   assert.match(src,/const light=new pc\.Entity\('F4E lamp light'\)/);
-  assert.match(src,/light\.light\.enabled=on&&litUtilityCount<5/);
+  assert.match(src,/light\.light\.enabled=litIds\.has\(item\.instanceId\)/);
+  assert.match(src,/lampIsOn\(game\.world,item\.instanceId\)/);
   assert.match(src,/furnitureUseWeight\(getActor\(game,id\)\?\.action,item\.instanceId\)/);
   assert.match(src,/new pc\.Entity\('F4E mirror highlight'\)/);
   assert.match(src,/\['sofa','seat','dining','cook','prep','wash','bed','tv','hobby','music','paint',\.\.\.UTILITY_ACTION_IDS\]/);
