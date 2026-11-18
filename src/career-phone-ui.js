@@ -147,6 +147,22 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
           (incident.performanceDelta>=0?'+':'')+incident.performanceDelta));
       }
     }
+    // The career route is presentation-only; stable catalog rank IDs drive it.
+    body.append(element('h3','career-phone-subtitle',
+      'Карьерный путь · '+(current.level+1)+' из '+career.ranks.length));
+    const ladder=element('ol','career-ladder');
+    career.ranks.forEach((rank,index)=>{
+      const status=index<current.level?'passed':index===current.level?'current':'future';
+      const item=element('li','career-ladder-step career-ladder-'+status);
+      item.append(element('span','career-ladder-marker',
+        index<current.level?'✓':index===current.level?'●':'○'));
+      const content=element('div','career-ladder-detail');
+      content.append(element('strong',null,(index+1)+'. '+rank.title));
+      content.append(element('small',null,rank.hourlyCredits+' кр./час'+
+        (index===current.level?' · текущая должность':'')));
+      item.append(content);ladder.append(item);
+    });
+    body.append(ladder);
     body.append(action('📖 История рабочих ситуаций',()=>{
       section='worklog';render();
     },'career-phone-secondary'));
@@ -154,11 +170,31 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
     if(growth?.maxLevel){
       body.append(element('p','career-phone-notice','Высшая должность этой карьерной ветки достигнута.'));
     }else if(growth){
-      body.append(element('h3','career-phone-section-title','Повышение: '+growth.rank));
-      const requirements=element('div','career-phone-facts');
+      const next=career.ranks[current.level+1];
+      body.append(element('h3','career-phone-subtitle',
+        'Повышение: '+growth.rank+' · следующая цель'));
+      body.append(element('p','career-phone-notice',
+        'Новая ставка: '+next.hourlyCredits+' кр./час · +'+
+        (next.hourlyCredits-career.ranks[current.level].hourlyCredits)+' кр./час к текущей'));
+      const requirements=element('div','career-goal-requirements');
+      const missing=[];
       for(const req of growth.requirements){
-        requirements.append(element('span',null,(req.met?'✓ ':'○ ')+(req.label==='Результативность'?'Рейтинг для повышения':req.label)+
-          ': '+req.current+' / '+req.target));
+        const label=req.label==='Результативность'?'Рейтинг для повышения':req.label;
+        const remaining=Math.max(0,req.target-(Number(req.current)||0));
+        const row=element('div','career-goal-requirement'+(req.met?' career-goal-met':''));
+        const header=element('div','career-goal-header');
+        header.append(element('strong',null,(req.met?'✓ ':'○ ')+label));
+        header.append(element('span',null,req.current+' / '+req.target));
+        row.append(header);
+        const progress=element('progress','career-goal-progress');
+        progress.max=Math.max(1,req.target);
+        progress.value=Math.min(progress.max,Math.max(0,Number(req.current)||0));
+        progress.setAttribute('aria-label',label+': '+req.current+' из '+req.target);
+        row.append(progress);
+        row.append(element('small',null,req.met?'Условие выполнено':
+          'Осталось: '+remaining));
+        if(!req.met)missing.push(label.toLowerCase()+' (ещё '+remaining+')');
+        requirements.append(row);
       }
       body.append(requirements);
       if(growth.ready){
@@ -174,7 +210,7 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
         },'career-phone-primary'));
       }else{
         body.append(element('p','career-phone-muted',
-          'Выполняй реальные смены и развивай навыки дома, чтобы открыть следующую должность.'));
+          'Пока недоступно: '+missing.join('; ')+'. Учитываются завершённые смены, результативность и настоящие навыки.'));
       }
     }
     if(active?.phase==='pending'&&root.minutes>=active.start-15){
