@@ -65,6 +65,7 @@ try{
   await phone.getByRole('button',{name:'История',exact:true}).tap();
   await phone.getByRole('button',{name:/История Редакция/}).tap();
   assert.ok(await phone.getByText(/Отказ работодателя/).isVisible());
+  assert.ok(await phone.getByText('Профессия: Стажёр редакции').count()>0);
   assert.ok(await phone.getByText(/Решения на собеседовании/).isVisible());
   assert.equal(await phone.getByText(/Ваш ответ:/).count(),3);
   assert.ok(await phone.getByText(/Следующая попытка:/).isVisible());
