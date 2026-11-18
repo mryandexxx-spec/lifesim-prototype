@@ -163,7 +163,7 @@ test('1.0s: actual browser panel is compact, modal, unclosable and has end actio
     document:{createElement:()=>({textContent:'',className:''})},
     endPlayerConversation:()=>{},CONVERSATION_MAX_TURNS:3,
     requiredChoiceFocus:{activate:required=>{if(required)$('conversation-panel').focus();},focusChoice:()=>{}},
-    setViewOpen:()=>{},closeTour:()=>{},closeInsightPanel:()=>{},
+    setViewOpen:()=>{},setHomeOpen:()=>{},closeTour:()=>{},closeInsightPanel:()=>{},
     renderSocialContext:()=>{},renderSocialMenu:()=>{},
     renderSharedPanel:()=>{},renderBranchPanel:()=>{},
     socialContextVisible:false,socialAnchor:null,sharedPicker:false,branchPicker:false

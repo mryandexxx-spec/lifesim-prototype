@@ -12,9 +12,10 @@ test('F1/F2 mobile UI has real mode enter/exit, 3D picking and accessible shop c
     'furnish-undo','furnish-redo','furnish-feedback'])
     assert.ok(html.includes('id="'+id+'"'),id);
   assert.match(html,/id="furnish-toggle"[^>]+aria-pressed="false"/);
-  assert.ok(html.indexOf('id="furnish-toggle"')>html.indexOf('id="pause-btn"'));
-  assert.ok(html.indexOf('id="furnish-toggle"')<html.indexOf('id="speed-btn"'),
-    'F1 entrance remains visible on a short landscape iPhone');
+  assert.match(html,/id="home-open"[^>]*aria-controls="home-panel"/);
+  assert.match(html,/id="home-furnish"[^>]*aria-controls="furniture-editor"/);
+  assert.match(game,/\$\('home-furnish'\).addEventListener\('click'/);
+  assert.match(css,/\.life-nav button\{min-height:50px;/);
   assert.match(html,/id="furniture-editor"[^>]+hidden/);
   assert.match(css,/\.furniture-editor\[hidden\]\{display:none!important;/);
   assert.match(css,/\.app-shell\[data-furnish-mode="true"\] #dashboard/);

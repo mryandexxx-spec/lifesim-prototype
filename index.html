@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
@@ -116,25 +116,40 @@
       </svg>
     </div>
 
-    <aside class="control-tray" aria-label="Управление временем">
-      <button id="career-phone-toggle" class="career-phone-toggle" type="button" aria-controls="career-phone-panel" aria-expanded="false" aria-label="Открыть работу и график выбранного жителя"><span aria-hidden="true">▣</span><small aria-hidden="true">РАБОТА</small></button>
+    <div class="life-clock-controls" role="group" aria-label="Управление временем">
       <button id="pause-btn" class="round-control" type="button" aria-label="Пауза"><span id="pause-icon">Ⅱ</span></button>
+      <button id="speed-btn" class="speed-control" type="button" aria-label="Скорость симуляции">1×</button>
+    </div>
+    <aside class="control-tray" aria-label="Инструменты редактора и камеры">
       <button id="furnish-toggle" class="furnish-toggle" type="button" aria-pressed="false" aria-controls="furniture-editor" aria-label="Войти в режим обстановки"><span aria-hidden="true">▦</span><small aria-hidden="true">ДОМ</small></button>
       <button id="build-toggle" class="furnish-toggle build-toggle" type="button" aria-pressed="false" aria-controls="build-editor" aria-label="Войти в строительство"><span aria-hidden="true">⌂</span><small aria-hidden="true">СТРОИТЬ</small></button>
-      <button id="speed-btn" class="speed-control" type="button" aria-label="Скорость симуляции">1×</button>
-      <button id="auto-btn" class="auto-control" type="button" aria-pressed="true" aria-label="Автономность включена. Нажмите, чтобы отключить"><span>Авто</span><small id="auto-state">ВКЛ</small></button>
       <button id="rotate-camera-btn" class="rotate-control" type="button" aria-pressed="false" aria-label="Включить вращение камеры одним пальцем" title="Вращать одним пальцем"><span aria-hidden="true">⟳</span><small aria-hidden="true">ПОВОРОТ</small></button>
       <button id="reset-camera-btn" class="round-control" type="button" aria-label="Вернуть камеру">⌖</button>
-      <button id="view-toggle" class="view-control" type="button" aria-controls="view-panel" aria-expanded="false" aria-label="Настройки вида"><span aria-hidden="true">◉</span><small aria-hidden="true">ВИД</small></button>
     </aside>
-    <section id="view-panel" class="view-panel" hidden aria-label="Настройки вида комнаты">
-      <div class="view-panel-head"><strong>Вид комнаты</strong><button id="view-close" type="button" aria-label="Закрыть настройки вида">×</button></div>
+    <nav class="life-nav" aria-label="Основные действия">
+      <button id="career-phone-toggle" class="career-phone-toggle" type="button" aria-controls="career-phone-panel" aria-expanded="false" aria-label="Открыть работу и график выбранного жителя"><span aria-hidden="true">▣</span><small>Работа</small></button>
+      <button id="home-open" type="button" aria-controls="home-panel" aria-expanded="false" aria-label="Открыть Дом: обстановка или строительство"><span aria-hidden="true">⌂</span><small>Дом</small></button>
+      <button id="view-toggle" class="view-control" type="button" aria-controls="view-panel" aria-expanded="false" aria-label="Открыть меню"><span aria-hidden="true">☰</span><small>Меню</small></button>
+    </nav>
+
+    <section id="view-panel" class="view-panel" hidden aria-label="Меню игры" tabindex="-1">
+      <div class="view-panel-head"><strong>Меню Блин’С</strong><button id="view-close" type="button" aria-label="Закрыть меню">×</button></div>
+      <button id="auto-btn" class="auto-control" type="button" aria-pressed="true" aria-label="Автономность включена. Нажмите, чтобы отключить"><span>Автономность</span><small id="auto-state">ВКЛ</small></button>
+      <button id="menu-rotate-btn" type="button" aria-pressed="false" aria-label="Настройка жеста камеры">⟳ Камера: перемещение одним пальцем</button>
+      <button id="menu-reset-camera-btn" type="button">⌖ Сброс камеры</button>
       <button id="item-labels-btn" class="item-labels-control" type="button" aria-pressed="false" aria-label="Показать подписи предметов"><span aria-hidden="true">⌗</span><span>Подписи предметов</span><small aria-hidden="true">МЕТКИ</small></button>
       <button id="tour-replay" class="tour-replay" type="button" aria-controls="tour-panel">? <span>Как играть</span></button>
       <button id="music-audio-toggle" class="music-audio-toggle" type="button" aria-pressed="false">🔇 Включить звук</button>
       <button id="mesh-model-btn" class="mesh-model-control" type="button" aria-pressed="true" aria-label="Алекс и Мира: 3D-модели Meshy. Нажмите, чтобы вернуть старые модели."><span aria-hidden="true">3D</span><span>Облики жителей</span><small id="mesh-model-state" aria-hidden="true">MESHY</small></button>
+      <div class="footer-actions"><button id="save-btn" type="button">Сохранить</button><button id="reset-btn" type="button">Новая игра</button></div>
+      <p class="menu-about">Блин’С · LifeSim · сборка 1.2u.17 · Comfort C2</p>
     </section>
 
+    <section id="home-panel" class="home-panel" role="dialog" aria-modal="false" aria-label="Дом: выбор редактора" hidden tabindex="-1">
+      <div class="view-panel-head"><strong>Дом</strong><button id="home-close" type="button" aria-label="Закрыть выбор редактора">×</button></div>
+      <button id="home-furnish" type="button" aria-controls="furniture-editor">▦ Обстановка <small>Мебель, магазин и склад</small></button>
+      <button id="home-build" type="button" aria-controls="build-editor">⌂ Строительство <small>Комнаты, стены и крыши</small></button>
+    </section>
     <button id="plan-peek" class="scene-badge plan-peek" type="button" aria-controls="queue-panel" aria-expanded="false" aria-label="Открыть очередь действий">
       <span class="plan-current"><span class="status-dot" aria-hidden="true"></span><span id="status-text">Свободное время</span><span class="plan-chevron" aria-hidden="true">›</span></span>
       <span id="plan-upcoming" class="plan-upcoming" aria-hidden="true" hidden></span>
@@ -482,7 +497,7 @@
     </section>
 
 
-    <footer id="dashboard" class="dashboard" data-collapsed="false" aria-label="Панель персонажа">
+    <footer id="dashboard" class="dashboard" data-collapsed="true" aria-label="Панель персонажа">
       <div class="resident-column">
         <div class="resident-switch" role="group" aria-label="Кем управлять">
           <button id="pick-alex" type="button" aria-pressed="true">Алекс</button>
@@ -490,6 +505,7 @@
         </div>
         <button id="mind-toggle" class="character-tag" type="button" aria-controls="mind-panel" aria-expanded="false"><span id="avatar-symbol" class="avatar-icon">☺</span><div><strong id="resident-name">Алекс</strong><small id="mood-label">Спокоен</small><small id="wish-label">♫ Хочет отдохнуть</small></div><span class="mind-indicator" aria-hidden="true">⌄</span></button>
       </div>
+      <output id="urgent-needs" class="urgent-needs" aria-label="Важные потребности">Потребности в норме</output>
       <div class="needs" aria-label="Потребности персонажа">
         <div class="need" data-need="hunger"><span class="need-icon">◕</span><div class="need-copy"><span>Сытость</span><div class="meter"><i id="bar-hunger"></i></div></div><output id="value-hunger">78</output></div>
         <div class="need" data-need="energy"><span class="need-icon">☾</span><div class="need-copy"><span>Энергия</span><div class="meter"><i id="bar-energy"></i></div></div><output id="value-energy">67</output></div>
@@ -498,7 +514,6 @@
         <div class="need" data-need="social"><span class="need-icon" aria-hidden="true">♧</span><div class="need-copy"><span>Общение</span><div class="meter"><i id="bar-social"></i></div></div><output id="value-social">78</output></div>
         <div class="need" data-need="bladder"><span class="need-icon" aria-hidden="true">WC</span><div class="need-copy"><span>Туалет</span><div class="meter"><i id="bar-bladder"></i></div></div><output id="value-bladder">76</output></div>
       </div>
-      <div class="footer-actions"><button id="save-btn" type="button">Сохранить</button><button id="reset-btn" type="button">Новая игра</button></div>
       <div class="mood-overview">
         <div id="mood-overview" role="meter" aria-label="Настроение выбранного персонажа" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70">
           <div class="mood-overview-head"><span>НАСТРОЕНИЕ</span><strong id="mood-overview-title">Спокоен</strong><small id="mood-overview-value">70/100</small></div>
@@ -507,7 +522,7 @@
         </div>
         <button id="insight-toggle" type="button" class="insight-toggle" aria-controls="insight-panel" aria-expanded="false">Почему?</button>
       </div>
-      <button id="hud-toggle" class="hud-toggle" type="button" aria-controls="dashboard" aria-expanded="true" aria-label="Свернуть панель персонажа">⌄</button>
+      <button id="hud-toggle" class="hud-toggle" type="button" aria-controls="dashboard" aria-expanded="false" aria-label="Показать все шесть потребностей">Все потребности</button>
     </footer>
 
     <section id="insight-panel" class="insight-panel" hidden aria-labelledby="insight-title">
@@ -536,7 +551,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');

@@ -89,7 +89,11 @@ try {
  // Legacy save resets to unpaused ×1; choose x3 again for visible movement.
  await page.locator('#speed-btn').click();
  assert.equal(await page.locator('#speed-btn').innerText(),'3×');
- await page.locator('#build-toggle').click();
+ const clickBuild=async()=>{
+    if(await page.locator('#build-toggle').isVisible())await page.locator('#build-toggle').click();
+    else{await page.locator('#home-open').click();await page.locator('#home-build').click();}
+  };
+  await clickBuild();
  assert.ok(await page.locator('#build-editor').isVisible());
  await page.waitForTimeout(350); // Let the last pre-build HUD time sample settle.
  const buildClock=await page.locator('#time-label').innerText();
@@ -100,7 +104,7 @@ try {
  const beforeLive=await page.locator('#time-label').innerText();
  await page.waitForFunction(before=>document.querySelector('#time-label')?.textContent!==before,
   beforeLive,{timeout:7000});
- await page.locator('#furnish-toggle').click();
+ await page.locator('#home-open').click();await page.locator('#home-furnish').click();
  assert.ok(await page.locator('#furniture-editor').isVisible());
  await page.waitForTimeout(350); // The HUD may be one frame behind the tick.
  const furnishClock=await page.locator('#time-label').innerText();

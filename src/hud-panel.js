@@ -2,14 +2,14 @@
 export const HUD_COMPACT_KEY='blins.ui.hud.compact.v1';
 export function isHudCompact(value){return value==='compact';}
 export function createHudPanel({panel,toggle,readPreference=()=>null,writePreference=()=>{},onChange=()=>{}}){
-  let compact=false;
-  try{compact=isHudCompact(readPreference());}
-  catch{/* Safari may reject localStorage; default to full HUD. */}
+  let compact=true;
+  try{const previous=readPreference();compact=previous==='full'?false:true;}
+  catch{/* Safari may reject localStorage; default to compact HUD. */}
   function render(){
     panel.dataset.collapsed=String(compact);
     toggle.setAttribute('aria-expanded',String(!compact));
-    toggle.setAttribute('aria-label',compact?'Развернуть панель персонажа':'Свернуть панель персонажа');
-    toggle.textContent=compact?'⌃':'⌄';
+    toggle.setAttribute('aria-label',compact?'Показать все шесть потребностей':'Свернуть полный список потребностей');
+    toggle.textContent=compact?'Все потребности':'Свернуть';
     onChange(compact);
   }
   toggle.addEventListener('click',()=>{
