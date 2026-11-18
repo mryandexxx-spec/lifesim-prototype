@@ -87,13 +87,15 @@ function cleanHistory(raw,now=TMAX){
     RECRUITMENT_CAREERS.includes(x.careerId)&&
     ['hired','rejected','declined'].includes(x.outcome)&&time(x.at)&&x.at<=now)
     .map(x=>{
-      const appliedAt=time(x.appliedAt)&&x.appliedAt<=x.at?x.appliedAt:x.at;
-      const resolvedAt=time(x.resolvedAt)&&x.resolvedAt>=appliedAt&&x.resolvedAt<=x.at
+      // Old history only stored completion time: do not invent an application date.
+      const appliedAt=time(x.appliedAt)&&x.appliedAt<=x.at?x.appliedAt:null;
+      const resolvedAt=time(x.resolvedAt)&&x.resolvedAt>=(appliedAt??0)&&x.resolvedAt<=x.at
         ?x.resolvedAt:x.at;
-      const entry={id:x.id,careerId:x.careerId,outcome:x.outcome,at:x.at,appliedAt,resolvedAt};
+      const entry={id:x.id,careerId:x.careerId,outcome:x.outcome,at:x.at,resolvedAt};
+      if(appliedAt!==null)entry.appliedAt=appliedAt;
       const questions=INTERVIEW_QUESTIONS_BY_CAREER[x.careerId],i=x.interview;
       if(questions&&i&&typeof i==='object'&&!Array.isArray(i)&&
-        time(i.startedAt)&&i.startedAt>=appliedAt&&i.startedAt<=x.at&&
+        time(i.startedAt)&&i.startedAt>=(appliedAt??0)&&i.startedAt<=x.at&&
         Number.isInteger(i.skill)&&i.skill>=0&&i.skill<=10&&
         Number.isInteger(i.traitBoost)&&Math.abs(i.traitBoost)<=4&&
         Number.isInteger(i.mood)&&i.mood>=0&&i.mood<=100&&
