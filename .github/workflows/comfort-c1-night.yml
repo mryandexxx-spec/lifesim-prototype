@@ -1,0 +1,41 @@
+name: Comfort C1 readable night — mobile PlayCanvas QA
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  night-readability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install project dependencies and mobile Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Pure seasonal lighting and all regressions
+        run: |
+          node --check src/day-night-cycle.js
+          node --check src/day-night-render.js
+          node --check tests/comfort-c1-browser-smoke.mjs
+          node --test tests/day-night-cycle.test.js
+          npm test
+      - name: Render real WebGL midnight and daytime at iPhone viewport
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/comfort-c1-http.log 2>&1 &
+          sleep 2
+          node tests/comfort-c1-browser-smoke.mjs
+      - name: Upload screenshots for before/after review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comfort-c1-day-and-night-390x844
+          path: comfort-c1-*-390x844.png
+          if-no-files-found: ignore
