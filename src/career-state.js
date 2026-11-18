@@ -78,7 +78,8 @@ function cleanWorkHistory(raw){
     const scene=workScenario(item.careerId,item.scenarioId);
     if(!scene?.options.some(o=>o.id===item.choiceId)||
       !validTime(item.shiftStart)||!validTime(item.at)||item.at<item.shiftStart||
-      !Number.isInteger(item.rank)||item.rank<0||item.rank>2||
+      !Number.isInteger(item.rank)||item.rank<0||
+      item.rank>=careerDefinition(item.careerId).ranks.length||
       !Number.isInteger(item.performanceDelta)||item.performanceDelta< -5||
         item.performanceDelta>10||
       !Number.isInteger(item.performanceAfter)||item.performanceAfter<0||
