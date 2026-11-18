@@ -131,7 +131,7 @@ test('W4-B: no scores, extra accounts or mutated wallet in presentation modules'
   const game=readFileSync('src/game.js','utf8');
   const html=readFileSync('index.html','utf8');
   const pages=readFileSync('.github/workflows/pages.yml','utf8');
-  assert.match(game,/financeTrigger:\$('family-balance-chip'\)/);
+  assert.ok(game.includes("financeTrigger:$('family-balance-chip')"));
   assert.match(html,/id="family-balance-chip"/);
   assert.match(phone,/finance-date-start/);
   assert.match(phone,/finance-date-end/);
