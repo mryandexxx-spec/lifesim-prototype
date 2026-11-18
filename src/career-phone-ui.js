@@ -11,6 +11,7 @@ import {seniorTrack} from './career-seniority.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
 import {createFinancePhoneUI} from './finance-phone-ui.js';
+import {payHouseholdBill} from './household-bills.js';
 import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
   startCareerInterview,answerCareerInterview,markRecruitmentRead,
@@ -29,7 +30,7 @@ function action(label,callback,kind=''){
   return el;
 }
 export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,setCareerSystem,
-  save,notify,onOpenChange=()=>{},beforeOpen=()=>{},canOpen=()=>true}){
+  save,notify,onFundsChanged=()=>{},onOpenChange=()=>{},beforeOpen=()=>{},canOpen=()=>true}){
   const overlay=element('section','career-phone-overlay');
   overlay.id='career-phone-panel';overlay.hidden=true;
   overlay.setAttribute('aria-label','Смартфон: работа Блин’С');
@@ -62,7 +63,16 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     tab.dataset.app=id;appTabs.append(tab);
   }
   frame.append(header,appTabs,body);overlay.append(shade,frame);host.append(overlay);
-  const financeUI=createFinancePhoneUI({body});
+  const financeUI=createFinancePhoneUI({body,payBill:root=>{
+    const payment=payHouseholdBill(root);
+    if(!payment.ok)return payment;
+    root.shop=payment.shop;
+    root.financialHistory=payment.financialHistory;
+    root.householdBills=payment.householdBills;
+    save(true);onFundsChanged();
+    notify('🧾 Семейный счёт оплачен · −'+payment.amount+' кр.');
+    return payment;
+  }});
   let app='work';
   let who=null,view='list',chosen=null,lastFocus=null,lastInterviewFeedback='';
   let section='vacancies',historyId=null;
