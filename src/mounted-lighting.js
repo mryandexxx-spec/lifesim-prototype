@@ -23,7 +23,9 @@ function roomsFor(world){
 }
 /** Canonical topology membership: wall barriers, not Euclidean distance. */
 export function lightingRoomAt(construction,x,z){
-  if(!valid(x)||!valid(z)||!construction||!constructionContains(construction,x,z))return null;
+  if(!valid(x)||!valid(z)||!construction)return null;
+  // Legacy A* bounds are inset from the real saved starter floor edges.
+  // A wall-mounted object occupies the room FLOOR cell, not the walkable inset.
   const key=cell(x,z);
   return roomsFor(construction).find(r=>r.cells.includes(key))?.id??null;
 }
