@@ -36,9 +36,17 @@ try{
     await page.locator('#home-open').tap();
     await page.locator('#home-furnish').tap();
     await page.locator('#furnish-item-select').selectOption(plant.instanceId);
-    page.once('dialog',d=>d.accept());
+    const selected=await page.locator('#furnish-item-select').inputValue();
+    const sellDisabled=await page.locator('#furnish-sell').isDisabled();
+    const sellVisible=await page.locator('#furnish-sell').isVisible();
+    let confirmed=false;
+    page.once('dialog',async d=>{confirmed=true;await d.accept();});
     await page.locator('#furnish-sell').tap();
     const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+    console.log('W4A sale diagnostic',JSON.stringify({width,height,selected,sellDisabled,
+      sellVisible,confirmed,credits:saved.shop?.credits,
+      entries:saved.financialHistory?.entries?.length,
+      feedback:await page.locator('#furnish-feedback').textContent()}));
     assert.equal(saved.version,1);
     assert.equal(saved.shop.credits,2810,'legacy balance plus one 70% plant sale');
     assert.equal(saved.financialHistory.schema,1);
