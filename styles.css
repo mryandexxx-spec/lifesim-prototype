@@ -1445,3 +1445,10 @@ button.time-card:active {transform:translateY(1px);}
   align-items:flex-start;gap:5px;min-height:60px;padding:12px 14px;
   text-align:left;touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .career-work-option-effect{font-size:12px;line-height:1.4;font-weight:500;opacity:.85;white-space:normal}
+
+/* W1-B.3b.3: a readable, bounded career journal inside the existing phone. */
+.career-phone-body .career-work-story{display:flex;flex-direction:column;gap:5px;
+  padding:12px 13px;margin:4px 0;min-width:0;max-width:100%;
+  overflow-wrap:anywhere;touch-action:pan-y}
+.career-phone-body .career-work-story p{margin:2px 0;line-height:1.4}
+.career-phone-body .career-work-story small{display:block;line-height:1.45}
