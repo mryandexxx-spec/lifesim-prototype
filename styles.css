@@ -1473,3 +1473,22 @@ button.time-card:active {transform:translateY(1px);}
 .career-goal-progress{width:100%;height:12px;display:block;margin:5px 0;accent-color:#3c8e70}
 .career-goal-requirement small{font-size:11px;line-height:1.3;color:#746246}
 .career-goal-met small{color:#2d7457}
+
+/* W2-A.2: compact native-details professional goal; thumbs and VoiceOver. */
+.career-professional-goals {margin:14px 0; padding:12px; border:1px solid #d6e6d7;
+  border-radius:15px; background:#f4f9f2; color:#344e40;}
+.career-professional-summary {min-height:44px; display:flex;align-items:center;
+  font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation;
+  padding:9px 5px;line-height:1.35;}
+.career-professional-summary:focus-visible {outline:3px solid #4fa892;outline-offset:2px;}
+.career-professional-card {margin:8px 0 12px;padding:12px;border:1px solid #dce9dd;
+  border-radius:12px;background:#fff;}
+.career-professional-card>strong {display:block;font-size:15px;}
+.career-professional-card .career-phone-muted {margin:7px 0 11px;}
+.career-professional-progress {display:flex;gap:8px;justify-content:space-between;
+  align-items:center;flex-wrap:wrap;font-size:12px;}
+.career-professional-condition {font-size:12px;line-height:1.5;margin:8px 0 0;}
+.career-professional-caption {display:block;font-size:12px;margin:11px 0 7px;}
+.career-professional-awards {padding-left:0;margin:0;list-style:none;display:grid;gap:6px;}
+.career-professional-awards li {font-size:12px;padding:9px;background:#e7f2e7;
+  border:1px solid #d1e2d1;border-radius:9px;}

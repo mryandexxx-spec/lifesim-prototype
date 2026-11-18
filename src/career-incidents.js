@@ -4,6 +4,7 @@ import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {refreshMind} from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
+import {recordProfessionalIncident} from './career-goals.js';
 
 const O=(id,text,feedback,performance,energy,fun,axis,memory,skill=null)=>
   Object.freeze({id,text,feedback,performance,energy,fun,axis,memory,skill});
@@ -228,7 +229,8 @@ export function decideWorkIncident(root,id,choiceId,{automatic=false}={}){
     if(journal.length>INCIDENT_HISTORY_LIMIT)
       journal.splice(0,journal.length-INCIDENT_HISTORY_LIMIT);
   }
-  return {ok:true,incident,option,performanceDelta:change,feedback:option.feedback};
+  const badges=recordProfessionalIncident(root,id,incident);
+  return {ok:true,incident,option,performanceDelta:change,feedback:option.feedback,badges};
 }
 export function automaticWorkIncident(root,id){
   return pendingWorkIncident(root,id)?

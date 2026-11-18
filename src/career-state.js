@@ -1,6 +1,7 @@
 /** W1-B.3a: additive root-v1 career save contract and sanitized work receipts. */
 import {careerDefinition} from './career-catalog.js';
 import {restoreWorkIncident,workScenario,INCIDENT_HISTORY_LIMIT} from './career-incidents.js';
+import {newProfessionalGoals,restoreProfessionalGoals} from './career-goals.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -98,7 +99,8 @@ function cleanWorkHistory(raw){
 }
 export function newCareerSystem(){
   return {schema:CAREER_SCHEMA,nextEmploymentId:1,byResident:{alex:null,mira:null},
-    settlementIds:[],incidentIds:[],incidentHistory:{alex:[],mira:[]}};
+    settlementIds:[],incidentIds:[],incidentHistory:{alex:[],mira:[]},
+    professionalGoals:newProfessionalGoals()};
 }
 export function restoreCareerSystem(raw){
   const state=newCareerSystem();
@@ -121,6 +123,7 @@ export function restoreCareerSystem(raw){
   if(Array.isArray(raw.incidentIds))state.incidentIds=[...new Set(raw.incidentIds.filter(x=>
     typeof x==='string'&&x.length<=102&&/^e[1-9]\d{0,8}@[0-9]+@[0-9]+#work$/.test(x)))].slice(-256);
   for(const id of CAREER_RESIDENT_IDS)state.incidentHistory[id]=cleanWorkHistory(raw.incidentHistory?.[id]);
+  state.professionalGoals=restoreProfessionalGoals(raw.professionalGoals,state);
   return state;
 }
 /** Pure hire transition. Gameplay/UI and attendance will call this adapter in W1-B.2. */
