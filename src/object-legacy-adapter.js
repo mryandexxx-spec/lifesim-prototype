@@ -13,7 +13,7 @@ import {createObjectRegistry} from './object-definition-registry.js';
 const historicalRooms=Object.freeze({
   'Спальня':'room.bedroom','Гостиная':'room.living',
   'Кухня':'room.kitchen','Ванная':'room.bathroom','Декор':'room.decor',
-  'Столовая':'room.dining','Кабинет':'room.study','Освещение':'room.living'
+  'Столовая':'room.dining','Кабинет':'room.study','Освещение':'room.lighting'
 });
 const shop=new Map(SHOP_ITEMS.map(({prefabId,price})=>[prefabId,price]));
 const defs=Object.values(FURNITURE_CATALOG);
