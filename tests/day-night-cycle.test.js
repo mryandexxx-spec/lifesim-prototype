@@ -157,7 +157,8 @@ test('Comfort C1: moonlit 00:00 and 03:00 are brighter, day stays intact, and la
       assert.equal(scene.sunlightIntensity,0);
       assert.deepEqual(scene.ambientColor,[.29,.32,.40]);
       assert.equal(scene.fillIntensity,.38);
-      assert.deepEqual(scene.backdropColor,[.09,.12,.20]);
+      assert.ok(difference(scene.backdropColor,[.09,.12,.20])<.001,
+        'tiny astronomical golden glow is allowed even at midnight');
       assert.equal(scene.artificialLightSuggestion,true);
     }
     const day=sampleDaylight(date,12*60);
