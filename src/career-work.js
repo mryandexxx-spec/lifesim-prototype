@@ -7,6 +7,7 @@ import {CAREER_RESIDENT_IDS} from './career-state.js';
 import {SHOP_MAX_CREDITS} from './furniture-shop.js';
 import {careerReadiness,recordCompletedCareerShift,recordMissedCareerShift,promotionReadiness} from './career-progression.js';
 import {startWorkIncident,automaticWorkIncident} from './career-incidents.js';
+import {recordProfessionalShift} from './career-goals.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 const ACTIVE=new Set(['departing','working','returning']);
@@ -49,12 +50,14 @@ function settle(root,contract,id,at){
   const salary=already?0:Math.min(gross,Math.max(0,CASH_LIMIT-root.shop.credits));
   const lateMinutes=Math.max(0,Math.round(shift.departedAt-shift.start));
   let result=null;
+  let badges=[];
   if(!already){
     root.shop.credits+=salary;
     ledger.push(shift.id);
     if(ledger.length>256)ledger.splice(0,ledger.length-256);
     // Salary, performance, fatigue and receipt belong to ONE saved snapshot.
     result=recordCompletedCareerShift(contract,actorFor(root,id),shift,worked,lateMinutes);
+    badges=recordProfessionalShift(root,id,shift);
   }
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
     outcome:'worked',salary:already?0:salary,
@@ -64,7 +67,7 @@ function settle(root,contract,id,at){
       scenarioId:shift.incident.scenarioId||'legacy',choiceId:shift.incident.choiceId,
       auto:shift.incident.auto,performanceDelta:shift.incident.performanceDelta}:null};
   shift.phase='returning';
-  return {salary,result};
+  return {salary,result,badges};
 }
 /** One canonical sweep. Call just once per active household tick BEFORE ticking
  * individual actors; after this, root.minutes and otherSim.minutes advance once.
@@ -91,12 +94,13 @@ export function progressCareerWork(root,before,after){
         emit(messages,id,'incident','новая ситуация на работе · открой смартфон, чтобы выбрать решение');
       if(after>=shift.end){
         automaticWorkIncident(root,id);
-        const {salary,result}=settle(root,contract,id,shift.end);
+        const {salary,result,badges}=settle(root,contract,id,shift.end);
         const growth=result?' · '+result.grade+' · результативность '+contract.performance+'/100':'';
         const ready=promotionReadiness(root,id);
         actor.event='Смена завершена · заработано '+salary+' кр.'+growth;
         emit(messages,id,'salary','смена окончена, начислено '+salary+' кр.'+growth+
-          (ready?.ready?' · условия повышения выполнены':'')+'. Возвращается домой');
+          (ready?.ready?' · условия повышения выполнены':'')+
+          (badges.length?' · достижение: '+badges.join(', '):'')+'. Возвращается домой');
       }
       continue;
     }

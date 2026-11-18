@@ -5,6 +5,7 @@ import {careerVacancies,leaveCareer,describeCareerShift} from './career-job-boar
 import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
+import {professionalGoalsView} from './career-goals.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
 import {calendarAt} from './calendar-core.js';
 import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
@@ -133,7 +134,8 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
             const live=personRoot();if(!live)return;
             const result=decideWorkIncident(live,who,option.id);
             if(!result.ok){notify(result.reason);render();return;}
-            save(true);notify(NAMES[who]+': '+result.feedback);render();
+            save(true);notify(NAMES[who]+': '+result.feedback+
+              (result.badges?.length?' · достижение: '+result.badges.join(', '):''));render();
           },'career-phone-secondary career-work-option');
           button.append(element('small','career-work-option-effect',
             workIncidentChoiceDescription(root,who,option)));
@@ -146,6 +148,55 @@ export function createCareerPhoneUI({host,trigger,getRoot,setCareerSystem,
           ' · '+(chosen?.feedback||'')+' · рейтинг '+
           (incident.performanceDelta>=0?'+':'')+incident.performanceDelta));
       }
+    }
+    // W2-A.2: compact, accessible, native scrolling professional recognition.
+    // View only: this section never simulates work, grants credits or changes promotion.
+    const achievements=professionalGoalsView(root,who);
+    if(achievements){
+      const details=element('details','career-professional-goals');
+      const summary=element('summary','career-professional-summary',
+        '🎯 Профессиональные цели · '+achievements.earned+' из 2');
+      details.append(summary);
+      details.append(element('p','career-phone-muted',
+        'Необязательные профессиональные достижения. На повышение и зарплату не влияют.'));
+      const currentGoal=achievements.current;
+      if(currentGoal){
+        const card=element('div','career-professional-card');
+        card.append(element('strong',null,currentGoal.title));
+        card.append(element('p','career-phone-muted',currentGoal.description));
+        const progress=element('div','career-professional-progress');
+        progress.append(element('span',null,'Завершённые смены в профессии'));
+        progress.append(element('strong',null,
+          currentGoal.shifts+' / '+currentGoal.requiredShifts));
+        card.append(progress);
+        const bar=element('progress','career-professional-bar');
+        bar.max=currentGoal.requiredShifts;
+        bar.value=Math.min(currentGoal.shifts,currentGoal.requiredShifts);
+        bar.setAttribute('aria-label','Смены для цели '+currentGoal.title);
+        card.append(bar);
+        card.append(element('p','career-professional-condition',
+          (currentGoal.sceneMet?'✓ ':'○ ')+
+          'Успешное решение тематической рабочей ситуации'));
+        if(currentGoal.skill){
+          const skillName={cooking:'Кулинария',painting:'Живопись',
+            literature:'Литературная эрудиция'}[currentGoal.skill];
+          card.append(element('p','career-professional-condition',
+            (currentGoal.skillMet?'✓ ':'○ ')+skillName+': '+
+            currentGoal.currentSkill+' / '+currentGoal.skillLevel));
+        }
+        details.append(card);
+      }else{
+        details.append(element('p','career-phone-notice',
+          'Все профессиональные достижения этой профессии получены!'));
+      }
+      if(achievements.completed.length){
+        details.append(element('strong','career-professional-caption','Профессиональное признание'));
+        const list=element('ul','career-professional-awards');
+        for(const goal of achievements.completed)
+          list.append(element('li',null,'🏅 '+goal.title));
+        details.append(list);
+      }
+      body.append(details);
     }
     // The career route is presentation-only; stable catalog rank IDs drive it.
     body.append(element('h3','career-phone-subtitle',
