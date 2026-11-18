@@ -1634,3 +1634,13 @@ button.time-card:active {transform:translateY(1px);}
 
 /* C2: secondary-panel dismiss controls are comfortably touch-sized. */
 .queue-head button,.action-header button{min-width:44px;min-height:44px;}
+
+
+/* In short landscape, avoid two full-width bottom bars: leave the right half
+   completely available for the PlayCanvas camera and object interactions. */
+@media(max-height:560px) and (orientation:landscape){
+ #dashboard.dashboard{left:max(8px,env(safe-area-inset-left));right:auto;
+   width:min(390px,calc(100vw - 40px));}
+ .life-nav{left:max(8px,env(safe-area-inset-left));right:auto;
+   width:min(390px,calc(100vw - 40px));border-radius:17px 17px 0 0;}
+}
