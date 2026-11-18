@@ -46,6 +46,29 @@ export function lightingMountPose(construction,productId,anchor){
   const height=Number(construction.wallHeightMeters)||2.8;
   return {x,y:Math.max(1.5,height-.60),z,yaw:w.axis==='v'?(anchor.side>0?90:270):(anchor.side>0?0:180),roomId:room};
 }
+/** A touch on the room floor picks a real nearby wall segment or room ceiling.
+ * Never create floating mounts where there is no physical supporting surface.
+ */
+export function mountedAnchorAt(construction,productId,x,z){
+  const sku=MOUNTED_LIGHTS[productId];
+  if(!sku||!valid(x)||!valid(z)||!constructionContains(construction,x,z))return null;
+  if(sku.mount==='ceiling')return {x,z};
+  const candidates=[];
+  for(const wall of constructionWallSegments(construction)){
+    const along=wall.axis==='v'?z:x;
+    const base=(wall.axis==='v'?wall.j:wall.i)*BUILD_STEP;
+    const t=(along-base)/BUILD_STEP;
+    if(t<.15||t>.85)continue;
+    const signed=wall.axis==='v'?x-wall.i*BUILD_STEP:z-wall.j*BUILD_STEP;
+    if(Math.abs(signed)>.95||Math.abs(signed)<.10)continue;
+    const side=signed>0?1:-1;
+    const mount={edgeId:wall.id,side,t};
+    const result=lightingMountPose(construction,productId,mount);
+    if(result)candidates.push({mount,distance:Math.abs(signed)});
+  }
+  candidates.sort((a,b)=>a.distance-b.distance);
+  return candidates[0]?.mount||null;
+}
 export function validMountedFixture(construction,fixture){
   if(!fixture||!MOUNTED_LIGHTS[fixture.itemDefinitionId])return false;
   const pose=lightingMountPose(construction,fixture.itemDefinitionId,fixture.mount);
