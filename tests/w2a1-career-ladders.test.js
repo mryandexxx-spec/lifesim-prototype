@@ -88,7 +88,7 @@ test('previous first and second promotion rules remain unchanged for all careers
 });
 test('senior promotions need earned rank-shifts, real rating and genuine profile skill',()=>{
   for(const career of CAREER_CATALOG){
-    const [,,,n2,p2,n3,p3,skill]=senior[career.id];
+    const [,n2,p2,n3,p3,skill]=senior[career.id];
     const {root,contract,actor}=fixture(career.id);
     contract.level=2;contract.workedShifts=25;contract.rankShifts=n2-1;contract.performance=p2;
     if(skill)actor.skills.xpById[skill]=3000;
@@ -132,13 +132,13 @@ test('only new completed full shifts pay senior rates once; old snapshots are im
     root.minutes=shift.start;root.otherSim.minutes=shift.start;
     progressCareerWork(root,shift.start-1,shift.start);
     assert.equal(arriveCareerPortal(root,'alex',shift.start),true);
-    assert.equal(contract.currentShift.hourlyCredits,senior[career.id][0][1]);
+    assert.equal(contract.currentShift.hourlyCredits,senior[career.id][0][0][1]);
     const loaded=loadHousehold(copy(root));
     const c=loaded.careerSystem.byResident.alex;
-    assert.equal(c.currentShift.hourlyCredits,senior[career.id][0][1]);
+    assert.equal(c.currentShift.hourlyCredits,senior[career.id][0][0][1]);
     assert.equal(promoteCareer(loaded,'alex').ok,false,'No promotion in-flight');
     tickHousehold(loaded,shift.end-shift.start);
-    const earned=Math.round(shift.duration*senior[career.id][0][1]/60);
+    const earned=Math.round(shift.duration*senior[career.id][0][0][1]/60);
     assert.equal(c.lastShift.salary,earned);
     assert.equal(loaded.shop.credits,oldCredits+earned);
     assert.equal(loaded.careerSystem.settlementIds.length,1);
