@@ -3874,7 +3874,11 @@ function boot() {
     $('furnish-placement-guide').hidden=!shopPlacing;
     $('furnish-placing-name').textContent=listing?.name||'Предмет';
     $('furnish-placing-status').textContent=shopPlacing
-      ?'Веди предмет пальцем по полу. Два пальца — камера.':'';
+      ?(MOUNTED_LIGHTS[listing?.itemId]?.mount==='wall'
+        ?'Проведи по полу вдоль стены: бра крепится к ближайшему свободному сегменту.'
+        :MOUNTED_LIGHTS[listing?.itemId]?.mount==='ceiling'
+          ?'Коснись пола нужной комнаты — светильник поднимется к потолку.'
+          :'Веди предмет пальцем по полу. Два пальца — камера.'):'';
     const preview=shopPlacing&&listing&&shopPose
       ?buyMarketItem(game.world.furniture,game.shop,shopSelectedItemId,shopPose,editorContext())
       :null;
