@@ -69,6 +69,21 @@ try{
   await page.waitForTimeout(160);
   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
   assert.equal(saved.world.outdoors.schema,1);
+  if(saved.actionQueues.byResident.alex.length!==1){
+    const diagnostic=await page.evaluate(({yard,canvasRect})=>({
+      yard,canvasRect,paused:JSON.parse(localStorage.getItem('lifesim.room01.v1')).paused,
+      selected:JSON.parse(localStorage.getItem('lifesim.room01.v1')).selectedSim,
+      action:JSON.parse(localStorage.getItem('lifesim.room01.v1')).action,
+      queue:JSON.parse(localStorage.getItem('lifesim.room01.v1')).actionQueues.byResident,
+      toast:document.querySelector('#toast')?.textContent,
+      feedback:document.querySelector('#queue-feedback')?.textContent,
+      hint:document.querySelector('#hint')?.textContent,
+      canvasCss:{width:document.querySelector('#game-canvas')?.clientWidth,
+        height:document.querySelector('#game-canvas')?.clientHeight}
+    }),{yard,canvasRect});
+    console.error('LOT-A pointer diagnostics',JSON.stringify(diagnostic));
+    await page.screenshot({path:'lot-a-'+w+'x'+h+'.png',fullPage:true});
+  }
   assert.equal(saved.actionQueues.byResident.alex.length,1,
     'Physical tap must queue exactly one manual walk');
   const cmd=saved.actionQueues.byResident.alex[0];
