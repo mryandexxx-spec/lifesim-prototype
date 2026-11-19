@@ -113,9 +113,9 @@
 
     <div id="hotspots" class="hotspots" aria-label="Предметы комнаты" hidden></div>
     <div id="world-tap-cue" class="world-tap-cue" aria-hidden="true" hidden></div>
-    <section id="ground-walk-menu" class="ground-walk-menu" aria-label="Действия с выбранной точкой" hidden>
-      <div class="ground-walk-heading"><strong>Действия на земле</strong><button id="ground-walk-close" type="button" aria-label="Закрыть действия">×</button></div>
-      <button id="ground-walk-action" type="button" disabled>↗ Идти сюда <small>Добавить в очередь</small></button>
+    <section id="ground-walk-menu" class="ground-walk-menu" aria-label="Доступные действия" hidden>
+      <div class="ground-walk-heading"><strong id="ground-walk-title">Действия на земле</strong><button id="ground-walk-close" type="button" aria-label="Закрыть действия">×</button></div>
+      <button id="ground-walk-action" type="button" disabled><span id="ground-walk-action-label">↗ Идти сюда</span><small>Добавить в очередь</small></button>
     </section>
     <div id="reaction-layer" class="reaction-layer" aria-label="Реакции жителей" aria-live="off"></div>
     <div id="mood-orbit" class="mood-orbit" aria-hidden="true" hidden>
@@ -616,7 +616,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b-w4c-shift-summary-lotb1"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b-w4c-shift-summary-lotb1-outdoor-context1"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
