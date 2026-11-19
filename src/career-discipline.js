@@ -5,7 +5,7 @@ const LIMIT=5256000000;
 const time=n=>Number.isSafeInteger(n)&&n>=0&&n<=LIMIT;
 const safeId=id=>typeof id==='string'&&/^e[1-9]\d{0,8}@[0-9]+@[0-9]+$/.test(id);
 export function newCareerDiscipline(){
-  return {entries:[],finalWarningId:null,pendingDismissal:false};
+  return {entries:[],finalWarningId:null,pendingDismissal:false,lastProcessedStart:-1};
 }
 export function restoreCareerDiscipline(raw,employmentId){
   const state=newCareerDiscipline();
@@ -23,6 +23,10 @@ export function restoreCareerDiscipline(raw,employmentId){
     state.entries.push({id:e.id,at:e.at,outcome:e.outcome,
       lateMinutes:e.lateMinutes,points});
   }
+  const lastEntry=state.entries.at(-1);
+  const lastStart=lastEntry?Number(lastEntry.id.split('@')[2]):-1;
+  state.lastProcessedStart=time(raw.lastProcessedStart)&&
+    raw.lastProcessedStart>=lastStart?raw.lastProcessedStart:lastStart;
   if(typeof raw.finalWarningId==='string'&&
     state.entries.some(e=>e.id===raw.finalWarningId)&&disciplineRisk(state)>=8)
     state.finalWarningId=raw.finalWarningId;
@@ -52,7 +56,8 @@ export function recordCareerDiscipline(contract,shift,outcome,lateMinutes=0,at=s
     !Number.isFinite(lateMinutes)||lateMinutes<0)
     return {newEvent:false,transition:null};
   const state=contract.discipline??=newCareerDiscipline();
-  if(state.pendingDismissal||state.entries.some(e=>e.id===shift.id))
+  if(state.pendingDismissal||state.entries.some(e=>e.id===shift.id)||
+    (Number.isSafeInteger(shift.start)&&shift.start<=state.lastProcessedStart))
     return {newEvent:false,transition:null,risk:disciplineRisk(state)};
   const before=disciplineRisk(state);
   const priorFinal=state.finalWarningId;
@@ -60,6 +65,8 @@ export function recordCareerDiscipline(contract,shift,outcome,lateMinutes=0,at=s
   const entry={id:shift.id,at:Math.floor(at),outcome,lateMinutes:late,
     points:outcome==='missed'?2:late>=90?2:late>=30?1:0};
   state.entries.push(entry);
+  state.lastProcessedStart=Number.isSafeInteger(shift.start)?
+    shift.start:Number(shift.id.split('@')[2]);
   if(state.entries.length>DISCIPLINE_WINDOW)state.entries.shift();
   const after=disciplineRisk(state);
   if(after<8||!state.entries.some(e=>e.id===state.finalWarningId))
