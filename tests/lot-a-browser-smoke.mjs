@@ -66,6 +66,18 @@ try{
       clientX:point.x,clientY:point.y}));
   },{type,point,id,where});
   await ptr('pointerdown',yard);await ptr('pointerup',yard,41,'window');
+  await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+  const beforeConfirm=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+  assert.equal(beforeConfirm.actionQueues.byResident.alex.length,0,
+    'Touching the ground only opens a menu: no queue mutation before confirmation');
+  assert.notEqual(beforeConfirm.action?.id,'move',
+    'Ground touch must never start walking immediately');
+  await page.locator('#ground-walk-close').click();
+  assert.equal(await page.locator('#ground-walk-menu').isVisible(),false,
+    'Closing ground menu must not enqueue an action');
+  await ptr('pointerdown',yard);await ptr('pointerup',yard,41,'window');
+  await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+  await page.locator('#ground-walk-action').click();
   await page.waitForTimeout(160);
   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
   assert.equal(saved.world.outdoors.schema,1);
