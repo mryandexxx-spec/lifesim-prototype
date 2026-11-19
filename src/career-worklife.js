@@ -142,7 +142,7 @@ export function workLifeConflict(root,id,at=root?.minutes){
   const contract=root?.careerSystem?.byResident?.[id];
   const shift=contract?.currentShift;
   const person=id==='mira'?root?.otherSim:id==='alex'?root:null;
-  if(contract.workLife?.choiceShiftId===shift?.id)return null;
+  if(contract?.workLife?.choiceShiftId===shift?.id)return null;
   if(!person||!shift||shift.phase!=='pending'||!validTime(at)||
     at<shift.start-15||at>=shift.end)return null;
   const active=person.action&&person.action.automatic!==true;
