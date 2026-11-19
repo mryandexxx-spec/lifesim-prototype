@@ -1,0 +1,24 @@
+name: Q3a read-only needs audit
+on:
+  pull_request:
+    paths:
+      - 'scripts/q3a-diagnostics.mjs'
+      - '.github/workflows/q3a-needs-audit.yml'
+  workflow_dispatch:
+jobs:
+  needs-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Execute production-kernel 1/7/30-day probes
+        run: node scripts/q3a-diagnostics.mjs > q3a-results.log && tail -n 24 q3a-results.log
+      - name: Archive full numeric scenario trace
+        uses: actions/upload-artifact@v4
+        with:
+          name: q3a-results
+          path: q3a-results.log
+          retention-days: 30
