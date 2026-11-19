@@ -214,6 +214,6 @@ test('old save, other actions and new action requests never add new persisted vi
   assert.equal(JSON.stringify(t),before,'transient animations cannot mutate saved household');
   assert.equal(chooseResidentAction(t,'sofa',false,'alex'),false);
   assert.equal(t.action.id,'shower','new intent cannot displace active shower');
-  assert.equal(ACTIONS.bed.duration,60);
+  assert.equal(ACTIONS.bed.duration,540);
   assert.equal(ACTIONS.fridge.duration,26);
 });
