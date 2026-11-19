@@ -239,7 +239,12 @@ export function tick(state, minutes,world=state?.world??null) {
   const sleepMinutes=Math.min(minutes,untilWake);
   for(const need of PHYSICAL_NEEDS){
     const elapsed=need==='energy'?Math.max(0,minutes-sofaRestMinutes-sleepMinutes):minutes;
-    state.needs[need]=clamp(state.needs[need]-NEED_DECAY_PER_MINUTE[need]*elapsed);
+    if(need==='energy'&&sleeping){
+      // Credit sleep first, then spend ONLY genuinely awake leftover minutes.
+      // Capping after the combined amount would create free Energy on big ticks.
+      const restored=clamp(state.needs.energy+ACTIONS.bed.benefitPerMinute*sleepMinutes);
+      state.needs.energy=clamp(restored-NEED_DECAY_PER_MINUTE.energy*elapsed);
+    }else state.needs[need]=clamp(state.needs[need]-NEED_DECAY_PER_MINUTE[need]*elapsed);
   }
   // Social fulfilment changes only on a newly confirmed social receipt.
   const social=Number.isFinite(state.needs.social)?state.needs.social:SOCIAL_NEED_LEGACY_DEFAULT;
@@ -291,8 +296,9 @@ export function tick(state, minutes,world=state?.world??null) {
       Math.min(minutes, Math.max(0, duration - state.action.elapsed));
     // Hunger rises only when eating, not before taking food from the shelf.
     // Preserve the previous total benefit by concentrating it in the bite phase.
-    let gained=(hobby?.needEffects.find(effect=>effect.statId==='needs.fun')?.perMinute
-      ??definition.benefitPerMinute)*amount;
+    let gained=(state.action.id==='bed'?0:
+      (hobby?.needEffects.find(effect=>effect.statId==='needs.fun')?.perMinute
+        ??definition.benefitPerMinute))*amount;
     if(state.action.id==='dining'&&state.action.portionTaken===true){
       const cooked=kitchenRecipe(state.action.cookedRecipeId);
       if(cooked)gained*=cooked.hungerFactor;
