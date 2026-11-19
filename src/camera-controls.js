@@ -8,11 +8,11 @@ export const CAMERA_INITIAL=Object.freeze({
   centerX:0,centerY:.62,centerZ:0
 });
 export const CAMERA_BOUNDS=Object.freeze({
-  minPitch:24,maxPitch:68,minDistance:11,maxDistance:32,
+  minPitch:24,maxPitch:68,minDistance:5.5,maxDistance:64,
   minX:-3.4,maxX:12.6,minZ:-2.9,maxZ:2.9
 });
 export const CAMERA_LOT_BOUNDS=Object.freeze({
-  minX:-8,maxX:22,minZ:-11,maxZ:11,minDistance:11,maxDistance:50
+  minX:-8,maxX:22,minZ:-11,maxZ:11,minDistance:5.5,maxDistance:100
 });
 const valid=Number.isFinite;
 const panBounds={...CAMERA_BOUNDS};

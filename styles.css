@@ -1919,3 +1919,25 @@ button.time-card:active {transform:translateY(1px);}
 .viewport-recovery-actions button{flex:1 1 145px;min-height:44px;border:1px solid #b7d4c1;border-radius:12px;background:#fff;color:#315e48;padding:8px;font-size:12px;font-weight:800;touch-action:manipulation}
 #viewport-health-reload{background:#397d64;color:white;border-color:#397d64}
 .viewport-recovery small{display:block;font-size:11px;color:#64786c;line-height:1.4}
+
+/* Q4: the notification is only interactive while an unresolved work choice is shown. */
+.toast.toast-actionable.show{pointer-events:auto;max-width:min(310px,calc(100vw - 24px));}
+.toast.toast-actionable:not(.show){pointer-events:none;}
+.toast-incident-cta{display:block;width:100%;min-height:44px;margin-top:8px;
+ border:1px solid #b8e0c9;border-radius:10px;background:#dcf7e8;color:#174c36;
+ font:inherit;font-size:13px;font-weight:800;touch-action:manipulation;}
+.career-phone-toggle{position:relative;}
+.career-incident-badge{position:absolute;top:-7px;right:-8px;min-width:20px;height:20px;
+ padding:0 5px;border-radius:99px;background:#b54543;color:#fff;border:2px solid #fff;
+ font-size:11px;line-height:16px;font-weight:800;text-align:center;pointer-events:none;}
+.career-incident-badge[hidden]{display:none!important;}
+.career-phone-incident-banner-slot:empty{display:none;}
+.career-phone-incident-banner{display:grid;gap:4px;margin:5px 12px 2px;padding:10px 12px;
+ border:1px solid #c9846d;border-radius:13px;background:#fff2e9;
+ color:#62402d;font-size:12px;line-height:1.35;}
+.career-phone-incident-banner strong{font-size:13px;}
+.career-phone-incident-banner span{overflow-wrap:anywhere;}
+.career-phone-incident-banner .career-incident-open{min-height:44px;margin-top:4px;
+ width:100%;border-radius:10px;border:0;background:#a54f38;color:#fff;
+ font-weight:800;font-size:14px;touch-action:manipulation;}
+#career-pending-incident-title:focus{outline:2px solid #a54f38;outline-offset:4px;}

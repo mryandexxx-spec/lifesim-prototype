@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CAMERA_INITIAL,CAMERA_BOUNDS,panCamera,orbitCamera,pinchCamera,wheelCamera,screenFloorDragDelta} from '../src/camera-controls.js';
+import {CAMERA_INITIAL,CAMERA_BOUNDS,CAMERA_LOT_BOUNDS,setCameraBuildBounds,panCamera,orbitCamera,pinchCamera,wheelCamera,screenFloorDragDelta} from '../src/camera-controls.js';
 const near=(x,y,eps=.00001)=>Math.abs(x-y)<=eps;
 test('one finger drags camera target without rotating or zooming',()=>{
  const a={...CAMERA_INITIAL},b=panCamera(a,80,35,800);
@@ -36,10 +36,26 @@ test('two fingers orbit and tilt without exceeding pitch bounds',()=>{
  assert.ok(orbitCamera(CAMERA_INITIAL,1e5,0).yaw>=0);
 });
 test('pinch and desktop zoom respect camera distance bounds',()=>{
- assert.equal(pinchCamera(CAMERA_INITIAL,100,200).distance,CAMERA_BOUNDS.minDistance);
+ assert.equal(pinchCamera(CAMERA_INITIAL,100,400).distance,CAMERA_BOUNDS.minDistance);
  assert.ok(pinchCamera(CAMERA_INITIAL,200,100).distance>CAMERA_INITIAL.distance);
  assert.equal(wheelCamera(CAMERA_INITIAL,1e6).distance,CAMERA_BOUNDS.maxDistance);
  assert.equal(wheelCamera(CAMERA_INITIAL,-1e6).distance,CAMERA_BOUNDS.minDistance);
+});
+test('Q1 extended zoom reaches both endpoints in room and lot modes',()=>{
+ setCameraBuildBounds(null);
+ assert.equal(CAMERA_BOUNDS.minDistance,5.5);
+ assert.equal(CAMERA_BOUNDS.maxDistance,64);
+ assert.equal(CAMERA_LOT_BOUNDS.minDistance,5.5);
+ assert.equal(CAMERA_LOT_BOUNDS.maxDistance,100);
+ assert.equal(pinchCamera(CAMERA_INITIAL,200,1000).distance,5.5);
+ assert.equal(wheelCamera(CAMERA_INITIAL,10000).distance,64);
+ setCameraBuildBounds(CAMERA_LOT_BOUNDS);
+ try{
+   assert.equal(pinchCamera(CAMERA_INITIAL,200,1000).distance,5.5);
+   assert.equal(pinchCamera(CAMERA_INITIAL,200,2).distance,100);
+   assert.equal(wheelCamera(CAMERA_INITIAL,10000).distance,100);
+   assert.equal(wheelCamera(CAMERA_INITIAL,-10000).distance,5.5);
+ }finally{setCameraBuildBounds(null);}
 });
 test('invalid inputs are harmless; complete reset restores target and angles',()=>{
  assert.deepEqual(panCamera(CAMERA_INITIAL,NaN,20,800),CAMERA_INITIAL);

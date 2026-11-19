@@ -19,6 +19,7 @@ import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
 import {consumeCalendarReminders} from './calendar-reminders.js';
 import {createCareerPhoneUI} from './career-phone-ui.js';
+import {pendingWorkIncident} from './career-incidents.js';
 import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
 import {applyWorkMoodContext} from './career-worklife.js';
 import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
@@ -412,9 +413,22 @@ let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let onManualCommandQueued = () => {};
 let toastTimeout;
-function toast(message) {
-  const el = $('toast'); el.textContent = message; el.classList.add('show');
-  clearTimeout(toastTimeout); toastTimeout = setTimeout(() => el.classList.remove('show'), 2600);
+function toast(message,{incidentResidentId=null}={}) {
+  const el=$('toast');
+  el.replaceChildren(document.createTextNode(message));
+  el.classList.toggle('toast-actionable',Boolean(incidentResidentId));
+  if(incidentResidentId&&pendingWorkIncident(game,incidentResidentId)){
+    const button=document.createElement('button');
+    button.type='button';button.className='toast-incident-cta';
+    button.textContent='Решить';
+    button.setAttribute('aria-label','Решить рабочую ситуацию: '+
+      (incidentResidentId==='mira'?'Мира':'Алекс'));
+    button.addEventListener('click',()=>openWorkIncident(incidentResidentId));
+    el.append(button);
+  }
+  el.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout=setTimeout(()=>el.classList.remove('show'),incidentResidentId?8000:2600);
 }
 function save(silent = false) {
   try {
@@ -1705,6 +1719,19 @@ const workHud=document.createElement('small');
 workHud.id='career-work-hud';
 workHud.className='career-work-hud';
 $('resident-name').insertAdjacentElement('afterend',workHud);
+const incidentBadge=document.createElement('b');
+incidentBadge.id='career-incident-badge';
+incidentBadge.className='career-incident-badge';
+incidentBadge.hidden=true;
+$('career-phone-toggle').append(incidentBadge);
+function refreshIncidentNotifications(){
+  const ids=HOUSEHOLD_IDS.filter(id=>pendingWorkIncident(game,id));
+  incidentBadge.hidden=ids.length===0;
+  incidentBadge.textContent=String(ids.length);
+  $('career-phone-toggle').setAttribute('aria-label',
+    ids.length?'Рабочие ситуации: '+ids.length+' требуют решения. Открыть смартфон':
+      'Открыть работу и график выбранного жителя');
+}
 function updateCareerHud(){
   const status=residentWorkStatus(game,game.selectedSim);
   workHud.hidden=!status;
@@ -1716,7 +1743,7 @@ function updateResidentPicker() {
     $('pick-'+id).setAttribute('aria-pressed',String(game.selectedSim===id));
   }
   $('resident-name').textContent=selectedName();
-  updateCareerHud();updateFamilyBalance();
+  updateCareerHud();updateFamilyBalance();refreshIncidentNotifications();
   $('avatar-symbol').textContent=game.selectedSim==='alex' ? '☺' : '✿';
   $('mind-panel').setAttribute('aria-label','Внутренний мир: '+selectedName());
   $('mind-person').textContent=selectedName().toUpperCase()+' / ВНУТРЕННИЙ МИР';
@@ -1749,12 +1776,25 @@ const careerPhone=createCareerPhoneUI({
   },
   save,notify:toast,onFundsChanged:updateFamilyBalance,
   onOpenChange:id=>updatePhoneProps(id),
+  onIncidentChanged:()=>{updateCareerHud();refreshIncidentNotifications();},
+  selectResident:id=>{
+    if(!HOUSEHOLD_IDS.includes(id))return false;
+    if(game.selectedSim!==id){
+      selectResident(game,id);
+      updateResidentPicker();save(true);
+    }
+    return true;
+  },
   canOpen:()=>!furnishMode&&!buildMode&&!outdoorMode&&!dialogueNeedsDecision(game),
   beforeOpen:()=>{
     calendarUI.close();closeCalendarAnchorPanel();setHomeOpen(false);
     closeMindPanel();closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);
   }
 });
+function openWorkIncident(residentId){
+  if(!pendingWorkIncident(game,residentId))return false;
+  return careerPhone.openIncident(residentId);
+}
 const shiftSummary=createCareerShiftSummaryUI({
   host:document.querySelector('.app-shell'),getRoot:()=>game,
   shouldDefer:()=>dialogueNeedsDecision(game)||careerPhone.isOpen()||
@@ -3797,7 +3837,7 @@ function boot() {
     type:'directional', intensity:0.6, color:new pc.Color(0.76,0.87,1), castShadows:false
   }); fill.setEulerAngles(15,160,0); app.root.addChild(fill);
   const camera = new pc.Entity('Camera');
-  camera.addComponent('camera',{ clearColor:new pc.Color(0.85,0.91,0.86), fov:41, nearClip:.1, farClip:120 });
+  camera.addComponent('camera',{ clearColor:new pc.Color(0.85,0.91,0.86), fov:41, nearClip:.1, farClip:180 });
   app.root.addChild(camera);
   // W1-A.2: physically varying environment uses ONLY the existing two
   // non-shadow directional lights and one camera. Saved lamp states stay manual.
@@ -4591,7 +4631,7 @@ function boot() {
     editSession=createFurnitureEditor(game.world.furniture,game.shop);
     // F5-D.2: reach built rooms across the 32×24 lot while arranging items.
     setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
-      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
+      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:100});
     furnishMode=true;
     document.querySelector('.app-shell').dataset.furnishMode='true';
     $('furniture-editor').hidden=false;
@@ -5178,7 +5218,7 @@ function boot() {
     oneFingerMode='pan';showCameraMode();
     buildPreviousView={...view};
     buildMode=true;setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
-      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
+      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:100});
     // Show the eastern expansion area within the narrow portrait viewport.
     setView({...view,centerX:14.5,centerZ:0,distance:36,pitch:64});
     document.querySelector('.app-shell').dataset.buildMode='true';
@@ -5653,7 +5693,7 @@ function boot() {
     $('outdoor-category').value='ground';syncOutdoorFeatureCatalog();syncOutdoorOwned();
     setView({...view,centerX:7,centerZ:0,distance:43,pitch:60});
     setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
-      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
+      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:100});
     document.querySelector('.app-shell').dataset.outdoorMode='true';
     $('outdoor-editor').hidden=false;
     setHomeOpen(false);setViewOpen(false);
@@ -6324,13 +6364,19 @@ function boot() {
         // localStorage snapshot; never wait for the eight-second autosave.
         if(careerEvents.length){
           save(true);updateFamilyBalance();
-          updateCareerHud();
+          updateCareerHud();refreshIncidentNotifications();
           careerPhone.refresh();
           shiftSummary.enqueue(careerEvents);
-          const otherEvents=careerEvents.filter(entry=>entry.type!=='salary'&&entry.type!=='missed');
-          if(otherEvents.length===1)
-            toast((otherEvents[0].type?.startsWith('bill')?'🧾 ':'💼 ')+otherEvents[0].text);
-          else if(otherEvents.length)toast('💼 '+otherEvents.map(entry=>entry.text).join(' · '));
+          const incidentEvent=careerEvents.find(entry=>
+            entry.type==='incident'&&pendingWorkIncident(game,entry.residentId));
+          if(incidentEvent)
+            toast('💼 '+incidentEvent.text,{incidentResidentId:incidentEvent.residentId});
+          else {
+            const otherEvents=careerEvents.filter(entry=>entry.type!=='salary'&&entry.type!=='missed');
+            if(otherEvents.length===1)
+              toast((otherEvents[0].type?.startsWith('bill')?'🧾 ':'💼 ')+otherEvents[0].text);
+            else if(otherEvents.length)toast('💼 '+otherEvents.map(entry=>entry.text).join(' · '));
+          }
         }
         const dueReminders=consumeCalendarReminders(game.calendar,priorCalendarMinute,game.minutes);
         if(dueReminders.messages.length){
