@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3-q0" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
@@ -150,6 +150,7 @@
       <button id="menu-rotate-btn" type="button" aria-pressed="false" aria-label="Настройка жеста камеры">⟳ Камера: перемещение одним пальцем</button>
       <button id="menu-reset-camera-btn" type="button">⌖ Сброс камеры</button>
       <button id="menu-lot-camera-btn" type="button">🌿 Показать участок</button>
+      <button id="viewport-health-open" type="button" aria-controls="viewport-recovery">▣ Проверить 3D-экран</button>
       <button id="item-labels-btn" class="item-labels-control" type="button" aria-pressed="false" aria-label="Показать подписи предметов"><span aria-hidden="true">⌗</span><span>Подписи предметов</span><small aria-hidden="true">МЕТКИ</small></button>
       <button id="tour-replay" class="tour-replay" type="button" aria-controls="tour-panel">? <span>Как играть</span></button>
       <button id="music-audio-toggle" class="music-audio-toggle" type="button" aria-pressed="false">🔇 Включить звук</button>
@@ -606,6 +607,16 @@
       <span class="social-result-symbol" aria-hidden="true">✦</span>
       <span><strong id="social-result-title"></strong><small id="social-result-detail">Реакция на завершённое взаимодействие</small></span>
     </div>
+    <section id="viewport-recovery" class="viewport-recovery" role="region" aria-label="Диагностика и восстановление 3D" hidden>
+      <div class="viewport-recovery-head"><strong id="viewport-health-title">Проверка 3D</strong><button id="viewport-health-close" type="button" aria-label="Закрыть диагностику">×</button></div>
+      <p id="viewport-health-message">Проверка изображения и управления камерой.</p>
+      <pre id="viewport-health-details" aria-label="Локальные диагностические данные"></pre>
+      <div class="viewport-recovery-actions">
+        <button id="viewport-health-copy" type="button">Копировать отчёт</button>
+        <button id="viewport-health-reload" type="button">Сохранить и восстановить 3D</button>
+      </div>
+      <small>Отчёт остаётся на устройстве, пока вы сами его не скопируете. Перезагрузка только по нажатию.</small>
+    </section>
     <div class="toast" role="status" id="toast" aria-live="polite"></div>
     <div class="loading" id="loading" role="status" aria-live="polite">
       <div class="loading-mark" aria-hidden="true">✦</div>
@@ -616,7 +627,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b-w4c-shift-summary-lotb1"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b-w4c-shift-summary-lotb1-q0"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
