@@ -19,8 +19,8 @@ export function newGardenRecord(atGameMinute=0){
   return {schema:1,plantedAt:time,evaluatedAt:time,progressWetMinutes:0,
     hydratedUntil:0,lastWateredAt:null};
 }
-export function restoreGardenRecord(raw,atGameMinute=0){
-  const fallback=newGardenRecord(atGameMinute);
+export function restoreGardenRecord(raw,atGameMinute=null){
+  const fallback=newGardenRecord(atGameMinute??0);
   if(raw?.schema!==1||!validMinute(raw.plantedAt)||
     !validMinute(raw.evaluatedAt)||raw.evaluatedAt<raw.plantedAt||
     !validMinute(raw.progressWetMinutes)||raw.progressWetMinutes>GARDEN_MATURE_MINUTES||
@@ -39,7 +39,7 @@ export function restoreGardens(raw,features,atGameMinute=null){
   const allowed=(features||[]).filter(f=>isGardenItem(f.itemId)).slice(0,GARDEN_LIMIT);
   const result={};
   for(const item of allowed)result[item.instanceId]=restoreGardenRecord(
-    raw?.[item.instanceId],atGameMinute??0);
+    raw?.[item.instanceId],atGameMinute);
   return result;
 }
 export function advanceGardenRecord(record,toGameMinute){
