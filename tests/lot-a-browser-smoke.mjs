@@ -39,7 +39,7 @@ try{
   page.on('pageerror',e=>issues.push(w+'x'+h+' PAGE: '+e.message));
   page.on('crash',()=>issues.push(w+'x'+h+' CRASH'));
   page.on('requestfailed',r=>{
-    if(/\\/src\\/|\\/vendor\\//.test(r.url()))
+    if(r.url().includes('/src/')||r.url().includes('/vendor/'))
       issues.push(w+'x'+h+' REQUEST: '+r.url()+' '+r.failure()?.errorText);
   });
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
