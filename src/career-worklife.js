@@ -12,6 +12,7 @@ const feelings=Object.freeze({
   'worklife.hard':-8,'worklife.hardStrain':-10,'worklife.overloaded':-5,
   'worklife.missed':-9,'worklife.warning':-6,'worklife.finalWarning':-10,
   'worklife.dismissal':-14,'worklife.promotion':11,'worklife.resignation':-3,
+  'worklife.resignationRelief':4,
   'worklife.sharedInterrupted':-6,'worklife.sharedDisappointed':-4
 });
 export const WORK_LIFE_FEELINGS=feelings;
@@ -115,6 +116,7 @@ export function recordWorkLifeShift(root,residentId,contract,shift,discipline){
   state.recentShifts=state.recentShifts.slice(-5);
   // A completed dismissal is more meaningful than duplicate shift grief;
   // it is emitted only after the later true contract separation.
+  if(discipline?.transition==='dismissal')state.lastFeeling=null;
   if(discipline?.transition!=='dismissal'&&feeling!=='worklife.neutral'){
     const actual=feeling==='worklife.hard'&&strain>=23
       ?'worklife.hardStrain':feeling;
