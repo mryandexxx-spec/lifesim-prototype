@@ -76,7 +76,7 @@ try{
     assert.equal(saved.world.outdoors.features[0].itemId,'garden.bench');
     assert.equal(saved.shop.credits,seed.shop.credits-240);
     await page.locator('#outdoor-feature-kind').selectOption('light.standing');
-    await touch(9,-9);
+    await touch(8,-9);
     await page.waitForFunction(()=>!document.getElementById('outdoor-apply').disabled,{timeout:8000});
     await page.locator('#outdoor-apply').click();
     saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
@@ -108,7 +108,7 @@ try{
     assert.ok(queued.needs.fun<=seed.needs.fun,'tapping bench cannot instantly reward Fun (normal time decay is allowed)');
     // A tall lamp is not a hidden walk-on-ground shortcut: its hit volume
     // opens the same action menu and only explicit confirmation appends MOVE.
-    await touch(9,-9,1.35);
+    await touch(8,-9,1.35);
     await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
     assert.match(await page.locator('#ground-walk-title').textContent(),/фонарь/i);
     assert.match(await page.locator('#ground-walk-action-label').textContent(),/Подойти/);
