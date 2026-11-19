@@ -2,6 +2,7 @@
  * It is presentation only: game state changes solely through explicit contract actions.
  */
 import {careerVacancies,leaveCareer,describeCareerShift} from './career-job-board.js';
+import {disciplineStatus} from './career-discipline.js';
 import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
@@ -12,7 +13,8 @@ import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt,select
 import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-work-needs.js';
 import {calendarAt} from './calendar-core.js';
 import {createFinancePhoneUI} from './finance-phone-ui.js';
-import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff} from './career-timeoff.js';
+import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff,
+  claimPortableCareerLeave} from './career-timeoff.js';
 import {payHouseholdBill} from './household-bills.js';
 import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
@@ -150,7 +152,34 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
           current.lastShift.performanceDelta:'')+
       (current.lastShift.lateMinutes?' · опоздание '+current.lastShift.lateMinutes+' мин.':'')));
 
+    const discipline=disciplineStatus(current.discipline);
+    const disciplineName={clear:'В порядке',warning:'Предупреждение',
+      final:'Последнее предупреждение',dismissal:'Решение об увольнении'}[discipline.stage];
+    facts.append(element('span','career-phone-discipline-status',
+      'Дисциплина: '+disciplineName+' · риск '+discipline.risk+'/12'));
     body.append(facts);
+    const disciplineDetails=element('details','career-phone-discipline');
+    disciplineDetails.append(element('summary','career-phone-notice',
+      '⚖️ Трудовая дисциплина · причины и восстановление'));
+    disciplineDetails.append(element('p','career-phone-muted',
+      'За последние 10 учтённых смен: опоздание до 29 мин. — 0, 30–89 — 1, '+
+      'от 90 мин. — 2, неуважительный пропуск — 2. Предупреждение при 4, '+
+      'последнее при 8, увольнение от 12 после последнего предупреждения.'));
+    disciplineDetails.append(element('p','career-phone-muted',
+      'Каждые две хорошие отработанные смены снижают риск на 1. '+
+      'Отпуска и праздничные выходные не считаются нарушениями.'));
+    const entries=current.discipline?.entries||[];
+    if(!entries.length)disciplineDetails.append(element('p','career-phone-muted',
+      'Новых учтённых смен пока нет. Прошлые опоздания и прогулы не пересчитываются.'));
+    for(const item of [...entries].reverse()){
+      const name=item.outcome==='missed'?'Пропущенная смена':
+        item.lateMinutes>=30?'Опоздание '+item.lateMinutes+' мин.':
+        item.lateMinutes?'Отработано · '+item.lateMinutes+' мин. опоздания':'Смена отработана вовремя';
+      disciplineDetails.append(element('p','career-phone-muted',
+        name+' · '+(item.points?'+'+item.points:'0')+
+        ' балл. · '+gameDueLabel(root,item.at)));
+    }
+    body.append(disciplineDetails);
     const currentMode=cleanWorkMode(active?.workMode??current.workMode);
     const modeDetails=element('details','career-work-modes');
     modeDetails.open=active?.phase==='working';
@@ -195,6 +224,17 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     body.append(element('p','career-phone-muted',
       'Оплачиваемых дней: '+leave.balance+'/3 · до следующего: '+
       (5-leave.progress)+' отработанных смен. Отгул без оплаты не считается прогулом.'));
+    const reserve=root.careerSystem?.portableLeave?.[who]||0;
+    if(reserve>0){
+      body.append(element('p','career-phone-muted',
+        'Заработанные дни от прежней работы в резерве: '+reserve));
+      if(leave.balance<3)body.append(action('Перенести отпускные дни из резерва',()=>{
+        const live=personRoot();if(!live)return;
+        const result=claimPortableCareerLeave(live,who);
+        if(!result.ok){notify(result.reason);render();return;}
+        save(true);notify('Перенесено оплачиваемых дней: '+result.count);render();
+      },'career-phone-secondary'));
+    }
     const leaveDetails=element('details','career-phone-leave');
     leaveDetails.append(element('summary','career-phone-notice',
       'Выбрать дату отдыха (ближайшие смены)'));
@@ -604,7 +644,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     body.append(element('p','career-phone-muted',offer.description));
     const facts=element('div','career-phone-facts');
     for(const label of [
-      'Стартовая должность: '+offer.rank,
+      'Доступная должность: '+offer.rank,
       'Ставка: '+offer.hourlyCredits+' кредитов/час',
       'Одна смена: до '+offer.shiftCredits+' кредитов за полный рабочий день',
       'Рабочие дни: '+offer.workdays,
@@ -637,6 +677,14 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   }
   function renderList(root){
     top('📱 '+NAMES[who]+' · открытые вакансии');
+    const ended=root.careerSystem?.endedContracts?.[who]||[];
+    if(ended.length){
+      const last=ended.at(-1);
+      body.append(element('p','career-phone-notice',
+        'Последняя работа: '+(careerDefinition(last.careerId)?.title||'Профессия')+
+        ' · '+(last.reason==='dismissed'?'увольнение работодателем':'добровольный уход')+
+        ' · '+(last.level+1)+'-я ступень. Заработанный опыт сохранён.'));
+    }
     body.append(element('h2','career-phone-section-title','Выбери направление'));
     body.append(element('p','career-phone-muted',
       'Шесть городских направлений. Каждая вакансия ведёт к настоящему договору и расписанию.'));
@@ -650,6 +698,8 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       const retry=recruitmentRetry(root,who,offer.id);
       if(retry.blocked)card.append(element('small','career-phone-cooldown',
         'Повторный отклик: '+gameDueLabel(root,retry.retryAt)));
+      if(offer.disciplineBlocked)card.append(element('small','career-phone-cooldown',
+        'После увольнения доступно: '+gameDueLabel(root,offer.disciplineRetryAt)));
       card.setAttribute('aria-label','Вакансия '+offer.title+', '+offer.rank+', '+offer.hourlyCredits+' кредитов в час');
       list.append(card);
     }
@@ -684,6 +734,17 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     body.append(action('📖 История рабочих ситуаций',()=>{
       section='worklog';render();
     },'career-phone-secondary'));
+    const contracts=root.careerSystem?.endedContracts?.[who]||[];
+    if(contracts.length){
+      body.append(element('h2','career-phone-section-title','История трудоустройства'));
+      for(const ended of [...contracts].reverse()){
+        const target=careerDefinition(ended.careerId);
+        body.append(element('p','career-phone-muted',
+          (target?.title||'Профессия')+' · '+(ended.level+1)+'-я ступень · '+
+          (ended.reason==='dismissed'?'Увольнение за нарушения':'Добровольный уход')+
+          ' · '+gameDueLabel(root,ended.at)));
+      }
+    }
     body.append(element('h2','career-phone-section-title','Завершённые отклики'));
     if(!entries.length){
       body.append(element('p','career-phone-muted','История появится после решения по отклику.'));

@@ -87,7 +87,12 @@ export function cancelCareerTimeOff(root,residentId,shiftId){
   if(!state||!booking||booking.settled||!Number.isFinite(root?.minutes)||
     root.minutes>=booking.start)return {ok:false,reason:'Этот отдых уже нельзя отменить'};
   state.bookings=state.bookings.filter(b=>b.id!==shiftId);
-  if(booking.type==='paid')state.balance=Math.min(PAID_LEAVE_CAP,state.balance+1);
+  if(booking.type==='paid'){
+    if(state.balance<PAID_LEAVE_CAP)state.balance++;
+    else if(root.careerSystem?.portableLeave)
+      root.careerSystem.portableLeave[residentId]=Math.min(64,
+        (root.careerSystem.portableLeave[residentId]||0)+1);
+  }
   return {ok:true};
 }
 /** Executes once at the scheduled end, not when booked; one saved receipt. */
@@ -117,4 +122,18 @@ export function settleCareerTimeOff(root,residentId,after){
   // a long-lived save able to request future leave without a growing array.
   state.bookings=state.bookings.filter(b=>!b.settled||b.end>=after-30*DAY);
   return events;
+}
+
+/** W3-C: claim legitimately earned leave from an older contract, never mint it. */
+export function claimPortableCareerLeave(root,residentId){
+  const contract=root?.careerSystem?.byResident?.[residentId];
+  const reserve=root?.careerSystem?.portableLeave?.[residentId];
+  if(!contract||!Number.isSafeInteger(reserve)||reserve<=0)
+    return {ok:false,reason:'Нет накопленных дней от прошлой работы'};
+  const timeOff=contract.timeOff??=restoreCareerTimeOff(null,contract.employmentId);
+  const count=Math.min(PAID_LEAVE_CAP-timeOff.balance,reserve);
+  if(count<=0)return {ok:false,reason:'Сначала используй накопленные дни'};
+  timeOff.balance+=count;
+  root.careerSystem.portableLeave[residentId]-=count;
+  return {ok:true,count};
 }
