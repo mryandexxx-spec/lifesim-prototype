@@ -335,9 +335,9 @@ export function tick(state, minutes,world=state?.world??null) {
     }
     refreshMind(state,world);
     state.action.elapsed += amount;
-    const sleepWoke=state.action.id==='bed'&&
-      (state.action.elapsed>=SLEEP_MAX_MINUTES||
-       (state.action.elapsed>=SLEEP_MIN_MINUTES&&state.needs.energy>=SLEEP_WAKE_ENERGY));
+    // Completion is decided at the exact sleep boundary, BEFORE any awake
+    // remainder of a large tick consumes energy. This keeps 1m and 540m ticks equivalent.
+    const sleepWoke=sleeping&&sleepMinutes>=untilWake-1e-8;
     if (state.action.elapsed >= duration || sleepWoke ||
         (!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
@@ -373,7 +373,8 @@ export function autonomousChoice(state) {
     // Sleep is a physiological priority at night, even if a leisure wish
     // happens to be active. Temperament never overrides basic rest.
     const bedtime = night && option.id === 'bed' && value < 70 ? 10+(70-value)*1.60 : 0;
-    const base = urgency + bedtime;
+    const exhaustion=option.id==='bed'&&value<16?12:0;
+    const base = urgency + bedtime + exhaustion;
     // No voluntary action at game start: let the player explore for the first hour.
     const recovery=state.workRecovery?.until>state.minutes&&
       ((option.id==='bed'&&value<45)||(option.id==='sofa'&&value<40));
