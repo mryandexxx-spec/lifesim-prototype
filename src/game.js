@@ -4970,7 +4970,10 @@ function boot() {
     buildHistoryButtons();setBuildTool(buildTool);
     syncConstructionRender(true);renderPauseButton();
   };
-  $('build-toggle').addEventListener('click',()=>buildMode?exitBuild():enterBuild());
+  $('build-toggle').addEventListener('click',()=>{
+    if(outdoorMode)exitOutdoor();
+    buildMode?exitBuild():enterBuild();
+  });
   $('build-exit').addEventListener('click',exitBuild);
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&buildMode){event.preventDefault();exitBuild();}
@@ -5122,7 +5125,11 @@ function boot() {
     return true;
   };
 
-  $('furnish-toggle').addEventListener('click',()=>{if(buildMode)exitBuild();furnishMode?exitFurniture():enterFurniture();});
+  $('furnish-toggle').addEventListener('click',()=>{
+    if(outdoorMode)exitOutdoor();
+    if(buildMode)exitBuild();
+    furnishMode?exitFurniture():enterFurniture();
+  });
   $('furnish-exit').addEventListener('click',exitFurniture);
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&furnishMode){event.preventDefault();exitFurniture();}
@@ -5256,6 +5263,164 @@ function boot() {
       if(!startEditorDrag(grabEvent))holdGesture.cancel();
     },FURNITURE_HOLD_MS);
   };
+  // LOT-B1: touch-first outdoor paint mode, with a session-local reversible
+  // financial timeline. The saved authoritative root stays game, never a UI VM.
+  let outdoorTool='paint',outdoorDrag=null,outdoorPending=null;
+  let outdoorTimeline=[],outdoorHistoryIndex=0;
+  const outdoorSnapshot=()=>({
+    outdoors:JSON.parse(JSON.stringify(game.world.outdoors)),
+    credits:game.shop.credits
+  });
+  const outdoorReason={
+    'outside-lot':'Выбери землю внутри участка',
+    'unchanged':'Выбранные клетки уже имеют это покрытие или защищены домом',
+    'ground-limit':'Слишком большая площадь: уменьши выделение',
+    'insufficient-credits':'Не хватает кредитов на выбранное покрытие',
+    'unknown-ground':'Неизвестный материал',
+    'invalid-state':'Данные участка недоступны',
+    'stale-preview':'Участок изменился: выбери клетки снова',
+    'revision-limit':'Достигнут предел операций'
+  };
+  const outdoorFeedback=(message,invalid=false)=>{
+    $('outdoor-preview-text').textContent=message;
+    $('outdoor-preview-text').dataset.invalid=String(invalid);
+  };
+  const updateOutdoorPanel=()=>{
+    $('outdoor-balance').textContent='Баланс семьи: '+game.shop.credits+' кр.';
+    $('outdoor-apply').disabled=!outdoorPending?.ok;
+    $('outdoor-undo').disabled=outdoorHistoryIndex===0;
+    $('outdoor-redo').disabled=outdoorHistoryIndex>=outdoorTimeline.length-1;
+    $('outdoor-tool-paint').setAttribute('aria-pressed',String(outdoorTool==='paint'));
+    $('outdoor-tool-camera').setAttribute('aria-pressed',String(outdoorTool==='camera'));
+  };
+  const clearOutdoorPending=(quiet=false)=>{
+    outdoorDrag=null;outdoorPending=null;outdoorPaintGhost.enabled=false;
+    if(!quiet)outdoorFeedback('Протяни пальцем прямоугольник по свободной земле');
+    updateOutdoorPanel();
+  };
+  const outdoorSurfaceAtScreen=point=>{
+    const {near,far}=furnitureRay(point);
+    return lotRaySurface(near,far,game.world);
+  };
+  const paintGhostFrom=(from,to)=>{
+    const a=outdoorCellAt(from?.x,from?.z),b=outdoorCellAt(to?.x,to?.z);
+    if(a===null||b===null){outdoorPaintGhost.enabled=false;return;}
+    const i0=Math.min(a%OUTDOOR_GRID_WIDTH,b%OUTDOOR_GRID_WIDTH);
+    const i1=Math.max(a%OUTDOOR_GRID_WIDTH,b%OUTDOOR_GRID_WIDTH);
+    const j0=Math.min(Math.floor(a/OUTDOOR_GRID_WIDTH),Math.floor(b/OUTDOOR_GRID_WIDTH));
+    const j1=Math.max(Math.floor(a/OUTDOOR_GRID_WIDTH),Math.floor(b/OUTDOOR_GRID_WIDTH));
+    outdoorPaintGhost.setPosition(-9+(i0+i1+1)*.25,-.506,-12+(j0+j1+1)*.25);
+    outdoorPaintGhost.setLocalScale((i1-i0+1)*.5,.025,(j1-j0+1)*.5);
+    outdoorPaintGhost.enabled=true;
+  };
+  const previewOutdoorSelection=(from,to,kind)=>{
+    const p=previewOutdoorPaint(game,{from,to,kind});
+    outdoorPending=p.ok?{...p,from,to,kind}:null;
+    if(p.ok)outdoorFeedback('Выбрано '+p.changedCells+
+      ' клеток · стоимость '+p.cost+' кр. · нажми «Купить и применить»');
+    else outdoorFeedback(outdoorReason[p.reason]||'Нельзя изменить этот участок',true);
+    updateOutdoorPanel();return p;
+  };
+  const exitOutdoor=()=>{
+    if(!outdoorMode)return;
+    outdoorMode=false;clearOutdoorPending(true);outdoorTimeline=[];
+    cameraGesture.clear();setCameraBuildBounds(CAMERA_LOT_BOUNDS);
+    $('outdoor-editor').hidden=true;
+    document.querySelector('.app-shell').dataset.outdoorMode='false';
+    renderPauseButton();save(true);
+  };
+  const enterOutdoor=()=>{
+    if(intimacyFrame(game.socialAction).active||dialogueNeedsDecision(game)||
+      careerPhone.interviewNeedsDecision()){
+      toast('Сначала закончи текущее взаимодействие');return;
+    }
+    if(buildMode)exitBuild();
+    if(furnishMode)exitFurniture();
+    outdoorMode=true;outdoorTool='paint';
+    setView({...view,centerX:7,centerZ:0,distance:43,pitch:60});
+    setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
+      minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
+    document.querySelector('.app-shell').dataset.outdoorMode='true';
+    $('outdoor-editor').hidden=false;
+    setHomeOpen(false);setViewOpen(false);
+    closeTour();closeMindPanel();closeInsightPanel();closeSocialContext();
+    select(null);cameraGesture.clear();
+    outdoorTimeline=[outdoorSnapshot()];outdoorHistoryIndex=0;
+    clearOutdoorPending();
+    renderPauseButton();
+  };
+  $('home-outdoors').addEventListener('click',()=>enterOutdoor());
+  $('outdoor-exit').addEventListener('click',exitOutdoor);
+  for(const mode of ['paint','camera'])$('outdoor-tool-'+mode).addEventListener('click',()=>{
+    if(!outdoorMode)return;
+    outdoorTool=mode;cameraGesture.clear();clearOutdoorPending();
+    outdoorFeedback(mode==='paint'
+      ?'Протяни пальцем прямоугольник по свободной земле'
+      :'Камера: свайп одним пальцем, масштаб и вращение двумя');
+  });
+  $('outdoor-ground-kind').addEventListener('change',()=>clearOutdoorPending());
+  $('outdoor-cancel').addEventListener('click',()=>clearOutdoorPending());
+  $('outdoor-apply').addEventListener('click',()=>{
+    if(!outdoorMode||!outdoorPending?.ok)return;
+    const p=previewOutdoorPaint(game,outdoorPending);
+    if(!p.ok){clearOutdoorPending(true);outdoorFeedback(outdoorReason[p.reason]||p.reason,true);return;}
+    const result=commitOutdoorPreview(game,p);
+    if(!result.ok){clearOutdoorPending(true);outdoorFeedback(outdoorReason[result.reason]||result.reason,true);return;}
+    game.world.outdoors=result.root.world.outdoors;
+    game.shop=result.root.shop;game.financialHistory=result.root.financialHistory;
+    outdoorTimeline=outdoorTimeline.slice(0,outdoorHistoryIndex+1);
+    outdoorTimeline.push(outdoorSnapshot());outdoorHistoryIndex++;
+    if(outdoorTimeline.length>50){outdoorTimeline.shift();outdoorHistoryIndex--;}
+    renderOutdoorGround();updateFamilyBalance();
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    save(true);clearOutdoorPending(true);
+    outdoorFeedback('Готово: '+p.changedCells+' клеток · списано '+p.cost+' кр.');
+    updateOutdoorPanel();
+  });
+  const navigateOutdoorHistory=direction=>{
+    if(!outdoorMode||!outdoorTimeline.length)return;
+    const target=outdoorHistoryIndex+direction;
+    if(target<0||target>=outdoorTimeline.length)return;
+    const before=outdoorTimeline[outdoorHistoryIndex],after=outdoorTimeline[target];
+    // Only reverse THIS transaction's delta; never restore a historical wallet
+    // snapshot that could erase a concurrent salary or invoice.
+    if(game.shop.credits!==before.credits){
+      outdoorFeedback('Баланс изменился. Повтори операцию после закрытия редактора',true);
+      return;
+    }
+    const delta=after.credits-before.credits;
+    const value=game.shop.credits+delta;
+    if(!Number.isSafeInteger(value)||value<0||value>1000000000){
+      outdoorFeedback('Недостаточно средств для повтора',true);return;
+    }
+    const revision=game.world.outdoors.revision+1;
+    if(revision>100000000){
+      outdoorFeedback('Слишком много правок участка',true);return;
+    }
+    const nextShop={...game.shop,credits:value};
+    const finance=recordFinanceChange(game,nextShop,{
+      kind:direction<0?'undo':'redo',sourceId:'outdoors-history-'+revision,
+      atGameMinute:Math.floor(game.minutes)});
+    if(!finance.ok){outdoorFeedback('Ошибка записи финансовой операции',true);return;}
+    game.world.outdoors={...after.outdoors,revision};
+    game.shop=finance.shop;game.financialHistory=finance.financialHistory;
+    outdoorHistoryIndex=target;
+    // Snapshot's revision tracks the latest canonical topology for the next
+    // undo/redo, while credits and old states remain stable.
+    outdoorTimeline[target]={...after,outdoors:JSON.parse(JSON.stringify(game.world.outdoors))};
+    renderOutdoorGround();updateFamilyBalance();
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    save(true);clearOutdoorPending(true);
+    outdoorFeedback(direction<0?'Отменено: баланс и покрытие восстановлены':
+      'Повторено: покрытие и расходы восстановлены');
+    updateOutdoorPanel();
+  };
+  $('outdoor-undo').addEventListener('click',()=>navigateOutdoorHistory(-1));
+  $('outdoor-redo').addEventListener('click',()=>navigateOutdoorHistory(1));
+  document.addEventListener('keydown',event=>{
+    if(outdoorMode&&event.key==='Escape'){event.preventDefault();exitOutdoor();}
+  },true);
+
   canvas.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse'&&event.button!==0)return;
     if(dialogueNeedsDecision(game))return;
