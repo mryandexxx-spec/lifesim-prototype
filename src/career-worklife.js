@@ -133,3 +133,30 @@ export function recordWorkLifePromotion(root,residentId,contract,at=root?.minute
 export function workLoadLabel(strain){
   return strain>=23?'Высокая':strain>=12?'Заметная':'Низкая';
 }
+
+/** Only a true ongoing manual task or genuine partner reservation competes
+ * with the imminent shift. Queued future plans do not count as conflicts. */
+export function workLifeConflict(root,id,at=root?.minutes){
+  const contract=root?.careerSystem?.byResident?.[id];
+  const shift=contract?.currentShift;
+  const person=id==='mira'?root?.otherSim:id==='alex'?root:null;
+  if(!person||!shift||shift.phase!=='pending'||!validTime(at)||
+    at<shift.start-15||at>=shift.end)return null;
+  const active=person.action&&person.action.automatic!==true;
+  const s=root.socialAction;
+  const shared=s&&s.automatic!==true&&
+    (s.initiator===id||s.partner===id)&&
+    ['walking','using'].includes(s.phase);
+  if(!active&&!shared)return null;
+  return {shiftId:shift.id,start:shift.start,end:shift.end,
+    lateMinutes:Math.max(0,Math.floor(at-shift.start)),
+    activeType:shared?'shared':'manual',canTimeOff:at<shift.start};
+}
+export function noteWorkLifeConflict(root,id,at){
+  const conflict=workLifeConflict(root,id,at);
+  const state=root?.careerSystem?.byResident?.[id]?.workLife;
+  if(!conflict||!state||state.conflictNotifiedShiftId===conflict.shiftId)
+    return false;
+  state.conflictNotifiedShiftId=conflict.shiftId;
+  return true;
+}
