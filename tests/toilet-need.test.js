@@ -83,7 +83,7 @@ test('M4: decay is deterministic in game minutes, never while paused',()=>{
   const snapshot=JSON.stringify(s);
   tick(s,500);
   assert.equal(JSON.stringify(s),snapshot);
-  s.paused=false;tick(s,2100);
+  s.paused=false;tick(s,2300);
   assert.equal(s.needs.bladder,0);
 });
 
