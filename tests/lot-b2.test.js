@@ -61,7 +61,7 @@ test('B2 fences block footprints, flowers are walkable, overlaps and resident pl
 });
 test('B2 rejecting unapproved item, malicious refund, duplicated receipt and stale preview',()=>{
   const root=newHousehold();
-  assert.equal(propose(root,'place',{itemId:'garden.bench',pose:pos(20,8)}).reason,'unavailable-item');
+  assert.equal(propose(root,'place',{itemId:'nonexistent.future',pose:pos(20,8)}).reason,'unavailable-item');
   const tree=propose(root,'place',{itemId:'tree.round',pose:pos(19,8)});
   assert.ok(tree.ok,tree.reason);
   assert.equal(commitOutdoorFeatureEdit(root,{...tree,cost:0}).reason,'stale-preview');
