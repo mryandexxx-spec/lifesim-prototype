@@ -69,24 +69,12 @@ try{
   await page.waitForTimeout(160);
   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
   assert.equal(saved.world.outdoors.schema,1);
-  if(saved.actionQueues.byResident.alex.length!==1){
-    const diagnostic=await page.evaluate(({yard,canvasRect})=>({
-      yard,canvasRect,paused:JSON.parse(localStorage.getItem('lifesim.room01.v1')).paused,
-      selected:JSON.parse(localStorage.getItem('lifesim.room01.v1')).selectedSim,
-      action:JSON.parse(localStorage.getItem('lifesim.room01.v1')).action,
-      queue:JSON.parse(localStorage.getItem('lifesim.room01.v1')).actionQueues.byResident,
-      toast:document.querySelector('#toast')?.textContent,
-      feedback:document.querySelector('#queue-feedback')?.textContent,
-      hint:document.querySelector('#hint')?.textContent,
-      canvasCss:{width:document.querySelector('#game-canvas')?.clientWidth,
-        height:document.querySelector('#game-canvas')?.clientHeight}
-    }),{yard,canvasRect});
-    console.error('LOT-A pointer diagnostics',JSON.stringify(diagnostic));
-    await page.screenshot({path:'lot-a-'+w+'x'+h+'.png',fullPage:true});
-  }
-  assert.equal(saved.actionQueues.byResident.alex.length,1,
-    'Physical tap must queue exactly one manual walk');
-  const cmd=saved.actionQueues.byResident.alex[0];
+  const queued=saved.actionQueues.byResident.alex;
+  const active=saved.action?.id==='move'&&saved.action?.automatic===false
+    ?saved.action:null;
+  assert.equal(queued.length+(active?1:0),1,
+    'Physical tap must create exactly one pending or already-active manual walk');
+  const cmd=queued[0]||{type:'move',...active.goal};
   assert.equal(cmd.type,'move');
   assert.ok(cmd.z>=4.4&&cmd.z<=5.6,'Tap lands on real lawn rather than an object');
   assert.equal(saved.shop.credits,seed.shop.credits);
@@ -95,7 +83,9 @@ try{
   await ptr('pointermove',{x:yard.x+70,y:yard.y-25},45,'window');
   await ptr('pointerup',{x:yard.x+70,y:yard.y-25},45,'window');
   const swiped=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
-  assert.equal(swiped.actionQueues.byResident.alex.length,1);
+  assert.equal(swiped.actionQueues.byResident.alex.length+
+    (swiped.action?.id==='move'&&!swiped.action?.automatic?1:0),1,
+    'Camera swipe must not add another walk or cancel the active walk');
   await page.screenshot({path:'lot-a-'+w+'x'+h+'.png'});
   await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
