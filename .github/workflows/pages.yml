@@ -26,6 +26,7 @@ jobs:
           npm ci
           npm test
           node --check src/game.js
+          node --check src/viewport-health.js
           node --check src/loading-progress.js
           node --check src/model-cache.js
           node --check sw.js
@@ -197,6 +198,7 @@ jobs:
           cp src/insight-presentation.js site/src/
           cp src/camera-gestures.js site/src/
           cp src/mobile-gesture-policy.js site/src/
+          cp src/viewport-health.js site/src/
           cp src/construction.js site/src/
           cp src/lot-surface.js src/outdoor-catalog.js src/outdoor-proposals.js src/outdoor-interactions.js site/src/
           cp src/furnished-room.js site/src/

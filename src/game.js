@@ -10,6 +10,7 @@ import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
 import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
+import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './viewport-health.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
@@ -416,8 +417,14 @@ function toast(message) {
   clearTimeout(toastTimeout); toastTimeout = setTimeout(() => el.classList.remove('show'), 2600);
 }
 function save(silent = false) {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); if (!silent) toast('Игра сохранена на этом устройстве'); }
-  catch { if (!silent) toast('Не удалось сохранить: браузер запретил хранилище'); }
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(game));
+    if (!silent) toast('Игра сохранена на этом устройстве');
+    return true;
+  } catch {
+    if (!silent) toast('Не удалось сохранить: браузер запретил хранилище');
+    return false;
+  }
 }
 // Fix the epoch at first migration, not on some later autosave after a phone date change.
 if(calendarNeedsPersistence||billsNeedsPersistence)save(true);
@@ -1793,6 +1800,85 @@ function boot() {
   app.setCanvasResolution(pc.RESOLUTION_AUTO);
   app.scene.ambientLight = new pc.Color(0.69, 0.70, 0.70);
   window.addEventListener('resize', () => app.resizeCanvas());
+
+  // Q0: game simulation can pause intentionally while PlayCanvas must keep
+  // rendering. Observe engine update and real postrender independently, even
+  // when game input and ordinary DOM save buttons still work.
+  const viewportHealth=createViewportHealth();
+  viewportHealth.begin(performance.now());
+  const viewportPanel=$('viewport-recovery');
+  let viewportManual=false,viewportDismissed=null,viewportIssue=null;
+  let activeViewportPointers=()=>0;
+  let viewportReport='';
+  const viewportSnapshot=()=>viewportHealth.inspect(performance.now(),{
+    hidden:document.hidden,paused:game.paused||furnishMode||buildMode||outdoorMode||
+      dialogueNeedsDecision(game)||shiftSummary.isOpen(),
+    mode:outdoorMode?'outdoors':buildMode?'build':furnishMode?'furnish':'play',
+    pointers:activeViewportPointers(),
+    canvasWidth:canvas.clientWidth,canvasHeight:canvas.clientHeight,
+    dpr:app.graphicsDevice.maxPixelRatio,
+    outdoorFeatures:game.world.outdoors?.features?.length||0,
+    furniture:game.world.furniture?.instances?.length||0
+  });
+  const refreshViewportPanel=()=>{
+    const snapshot=viewportSnapshot(),status=snapshot.status;
+    const bad=['webgl-lost','update-stall','render-stall'].includes(status);
+    if(bad&&viewportIssue!==status){viewportIssue=status;viewportDismissed=null;
+      viewportHealth.markError('viewport-'+status,performance.now());}
+    if(!bad){viewportIssue=null;viewportDismissed=null;}
+    const show=viewportManual||(bad&&viewportDismissed!==status);
+    viewportPanel.hidden=!show;
+    if(!show)return;
+    $('viewport-health-title').textContent=viewportHealthLabel(status);
+    $('viewport-health-message').textContent=status==='healthy'
+      ?snapshot.paused
+        ?'Графика работает. Игровое время или действия сейчас приостановлены намеренно.'
+        :'Графика обновляется. Если касания не работают, скопируйте отчёт и проверьте режим управления.'
+      :status==='webgl-lost'
+        ?'Safari потерял WebGL-контекст. Игра не будет перезагружена без вашего согласия.'
+        :status==='update-stall'||status==='render-stall'
+          ?'3D перестал отвечать. Можно сохранить прогресс и вручную перезагрузить изображение.'
+          :'Проверка продолжается. При сворачивании Safari останавливает кадры — это нормально.';
+    viewportReport=viewportHealthReport(viewportSnapshot());
+    $('viewport-health-details').textContent=viewportReport;
+  };
+  $('viewport-health-open').addEventListener('click',()=>{
+    setViewOpen(false);viewportManual=true;refreshViewportPanel();
+  });
+  $('viewport-health-close').addEventListener('click',()=>{
+    viewportManual=false;viewportDismissed=viewportSnapshot().status;
+    viewportPanel.hidden=true;
+  });
+  $('viewport-health-copy').addEventListener('click',async()=>{
+    refreshViewportPanel();
+    try{
+      if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(viewportReport);
+      toast('Диагностика 3D скопирована');
+    }catch{
+      toast('Не удалось скопировать: можно сделать снимок экрана');
+    }
+  });
+  $('viewport-health-reload').addEventListener('click',()=>{
+    // A failed write is a hard stop: never erase unsaved household progress.
+    if(!save(true)){
+      $('viewport-health-message').textContent=
+        'Сохранение не удалось. Не перезагружайте страницу, пока Safari не разрешит сохранение.';
+      return;
+    }
+    window.location.reload();
+  });
+  canvas.addEventListener('webglcontextlost',event=>{
+    event.preventDefault(); // Permit WebGL's context-restoration mechanism.
+    viewportHealth.loseContext(performance.now());refreshViewportPanel();
+  },false);
+  canvas.addEventListener('webglcontextrestored',()=>{
+    viewportHealth.restoreContext(performance.now());refreshViewportPanel();
+  },false);
+  app.on('postrender',()=>viewportHealth.markRender(performance.now()));
+  // This timer is intentionally outside app.on('update'): a broken game loop
+  // cannot silence the watchdog while ordinary HTML controls still function.
+  window.setInterval(refreshViewportPanel,2600);
 
   const mat = (hex, opts = {}) => {
     const color = new pc.Color().fromString(hex);
@@ -3771,6 +3857,7 @@ function boot() {
   // Pure session separates a deliberate tap from any rotation/pan/pinch.
   // A second pointer disqualifies the whole touch until BOTH are released.
   const cameraGesture=createCameraGestureSession();
+  activeViewportPointers=()=>cameraGesture.count();
   // User may view the entire lot from the same camera in touch Build mode.
   const gesturePoint=e=>({id:e.pointerId,x:e.clientX,y:e.clientY});
   // F1 edit mode: UI state is ephemeral; only confirmed domain transactions
@@ -5734,6 +5821,7 @@ function boot() {
   },true);
 
   canvas.addEventListener('pointerdown',event=>{
+    viewportHealth.markInput(performance.now());
     if(event.pointerType==='mouse'&&event.button!==0)return;
     if(dialogueNeedsDecision(game))return;
     if(event.cancelable)event.preventDefault();
@@ -5809,6 +5897,9 @@ function boot() {
     cameraGesture.begin(point,now);
     armFurnitureHold(event,now);
   });
+  // Track user input even when an editor consumes the pointer event before
+  // it reaches cameraGesture (otherwise a frozen camera looks like no input).
+  window.addEventListener('pointermove',()=>viewportHealth.markInput(performance.now()),true);
   // Global listeners survive canvas leaving the viewport on iOS Safari.
   // Separate capture listener preserves the furniture VM touch contract.
   window.addEventListener('pointermove',event=>{
@@ -6032,6 +6123,7 @@ function boot() {
     tapCueTimeout=setTimeout(()=>{cue.hidden=true;},450);
   };
   const endPointer=event=>{
+    viewportHealth.markInput(performance.now());
     if(outdoorMode){
       if(outdoorDrag?.pointerId===event.pointerId){
         const drag=outdoorDrag;outdoorDrag=null;
@@ -6090,6 +6182,7 @@ function boot() {
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
+    viewportHealth.markInput(performance.now());
     closeGroundWalkMenu();
     if(outdoorDrag?.pointerId===event.pointerId)clearOutdoorPending(true);
     if(buildDrag?.pointerId===event.pointerId){buildDrag=null;buildGhost.enabled=false;}
@@ -6101,12 +6194,13 @@ function boot() {
     shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
-    cancelPendingGrab();closeGroundWalkMenu();
+    cancelPendingGrab();viewportHealth.markInput(performance.now());closeGroundWalkMenu();
     if(outdoorMode)clearOutdoorPending(true);
     buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
   // Safari may suspend a background tab without a matching pointerup/blur.
   document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden)viewportHealth.resume(performance.now());
     if(document.hidden){
       closeGroundWalkMenu();
       if(outdoorMode)clearOutdoorPending(true);
@@ -6133,6 +6227,7 @@ function boot() {
   const approach = (a,b,rate,dt) => a+(b-a)*(1-Math.exp(-rate*dt));
   const approachAngle=(a,b,rate,dt)=>a+((((b-a+540)%360)+360)%360-180)*(1-Math.exp(-rate*dt));
   app.on('update',dt=>{
+    viewportHealth.markUpdate(performance.now());
     dt=Math.min(dt,.06);
     // Cosmetic 0.3s phone raise/reveal; never affects animation controller or clock.
     for(const [id,phone] of Object.entries(phoneMeshes))if(phone.enabled&&phoneReveal[id]<1){
