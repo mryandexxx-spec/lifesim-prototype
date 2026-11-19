@@ -31,7 +31,7 @@ export function resolveWorkLifeConflict(root,residentId,choice,{leaveType='unpai
     social.phase==='using'&&shared?.mode==='leisure'&&
     (shared.choiceId==='tv'?shared.tvConsent===true:
       ['books','music'].includes(shared.choiceId)?shared.pairConsent===true:
-      shared.choiceId==='games'));
+      false));
   const other=participates?
     (social.initiator===residentId?social.partner:social.initiator):null;
   if(participates)cancelSocial(root);
