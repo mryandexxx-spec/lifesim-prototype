@@ -18,7 +18,7 @@ export function effectiveSleepSpeed(root,{blocked=false}={}){
     const contract=root.careerSystem?.byResident?.[id];
     const shift=contract?.currentShift;
     // A pending work departure/choice must never race ahead at 3x.
-    if(shift?.phase&&shift.phase!=='returning')return playerSpeed;
+    if(shift?.phase)return playerSpeed;
     if(shift?.incident&&!shift.incident.choiceId)return playerSpeed;
     if(contract&&root.calendar){
       const upcoming=nextCareerShift(root.calendar,contract,root.minutes);
