@@ -1905,3 +1905,17 @@ button.time-card:active {transform:translateY(1px);}
   text-align:left;gap:2px;touch-action:manipulation;}
 #ground-walk-action small{font-size:10px;font-weight:650;opacity:.86;}
 #ground-walk-action:disabled{opacity:.5;}
+
+/* Q0: always-on-DOM recovery surface; never blocks normal gameplay until a
+   genuine graphics anomaly is detected or the user opens diagnostics. */
+.viewport-recovery{position:absolute;z-index:65;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));top:calc(env(safe-area-inset-top) + 94px);width:min(410px,calc(100vw - 24px));max-height:min(68dvh,580px);overflow-y:auto;overscroll-behavior:contain;padding:14px 15px 16px;background:#fffdf6f7;color:#304438;border:1px solid #d0e4d4;border-radius:18px;box-shadow:0 14px 40px #24382d3f;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.viewport-recovery[hidden]{display:none!important}
+.viewport-recovery-head{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.viewport-recovery-head strong{font-size:16px}
+.viewport-recovery-head button{min-height:44px;min-width:44px;background:#eef4ee;color:#2e6149;border:0;border-radius:12px;font-size:24px}
+.viewport-recovery p{margin:8px 0 10px;font-size:13px;line-height:1.4}
+.viewport-recovery pre{max-height:156px;overflow:auto;white-space:pre-wrap;word-break:break-word;border-radius:10px;background:#ecf3eb;padding:10px;font:11px/1.45 ui-monospace,SFMono-Regular,monospace;touch-action:pan-y}
+.viewport-recovery-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.viewport-recovery-actions button{flex:1 1 145px;min-height:44px;border:1px solid #b7d4c1;border-radius:12px;background:#fff;color:#315e48;padding:8px;font-size:12px;font-weight:800;touch-action:manipulation}
+#viewport-health-reload{background:#397d64;color:white;border-color:#397d64}
+.viewport-recovery small{display:block;font-size:11px;color:#64786c;line-height:1.4}
