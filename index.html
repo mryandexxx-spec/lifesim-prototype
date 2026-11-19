@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/kitchen.js":"./src/kitchen.js?v=1.2u-f4g2",
@@ -158,7 +158,7 @@
       <div class="view-panel-head"><strong>Дом</strong><button id="home-close" type="button" aria-label="Закрыть выбор редактора">×</button></div>
       <button id="home-furnish" type="button" aria-controls="furniture-editor">▦ Обстановка <small>Мебель, магазин и склад</small></button>
       <button id="home-build" type="button" aria-controls="build-editor">⌂ Строительство <small>Комнаты, стены и крыши</small></button>
-      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Покрытия, растения и ограждения</small></button>
+      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Покрытия, растения, мебель и освещение</small></button>
     </section>
     <section id="outdoor-editor" class="outdoor-editor" aria-label="Благоустройство участка" hidden>
       <div class="outdoor-editor-head"><strong>🌿 Участок · Благоустройство</strong><button id="outdoor-exit" type="button">✓ В жизнь</button></div>
@@ -167,6 +167,7 @@
         <select id="outdoor-category">
           <option value="ground">▦ Покрытия</option>
           <option value="plants">🌳 Растения и ограды</option>
+          <option value="objects">🪑 Мебель и свет</option>
         </select>
       </label>
       <div class="outdoor-tool-bar" role="group" aria-label="Инструменты участка">
