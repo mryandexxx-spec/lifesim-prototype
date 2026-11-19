@@ -2,6 +2,7 @@
 import {FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {BUILD_LOT,constructionContains,constructionWallAt} from './construction.js';
 import {insideLot,legacyLotWallAt,OUTDOORS_SCHEMA} from './lot-surface.js';
+import {outdoorFeatureObstacles} from './outdoor-catalog.js';
 import {newFurnitureWorld,furnitureObstacles} from './furniture-catalog.js';
 // F4D: eastward extension exactly doubles navigable floor area; old positions stay fixed.
 export const ROOM = Object.freeze({ minX: -4.62, maxX: 13.86, minZ: -3.96, maxZ: 3.98 });
@@ -38,7 +39,10 @@ export function isWalkable(x,z,layout=null){
     return insideLot(x,z)&&!legacyLotWallAt(layout.construction,x,z,ACTOR_RADIUS)&&
       !constructionWallAt(layout,x,z,ACTOR_RADIUS)&&
       !obstaclesFor(layout).some(rect=>x>=rect.minX-ACTOR_RADIUS&&x<=rect.maxX+ACTOR_RADIUS&&
-        z>=rect.minZ-ACTOR_RADIUS&&z<=rect.maxZ+ACTOR_RADIUS);
+        z>=rect.minZ-ACTOR_RADIUS&&z<=rect.maxZ+ACTOR_RADIUS)&&
+      !outdoorFeatureObstacles(layout).some(rect=>x>=rect.minX-ACTOR_RADIUS&&
+        x<=rect.maxX+ACTOR_RADIUS&&z>=rect.minZ-ACTOR_RADIUS&&
+        z<=rect.maxZ+ACTOR_RADIUS);
   if(dynamicConstruction(layout))return Number.isFinite(x)&&Number.isFinite(z)&&
     constructionContains(layout,x,z)&&!constructionWallAt(layout,x,z,ACTOR_RADIUS)&&
     !obstaclesFor(layout).some(rect=>x>=rect.minX-ACTOR_RADIUS&&x<=rect.maxX+ACTOR_RADIUS&&
