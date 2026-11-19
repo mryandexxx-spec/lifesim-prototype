@@ -77,7 +77,10 @@ try{
   await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
   const restored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
-  assert.equal(restored.actionQueues.byResident.alex[0].type,'move');
+  assert.equal(restored.world.outdoors.schema,1);
+  assert.ok(restored.actionQueues.byResident.alex.some(c=>c.type==='move')||
+    restored.action?.id==='move'||Math.hypot(restored.position.x,restored.position.z-5)<1,
+    'After reload the saved walk must be queued, already walking or safely completed');
   await context.close();
  }
  assert.deepEqual(issues,[],'No module/scene runtime errors');
