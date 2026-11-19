@@ -1,9 +1,7 @@
-/** F2.1a: provisional furniture shop domain, no PlayCanvas/DOM dependencies.
- * Prices are deliberately labelled playtest-only until owner approves balance.
- * Decor and independently targetable purchased sofas/beds are tradeable; original
- * essential fixtures remain protected until visual/interaction adapters exist.
- */
-import {FURNITURE_CATALOG,restoreFurnitureWorld,furnitureActionApproach} from './furniture-catalog.js';
+/** F2/Q2: pure furniture transactions. Starter origin is canonical and
+ * essential household resources require a usable physical replacement. */
+import {FURNITURE_CATALOG,restoreFurnitureWorld,furnitureActionApproach,
+  furnitureProvenance} from './furniture-catalog.js';
 import {findPath} from './navigation.js';
 import {BED_SLOTS} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
@@ -16,6 +14,13 @@ import {FURNITURE_PRODUCTS,FURNITURE_LEGACY_OFFERS,
 export const SHOP_SCHEMA=1;
 export const SHOP_START_CREDITS=5000; // Provisional, NOT a signed-off economy.
 export const SHOP_SELL_PERCENT=70;
+export const STARTER_SELL_PERCENT=30;
+// Provisional reference appraisals for three starter-only fixtures; these are
+// not sale listings and do not change the approved catalog or household funds.
+export const STARTER_APPLIANCE_APPRAISAL=Object.freeze({
+  fridge:900,shower:700,toilet:450
+});
+const ESSENTIAL_PREFABS=new Set(['bed','fridge','shower','toilet']);
 // Old six-item API remains byte-shape compatible for existing tests/saves.
 export const SHOP_ITEMS=Object.freeze(FURNITURE_LEGACY_OFFERS.map(({prefabId,price})=>
   Object.freeze({prefabId,price})));
@@ -102,13 +107,42 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
     shop:{...current.shop,credits:current.shop.credits-item.price,nextId:current.shop.nextId+1},
     instanceId:id,amount:-item.price};
 }
-/** Protect original functional fixtures. Only shop-purchased beds and sofas may
- * enter storage or be sold; keep older decor trade rules intact.
+/** The kitchen counter is an authored architectural assembly, not a
+ * detachable prefab. Other starter fixtures may trade after safety guards.
  */
 export function canTradeMarketInstance(item){
-  return !!item&&shopPrefabs.has(item.prefabId)&&(
-    !['sofa','bed'].includes(item.prefabId)||
-    new RegExp('^shop-'+item.prefabId+'-[1-9][0-9]*$').test(item.instanceId));
+  if(!item)return false;
+  if(furnitureProvenance(item)==='starter')
+    return item.prefabId!=='counter';
+  return shopPrefabs.has(item.prefabId)&&
+    furnitureProvenance(item)==='purchased';
+}
+export function starterAppraisal(item){
+  if(furnitureProvenance(item)!=='starter')return null;
+  return stock.get(legacyProductId(item.prefabId))?.price??
+    STARTER_APPLIANCE_APPRAISAL[item.prefabId]??null;
+}
+/** A replacement is present AND navigable for both residents, not merely
+ * present as a stored item or a visually inaccessible prop.
+ */
+function essentialRemovalGuard(world,item,opts={}){
+  if(!ESSENTIAL_PREFABS.has(item.prefabId))return null;
+  const alternatives=world.instances.filter(candidate=>
+    candidate.instanceId!==item.instanceId&&candidate.location==='home'&&
+    candidate.prefabId===item.prefabId);
+  if(!alternatives.length)return 'last-essential';
+  const residents=(opts.residents||[]).filter(p=>
+    Number.isFinite(p?.x)&&Number.isFinite(p?.z));
+  const nav=opts.construction?{furniture:world,construction:opts.construction}:world;
+  const reachable=alternatives.some(candidate=>{
+    const goals=candidate.prefabId==='bed'
+      ?Object.values(BED_SLOTS).map(slot=>furniturePoint(world,'bed',
+        slot.approach,candidate.instanceId))
+      :[furnitureActionApproach(world,candidate.prefabId,candidate.instanceId)];
+    return goals.every(Boolean)&&residents.every(pos=>
+      goals.every(goal=>Boolean(findPath(pos,goal,nav))));
+  });
+  return reachable?null:'missing-working-replacement';
 }
 function tradeable(world,instanceId){
   const item=world.instances.find(x=>x.instanceId===instanceId);
@@ -138,6 +172,8 @@ export function storeMarketItem(world,shop,instanceId,opts={}){
   if(!item)return reject('protected-item');
   if(item.location!=='home')return reject('already-stored');
   if((opts.lockedInstanceIds||[]).includes(instanceId))return reject('reserved');
+  const necessity=essentialRemovalGuard(current.world,item,opts);
+  if(necessity)return reject(necessity);
   return {ok:true,world:{...current.world,revision:current.world.revision+1,
     instances:current.world.instances.map(x=>x.instanceId===instanceId
       ?{...x,location:'storage'}:x)},shop:current.shop,instanceId,amount:0};
@@ -175,17 +211,22 @@ export function restoreMarketItem(world,shop,instanceId,pose,opts={}){
 export function sellMarketItem(world,shop,instanceId,opts={}){
   const current=normalized(world,shop),item=tradeable(current.world,instanceId);
   if(!item)return reject('protected-item');
-  if(item.location==='home'&&(opts.lockedInstanceIds||[]).includes(instanceId))
+  if((opts.lockedInstanceIds||[]).includes(instanceId))
     return reject('reserved');
+  const necessity=essentialRemovalGuard(current.world,item,opts);
+  if(necessity)return reject(necessity);
   const product=compatibleFurnitureProduct(item.prefabId,item.itemDefinitionId)||
     stock.get(legacyProductId(item.prefabId));
-  if(!product)return reject('protected-item');
-  // The price paid belongs to the physical instance, not current catalog price.
-  // Old v1 items without a snapshot preserve the original fallback sale value.
-  const paid=Number.isSafeInteger(item.purchasePriceCredits)&&
+  const starter=furnitureProvenance(item)==='starter';
+  if(!product&&!starter)return reject('protected-item');
+  // Starter 30% appraisal never trusts a forged paid price.
+  // Bought goods retain 70% of their own historical paid price.
+  const value=starter?starterAppraisal(item):(
+    Number.isSafeInteger(item.purchasePriceCredits)&&
     item.purchasePriceCredits>=0&&item.purchasePriceCredits<=cap
-    ?item.purchasePriceCredits:product.price;
-  const amount=Math.floor(paid*SHOP_SELL_PERCENT/100);
+      ?item.purchasePriceCredits:product.price);
+  if(!Number.isSafeInteger(value)||value<0)return reject('missing-appraisal');
+  const amount=Math.floor(value*(starter?STARTER_SELL_PERCENT:SHOP_SELL_PERCENT)/100);
   if(current.shop.credits+amount>cap)return reject('wallet-limit');
   return {ok:true,world:{...current.world,revision:current.world.revision+1,
     instances:current.world.instances.filter(x=>x.instanceId!==instanceId)},
@@ -202,6 +243,16 @@ const CANDIDATES=Object.freeze([
   [6.4,0],[8.4,0],[10.5,0],[12.2,0],
   [6.4,2.3],[8.4,2.3],[10.5,2.3],[12.2,2.3]
 ]);
+/** Pure restore preview. Never charges money; caller explicitly confirms. */
+export function findStoredPlacement(world,shop,instanceId,opts={}){
+  const stored=world?.instances?.find(x=>x.instanceId===instanceId&&x.location==='storage');
+  if(!stored)return null;
+  const poses=[{x:stored.x,z:stored.z,yaw:stored.yaw},
+    ...CANDIDATES.map(([x,z])=>({x,z,yaw:stored.yaw}))];
+  for(const pose of poses)if(restoreMarketItem(world,shop,instanceId,pose,opts).ok)
+    return pose;
+  return null;
+}
 export function findMarketPlacement(world,shop,prefabId,opts={}){
   for(const [x,z] of CANDIDATES){
     const pose={x,z,yaw:0};
