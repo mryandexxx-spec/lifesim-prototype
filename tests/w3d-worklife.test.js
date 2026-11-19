@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
+import {leaveCareer} from '../src/career-job-board.js';
 import {nextCareerShift} from '../src/career-scheduler.js';
 import {progressCareerWork,requestCareerDeparture} from '../src/career-work.js';
 import {newWorkLife,restoreWorkLife,jobSatisfaction,workMoodContext,
@@ -202,4 +203,23 @@ test('W3-D: independent resident state, no ghost household mood or receipts',()=
   assert.equal(recordWorkLifeShift(root,'mira',contract,shift,null),'worklife.success');
   assert.equal(root.mind.memories.length,0);
   assert.equal(root.otherSim.mind.memories.at(-1).id,'worklife.success');
+});
+
+test('W3-D: real voluntary resignation can bring relief or anxiety, never salary',()=>{
+  const {root,contract}=prepared();
+  const startMoney=root.shop.credits;
+  contract.performance=0;
+  contract.workLife.recentShifts=[0,1,2,3,4].map(n=>({
+    id:contract.employmentId+'@'+n+'@'+(540+1440*n),
+    start:540+1440*n,feeling:'worklife.missed'}));
+  assert.ok(jobSatisfaction(contract,root.minutes)<40);
+  const low=leaveCareer(root,'alex');
+  assert.equal(low.ok,true);
+  assert.equal(root.mind.memories.at(-1).id,'worklife.resignationRelief');
+  assert.equal(root.shop.credits,startMoney);
+  const happy=prepared();
+  happy.contract.performance=100;
+  assert.ok(jobSatisfaction(happy.contract,happy.root.minutes)>40);
+  assert.equal(leaveCareer(happy.root,'alex').ok,true);
+  assert.equal(happy.root.mind.memories.at(-1).id,'worklife.resignation');
 });
