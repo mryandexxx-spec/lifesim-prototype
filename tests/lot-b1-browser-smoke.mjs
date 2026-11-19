@@ -47,6 +47,7 @@ try{
       'Home > Lot editor must be available');
     assert.equal(await page.locator('#outdoor-apply').isDisabled(),true);
     await page.locator('#outdoor-ground-kind').selectOption('stone');
+    await page.waitForTimeout(260); // settle the actual camera view and Safari layout
     const rect=await page.locator('#game-canvas').evaluate(node=>{
       const r=node.getBoundingClientRect();
       return {x:r.left,y:r.top,width:r.width,height:r.height};
