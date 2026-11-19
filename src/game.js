@@ -1720,7 +1720,15 @@ const careerPhone=createCareerPhoneUI({
 const shiftSummary=createCareerShiftSummaryUI({
   host:document.querySelector('.app-shell'),getRoot:()=>game,
   shouldDefer:()=>dialogueNeedsDecision(game)||careerPhone.isOpen()||
-    document.querySelector('.life-calendar:not([hidden])')!==null
+    document.querySelector('.life-calendar:not([hidden])')!==null,
+  onDismissal:residentId=>{
+    if(game.selectedSim!==residentId){
+      selectResident(game,residentId);
+      updateResidentPicker();
+      save(true);
+    }
+    careerPhone.open();
+  }
 });
 // Presentation-only HUD preference: never touches simulation or household saves.
 createHudPanel({
