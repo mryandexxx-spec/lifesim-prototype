@@ -66,6 +66,18 @@ try{
       clientX:point.x,clientY:point.y}));
   },{type,point,id,where});
   await ptr('pointerdown',yard);await ptr('pointerup',yard,41,'window');
+  await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+  const beforeConfirm=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+  assert.equal(beforeConfirm.actionQueues.byResident.alex.length,0,
+    'Touching the ground only opens a menu: no queue mutation before confirmation');
+  assert.notEqual(beforeConfirm.action?.id,'move',
+    'Ground touch must never start walking immediately');
+  await page.locator('#ground-walk-close').click();
+  assert.equal(await page.locator('#ground-walk-menu').isVisible(),false,
+    'Closing ground menu must not enqueue an action');
+  await ptr('pointerdown',yard);await ptr('pointerup',yard,41,'window');
+  await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+  await page.locator('#ground-walk-action').click();
   await page.waitForTimeout(160);
   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
   assert.equal(saved.world.outdoors.schema,1);
@@ -78,13 +90,23 @@ try{
   assert.equal(cmd.type,'move');
   assert.ok(cmd.z>=4.4&&cmd.z<=5.6,'Tap lands on real lawn rather than an object');
   assert.equal(saved.shop.credits,seed.shop.credits);
+  // A second walk must append, never reroute the first active move or replace FIFO tail.
+  await ptr('pointerdown',yard,43);await ptr('pointerup',yard,43,'window');
+  await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+  await page.locator('#ground-walk-action').click();
+  const two=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+  assert.equal(two.actionQueues.byResident.alex.length+
+    (two.action?.id==='move'&&!two.action?.automatic?1:0),2,
+    'Two explicit ground commands remain independent FIFO tasks');
+  if(active&&two.action?.id==='move')
+    assert.deepEqual(two.action.goal,active.goal,'A new walk cannot retarget active walk');
   // A gesture moves camera; it must not enqueue another command.
   await ptr('pointerdown',yard,45);
   await ptr('pointermove',{x:yard.x+70,y:yard.y-25},45,'window');
   await ptr('pointerup',{x:yard.x+70,y:yard.y-25},45,'window');
   const swiped=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
   assert.equal(swiped.actionQueues.byResident.alex.length+
-    (swiped.action?.id==='move'&&!swiped.action?.automatic?1:0),1,
+    (swiped.action?.id==='move'&&!swiped.action?.automatic?1:0),2,
     'Camera swipe must not add another walk or cancel the active walk');
   await page.screenshot({path:'lot-a-'+w+'x'+h+'.png'});
   await page.reload({waitUntil:'domcontentloaded'});

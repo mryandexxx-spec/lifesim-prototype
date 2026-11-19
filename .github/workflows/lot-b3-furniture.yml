@@ -17,7 +17,7 @@ jobs:
         run: |
           npm ci
           npm install --no-save playwright@1.56.1
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
       - name: Domain, save, action and entire Node regression
         run: |
           node --check src/game.js

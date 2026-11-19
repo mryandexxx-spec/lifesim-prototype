@@ -17,7 +17,7 @@ jobs:
         run: |
           npm ci
           npm install --no-save playwright@1.56.1
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
       - name: Validate W3-D contracts and full regression
         run: |
           node --check src/career-worklife.js

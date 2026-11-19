@@ -1889,3 +1889,19 @@ button.time-card:active {transform:translateY(1px);}
   .outdoor-editor-tip{display:none}
   .outdoor-editor-head{font-size:13px}
 }
+
+/* LOT-A ground context menu: anchored to the tapped walkable spot, away from HUD. */
+.ground-walk-menu{position:absolute;z-index:17;width:min(215px,calc(100vw - 16px));
+  padding:10px;border:1px solid #c5ddca;border-radius:17px;background:#fffffff5;
+  box-shadow:0 12px 32px #152d2440;backdrop-filter:blur(16px);color:#2d6348;}
+.ground-walk-menu[hidden]{display:none!important;}
+.ground-walk-heading{display:flex;align-items:center;justify-content:space-between;
+  gap:5px;margin-bottom:8px;font-size:12px;}
+.ground-walk-heading button{width:32px;height:32px;border:0;border-radius:10px;
+  background:#e9f1e9;color:#2d6348;font-size:21px;touch-action:manipulation;}
+#ground-walk-action{width:100%;min-height:48px;padding:8px 12px;border:0;
+  border-radius:12px;background:#2d8059;color:#fff;font-size:15px;font-weight:800;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  text-align:left;gap:2px;touch-action:manipulation;}
+#ground-walk-action small{font-size:10px;font-weight:650;opacity:.86;}
+#ground-walk-action:disabled{opacity:.5;}

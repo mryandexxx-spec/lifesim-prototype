@@ -60,7 +60,7 @@ jobs:
           node --check src/household.js
           npm test
       - run: npm install --no-save playwright@1.56.1
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - name: Serve production module graph with pinned PlayCanvas
         run: |
           mkdir -p vendor

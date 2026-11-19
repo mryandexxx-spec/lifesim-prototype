@@ -17,7 +17,7 @@ jobs:
         run: |
           npm ci
           npm install --no-save playwright@1.56.1
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
       - name: Node regression plus real WebGL touch interaction at 390x844
         run: |
           node --check src/career-incidents.js
