@@ -122,9 +122,10 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         raw.calendar.holidays.some(saved=>saved?.id===h.id)):[],
     reminderReceipts:restoreReminderReceipts(raw.calendar?.reminderReceipts),
     weekendDays:restoreWeekendDays(raw.calendar?.weekendDays)};
+  const restoredConstruction=restoreConstructionWorld(raw.world?.construction);
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
-    construction:restoreConstructionWorld(raw.world?.construction),
-    outdoors:restoreOutdoorsWorld(raw.world?.outdoors)};
+    construction:restoredConstruction,
+    outdoors:restoreOutdoorsWorld(raw.world?.outdoors,restoredConstruction)};
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.financialHistory=restoreFinancialHistory(raw.financialHistory);
