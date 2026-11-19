@@ -94,18 +94,18 @@ export function createCareerShiftSummaryUI({host,getRoot,shouldDefer=()=>false,
   overlay.append(shade,panel);host.append(overlay);
   let current=null,previousFocus=null;
   const isOpen=()=>!overlay.hidden;
-  function dismiss(){
+  function dismiss(openJobs=false){
     if(!isOpen())return;
     const dismissed=current?.dismissed,person=current?.residentId;
     overlay.hidden=true;current=null;
     const focus=previousFocus;previousFocus=null;
     if(focus?.isConnected&&typeof focus.focus==='function')focus.focus({preventScroll:true});
     flush();
-    if(dismissed)onDismissal(person);
+    if(dismissed&&openJobs&&!isOpen())onDismissal(person);
   }
-  done.addEventListener('click',dismiss);
+  done.addEventListener('click',()=>dismiss(true));
   // A backdrop tap is an explicit dismissal, not a click-through to the 3D world.
-  shade.addEventListener('click',dismiss);
+  shade.addEventListener('click',()=>dismiss());
   document.addEventListener('keydown',event=>{
     if(!isOpen())return;
     if(event.key==='Escape'){event.preventDefault();dismiss();}
