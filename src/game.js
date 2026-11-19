@@ -19,6 +19,7 @@ import {createCalendarUI} from './calendar-ui.js';
 import {consumeCalendarReminders} from './calendar-reminders.js';
 import {createCareerPhoneUI} from './career-phone-ui.js';
 import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
+import {applyWorkMoodContext} from './career-worklife.js';
 import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
   residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
 import { findPath, nearestWalkable } from './navigation.js';
@@ -1708,7 +1709,9 @@ updateResidentPicker();
 const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
   financeTrigger:$('family-balance-chip'),getRoot:()=>game,
-  setCareerSystem:state=>{game.careerSystem=state;calendarUI.refresh();},
+  setCareerSystem:state=>{
+    game.careerSystem=state;applyWorkMoodContext(game);calendarUI.refresh();
+  },
   save,notify:toast,onFundsChanged:updateFamilyBalance,
   onOpenChange:id=>updatePhoneProps(id),
   canOpen:()=>!furnishMode&&!buildMode&&!dialogueNeedsDecision(game),
