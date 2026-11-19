@@ -150,7 +150,7 @@ test('W3-D: real manually interrupted shared leisure gives two memories, never a
   progressCareerWork(root,shift.start-61,root.minutes);
   root.socialAction={kind:'talk',initiator:'alex',partner:'mira',
     phase:'using',elapsed:5,automatic:false,
-    shared:{mode:'leisure',choiceId:'games'}};
+    shared:{mode:'leisure',choiceId:'tv',tvConsent:true}};
   const relation=root.relationship.affinity;
   const result=resolveWorkLifeConflict(root,'alex','leave');
   assert.equal(result.ok,true);
