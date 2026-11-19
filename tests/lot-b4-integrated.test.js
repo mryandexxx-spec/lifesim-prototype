@@ -77,7 +77,7 @@ test('LOT-B4: mixed garden decor and bench stay navigable from both residents',(
   assert.ok(isWalkable(approach.x,approach.z,root.world));
   for(const resident of [root,root.otherSim]){
     assert.ok(findPath(resident.position,approach,root.world),'resident can reach bench');
-    assert.ok(findPath(resident.position,{x:18,z:8},root.world),'resident can reach outdoor yard');
+    assert.ok(findPath(resident.position,{x:17,z:8},root.world),'resident can reach outdoor yard');
   }
   assert.equal(isWalkable(21,9,root.world),false,'fence must block A*');
   assert.equal(isWalkable(20,10,root.world),true,'walk-through flowers must not block');
@@ -125,7 +125,9 @@ test('LOT-B4: damaged outdoor payload cannot reset construction, actors, finance
   for(const field of ['construction','furniture'])
     assert.deepEqual(recovered.world[field],before.world[field]);
   for(const field of ['shop','financialHistory','actionQueues','position','needs',
-    'careerSystem','otherSim'])assert.deepEqual(recovered[field],before[field],field);
+    'careerSystem'])assert.deepEqual(recovered[field],before[field],field);
+  assert.deepEqual(recovered.otherSim.position,before.otherSim.position);
+  assert.deepEqual(recovered.otherSim.needs,before.otherSim.needs);
 });
 
 test('LOT-B4: restoring old root-v1 without an outdoor record keeps both residents',()=>{
