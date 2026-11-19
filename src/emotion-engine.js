@@ -47,7 +47,8 @@ export const EMOTION_SOURCES=Object.freeze({
   'worklife.finalWarning':Object.freeze({kind:'anxiety',cause:'Последнее предупреждение',mood:-10}),
   'worklife.dismissal':Object.freeze({kind:'sadness',cause:'Увольнение',mood:-14}),
   'worklife.promotion':Object.freeze({kind:'inspiration',cause:'Карьерное повышение',mood:11}),
-  'worklife.resignation':Object.freeze({kind:'calm',cause:'Смена места работы',mood:-3}),
+  'worklife.resignation':Object.freeze({kind:'anxiety',cause:'Волнение после ухода с работы',mood:-3}),
+  'worklife.resignationRelief':Object.freeze({kind:'calm',cause:'Облегчение после ухода с работы',mood:4}),
   'worklife.sharedInterrupted':Object.freeze({kind:'sadness',cause:'Пришлось прервать совместный отдых',mood:-6}),
   'worklife.sharedDisappointed':Object.freeze({kind:'sadness',cause:'Совместный отдых прервался',mood:-4})
 });
