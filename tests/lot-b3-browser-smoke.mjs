@@ -101,10 +101,16 @@ try{
     await page.locator('#ground-walk-action').click();
     await page.waitForFunction(key=>{
       const save=JSON.parse(localStorage.getItem(key));
-      return (save.actionQueues?.byResident?.alex||[]).some(t=>t.type==='outdoor');
+      return (save.actionQueues?.byResident?.alex||[]).some(t=>t.type==='outdoor')||
+        (save.action?.id==='bench'&&save.action?.automatic===false&&
+          save.action?.targetInstanceId==='out-1');
     },SAVE_KEY,{timeout:8000});
     const queued=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
-    assert.equal(queued.actionQueues.byResident.alex[0].instanceId,'out-1');
+    const pickedBench=queued.actionQueues.byResident.alex.find(t=>t.type==='outdoor');
+    const runningBench=queued.action?.id==='bench'&&
+      queued.action?.automatic===false?queued.action:null;
+    assert.equal(pickedBench?.instanceId||runningBench?.targetInstanceId,'out-1',
+      'confirmed bench must be queued or already active, never lost');
     assert.ok(queued.needs.fun<=seed.needs.fun,'tapping bench cannot instantly reward Fun (normal time decay is allowed)');
     // A tall lamp is not a hidden walk-on-ground shortcut: its hit volume
     // opens the same action menu and only explicit confirmation appends MOVE.
