@@ -5,7 +5,7 @@
 import {nextCareerShift} from './career-scheduler.js';
 import {CAREER_RESIDENT_IDS,separateCareer} from './career-state.js';
 import {recordCareerDiscipline,DISCIPLINE_REHIRE_MINUTES} from './career-discipline.js';
-import {recordWorkLifeShift,recordWorkFeeling,applyWorkMoodContext} from './career-worklife.js';
+import {recordWorkLifeShift,recordWorkFeeling,applyWorkMoodContext,noteWorkLifeConflict} from './career-worklife.js';
 import {careerRankForContract} from './career-specializations.js';
 import {SHOP_MAX_CREDITS} from './furniture-shop.js';
 import {recordFinanceChange} from './finance-ledger.js';
@@ -163,7 +163,10 @@ export function progressCareerWork(root,before,after){
       }
       if(!shift.warn15&&after>=shift.start-15&&after<shift.start){
         shift.warn15=true;
-        emit(messages,id,'reminder','через 15 минут работа · можно отправиться раньше или пропустить');
+        if(noteWorkLifeConflict(root,id,after))
+          emit(messages,id,'worklife','работа скоро начнётся, а личное занятие ещё идёт · выбор в смартфоне');
+        else emit(messages,id,'reminder',
+          'через 15 минут работа · можно отправиться раньше или пропустить');
       }
     }
     if(after>=shift.end){
@@ -175,6 +178,8 @@ export function progressCareerWork(root,before,after){
     // Waiting for an active MANUAL action is deliberate; never silently delete
     // player FIFO instructions. Automatic tasks can be interrupted for work.
     if(shift.phase==='pending'&&after>=shift.start){
+      if(noteWorkLifeConflict(root,id,after))
+        emit(messages,id,'worklife','смена началась во время личного занятия · выбор в смартфоне');
       if(actor.action?.automatic){
         actor.action=null;actor.activitySession=null;
       }
