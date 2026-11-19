@@ -5490,7 +5490,31 @@ function boot() {
       toast('Картина · открыть инвентарь, повесить или продать во вкладке «Навыки»');
     }
     else if(target?.kind==='object')select(target.id,target.instanceId);
-    else{closeSocialContext();select(null);}
+    else{
+      closeSocialContext();select(null);
+      const {near,far}=furnitureRay(pos);
+      const ground=lotRaySurface(near,far,game.world);
+      if(!ground)return; // Sky / off-lot: do not manufacture movement.
+      const id=game.selectedSim,actor=getActor(game,id);
+      if(residentUnavailableForHome(game,id)){
+        toast('Персонаж сейчас не на участке');return;
+      }
+      const requested={x:Math.round(ground.x*20)/20,z:Math.round(ground.z*20)/20};
+      const valid=isWalkable(requested.x,requested.z,game.world)?requested:null;
+      const nearest=valid||nearestWalkable(requested,game.world);
+      if(!valid&&Math.hypot(nearest.x-requested.x,nearest.z-requested.z)>.35){
+        toast('Здесь нельзя пройти — выбери свободное место');return;
+      }
+      if(!findPath(actor.position,nearest,game.world)){
+        toast('Путь к этой точке недоступен');return;
+      }
+      const walk={type:'move',x:nearest.x,z:nearest.z};
+      if(actor.action?.id==='move'&&!pendingActions(game.actionQueues,id).length){
+        actor.action.goal={x:nearest.x,z:nearest.z};
+        paths[id]={points:null,index:0,id:null};
+        actor.event='Идёт к новой точке';save(true);confirmWorldTap(pos);
+      }else if(scheduleCommand(walk,id))confirmWorldTap(pos);
+    }
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
