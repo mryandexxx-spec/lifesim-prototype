@@ -106,9 +106,9 @@ try {
   beforeLive,{timeout:7000});
  await page.locator('#home-open').click();await page.locator('#home-furnish').click();
  assert.ok(await page.locator('#furniture-editor').isVisible());
- await page.waitForTimeout(350); // The HUD may be one frame behind the tick.
+ await page.waitForTimeout(900); // Let any in-flight pre-editor game tick reach the HUD.
  const furnishClock=await page.locator('#time-label').innerText();
- await page.waitForTimeout(1100);
+ await page.waitForTimeout(1250);
  assert.equal(await page.locator('#time-label').innerText(),furnishClock,
   'Furnish mode freezes the single calendar as in previous versions');
  await page.locator('#furnish-exit').click();
