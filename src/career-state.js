@@ -6,6 +6,9 @@ import {careerRankForContract,restoreCareerSpecialization} from './career-specia
 import {restoreSeniorProof} from './career-seniority.js';
 import {restoreCareerTimeOff} from './career-timeoff.js';
 import {cleanWorkMode,restoreWorkNeeds} from './career-work-needs.js';
+import {newCareerDiscipline,restoreCareerDiscipline,disciplineRisk} from './career-discipline.js';
+import {specializationDefinition} from './career-specializations.js';
+import {resetSeniorProof} from './career-seniority.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -82,6 +85,7 @@ function cleanContract(raw,id){
   const seniorProof=restoreSeniorProof(raw.seniorProofs,contract);
   if(seniorProof)contract.seniorProofs=seniorProof;
   contract.timeOff=restoreCareerTimeOff(raw.timeOff,contract.employmentId);
+  contract.discipline=restoreCareerDiscipline(raw.discipline,contract.employmentId);
   contract.currentShift=cleanWorkShift(raw.currentShift,contract);
   const last=cleanLastShift(raw.lastShift,contract);
   if(last)contract.lastShift=last;
@@ -117,10 +121,31 @@ function cleanWorkHistory(raw){
   }
   return entries.slice(-INCIDENT_HISTORY_LIMIT);
 }
+const validArchiveTime=n=>Number.isSafeInteger(n)&&n>=0&&n<=5256000000;
+function cleanEndedContracts(raw,id){
+  if(!Array.isArray(raw))return [];
+  const seen=new Set(),entries=[];
+  for(const item of raw.slice(-8)){
+    if(!item||!validEmployeeId(item.employmentId)||seen.has(item.employmentId)||
+      !careerDefinition(item.careerId)||!Number.isInteger(item.level)||
+      item.level<0||item.level>7||!validArchiveTime(item.at)||
+      !['resigned','dismissed'].includes(item.reason)||
+      !Number.isInteger(item.risk)||item.risk<0||item.risk>20)continue;
+    const branch=typeof item.branchId==='string'&&
+      specializationDefinition(item.careerId,item.branchId)?item.branchId:null;
+    if(item.level>=5&&!branch)continue;
+    seen.add(item.employmentId);
+    entries.push({employmentId:item.employmentId,careerId:item.careerId,
+      level:item.level,branchId:branch,at:item.at,reason:item.reason,
+      risk:item.risk});
+  }
+  return entries;
+}
 export function newCareerSystem(){
   return {schema:CAREER_SCHEMA,nextEmploymentId:1,byResident:{alex:null,mira:null},
     settlementIds:[],incidentIds:[],incidentHistory:{alex:[],mira:[]},
-    professionalGoals:newProfessionalGoals()};
+    professionalGoals:newProfessionalGoals(),
+    endedContracts:{alex:[],mira:[]},portableLeave:{alex:0,mira:0}};
 }
 export function restoreCareerSystem(raw){
   const state=newCareerSystem();
@@ -132,7 +157,14 @@ export function restoreCareerSystem(raw){
       state.byResident[id]=entry;ids.add(entry.employmentId);
     }
   }
-  const max=Math.max(0,...[...ids].map(x=>Number(x.slice(1))));
+  for(const id of CAREER_RESIDENT_IDS){
+    state.endedContracts[id]=cleanEndedContracts(raw.endedContracts?.[id],id);
+    const portable=raw.portableLeave?.[id];
+    state.portableLeave[id]=Number.isSafeInteger(portable)&&portable>=0&&portable<=64?portable:0;
+  }
+  const max=Math.max(0,...[...ids].map(x=>Number(x.slice(1))),
+    ...CAREER_RESIDENT_IDS.flatMap(id=>
+      state.endedContracts[id].map(x=>Number(x.employmentId.slice(1)))));
   const next=raw.nextEmploymentId;
   state.nextEmploymentId=Number.isSafeInteger(next)&&next>max&&next<=999999999
     ?next:max+1;
@@ -154,10 +186,23 @@ export function hireCareer(system,residentId,careerId,atMinute){
   if(state.byResident[residentId])throw new Error('Resident already employed');
   if(state.nextEmploymentId>999999999)throw new RangeError('Employment limit');
   const id='e'+state.nextEmploymentId++;
-  state.byResident[residentId]={residentId,employmentId:id,careerId,level:0,
-    hiredAt:atMinute,status:'employed',performance:50,currentShift:null,
+  const latest=[...state.endedContracts[residentId]].reverse()
+    .find(entry=>entry.careerId===careerId);
+  const level=latest?Math.max(0,latest.level-1):0;
+  const timeOff=restoreCareerTimeOff(null,id);
+  const transferred=Math.min(3,state.portableLeave[residentId]||0);
+  timeOff.balance=transferred;
+  state.portableLeave[residentId]-=transferred;
+  const contract={residentId,employmentId:id,careerId,level,
+    hiredAt:atMinute,status:'employed',performance:latest?60:50,currentShift:null,
     workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0,
-    timeOff:restoreCareerTimeOff(null,id),workMode:'normal'};
+    timeOff,workMode:'normal',discipline:newCareerDiscipline()};
+  if(latest?.branchId&&specializationDefinition(careerId,latest.branchId)){
+    contract.specialization={schema:1,id:latest.branchId,chosenAt:atMinute,
+      workedShiftsAtChoice:0,focusReceiptId:null,focusScenarioId:null,focusAt:null};
+    if(level>=5)contract.seniorProofs=resetSeniorProof(contract,atMinute);
+  }
+  state.byResident[residentId]=contract;
   return state;
 }
 export function resignCareer(system,residentId){
@@ -165,4 +210,29 @@ export function resignCareer(system,residentId){
   const state=restoreCareerSystem(system);
   state.byResident[residentId]=null;
   return state;
+}
+
+/** Archive only after all salary/shift-summary receipts are written and actor is home.
+ * Handles resignation and employer dismissal identically for earned career/leave.
+ */
+export function separateCareer(system,residentId,reason,atMinute){
+  if(!CAREER_RESIDENT_IDS.includes(residentId)||!validArchiveTime(atMinute)||
+    !['resigned','dismissed'].includes(reason))throw new RangeError('Invalid separation');
+  const state=restoreCareerSystem(system);
+  const contract=state.byResident[residentId];
+  if(!contract||contract.currentShift)return {ok:false,reason:'Сначала завершите смену'};
+  if(contract.discipline?.pendingDismissal)reason='dismissed';
+  const risk=disciplineRisk(contract.discipline);
+  const branchId=contract.specialization?.id||null;
+  const archived={employmentId:contract.employmentId,careerId:contract.careerId,
+    level:contract.level,branchId,at:atMinute,reason,risk};
+  const history=state.endedContracts[residentId];
+  if(!history.some(e=>e.employmentId===archived.employmentId))history.push(archived);
+  if(history.length>8)history.splice(0,history.length-8);
+  const leave=contract.timeOff||{};
+  const booked=(leave.bookings||[]).filter(b=>b.type==='paid'&&!b.settled).length;
+  state.portableLeave[residentId]=Math.min(64,state.portableLeave[residentId]+
+    Math.max(0,leave.balance||0)+booked);
+  state.byResident[residentId]=null;
+  return {ok:true,careerSystem:state,archived};
 }
