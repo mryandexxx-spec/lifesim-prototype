@@ -19,7 +19,8 @@ test('arbitrary residents have separate, empty, JSON-safe FIFO queues',()=>{
   assert.equal(pendingActions(q,'nova').length,0);
   assert.equal(pendingActions(q,'alex').length,0);
   assert.deepEqual(copy(q),q);
-  assert.equal(ACTION_QUEUE_TYPES.length,6);
+  assert.equal(ACTION_QUEUE_TYPES.length,7);
+  assert.ok(ACTION_QUEUE_TYPES.includes('move'),'LOT-A adds point movement without losing older types');
   assert.throws(()=>newActionQueues(['nova','nova']),TypeError);
   assert.throws(()=>newActionQueues(['bad id']),TypeError);
 });
