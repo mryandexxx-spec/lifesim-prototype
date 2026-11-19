@@ -24,6 +24,8 @@ import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
 import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchAvailable} from './outdoor-interactions.js';
+import {gardenFeature,gardenApproach,gardenActionAllowed,restoreGardenRewards,
+  advanceGardens,settleGardenAction,GARDEN_DURATION} from './gardening.js';
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
@@ -103,6 +105,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   // F2.1 optional root-v1 extension. Old households get test credits only once.
   state.shop=newFurnitureShop();
   state.financialHistory=newFinancialHistory();
+  state.gardenRewards=restoreGardenRewards(null);
   state.householdBills=newHouseholdBills(state.minutes);
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
@@ -126,10 +129,11 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   const restoredConstruction=restoreConstructionWorld(raw.world?.construction);
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
     construction:restoredConstruction,
-    outdoors:restoreOutdoorsWorld(raw.world?.outdoors,restoredConstruction)};
+    outdoors:restoreOutdoorsWorld(raw.world?.outdoors,restoredConstruction,root.minutes)};
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.financialHistory=restoreFinancialHistory(raw.financialHistory);
+  root.gardenRewards=restoreGardenRewards(raw.gardenRewards);
   root.householdBills=restoreHouseholdBills(raw.householdBills,root.minutes);
   root.careerSystem=restoreCareerSystem(raw.careerSystem);
   root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem,root.minutes);
@@ -173,13 +177,23 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         (sim.action.phase==='walking'&&!findPath(sim.position,target,root.world)))
         sim.action=null;
     }
-    if(sim.action&&sim.action.id!=='move'&&sim.action.id!=='bench'){
+    if(sim.action?.id==='garden'){
+      const a=sim.action,plan=gardenApproach(root.world,a.targetInstanceId,sim.position);
+      const valid=plan&&gardenActionAllowed(root,id,a.targetInstanceId,
+        a.gardenActionId,{ignoreReservation:true})&&
+        (a.phase!=='using'||Math.hypot(sim.position.x-a.gardenGoal.x,
+          sim.position.z-a.gardenGoal.z)<.45);
+      if(!valid)sim.action=null;
+    }
+    if(sim.action&&sim.action.id!=='move'&&sim.action.id!=='bench'&&
+      sim.action.id!=='garden'){
       const object=resolveActionFurniture(root.world,sim.action.id,sim.action.targetInstanceId);
       if(object)sim.action.targetInstanceId=object.instanceId;
       else sim.action=null; // no phantom action or silent rerouting to another item
     }
     root.actionQueues.byResident[id]=root.actionQueues.byResident[id].filter(task=>
-      task.type!=='outdoor'||Boolean(outdoorBench(root.world,task.instanceId)));
+      (task.type!=='outdoor'||Boolean(outdoorBench(root.world,task.instanceId)))&&
+      (task.type!=='garden'||Boolean(gardenFeature(root.world,task.instanceId))));
     for(const task of root.actionQueues.byResident[id]){
       if(task.type!=='object'||task.targetInstanceId)continue;
       const object=resolveActionFurniture(root.world,task.actionId);
@@ -888,6 +902,13 @@ export function tickHousehold(root,minutes) {
     return [id,actor.action?.id==='paint'&&actor.activitySession?.phase==='ready'
       ?{action:actor.action,session:actor.activitySession}:null];
   }));
+  // Capture timed garden sessions before generic tick() clears a completed action.
+  // Completion and persistent watermarks are committed once per household, not per actor.
+  const gardenBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>{
+    const a=getActor(root,id).action;
+    return [id,a?.id==='garden'&&a.phase==='using'
+      ?{instanceId:a.targetInstanceId,actionId:a.gardenActionId,elapsed:a.elapsed}:null];
+  }));
   // Capture stages BEFORE the simulation. The completion tick may switch
   // reading→closing; it must not also consume a full closing interval.
   const stageBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>
@@ -1015,6 +1036,16 @@ export function tickHousehold(root,minutes) {
       }
       session.creditedMinutes=Math.min(sharedDuration(session),
         session.creditedMinutes+credited);
+    }
+  }
+  // Use the ONE shared household clock for growth. Never credit dry or offline hours.
+  advanceGardens(root.world.outdoors,root.minutes);
+  for(const id of HOUSEHOLD_IDS){
+    const before=gardenBefore[id],actor=getActor(root,id);
+    if(before&&!actor.action&&
+      before.elapsed+minutes>=GARDEN_DURATION[before.actionId]){
+      if(settleGardenAction(root,id,before.instanceId,before.actionId))
+        refreshMind(actor,root.world);
     }
   }
   // Both clocks remain identical (including when paused).

@@ -2,6 +2,7 @@
  * Optional outdoor entries extend root-v1 without replacing indoor construction.
  */
 import {BUILD_LOT,BUILD_STEP,constructionContains} from './construction.js';
+import {GARDEN_LIMIT,isGardenItem,restoreGardens} from './gardening.js';
 import {OUTDOOR_CATALOG,OUTDOOR_FEATURE_LIMIT,validOutdoorId,
   outdoorFeatureRect,outdoorRectsOverlap} from './outdoor-catalog.js';
 
@@ -59,7 +60,7 @@ export function outdoorFeatureFits(item,construction=null){
 /** Bounded per-entry recovery: a damaged outdoor edit never resets the house,
  * its characters, queue, money or career.
  */
-export function restoreOutdoorsWorld(raw,construction=null){
+export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
   if(!raw||raw.schema!==OUTDOORS_SCHEMA)return newOutdoorsWorld();
   const next=newOutdoorsWorld();
   next.revision=validRevision(raw.revision)?raw.revision:0;
@@ -74,7 +75,7 @@ export function restoreOutdoorsWorld(raw,construction=null){
   }
   next.ground=[...cells].sort(([a],[b])=>a-b).map(([cell,kind])=>({cell,kind}));
   const seen=new Set(),rects=[];
-  let greatestId=0;
+  let greatestId=0,gardenCount=0;
   if(Array.isArray(raw.features))for(const saved of raw.features.slice(0,OUTDOOR_FEATURE_LIMIT*4)){
     if(next.features.length>=OUTDOOR_FEATURE_LIMIT)break;
     if(!validOutdoorId(saved?.instanceId)||seen.has(saved.instanceId)||
@@ -84,7 +85,9 @@ export function restoreOutdoorsWorld(raw,construction=null){
        !Number.isSafeInteger(saved.purchasePriceCredits)||
        saved.purchasePriceCredits<0||saved.purchasePriceCredits>1000000)continue;
     const rect=outdoorFeatureRect(saved);
+    if(isGardenItem(saved.itemId)&&gardenCount>=GARDEN_LIMIT)continue;
     if(rects.some(prior=>outdoorRectsOverlap(prior,rect)))continue;
+    if(isGardenItem(saved.itemId))gardenCount++;
     seen.add(saved.instanceId);rects.push(rect);
     greatestId=Math.max(greatestId,Number(saved.instanceId.slice(4)));
     next.features.push({instanceId:saved.instanceId,itemId:saved.itemId,
@@ -94,6 +97,7 @@ export function restoreOutdoorsWorld(raw,construction=null){
   const requestedId=Number.isSafeInteger(raw.nextId)&&raw.nextId>=1&&
     raw.nextId<=10000000?raw.nextId:1;
   next.nextId=Math.min(10000000,Math.max(requestedId,greatestId+1));
+  if(gardenCount)next.gardens=restoreGardens(raw.gardens,next.features,atGameMinute);
   return next;
 }
 const groundCache=new WeakMap();
