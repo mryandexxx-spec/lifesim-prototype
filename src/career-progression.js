@@ -6,6 +6,7 @@ import {CAREER_RESIDENT_IDS} from './career-state.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {refreshMind} from './psychology.js';
+import {recordWorkLifePromotion,applyWorkMoodContext} from './career-worklife.js';
 import {WORK_MODES,cleanWorkMode} from './career-work-needs.js';
 import {careerRankForContract,specializationReadiness} from './career-specializations.js';
 import {seniorPromotionReadiness,resetSeniorProof} from './career-seniority.js';
@@ -85,6 +86,8 @@ export function promoteCareer(root,residentId){
   contract.performance=Math.max(55,clip(contract.performance-18));
   const actor=actorFor(root,residentId);
   if(actor)actor.event='Повышение: '+goal.rank;
+  recordWorkLifePromotion(root,residentId,contract);
+  applyWorkMoodContext(root);
   return {ok:true,rank:goal.rank,rate:careerRankForContract(contract).hourlyCredits};
 }
 /** Called ONCE from idempotent salary settlement, never from presentation. */
