@@ -165,3 +165,77 @@ export function commitOutdoorPreview(root,proposal){
     shop:transaction.shop,financialHistory:transaction.financialHistory},
     cost:proposal.cost,recorded:transaction.recorded};
 }
+
+
+/** LOT-B2: edits are rebuilt from the current canonical root at confirmation.
+ * A stale preview cannot mint money or bypass topology/overlap checks.
+ * Decor and boundaries never grant passive XP/need bonuses.
+ */
+const b2Category=id=>['tree','shrub','flower','fence'].includes(OUTDOOR_CATALOG[id]?.category);
+export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose}={}){
+  if(operation==='place'){
+    if(!b2Category(itemId))return fail('unavailable-item');
+    const p=previewOutdoorFeature(root,itemId,pose);
+    return p.ok?{...p,operation,itemId,pose,instanceId:p.instanceId}:p;
+  }
+  const current=context(root);
+  if(!current)return fail('invalid-state');
+  if(operation!=='move'&&operation!=='sell')return fail('unknown-operation');
+  const original=current.features.find(x=>x.instanceId===instanceId);
+  if(!original||!b2Category(original.itemId))return fail('missing-instance');
+  if(current.revision>=100000000)return fail('revision-limit');
+  let features;
+  if(operation==='sell')features=current.features.filter(f=>f.instanceId!==instanceId);
+  else {
+    if(!pose||![0,90,180,270].includes(pose.yaw))return fail('invalid-pose');
+    if(pose.x===original.x&&pose.z===original.z&&pose.yaw===original.yaw)
+      return fail('unchanged');
+    const moved={...original,x:pose.x,z:pose.z,yaw:pose.yaw};
+    const rect=outdoorFeatureRect(moved);
+    if(!outdoorFeatureFits(moved,root.world.construction))
+      return fail('blocked-or-outside');
+    if(current.features.some(f=>f.instanceId!==instanceId&&
+      outdoorRectsOverlap(rect,outdoorFeatureRect(f))))return fail('overlap-outdoor');
+    if(furnitureObstacles(root.world.furniture).some(f=>outdoorRectsOverlap(rect,f)))
+      return fail('overlap-furniture');
+    if(participantPositions(root).some(p=>
+      p.x>=rect.minX-ACTOR_RADIUS&&p.x<=rect.maxX+ACTOR_RADIUS&&
+      p.z>=rect.minZ-ACTOR_RADIUS&&p.z<=rect.maxZ+ACTOR_RADIUS))
+      return fail('resident-blocked');
+    features=current.features.map(f=>f.instanceId===instanceId?moved:f);
+  }
+  const next={...current,revision:current.revision+1,features};
+  if(operation==='move'&&!keepsExistingRoutes(root,next))
+    return fail('would-block-route');
+  const refund=operation==='sell'?Math.floor(original.purchasePriceCredits*0.7):0;
+  const balance=root.shop.credits+refund;
+  if(!Number.isSafeInteger(balance)||balance>1000000000)return fail('wallet-limit');
+  return {ok:true,operation,itemId:original.itemId,instanceId,
+    pose:operation==='move'?{x:pose.x,z:pose.z,yaw:pose.yaw}:null,
+    cost:operation==='sell'?-refund:0,sourceId:'outdoors-'+operation+'-'+instanceId+'-'+next.revision,
+    fromRevision:current.revision,fromBalance:root.shop.credits,outdoors:next};
+}
+export function commitOutdoorFeatureEdit(root,draft){
+  if(!draft?.ok||!['place','move','sell'].includes(draft.operation))
+    return fail('invalid-preview');
+  const current=context(root);
+  if(!current||current.revision!==draft.fromRevision||
+    root.shop.credits!==draft.fromBalance)return fail('stale-preview');
+  const verified=previewOutdoorFeatureEdit(root,{
+    operation:draft.operation,itemId:draft.itemId,
+    instanceId:draft.operation==='place'?undefined:draft.instanceId,pose:draft.pose});
+  if(!verified.ok)return verified;
+  if(verified.sourceId!==draft.sourceId||verified.cost!==draft.cost||
+    JSON.stringify(verified.outdoors)!==JSON.stringify(draft.outdoors))
+    return fail('stale-preview');
+  if(draft.operation==='place')return commitOutdoorPreview(root,verified);
+  const nextCredits=root.shop.credits-verified.cost;
+  const nextShop={...root.shop,credits:nextCredits};
+  const receipt=recordFinanceChange(root,nextShop,{
+    kind:draft.operation==='sell'?'sale':'purchase',
+    sourceId:verified.sourceId,atGameMinute:Math.floor(root.minutes||0)});
+  if(!receipt.ok)return fail(receipt.reason);
+  return {ok:true,root:{...root,world:{...root.world,outdoors:verified.outdoors},
+    shop:receipt.shop,financialHistory:receipt.financialHistory},
+    cost:verified.cost,instanceId:verified.instanceId,recorded:receipt.recorded};
+}

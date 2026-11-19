@@ -1830,6 +1830,15 @@ button.time-card:active {transform:translateY(1px);}
 .career-phone-worklife summary { cursor:pointer; }
 
 
+/* LOT-B2: adaptive plant/fence controls in the existing mobile lot sheet. */
+.outdoor-feature-controls{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}
+.outdoor-feature-controls[hidden],.outdoor-feature-controls label[hidden]{display:none!important}
+.outdoor-feature-controls label{display:flex;flex-direction:column;gap:3px;min-width:0;
+  font-size:11px;font-weight:750;color:#396b51}
+.outdoor-feature-controls select{width:100%;min-width:0}
+#outdoor-feature-rotate{grid-column:1/-1}
+@media (max-width:380px){.outdoor-feature-controls{grid-template-columns:1fr}
+  #outdoor-feature-rotate{grid-column:1}}
 /* LOT-B1: compact bottom sheet; no new always-visible HUD button. */
 .outdoor-editor[hidden]{display:none!important}
 .outdoor-editor{

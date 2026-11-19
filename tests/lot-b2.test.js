@@ -1,0 +1,87 @@
+/** LOT-B2: persistent plants/fences, live collision and honest sale receipts. */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {newHousehold,loadHousehold} from '../src/household.js';
+import {previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from '../src/outdoor-proposals.js';
+import {OUTDOOR_CATALOG,outdoorFeatureObstacles} from '../src/outdoor-catalog.js';
+import {isWalkable,findPath} from '../src/navigation.js';
+const copy=x=>JSON.parse(JSON.stringify(x));
+const pos=(x,z,yaw=0)=>({x,z,yaw});
+const propose=(root,operation,fields)=>previewOutdoorFeatureEdit(root,{operation,...fields});
+const apply=(root,proposal)=>{const result=commitOutdoorFeatureEdit(root,proposal);
+  assert.ok(result.ok,result.reason);return result.root;};
+test('B2 catalog is original and fences use narrow rotated physical footprints',()=>{
+  assert.equal(Object.values(OUTDOOR_CATALOG).filter(x=>['tree','shrub','flower','fence'].includes(x.category)).length,11);
+  assert.equal(OUTDOOR_CATALOG['fence.wood'].price,55);
+  assert.equal(OUTDOOR_CATALOG['flower.tulip'].walkThrough,true);
+});
+test('B2 place, save, move, rotate, reload, sell 70% and exact finance',()=>{
+  const base=newHousehold();
+  const p=propose(base,'place',{itemId:'tree.round',pose:pos(19,8)});
+  assert.ok(p.ok,p.reason);
+  const bought=apply(base,p);
+  assert.equal(bought.shop.credits,base.shop.credits-220);
+  assert.equal(bought.world.outdoors.features[0].instanceId,'out-1');
+  assert.equal(isWalkable(19,8,bought.world),false);
+  assert.ok(findPath({x:17,z:8},{x:21,z:8},bought.world));
+  const moving=propose(bought,'move',{instanceId:'out-1',pose:pos(21,7,90)});
+  assert.ok(moving.ok,moving.reason);
+  const moved=apply(bought,moving);
+  assert.equal(moved.shop.credits,bought.shop.credits);
+  assert.equal(moved.financialHistory.entries.length,1,'free move has no fake receipt');
+  assert.equal(moved.world.outdoors.features[0].yaw,90);
+  const reloaded=loadHousehold(copy(moved));
+  assert.deepEqual(reloaded.world.outdoors,moved.world.outdoors);
+  const sale=propose(reloaded,'sell',{instanceId:'out-1'});
+  assert.equal(sale.cost,-154);
+  const sold=apply(reloaded,sale);
+  assert.equal(sold.shop.credits,base.shop.credits-66);
+  assert.equal(sold.financialHistory.entries.at(-1).kind,'sale');
+  assert.equal(sold.world.outdoors.features.length,0);
+  assert.equal(sold.world.outdoors.nextId,2,'IDs cannot be recycled after sale');
+  assert.equal(propose(sold,'sell',{instanceId:'out-1'}).reason,'missing-instance');
+  assert.equal(commitOutdoorFeatureEdit(bought,moving).ok,true,'draft valid for the same immutable old root');
+  assert.equal(commitOutdoorFeatureEdit(sold,sale).reason,'stale-preview');
+});
+test('B2 fences block footprints, flowers are walkable, overlaps and resident placement fail',()=>{
+  const base=newHousehold();
+  const fence=propose(base,'place',{itemId:'fence.wood',pose:pos(19,8)});
+  assert.ok(fence.ok,fence.reason);
+  const fenced=apply(base,fence);
+  assert.equal(outdoorFeatureObstacles(fenced.world).length,1);
+  assert.equal(isWalkable(19,8,fenced.world),false);
+  assert.equal(propose(fenced,'place',{itemId:'shrub.small',pose:pos(19,8)}).reason,'overlap-outdoor');
+  assert.equal(propose(fenced,'move',{instanceId:'out-1',pose:pos(base.position.x,base.position.z)}).reason,'blocked-or-outside');
+  const flowers=propose(fenced,'place',{itemId:'flower.tulip',pose:pos(20,9)});
+  assert.ok(flowers.ok,flowers.reason);
+  const planted=apply(fenced,flowers);
+  assert.equal(isWalkable(20,9,planted.world),true);
+  assert.equal(propose(planted,'move',{instanceId:'out-1',pose:pos(20,9)}).reason,'overlap-outdoor');
+});
+test('B2 rejecting unapproved item, malicious refund, duplicated receipt and stale preview',()=>{
+  const root=newHousehold();
+  assert.equal(propose(root,'place',{itemId:'garden.bench',pose:pos(20,8)}).reason,'unavailable-item');
+  const tree=propose(root,'place',{itemId:'tree.round',pose:pos(19,8)});
+  assert.ok(tree.ok,tree.reason);
+  assert.equal(commitOutdoorFeatureEdit(root,{...tree,cost:0}).reason,'stale-preview');
+  const bought=apply(root,tree);
+  assert.equal(commitOutdoorFeatureEdit(bought,tree).reason,'stale-preview');
+  const sale=propose(bought,'sell',{instanceId:'out-1'});
+  assert.equal(commitOutdoorFeatureEdit(bought,{...sale,cost:-10000000}).reason,'stale-preview');
+  const after=apply(bought,sale);
+  assert.equal(commitOutdoorFeatureEdit(after,sale).reason,'stale-preview');
+  assert.deepEqual(root.world.outdoors.features,[]);
+  assert.equal(root.shop.credits,after.shop.credits+66);
+});
+test('B2 editor/Pages source contract',()=>{
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const pages=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
+  for(const id of ['outdoor-category','outdoor-feature-kind','outdoor-feature-owned',
+    'outdoor-feature-operation','outdoor-feature-rotate'])assert.ok(html.includes('id="'+id+'"'),id);
+  assert.match(game,/renderOutdoorFeatures\(\)/);
+  assert.match(game,/previewOutdoorFeatureEdit\(game/);
+  assert.match(game,/commitOutdoorFeatureEdit\(game/);
+  assert.match(pages,/src\/outdoor-proposals.js/);
+});

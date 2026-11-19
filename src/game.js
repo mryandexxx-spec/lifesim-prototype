@@ -24,7 +24,9 @@ import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
   residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
 import { findPath, nearestWalkable, isWalkable } from './navigation.js';
 import {lotRaySurface,lotActorHeight,outdoorCellAt,OUTDOOR_GRID_WIDTH} from './lot-surface.js';
-import {previewOutdoorPaint,commitOutdoorPreview} from './outdoor-proposals.js';
+import {previewOutdoorPaint,commitOutdoorPreview,
+  previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from './outdoor-proposals.js';
+import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -2147,6 +2149,62 @@ function boot() {
     }
   };
   renderOutdoorGround();
+  // LOT-B2: original low-poly plants and boundaries, grouped under one node
+  // per owned instance. Only the 96-item bounded save controls these meshes.
+  const outdoorFeatureNodes=[];
+  const outdoorFeatureMaterials={
+    bark:mat('#917256'),leaf:mat('#4d8960'),lightLeaf:mat('#7cac69'),
+    darkLeaf:mat('#437956'),pink:mat('#dc9aa7'),white:mat('#f6eee0'),
+    yellow:mat('#e9c767'),purple:mat('#8f77b6'),
+    wood:mat('#af8967'),woodDark:mat('#846e54'),soil:mat('#6e8761')
+  };
+  const renderOutdoorFeatures=()=>{
+    for(const node of outdoorFeatureNodes.splice(0))node.destroy();
+    for(const item of game.world?.outdoors?.features||[]){
+      const def=OUTDOOR_CATALOG[item.itemId];
+      if(!def||!['tree','shrub','flower','fence'].includes(def.category))continue;
+      const node=new pc.Entity('LOT-B2 '+item.instanceId+' '+item.itemId);
+      node.setLocalPosition(item.x,-.53,item.z);
+      node.setLocalEulerAngles(0,-item.yaw,0);
+      app.root.addChild(node);outdoorFeatureNodes.push(node);
+      const part=(shape,name,x,y,z,sx,sy,sz,color)=>
+        primitive(shape,name,x,y,z,sx,sy,sz,outdoorFeatureMaterials[color],node);
+      if(def.category==='tree'){
+        const scale=item.itemId==='tree.tall'?1.30:item.itemId==='tree.broad'?1.12:1;
+        part('cylinder','trunk',0,.70*scale,0,.28,1.40*scale,.28,'bark');
+        part('sphere','canopy',0,1.65*scale,0,def.width*1.08,.94*scale,def.depth*1.08,'leaf');
+        if(item.itemId!=='tree.tall'){
+          part('sphere','canopy east',.38,1.43*scale,-.14,.72,.72,.72,'lightLeaf');
+          part('sphere','canopy west',-.37,1.48*scale,.20,.64,.68,.66,'darkLeaf');
+        }
+      }else if(def.category==='shrub'){
+        const flowering=item.itemId==='shrub.flowering';
+        part('sphere','bush',0,.43,0,def.width*1.1,.74,def.depth*1.10,flowering?'lightLeaf':'leaf');
+        if(item.itemId==='shrub.broad')part('sphere','bush side',.34,.36,-.18,.7,.57,.67,'darkLeaf');
+        if(flowering)for(const [x,z] of [[-.24,0],[.22,.18],[.04,-.28]])
+          part('sphere','blossom',x,.77,z,.18,.15,.18,'pink');
+      }else if(def.category==='flower'){
+        const color=item.itemId==='flower.lavender'?'purple':
+          item.itemId==='flower.tulip'?'pink':'white';
+        for(const [x,z] of [[-.16,-.12],[.17,.10],[0,.19]]){
+          part('cylinder','stem',x,.18,z,.035,.36,.035,'soil');
+          part('sphere','petals',x,.39,z,.16,.15,.16,color);
+          if(item.itemId==='flower.daisy')
+            part('sphere','heart',x,.48,z,.055,.06,.055,'yellow');
+        }
+      }else if(item.itemId==='fence.wood'){
+        for(const x of [-.20,.20])
+          part('box','fence post',x,.44,0,.09,.88,.10,'woodDark');
+        for(const y of [.30,.63])
+          part('box','fence rail',0,y,0,.51,.095,.09,'wood');
+      }else{
+        part('box','hedge base',0,.23,0,.49,.20,.24,'bark');
+        for(const x of [-.17,.05,.20])
+          part('sphere','hedge foliage',x,.55,0,.31,.63,.44,'darkLeaf');
+      }
+    }
+  };
+  renderOutdoorFeatures();
   const outdoorPaintGhost=box('LOT-B1 paint preview',0,-.509,0,.5,.025,.5,
     mat('#62b889',{opacity:.30}));
   outdoorPaintGhost.enabled=false;
@@ -3563,7 +3621,7 @@ function boot() {
     game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
     alexSeatInstanceId=null;
     drawnDiningChairs.clear(); // reset returns every visual-only chair to its saved position
-    updateDecorNodes();renderOutdoorGround();
+    updateDecorNodes();renderOutdoorGround();renderOutdoorFeatures();
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
     showerPrivacy.enabled=false;
@@ -5264,9 +5322,29 @@ function boot() {
       if(!startEditorDrag(grabEvent))holdGesture.cancel();
     },FURNITURE_HOLD_MS);
   };
-  // LOT-B1: touch-first outdoor paint mode, with a session-local reversible
+  // LOT-B2: touch-first surface and feature editing with one shared timeline; with a session-local reversible
   // financial timeline. The saved authoritative root stays game, never a UI VM.
   let outdoorTool='paint',outdoorDrag=null,outdoorPending=null;
+  let outdoorCategory='ground',outdoorPose=null,outdoorYaw=0;
+  const outdoorFeatureItems=OUTDOOR_PRODUCTS.filter(item=>
+    ['tree','shrub','flower','fence'].includes(item.category));
+  for(const item of outdoorFeatureItems){
+    const opt=document.createElement('option');opt.value=item.itemId;
+    opt.textContent=item.name+' · '+item.price+' кр.';
+    $('outdoor-feature-kind').append(opt);
+  }
+  const syncOutdoorOwned=()=>{
+    const selected=$('outdoor-feature-owned').value;
+    const list=game.world.outdoors.features.filter(i=>
+      outdoorFeatureItems.some(p=>p.itemId===i.itemId));
+    const options=list.map(item=>{
+      const opt=document.createElement('option');opt.value=item.instanceId;
+      opt.textContent=OUTDOOR_CATALOG[item.itemId].name+' · №'+item.instanceId.slice(4);
+      return opt;
+    });
+    $('outdoor-feature-owned').replaceChildren(...options);
+    if(list.some(i=>i.instanceId===selected))$('outdoor-feature-owned').value=selected;
+  };
   let outdoorTimeline=[],outdoorHistoryIndex=0;
   const outdoorSnapshot=()=>({
     outdoors:JSON.parse(JSON.stringify(game.world.outdoors)),
@@ -5280,7 +5358,19 @@ function boot() {
     'unknown-ground':'Неизвестный материал',
     'invalid-state':'Данные участка недоступны',
     'stale-preview':'Участок изменился: выбери клетки снова',
-    'revision-limit':'Достигнут предел операций'
+    'revision-limit':'Достигнут предел операций',
+    'unavailable-item':'Этот предмет появится в следующем этапе',
+    'unknown-item':'Неизвестное растение или ограждение',
+    'missing-instance':'Этот объект уже удалён или недоступен',
+    'feature-limit':'Достигнут предел в 96 уличных объектов',
+    'id-limit':'Достигнут предел номеров объектов',
+    'blocked-or-outside':'Требуется свободная земля вне дома и границ участка',
+    'overlap-outdoor':'Здесь уже стоит растение или ограждение',
+    'overlap-furniture':'Место занято домашней мебелью',
+    'resident-blocked':'Нельзя ставить препятствие прямо на жителя',
+    'would-block-route':'Нельзя перекрывать проход к дому, выходу или нужным предметам',
+    'invalid-pose':'Выбери допустимое место и поворот',
+    'wallet-limit':'Баланс семьи достиг предела'
   };
   const outdoorFeedback=(message,invalid=false)=>{
     $('outdoor-preview-text').textContent=message;
@@ -5293,10 +5383,25 @@ function boot() {
     $('outdoor-redo').disabled=outdoorHistoryIndex>=outdoorTimeline.length-1;
     $('outdoor-tool-paint').setAttribute('aria-pressed',String(outdoorTool==='paint'));
     $('outdoor-tool-camera').setAttribute('aria-pressed',String(outdoorTool==='camera'));
+    outdoorCategory=$('outdoor-category').value;
+    document.querySelector('.outdoor-surface-choice[for="outdoor-ground-kind"]').hidden=outdoorCategory!=='ground';
+    $('outdoor-feature-controls').hidden=outdoorCategory==='ground';
+    $('outdoor-feature-kind-label').hidden=outdoorCategory==='ground'||
+      $('outdoor-feature-operation').value!=='place';
+    $('outdoor-feature-owned-label').hidden=outdoorCategory==='ground'||
+      $('outdoor-feature-operation').value==='place';
+    $('outdoor-feature-rotate').disabled=outdoorCategory==='ground'||
+      $('outdoor-feature-operation').value==='sell';
+    $('outdoor-apply').textContent=outdoorPending?.operation==='sell'
+      ?'✓ Продать · +'+(-outdoorPending.cost)+' кр.'
+      :outdoorPending?.operation==='move'?'✓ Переместить бесплатно'
+      :'✓ Купить и применить';
   };
   const clearOutdoorPending=(quiet=false)=>{
-    outdoorDrag=null;outdoorPending=null;outdoorPaintGhost.enabled=false;
-    if(!quiet)outdoorFeedback('Протяни пальцем прямоугольник по свободной земле');
+    outdoorDrag=null;outdoorPending=null;outdoorPaintGhost.enabled=false;outdoorPose=null;
+    if(!quiet)outdoorFeedback(outdoorCategory==='ground'
+      ?'Протяни пальцем прямоугольник по свободной земле'
+      :'Выбери предмет и коснись свободной земли. Поворот — отдельной кнопкой.');
     updateOutdoorPanel();
   };
   const outdoorSurfaceAtScreen=point=>{
@@ -5322,6 +5427,43 @@ function boot() {
     else outdoorFeedback(outdoorReason[p.reason]||'Нельзя изменить этот участок',true);
     updateOutdoorPanel();return p;
   };
+  const outdoorSnap=n=>Math.round(n*4)/4;
+  const showOutdoorFeatureGhost=(pose,valid=true)=>{
+    if(!pose){outdoorPaintGhost.enabled=false;return;}
+    const operation=$('outdoor-feature-operation').value;
+    const chosen=operation==='place'
+      ?{itemId:$('outdoor-feature-kind').value,...pose}
+      :game.world.outdoors.features.find(i=>i.instanceId===$('outdoor-feature-owned').value);
+    if(!chosen){outdoorPaintGhost.enabled=false;return;}
+    const boxRect=outdoorFeatureRect({...chosen,...pose});
+    if(!boxRect){outdoorPaintGhost.enabled=false;return;}
+    outdoorPaintGhost.setPosition((boxRect.minX+boxRect.maxX)/2,-.505,
+      (boxRect.minZ+boxRect.maxZ)/2);
+    outdoorPaintGhost.setLocalScale(boxRect.maxX-boxRect.minX,.045,
+      boxRect.maxZ-boxRect.minZ);
+    outdoorPaintGhost.render.material=valid?ghostValid:ghostInvalid;
+    outdoorPaintGhost.enabled=true;
+  };
+  const previewOutdoorObject=(pose=null)=>{
+    const operation=$('outdoor-feature-operation').value;
+    const id=$('outdoor-feature-owned').value;
+    const itemId=$('outdoor-feature-kind').value;
+    const proposal=previewOutdoorFeatureEdit(game,{
+      operation,itemId,instanceId:id,
+      pose:operation==='sell'?null:pose
+    });
+    outdoorPending=proposal.ok?proposal:null;
+    if(proposal.ok)outdoorFeedback(operation==='sell'
+      ?'Продажа '+OUTDOOR_CATALOG[proposal.itemId].name+
+        ' · возврат '+(-proposal.cost)+' кр. (70% от оплаченной цены)'
+      :operation==='move'
+        ?'Положение подходит · перенос бесплатный · подтверди'
+        :'Место подходит · '+OUTDOOR_CATALOG[itemId].name+
+          ' · стоимость '+proposal.cost+' кр. · подтверди');
+    else outdoorFeedback(outdoorReason[proposal.reason]||'Нельзя разместить здесь объект',true);
+    if(operation!=='sell')showOutdoorFeatureGhost(pose,proposal.ok);
+    updateOutdoorPanel();return proposal;
+  };
   const exitOutdoor=()=>{
     if(!outdoorMode)return;
     outdoorMode=false;clearOutdoorPending(true);outdoorTimeline=[];
@@ -5337,7 +5479,8 @@ function boot() {
     }
     if(buildMode)exitBuild();
     if(furnishMode)exitFurniture();
-    outdoorMode=true;outdoorTool='paint';
+    outdoorMode=true;outdoorTool='paint';outdoorCategory='ground';
+    $('outdoor-category').value='ground';syncOutdoorOwned();
     setView({...view,centerX:7,centerZ:0,distance:43,pitch:60});
     setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
@@ -5360,22 +5503,61 @@ function boot() {
       :'Камера: свайп одним пальцем, масштаб и вращение двумя');
   });
   $('outdoor-ground-kind').addEventListener('change',()=>clearOutdoorPending());
+  $('outdoor-category').addEventListener('change',()=>{
+    outdoorCategory=$('outdoor-category').value;outdoorYaw=0;
+    clearOutdoorPending();syncOutdoorOwned();
+  });
+  $('outdoor-feature-kind').addEventListener('change',()=>{
+    outdoorYaw=0;clearOutdoorPending();
+  });
+  $('outdoor-feature-owned').addEventListener('change',()=>{
+    const item=game.world.outdoors.features.find(f=>
+      f.instanceId===$('outdoor-feature-owned').value);
+    outdoorYaw=item?.yaw||0;clearOutdoorPending();
+    if($('outdoor-feature-operation').value==='sell')previewOutdoorObject();
+  });
+  $('outdoor-feature-operation').addEventListener('change',()=>{
+    const item=game.world.outdoors.features.find(f=>
+      f.instanceId===$('outdoor-feature-owned').value);
+    outdoorYaw=item?.yaw||0;clearOutdoorPending();
+    if($('outdoor-feature-operation').value==='sell')previewOutdoorObject();
+  });
+  $('outdoor-feature-rotate').addEventListener('click',()=>{
+    outdoorYaw=(outdoorYaw+90)%360;
+    const operation=$('outdoor-feature-operation').value;
+    if(operation==='move'&&!outdoorPose){
+      const item=game.world.outdoors.features.find(f=>
+        f.instanceId===$('outdoor-feature-owned').value);
+      if(item)outdoorPose={x:item.x,z:item.z,yaw:outdoorYaw};
+    }else if(outdoorPose)outdoorPose={...outdoorPose,yaw:outdoorYaw};
+    if(outdoorPose)previewOutdoorObject(outdoorPose);
+    else outdoorFeedback('Поворот: '+outdoorYaw+'° · выбери землю для размещения');
+  });
   $('outdoor-cancel').addEventListener('click',()=>clearOutdoorPending());
   $('outdoor-apply').addEventListener('click',()=>{
     if(!outdoorMode||!outdoorPending?.ok)return;
-    const p=previewOutdoorPaint(game,outdoorPending);
+    const feature=Boolean(outdoorPending.operation);
+    const p=feature?previewOutdoorFeatureEdit(game,{
+      operation:outdoorPending.operation,itemId:outdoorPending.itemId,
+      instanceId:outdoorPending.operation==='place'?undefined:outdoorPending.instanceId,
+      pose:outdoorPending.pose
+    }):previewOutdoorPaint(game,outdoorPending);
     if(!p.ok){clearOutdoorPending(true);outdoorFeedback(outdoorReason[p.reason]||p.reason,true);return;}
-    const result=commitOutdoorPreview(game,p);
+    const result=feature?commitOutdoorFeatureEdit(game,p):commitOutdoorPreview(game,p);
     if(!result.ok){clearOutdoorPending(true);outdoorFeedback(outdoorReason[result.reason]||result.reason,true);return;}
     game.world.outdoors=result.root.world.outdoors;
     game.shop=result.root.shop;game.financialHistory=result.root.financialHistory;
     outdoorTimeline=outdoorTimeline.slice(0,outdoorHistoryIndex+1);
     outdoorTimeline.push(outdoorSnapshot());outdoorHistoryIndex++;
     if(outdoorTimeline.length>50){outdoorTimeline.shift();outdoorHistoryIndex--;}
-    renderOutdoorGround();updateFamilyBalance();
+    renderOutdoorGround();renderOutdoorFeatures();syncOutdoorOwned();updateFamilyBalance();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     save(true);clearOutdoorPending(true);
-    outdoorFeedback('Готово: '+p.changedCells+' клеток · списано '+p.cost+' кр.');
+    outdoorFeedback(feature?(p.operation==='sell'
+      ?'Объект продан · зачислено '+(-p.cost)+' кр.'
+      :p.operation==='move'?'Объект перенесён бесплатно'
+      :'Объект посажен/поставлен · списано '+p.cost+' кр.')
+      :'Готово: '+p.changedCells+' клеток · списано '+p.cost+' кр.');
     updateOutdoorPanel();
   });
   const navigateOutdoorHistory=direction=>{
@@ -5409,11 +5591,11 @@ function boot() {
     // Snapshot's revision tracks the latest canonical topology for the next
     // undo/redo, while credits and old states remain stable.
     outdoorTimeline[target]={...after,outdoors:JSON.parse(JSON.stringify(game.world.outdoors))};
-    renderOutdoorGround();updateFamilyBalance();
+    renderOutdoorGround();renderOutdoorFeatures();syncOutdoorOwned();updateFamilyBalance();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     save(true);clearOutdoorPending(true);
-    outdoorFeedback(direction<0?'Отменено: баланс и покрытие восстановлены':
-      'Повторено: покрытие и расходы восстановлены');
+    outdoorFeedback(direction<0?'Отменено: объект/покрытие и баланс восстановлены':
+      'Повторено: объект/покрытие и баланс восстановлены');
     updateOutdoorPanel();
   };
   $('outdoor-undo').addEventListener('click',()=>navigateOutdoorHistory(-1));
@@ -5465,13 +5647,20 @@ function boot() {
         if(first&&first.id!==point.id)cameraGesture.begin(first,now);
         cameraGesture.begin(point,now);return;
       }
-      if(outdoorTool==='paint'&&cameraGesture.count()===0){
+      if(outdoorTool==='paint'&&cameraGesture.count()===0&&
+        (outdoorCategory==='ground'||$('outdoor-feature-operation').value!=='sell')){
         const ground=outdoorSurfaceAtScreen(point);
         if(ground?.kind==='yard'){
           outdoorPending=null;
           outdoorDrag={pointerId:event.pointerId,from:ground,to:ground,last:point};
-          paintGhostFrom(ground,ground);
-          outdoorFeedback('Выдели прямоугольник · после отпускания покажу цену');
+          if(outdoorCategory==='ground')paintGhostFrom(ground,ground);
+          else{
+            outdoorPose={x:outdoorSnap(ground.x),z:outdoorSnap(ground.z),yaw:outdoorYaw};
+            showOutdoorFeatureGhost(outdoorPose);
+          }
+          outdoorFeedback(outdoorCategory==='ground'
+            ?'Выдели прямоугольник · после отпускания покажу цену'
+            :'Выбери место · после отпускания проверю проходы');
           updateOutdoorPanel();
           return;
         }
@@ -5500,7 +5689,11 @@ function boot() {
     outdoorDrag.last=gesturePoint(event);
     if(hit?.kind==='yard'){
       outdoorDrag.to=hit;
-      paintGhostFrom(outdoorDrag.from,outdoorDrag.to);
+      if(outdoorCategory==='ground')paintGhostFrom(outdoorDrag.from,outdoorDrag.to);
+      else{
+        outdoorPose={x:outdoorSnap(hit.x),z:outdoorSnap(hit.z),yaw:outdoorYaw};
+        showOutdoorFeatureGhost(outdoorPose);
+      }
     }
     event.stopImmediatePropagation?.();
   },true);
@@ -5705,7 +5898,9 @@ function boot() {
     if(outdoorMode){
       if(outdoorDrag?.pointerId===event.pointerId){
         const drag=outdoorDrag;outdoorDrag=null;
-        previewOutdoorSelection(drag.from,drag.to,$('outdoor-ground-kind').value);
+        if(outdoorCategory==='ground')
+          previewOutdoorSelection(drag.from,drag.to,$('outdoor-ground-kind').value);
+        else previewOutdoorObject(outdoorPose);
       }else cameraGesture.end(gesturePoint(event),performance.now());
       return; // Editor touch never creates a free-walk command.
     }

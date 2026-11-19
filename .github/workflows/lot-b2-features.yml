@@ -1,0 +1,41 @@
+name: LOT-B2 — plants, fences and mobile WebGL QA
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  outdoor-features:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Node and Playwright Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Feature domain + full regression
+        run: |
+          node --check src/game.js
+          node --check src/outdoor-proposals.js
+          node --check tests/lot-b2-browser-smoke.mjs
+          node --test tests/lot-b2.test.js tests/lot-b1-ui.test.js tests/lot-b0.test.js
+          npm test
+      - name: Real PlayCanvas mobile-size vegetation, rotation and resale
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-b2-http.log 2>&1 &
+          sleep 3
+          node tests/lot-b2-browser-smoke.mjs
+      - name: Four viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lot-b2-mobile-webgl
+          path: lot-b2-*.png
+          if-no-files-found: ignore
