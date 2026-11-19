@@ -197,6 +197,7 @@ test('W3-C: resignation before physical departure does not create a fake missed 
   root.minutes=shift.start-20;
   progressCareerWork(root,shift.start-59,root.minutes);
   assert.equal(contract.currentShift?.phase,'pending');
+  root.minutes+=0.25; // Actual x1/x3 clock is not restricted to whole minutes.
   const leave=leaveCareer(root,'alex');
   assert.equal(leave.ok,true);
   assert.equal(leave.careerSystem.byResident.alex,null);
