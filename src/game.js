@@ -7,7 +7,7 @@ import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
-import {CAMERA_INITIAL,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
+import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
 import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
@@ -22,7 +22,8 @@ import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
 import {applyWorkMoodContext} from './career-worklife.js';
 import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
   residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
-import { findPath, nearestWalkable } from './navigation.js';
+import { findPath, nearestWalkable, isWalkable } from './navigation.js';
+import {lotRaySurface,lotActorHeight} from './lot-surface.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -440,6 +441,7 @@ $('calendar-anchor-apply').addEventListener('click',()=>{
 });
 function taskLabel(task){
   if(!task)return 'Неизвестное действие';
+  if(task.type==='move')return 'Идти в указанное место';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
@@ -2090,8 +2092,8 @@ function boot() {
   // Hinges are renderer-only; the navigation graph always uses the authoritative
   // physical opening. A nearby resident gently swings a real panel open.
   const automaticDoors=[];
-  const lotGround=box('F5 lot ground',7,-.59,0,32,.12,24,mat('#9fbea0'));
-  lotGround.enabled=false;
+  const lotGround=box('LOT-A lawn',7,-.59,0,32,.12,24,mat('#8fb78b'));
+  lotGround.enabled=true;
   const buildGhost=box('F5 preview',0,.05,0,.2,.06,.2,mat('#438ac4',{opacity:.25}));
   buildGhost.enabled=false;
   const buildWallMarker=box('F5 selected wall',0,.32,0,.3,.62,.3,mat('#24c8bc',{opacity:.72}));
@@ -2409,7 +2411,7 @@ function boot() {
     renderedConstruction=state;renderedWallMode=constructionWallMode;
     renderedRoofPreview=roofPreview;
     clearConstructionNodes();
-    lotGround.enabled=buildMode;
+    lotGround.enabled=true;
     const raised=constructionWallMode!=='down';
     const height=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
     const w=starterShellOffset(state,'west'),e=starterShellOffset(state,'east');
@@ -3123,8 +3125,8 @@ function boot() {
     game.otherSim.position={x,z};
   }
   game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
-  const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0,roll:0};
-  const miraDisplay={x:game.otherSim.position.x,y:0,z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
+  const display={x:game.position.x,y:lotActorHeight(game.world,game.position),z:game.position.z,yaw:0,pitch:0,roll:0};
+  const miraDisplay={x:game.otherSim.position.x,y:lotActorHeight(game.world,game.otherSim.position),z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
@@ -3516,6 +3518,7 @@ function boot() {
   // non-shadow directional lights and one camera. Saved lamp states stay manual.
   const dayNightRenderer=createDayNightRenderer({scene:app.scene,sun,fill,camera,Color:pc.Color});
   dayNightRenderer.update(game.calendar,game.minutes);
+  setCameraBuildBounds(CAMERA_LOT_BOUNDS);
   const view={...CAMERA_INITIAL};
   const cameraTarget=new pc.Vec3(view.centerX,view.centerY,view.centerZ);
   function cameraUpdate(){
@@ -4272,7 +4275,7 @@ function boot() {
     editDrag=null;canvas.dataset.furnitureGrab='false';
     cameraGesture.clear();
     furnishMode=false;editSelectedId=null;editSession=null;
-    setCameraBuildBounds();
+    setCameraBuildBounds(CAMERA_LOT_BOUNDS);
     furnitureGhost.enabled=false;marketGhost.enabled=false;
     setEditorView('edit');
     updateDecorNodes();
@@ -4853,13 +4856,13 @@ function boot() {
     $('build-roof-toggle').setAttribute('aria-pressed','false');
     $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
-    cameraGesture.clear();setCameraBuildBounds();
+    cameraGesture.clear();setCameraBuildBounds(CAMERA_LOT_BOUNDS);
     if(buildPreviousView)setView(buildPreviousView);
     buildPreviousView=null;
     $('build-editor').hidden=true;
     $('build-toggle').setAttribute('aria-pressed','false');
     document.querySelector('.app-shell').dataset.buildMode='false';
-    lotGround.enabled=false;
+    lotGround.enabled=true;
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     syncConstructionRender(true);renderPauseButton();save(true);
   };
