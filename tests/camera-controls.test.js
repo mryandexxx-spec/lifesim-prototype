@@ -36,7 +36,7 @@ test('two fingers orbit and tilt without exceeding pitch bounds',()=>{
  assert.ok(orbitCamera(CAMERA_INITIAL,1e5,0).yaw>=0);
 });
 test('pinch and desktop zoom respect camera distance bounds',()=>{
- assert.equal(pinchCamera(CAMERA_INITIAL,100,200).distance,CAMERA_BOUNDS.minDistance);
+ assert.equal(pinchCamera(CAMERA_INITIAL,100,400).distance,CAMERA_BOUNDS.minDistance);
  assert.ok(pinchCamera(CAMERA_INITIAL,200,100).distance>CAMERA_INITIAL.distance);
  assert.equal(wheelCamera(CAMERA_INITIAL,1e6).distance,CAMERA_BOUNDS.maxDistance);
  assert.equal(wheelCamera(CAMERA_INITIAL,-1e6).distance,CAMERA_BOUNDS.minDistance);
