@@ -1828,3 +1828,52 @@ button.time-card:active {transform:translateY(1px);}
   white-space:normal;overflow-wrap:anywhere; }
 .career-phone-worklife { margin:10px 0;min-width:0; }
 .career-phone-worklife summary { cursor:pointer; }
+
+
+/* LOT-B1: compact bottom sheet; no new always-visible HUD button. */
+.outdoor-editor[hidden]{display:none!important}
+.outdoor-editor{
+  position:absolute;z-index:30;left:0;right:0;bottom:0;
+  display:flex;flex-direction:column;gap:7px;box-sizing:border-box;
+  padding:10px max(13px,env(safe-area-inset-right))
+    max(12px,env(safe-area-inset-bottom)) max(13px,env(safe-area-inset-left));
+  border-radius:19px 19px 0 0;background:#f8fff6f2;border:1px solid #eef5e8;
+  box-shadow:0 -12px 34px #19372a3a;
+  max-height:min(46dvh,320px);overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;backdrop-filter:blur(15px);
+}
+.outdoor-editor-head,.outdoor-tool-bar,.outdoor-editor-actions{
+  display:flex;align-items:center;gap:7px;
+}
+.outdoor-editor-head{justify-content:space-between;flex-shrink:0;color:#295c44;font-size:15px}
+.outdoor-editor button,.outdoor-editor select{
+  font:inherit;color:#286046;font-size:13px;font-weight:750;min-height:44px;
+  border:1px solid #bfd9c5;border-radius:10px;background:#eef7e9;
+  padding:5px 9px;touch-action:manipulation;
+}
+.outdoor-editor-head button{background:#307956;color:#fff;min-width:95px}
+.outdoor-tool-bar button{flex:1}
+.outdoor-tool-bar button[aria-pressed="true"]{background:#307956;color:#fff;border-color:#307956}
+.outdoor-editor-tip{font-size:11px;line-height:1.3;color:#5b7564;margin:0}
+.outdoor-surface-choice{display:flex;align-items:center;gap:9px;color:#396b51;
+  font-size:12px;font-weight:750}
+.outdoor-surface-choice select{flex:1;min-width:0;max-width:100%}
+.outdoor-editor-status{font-size:12px;min-height:18px;margin:0;line-height:1.35;color:#34694c}
+.outdoor-editor-status[data-invalid="true"]{color:#a14238}
+.outdoor-editor-balance{font-size:12px;font-weight:750;margin:0;color:#426d50}
+.outdoor-editor-actions{display:grid;grid-template-columns:1fr 1fr;flex-shrink:0}
+.outdoor-editor-actions button{width:100%}
+#outdoor-apply{background:#317f58;color:#fff;border-color:#317f58}
+.outdoor-editor button:disabled{opacity:.42}
+.app-shell[data-outdoor-mode="true"] #view-panel,
+.app-shell[data-outdoor-mode="true"] #home-panel,
+.app-shell[data-outdoor-mode="true"] #tour-panel,
+.app-shell[data-outdoor-mode="true"] #queue-panel,
+.app-shell[data-outdoor-mode="true"] #conversation-panel,
+.app-shell[data-outdoor-mode="true"] #shared-panel,
+.app-shell[data-outdoor-mode="true"] #branch-panel{display:none!important}
+@media(max-height:570px) and (orientation:landscape){
+  .outdoor-editor{max-height:54dvh;left:18%;right:18%;padding-top:5px;gap:4px}
+  .outdoor-editor-tip{display:none}
+  .outdoor-editor-head{font-size:13px}
+}
