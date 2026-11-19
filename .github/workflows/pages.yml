@@ -249,7 +249,8 @@ jobs:
           cp src/romantic-evening-stage.js site/src/
           cp src/romantic-sofa-stage.js site/src/
           cp src/toilet-interaction.js site/src/
-          cp src/need-balance.js src/sleep-acceleration.js site/src/
+          cp src/need-balance.js site/src/
+           cp src/sleep-acceleration.js site/src/
           cp src/environment-effects.js site/src/
           cp src/meshy-toilet-pose.js site/src/
       - name: Include optional Meshy character GLB when present
