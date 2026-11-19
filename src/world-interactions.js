@@ -55,7 +55,7 @@ export function pickWorldRayTarget(near,far,targets){
   if(!Array.isArray(targets))return null;
   const found=[];
   for(const candidate of targets){
-    if(!candidate||candidate.visible===false||!['object','resident','blocker'].includes(candidate.kind))continue;
+    if(!candidate||candidate.visible===false||!['object','resident','blocker','outdoor'].includes(candidate.kind))continue;
     if(typeof candidate.id!=='string'||!candidate.id.trim())continue;
     const at=rayBoxHit(near,far,candidate.bounds);
     if(at!==null)found.push({target:candidate,at});
