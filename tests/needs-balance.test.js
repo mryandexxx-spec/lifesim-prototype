@@ -74,7 +74,7 @@ test('full normal-speed recovery of core actions establishes a green buffer',()=
       assert.ok(sim.needs[need]>score+10,id+' snack did not restore hunger');
       assert.ok(sim.needs[need]<75,id+' snack restored a full meal');
     }else{
-      assert.ok(sim.needs[need]>score+25,`${id} ended below green at ${sim.needs[need]}`);
+      assert.ok(sim.needs[need]>=65,`${id} ended below 65 at ${sim.needs[need]}`);
       assert.ok(sim.needs[need]>score+25,id+' restored too little');
     }
   }
@@ -106,7 +106,7 @@ test('published Pages uses one pure rate table, with original animation and save
   const rules=readFileSync(new URL('../src/simulation.js',import.meta.url),'utf8');
   const social=readFileSync(new URL('../src/social-need.js',import.meta.url),'utf8');
   const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
-  assert.match(scene,/tickHousehold\(game,\.30 \* game\.speed\)/);
+  assert.match(scene,/tickHousehold\(game,\.30 \* effectiveSleepSpeed\(game,/);
   assert.match(scene,/while\(accumulator>=\.10\)/);
   assert.match(rules,/NEED_DECAY_PER_MINUTE\[need\]/);
   assert.match(social,/NEED_DECAY_PER_MINUTE\.social/);
