@@ -3,7 +3,9 @@
  * The household root owns the sole clock and authoritative shop credits.
  */
 import {nextCareerShift} from './career-scheduler.js';
-import {CAREER_RESIDENT_IDS} from './career-state.js';
+import {CAREER_RESIDENT_IDS,separateCareer} from './career-state.js';
+import {recordCareerDiscipline,DISCIPLINE_REHIRE_MINUTES} from './career-discipline.js';
+import {careerRankForContract} from './career-specializations.js';
 import {SHOP_MAX_CREDITS} from './furniture-shop.js';
 import {recordFinanceChange} from './finance-ledger.js';
 import {careerReadiness,recordCompletedCareerShift,recordMissedCareerShift,promotionReadiness} from './career-progression.js';
@@ -36,13 +38,23 @@ function shiftSnapshot(shift,mode='normal'){
 function emit(messages,id,type,text){
   messages.push({residentId:id,type,text:NAMES[id]+': '+text});
 }
+function disciplineNotices(messages,id,outcome){
+  if(outcome?.transition==='warning')
+    emit(messages,id,'discipline','письменное предупреждение · риск '+outcome.risk+
+      '/8. Две хорошие смены снижают риск на 1');
+  if(outcome?.transition==='final')
+    emit(messages,id,'discipline','последнее предупреждение · риск '+outcome.risk+
+      '/12. Следующее серьёзное нарушение грозит увольнением');
+}
 function finalizeMissed(contract,at){
   const shift=contract.currentShift;
   const result=recordMissedCareerShift(contract);
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
     outcome:'missed',salary:0,workedMinutes:0,lateMinutes:0,finishedAt:at,
     grade:result.grade,performanceDelta:result.delta};
+  const discipline=recordCareerDiscipline(contract,shift,'missed',0,at);
   contract.currentShift=null;
+  return discipline;
 }
 function settle(root,contract,id,at){
   const shift=contract.currentShift;
@@ -55,6 +67,7 @@ function settle(root,contract,id,at){
   const lateMinutes=Math.max(0,Math.round(shift.departedAt-shift.start));
   let result=null;
   let badges=[];
+  let discipline=null;
   if(!already){
     const payment=recordFinanceChange(root,
       {...root.shop,credits:root.shop.credits+salary},
@@ -69,6 +82,7 @@ function settle(root,contract,id,at){
     result=recordCompletedCareerShift(contract,actorFor(root,id),shift,worked,lateMinutes);
     creditCareerPaidLeave(contract);
     badges=recordProfessionalShift(root,id,shift);
+    discipline=recordCareerDiscipline(contract,shift,'worked',lateMinutes,at);
   }
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
     workMode:cleanWorkMode(shift.workMode),workReport:workNeedsReport(shift),
@@ -79,7 +93,7 @@ function settle(root,contract,id,at){
       scenarioId:shift.incident.scenarioId||'legacy',choiceId:shift.incident.choiceId,
       auto:shift.incident.auto,performanceDelta:shift.incident.performanceDelta}:null};
   shift.phase='returning';
-  return {salary,result,badges};
+  return {salary,result,badges,discipline};
 }
 /** One canonical sweep. Call just once per active household tick BEFORE ticking
  * individual actors; after this, root.minutes and otherSim.minutes advance once.
@@ -93,6 +107,22 @@ export function progressCareerWork(root,before,after){
     const contract=root.careerSystem.byResident?.[id];
     const actor=actorFor(root,id);
     if(!contract||!actor)continue;
+    // The shift result was already emitted and saved on a previous tick.
+    // Never delete the contract before the salary/missed summary can be queued.
+    if(contract.discipline?.pendingDismissal&&!contract.currentShift){
+      const role=careerRankForContract(contract)?.title||'Сотрудник';
+      const finished=separateCareer(root.careerSystem,id,'dismissed',Math.floor(before));
+      if(finished.ok){
+        root.careerSystem=finished.careerSystem;
+        const archived=finished.archived;
+        const retryAt=archived.at+DISCIPLINE_REHIRE_MINUTES;
+        messages.push({type:'dismissed',residentId:id,
+          termination:{...archived,role,retryAt},
+          text:NAMES[id]+': трудовой договор расторгнут из-за повторяющихся нарушений. '+
+            'Повторный отклик в эту профессию через 3 игровых дня'});
+      }
+      continue;
+    }
     for(const leave of settleCareerTimeOff(root,id,after))
       emit(messages,id,leave.type,leave.text);
     let shift=contract.currentShift;
@@ -109,7 +139,7 @@ export function progressCareerWork(root,before,after){
         emit(messages,id,'incident','новая ситуация на работе · открой смартфон, чтобы выбрать решение');
       if(after>=shift.end){
         automaticWorkIncident(root,id);
-        const {salary,result,badges,failed}=settle(root,contract,id,shift.end);
+        const {salary,result,badges,failed,discipline}=settle(root,contract,id,shift.end);
         if(failed)continue; // Never mark a shift paid without an atomic wallet receipt.
         const growth=result?' · '+result.grade+' · результативность '+contract.performance+'/100':'';
         const ready=promotionReadiness(root,id);
@@ -117,6 +147,7 @@ export function progressCareerWork(root,before,after){
         emit(messages,id,'salary','смена окончена, начислено '+salary+' кр.'+growth+
           (ready?.ready?' · условия повышения выполнены':'')+
           (badges.length?' · достижение: '+badges.join(', '):'')+'. Возвращается домой');
+        disciplineNotices(messages,id,discipline);
       }
       continue;
     }
@@ -131,8 +162,9 @@ export function progressCareerWork(root,before,after){
       }
     }
     if(after>=shift.end){
-      finalizeMissed(contract,shift.end);
+      const discipline=finalizeMissed(contract,shift.end);
       emit(messages,id,'missed','смена пропущена, зарплата 0 кр.');
+      disciplineNotices(messages,id,discipline);
       continue;
     }
     // Waiting for an active MANUAL action is deliberate; never silently delete
