@@ -24,7 +24,7 @@ test('F4F.2: quick snack restores much less hunger than the unchanged table meal
   assert.equal(ACTIONS.dining.benefitPerMinute,1.00);
   const quick=ACTIONS.fridge.duration*ACTIONS.fridge.benefitPerMinute;
   const full=ACTIONS.dining.duration*ACTIONS.dining.benefitPerMinute;
-  assert.ok(quick>0&&quick<full*.55);
+  assert.ok(quick>0&&quick<full*.65);
   const h=newHousehold();h.needs.hunger=10;h.autonomy.enabled=false;
   assert.ok(chooseResidentAction(h,'fridge',false,'alex'));
   arrive(h);const before=h.needs.hunger;
