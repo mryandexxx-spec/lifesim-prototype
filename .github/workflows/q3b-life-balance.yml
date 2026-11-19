@@ -26,6 +26,8 @@ jobs:
           node --check tests/q3b-browser-smoke.mjs
           node --test tests/q3b-life-balance.test.js
           npm test
+          node scripts/q3a-diagnostics.mjs > q3b-horizons.log
+          tail -n 4 q3b-horizons.log
       - name: Test real PlayCanvas WebGL at four mobile sizes
         run: |
           mkdir -p vendor
