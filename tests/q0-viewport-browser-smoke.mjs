@@ -38,7 +38,7 @@ try{
     await page.waitForFunction(()=>{
       const d=document.querySelector('#viewport-health-details')?.textContent||'';
       return /кадров [1-9]/.test(d);
-    },{timeout:9000});
+    },null,{timeout:9000});
     const first=await page.locator('#viewport-health-details').innerText();
     assert.match(first,/Режим: play · пауза: да/);
     assert.match(first,/Экран:/);
