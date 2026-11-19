@@ -5779,8 +5779,8 @@ function boot() {
     shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
-    if(outdoorMode)clearOutdoorPending(true);
     cancelPendingGrab();
+    if(outdoorMode)clearOutdoorPending(true);
     buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
   // Safari may suspend a background tab without a matching pointerup/blur.
@@ -5833,14 +5833,14 @@ function boot() {
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
     shiftSummary.flush();
-    const active=!game.paused&&!furnishMode&&!outdoorMode&&!dialogueNeedsDecision(game)&&
+    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&
       !careerPhone.interviewNeedsDecision()&&!shiftSummary.isOpen()&&!document.hidden;
     const frameActive=active&&!buildMode&&!outdoorMode;
     const sharedSound=frameActive&&game.socialAction?.phase==='using'&&
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
     musicAudio.update(audibleMusicStyle([game,game.otherSim],{
       paused:!frameActive,hidden:document.hidden,editing:furnishMode||buildMode||outdoorMode})||sharedSound);
-    const animDt=active?dt:0;
+    const animDt=active&&!outdoorMode?dt:0;
     const frameAnimDt=buildMode||outdoorMode?0:animDt;
     if(frameActive){
       accumulator+=dt;
