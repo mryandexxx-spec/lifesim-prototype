@@ -62,7 +62,7 @@ try{
     await conserve.tap();
     saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     assert.equal(saved.careerSystem.byResident.alex.currentShift.workMode,'conserve');
-    assert.equal(saved.careerSystem.byResident.alex.currentShift.workNeeds.appliedThrough,earned.appliedThrough);
+    assert.ok(saved.careerSystem.byResident.alex.currentShift.workNeeds.appliedThrough>=earned.appliedThrough,'Reload may advance live work minutes but must never rewind the saved watermark');
     const geometry=await page.evaluate(()=>({
       width:window.innerWidth,scroll:document.documentElement.scrollWidth}));
     assert.ok(geometry.scroll<=geometry.width+2,'No horizontal viewport overflow');
