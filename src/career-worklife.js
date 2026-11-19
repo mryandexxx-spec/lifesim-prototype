@@ -79,7 +79,7 @@ export function applyWorkMoodContext(root){
     const last=contract?.lastShift;
     actor.workRecovery=last&&validTime(last.finishedAt)&&
       root.minutes-last.finishedAt>=0&&root.minutes-last.finishedAt<=180&&
-      last.grade==='сложный день'
+      (last.grade==='сложный день'||(last.workReport?.strain||0)>=23)
       ?{until:last.finishedAt+180,strain:last.workReport?.strain||0}:null;
     refreshMind(actor,root.world);
   }
