@@ -35,7 +35,7 @@ try{
   const chip=page.locator('#career-work-hud');
   assert.match(await chip.innerText(),/На работе/);
   await page.locator('#career-phone-toggle').click();
-  await page.locator('#career-phone-panel').locator('span').getByText(/Статус: На работе/).waitFor();
+  await page.locator('#career-phone-panel').locator('span').filter({hasText:/Статус: На работе/}).first().waitFor();
   await page.locator('#career-phone-panel').getByText(/Повышение: Обозреватель/).waitFor();
   await page.screenshot({path:'w1b3a-working-iphone.png'});
   await page.locator('#career-phone-panel .career-phone-x').click();
