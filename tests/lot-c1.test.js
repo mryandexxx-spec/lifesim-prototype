@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {advanceGardens,advanceGardenRecord,gardenView,gardenApproach,
-  gardenActionAllowed,gardenBusy,settleGardenAction,newGardenRecord,
+  gardenActionAllowed,gardenRequestStillValid,gardenBusy,settleGardenAction,newGardenRecord,
   GARDEN_DURATION,GARDEN_LIMIT,GARDEN_MATURE_MINUTES} from '../src/gardening.js';
 import {previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from '../src/outdoor-proposals.js';
 import {restoreOutdoorsWorld} from '../src/lot-surface.js';
@@ -187,4 +187,16 @@ test('C1: UI and deploy contract includes distinct garden category, popup and 3D
   assert.match(game,/part\('box','garden rich soil'/);
   assert.match(game,/offerWorldAction\(point,def.name,action==='water'/);
   assert.match(pages,/cp src\/gardening\.js site\/src\//);
+});
+
+test('C1: a queued water task expires on maturity, never trapping the rest of FIFO',()=>{
+  const root=place(newHousehold()),id=gardenId(root);
+  assert.ok(enqueueAction(root.actionQueues,'alex',{
+    type:'garden',instanceId:id,actionId:'water'
+  }));
+  assert.equal(gardenRequestStillValid(root,'alex',id,'water'),true);
+  root.world.outdoors.gardens[id].progressWetMinutes=GARDEN_MATURE_MINUTES;
+  assert.equal(gardenRequestStillValid(root,'alex',id,'water'),false);
+  const reloaded=loadHousehold(copy(root));
+  assert.equal(reloaded.actionQueues.byResident.alex.length,0);
 });

@@ -101,18 +101,22 @@ export function gardenBusy(root,instanceId){
     Object.values(root?.actionQueues?.byResident||{}).some(queue=>
       Array.isArray(queue)&&queue.some(c=>c.type==='garden'&&c.instanceId===instanceId));
 }
-export function gardenActionAllowed(root,residentId,instanceId,actionId,{ignoreReservation=false}={}){
+/** Validity is independent of current ownership: a FIFO request can go stale. */
+export function gardenRequestStillValid(root,residentId,instanceId,actionId){
   if(!GARDEN_ACTIONS.includes(actionId)||!gardenFeature(root?.world,instanceId))return false;
   const view=gardenView(root.world.outdoors,instanceId,root.minutes);
   if(!view)return false;
-  if(!ignoreReservation&&gardenBusy(root,instanceId))return false;
-  const other=residentId==='alex'?root.otherSim:root;
-  if(other?.action?.id==='garden'&&other.action.targetInstanceId===instanceId)return false;
   if(actionId==='water')return !view.mature&&
     (view.lastWateredAt===null||root.minutes-view.lastWateredAt>=GARDEN_CARE_COOLDOWN);
   const rewards=restoreGardenRewards(root.gardenRewards);
   const last=residentId==='mira'?rewards.miraLastAdmireAt:rewards.alexLastAdmireAt;
   return view.mature&&(last===null||root.minutes-last>=GARDEN_CARE_COOLDOWN);
+}
+export function gardenActionAllowed(root,residentId,instanceId,actionId,{ignoreReservation=false}={}){
+  if(!gardenRequestStillValid(root,residentId,instanceId,actionId))return false;
+  if(!ignoreReservation&&gardenBusy(root,instanceId))return false;
+  const other=residentId==='alex'?root.otherSim:root;
+  return !(other?.action?.id==='garden'&&other.action.targetInstanceId===instanceId);
 }
 export function settleGardenAction(root,residentId,instanceId,actionId){
   if(!gardenActionAllowed(root,residentId,instanceId,actionId,{ignoreReservation:true}))return false;

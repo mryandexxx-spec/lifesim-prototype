@@ -25,7 +25,8 @@ import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue
 import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchAvailable} from './outdoor-interactions.js';
 import {gardenFeature,gardenApproach,gardenActionAllowed,restoreGardenRewards,
-  advanceGardens,settleGardenAction,GARDEN_DURATION} from './gardening.js';
+  advanceGardens,settleGardenAction,GARDEN_DURATION,
+  gardenRequestStillValid} from './gardening.js';
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
@@ -193,7 +194,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     }
     root.actionQueues.byResident[id]=root.actionQueues.byResident[id].filter(task=>
       (task.type!=='outdoor'||Boolean(outdoorBench(root.world,task.instanceId)))&&
-      (task.type!=='garden'||Boolean(gardenFeature(root.world,task.instanceId))));
+      (task.type!=='garden'||gardenRequestStillValid(root,id,task.instanceId,task.actionId)));
     for(const task of root.actionQueues.byResident[id]){
       if(task.type!=='object'||task.targetInstanceId)continue;
       const object=resolveActionFurniture(root.world,task.actionId);

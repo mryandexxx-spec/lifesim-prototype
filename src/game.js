@@ -31,8 +31,8 @@ import {previewOutdoorPaint,commitOutdoorPreview,
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
-import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed
-} from './gardening.js';
+import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
+  gardenRequestStillValid} from './gardening.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -3702,6 +3702,14 @@ function boot() {
   };
   dispatchPlannedActions=()=>{
     if(game.paused||dialogueNeedsDecision(game))return [];
+    // An unfinished plan can mature before its watering command is reached.
+    // Drop obsolete garden instructions without blocking subsequent FIFO tasks.
+    let expired=0;
+    for(const id of HOUSEHOLD_IDS)for(const task of [...pendingActions(game.actionQueues,id)]){
+      if(task.type==='garden'&&!gardenRequestStillValid(game,id,task.instanceId,task.actionId))
+        if(removeQueuedAction(game.actionQueues,id,task.seq))expired++;
+    }
+    if(expired){save(true);toast('Сад вырос: устаревшее действие убрано из очереди');}
     const refused=[];
     const started=dispatchActionQueues(game.actionQueues,{
       canStart(residentId,command){
