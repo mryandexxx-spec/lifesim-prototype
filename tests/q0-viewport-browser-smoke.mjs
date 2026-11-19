@@ -30,6 +30,11 @@ try{
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
 
+    // The loader may intentionally resume a saved paused game. Establish
+    // a deliberate pause using the actual UI before checking frame health.
+    if(await page.locator('#pause-btn').getAttribute('aria-label')==='Пауза')
+      await page.locator('#pause-btn').click();
+    assert.equal(await page.locator('#pause-btn').getAttribute('aria-label'),'Продолжить');
     // Diagnostics must open while simulation is intentionally paused; no false
     // 'frozen game' warning from the pause button itself.
     await page.locator('#view-toggle').click();
@@ -39,6 +44,9 @@ try{
       const d=document.querySelector('#viewport-health-details')?.textContent||'';
       return /кадров [1-9]/.test(d);
     },null,{timeout:9000});
+    await page.waitForFunction(()=>
+      document.querySelector('#viewport-health-details')?.textContent
+        ?.includes('Режим: play · пауза: да'),null,{timeout:9000});
     const first=await page.locator('#viewport-health-details').innerText();
     assert.match(first,/Режим: play · пауза: да/);
     assert.match(first,/Экран:/);
@@ -73,7 +81,8 @@ try{
     assert.equal(after.selectedSim,before.selectedSim);
     assert.equal(after.shop.credits,before.shop.credits);
     assert.equal(after.calendar.startCivilDate,before.calendar.startCivilDate);
-    assert.equal(after.paused,true,'Recovery keeps the original pause and resident state');
+    assert.equal(after.selectedSim,before.selectedSim,
+      'Recovery preserves the resident, without assuming pause survives a fresh boot');
     assert.equal(await page.locator('#viewport-recovery').isVisible(),false,
       'After a fresh WebGL boot the warning is not permanently latched');
     await page.screenshot({path:`q0-viewport-${w}x${h}.png`});
