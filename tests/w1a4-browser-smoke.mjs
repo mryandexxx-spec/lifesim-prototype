@@ -47,9 +47,17 @@ try {
  await page.locator('#pause-btn').click();
  assert.match(await page.locator('#day-label').innerText(),/28 фев/);
  assert.equal(await page.locator('#light-phase-label').innerText(),'Ночь');
- // Let the HUD paint its last pre-pause minute before the comparison.
- // Compare two settled samples to still catch a clock that keeps running.
- await page.waitForTimeout(650);
+ // Pause must be explicitly active. In SwiftShader/WebGL CI, a wall-clock
+ // 650ms wait is not enough to guarantee even one expensive render frame;
+ // stale HUD paint would falsely report 23:20 -> 23:21 while paused.
+ assert.equal(await page.locator('#pause-btn').getAttribute('aria-label'),'Продолжить');
+ // Wait for actual render opportunities rather than relying on fast FPS.
+ // Still compare distinct settled samples so a ticking paused game fails.
+ await page.evaluate(()=>new Promise(resolve=>{
+   let frames=0;
+   const next=()=>{if(++frames>=16)resolve();else requestAnimationFrame(next);};
+   requestAnimationFrame(next);
+ }));
  const pausedTime=await page.locator('#time-label').innerText();
  await page.waitForTimeout(1100);
  assert.equal(await page.locator('#time-label').innerText(),pausedTime,'Pause freezes game clock and lighting');
