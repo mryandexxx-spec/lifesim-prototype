@@ -104,7 +104,8 @@ test('W3-D: real manual action warning exactly once; still valid after restore',
   root.action={id:'sofa',phase:'using',elapsed:5,automatic:false};
   progressCareerWork(root,shift.start-61,root.minutes);
   assert.ok(workLifeConflict(root,'alex'));
-  assert.equal(noteWorkLifeConflict(root,'alex',root.minutes),true);
+  assert.equal(root.careerSystem.byResident.alex.workLife.conflictNotifiedShiftId,
+    shift.id,'The 15-minute scheduled sweep already issued the single notice');
   assert.equal(noteWorkLifeConflict(root,'alex',root.minutes),false);
   const restored=loadHousehold(clone(root),'2026-11-16');
   assert.equal(restored.careerSystem.byResident.alex.workLife.conflictNotifiedShiftId,shift.id);
