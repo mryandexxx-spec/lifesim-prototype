@@ -176,7 +176,10 @@ export function proposeAutonomousSocial({
   // cannot override the existing exhaustion, consent or pair cooldown gates.
   const socialLevel=finite(self.needs.social)?clamp(self.needs.social,0,100):75;
   const socialUrge=clamp(65-socialLevel,0,65)*.85;
-  const urge=clamp(65-self.needs.fun,0,65)*.8+socialUrge+axes.sociability*11-
+  // Real work recovery lightly prefers a real available relationship,
+  // never bypassing consent, physical urgency or social cooldowns.
+  const recovery=self.workRecovery?.until>minutes&&socialLevel<35?5:0;
+  const urge=clamp(65-self.needs.fun,0,65)*.8+socialUrge+recovery+axes.sociability*11-
     axes.independence*5+(mood>60?3:0);
   let chosen=null;
   for(const targetId of graph.persons){
