@@ -139,6 +139,14 @@ export const ACTION_PREFABS=Object.freeze(Object.fromEntries(original.filter(x=>
 export const ORIGINAL_FURNITURE=Object.freeze(original.filter(item=>!item.templateOnly).map(item=>Object.freeze({
   instanceId:item.instanceId,prefabId:item.prefabId,x:item.x,z:item.z,yaw:0,location:'home'
 })));
+// Q2: provenance is determined from the stable authored identity. Old v1
+// saves retain their byte shape; storage/sale cannot rewrite ownership.
+const starterIdentities=new Map(ORIGINAL_FURNITURE.map(item=>[item.instanceId,item.prefabId]));
+export function furnitureProvenance(item){
+  if(!item||typeof item.instanceId!=='string')return 'unknown';
+  if(starterIdentities.get(item.instanceId)===item.prefabId)return 'starter';
+  return /^shop-[a-z0-9-]+-[1-9][0-9]*$/.test(item.instanceId)?'purchased':'unknown';
+}
 /** Renderer origin for installed authored fixtures OR a hidden, unowned prefab.
  * Template-only products are intentionally absent from saved/new worlds. */
 export function furnitureRenderOrigin(prefabId){

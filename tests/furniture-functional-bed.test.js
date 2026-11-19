@@ -52,17 +52,20 @@ test('two sleepers reserve different sides of the same purchased bed and survive
   assert.equal(furnitureAvailable(loaded,'bed','alex','missing-bed'),false);
 });
 
-test('original bed is protected; bought bed cannot be stored or sold while reserved',()=>{
+test('last essential bed is protected; bought bed cannot be stored or sold while reserved',()=>{
   const original=newFurnitureWorld().instances.find(i=>i.prefabId==='bed');
-  assert.equal(canTradeMarketInstance(original),false);
-  assert.equal(storeMarketItem(newFurnitureWorld(),newFurnitureShop(),original.instanceId).reason,'protected-item');
+  assert.equal(canTradeMarketInstance(original),true);
+  assert.equal(storeMarketItem(newFurnitureWorld(),newFurnitureShop(),original.instanceId).reason,'last-essential');
   const bought=buyMarketItem(emptyHouse(),newFurnitureShop(),'bed',bedPose,trialResidents);
   assert.equal(bought.ok,true);
   const lock={lockedInstanceIds:[bought.instanceId]};
   assert.equal(storeMarketItem(bought.world,bought.shop,bought.instanceId,lock).reason,'reserved');
   assert.equal(sellMarketItem(bought.world,bought.shop,bought.instanceId,lock).reason,'reserved');
-  const stored=storeMarketItem(bought.world,bought.shop,bought.instanceId);
-  assert.equal(stored.ok,true);
+  assert.equal(storeMarketItem(bought.world,bought.shop,bought.instanceId).reason,
+    'last-essential','a lone purchased bed is essential too');
+  const withReplacement={...bought.world,instances:[...bought.world.instances,original]};
+  const stored=storeMarketItem(withReplacement,bought.shop,bought.instanceId);
+  assert.equal(stored.ok,true,stored.reason);
   assert.equal(resolveActionFurniture(stored.world,'bed',bought.instanceId),null);
   const restored=restoreMarketItem(stored.world,stored.shop,bought.instanceId,bedPose,trialResidents);
   assert.equal(restored.ok,true,JSON.stringify(restored));

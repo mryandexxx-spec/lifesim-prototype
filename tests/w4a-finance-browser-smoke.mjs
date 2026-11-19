@@ -49,17 +49,17 @@ try{
       entries:saved.financialHistory?.entries?.length,
       feedback:await page.locator('#furnish-feedback').textContent()}));
     assert.equal(saved.version,1);
-    assert.equal(saved.shop.credits,2810,'legacy balance plus one 70% plant sale');
+    assert.equal(saved.shop.credits,2758,'legacy balance plus one 30% starter plant sale');
     assert.equal(saved.financialHistory.schema,1);
     assert.equal(saved.financialHistory.entries.length,1);
     assert.equal(saved.financialHistory.entries[0].kind,'sale');
-    assert.equal(saved.financialHistory.entries[0].delta,91);
+    assert.equal(saved.financialHistory.entries[0].delta,39);
     assert.equal(saved.world.furniture.instances.some(i=>i.instanceId===plant.instanceId),false);
     await page.screenshot({path:'w4a-finance-'+width+'x'+height+'.png'});
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:60000});
     const restored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
-    assert.equal(restored.shop.credits,2810);
+    assert.equal(restored.shop.credits,2758);
     assert.equal(restored.financialHistory.entries.length,1);
     assert.equal(faults.length,0,faults.join('\n'));
     await ctx.close();

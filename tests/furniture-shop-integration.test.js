@@ -53,10 +53,10 @@ test('F2.1 atomic storage/sale within editor and full save/reload preserve curre
   const sold=editor.transactMarket(sellMarketItem(editor.state().world,
     editor.state().shop,item.instanceId));
   assert.equal(sold.ok,true);
-  assert.equal(sold.shop.credits,5091);
+  assert.equal(sold.shop.credits,5039);
   root.world.furniture=sold.world;root.shop=sold.shop;
   const reloaded=loadHousehold(copy(root));
-  assert.equal(reloaded.shop.credits,5091);
+  assert.equal(reloaded.shop.credits,5039);
   assert.equal(reloaded.world.furniture.instances.length,9);
   const undid=editor.undo();
   assert.equal(undid.shop.credits,5000);

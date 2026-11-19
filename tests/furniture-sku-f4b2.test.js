@@ -155,7 +155,7 @@ test('F4b2 sale uses saved paid price (70%) rather than current catalog price',(
   assert.equal(result.world.instances.some(x=>x.instanceId===item.instanceId),false);
   assert.equal(sellMarketItem(result.world,result.shop,item.instanceId).ok,false);
   const oldPlant=w.instances.find(x=>x.prefabId==='plant');
-  assert.equal(sellMarketItem(w,wallet,oldPlant.instanceId).amount,91);
+  assert.equal(sellMarketItem(w,wallet,oldPlant.instanceId).amount,39);
   assert.equal(FURNITURE_CATALOG.plant.price,null);
 });
 test('F4b2 nonmatching old save metadata cannot mint a larger refund',()=>{
@@ -168,7 +168,7 @@ test('F4b2 nonmatching old save metadata cannot mint a larger refund',()=>{
   const restored=restoreFurnitureWorld(changed);
   assert.equal(restored.instances.find(x=>x.instanceId===old.instanceId).itemDefinitionId,undefined);
   assert.equal(restored.instances.find(x=>x.instanceId===old.instanceId).purchasePriceCredits,undefined);
-  assert.equal(sellMarketItem(restored,wallet,old.instanceId).amount,91);
+  assert.equal(sellMarketItem(restored,wallet,old.instanceId).amount,39);
 });
 test('F4b2 product appearance is applied only on the bought clone, not every plant',()=>{
   const game=src('../src/game.js');

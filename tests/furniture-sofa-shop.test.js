@@ -27,12 +27,12 @@ test('six trial products preserve independently functional sofa and its price',(
  assert.equal(newFurnitureShop().credits,5000);
  assert.match(css,/\.furnish-stock\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 });
-test('the original sofa is protected; purchased sofa can be stored, restored and sold if free',()=>{
+test('the original sofa trades at 30%; purchased sofa can be stored, restored and sold if free',()=>{
  const world=newFurnitureWorld(),shop=newFurnitureShop();
  const original=world.instances.find(i=>i.prefabId==='sofa');
- assert.equal(canTradeMarketInstance(original),false);
- assert.equal(storeMarketItem(world,shop,original.instanceId).reason,'protected-item');
- assert.equal(sellMarketItem(world,shop,original.instanceId).reason,'protected-item');
+ assert.equal(canTradeMarketInstance(original),true);
+ assert.equal(storeMarketItem(world,shop,original.instanceId).ok,true);
+ assert.equal(sellMarketItem(world,shop,original.instanceId).amount,165);
  const duplicate=newSofa();
  assert.equal(canTradeMarketInstance(duplicate),true);
  assert.equal(canTradeMarketInstance({...duplicate,instanceId:'home-sofa-3'}),false);

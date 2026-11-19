@@ -38,13 +38,13 @@ import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge
   BUILD_WALL_HEIGHTS,BUILD_FACADE_FINISHES,BUILD_PORCH_FINISHES} from './construction.js';
 import {ROOF_STYLES,ROOF_MATERIALS,ROOF_PITCHES,ROOF_EAVES,
   roofContains,roofMeshGeometry} from './roof-construction.js';
-import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,instanceRect,furnitureRenderOrigin,
-  rotateLocal} from './furniture-catalog.js';
+import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,LEGACY_FURNITURE_IDS,
+  instanceRect,furnitureRenderOrigin,rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
-import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
+import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,findStoredPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
 import {recordFinanceChange} from './finance-ledger.js';
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
@@ -1995,7 +1995,8 @@ function boot() {
     if(!origin)throw new Error('Unknown furniture renderer origin: '+prefabId);
     const templateOnly=origin.location==='template';
     const current=templateOnly?origin:
-      game.world.furniture.instances.find(i=>i.instanceId===origin.instanceId)||origin;
+      game.world.furniture.instances.find(i=>i.instanceId===origin.instanceId)||
+      {...origin,location:'storage'};
     const node=new pc.Entity('F1 furniture / '+origin.instanceId);
     app.root.addChild(node);
     node.setPosition(current.x,0,current.z);
@@ -3929,6 +3930,11 @@ function boot() {
       busy.add(game.socialAction.eveningStage.instanceId);
     if(game.socialAction?.eveningSofa?.instanceId)
       busy.add(game.socialAction.eveningSofa.instanceId);
+    // Unaddressed shared plans in old saves: do not remove the partner's seat.
+    if(game.socialAction?.shared&&!game.socialAction.shared.tvPlan)
+      for(const item of game.world.furniture.instances)
+        if(['sofa','tv','bed'].includes(item.prefabId)&&item.location==='home')
+          busy.add(item.instanceId);
     const lockPrefab=prefabId=>{
       // Conservative transient lock over all instances of this prefab:
       // future F2 can add duplicates without original home-*-1 hardcodes.
@@ -3967,6 +3973,11 @@ function boot() {
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       if(actor?.action?.targetInstanceId)busy.add(actor.action.targetInstanceId);
+      else if(actor?.action?.id){
+        const prefab=Object.values(FURNITURE_CATALOG).find(def=>
+          def.actionId===actor.action.id)?.prefabId;
+        if(prefab)lockPrefab(prefab);
+      }
       if(actor?.action?.id==='hobby'&&actor.action.readingSeatInstanceId)
         busy.add(actor.action.readingSeatInstanceId);
       if(actor?.action?.id==='tv'&&actor.action.watchSeatInstanceId)
@@ -3978,9 +3989,15 @@ function boot() {
       // Pending commands identify the same durable instance ID after moving
       // or rotating it, so allow repositioning to repair a blocked approach.
       // Storing/selling is still prohibited while commands are pending.
-      if(includePending)for(const pending of pendingActions(game.actionQueues,id))
+      if(includePending)for(const pending of pendingActions(game.actionQueues,id)){
         if(['object','activity'].includes(pending.type)&&pending.targetInstanceId)
           busy.add(pending.targetInstanceId);
+        else if(pending.type==='object'){
+          const prefab=Object.values(FURNITURE_CATALOG).find(def=>
+            def.actionId===pending.actionId)?.prefabId;
+          if(prefab)lockPrefab(prefab);
+        }
+      }
     }
     return [...busy];
   };
@@ -4009,7 +4026,10 @@ function boot() {
       'invalid-pose':'Это положение невозможно', 'unchanged':'Положение не изменилось',
       'empty-history':'Больше нечего отменять или повторять',
       'not-in-shop':'Этот товар пока недоступен',
-      'protected-item':'Исходная функциональная мебель защищена',
+      'protected-item':'Этот предмет встроен в конструкцию и пока не отделяется',
+      'last-essential':'Нельзя убрать последнюю необходимую мебель · сначала установи замену',
+      'missing-working-replacement':'Замена есть, но к ней нельзя безопасно подойти',
+      'missing-appraisal':'Для этого предмета ещё не определена оценочная стоимость',
       'unreachable-sofa':'К этому дивану нельзя пройти · выбери другое место',
       'unreachable-tv':'Нельзя подойти к экрану этого телевизора · выбери другое место',
       'unreachable-music':'К музыкальному центру не подойти · поверни его или освободи проход',
@@ -4099,9 +4119,19 @@ function boot() {
     }
     $('furnish-rotate').disabled=!selectable||!canMoveFurniture(item);
     const tradable=selectable&&canTradeMarketInstance(item);
-    $('furnish-store').disabled=!tradable;
+    const storeQuote=tradable?storeMarketItem(game.world.furniture,game.shop,
+      item.instanceId,editorContext()):null;
+    const saleQuote=tradable?sellMarketItem(game.world.furniture,game.shop,
+      item.instanceId,editorContext()):null;
+    $('furnish-store').disabled=!storeQuote?.ok;
     $('furnish-restore').hidden=true; // storage gets its own visible item actions
-    $('furnish-sell').disabled=!tradable;
+    $('furnish-sell').disabled=!saleQuote?.ok;
+    $('furnish-sell').textContent=saleQuote?.ok
+      ?'Продать · +'+saleQuote.amount+' кр.':'Продать';
+    $('furnish-store').title=storeQuote?.ok?'Поместить на склад бесплатно':
+      editorMessage(storeQuote?.reason||'protected-item');
+    $('furnish-sell').title=saleQuote?.ok?'Продажа с подтверждением':
+      editorMessage(saleQuote?.reason||'protected-item');
     const history=editSession?.state();
     $('furnish-undo').disabled=!furnishMode||!history?.canUndo;
     $('furnish-redo').disabled=!furnishMode||!history?.canRedo;
@@ -4283,7 +4313,7 @@ function boot() {
   };
   const renderWarehouse=()=>{
     const stored=game.world.furniture.instances.filter(item=>
-      item.location==='storage'&&SHOP_ITEMS.some(product=>product.prefabId===item.prefabId));
+      item.location==='storage'&&canTradeMarketInstance(item));
     $('furnish-storage-count').textContent=String(stored.length);
     $('furnish-storage-empty').hidden=stored.length>0;
     const list=$('furnish-storage-list');
@@ -4298,8 +4328,16 @@ function boot() {
       const restore=document.createElement('button');restore.type='button';
       restore.textContent='↩ Вернуть';
       restore.addEventListener('click',()=>{
-        const result=restoreMarketItem(game.world.furniture,game.shop,item.instanceId,
-          {x:item.x,z:item.z,yaw:item.yaw},editorContext());
+        const pose=findStoredPlacement(game.world.furniture,game.shop,
+          item.instanceId,editorContext());
+        if(!pose){
+          editorFeedback('Не найдено безопасного места: освободи место в комнате',true);
+          return;
+        }
+        if(!window.confirm('Вернуть «'+title.textContent+
+          '» в комнату без оплаты? Место проверено по маршрутам и коллизиям.'))return;
+        const result=restoreMarketItem(game.world.furniture,game.shop,
+          item.instanceId,pose,editorContext());
         applyMarketTransaction(result,'Возвращено из склада без оплаты');
       });
       const sell=document.createElement('button');sell.type='button';sell.textContent='Продать';
@@ -6067,19 +6105,24 @@ function boot() {
       }});
     }
     // The movable coffee table must block object rays at its *new* position.
-    const table=game.world.furniture.instances.find(i=>i.prefabId==='table');
-    let blockers=[];
-    if(table&&table.location==='home'){
-      const r=instanceRect(table,FURNITURE_CATALOG.table.footprint);
-      blockers=[{kind:'blocker',id:'coffee-table',bounds:{
-        min:{x:r.minX,y:.28,z:r.minZ},max:{x:r.maxX,y:.48,z:r.maxZ}
-      }}];
-    }
+    const blockers=game.world.furniture.instances
+      .filter(i=>i.prefabId==='table'&&i.location==='home')
+      .map(table=>{
+        const r=instanceRect(table,FURNITURE_CATALOG.table.footprint);
+        return {kind:'blocker',id:'coffee-table',bounds:{
+          min:{x:r.minX,y:.28,z:r.minZ},max:{x:r.maxX,y:.48,z:r.maxZ}
+        }};
+      });
     const movedVolumes=hitVolumes.map(volume=>{
       if(!volume.fixtureType)return volume;
-      return {...volume,bounds:furnitureBounds(game.world,volume.fixtureType,
-        volume.bounds)};
-    }).concat(game.world.furniture.instances
+      const originalId=LEGACY_FURNITURE_IDS[volume.fixtureType];
+      const present=game.world.furniture.instances.some(item=>
+        item.instanceId===originalId&&item.location==='home');
+      if(!present)return null; // Sold/stored starter cannot intercept taps.
+      const bounds=furnitureBounds(game.world,volume.fixtureType,
+        volume.bounds,originalId);
+      return bounds?{...volume,bounds}:null;
+    }).filter(Boolean).concat(game.world.furniture.instances
       .filter(item=>item.location==='home'&&
         Object.values(UTILITY_FURNITURE).some(p=>p.prefabId===item.prefabId))
       .map(item=>{
