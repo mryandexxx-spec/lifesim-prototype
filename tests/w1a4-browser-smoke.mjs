@@ -49,9 +49,9 @@ try {
  assert.equal(await page.locator('#light-phase-label').innerText(),'Ночь');
  // Let the HUD paint its last pre-pause minute before the comparison.
  // Compare two settled samples to still catch a clock that keeps running.
- await page.waitForTimeout(250);
+ await page.waitForTimeout(650);
  const pausedTime=await page.locator('#time-label').innerText();
- await page.waitForTimeout(750);
+ await page.waitForTimeout(1100);
  assert.equal(await page.locator('#time-label').innerText(),pausedTime,'Pause freezes game clock and lighting');
  const winterNight=await page.locator('#game-canvas').screenshot();
  await page.locator('#speed-btn').click();
