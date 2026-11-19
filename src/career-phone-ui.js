@@ -126,7 +126,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     const id=ids.includes(who)?who:ids[0];
     const contract=root.careerSystem.byResident[id];
     const scenario=workScenario(contract.careerId,contract.currentShift.incident.scenarioId||'legacy');
-    const label=scenario?.title||'Рабочая ситуация';
+    const label=app==='finance'?(scenario?.title||'Рабочая ситуация'):'Рабочая ситуация';
     const card=element('section','career-phone-incident-banner');
     card.setAttribute('aria-label','Требует решения рабочая ситуация');
     card.append(element('strong',null,'💼 '+ids.length+' '+(ids.length===1?'решение':'решения')+' до конца смены'));
