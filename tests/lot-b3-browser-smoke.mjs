@@ -94,7 +94,7 @@ try{
     },SAVE_KEY,{timeout:8000});
     const queued=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     assert.equal(queued.actionQueues.byResident.alex[0].instanceId,'out-1');
-    assert.equal(queued.needs.fun,seed.needs.fun,'tapping bench cannot instantly reward Fun');
+    assert.ok(queued.needs.fun<=seed.needs.fun,'tapping bench cannot instantly reward Fun (normal time decay is allowed)');
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
     const old=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
