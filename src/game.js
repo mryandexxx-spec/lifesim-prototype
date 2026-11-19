@@ -2180,7 +2180,7 @@ function boot() {
     outdoorLightNodes.length=0;
     for(const item of game.world?.outdoors?.features||[]){
       const def=OUTDOOR_CATALOG[item.itemId];
-      if(!def||!['tree','shrub','flower','fence'].includes(def.category))continue;
+      if(!def||!['tree','shrub','flower','fence','furniture','light'].includes(def.category))continue;
       const node=new pc.Entity('LOT-B2 '+item.instanceId+' '+item.itemId);
       node.setLocalPosition(item.x,-.53,item.z);
       node.setLocalEulerAngles(0,-item.yaw,0);
