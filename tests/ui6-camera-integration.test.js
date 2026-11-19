@@ -31,7 +31,7 @@ test('UI6 preserves fallback, strict dialogue, camera reset and iPhone pointer c
  assert.match(src,/setView\(CAMERA_INITIAL\)/);
  assert.match(src,/wheelCamera\(view,event\.deltaY\)/);
  assert.match(html,/id="rotate-camera-btn"[^>]*aria-label="Включить вращение камеры одним пальцем/);
- assert.match(html,/Один палец — сдвиг · два — вращение и масштаб/);
+ assert.match(html,/Тап по земле — идти · свайп — камера · два пальца — масштаб/);
  assert.match(html,/id="game-canvas"/);
 });
 test('UI6 static pages includes all new runtime dependencies',()=>{
