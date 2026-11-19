@@ -55,6 +55,14 @@ test('Q3b player pause and interrupted/reloaded sleep never grant retroactive en
   loaded.paused=false;tick(loaded,10);
   close(loaded.needs.energy,s.needs.energy+1.02);
 });
+test('Q3b clamp-at-100 sleep is chunk invariant, including awake remainder',()=>{
+  const a=newGame();a.needs.energy=78;chooseAction(a,'bed');arrive(a);
+  const b=loadGame(copy(a));
+  tick(a,480);for(let i=0;i<480;i++)tick(b,1);
+  close(a.needs.energy,97.54,1e-4);
+  close(a.needs.energy,b.needs.energy,1e-4);
+  assert.equal(a.action,null);assert.equal(b.action,null);
+});
 test('Q3b 180-minute repeat protection permits true emergency and blocks green wish',()=>{
   assert.equal(SELF_CARE_REPEAT_COOLDOWN_MINUTES,180);
   const s=newGame();s.minutes=850;s.needs.fun=70;
