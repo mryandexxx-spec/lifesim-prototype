@@ -5,6 +5,7 @@
 import {nextCareerShift} from './career-scheduler.js';
 import {CAREER_RESIDENT_IDS,separateCareer} from './career-state.js';
 import {recordCareerDiscipline,DISCIPLINE_REHIRE_MINUTES} from './career-discipline.js';
+import {recordWorkLifeShift,recordWorkFeeling,applyWorkMoodContext} from './career-worklife.js';
 import {careerRankForContract} from './career-specializations.js';
 import {SHOP_MAX_CREDITS} from './furniture-shop.js';
 import {recordFinanceChange} from './finance-ledger.js';
@@ -46,13 +47,14 @@ function disciplineNotices(messages,id,outcome){
     emit(messages,id,'discipline','последнее предупреждение · риск '+outcome.risk+
       '/12. Следующее серьёзное нарушение грозит увольнением');
 }
-function finalizeMissed(contract,at){
+function finalizeMissed(root,contract,id,at){
   const shift=contract.currentShift;
   const result=recordMissedCareerShift(contract);
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
     outcome:'missed',salary:0,workedMinutes:0,lateMinutes:0,finishedAt:at,
     grade:result.grade,performanceDelta:result.delta};
   const discipline=recordCareerDiscipline(contract,shift,'missed',0,at);
+  recordWorkLifeShift(root,id,contract,shift,discipline);
   contract.currentShift=null;
   return discipline;
 }
@@ -92,6 +94,7 @@ function settle(root,contract,id,at){
     incident:shift.incident?.choiceId?{
       scenarioId:shift.incident.scenarioId||'legacy',choiceId:shift.incident.choiceId,
       auto:shift.incident.auto,performanceDelta:shift.incident.performanceDelta}:null};
+  if(!already)recordWorkLifeShift(root,id,contract,shift,discipline);
   shift.phase='returning';
   return {salary,result,badges,discipline};
 }
@@ -114,6 +117,8 @@ export function progressCareerWork(root,before,after){
       const finished=separateCareer(root.careerSystem,id,'dismissed',Math.floor(before));
       if(finished.ok){
         root.careerSystem=finished.careerSystem;
+        recordWorkFeeling(root,id,'worklife.dismissal',before);
+        applyWorkMoodContext(root);
         const archived=finished.archived;
         const retryAt=archived.at+DISCIPLINE_REHIRE_MINUTES;
         messages.push({type:'dismissed',residentId:id,
@@ -162,7 +167,7 @@ export function progressCareerWork(root,before,after){
       }
     }
     if(after>=shift.end){
-      const discipline=finalizeMissed(contract,shift.end);
+      const discipline=finalizeMissed(root,contract,id,shift.end);
       emit(messages,id,'missed','смена пропущена, зарплата 0 кр.');
       disciplineNotices(messages,id,discipline);
       continue;
@@ -238,7 +243,8 @@ export function finishCareerReturn(root,id){
 export function skipCareerShift(root,id){
   const contract=root?.careerSystem?.byResident?.[id],shift=contract?.currentShift;
   if(!shift||!['pending','departing'].includes(shift.phase))return false;
-  finalizeMissed(contract,root.minutes);
+  finalizeMissed(root,contract,id,root.minutes);
+  applyWorkMoodContext(root);
   const actor=actorFor(root,id);
   if(actor)actor.event='Остался дома · смена пропущена';
   return true;
