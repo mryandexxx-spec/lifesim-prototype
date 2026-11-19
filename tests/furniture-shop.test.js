@@ -64,17 +64,20 @@ test('home => storage => restored home preserves same identity and charges nothi
   assert.equal(putBack.world.instances.find(x=>x.instanceId===plant.instanceId).location,'home');
   assert.equal(putBack.shop.credits,shop.credits);
 });
-test('busy furniture cannot store/sell and essential fixtures are protected',()=>{
-  let {world,shop}=setup();
-  for(const type of ['bed','sofa','fridge','shower','toilet','counter']){
+test('busy instances and irreplaceable essentials are guarded, starter sofa trades',()=>{
+  const {world,shop}=setup();
+  for(const type of ['bed','fridge','shower','toilet']){
     const item=world.instances.find(x=>x.prefabId===type);
-    assert.equal(storeMarketItem(world,shop,item.instanceId).reason,'protected-item');
-    assert.equal(sellMarketItem(world,shop,item.instanceId).reason,'protected-item');
+    assert.equal(storeMarketItem(world,shop,item.instanceId).reason,'last-essential');
+    assert.equal(sellMarketItem(world,shop,item.instanceId).reason,'last-essential');
   }
-  const item=world.instances.find(x=>x.prefabId==='tv');
-  const locks={lockedInstanceIds:[item.instanceId]};
-  assert.equal(storeMarketItem(world,shop,item.instanceId,locks).reason,'reserved');
-  assert.equal(sellMarketItem(world,shop,item.instanceId,locks).reason,'reserved');
+  const counter=world.instances.find(x=>x.prefabId==='counter');
+  assert.equal(storeMarketItem(world,shop,counter.instanceId).reason,'protected-item');
+  const sofa=world.instances.find(x=>x.prefabId==='sofa');
+  assert.equal(storeMarketItem(world,shop,sofa.instanceId).ok,true);
+  const locks={lockedInstanceIds:[sofa.instanceId]};
+  assert.equal(storeMarketItem(world,shop,sofa.instanceId,locks).reason,'reserved');
+  assert.equal(sellMarketItem(world,shop,sofa.instanceId,locks).reason,'reserved');
 });
 test('selling credits exactly 70%, removes instance and is not repeatable',()=>{
   const {world,shop}=setup(), item=world.instances.find(x=>x.prefabId==='plant');
