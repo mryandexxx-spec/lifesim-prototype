@@ -1,0 +1,42 @@
+name: LOT-B1 — mobile landscaping paint & finance WebGL QA
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  outdoor-surfaces:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies and Playwright Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Domain, UI contract and entire Node regression
+        run: |
+          node --check src/game.js
+          node --check src/outdoor-proposals.js
+          node --check src/lot-surface.js
+          node --check tests/lot-b1-browser-smoke.mjs
+          node --test tests/lot-b1-ui.test.js tests/lot-b0.test.js
+          npm test
+      - name: Real mobile-size PlayCanvas WebGL surface painting smoke
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-b1-http.log 2>&1 &
+          sleep 3
+          node tests/lot-b1-browser-smoke.mjs
+      - name: Upload four-viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lot-b1-mobile-webgl
+          path: lot-b1-*.png
+          if-no-files-found: ignore
