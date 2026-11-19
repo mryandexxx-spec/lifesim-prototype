@@ -11,6 +11,7 @@ import {furniturePoint} from './furniture-transform.js';
 import {BED_SLOTS} from './bed-layout.js';
 import {findPath,isWalkable,ACTOR_RADIUS} from './navigation.js';
 import {recordFinanceChange} from './finance-ledger.js';
+import {outdoorBenchApproach,outdoorBenchBusy} from './outdoor-interactions.js';
 
 const fail=reason=>({ok:false,reason});
 const integer=n=>Number.isSafeInteger(n)&&n>=0;
@@ -137,6 +138,12 @@ export function previewOutdoorFeature(root,itemId,{x,z,yaw=0}={}){
   const next={...current,revision:current.revision+1,nextId:current.nextId+1,
     features:[...current.features,item]};
   if(!keepsExistingRoutes(root,next))return fail('would-block-route');
+  if(itemId==='garden.bench'){
+    const approach=outdoorBenchApproach({...root.world,outdoors:next},item.instanceId);
+    if(!approach||!isWalkable(approach.x,approach.z,{...root.world,outdoors:next})||
+      !participantPositions(root).every(p=>Boolean(findPath(p,approach,{...root.world,outdoors:next}))))
+      return fail('unreachable-bench');
+  }
   const result=preview(root,next,def.price,item.instanceId);
   return result.ok?{...result,instanceId:item.instanceId}:result;
 }
@@ -171,7 +178,8 @@ export function commitOutdoorPreview(root,proposal){
  * A stale preview cannot mint money or bypass topology/overlap checks.
  * Decor and boundaries never grant passive XP/need bonuses.
  */
-const b2Category=id=>['tree','shrub','flower','fence'].includes(OUTDOOR_CATALOG[id]?.category);
+const b2Category=id=>['tree','shrub','flower','fence','furniture','light']
+  .includes(OUTDOOR_CATALOG[id]?.category);
 export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose}={}){
   if(operation==='place'){
     if(!b2Category(itemId))return fail('unavailable-item');
@@ -183,6 +191,8 @@ export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose
   if(operation!=='move'&&operation!=='sell')return fail('unknown-operation');
   const original=current.features.find(x=>x.instanceId===instanceId);
   if(!original||!b2Category(original.itemId))return fail('missing-instance');
+  if(original.itemId==='garden.bench'&&outdoorBenchBusy(root,instanceId))
+    return fail('reserved-bench');
   if(current.revision>=100000000)return fail('revision-limit');
   let features;
   if(operation==='sell')features=current.features.filter(f=>f.instanceId!==instanceId);
@@ -207,6 +217,13 @@ export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose
   const next={...current,revision:current.revision+1,features};
   if(operation==='move'&&!keepsExistingRoutes(root,next))
     return fail('would-block-route');
+  if(operation==='move'&&original.itemId==='garden.bench'){
+    const after={...root.world,outdoors:next};
+    const approach=outdoorBenchApproach(after,instanceId);
+    if(!approach||!isWalkable(approach.x,approach.z,after)||
+      !participantPositions(root).every(p=>Boolean(findPath(p,approach,after))))
+      return fail('unreachable-bench');
+  }
   const refund=operation==='sell'?Math.floor(original.purchasePriceCredits*0.7):0;
   const balance=root.shop.credits+refund;
   if(!Number.isSafeInteger(balance)||balance>1000000000)return fail('wallet-limit');

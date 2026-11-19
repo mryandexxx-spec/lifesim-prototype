@@ -13,10 +13,11 @@ import {getHobbyContent} from './hobby-content.js';
 import {HOBBY_ACTIVITIES,HOBBY_CONTENT} from './hobby-reading.js';
 import {kitchenRecipe} from './kitchen.js';
 import {insideLot} from './lot-surface.js';
+import {validOutdoorId} from './outdoor-catalog.js';
 
 export const ACTION_QUEUE_SCHEMA=1;
 export const MAX_ACTION_QUEUE=12;
-export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity','move']);
+export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity','move','outdoor']);
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const count=n=>Number.isSafeInteger(n)&&n>=1&&n<=1000000000;
 const known=(o,k)=>typeof k==='string'&&Object.hasOwn(o,k);
@@ -25,6 +26,8 @@ export function sanitizeQueueCommand(id,raw,persons){
   if(!record(raw)||!Array.isArray(persons)||!persons.includes(id))return null;
   const type=raw.type;
   if(!ACTION_QUEUE_TYPES.includes(type))return null;
+  if(type==='outdoor')return validOutdoorId(raw.instanceId)
+    ?{type:'outdoor',instanceId:raw.instanceId}:null;
   if(type==='move'){
     if(!insideLot(raw.x,raw.z))return null;
     const x=Math.round(raw.x*20)/20,z=Math.round(raw.z*20)/20;
