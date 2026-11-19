@@ -37,7 +37,8 @@ try{
     const saved=()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     const boot=()=>page.locator('#loading').waitFor({state:'hidden',timeout:65000});
     const enter=async()=>{
-      await page.locator('#furnish-toggle').click();
+      await page.locator('#home-open').click();
+      await page.locator('#home-furnish').click();
       await page.locator('#furnish-commands').waitFor({state:'hidden'});
       await page.locator('#furnish-item-select').selectOption(starterId);
       await page.locator('#furnish-commands').waitFor({state:'visible'});
@@ -59,7 +60,8 @@ try{
     assert.equal(state.world.furniture.instances.find(i=>i.instanceId===starterId).location,'storage',
       'Saved starter must remain stored after full WebGL boot');
     assert.equal(state.world.furniture.instances.find(i=>i.instanceId===replacementId).location,'home');
-    await page.locator('#furnish-toggle').click();
+    await page.locator('#home-open').click();
+    await page.locator('#home-furnish').click();
     await page.locator('#furnish-warehouse-toggle').click();
     const storage=page.locator('#furnish-storage-list');
     assert.equal(await storage.locator('.furnish-storage-card').count(),1);
