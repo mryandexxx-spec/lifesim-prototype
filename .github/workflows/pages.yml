@@ -61,6 +61,7 @@ jobs:
           node --check src/day-night-render.js
           node --check src/need-balance.js
           node --check src/navigation.js
+          node --check src/lot-surface.js
           node --check src/construction.js
           node --check src/furnished-room.js
           node --check src/roof-construction.js
@@ -194,6 +195,7 @@ jobs:
           cp src/camera-gestures.js site/src/
           cp src/mobile-gesture-policy.js site/src/
           cp src/construction.js site/src/
+          cp src/lot-surface.js site/src/
           cp src/furnished-room.js site/src/
           cp src/roof-construction.js site/src/
           cp src/exterior-construction.js site/src/

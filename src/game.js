@@ -7,7 +7,7 @@ import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
-import {CAMERA_INITIAL,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
+import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
 import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
@@ -22,7 +22,8 @@ import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
 import {applyWorkMoodContext} from './career-worklife.js';
 import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
   residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
-import { findPath, nearestWalkable } from './navigation.js';
+import { findPath, nearestWalkable, isWalkable } from './navigation.js';
+import {lotRaySurface,lotActorHeight} from './lot-surface.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -440,6 +441,7 @@ $('calendar-anchor-apply').addEventListener('click',()=>{
 });
 function taskLabel(task){
   if(!task)return 'Неизвестное действие';
+  if(task.type==='move')return 'Идти в указанное место';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
@@ -454,6 +456,20 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
+  if(command.type==='move'){
+    const person=getActor(game,residentId);
+    if(!person||residentUnavailableForHome(game,residentId)||
+      !isWalkable(command.x,command.z,game.world)||
+      !findPath(person.position,{x:command.x,z:command.z},game.world)){
+      toast('Путь к этой точке недоступен');return false;
+    }
+    const pending=pendingActions(game.actionQueues,residentId);
+    if(pending.at(-1)?.type==='move'){
+      const replacement={x:Math.round(command.x*20)/20,z:Math.round(command.z*20)/20};
+      pending[pending.length-1]={...pending.at(-1),...replacement};
+      renderQueuePanel(true);save(true);return true;
+    }
+  }
   if(command.type==='object'||command.type==='activity'){
     const definition=command.type==='activity'
       ?getActivityDefinition(HOBBY_ACTIVITIES,command.activityId):null;
@@ -2090,8 +2106,8 @@ function boot() {
   // Hinges are renderer-only; the navigation graph always uses the authoritative
   // physical opening. A nearby resident gently swings a real panel open.
   const automaticDoors=[];
-  const lotGround=box('F5 lot ground',7,-.59,0,32,.12,24,mat('#9fbea0'));
-  lotGround.enabled=false;
+  const lotGround=box('LOT-A lawn',7,-.59,0,32,.12,24,mat('#8fb78b'));
+  lotGround.enabled=true;
   const buildGhost=box('F5 preview',0,.05,0,.2,.06,.2,mat('#438ac4',{opacity:.25}));
   buildGhost.enabled=false;
   const buildWallMarker=box('F5 selected wall',0,.32,0,.3,.62,.3,mat('#24c8bc',{opacity:.72}));
@@ -2409,7 +2425,7 @@ function boot() {
     renderedConstruction=state;renderedWallMode=constructionWallMode;
     renderedRoofPreview=roofPreview;
     clearConstructionNodes();
-    lotGround.enabled=buildMode;
+    lotGround.enabled=true;
     const raised=constructionWallMode!=='down';
     const height=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
     const w=starterShellOffset(state,'west'),e=starterShellOffset(state,'east');
@@ -3123,8 +3139,8 @@ function boot() {
     game.otherSim.position={x,z};
   }
   game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
-  const display={x:game.position.x,y:0,z:game.position.z,yaw:0,pitch:0,roll:0};
-  const miraDisplay={x:game.otherSim.position.x,y:0,z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
+  const display={x:game.position.x,y:lotActorHeight(game.world,game.position),z:game.position.z,yaw:0,pitch:0,roll:0};
+  const miraDisplay={x:game.otherSim.position.x,y:lotActorHeight(game.world,game.otherSim.position),z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
@@ -3162,6 +3178,7 @@ function boot() {
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
   const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>{
+    if(id==='move')return getActor(game,residentId)?.action?.goal||null;
     if(id==='hobby:toSeat'){
       const reader=getActor(game,residentId);
       return reader?.action?.id==='hobby'
@@ -3363,6 +3380,8 @@ function boot() {
               id!==residentId&&showerStates[id].active))&&
             !(command.actionId==='toilet'&&HOUSEHOLD_IDS.some(id=>
               id!==residentId&&toiletStates[id].active));
+        if(command.type==='move')return isWalkable(command.x,command.z,game.world)&&
+          Boolean(findPath(actor.position,{x:command.x,z:command.z},game.world));
         const partnerId=command.targetId;
         // Current 3D scene is a two-person adapter; the queue core is N-person.
         if(!HOUSEHOLD_IDS.includes(partnerId)||partnerId===residentId||
@@ -3414,6 +3433,16 @@ function boot() {
             activity?.requiredCapabilities.includes('art.paint')?'paint':'hobby';
           started=beginAction(actionId,false,residentId,true,command.targetInstanceId,
             command.activityId,command.contentId,command.inventoryItemId||null);
+        }
+        else if(command.type==='move'){
+          const actor=getActor(game,residentId),goal={x:command.x,z:command.z};
+          const route=findPath(actor.position,goal,game.world);
+          if(route){
+            actor.action={id:'move',phase:'walking',elapsed:0,automatic:false,goal};
+            actor.event='Идёт в выбранное место';
+            paths[residentId]={id:'move',points:route,index:0};
+            restartAutonomyWait(residentId);started=true;
+          }
         }
         else if(command.type==='social')
           started=beginSocial(command.actionId,false,residentId,null,null,null,true);
@@ -3516,6 +3545,7 @@ function boot() {
   // non-shadow directional lights and one camera. Saved lamp states stay manual.
   const dayNightRenderer=createDayNightRenderer({scene:app.scene,sun,fill,camera,Color:pc.Color});
   dayNightRenderer.update(game.calendar,game.minutes);
+  setCameraBuildBounds(CAMERA_LOT_BOUNDS);
   const view={...CAMERA_INITIAL};
   const cameraTarget=new pc.Vec3(view.centerX,view.centerY,view.centerZ);
   function cameraUpdate(){
@@ -3533,6 +3563,11 @@ function boot() {
     // Camera reset must not teleport a pending shop object.
     toast('Камера сброшена');
   });
+  $('menu-lot-camera-btn').addEventListener('click',()=>{
+    if(furnishMode||buildMode)return;
+    setView({...view,centerX:7,centerZ:0,distance:44,pitch:61});
+    setViewOpen(false);toast('Весь участок: коснись земли, чтобы отправить жителя');
+  });
   // One finger pans by default; two fingers orbit and pinch.
   // Side button temporarily switches one-finger movement to rotation.
   let oneFingerMode='pan';
@@ -3547,8 +3582,8 @@ function boot() {
       :'Вращать одним пальцем';
     rotateButton.querySelector('small').textContent=rotating?'ВРАЩЕНИЕ':'ПОВОРОТ';
     $('hint').textContent=rotating
-      ?'Один палец — вращение · два — вращение и масштаб'
-      :'Один палец — сдвиг · два — вращение и масштаб';
+      ?'Тап — идти · один палец — вращение · два — масштаб'
+      :'Тап по земле — идти · свайп — камера · два пальца — масштаб';
   };
   rotateButton.addEventListener('click',()=>{
     oneFingerMode=oneFingerMode==='orbit'?'pan':'orbit';
@@ -4272,7 +4307,7 @@ function boot() {
     editDrag=null;canvas.dataset.furnitureGrab='false';
     cameraGesture.clear();
     furnishMode=false;editSelectedId=null;editSession=null;
-    setCameraBuildBounds();
+    setCameraBuildBounds(CAMERA_LOT_BOUNDS);
     furnitureGhost.enabled=false;marketGhost.enabled=false;
     setEditorView('edit');
     updateDecorNodes();
@@ -4853,13 +4888,13 @@ function boot() {
     $('build-roof-toggle').setAttribute('aria-pressed','false');
     $('build-ceiling-toggle').setAttribute('aria-pressed','false');
     buildDrag=null;buildSession=null;clearBuildPending();resetBuildWallSelection();
-    cameraGesture.clear();setCameraBuildBounds();
+    cameraGesture.clear();setCameraBuildBounds(CAMERA_LOT_BOUNDS);
     if(buildPreviousView)setView(buildPreviousView);
     buildPreviousView=null;
     $('build-editor').hidden=true;
     $('build-toggle').setAttribute('aria-pressed','false');
     document.querySelector('.app-shell').dataset.buildMode='false';
-    lotGround.enabled=false;
+    lotGround.enabled=true;
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     syncConstructionRender(true);renderPauseButton();save(true);
   };
@@ -5460,7 +5495,31 @@ function boot() {
       toast('Картина · открыть инвентарь, повесить или продать во вкладке «Навыки»');
     }
     else if(target?.kind==='object')select(target.id,target.instanceId);
-    else{closeSocialContext();select(null);}
+    else{
+      closeSocialContext();select(null);
+      const {near,far}=furnitureRay(pos);
+      const ground=lotRaySurface(near,far,game.world);
+      if(!ground)return; // Sky / off-lot: do not manufacture movement.
+      const id=game.selectedSim,actor=getActor(game,id);
+      if(residentUnavailableForHome(game,id)){
+        toast('Персонаж сейчас не на участке');return;
+      }
+      const requested={x:Math.round(ground.x*20)/20,z:Math.round(ground.z*20)/20};
+      const valid=isWalkable(requested.x,requested.z,game.world)?requested:null;
+      const nearest=valid||nearestWalkable(requested,game.world);
+      if(!valid&&Math.hypot(nearest.x-requested.x,nearest.z-requested.z)>.35){
+        toast('Здесь нельзя пройти — выбери свободное место');return;
+      }
+      if(!findPath(actor.position,nearest,game.world)){
+        toast('Путь к этой точке недоступен');return;
+      }
+      const walk={type:'move',x:nearest.x,z:nearest.z};
+      if(actor.action?.id==='move'&&!pendingActions(game.actionQueues,id).length){
+        actor.action.goal={x:nearest.x,z:nearest.z};
+        paths[id]={points:null,index:0,id:null};
+        actor.event='Идёт к новой точке';save(true);confirmWorldTap(pos);
+      }else if(scheduleCommand(walk,id))confirmWorldTap(pos);
+    }
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
@@ -5575,8 +5634,8 @@ function boot() {
         // A completed job frees its own resident; planned commands start only
         // after both participant states and render transition guards allow it.
         dispatchPlannedActions();
-        if(prevAlex && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex].label).toLowerCase());
-        if(prevMira && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira].label).toLowerCase());
+        if(prevAlex && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex]?.label||'прогулку').toLowerCase());
+        if(prevMira && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira]?.label||'прогулку').toLowerCase());
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
       if(sharedBefore&&!game.socialAction)
         toast(getActor(game,sharedBefore).event);
@@ -5698,6 +5757,11 @@ function boot() {
               resident.position=socialWalking?{...socialGoal}:
                 destination(jobId,residentId,resident.action?.targetInstanceId,
                    resident.action?.watchSeatInstanceId);
+              if(!socialWalking&&resident.action?.id==='move'){
+                resident.action=null;resident.event='Пришёл в выбранное место';
+                paths[residentId]={points:null,index:0,id:null};
+                restartAutonomyWait(residentId);save(true);continue;
+              }
               if(socialWalking){
                 if(pairedPlan){
                   const ready=HOUSEHOLD_IDS.every(id=>{
@@ -5943,7 +6007,7 @@ function boot() {
     const previousAlexXZ={x:display.x,z:display.z};
     const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
-      y:pose?pose.y:animationStates.alex.walkBob,
+      y:pose?pose.y:animationStates.alex.walkBob+lotActorHeight(game.world,game.position),
       z:pose?pose.z:pairTargets?.a.z??game.position.z,
       pitch:pose?pose.pitch:0,
       yaw:pose?pose.yaw:socialUsing
@@ -6011,7 +6075,8 @@ function boot() {
     // the SAME frame as its ankle joints; the old display spring lagged one.
     // Never override the directly controlled bed/sofa/shower interaction root.
     if(!alexShower&&!alexToilet&&!bedding&&!seating&&!pose&&!socialUsing){
-      display.y=animationStates.alex.walkBob;
+      display.y=approach(display.y,animationStates.alex.walkBob+
+        lotActorHeight(game.world,game.position),10,frameAnimDt);
       avatar.setPosition(display.x,display.y,display.z);
     }
     applyCharacterAnimation(alexRig,animationStates.alex);
@@ -6109,7 +6174,7 @@ function boot() {
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
-      y:miraPose?miraPose.y:animationStates.mira.walkBob,
+      y:miraPose?miraPose.y:animationStates.mira.walkBob+lotActorHeight(game.world,game.otherSim.position),
       z:miraPose?miraPose.z:pairTargets?.b.z??game.otherSim.position.z,
       pitch:miraPose?miraPose.pitch:0,
       yaw:miraPose?miraPose.yaw:socialUsing
@@ -6170,7 +6235,8 @@ function boot() {
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
     },frameAnimDt);
     if(!miraShower&&!miraToilet&&!miraBedding&&!miraSeating&&!miraPose&&!socialUsing){
-      miraDisplay.y=animationStates.mira.walkBob;
+      miraDisplay.y=approach(miraDisplay.y,animationStates.mira.walkBob+
+        lotActorHeight(game.world,game.otherSim.position),10,frameAnimDt);
       miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
     }
     applyCharacterAnimation(miraRig,animationStates.mira);
