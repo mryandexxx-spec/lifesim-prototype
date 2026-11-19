@@ -62,7 +62,8 @@ test('LOT-B0: repaint and returning to lawn charges only changes, no phantom ref
   assert.equal(previewOutdoorPaint(last,{from:location,to:location,kind:'not-real'}).reason,'unknown-ground');
 });
 test('LOT-B0: one original product registry and bounded distinct features',()=>{
-  assert.equal(OUTDOOR_PRODUCTS.length,15);
+  assert.equal(OUTDOOR_PRODUCTS.filter(p=>p.category!=='garden').length,15);
+  assert.equal(OUTDOOR_PRODUCTS.length,19);
   assert.equal(OUTDOOR_CATALOG['tree.round'].price,220);
   assert.equal(OUTDOOR_CATALOG['garden.bench'].price,240);
   assert.equal(OUTDOOR_CATALOG['light.path'].light,true);
