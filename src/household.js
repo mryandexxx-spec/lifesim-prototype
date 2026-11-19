@@ -10,6 +10,7 @@ import {newCareerSystem,restoreCareerSystem} from './career-state.js';
 import {newRecruitmentSystem,restoreRecruitmentSystem,progressCareerRecruitment} from './career-recruitment.js';
 import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork} from './career-work.js';
 import {progressWorkNeeds} from './career-work-needs.js';
+import {applyWorkMoodContext} from './career-worklife.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
@@ -102,6 +103,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.householdBills=newHouseholdBills(state.minutes);
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
+  applyWorkMoodContext(state);
   return state;
 }
 
@@ -141,6 +143,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   mira.autonomy.enabled=root.autonomy.enabled;
   if (!root.autonomy.enabled && mira.action?.automatic) mira.action=null;
   root.otherSim=mira;
+  applyWorkMoodContext(root);
   // Restored off-lot residents cannot resume a stale home action or grant
   // cooking/painting/social rewards after refreshing Safari midshift.
   for(const id of HOUSEHOLD_IDS){
@@ -984,6 +987,7 @@ export function tickHousehold(root,minutes) {
   for(const id of HOUSEHOLD_IDS)if(residentAwayAtWork(root,id))
     refreshMind(getActor(root,id),root.world);
   tickSocial(root,minutes);
+  applyWorkMoodContext(root);
   // One family calendar, one weekly bill cycle, never one charge per resident.
   const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
   return [...careerEvents,...billEvents];

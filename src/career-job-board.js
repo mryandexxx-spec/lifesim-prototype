@@ -1,3 +1,4 @@
+import {recordWorkFeeling,jobSatisfaction} from './career-worklife.js';
 /** W1-B.2a: pure recruitment/read-model adapter. No DOM, PlayCanvas or salary mutations. */
 import {CAREER_CATALOG,careerDefinition} from './career-catalog.js';
 import {hireCareer,separateCareer,CAREER_RESIDENT_IDS} from './career-state.js';
@@ -77,8 +78,11 @@ export function leaveCareer(root,residentId){
     return {ok:false,reason:'Нет действующего договора'};
   if(!canResignNow(root,residentId))
     return {ok:false,reason:'Дождись возвращения со смены перед увольнением'};
+  const satisfaction=jobSatisfaction(root.careerSystem.byResident[residentId],root.minutes);
   const result=separateCareer(root.careerSystem,residentId,'resigned',root.minutes);
   if(!result.ok)return result;
+  recordWorkFeeling(root,residentId,result.archived.reason==='dismissed'
+    ?'worklife.dismissal':satisfaction<40?'worklife.resignationRelief':'worklife.resignation');
   return {ok:true,careerSystem:result.careerSystem};
 }
 

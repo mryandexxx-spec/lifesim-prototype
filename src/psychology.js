@@ -37,7 +37,21 @@ export const MEMORY_TEXT = Object.freeze({
   'leisure.refused':'Совместный досуг не сложился',
   'work.pride':'Гордится решением на работе',
   'work.pressure':'Переживает напряжённую смену',
-  'work.relief':'Нашёл спокойный выход из рабочей ситуации'
+  'work.relief':'Нашёл спокойный выход из рабочей ситуации',
+  'worklife.success':'Гордится удачной сменой',
+  'worklife.exhaustedPride':'Успешно поработал, но сильно устал',
+  'worklife.hard':'Переживает трудный рабочий день',
+  'worklife.hardStrain':'Перенапрягся на сложной смене',
+  'worklife.overloaded':'Устал от сильной нагрузки',
+  'worklife.missed':'Сожалеет о пропущенной смене',
+  'worklife.warning':'Переживает из-за рабочего предупреждения',
+  'worklife.finalWarning':'Тревожится после последнего предупреждения',
+  'worklife.dismissal':'Расстроен увольнением',
+  'worklife.promotion':'Радуется повышению',
+  'worklife.resignation':'Волнуется после смены работы',
+  'worklife.resignationRelief':'Почувствовал облегчение после ухода с работы',
+  'worklife.sharedInterrupted':'Жалеет о прерванном совместном отдыхе',
+  'worklife.sharedDisappointed':'Огорчился из-за прерванного совместного отдыха'
 });
 const IDS = Object.keys(WISHES);
 const LIMIT = 12;
@@ -55,9 +69,13 @@ export function createMind(minutes = 480) {
   };
 }
 
-export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
+const isWorkMemory=id=>typeof id==='string'&&
+  (id.startsWith('work.')||id.startsWith('worklife.'));
+export function recentMemoryEffect(mind, minutes, excluded=new Set(),scope='all') {
   return (mind.memories || []).reduce((sum, memory) => {
-    if(excluded.has(memoryEmotionKey(memory)))return sum;
+    if(excluded.has(memoryEmotionKey(memory))||
+      (scope==='work'&&!isWorkMemory(memory.id))||
+      (scope==='other'&&isWorkMemory(memory.id)))return sum;
     const elapsed = clamp(minutes - memory.at, 0, 10000000);
     const strength = Math.max(0, 1 - elapsed / 360);
     // Identical social event, different memories: the initiator regrets
@@ -67,7 +85,15 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
       'gift.given':7,'gift.liked':14,'gift.neutral':5,'gift.rejected':-9,
       'gift.refused':-5,'leisure.music':11,'leisure.books':11,
       'leisure.games':11,'leisure.refused':-5,
-      'work.pride':8,'work.pressure':-7,'work.relief':4};
+      'work.pride':8,'work.pressure':-7,'work.relief':4,
+      'worklife.success':7,'worklife.exhaustedPride':2,
+      'worklife.hard':-8,'worklife.hardStrain':-10,
+      'worklife.overloaded':-5,'worklife.missed':-9,
+      'worklife.warning':-6,'worklife.finalWarning':-10,
+      'worklife.dismissal':-14,'worklife.promotion':11,
+      'worklife.resignation':-3,'worklife.resignationRelief':4,
+      'worklife.sharedInterrupted':-6,
+      'worklife.sharedDisappointed':-4};
     const effect=Object.hasOwn(socialEffect,memory.id)
       ?socialEffect[memory.id]:memory.fulfilled?12:5;
     return sum+effect*strength;
@@ -75,7 +101,7 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set()) {
 }
 
 /** Mood is a derived snapshot, never trusted from localStorage. */
-export function calculateMood(needs, mind, minutes, personality = null,environment=0) {
+export function calculateMood(needs, mind, minutes, personality = null,environment=0,workContext=0) {
   const values = [needs.hunger, needs.energy, needs.hygiene, needs.fun,
     needs.social,needs.bladder].map((x,i) => clamp(finite(x) ? x : i>=4?75:50, 0, 100));
   const average = values.reduce((a, b) => a + b, 0) / values.length;
@@ -84,13 +110,20 @@ export function calculateMood(needs, mind, minutes, personality = null,environme
   const weights=[.5+axes.creativity*.3+axes.sociability*.1,.5+axes.organization*.4,.5+axes.resilience*.4];
   const comfort=(needs.fun*weights[0]+needs.hygiene*weights[1]+needs.energy*weights[2])/
     weights.reduce((a,b)=>a+b,0);
-  const emotional=emotionMoodImpact(mind,minutes);
-  const memories=(recentMemoryEffect(mind,minutes,emotional.covered)+emotional.delta)*
-    (.75+axes.emotionalReactivity*.8);
+  // Divide the ONE existing emotion engine's outputs by source before capping
+  // work. A strong family event must not be erased by an unrelated work cap.
+  const entries=Array.isArray(mind?.emotions)?mind.emotions:[];
+  const worker=emotionMoodImpact({...mind,emotions:entries.filter(e=>isWorkMemory(e.source))},minutes);
+  const personal=emotionMoodImpact({...mind,emotions:entries.filter(e=>!isWorkMemory(e.source))},minutes);
+  const work=clamp(recentMemoryEffect(mind,minutes,worker.covered,'work')+
+    worker.delta,-14,12);
+  const everyday=recentMemoryEffect(mind,minutes,personal.covered,'other')+personal.delta;
+  const memories=(work+everyday)*(.75+axes.emotionalReactivity*.8);
   const optimism=(axes.optimism-.5)*14;
   const score=clamp(Math.round(20+average*.48+comfort*.27+
     clamp(memories,-24,17)+optimism-(worst<25?(25-worst)*.8:0)+
-    clamp(finite(environment)?environment:0,-ENVIRONMENT_MOOD_LIMIT,ENVIRONMENT_MOOD_LIMIT)),0,100);
+    clamp(finite(environment)?environment:0,-ENVIRONMENT_MOOD_LIMIT,ENVIRONMENT_MOOD_LIMIT)+
+    clamp(finite(workContext)?workContext:0,-5,5)),0,100);
   let label = 'Спокоен';
   if (worst < 20) {
     const lowest = values.indexOf(worst);
@@ -136,7 +169,7 @@ export function refreshMind(state,world=state?.world??null) {
     state.mind.wish = { id, since: state.minutes, until: state.minutes + 480 };
   }
   state.mind.mood = calculateMood(state.needs, state.mind, state.minutes,
-    state.personality,environmentSnapshot(state,world).delta);
+    state.personality,environmentSnapshot(state,world).delta,state.workMoodContext??0);
 }
 
 export function rememberAction(state, id) {
@@ -196,6 +229,10 @@ export function psychologyScore(state, id, wishReady = true) {
   if (id === 'fridge') score += taste('cooking')*3;
   if (!critical && wishReady && state.mind?.wish?.id === id) score += 11;
   if (id === 'sofa' && !critical && state.mind?.mood?.value < 48) score += 3;
+  if (state.workRecovery?.until>state.minutes) {
+    if(id==='bed'&&n.energy<45)score+=12;
+    if(id==='sofa'&&n.fun<40)score+=6;
+  }
   const last = state.mind?.memories?.at(-1);
   if (last && last.id === id && state.minutes - last.at < 90) score -= 4;
   return score;

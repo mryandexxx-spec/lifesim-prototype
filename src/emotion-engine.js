@@ -36,7 +36,21 @@ export const EMOTION_SOURCES=Object.freeze({
   'leisure.refused':Object.freeze({kind:'sadness',cause:'Не удалось провести время вместе',mood:-5}),
   'work.pride':Object.freeze({kind:'inspiration',cause:'Профессиональная гордость',mood:8}),
   'work.pressure':Object.freeze({kind:'anxiety',cause:'Напряжённая смена',mood:-7}),
-  'work.relief':Object.freeze({kind:'calm',cause:'Справился с рабочей ситуацией',mood:4})
+  'work.relief':Object.freeze({kind:'calm',cause:'Справился с рабочей ситуацией',mood:4}),
+  'worklife.success':Object.freeze({kind:'inspiration',cause:'Удачная рабочая смена',mood:7}),
+  'worklife.exhaustedPride':Object.freeze({kind:'inspiration',cause:'Гордость ценой усталости',mood:2}),
+  'worklife.hard':Object.freeze({kind:'anxiety',cause:'Сложная смена',mood:-8}),
+  'worklife.hardStrain':Object.freeze({kind:'anxiety',cause:'Сильная нагрузка на работе',mood:-10}),
+  'worklife.overloaded':Object.freeze({kind:'anxiety',cause:'Усталость после работы',mood:-5}),
+  'worklife.missed':Object.freeze({kind:'sadness',cause:'Пропущенная смена',mood:-9}),
+  'worklife.warning':Object.freeze({kind:'anxiety',cause:'Рабочее предупреждение',mood:-6}),
+  'worklife.finalWarning':Object.freeze({kind:'anxiety',cause:'Последнее предупреждение',mood:-10}),
+  'worklife.dismissal':Object.freeze({kind:'sadness',cause:'Увольнение',mood:-14}),
+  'worklife.promotion':Object.freeze({kind:'inspiration',cause:'Карьерное повышение',mood:11}),
+  'worklife.resignation':Object.freeze({kind:'anxiety',cause:'Волнение после ухода с работы',mood:-3}),
+  'worklife.resignationRelief':Object.freeze({kind:'calm',cause:'Облегчение после ухода с работы',mood:4}),
+  'worklife.sharedInterrupted':Object.freeze({kind:'sadness',cause:'Пришлось прервать совместный отдых',mood:-6}),
+  'worklife.sharedDisappointed':Object.freeze({kind:'sadness',cause:'Совместный отдых прервался',mood:-4})
 });
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const isRecord=v=>Boolean(v)&&typeof v==='object'&&!Array.isArray(v);

@@ -2,6 +2,8 @@
 import {careerDefinition} from './career-catalog.js';
 import {careerRankForContract} from './career-specializations.js';
 import {clockAt} from './career-work.js';
+import {MEMORY_TEXT} from './psychology.js';
+import {workLoadLabel} from './career-worklife.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 const signed=n=>(n>0?'+':'')+n;
@@ -44,6 +46,7 @@ export function shiftSummaryForEvent(root,event){
     workReport:last.workReport||null,
     lateMinutes:Math.max(0,last.lateMinutes||0),
     performance:contract.performance,
+    workFeeling:contract.workLife?.lastFeeling||null,
     performanceDelta:Number.isInteger(last.performanceDelta)?last.performanceDelta:null,
     detail:typeof event.text==='string'?event.text:'',
   });
@@ -142,6 +145,13 @@ export function createCareerShiftSummaryUI({host,getRoot,shouldDefer=()=>false,
     addRow('График',next.period);
     if(!next.missed)addRow('Отработано',next.duration);
     if(next.grade)addRow('Оценка',next.grade);
+    if(next.workReport&&!next.missed)
+      addRow('Самочувствие после смены',
+        workLoadLabel(next.workReport.strain||0)+' нагрузка'+
+        (next.workFeeling&&MEMORY_TEXT[next.workFeeling]
+          ?' · '+MEMORY_TEXT[next.workFeeling]:''));
+    else if(next.workFeeling&&MEMORY_TEXT[next.workFeeling])
+      addRow('Переживание',MEMORY_TEXT[next.workFeeling]);
     if(next.performanceDelta!==null)
       addRow('Результативность',signed(next.performanceDelta)+' · теперь '+next.performance+'/100');
     if(next.lateMinutes)addRow('Опоздание',duration(next.lateMinutes));

@@ -32,6 +32,8 @@ jobs:
           node --check src/simulation.js
           node --check src/career-catalog.js
           node --check src/career-scheduler.js
+          node --check src/career-worklife.js
+          node --check src/career-worklife-conflict.js
           node --check src/career-discipline.js
           node --check src/career-timeoff.js
           node --check src/career-state.js
@@ -224,7 +226,7 @@ jobs:
           cp src/tv-together.js site/src/
           cp src/furniture-placement-preview.js site/src/
           cp src/career-catalog.js src/career-scheduler.js src/career-state.js src/career-job-board.js src/career-phone-ui.js src/career-shift-summary-ui.js site/src/
-          cp src/career-discipline.js src/career-timeoff.js site/src/
+          cp src/career-discipline.js src/career-timeoff.js src/career-worklife.js src/career-worklife-conflict.js site/src/
           cp src/career-work-needs.js src/career-work.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js src/finance-ledger.js src/finance-presentation.js src/finance-phone-ui.js src/household-bills.js site/src/
           cp src/career-goals.js src/career-specializations.js src/career-seniority.js site/src/
           cp src/calendar-core.js src/calendar-events.js src/calendar-holidays.js src/calendar-reminders.js src/calendar-ui.js site/src/

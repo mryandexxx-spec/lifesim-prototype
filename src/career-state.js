@@ -7,6 +7,7 @@ import {restoreSeniorProof} from './career-seniority.js';
 import {restoreCareerTimeOff} from './career-timeoff.js';
 import {cleanWorkMode,restoreWorkNeeds} from './career-work-needs.js';
 import {newCareerDiscipline,restoreCareerDiscipline,disciplineRisk} from './career-discipline.js';
+import {newWorkLife,restoreWorkLife} from './career-worklife.js';
 import {specializationDefinition} from './career-specializations.js';
 import {resetSeniorProof} from './career-seniority.js';
 export const CAREER_SCHEMA=1;
@@ -89,6 +90,7 @@ function cleanContract(raw,id){
   contract.currentShift=cleanWorkShift(raw.currentShift,contract);
   const last=cleanLastShift(raw.lastShift,contract);
   if(last)contract.lastShift=last;
+  contract.workLife=restoreWorkLife(raw.workLife,contract.employmentId,last);
   return contract;
 }
 /** Only authored decisions enter per-resident work memory; no arbitrary save text. */
@@ -196,7 +198,7 @@ export function hireCareer(system,residentId,careerId,atMinute){
   const contract={residentId,employmentId:id,careerId,level,
     hiredAt:atMinute,status:'employed',performance:latest?60:50,currentShift:null,
     workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0,
-    timeOff,workMode:'normal',discipline:newCareerDiscipline()};
+    timeOff,workMode:'normal',discipline:newCareerDiscipline(),workLife:newWorkLife()};
   if(latest?.branchId&&specializationDefinition(careerId,latest.branchId)){
     contract.specialization={schema:1,id:latest.branchId,chosenAt:atMinute,
       workedShiftsAtChoice:0,focusReceiptId:null,focusScenarioId:null,focusAt:null};

@@ -1819,3 +1819,12 @@ button.time-card:active {transform:translateY(1px);}
 .career-phone-leave summary,.career-phone-discipline summary{min-height:44px;display:flex;align-items:center;cursor:pointer;touch-action:manipulation;font-weight:700;line-height:1.35}
 .career-phone-leave summary:focus-visible{outline:3px solid #3e865c;outline-offset:2px}
 .career-phone-leave .career-phone-action{min-height:44px;margin:5px 0}
+
+/* W3-D: compact, scroll-contained conflict controls inside the existing phone. */
+.career-phone-worklife-conflict { border:1px solid rgba(158,125,86,.40);
+  border-radius:12px;padding:12px;margin:12px 0;display:grid;gap:8px;
+  background:rgba(228,210,174,.13);min-width:0; }
+.career-phone-worklife-conflict .career-phone-action { min-height:44px;
+  white-space:normal;overflow-wrap:anywhere; }
+.career-phone-worklife { margin:10px 0;min-width:0; }
+.career-phone-worklife summary { cursor:pointer; }
