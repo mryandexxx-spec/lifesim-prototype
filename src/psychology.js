@@ -49,6 +49,7 @@ export const MEMORY_TEXT = Object.freeze({
   'worklife.dismissal':'Расстроен увольнением',
   'worklife.promotion':'Радуется повышению',
   'worklife.resignation':'Волнуется после смены работы',
+  'worklife.resignationRelief':'Почувствовал облегчение после ухода с работы',
   'worklife.sharedInterrupted':'Жалеет о прерванном совместном отдыхе',
   'worklife.sharedDisappointed':'Огорчился из-за прерванного совместного отдыха'
 });
@@ -90,7 +91,8 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set(),scope='all'
       'worklife.overloaded':-5,'worklife.missed':-9,
       'worklife.warning':-6,'worklife.finalWarning':-10,
       'worklife.dismissal':-14,'worklife.promotion':11,
-      'worklife.resignation':-3,'worklife.sharedInterrupted':-6,
+      'worklife.resignation':-3,'worklife.resignationRelief':4,
+      'worklife.sharedInterrupted':-6,
       'worklife.sharedDisappointed':-4};
     const effect=Object.hasOwn(socialEffect,memory.id)
       ?socialEffect[memory.id]:memory.fulfilled?12:5;
