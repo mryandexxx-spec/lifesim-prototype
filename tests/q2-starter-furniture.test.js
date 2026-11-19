@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newHousehold,loadHousehold,resolveActionFurniture} from '../src/household.js';
-import {ORIGINAL_FURNITURE,furnitureProvenance} from '../src/furniture-catalog.js';
+import {newHousehold,loadHousehold} from '../src/household.js';
+import {ORIGINAL_FURNITURE,furnitureProvenance,resolveActionFurniture} from '../src/furniture-catalog.js';
 import {createFurnitureEditor} from '../src/furniture-editor.js';
 import {recordFinanceChange} from '../src/finance-ledger.js';
 import {newFurnitureShop,STARTER_SELL_PERCENT,SHOP_SELL_PERCENT,starterAppraisal,
