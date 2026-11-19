@@ -13,7 +13,7 @@ test('UI3 registers each interactive object by geometry and allows future pieces
   assert.match(src,/const registerHitVolume=\(id,kind,x,y,z,sx,sy,sz\)=>/);
   for(const id of ['bed','fridge','sofa','shower','toilet'])
     assert.ok(src.includes("touchBox('"+id+"'"),id+' is registered');
-  assert.match(src,/const table=game\.world\.furniture\.instances\.find\(i=>i\.prefabId==='table'\)/);
+  assert.match(src,/\.filter\(i=>i\.prefabId==='table'&&i\.location==='home'\)/);
   assert.match(src,/kind:'blocker',id:'coffee-table'/);
 });
 test('UI3 tests only non-selected 3D residents and honors shower privacy',()=>{

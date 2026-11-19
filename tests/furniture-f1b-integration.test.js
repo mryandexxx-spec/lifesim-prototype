@@ -30,7 +30,8 @@ test('F1b all five physical appliances are scene grouped and registered for touc
     assert.ok(FURNITURE_CATALOG[key].actionId,key);
   }
   assert.match(scene,/fixtureType:decorDrawing\?\.origin\.prefabId\|\|null/);
-  assert.match(scene,/bounds:furnitureBounds\(game\.world,volume\.fixtureType/);
+  assert.match(scene,/furnitureBounds\(game\.world,volume\.fixtureType,/);
+  assert.match(scene,/item\.instanceId===originalId&&item\.location==='home'/);
   assert.match(scene,/const placed=furniturePoint\(game\.world,id,/);
 });
 test('F1b bed two slots and available sleeping destination use current transformed instance',()=>{

@@ -52,10 +52,10 @@ test('two sleepers reserve different sides of the same purchased bed and survive
   assert.equal(furnitureAvailable(loaded,'bed','alex','missing-bed'),false);
 });
 
-test('original bed is protected; bought bed cannot be stored or sold while reserved',()=>{
+test('last essential bed is protected; bought bed cannot be stored or sold while reserved',()=>{
   const original=newFurnitureWorld().instances.find(i=>i.prefabId==='bed');
-  assert.equal(canTradeMarketInstance(original),false);
-  assert.equal(storeMarketItem(newFurnitureWorld(),newFurnitureShop(),original.instanceId).reason,'protected-item');
+  assert.equal(canTradeMarketInstance(original),true);
+  assert.equal(storeMarketItem(newFurnitureWorld(),newFurnitureShop(),original.instanceId).reason,'last-essential');
   const bought=buyMarketItem(emptyHouse(),newFurnitureShop(),'bed',bedPose,trialResidents);
   assert.equal(bought.ok,true);
   const lock={lockedInstanceIds:[bought.instanceId]};
