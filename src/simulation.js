@@ -9,6 +9,7 @@ import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interact
 import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-interaction.js';
 import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
+import {insideLot} from './lot-surface.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
 import {kitchenRecipe} from './kitchen.js';
@@ -84,13 +85,17 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
   // M4 is an optional v1 field; don't reset old progress or invent accidents.
   if (!Number.isFinite(data.needs.bladder)) next.needs.bladder=BLADDER_LEGACY_DEFAULT;
   if (Number.isFinite(data.position.x) && Number.isFinite(data.position.z)) {
-    next.position.x = Math.max(-4.5, Math.min(13.7, data.position.x));
-    next.position.z = Math.max(-3.7, Math.min(3.7, data.position.z));
+    next.position.x = Math.max(-8.73, Math.min(22.73, data.position.x));
+    next.position.z = Math.max(-11.73, Math.min(11.73, data.position.z));
   }
   if (Number.isFinite(data.autonomy?.nextAt)) next.autonomy.nextAt = Math.max(0, Math.min(data.autonomy.nextAt, 10000000));
   if (typeof data.autonomy?.enabled === 'boolean') next.autonomy.enabled = data.autonomy.enabled;
   restoreMind(data.mind, next);
-  if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase) && (next.autonomy.enabled || !data.action.automatic)) {
+  if(data.action?.id==='move'&&data.action.phase==='walking'&&
+    data.action.automatic===false&&insideLot(data.action.goal?.x,data.action.goal?.z)){
+    next.action={id:'move',phase:'walking',automatic:false,elapsed:0,
+      goal:{x:data.action.goal.x,z:data.action.goal.z}};
+  }else if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase) && (next.autonomy.enabled || !data.action.automatic)) {
     next.action = { id: data.action.id, phase: data.action.phase, elapsed: Math.max(0, Math.min(1000, Number(data.action.elapsed) || 0)), automatic: Boolean(data.action.automatic) };
     if(data.action.id==='dining'){
       if(validFurnitureInstanceId(data.action.diningSeatInstanceId)&&
