@@ -1,6 +1,8 @@
 /** W1-B.2a: pure recruitment/read-model adapter. No DOM, PlayCanvas or salary mutations. */
 import {CAREER_CATALOG,careerDefinition} from './career-catalog.js';
-import {hireCareer,resignCareer,CAREER_RESIDENT_IDS} from './career-state.js';
+import {hireCareer,separateCareer,CAREER_RESIDENT_IDS} from './career-state.js';
+import {careerRankForContract} from './career-specializations.js';
+import {DISCIPLINE_REHIRE_MINUTES} from './career-discipline.js';
 import {nextCareerShift,plannedCareerShift} from './career-scheduler.js';
 import {civilToSerial} from './calendar-core.js';
 import {canResignNow} from './career-work.js';
@@ -21,6 +23,15 @@ function legalRoot(root,id){
     Number.isFinite(root.minutes)&&root.minutes>=0&&root.calendar?.startCivilDate&&
     root.careerSystem?.schema===1;
 }
+/** A discharge locks only the same profession; resignation is never locked. */
+export function careerRehireRetry(root,residentId,careerId){
+  const now=Number.isFinite(root?.minutes)?root.minutes:0;
+  const previous=[...(root?.careerSystem?.endedContracts?.[residentId]||[])].reverse()
+    .find(entry=>entry.careerId===careerId);
+  const retryAt=previous?.reason==='dismissed'?
+    previous.at+DISCIPLINE_REHIRE_MINUTES:0;
+  return {retryAt,remaining:Math.max(0,Math.ceil(retryAt-now)),blocked:retryAt>now};
+}
 export function careerVacancies(root,residentId){
   if(!legalRoot(root,residentId))return [];
   if(root.careerSystem.byResident?.[residentId])return [];
@@ -28,9 +39,11 @@ export function careerVacancies(root,residentId){
     // Preview the real scheduler using a TEMPORARY contract; no state is written.
     const preview=hireCareer(root.careerSystem,residentId,career.id,root.minutes);
     const shift=nextCareerShift(root.calendar,preview.byResident[residentId],root.minutes);
-    const rank=career.ranks[0];
+    const rank=careerRankForContract(preview.byResident[residentId])||career.ranks[0];
+    const retry=careerRehireRetry(root,residentId,career.id);
     return Object.freeze({
       id:career.id,title:career.title,description:career.description,
+      disciplineRetryAt:retry.retryAt,disciplineBlocked:retry.blocked,
       rank:rank.title,hourlyCredits:rank.hourlyCredits,
       duration:career.schedule.duration,
       workdays:career.schedule.weekdays.map(d=>DAY_NAMES[d]).join(' · '),
@@ -47,6 +60,9 @@ export function acceptCareerOffer(root,residentId,careerId){
   if(root.careerSystem.byResident?.[residentId])
     return {ok:false,reason:'У персонажа уже есть работа'};
   if(!careerDefinition(careerId))return {ok:false,reason:'Вакансия больше недоступна'};
+  const retry=careerRehireRetry(root,residentId,careerId);
+  if(retry.blocked)return {ok:false,
+    reason:'После увольнения повторный отклик доступен через '+retry.remaining+' игровых мин.'};
   try{
     const careerSystem=hireCareer(root.careerSystem,residentId,careerId,root.minutes);
     const contract=careerSystem.byResident[residentId];
@@ -61,7 +77,9 @@ export function leaveCareer(root,residentId){
     return {ok:false,reason:'Нет действующего договора'};
   if(!canResignNow(root,residentId))
     return {ok:false,reason:'Дождись возвращения со смены перед увольнением'};
-  return {ok:true,careerSystem:resignCareer(root.careerSystem,residentId)};
+  const result=separateCareer(root.careerSystem,residentId,'resigned',root.minutes);
+  if(!result.ok)return result;
+  return {ok:true,careerSystem:result.careerSystem};
 }
 
 /** Read-only work dates for the EXISTING family calendar. Employment contract is
