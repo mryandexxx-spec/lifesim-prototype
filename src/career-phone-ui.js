@@ -17,6 +17,9 @@ import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff,
   claimPortableCareerLeave} from './career-timeoff.js';
 import {payHouseholdBill} from './household-bills.js';
 import {workScenario,decideWorkIncident,workIncidentChoiceDescription} from './career-incidents.js';
+import {jobSatisfaction,workLoadLabel,workLifeConflict} from './career-worklife.js';
+import {resolveWorkLifeConflict} from './career-worklife-conflict.js';
+import {MEMORY_TEXT} from './psychology.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
   startCareerInterview,answerCareerInterview,markRecruitmentRead,
   finishRecruitmentApplication,interviewScore,recruitmentRetry} from './career-recruitment.js';
@@ -158,6 +161,62 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     facts.append(element('span','career-phone-discipline-status',
       'Дисциплина: '+disciplineName+' · риск '+discipline.risk+'/12'));
     body.append(facts);
+    const life=element('details','career-phone-worklife');
+    const satisfaction=jobSatisfaction(current,root.minutes);
+    life.append(element('summary','career-phone-notice',
+      '💛 Баланс работы и жизни · '+satisfaction+'/100'));
+    life.append(element('p','career-phone-muted',
+      'Удовлетворённость: '+satisfaction+'/100. Оценка последних пяти смен, '+ 
+      'результативность, повышение и дисциплина. Влияние на настроение — до ±5.'));
+    if(current.lastShift){
+      const last=current.lastShift,report=last.workReport;
+      life.append(element('p','career-phone-muted',
+        'Последняя смена: '+(last.grade||last.outcome)+
+        ' · нагрузка '+workLoadLabel(report?.strain||0)+
+        (report?' ('+Math.round(report.strain)+' / 100)':' (нет отчёта)')));
+    }
+    const feeling=current.workLife?.lastFeeling;
+    if(feeling&&MEMORY_TEXT[feeling])
+      life.append(element('p','career-phone-notice',MEMORY_TEXT[feeling]));
+    life.append(element('p','career-phone-muted',
+      'Восстановление: сон при усталости, отдых, полноценное питание и настоящее общение. '+
+      'Режим «Беречь силы» уменьшает будущую нагрузку.'));
+    body.append(life);
+    const conflict=workLifeConflict(root,who);
+    if(conflict){
+      const card=element('section','career-phone-worklife-conflict');
+      card.append(element('h3','career-phone-section-title','⚖️ Работа или личные дела?'));
+      card.append(element('p','career-phone-notice',
+        conflict.activeType==='shared'?
+        'Совместное занятие пересекается с выходом на смену.':
+        'Твоё текущее домашнее занятие пересекается с выходом на смену.'));
+      card.append(element('p','career-phone-muted',
+        conflict.lateMinutes>=30?'Уже опаздывает на '+conflict.lateMinutes+
+        ' мин.; дисциплинарные правила W3-C сохраняются.':
+        'Если закончить дело, возможно опоздание. Ручная очередь не исчезнет.'));
+      for(const [kind,label] of [['leave','Выйти на работу'],['finish','Закончить дело']]){
+        card.append(action(label,()=>{
+          const live=personRoot();if(!live)return;
+          const result=resolveWorkLifeConflict(live,who,kind);
+          if(!result.ok){notify(result.reason);render();return;}
+          save(true);
+          notify(kind==='leave'?'Идёт на работу. Очередь сохранена.':'Продолжает своё занятие');
+          render();
+        },kind==='leave'?'career-phone-primary':'career-phone-secondary'));
+      }
+      if(conflict.canTimeOff){
+        for(const type of ['unpaid','paid']){
+          if(type==='paid'&&(current.timeOff?.balance||0)<1)continue;
+          card.append(action(type==='paid'?'Оформить оплачиваемый отпуск':'Оформить отгул',()=>{
+            const live=personRoot();if(!live)return;
+            const result=resolveWorkLifeConflict(live,who,'timeoff',{leaveType:type});
+            if(!result.ok){notify(result.reason);render();return;}
+            save(true);notify('Законный отдых оформлен без прогула');render();
+          },'career-phone-secondary'));
+        }
+      }
+      body.append(card);
+    }
     const disciplineDetails=element('details','career-phone-discipline');
     disciplineDetails.append(element('summary','career-phone-notice',
       '⚖️ Трудовая дисциплина · причины и восстановление'));
