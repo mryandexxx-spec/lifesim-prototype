@@ -9,7 +9,8 @@ import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interact
 import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-interaction.js';
 import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {validOutdoorId} from './outdoor-catalog.js';
-import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
+import {NEED_DECAY_PER_MINUTE,SLEEP_MIN_MINUTES,SLEEP_MAX_MINUTES,SLEEP_WAKE_ENERGY,
+  SELF_CARE_WISH_MAX_NEED,SELF_CARE_REPEAT_COOLDOWN_MINUTES} from './need-balance.js';
 import {insideLot} from './lot-surface.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
@@ -20,9 +21,9 @@ import {preferenceAffinity} from './trait-catalog.js';
 export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','bladder']);
 export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
-  bed: { label: 'Поспать', need: 'energy', duration: 60, benefitPerMinute: 0.74, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
-  fridge: { label: 'Быстро перекусить', need: 'hunger', duration: 26, benefitPerMinute: 0.80, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
-  shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.48, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
+  bed: { label: 'Поспать', need: 'energy', duration: SLEEP_MAX_MINUTES, benefitPerMinute: 0.102, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
+  fridge: { label: 'Быстро перекусить', need: 'hunger', duration: 26, benefitPerMinute: 0.68, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
+  shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.27, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
   // F4D: sitting is a real physical activity, not an unearned skill or need bonus.
   seat: { label: 'Посидеть', need: 'fun', duration: 42, benefitPerMinute: 0, location: [0,-1.03] },
@@ -31,7 +32,7 @@ export const ACTIONS = Object.freeze({
     benefitPerMinute:.74,location:[0,0]},
   // F4F: a real fridge-to-purchased-chair dining journey; hunger only during bites.
   dining: { label:'Пообедать за столом',need:'hunger',duration:31,
-    benefitPerMinute:1.55,location:[0,-1.5] },
+    benefitPerMinute:1.00,location:[0,-1.5] },
   // F4G: cooking never directly feeds or rewards skills in the generic tick.
   cook: {label:'Приготовить блюдо',need:'fun',duration:32,
     benefitPerMinute:0,location:[0,-1.08]},
@@ -47,7 +48,7 @@ export const ACTIONS = Object.freeze({
   tv: { label: 'Смотреть телевизор', need: 'fun', duration: TV_WATCH_DURATION,
     benefitPerMinute: 1.08, location: [TV_APPROACH.x,TV_APPROACH.z] },
   toilet: { label: 'Сходить в туалет', need: 'bladder', duration: 26,
-    benefitPerMinute: 2.7, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] },
+    benefitPerMinute: 1.2, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] },
   // One compatibility bridge for every future item-driven hobby: the true
   // activity, timing and effects are authored in the H0 activity registry.
   hobby: { label: 'Читать книгу', need: 'fun', duration: 36, benefitPerMinute: 1.05,
@@ -67,7 +68,7 @@ const clamp = value => Math.max(0, Math.min(100, value));
 export function newGame(profile=DEMO_PROFILES.first) {
   const state = {
     version: 1, minutes: 8 * 60, speed: 1, paused: false,
-    needs: { hunger: 78, energy: 67, hygiene: 82, fun: 58, social:SOCIAL_NEED_INITIAL, bladder:76 },
+    needs: { hunger: 82, energy: 85, hygiene: 80, fun: 76, social:SOCIAL_NEED_INITIAL, bladder:82 },
     position: { x: -0.25, z: 0.35 }, action: null, event: 'Свободное время',
     autonomy: { nextAt: 480, enabled: true },
     personality:restoreProfile(profile,DEMO_PROFILES.first),
@@ -227,8 +228,17 @@ export function tick(state, minutes,world=state?.world??null) {
   const sofaRestMinutes=sitting&&state.action?.phase==='using'
     ?Math.min(minutes,Math.max(0,ACTIONS[state.action.id].duration-state.action.elapsed))
     :0;
+  // Q3b: sleep is restorative for 7–9 hours. At or after seven hours,
+  // wake once Energy reaches 92; always wake at nine hours. Account for an
+  // oversized tick without granting sleep beyond the natural wake boundary.
+  const sleeping=state.action?.id==='bed'&&state.action.phase==='using';
+  const sleepElapsed=sleeping?state.action.elapsed:0;
+  const untilWake=sleeping?Math.max(0,Math.min(SLEEP_MAX_MINUTES-sleepElapsed,
+    Math.max(SLEEP_MIN_MINUTES-sleepElapsed,
+      (SLEEP_WAKE_ENERGY-state.needs.energy)/ACTIONS.bed.benefitPerMinute))):0;
+  const sleepMinutes=Math.min(minutes,untilWake);
   for(const need of PHYSICAL_NEEDS){
-    const elapsed=need==='energy'?minutes-sofaRestMinutes:minutes;
+    const elapsed=need==='energy'?Math.max(0,minutes-sofaRestMinutes-sleepMinutes):minutes;
     state.needs[need]=clamp(state.needs[need]-NEED_DECAY_PER_MINUTE[need]*elapsed);
   }
   // Social fulfilment changes only on a newly confirmed social receipt.
@@ -277,7 +287,8 @@ export function tick(state, minutes,world=state?.world??null) {
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
     const duration=hobby?.timeBudget.targetMinutes??definition.duration;
-    const amount = Math.min(minutes, Math.max(0, duration - state.action.elapsed));
+    const amount = state.action.id==='bed'?sleepMinutes:
+      Math.min(minutes, Math.max(0, duration - state.action.elapsed));
     // Hunger rises only when eating, not before taking food from the shelf.
     // Preserve the previous total benefit by concentrating it in the bite phase.
     let gained=(hobby?.needEffects.find(effect=>effect.statId==='needs.fun')?.perMinute
@@ -324,8 +335,11 @@ export function tick(state, minutes,world=state?.world??null) {
     }
     refreshMind(state,world);
     state.action.elapsed += amount;
-    if (state.action.elapsed >= duration ||
-        (!['seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+    const sleepWoke=state.action.id==='bed'&&
+      (state.action.elapsed>=SLEEP_MAX_MINUTES||
+       (state.action.elapsed>=SLEEP_MIN_MINUTES&&state.needs.energy>=SLEEP_WAKE_ENERGY));
+    if (state.action.elapsed >= duration || sleepWoke ||
+        (!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
@@ -341,30 +355,38 @@ export function tick(state, minutes,world=state?.world??null) {
 export function autonomousChoice(state) {
   if (state.paused || state.action || !state.autonomy.enabled || state.minutes < state.autonomy.nextAt) return null;
   const hour = Math.floor(state.minutes % 1440 / 60);
-  const night = hour >= 22 || hour < 6;
+  const night = hour >= 21 || hour < 6;
   const critical = Math.min(...PHYSICAL_NEEDS.map(id => state.needs[id])) < 24;
   // A lonely resident may still take care of basic needs or seek a real
   // social interaction; there is deliberately no imaginary 'social sofa'.
   const wishReady = !critical && state.minutes >= 540;
   const options = [
-    { id: 'fridge', need: 'hunger', threshold: 43, weight: 1.25 },
+    { id: 'fridge', need: 'hunger', threshold: 55, weight: 1.25 },
     { id: 'bed', need: 'energy', threshold: 42, weight: 1.12 },
-    { id: 'shower', need: 'hygiene', threshold: 40, weight: 0.95 },
-    { id: 'toilet', need: 'bladder', threshold: 53, weight: 1.67 },
-    { id: 'sofa', need: 'fun', threshold: 37, weight: 0.90 }
+    { id: 'shower', need: 'hygiene', threshold: 58, weight: 0.95 },
+    { id: 'toilet', need: 'bladder', threshold: 50, weight: 1.67 },
+    { id: 'sofa', need: 'fun', threshold: 55, weight: 0.90 }
   ];
   const scored = options.map(option => {
     const value = state.needs[option.need];
     const urgency = Math.max(0, option.threshold - value) * option.weight;
     // Sleep is a physiological priority at night, even if a leisure wish
     // happens to be active. Temperament never overrides basic rest.
-    const bedtime = night && option.id === 'bed' && value < 67 ? 10+(67-value)*1.60 : 0;
+    const bedtime = night && option.id === 'bed' && value < 70 ? 10+(70-value)*1.60 : 0;
     const base = urgency + bedtime;
     // No voluntary action at game start: let the player explore for the first hour.
     const recovery=state.workRecovery?.until>state.minutes&&
       ((option.id==='bed'&&value<45)||(option.id==='sofa'&&value<40));
-    const eligible = base > 0 || recovery || (wishReady && state.mind?.wish?.id === option.id);
-    const score = eligible ? base + psychologyScore(state, option.id, wishReady) : 0;
+    // Wishes never force repetitive green-zone self-care. Memories are
+    // canonical save-v1 receipts, so cooldown survives reload without a new field.
+    const urgent=value<24||(option.id==='bed'&&night&&value<42);
+    const recent=(state.mind?.memories||[]).some(memory=>
+      memory.id===option.id&&state.minutes-memory.at>=0&&
+      state.minutes-memory.at<SELF_CARE_REPEAT_COOLDOWN_MINUTES);
+    const wish=wishReady&&value<SELF_CARE_WISH_MAX_NEED&&
+      state.mind?.wish?.id===option.id;
+    const eligible=(base>0||recovery||wish)&&(!recent||urgent);
+    const score=eligible ? base + psychologyScore(state,option.id,wishReady) : 0;
     return { id: option.id, score };
   }).sort((a, b) => b.score - a.score);
   return scored[0].score > 0 ? scored[0].id : null;
