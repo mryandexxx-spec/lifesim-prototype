@@ -1,6 +1,7 @@
 /** Headless navigation: room geometry in world X/Z coordinates, no PlayCanvas dependency. */
 import {FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {BUILD_LOT,constructionContains,constructionWallAt} from './construction.js';
+import {insideLot,legacyLotWallAt,OUTDOORS_SCHEMA} from './lot-surface.js';
 import {newFurnitureWorld,furnitureObstacles} from './furniture-catalog.js';
 // F4D: eastward extension exactly doubles navigable floor area; old positions stay fixed.
 export const ROOM = Object.freeze({ minX: -4.62, maxX: 13.86, minZ: -3.96, maxZ: 3.98 });
@@ -9,7 +10,8 @@ export const ACTOR_RADIUS = 0.26;
 export const FURNITURE = Object.freeze(furnitureObstacles(newFurnitureWorld()));
 const layoutCache=new WeakMap();
 // Function declaration is hoisted before the historic static-grid initialization.
-function dynamicConstruction(layout){return layout?.construction?.schema===1&&!layout.construction.legacy;}
+function dynamicConstruction(layout){return layout?.construction?.schema===1&&
+  (!layout.construction.legacy||layout?.outdoors?.schema===OUTDOORS_SCHEMA);}
 function furnitureData(layout){
   return layout?.furniture?.instances?layout.furniture:layout?.instances?layout:null;
 }
@@ -32,6 +34,11 @@ function canWalk(x,z,obstacles){
 
 /** Obstacles include a walking clearance radius to protect the body. */
 export function isWalkable(x,z,layout=null){
+  if(layout?.outdoors?.schema===OUTDOORS_SCHEMA&&layout?.construction?.schema===1)
+    return insideLot(x,z)&&!legacyLotWallAt(layout.construction,x,z,ACTOR_RADIUS)&&
+      !constructionWallAt(layout,x,z,ACTOR_RADIUS)&&
+      !obstaclesFor(layout).some(rect=>x>=rect.minX-ACTOR_RADIUS&&x<=rect.maxX+ACTOR_RADIUS&&
+        z>=rect.minZ-ACTOR_RADIUS&&z<=rect.maxZ+ACTOR_RADIUS);
   if(dynamicConstruction(layout))return Number.isFinite(x)&&Number.isFinite(z)&&
     constructionContains(layout,x,z)&&!constructionWallAt(layout,x,z,ACTOR_RADIUS)&&
     !obstaclesFor(layout).some(rect=>x>=rect.minX-ACTOR_RADIUS&&x<=rect.maxX+ACTOR_RADIUS&&
@@ -175,7 +182,8 @@ export function findPath(from,to,layout=null){
 const topologyGrids=new WeakMap();
 const DSTEP=.22;
 function dynamicGrid(layout){
-  const construction=layout.construction,revision=furnitureData(layout)?.revision??0;
+  const construction=layout.construction,revision=[construction.revision||0,
+    furnitureData(layout)?.revision||0,layout.outdoors?.revision||0].join(':');
   const prior=topologyGrids.get(construction);
   if(prior?.revision===revision)return prior.grid;
   const nx=Math.floor((BUILD_LOT.maxX-BUILD_LOT.minX)/DSTEP)+1;
