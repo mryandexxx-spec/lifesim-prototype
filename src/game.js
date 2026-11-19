@@ -5384,7 +5384,7 @@ function boot() {
     $('outdoor-tool-paint').setAttribute('aria-pressed',String(outdoorTool==='paint'));
     $('outdoor-tool-camera').setAttribute('aria-pressed',String(outdoorTool==='camera'));
     outdoorCategory=$('outdoor-category').value;
-    $('outdoor-surface-choice').hidden=outdoorCategory!=='ground';
+    document.querySelector('.outdoor-surface-choice[for="outdoor-ground-kind"]').hidden=outdoorCategory!=='ground';
     $('outdoor-feature-controls').hidden=outdoorCategory==='ground';
     $('outdoor-feature-kind-label').hidden=outdoorCategory==='ground'||
       $('outdoor-feature-operation').value!=='place';
