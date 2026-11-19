@@ -1,0 +1,41 @@
+name: Q1 + Q4 — camera zoom and work incident mobile WebGL
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  q1-q4:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Node modules and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Pure state, syntax and full unit regression
+        run: |
+          node --check src/game.js
+          node --check src/career-phone-ui.js
+          node --check src/camera-controls.js
+          node --check tests/q1-q4-browser-smoke.mjs
+          npm test
+      - name: Real Chromium WebGL four-size touch and work incident smoke
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/q1-q4-http.log 2>&1 &
+          sleep 3
+          node tests/q1-q4-browser-smoke.mjs
+      - name: Keep diagnostic view screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q1-q4-webgl-screens
+          path: q1-q4-work-*.png
+          if-no-files-found: ignore
