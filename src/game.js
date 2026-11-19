@@ -23,7 +23,8 @@ import {applyWorkMoodContext} from './career-worklife.js';
 import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
   residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
 import { findPath, nearestWalkable, isWalkable } from './navigation.js';
-import {lotRaySurface,lotActorHeight} from './lot-surface.js';
+import {lotRaySurface,lotActorHeight,outdoorCellAt,OUTDOOR_GRID_WIDTH} from './lot-surface.js';
+import {previewOutdoorPaint,commitOutdoorPreview} from './outdoor-proposals.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -273,7 +274,7 @@ document.addEventListener('pointerdown',event=>{
 // the existing, tested Build/Furnish handlers.
 let homeOpen=false;
 function setHomeOpen(open,{restoreFocus=false}={}){
-  if(open&&(dialogueNeedsDecision(game)||furnishMode||buildMode))return;
+  if(open&&(dialogueNeedsDecision(game)||furnishMode||buildMode||outdoorMode))return;
   homeOpen=Boolean(open);
   $('home-panel').hidden=!homeOpen;
   $('home-open').setAttribute('aria-expanded',String(homeOpen));
@@ -323,7 +324,7 @@ const positionViewPanel=()=>{
   panel.style.setProperty('--view-y',pos.y+'px');
 };
 function setViewOpen(open,{restoreFocus=false}={}){
-  if(open&&(dialogueNeedsDecision(game)||furnishMode||buildMode))return;
+  if(open&&(dialogueNeedsDecision(game)||furnishMode||buildMode||outdoorMode))return;
   viewOpen=Boolean(open);
   $('view-panel').hidden=!viewOpen;
   $('view-toggle').setAttribute('aria-expanded',String(viewOpen));
@@ -379,6 +380,7 @@ const META = {
 let updatePhoneProps=()=>{}; // Cosmetic phone mesh is bound when the 3D rigs exist.
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
 let buildMode=false; // F5-A separate pause-on-editor; house geometry persists, UI mode does not.
+let outdoorMode=false; // LOT-B1 transient outdoor editor: world and credits still persist in root-v1.
 let selected = null;
 let selectedFurnitureInstanceId=null; // action-specific target, never in household save
 let beginAction = () => false;
@@ -1631,21 +1633,23 @@ renderQueuePanel();
 renderSocialContext();
 function renderPauseButton(){
   const blocked=dialogueNeedsDecision(game);
-  const paused=game.paused||blocked||furnishMode;
+  const paused=game.paused||blocked||furnishMode||buildMode||outdoorMode;
   $('pause-icon').textContent=paused?'▶':'Ⅱ';
   $('pause-btn').setAttribute('aria-label',blocked
     ?'Выбери реплику: игровое время остановлено'
+    :outdoorMode?'Участок: игровое время остановлено'
+    :buildMode?'Строительство: игровое время остановлено'
     :furnishMode?'Обстановка: игровое время остановлено'
       :paused?'Продолжить':'Пауза');
 }
 $('pause-btn').addEventListener('click', () => {
-  if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||furnishMode)return;
+  if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||furnishMode||buildMode||outdoorMode)return;
   game.paused = !game.paused;
   renderPauseButton();
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
 });
 $('speed-btn').addEventListener('click', () => {
-  if(furnishMode||buildMode)return;
+  if(furnishMode||buildMode||outdoorMode)return;
   game.speed = game.speed === 1 ? 3 : 1;
   $('speed-btn').textContent = `${game.speed}×`;
   toast(game.speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
@@ -1659,7 +1663,7 @@ function updateAutoButton() {
   $('auto-state').textContent = enabled ? 'ВКЛ' : 'ВЫКЛ';
 }
 $('auto-btn').addEventListener('click', () => {
-  if(furnishMode||buildMode)return;
+  if(furnishMode||buildMode||outdoorMode)return;
   const enabled = setHouseholdAutonomy(game, !game.autonomy.enabled);
   restartAutonomyWait();
   if (enabled) game.event = 'Свободное время';
@@ -1730,7 +1734,7 @@ const careerPhone=createCareerPhoneUI({
   },
   save,notify:toast,onFundsChanged:updateFamilyBalance,
   onOpenChange:id=>updatePhoneProps(id),
-  canOpen:()=>!furnishMode&&!buildMode&&!dialogueNeedsDecision(game),
+  canOpen:()=>!furnishMode&&!buildMode&&!outdoorMode&&!dialogueNeedsDecision(game),
   beforeOpen:()=>{
     calendarUI.close();closeCalendarAnchorPanel();setHomeOpen(false);
     closeMindPanel();closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);
@@ -2108,6 +2112,43 @@ function boot() {
   const automaticDoors=[];
   const lotGround=box('LOT-A lawn',7,-.59,0,32,.12,24,mat('#8fb78b'));
   lotGround.enabled=true;
+  // B1: four *combined* meshes, not one entity per cell. Even the full
+  // 1536-cell override limit produces at most four draw-call groups.
+  const outdoorPaintMaterials={
+    stone:mat('#aaa99b'),gravel:mat('#c1b6a0'),
+    soil:mat('#80694e'),flowers:mat('#9875a7')
+  };
+  const outdoorPaintNodes=[],outdoorPaintMeshes=[];
+  const renderOutdoorGround=()=>{
+    for(const n of outdoorPaintNodes.splice(0))n.destroy();
+    for(const m of outdoorPaintMeshes.splice(0))m.destroy();
+    const groups=new Map();
+    for(const entry of game.world?.outdoors?.ground||[]){
+      if(!outdoorPaintMaterials[entry.kind]||!Number.isInteger(entry.cell)||
+         entry.cell<0||entry.cell>=3072)continue;
+      let group=groups.get(entry.kind);
+      if(!group){group={vertices:[],normals:[],indices:[]};groups.set(entry.kind,group);}
+      const i=entry.cell%OUTDOOR_GRID_WIDTH,j=Math.floor(entry.cell/OUTDOOR_GRID_WIDTH);
+      const x=-9+i*.5,z=-12+j*.5,y=-.521,base=group.vertices.length/3;
+      group.vertices.push(x,y,z,x+.5,y,z,x+.5,y,z+.5,x,y,z+.5);
+      for(let k=0;k<4;k++)group.normals.push(0,1,0);
+      group.indices.push(base,base+2,base+1,base,base+3,base+2);
+    }
+    for(const [kind,group] of groups){
+      const mesh=new pc.Mesh(app.graphicsDevice);
+      mesh.setPositions(group.vertices);mesh.setNormals(group.normals);
+      mesh.setIndices(group.indices);mesh.update();
+      const node=new pc.Entity('LOT-B1 ground '+kind);
+      node.addComponent('render',{meshInstances:[
+        new pc.MeshInstance(mesh,outdoorPaintMaterials[kind])
+      ]});
+      app.root.addChild(node);outdoorPaintMeshes.push(mesh);outdoorPaintNodes.push(node);
+    }
+  };
+  renderOutdoorGround();
+  const outdoorPaintGhost=box('LOT-B1 paint preview',0,-.509,0,.5,.025,.5,
+    mat('#62b889',{opacity:.30}));
+  outdoorPaintGhost.enabled=false;
   const buildGhost=box('F5 preview',0,.05,0,.2,.06,.2,mat('#438ac4',{opacity:.25}));
   buildGhost.enabled=false;
   const buildWallMarker=box('F5 selected wall',0,.32,0,.3,.62,.3,mat('#24c8bc',{opacity:.72}));
@@ -3521,7 +3562,7 @@ function boot() {
     game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
     alexSeatInstanceId=null;
     drawnDiningChairs.clear(); // reset returns every visual-only chair to its saved position
-    updateDecorNodes();
+    updateDecorNodes();renderOutdoorGround();
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
     showerPrivacy.enabled=false;
@@ -3564,7 +3605,7 @@ function boot() {
     toast('Камера сброшена');
   });
   $('menu-lot-camera-btn').addEventListener('click',()=>{
-    if(furnishMode||buildMode)return;
+    if(furnishMode||buildMode||outdoorMode)return;
     setView({...view,centerX:7,centerZ:0,distance:44,pitch:61});
     setViewOpen(false);toast('Весь участок: коснись земли, чтобы отправить жителя');
   });
@@ -5584,15 +5625,15 @@ function boot() {
     // Mandatory dialogue decisions freeze clock/needs/autonomy/animation
     // without altering the player's saved manual pause preference.
     shiftSummary.flush();
-    const active=!game.paused&&!furnishMode&&!dialogueNeedsDecision(game)&&
+    const active=!game.paused&&!furnishMode&&!outdoorMode&&!dialogueNeedsDecision(game)&&
       !careerPhone.interviewNeedsDecision()&&!shiftSummary.isOpen()&&!document.hidden;
-    const frameActive=active&&!buildMode;
+    const frameActive=active&&!buildMode&&!outdoorMode;
     const sharedSound=frameActive&&game.socialAction?.phase==='using'&&
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
     musicAudio.update(audibleMusicStyle([game,game.otherSim],{
-      paused:!frameActive,hidden:document.hidden,editing:furnishMode||buildMode})||sharedSound);
+      paused:!frameActive,hidden:document.hidden,editing:furnishMode||buildMode||outdoorMode})||sharedSound);
     const animDt=active?dt:0;
-    const frameAnimDt=buildMode?0:animDt;
+    const frameAnimDt=buildMode||outdoorMode?0:animDt;
     if(frameActive){
       accumulator+=dt;
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
