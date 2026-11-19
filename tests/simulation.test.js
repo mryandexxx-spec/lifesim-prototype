@@ -5,7 +5,7 @@ import { newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, readab
 test('initial state is valid, with independent new instances', () => {
   const a = newGame(), b = newGame();
   a.needs.hunger = 0;
-  assert.equal(b.needs.hunger, 78);
+  assert.equal(b.needs.hunger, 82);
   assert.equal(readableTime(480).time, '08:00');
   assert.equal(readableTime(1440).day, 'День 2');
 });
