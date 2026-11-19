@@ -97,7 +97,9 @@ test('B3 scene renderer includes owned garden furniture and lights',()=>{
   assert.ok(filter,'renderer must iterate saved outdoor features with explicit category filter');
   for(const category of ['tree','shrub','flower','fence','furniture','light'])
     assert.ok(filter[1].includes("'"+category+"'"),'renderer skips '+category);
-  for(const itemId of ['garden.bench','garden.table','light.path','light.standing'])
+  for(const itemId of ['garden.bench','garden.table'])
     assert.ok(source.includes("item.itemId==='"+itemId+"'"),
       'scene must render '+itemId);
+  assert.ok(source.includes("def.category==='light'"),
+    'both lamp SKUs must share the light rendering branch');
 });
