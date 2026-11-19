@@ -6101,7 +6101,7 @@ function boot() {
     shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
-    closeGroundWalkMenu();cancelPendingGrab();
+    cancelPendingGrab();closeGroundWalkMenu();
     if(outdoorMode)clearOutdoorPending(true);
     buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
