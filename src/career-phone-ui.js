@@ -158,7 +158,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     facts.append(element('span','career-phone-discipline-status',
       'Дисциплина: '+disciplineName+' · риск '+discipline.risk+'/12'));
     body.append(facts);
-    const disciplineDetails=element('details','career-phone-leave career-phone-discipline');
+    const disciplineDetails=element('details','career-phone-discipline');
     disciplineDetails.append(element('summary','career-phone-notice',
       '⚖️ Трудовая дисциплина · причины и восстановление'));
     disciplineDetails.append(element('p','career-phone-muted',
