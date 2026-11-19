@@ -216,7 +216,7 @@ export function resignCareer(system,residentId){
  * Handles resignation and employer dismissal identically for earned career/leave.
  */
 export function separateCareer(system,residentId,reason,atMinute){
-  if(!CAREER_RESIDENT_IDS.includes(residentId)||!validArchiveTime(atMinute)||
+  if(!CAREER_RESIDENT_IDS.includes(residentId)||!validArchiveTime(Math.floor(atMinute))||
     !['resigned','dismissed'].includes(reason))throw new RangeError('Invalid separation');
   const state=restoreCareerSystem(system);
   const contract=state.byResident[residentId];
@@ -229,7 +229,7 @@ export function separateCareer(system,residentId,reason,atMinute){
   const risk=disciplineRisk(contract.discipline);
   const branchId=contract.specialization?.id||null;
   const archived={employmentId:contract.employmentId,careerId:contract.careerId,
-    level:contract.level,branchId,at:atMinute,reason,risk};
+    level:contract.level,branchId,at:Math.floor(atMinute),reason,risk};
   const history=state.endedContracts[residentId];
   if(!history.some(e=>e.employmentId===archived.employmentId))history.push(archived);
   if(history.length>8)history.splice(0,history.length-8);
