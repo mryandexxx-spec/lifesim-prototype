@@ -1643,7 +1643,8 @@ function renderPauseButton(){
       :paused?'Продолжить':'Пауза');
 }
 $('pause-btn').addEventListener('click', () => {
-  if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||furnishMode||buildMode||outdoorMode)return;
+  if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||furnishMode)return;
+  if(buildMode||outdoorMode)return;
   game.paused = !game.paused;
   renderPauseButton();
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
@@ -5840,7 +5841,7 @@ function boot() {
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
     musicAudio.update(audibleMusicStyle([game,game.otherSim],{
       paused:!frameActive,hidden:document.hidden,editing:furnishMode||buildMode||outdoorMode})||sharedSound);
-    const animDt=active&&!outdoorMode?dt:0;
+    const animDt=active?dt:0;
     const frameAnimDt=buildMode||outdoorMode?0:animDt;
     if(frameActive){
       accumulator+=dt;
