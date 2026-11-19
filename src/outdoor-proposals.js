@@ -131,7 +131,10 @@ export function previewOutdoorFeature(root,itemId,{x,z,yaw=0}={}){
      p.x>=rect.minX-ACTOR_RADIUS&&p.x<=rect.maxX+ACTOR_RADIUS&&
      p.z>=rect.minZ-ACTOR_RADIUS&&p.z<=rect.maxZ+ACTOR_RADIUS))
     return fail('resident-blocked');
-  const next={...current,nextId:current.nextId+1,
+  // Topology cache is keyed by the same outdoor revision as production A*.
+  // Preview must use its *future* revision, never reuse an old walkability grid.
+  if(current.revision>=100000000)return fail('revision-limit');
+  const next={...current,revision:current.revision+1,nextId:current.nextId+1,
     features:[...current.features,item]};
   if(!keepsExistingRoutes(root,next))return fail('would-block-route');
   const result=preview(root,next,def.price,item.instanceId);
