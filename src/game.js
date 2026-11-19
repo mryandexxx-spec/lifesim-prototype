@@ -3563,6 +3563,11 @@ function boot() {
     // Camera reset must not teleport a pending shop object.
     toast('Камера сброшена');
   });
+  $('menu-lot-camera-btn').addEventListener('click',()=>{
+    if(furnishMode||buildMode)return;
+    setView({...view,centerX:7,centerZ:0,distance:44,pitch:61});
+    setViewOpen(false);toast('Весь участок: коснись земли, чтобы отправить жителя');
+  });
   // One finger pans by default; two fingers orbit and pinch.
   // Side button temporarily switches one-finger movement to rotation.
   let oneFingerMode='pan';
@@ -3577,8 +3582,8 @@ function boot() {
       :'Вращать одним пальцем';
     rotateButton.querySelector('small').textContent=rotating?'ВРАЩЕНИЕ':'ПОВОРОТ';
     $('hint').textContent=rotating
-      ?'Один палец — вращение · два — вращение и масштаб'
-      :'Один палец — сдвиг · два — вращение и масштаб';
+      ?'Тап — идти · один палец — вращение · два — масштаб'
+      :'Тап по земле — идти · свайп — камера · два пальца — масштаб';
   };
   rotateButton.addEventListener('click',()=>{
     oneFingerMode=oneFingerMode==='orbit'?'pan':'orbit';
