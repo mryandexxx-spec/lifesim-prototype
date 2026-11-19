@@ -257,7 +257,7 @@ test('M2: policies and callbacks are wired in game without bypassing UI, saves o
   assert.match(game,/if\(started.length\|\|refused.length\)save\(true\)/);
   assert.match(game,/if\(willing\)resident.autonomy.nextAt=game.minutes\+15/);
   assert.match(game,/renderQueuePanel\(true\)/);
-  assert.match(sim,/if\(\['sofa','tv','hobby'\]\.includes\(state.action.id\)\)gained\*=voluntaryMoodEfficiency/);
+  assert.match(sim,/if\(\['sofa','tv','hobby','bench'\]\.includes\(state.action.id\)\)gained\*=voluntaryMoodEfficiency/);
   assert.match(gifts,/const giverGain=finalFun\*voluntaryMoodEfficiency/);
   assert.match(queue,/if\(!canStart\(residentId,command\)\)continue;/);
   assert.match(workflow,/npm test/);

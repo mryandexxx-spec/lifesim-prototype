@@ -129,8 +129,8 @@ test('F4D: runtime contract and Pages delivery expose the new action',()=>{
   const game=text('../src/game.js'),html=text('../index.html'),workflow=text('../.github/workflows/pages.yml');
   assert.match(game,/purchasedSeatPose\(game\.world/);
   assert.match(game,/chairSeats=game\.world\.furniture\.instances/);
-  assert.match(game,/actionId:\(useId==='seat'\|\|alexDining\)\?'sofa':useId/);
-  assert.match(game,/actionId:\(miraUseId==='seat'\|\|miraDining\)\?'sofa':miraUseId/);
+  assert.match(game,/actionId:\(useId==='seat'\|\|useId==='bench'\|\|alexDining\)\?'sofa':useId/);
+  assert.match(game,/actionId:\(miraUseId==='seat'\|\|miraUseId==='bench'\|\|miraDining\)\?'sofa':miraUseId/);
   assert.match(game,/box\('floor',4\.625,-0\.032,0,19\.25/);
   assert.match(html,/1\.2u\.17 · F4G\.2 \/ H5c \/ H5b \/ F4F\.2/);
   assert.match(html,/seat-furniture\.js\?v=1\.2v-f4d/);
