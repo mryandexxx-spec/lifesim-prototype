@@ -83,10 +83,18 @@ function essentialGoals(root){
   for(const resident of [root,root.otherSim]){
     if(resident?.action?.id==='move'&&resident.action.goal)
       goals.push(resident.action.goal);
+    if(resident?.action?.id==='bench'){
+      const p=outdoorBenchApproach(root.world,resident.action.targetInstanceId);
+      if(p)goals.push(p);
+    }
   }
   for(const key of ['alex','mira']){
     for(const command of (root.actionQueues?.byResident?.[key]||[])){
       if(command.type==='move')goals.push({x:command.x,z:command.z});
+      if(command.type==='outdoor'){
+        const p=outdoorBenchApproach(root.world,command.instanceId);
+        if(p)goals.push(p);
+      }
     }
   }
   return goals.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.z));
