@@ -5455,6 +5455,28 @@ function boot() {
       }
       cameraGesture.begin(point,now);return;
     }
+    if(outdoorMode){
+      if(outdoorDrag){
+        // Second finger cancels paint rather than committing a giant rectangle.
+        // Feed both contacts back to the camera for true pinch/orbit.
+        const first=outdoorDrag.last;
+        clearOutdoorPending(true);cameraGesture.clear();
+        if(first&&first.id!==point.id)cameraGesture.begin(first,now);
+        cameraGesture.begin(point,now);return;
+      }
+      if(outdoorTool==='paint'&&cameraGesture.count()===0){
+        const ground=outdoorSurfaceAtScreen(point);
+        if(ground?.kind==='yard'){
+          outdoorPending=null;
+          outdoorDrag={pointerId:event.pointerId,from:ground,to:ground,last:point};
+          paintGhostFrom(ground,ground);
+          outdoorFeedback('Выдели прямоугольник · после отпускания покажу цену');
+          updateOutdoorPanel();
+          return;
+        }
+      }
+      cameraGesture.begin(point,now);return;
+    }
     if(furnishMode&&editDrag){
       // Two fingers always win over furniture. Re-seed the original
       // captured touch before adding the second for seamless pinch/pan.
@@ -5470,6 +5492,17 @@ function boot() {
   });
   // Global listeners survive canvas leaving the viewport on iOS Safari.
   // Separate capture listener preserves the furniture VM touch contract.
+  window.addEventListener('pointermove',event=>{
+    if(!outdoorMode||outdoorDrag?.pointerId!==event.pointerId)return;
+    if(event.cancelable)event.preventDefault();
+    const hit=outdoorSurfaceAtScreen(gesturePoint(event));
+    outdoorDrag.last=gesturePoint(event);
+    if(hit?.kind==='yard'){
+      outdoorDrag.to=hit;
+      paintGhostFrom(outdoorDrag.from,outdoorDrag.to);
+    }
+    event.stopImmediatePropagation?.();
+  },true);
   window.addEventListener('pointermove',event=>{
     if(!buildMode||buildDrag?.pointerId!==event.pointerId)return;
     if(event.cancelable)event.preventDefault();
@@ -5668,6 +5701,13 @@ function boot() {
     tapCueTimeout=setTimeout(()=>{cue.hidden=true;},450);
   };
   const endPointer=event=>{
+    if(outdoorMode){
+      if(outdoorDrag?.pointerId===event.pointerId){
+        const drag=outdoorDrag;outdoorDrag=null;
+        previewOutdoorSelection(drag.from,drag.to,$('outdoor-ground-kind').value);
+      }else cameraGesture.end(gesturePoint(event),performance.now());
+      return; // Editor touch never creates a free-walk command.
+    }
     if(buildMode&&endBuildDrag(event))return;
     if(buildMode){cameraGesture.end(gesturePoint(event),performance.now());return;}
     if(furnishMode&&endEditorDrag(event))return;
@@ -5729,6 +5769,7 @@ function boot() {
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
+    if(outdoorDrag?.pointerId===event.pointerId)clearOutdoorPending(true);
     if(buildDrag?.pointerId===event.pointerId){buildDrag=null;buildGhost.enabled=false;}
     if(holdGesture.pointerId===event.pointerId)cancelPendingGrab();
     if(editDrag?.pointerId===event.pointerId){
@@ -5738,12 +5779,14 @@ function boot() {
     shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
+    if(outdoorMode)clearOutdoorPending(true);
     cancelPendingGrab();
     buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
   // Safari may suspend a background tab without a matching pointerup/blur.
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
+      if(outdoorMode)clearOutdoorPending(true);
       buildDrag=null;buildGhost.enabled=false;
       cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
     }
