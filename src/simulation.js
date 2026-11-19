@@ -348,7 +348,9 @@ export function autonomousChoice(state) {
     const bedtime = night && option.id === 'bed' && value < 67 ? 10+(67-value)*1.60 : 0;
     const base = urgency + bedtime;
     // No voluntary action at game start: let the player explore for the first hour.
-    const eligible = base > 0 || (wishReady && state.mind?.wish?.id === option.id);
+    const recovery=state.workRecovery?.until>state.minutes&&
+      ((option.id==='bed'&&value<45)||(option.id==='sofa'&&value<40));
+    const eligible = base > 0 || recovery || (wishReady && state.mind?.wish?.id === option.id);
     const score = eligible ? base + psychologyScore(state, option.id, wishReady) : 0;
     return { id: option.id, score };
   }).sort((a, b) => b.score - a.score);
