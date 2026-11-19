@@ -61,8 +61,11 @@ test('last essential bed is protected; bought bed cannot be stored or sold while
   const lock={lockedInstanceIds:[bought.instanceId]};
   assert.equal(storeMarketItem(bought.world,bought.shop,bought.instanceId,lock).reason,'reserved');
   assert.equal(sellMarketItem(bought.world,bought.shop,bought.instanceId,lock).reason,'reserved');
-  const stored=storeMarketItem(bought.world,bought.shop,bought.instanceId);
-  assert.equal(stored.ok,true);
+  assert.equal(storeMarketItem(bought.world,bought.shop,bought.instanceId).reason,
+    'last-essential','a lone purchased bed is essential too');
+  const withReplacement={...bought.world,instances:[...bought.world.instances,original]};
+  const stored=storeMarketItem(withReplacement,bought.shop,bought.instanceId);
+  assert.equal(stored.ok,true,stored.reason);
   assert.equal(resolveActionFurniture(stored.world,'bed',bought.instanceId),null);
   const restored=restoreMarketItem(stored.world,stored.shop,bought.instanceId,bedPose,trialResidents);
   assert.equal(restored.ok,true,JSON.stringify(restored));
