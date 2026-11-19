@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 /** LOT-B3: no phantom bench rewards, bounded lights and honest economy. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -88,4 +89,15 @@ test('B3 restores malformed action without phantom bonus and old saves remain co
   assert.equal(next.action,null);
   assert.equal(next.shop.credits,h.shop.credits);
   assert.equal(next.world.outdoors.features.length,0);
+});
+
+test('B3 scene renderer includes owned garden furniture and lights',()=>{
+  const source=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const filter=source.match(/const renderOutdoorFeatures=\(\)=>\{[\s\S]*?for\(const item of game\.world\?\.outdoors\?\.features\|\|\[\]\)\{[\s\S]*?if\(!def\|\|!\[([^\]]+)\]\.includes\(def\.category\)\)continue;/);
+  assert.ok(filter,'renderer must iterate saved outdoor features with explicit category filter');
+  for(const category of ['tree','shrub','flower','fence','furniture','light'])
+    assert.ok(filter[1].includes("'"+category+"'"),'renderer skips '+category);
+  for(const itemId of ['garden.bench','garden.table','light.path','light.standing'])
+    assert.ok(source.includes("item.itemId==='"+itemId+"'"),
+      'scene must render '+itemId);
 });
