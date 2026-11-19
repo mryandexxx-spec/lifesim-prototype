@@ -99,7 +99,12 @@ try{
     await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
     const old=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     assert.equal(old.world.outdoors.features.length,2);
-    assert.equal(old.actionQueues.byResident.alex[0].type,'outdoor');
+    // Reload may dispatch the FIFO head immediately. In that case the
+    // exact saved target must already be the actively walking/resting bench.
+    const queuedRest=old.actionQueues.byResident.alex.find(t=>t.type==='outdoor');
+    const activeRest=old.action?.id==='bench'?old.action:null;
+    assert.ok(queuedRest||activeRest,'rest must persist as FIFO or active action');
+    assert.equal((queuedRest?.instanceId||activeRest?.targetInstanceId),'out-1');
     assert.equal(old.shop.credits,queued.shop.credits);
     await page.screenshot({path:`lot-b3-${w}x${h}.png`});
     await context.close();
