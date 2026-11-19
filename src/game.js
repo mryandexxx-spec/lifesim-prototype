@@ -5730,13 +5730,27 @@ function boot() {
       :'Готово: '+p.changedCells+' клеток · списано '+p.cost+' кр.');
     updateOutdoorPanel();
   });
-  // LOT-A UX: tapping terrain only offers an action; no queue mutation on tap.
-  // The pending point belongs to this transient panel, never persisted until confirmed.
+  // One explicit action confirmation for terrain AND every outdoor item.
+  // Opening/closing the popup never changes a sim, their task or saved FIFO.
   let groundWalkOffer=null;
   const groundWalkPanel=$('ground-walk-menu');
   const closeGroundWalkMenu=()=>{
     groundWalkOffer=null;groundWalkPanel.hidden=true;
     $('ground-walk-action').disabled=true;
+  };
+  const offerWorldAction=(point,heading,label,command,instanceId=null)=>{
+    groundWalkOffer={residentId:game.selectedSim,command,instanceId};
+    $('ground-walk-title').textContent=heading;
+    $('ground-walk-action-label').textContent=label;
+    const frame=document.querySelector('.app-shell').getBoundingClientRect();
+    groundWalkPanel.hidden=false;
+    const width=groundWalkPanel.offsetWidth||190,height=groundWalkPanel.offsetHeight||110;
+    const topInset=Math.max(70,Math.ceil($('calendar-anchor-toggle').getBoundingClientRect().bottom-frame.top)+10);
+    const bottomInset=Math.ceil($('dashboard').getBoundingClientRect().height)+18;
+    const x=Math.max(8,Math.min(point.x-frame.left+10,frame.width-width-8));
+    const y=Math.max(topInset,Math.min(point.y-frame.top-height/2,frame.height-bottomInset-height));
+    groundWalkPanel.style.left=x+'px';groundWalkPanel.style.top=y+'px';
+    $('ground-walk-action').disabled=false;
   };
   const openGroundWalkMenu=(point,ground)=>{
     const id=game.selectedSim,actor=getActor(game,id);
@@ -5752,23 +5766,46 @@ function boot() {
     if(!findPath(actor.position,nearest,game.world)){
       closeGroundWalkMenu();toast('Путь к этой точке недоступен');return;
     }
-    groundWalkOffer={residentId:id,x:nearest.x,z:nearest.z};
-    const frame=document.querySelector('.app-shell').getBoundingClientRect();
-    groundWalkPanel.hidden=false;
-    const width=groundWalkPanel.offsetWidth||190,height=groundWalkPanel.offsetHeight||110;
-    const topInset=Math.max(70,Math.ceil($('calendar-anchor-toggle').getBoundingClientRect().bottom-frame.top)+10);
-    const bottomInset=Math.ceil($('dashboard').getBoundingClientRect().height)+18;
-    const x=Math.max(8,Math.min(point.x-frame.left+10,frame.width-width-8));
-    const y=Math.max(topInset,Math.min(point.y-frame.top-height/2,frame.height-bottomInset-height));
-    groundWalkPanel.style.left=x+'px';groundWalkPanel.style.top=y+'px';
-    $('ground-walk-action').disabled=false;
+    offerWorldAction(point,'Действия на земле','↗ Идти сюда',
+      {type:'move',x:nearest.x,z:nearest.z});
+  };
+  const openOutdoorActionMenu=(point,target)=>{
+    const feature=game.world.outdoors?.features?.find(
+      item=>item.instanceId===target.instanceId);
+    const def=feature&&OUTDOOR_CATALOG[feature.itemId];
+    const id=game.selectedSim,actor=getActor(game,id);
+    if(!feature||!def)return;
+    if(residentUnavailableForHome(game,id)){
+      toast('Персонаж сейчас не на участке');return;
+    }
+    if(feature.itemId==='garden.bench'){
+      // Revalidation of availability and route happens again on confirmation.
+      offerWorldAction(point,def.name,'🪑 Отдохнуть',
+        {type:'outdoor',instanceId:feature.instanceId},feature.instanceId);
+      return;
+    }
+    const rect=outdoorFeatureRect(feature),margin=.55;
+    const candidates=[
+      {x:feature.x,z:rect.minZ-margin},
+      {x:feature.x,z:rect.maxZ+margin},
+      {x:rect.minX-margin,z:feature.z},
+      {x:rect.maxX+margin,z:feature.z}
+    ].sort((a,b)=>Math.hypot(a.x-actor.position.x,a.z-actor.position.z)-
+      Math.hypot(b.x-actor.position.x,b.z-actor.position.z));
+    const spot=candidates.find(p=>isWalkable(p.x,p.z,game.world)&&
+      findPath(actor.position,p,game.world));
+    if(!spot){toast('К предмету сейчас нельзя подойти');return;}
+    offerWorldAction(point,def.name,'↗ Подойти',
+      {type:'move',x:spot.x,z:spot.z},feature.instanceId);
   };
   $('ground-walk-action').addEventListener('click',()=>{
     const offer=groundWalkOffer;
     closeGroundWalkMenu();
     if(!offer)return;
-    if(scheduleCommand({type:'move',x:offer.x,z:offer.z},offer.residentId))
-      $('queue-feedback').textContent=getActorName(offer.residentId)+': команда «Идти сюда» добавлена в очередь';
+    // An edited/removed object must not turn an old popup into a phantom task.
+    if(offer.instanceId&&!game.world.outdoors?.features?.some(
+      item=>item.instanceId===offer.instanceId))return;
+    scheduleCommand(offer.command,offer.residentId);
   });
   $('ground-walk-close').addEventListener('click',closeGroundWalkMenu);
   document.addEventListener('keydown',event=>{
@@ -6094,14 +6131,22 @@ function boot() {
           instanceId:item.instanceId,bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:1.66,z:r.maxZ}}};
       });
-    const outdoorBenches=(game.world.outdoors?.features||[])
-      .filter(item=>item.itemId==='garden.bench')
+    // Every purchased outdoor item has a real 3D pick volume. Decorative
+    // items offer a queued walk nearby; the bench offers queued rest.
+    const outdoorTargets=(game.world.outdoors?.features||[])
       .map(item=>{
-        const rect=outdoorFeatureRect(item);
-        return {kind:'outdoor',id:'bench',instanceId:item.instanceId,
+        const rect=outdoorFeatureRect(item),def=OUTDOOR_CATALOG[item.itemId];
+        if(!rect||!def)return null;
+        const height=def.category==='tree'?3.10:
+          def.category==='light'?(item.itemId==='light.standing'?3.05:1.85):
+          def.category==='shrub'?1.12:
+          def.category==='flower'?.48:
+          def.category==='fence'?1.12:
+          item.itemId==='garden.bench'?1.20:1.24;
+        return {kind:'outdoor',id:item.itemId,instanceId:item.instanceId,
           bounds:{min:{x:rect.minX,y:-.49,z:rect.minZ},
-            max:{x:rect.maxX,y:.63,z:rect.maxZ}}};
-      });
+            max:{x:rect.maxX,y:height-.53,z:rect.maxZ}}};
+      }).filter(Boolean);
     const easels=game.world.furniture.instances
       .filter(item=>item.prefabId==='easel'&&item.location==='home')
       .map(item=>{
@@ -6110,7 +6155,7 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:2.02,z:r.maxZ}}};
       });
     return pickWorldRayTarget(near,far,
-      [...residents,...finishedArt,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...kitchenAppliances,...easels,...outdoorBenches,...movedVolumes,...blockers]);
+      [...residents,...finishedArt,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...kitchenAppliances,...easels,...outdoorTargets,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -6167,10 +6212,9 @@ function boot() {
       toast('Картина · открыть инвентарь, повесить или продать во вкладке «Навыки»');
     }
     else if(target?.kind==='object')select(target.id,target.instanceId);
-    else if(target?.kind==='outdoor'&&target.id==='bench'){
+    else if(target?.kind==='outdoor'){
       closeSocialContext();select(null);
-      if(scheduleCommand({type:'outdoor',instanceId:target.instanceId}))
-        toast(getActorName(game.selectedSim)+' запланировал(а) отдых на скамейке');
+      openOutdoorActionMenu(pos,target);
     }
     else{
       closeSocialContext();select(null);
