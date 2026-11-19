@@ -48,9 +48,17 @@ try{
     canvas.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:2300}));
   });
   await page.waitForTimeout(220);
-  const yard=projectYard(w,h);
-  assert.ok(yard.x>20&&yard.x<w-20&&yard.y>60&&yard.y<h-60,
-    'Test must touch visible outdoor terrain, not the HUD');
+  // Project in actual canvas CSS coordinates, not the full browser viewport.
+  // The compact HUD and landscape layout intentionally change the canvas rect.
+  const canvasRect=await page.locator('#game-canvas').evaluate(el=>{
+    const r=el.getBoundingClientRect();
+    return {x:r.left,y:r.top,width:r.width,height:r.height};
+  });
+  const projected=projectYard(canvasRect.width,canvasRect.height);
+  const yard={x:canvasRect.x+projected.x,y:canvasRect.y+projected.y};
+  assert.ok(projected.x>10&&projected.x<canvasRect.width-10&&
+    projected.y>10&&projected.y<canvasRect.height-10,
+    'Test must touch lawn within the real canvas, not HUD or outside the viewport');
   const ptr=async(type,point,id=41,where='canvas')=>page.evaluate(({type,point,id,where})=>{
     const element=where==='canvas'?document.querySelector('#game-canvas'):window;
     element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,
