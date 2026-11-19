@@ -3,7 +3,7 @@
  */
 import {careerDefinition} from './career-catalog.js';
 import {CAREER_RESIDENT_IDS} from './career-state.js';
-import {acceptCareerOffer} from './career-job-board.js';
+import {acceptCareerOffer,careerRehireRetry} from './career-job-board.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {deriveAxes} from './trait-catalog.js';
@@ -213,6 +213,9 @@ export function submitCareerApplication(root,id,careerId){
     return reason('Недоступная вакансия');
   if(root.careerSystem?.byResident?.[id])return reason('У персонажа уже есть работа');
   if(getApp(root,id))return reason('Сначала завершите текущий отклик');
+  const discharge=careerRehireRetry(root,id,careerId);
+  if(discharge.blocked)return reason('После увольнения повторный отклик через '+
+    discharge.remaining+' игровых мин.');
   const retry=recruitmentRetry(root,id,careerId);
   if(retry.blocked)return reason('Повторный отклик доступен через '+retry.remaining+' игровых мин.');
   const next=root.recruitmentSystem.nextApplicationId;
