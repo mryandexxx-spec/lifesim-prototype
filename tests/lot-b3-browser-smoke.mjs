@@ -117,10 +117,28 @@ try{
       'Lamp tap cannot enqueue a movement before the player selects an action');
     await page.locator('#ground-walk-action').click();
     const afterLamp=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
-    assert.equal(afterLamp.actionQueues.byResident.alex.length,2);
-    assert.equal(afterLamp.actionQueues.byResident.alex[0].type,'outdoor');
-    assert.equal(afterLamp.actionQueues.byResident.alex[1].type,'move',
-      'Lamp approach appends behind the existing bench reservation');
+    const remaining=afterLamp.actionQueues.byResident.alex;
+    const activeBench=afterLamp.action?.id==='bench'&&
+      afterLamp.action?.automatic===false?afterLamp.action:null;
+    const menuDebug=await page.evaluate(()=>({
+      toast:document.getElementById('toast')?.textContent,
+      feedback:document.getElementById('queue-feedback')?.textContent,
+      popupHidden:document.getElementById('ground-walk-menu')?.hidden
+    }));
+    // A frame may dispatch the old bench between the two button clicks.
+    // Count the active bench as the FIFO head rather than treating it as lost.
+    assert.equal(remaining.length+(activeBench?1:0),2,
+      'Lamp approach must append once; '+JSON.stringify({
+        pending:remaining,active:afterLamp.action,menuDebug}));
+    if(activeBench){
+      assert.equal(activeBench.targetInstanceId,'out-1');
+      assert.equal(remaining[0]?.type,'move',
+        'A running bench precedes the newly queued lamp approach');
+    }else{
+      assert.equal(remaining[0]?.type,'outdoor');
+      assert.equal(remaining[1]?.type,'move',
+        'Lamp approach appends behind the existing bench reservation');
+    }
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
     const old=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
