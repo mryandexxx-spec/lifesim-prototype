@@ -78,7 +78,7 @@ test('source integration keeps diagnostics off simulation save schema',async()=>
   assert.match(src,/webglcontextrestored/);
   assert.match(src,/app\.on\('postrender'/);
   assert.match(src,/viewportHealth\.markUpdate/);
-  assert.match(src,/if\(!save\(true\)\)return/);
+  assert.match(src,/if\(!save\(true\)\)\{/);
   assert.match(html,/id="viewport-recovery"/);
   assert.match(html,/id="viewport-health-open"/);
   assert.match(pages,/cp src\/viewport-health\.js site\/src\//);
