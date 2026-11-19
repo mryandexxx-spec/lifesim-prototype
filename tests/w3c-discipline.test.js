@@ -177,6 +177,31 @@ test('W3-C: portable reserve beyond bank cap can be reclaimed later',()=>{
   assert.equal(root.careerSystem.portableLeave.alex,3);
   assert.notEqual(old.employmentId,offer.contract.employmentId);
 });
+test('W3-C: high-watermark rejects old shift replay after rolling history eviction',()=>{
+  const c=fresh().careerSystem.byResident.alex;
+  for(let i=0;i<14;i++)record(c,i,'worked',0);
+  const once=c.discipline.entries.length;
+  assert.equal(once,10);
+  assert.equal(record(c,0,'missed').newEvent,false,'evicted oldest shift cannot replay');
+  const copy=loadHousehold({...clone(fresh()),
+    careerSystem:{...clone(fresh().careerSystem),byResident:{
+      alex:{...clone(fresh().careerSystem.byResident.alex),discipline:clone(c.discipline)},
+      mira:null
+    }}});
+  const restored=copy.careerSystem.byResident.alex;
+  assert.equal(record(restored,0,'missed').newEvent,false,'reload keeps watermark');
+});
+test('W3-C: resignation before physical departure does not create a fake missed shift',()=>{
+  const root=fresh(),contract=root.careerSystem.byResident.alex;
+  const shift=nextCareerShift(root.calendar,contract,root.minutes);
+  root.minutes=shift.start-20;
+  progressCareerWork(root,shift.start-59,root.minutes);
+  assert.equal(contract.currentShift?.phase,'pending');
+  const leave=leaveCareer(root,'alex');
+  assert.equal(leave.ok,true);
+  assert.equal(leave.careerSystem.byResident.alex,null);
+  assert.equal(leave.careerSystem.endedContracts.alex[0].reason,'resigned');
+});
 test('W3-C: two independent employees, no retro discipline on leave',()=>{
   const root=fresh();
   root.careerSystem=hireCareer(root.careerSystem,'mira','civic-service',root.minutes);
