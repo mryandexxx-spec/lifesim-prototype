@@ -5,9 +5,9 @@ import {newHousehold} from '../src/household.js';
 import {SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 
-function projectGround(w,h,x,z){
+function projectGround(w,h,x,z,y=-.53){
   const yaw=42*Math.PI/180,pitch=60*Math.PI/180,dist=43;
-  const cx=7,cy=.62,cz=0,y=-.53;
+  const cx=7,cy=.62,cz=0;
   const px=cx+Math.sin(yaw)*Math.cos(pitch)*dist;
   const py=cy+Math.sin(pitch)*dist;
   const pz=cz+Math.cos(yaw)*Math.cos(pitch)*dist;
@@ -53,8 +53,8 @@ try{
       const r=node.getBoundingClientRect();
       return {x:r.left,y:r.top,width:r.width,height:r.height};
     });
-    const touch=async(x,z)=>{
-      const hit=projectGround(rect.width,rect.height,x,z);
+    const touch=async(x,z,y=-.53)=>{
+      const hit=projectGround(rect.width,rect.height,x,z,y);
       assert.ok(hit.x>8&&hit.x<rect.width-8&&hit.y>8&&hit.y<rect.height-8,
         'Outdoor 3D point must be on visible canvas');
       const point={x:rect.x+hit.x,y:rect.y+hit.y};
@@ -76,7 +76,7 @@ try{
     assert.equal(saved.world.outdoors.features[0].itemId,'garden.bench');
     assert.equal(saved.shop.credits,seed.shop.credits-240);
     await page.locator('#outdoor-feature-kind').selectOption('light.standing');
-    await touch(9,-9);
+    await touch(8,-9);
     await page.waitForFunction(()=>!document.getElementById('outdoor-apply').disabled,{timeout:8000});
     await page.locator('#outdoor-apply').click();
     saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
@@ -85,9 +85,20 @@ try{
     assert.equal(saved.shop.credits,seed.shop.credits-420);
     assert.equal(saved.financialHistory.entries.length,2);
     await page.locator('#outdoor-exit').click();
-    // Tap original, physical 3D bench during life mode, never add a free-walk
-    // destination or immediate Fun. The command must survive a Safari reload.
+    // Physical bench: FIRST the popup, never automatic seating/queue changes.
+    // Cancel must leave the previous task order and needs untouched.
     await touch(7,-7);
+    await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+    assert.match(await page.locator('#ground-walk-title').textContent(),/скамейка/i);
+    assert.match(await page.locator('#ground-walk-action-label').textContent(),/Отдохнуть/);
+    let beforeAction=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+    assert.equal(beforeAction.actionQueues.byResident.alex.length,0,
+      'Bench tap must not queue seating until the player confirms');
+    await page.locator('#ground-walk-close').click();
+    assert.equal(await page.locator('#ground-walk-menu').isVisible(),false);
+    await touch(7,-7);
+    await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+    await page.locator('#ground-walk-action').click();
     await page.waitForFunction(key=>{
       const save=JSON.parse(localStorage.getItem(key));
       return (save.actionQueues?.byResident?.alex||[]).some(t=>t.type==='outdoor');
@@ -95,6 +106,39 @@ try{
     const queued=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     assert.equal(queued.actionQueues.byResident.alex[0].instanceId,'out-1');
     assert.ok(queued.needs.fun<=seed.needs.fun,'tapping bench cannot instantly reward Fun (normal time decay is allowed)');
+    // A tall lamp is not a hidden walk-on-ground shortcut: its hit volume
+    // opens the same action menu and only explicit confirmation appends MOVE.
+    await touch(8,-9,1.35);
+    await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+    assert.match(await page.locator('#ground-walk-title').textContent(),/фонарь/i);
+    assert.match(await page.locator('#ground-walk-action-label').textContent(),/Подойти/);
+    beforeAction=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+    assert.equal(beforeAction.actionQueues.byResident.alex.length,1,
+      'Lamp tap cannot enqueue a movement before the player selects an action');
+    await page.locator('#ground-walk-action').click();
+    const afterLamp=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+    const remaining=afterLamp.actionQueues.byResident.alex;
+    const activeBench=afterLamp.action?.id==='bench'&&
+      afterLamp.action?.automatic===false?afterLamp.action:null;
+    const menuDebug=await page.evaluate(()=>({
+      toast:document.getElementById('toast')?.textContent,
+      feedback:document.getElementById('queue-feedback')?.textContent,
+      popupHidden:document.getElementById('ground-walk-menu')?.hidden
+    }));
+    // A frame may dispatch the old bench between the two button clicks.
+    // Count the active bench as the FIFO head rather than treating it as lost.
+    assert.equal(remaining.length+(activeBench?1:0),2,
+      'Lamp approach must append once; '+JSON.stringify({
+        pending:remaining,active:afterLamp.action,menuDebug}));
+    if(activeBench){
+      assert.equal(activeBench.targetInstanceId,'out-1');
+      assert.equal(remaining[0]?.type,'move',
+        'A running bench precedes the newly queued lamp approach');
+    }else{
+      assert.equal(remaining[0]?.type,'outdoor');
+      assert.equal(remaining[1]?.type,'move',
+        'Lamp approach appends behind the existing bench reservation');
+    }
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
     const old=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
