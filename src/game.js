@@ -3262,7 +3262,9 @@ function boot() {
           :['toPrep','preparing'].includes(game.action.cookStage)
             ?furnitureActionApproach(game.world,'prep',game.action.prepInstanceId)
             :furnitureActionApproach(game.world,'cook',game.action.targetInstanceId)):null;
-    const actual=dest||furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId);
+    const actual=dest||(game.action.id==='bench'
+      ?outdoorBenchApproach(game.world,game.action.targetInstanceId)
+      :furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId));
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
@@ -3284,7 +3286,9 @@ function boot() {
           :['toPrep','preparing'].includes(game.otherSim.action.cookStage)
             ?furnitureActionApproach(game.world,'prep',game.otherSim.action.prepInstanceId)
             :furnitureActionApproach(game.world,'cook',game.otherSim.action.targetInstanceId)):null;
-    const actual=dest||furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId);
+    const actual=dest||(game.otherSim.action.id==='bench'
+      ?outdoorBenchApproach(game.world,game.otherSim.action.targetInstanceId)
+      :furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId));
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
   }
