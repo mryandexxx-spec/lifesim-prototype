@@ -125,7 +125,7 @@ test('M2: essential sleeping gets exactly original benefit regardless of bad moo
   assert.equal(chooseAction(s,'bed'),true);arrive(s);
   const before=s.needs.energy;
   tick(s,5);
-  assert.ok(Math.abs(s.needs.energy-(before+5*(.74-NEED_DECAY_PER_MINUTE.energy)))<1e-6);
+  assert.ok(Math.abs(s.needs.energy-(before+5*ACTIONS.bed.benefitPerMinute))<1e-6);
   assert.equal(s.action.elapsed,5);
 });
 
