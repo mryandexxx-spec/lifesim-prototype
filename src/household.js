@@ -22,6 +22,7 @@ import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './g
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
+import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
@@ -96,7 +97,8 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.inventory=starterInventory();
   state.actionQueues=newActionQueues(HOUSEHOLD_IDS);
   // F0 optional v1 extension; each piece has its own immutable instanceId.
-  state.world={furniture:newFurnitureWorld(),construction:newConstructionWorld()};
+  state.world={furniture:newFurnitureWorld(),construction:newConstructionWorld(),
+    outdoors:newOutdoorsWorld()};
   // F2.1 optional root-v1 extension. Old households get test credits only once.
   state.shop=newFurnitureShop();
   state.financialHistory=newFinancialHistory();
@@ -121,7 +123,8 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     reminderReceipts:restoreReminderReceipts(raw.calendar?.reminderReceipts),
     weekendDays:restoreWeekendDays(raw.calendar?.weekendDays)};
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
-    construction:restoreConstructionWorld(raw.world?.construction)};
+    construction:restoreConstructionWorld(raw.world?.construction),
+    outdoors:restoreOutdoorsWorld(raw.world?.outdoors)};
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.financialHistory=restoreFinancialHistory(raw.financialHistory);
@@ -159,7 +162,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   // v1 commands migrate to deterministic original instance IDs once.
   for(const id of HOUSEHOLD_IDS){
     const sim=id==='alex'?root:mira;
-    if(sim.action){
+    if(sim.action&&sim.action.id!=='move'){
       const object=resolveActionFurniture(root.world,sim.action.id,sim.action.targetInstanceId);
       if(object)sim.action.targetInstanceId=object.instanceId;
       else sim.action=null; // no phantom action or silent rerouting to another item
@@ -169,6 +172,12 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
       const object=resolveActionFurniture(root.world,task.actionId);
       if(object)task.targetInstanceId=object.instanceId;
     }
+  }
+  // A saved manual walk must still have a real destination on this lot.
+  for(const id of HOUSEHOLD_IDS){
+    const resident=getActor(root,id);
+    if(resident.action?.id==='move'&&
+      !findPath(resident.position,resident.action.goal,root.world))resident.action=null;
   }
   // H1 optional per-resident skill progress in the existing v1 root;
   // malformed or absent fields never reset old household/furniture.
