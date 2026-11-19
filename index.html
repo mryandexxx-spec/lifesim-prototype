@@ -115,6 +115,7 @@
     <div id="world-tap-cue" class="world-tap-cue" aria-hidden="true" hidden></div>
     <section id="ground-walk-menu" class="ground-walk-menu" aria-label="Доступные действия" hidden>
       <div class="ground-walk-heading"><strong id="ground-walk-title">Действия на земле</strong><button id="ground-walk-close" type="button" aria-label="Закрыть действия">×</button></div>
+      <p id="ground-walk-info" class="garden-action-status" hidden></p>
       <button id="ground-walk-action" type="button" disabled><span id="ground-walk-action-label">↗ Идти сюда</span><small>Добавить в очередь</small></button>
     </section>
     <div id="reaction-layer" class="reaction-layer" aria-label="Реакции жителей" aria-live="off"></div>
@@ -163,7 +164,7 @@
       <div class="view-panel-head"><strong>Дом</strong><button id="home-close" type="button" aria-label="Закрыть выбор редактора">×</button></div>
       <button id="home-furnish" type="button" aria-controls="furniture-editor">▦ Обстановка <small>Мебель, магазин и склад</small></button>
       <button id="home-build" type="button" aria-controls="build-editor">⌂ Строительство <small>Комнаты, стены и крыши</small></button>
-      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Покрытия, растения, мебель и освещение</small></button>
+      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Покрытия, растения, грядки, мебель и освещение</small></button>
     </section>
     <section id="outdoor-editor" class="outdoor-editor" aria-label="Благоустройство участка" hidden>
       <div class="outdoor-editor-head"><strong>🌿 Участок · Благоустройство</strong><button id="outdoor-exit" type="button">✓ В жизнь</button></div>
@@ -172,6 +173,7 @@
         <select id="outdoor-category">
           <option value="ground">▦ Покрытия</option>
           <option value="plants">🌳 Растения и ограды</option>
+          <option value="garden">🌱 Сад · грядки</option>
           <option value="objects">🪑 Мебель и свет</option>
         </select>
       </label>
