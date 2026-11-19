@@ -136,7 +136,7 @@
     </aside>
     <nav class="life-nav" aria-label="Основные действия">
       <button id="career-phone-toggle" class="career-phone-toggle" type="button" aria-controls="career-phone-panel" aria-expanded="false" aria-label="Открыть работу и график выбранного жителя"><span aria-hidden="true">▣</span><small>Работа</small></button>
-      <button id="home-open" type="button" aria-controls="home-panel" aria-expanded="false" aria-label="Открыть Дом: обстановка или строительство"><span aria-hidden="true">⌂</span><small>Дом</small></button>
+      <button id="home-open" type="button" aria-controls="home-panel" aria-expanded="false" aria-label="Открыть Дом: обстановка, строительство или участок"><span aria-hidden="true">⌂</span><small>Дом</small></button>
       <button id="view-toggle" class="view-control" type="button" aria-controls="view-panel" aria-expanded="false" aria-label="Открыть меню"><span aria-hidden="true">☰</span><small>Меню</small></button>
     </nav>
 
@@ -158,6 +158,32 @@
       <div class="view-panel-head"><strong>Дом</strong><button id="home-close" type="button" aria-label="Закрыть выбор редактора">×</button></div>
       <button id="home-furnish" type="button" aria-controls="furniture-editor">▦ Обстановка <small>Мебель, магазин и склад</small></button>
       <button id="home-build" type="button" aria-controls="build-editor">⌂ Строительство <small>Комнаты, стены и крыши</small></button>
+      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Газон, дорожки и цветники</small></button>
+    </section>
+    <section id="outdoor-editor" class="outdoor-editor" aria-label="Благоустройство участка" hidden>
+      <div class="outdoor-editor-head"><strong>🌿 Участок · Покрытия</strong><button id="outdoor-exit" type="button">✓ В жизнь</button></div>
+      <p class="outdoor-editor-tip">Выбери покрытие, проведи пальцем по двору и подтверди цену. Дом и крыльцо защищены.</p>
+      <div class="outdoor-tool-bar" role="group" aria-label="Инструменты участка">
+        <button id="outdoor-tool-paint" type="button" aria-pressed="true">▦ Рисовать</button>
+        <button id="outdoor-tool-camera" type="button" aria-pressed="false">✥ Камера</button>
+      </div>
+      <label class="outdoor-surface-choice" for="outdoor-ground-kind">Покрытие
+        <select id="outdoor-ground-kind">
+          <option value="lawn">🌿 Газон · бесплатно</option>
+          <option value="stone">▥ Каменная дорожка · 8 кр./клетка</option>
+          <option value="gravel">◌ Гравий · 5 кр./клетка</option>
+          <option value="soil">▤ Грунт · 2 кр./клетка</option>
+          <option value="flowers">✿ Декоративный цветник · 12 кр./клетка</option>
+        </select>
+      </label>
+      <p id="outdoor-preview-text" class="outdoor-editor-status" role="status" aria-live="polite">Коснись свободной земли и протяни прямоугольник.</p>
+      <p id="outdoor-balance" class="outdoor-editor-balance">Баланс: —</p>
+      <div class="outdoor-editor-actions">
+        <button id="outdoor-apply" type="button" disabled>✓ Купить и применить</button>
+        <button id="outdoor-cancel" type="button">Отменить выбор</button>
+        <button id="outdoor-undo" type="button" disabled>↶ Шаг назад</button>
+        <button id="outdoor-redo" type="button" disabled>↷ Повторить</button>
+      </div>
     </section>
     <button id="plan-peek" class="scene-badge plan-peek" type="button" aria-controls="queue-panel" aria-expanded="false" aria-label="Открыть очередь действий">
       <span class="plan-current"><span class="status-dot" aria-hidden="true"></span><span id="status-text">Свободное время</span><span class="plan-chevron" aria-hidden="true">›</span></span>
