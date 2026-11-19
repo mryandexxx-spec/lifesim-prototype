@@ -6194,8 +6194,7 @@ function boot() {
     shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
-    viewportHealth.markInput(performance.now());
-    cancelPendingGrab();closeGroundWalkMenu();
+    cancelPendingGrab();viewportHealth.markInput(performance.now());closeGroundWalkMenu();
     if(outdoorMode)clearOutdoorPending(true);
     buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
