@@ -96,7 +96,7 @@ test('Q3b work meal, WC, energy and non-duplicated shift accounting',()=>{
   assert.ok(h.careerSystem.byResident.alex.lastShift.workReport.toilet>0);
   assert.ok(h.needs.energy<48,'new work fatigue applied');
   const before=h.needs.energy;tickHousehold(h,10);
-  close(h.needs.energy,before,'return trip does not charge off-lot fatigue again');
+  close(h.needs.energy,before);
 });
 test('Q3b 24-hour, seven-day, 30-day no-care baseline is bounded and deterministic',()=>{
   for(const days of [1,7,30]){
