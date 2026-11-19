@@ -45,6 +45,7 @@ export function planPreview({
 }
 export function planTaskIcon(type){
   return type==='object'?'⌂':
+    type==='outdoor'?'🪑':
     type==='conversation'?'☏':
     type==='social'||type==='branch'?'♡':
     type==='shared'?'♫':'•';

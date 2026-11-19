@@ -27,6 +27,8 @@ import {lotRaySurface,lotActorHeight,outdoorCellAt,OUTDOOR_GRID_WIDTH} from './l
 import {previewOutdoorPaint,commitOutdoorPreview,
   previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from './outdoor-proposals.js';
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
+import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
+  outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -446,6 +448,7 @@ $('calendar-anchor-apply').addEventListener('click',()=>{
 function taskLabel(task){
   if(!task)return 'Неизвестное действие';
   if(task.type==='move')return 'Идти в указанное место';
+  if(task.type==='outdoor')return 'Отдохнуть на садовой скамейке';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
@@ -460,6 +463,14 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
+  if(command.type==='outdoor'){
+    const p=outdoorBenchApproach(game.world,command.instanceId);
+    const actor=getActor(game,residentId);
+    if(!p||!outdoorBenchAvailable(game,residentId,command.instanceId)||
+      !findPath(actor.position,p,game.world)){
+      toast('Скамейка недоступна или занята');return false;
+    }
+  }
   if(command.type==='move'){
     const person=getActor(game,residentId);
     if(!person||residentUnavailableForHome(game,residentId)||
@@ -2151,7 +2162,13 @@ function boot() {
   renderOutdoorGround();
   // LOT-B2: original low-poly plants and boundaries, grouped under one node
   // per owned instance. Only the 96-item bounded save controls these meshes.
-  const outdoorFeatureNodes=[];
+  const outdoorFeatureNodes=[],outdoorLightNodes=[];
+  let currentOutdoorDaylight=null;
+  const syncOutdoorLights=daylight=>{
+    const brightness=outdoorLightFactor(daylight);
+    for(const light of outdoorLightNodes)
+      light.light.intensity=brightness*(light.name.includes('standing')?1.75:1.15);
+  };
   const outdoorFeatureMaterials={
     bark:mat('#917256'),leaf:mat('#4d8960'),lightLeaf:mat('#7cac69'),
     darkLeaf:mat('#437956'),pink:mat('#dc9aa7'),white:mat('#f6eee0'),
@@ -2160,6 +2177,7 @@ function boot() {
   };
   const renderOutdoorFeatures=()=>{
     for(const node of outdoorFeatureNodes.splice(0))node.destroy();
+    outdoorLightNodes.length=0;
     for(const item of game.world?.outdoors?.features||[]){
       const def=OUTDOOR_CATALOG[item.itemId];
       if(!def||!['tree','shrub','flower','fence'].includes(def.category))continue;
@@ -2192,6 +2210,36 @@ function boot() {
           if(item.itemId==='flower.daisy')
             part('sphere','heart',x,.48,z,.055,.06,.055,'yellow');
         }
+      }else if(item.itemId==='garden.bench'){
+        for(const x of [-.57,.57])
+          for(const z of [-.20,.20])
+            part('box','bench leg',x,.30,z,.12,.60,.12,'woodDark');
+        for(const z of [-.23,0,.23])
+          part('box','bench slat',0,.59,z,1.50,.10,.17,'wood');
+        part('box','bench back',0,.91,.25,1.50,.53,.11,'wood');
+      }else if(item.itemId==='garden.table'){
+        part('cylinder','table stand',0,.43,0,.20,.80,.20,'woodDark');
+        part('cylinder','garden tabletop',0,.86,0,1.06,.11,1.06,'wood');
+        for(const x of [-.33,.33])for(const z of [-.33,.33])
+          part('box','table leg',x,.43,z,.09,.80,.09,'woodDark');
+      }else if(def.category==='light'){
+        const tall=item.itemId==='light.standing';
+        const height=tall?2.35:1.06;
+        part('cylinder','light pole',0,height/2,0,.13,height,.13,'woodDark');
+        part('box','light body',0,height,0,tall?.43:.34,tall?.45:.35,tall?.43:.34,'wood');
+        part('sphere','light lens',0,height+.02,0,tall?.30:.24,.24,tall?.30:.24,'yellow');
+        part('box','light cap',0,height+.27,0,tall?.51:.39,.09,tall?.51:.39,'woodDark');
+        // Real omni emitter, not a glowing sprite. Fully removed with the
+        // owned fixture, capped at 8 and never allowed to cast shadow maps.
+        if(outdoorLightNodes.length<OUTDOOR_LIGHT_LIMIT){
+          const glow=new pc.Entity('LOT-B3 '+item.itemId+' emitter');
+          glow.addComponent('light',{type:'omni',
+            color:new pc.Color(1,.78,.51),intensity:0,
+            range:tall?7.2:5.2,castShadows:false});
+          glow.setLocalPosition(0,height+.09,0);
+          node.addChild(glow);
+          outdoorLightNodes.push(glow);
+        }
       }else if(item.itemId==='fence.wood'){
         for(const x of [-.20,.20])
           part('box','fence post',x,.44,0,.09,.88,.10,'woodDark');
@@ -2203,6 +2251,7 @@ function boot() {
           part('sphere','hedge foliage',x,.55,0,.31,.63,.44,'darkLeaf');
       }
     }
+    syncOutdoorLights(currentOutdoorDaylight);
   };
   renderOutdoorFeatures();
   const outdoorPaintGhost=box('LOT-B1 paint preview',0,-.509,0,.5,.025,.5,
@@ -3100,6 +3149,7 @@ function boot() {
   updatePhoneProps(careerPhone.isOpen()?game.selectedSim:null);
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
+  const benchVisualTargets={alex:null,mira:null};
   // F4F.1: entirely cosmetic chair draw-out. Keep the selected table/seat
   // through the reverse stand-up animation, but never persist a moved chair.
   const diningVisual={alex:null,mira:null};
@@ -3212,7 +3262,9 @@ function boot() {
           :['toPrep','preparing'].includes(game.action.cookStage)
             ?furnitureActionApproach(game.world,'prep',game.action.prepInstanceId)
             :furnitureActionApproach(game.world,'cook',game.action.targetInstanceId)):null;
-    const actual=dest||furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId);
+    const actual=dest||(game.action.id==='bench'
+      ?outdoorBenchApproach(game.world,game.action.targetInstanceId)
+      :furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId));
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
@@ -3234,7 +3286,9 @@ function boot() {
           :['toPrep','preparing'].includes(game.otherSim.action.cookStage)
             ?furnitureActionApproach(game.world,'prep',game.otherSim.action.prepInstanceId)
             :furnitureActionApproach(game.world,'cook',game.otherSim.action.targetInstanceId)):null;
-    const actual=dest||furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId);
+    const actual=dest||(game.otherSim.action.id==='bench'
+      ?outdoorBenchApproach(game.world,game.otherSim.action.targetInstanceId)
+      :furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId));
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
   }
@@ -3279,6 +3333,7 @@ function boot() {
   const routeRetryAt=new Map(),routeFailures=new Map();
   const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>{
     if(id==='move')return getActor(game,residentId)?.action?.goal||null;
+    if(id==='bench')return outdoorBenchApproach(game.world,targetInstanceId);
     if(id==='hobby:toSeat'){
       const reader=getActor(game,residentId);
       return reader?.action?.id==='hobby'
@@ -3359,6 +3414,24 @@ function boot() {
     return started;
   };
 
+  // LOT-B3: one genuine, timed seat reserved by exact outdoor ID.
+  // Uses canonical A*, action simulation and FIFO, never a parallel clock.
+  const beginOutdoorBench=(actorId,instanceId,fromQueue=false)=>{
+    const actor=getActor(game,actorId);
+    if(actor.action||game.socialAction||residentUnavailableForHome(game,actorId)||
+      !outdoorBenchAvailable(game,actorId,instanceId)){
+      if(!fromQueue)toast('Скамейка занята или персонаж недоступен');
+      return false;
+    }
+    if(!buildRoute('bench',actorId,instanceId)){
+      if(!fromQueue)toast('Не получается подойти к скамейке');
+      return false;
+    }
+    if(!chooseAction(actor,'bench',false))return false;
+    actor.action.targetInstanceId=instanceId;
+    actor.event='Идёт отдыхать на садовой скамейке';
+    restartAutonomyWait(actorId);return true;
+  };
   // Meet beside the other resident at a walkable, reachable point.
   beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null,branchId=null,fromQueue=false)=>{
     if(residentUnavailableForHome(game,actorId)||
@@ -3480,6 +3553,8 @@ function boot() {
               id!==residentId&&showerStates[id].active))&&
             !(command.actionId==='toilet'&&HOUSEHOLD_IDS.some(id=>
               id!==residentId&&toiletStates[id].active));
+        if(command.type==='outdoor')return outdoorBenchAvailable(game,residentId,command.instanceId)&&
+          Boolean(findPath(actor.position,outdoorBenchApproach(game.world,command.instanceId),game.world));
         if(command.type==='move')return isWalkable(command.x,command.z,game.world)&&
           Boolean(findPath(actor.position,{x:command.x,z:command.z},game.world));
         const partnerId=command.targetId;
@@ -3534,6 +3609,8 @@ function boot() {
           started=beginAction(actionId,false,residentId,true,command.targetInstanceId,
             command.activityId,command.contentId,command.inventoryItemId||null);
         }
+        else if(command.type==='outdoor')
+          started=beginOutdoorBench(residentId,command.instanceId,true);
         else if(command.type==='move'){
           const actor=getActor(game,residentId),goal={x:command.x,z:command.z};
           const route=findPath(actor.position,goal,game.world);
@@ -3602,6 +3679,7 @@ function boot() {
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
     renderSocialMenu();renderQueuePanel();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    benchVisualTargets.alex=null;benchVisualTargets.mira=null;
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
     for(const id of HOUSEHOLD_IDS){
@@ -3644,7 +3722,8 @@ function boot() {
   // W1-A.2: physically varying environment uses ONLY the existing two
   // non-shadow directional lights and one camera. Saved lamp states stay manual.
   const dayNightRenderer=createDayNightRenderer({scene:app.scene,sun,fill,camera,Color:pc.Color});
-  dayNightRenderer.update(game.calendar,game.minutes);
+  currentOutdoorDaylight=dayNightRenderer.update(game.calendar,game.minutes);
+  syncOutdoorLights(currentOutdoorDaylight);
   setCameraBuildBounds(CAMERA_LOT_BOUNDS);
   const view={...CAMERA_INITIAL};
   const cameraTarget=new pc.Vec3(view.centerX,view.centerY,view.centerZ);
@@ -5326,17 +5405,24 @@ function boot() {
   // financial timeline. The saved authoritative root stays game, never a UI VM.
   let outdoorTool='paint',outdoorDrag=null,outdoorPending=null;
   let outdoorCategory='ground',outdoorPose=null,outdoorYaw=0;
-  const outdoorFeatureItems=OUTDOOR_PRODUCTS.filter(item=>
-    ['tree','shrub','flower','fence'].includes(item.category));
-  for(const item of outdoorFeatureItems){
-    const opt=document.createElement('option');opt.value=item.itemId;
-    opt.textContent=item.name+' · '+item.price+' кр.';
-    $('outdoor-feature-kind').append(opt);
-  }
+  const outdoorFeatureItems=OUTDOOR_PRODUCTS;
+  const activeOutdoorItems=()=>outdoorFeatureItems.filter(item=>
+    outdoorCategory==='objects'?['furniture','light'].includes(item.category):
+      ['tree','shrub','flower','fence'].includes(item.category));
+  const syncOutdoorFeatureCatalog=()=>{
+    const selected=$('outdoor-feature-kind').value;
+    const list=activeOutdoorItems().map(item=>{
+      const opt=document.createElement('option');opt.value=item.itemId;
+      opt.textContent=item.name+' · '+item.price+' кр.';
+      return opt;
+    });
+    $('outdoor-feature-kind').replaceChildren(...list);
+    if(list.some(o=>o.value===selected))$('outdoor-feature-kind').value=selected;
+  };
   const syncOutdoorOwned=()=>{
     const selected=$('outdoor-feature-owned').value;
-    const list=game.world.outdoors.features.filter(i=>
-      outdoorFeatureItems.some(p=>p.itemId===i.itemId));
+    const permitted=new Set(activeOutdoorItems().map(p=>p.itemId));
+    const list=game.world.outdoors.features.filter(i=>permitted.has(i.itemId));
     const options=list.map(item=>{
       const opt=document.createElement('option');opt.value=item.instanceId;
       opt.textContent=OUTDOOR_CATALOG[item.itemId].name+' · №'+item.instanceId.slice(4);
@@ -5370,7 +5456,10 @@ function boot() {
     'resident-blocked':'Нельзя ставить препятствие прямо на жителя',
     'would-block-route':'Нельзя перекрывать проход к дому, выходу или нужным предметам',
     'invalid-pose':'Выбери допустимое место и поворот',
-    'wallet-limit':'Баланс семьи достиг предела'
+    'wallet-limit':'Баланс семьи достиг предела',
+    'reserved-bench':'Сначала закончи отдых или удали заказ из очереди',
+    'unreachable-bench':'Нельзя сесть: оставь подход и путь для обоих жителей',
+    'light-limit':'На участке уже установлено восемь фонарей'
   };
   const outdoorFeedback=(message,invalid=false)=>{
     $('outdoor-preview-text').textContent=message;
@@ -5480,7 +5569,7 @@ function boot() {
     if(buildMode)exitBuild();
     if(furnishMode)exitFurniture();
     outdoorMode=true;outdoorTool='paint';outdoorCategory='ground';
-    $('outdoor-category').value='ground';syncOutdoorOwned();
+    $('outdoor-category').value='ground';syncOutdoorFeatureCatalog();syncOutdoorOwned();
     setView({...view,centerX:7,centerZ:0,distance:43,pitch:60});
     setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:50});
@@ -5505,7 +5594,7 @@ function boot() {
   $('outdoor-ground-kind').addEventListener('change',()=>clearOutdoorPending());
   $('outdoor-category').addEventListener('change',()=>{
     outdoorCategory=$('outdoor-category').value;outdoorYaw=0;
-    clearOutdoorPending();syncOutdoorOwned();
+    clearOutdoorPending();syncOutdoorFeatureCatalog();syncOutdoorOwned();
   });
   $('outdoor-feature-kind').addEventListener('change',()=>{
     outdoorYaw=0;clearOutdoorPending();
@@ -5874,6 +5963,14 @@ function boot() {
           instanceId:item.instanceId,bounds:{min:{x:r.minX,y:0,z:r.minZ},
             max:{x:r.maxX,y:1.66,z:r.maxZ}}};
       });
+    const outdoorBenches=(game.world.outdoors?.features||[])
+      .filter(item=>item.itemId==='garden.bench')
+      .map(item=>{
+        const rect=outdoorFeatureRect(item);
+        return {kind:'outdoor',id:'bench',instanceId:item.instanceId,
+          bounds:{min:{x:rect.minX,y:-.49,z:rect.minZ},
+            max:{x:rect.maxX,y:.63,z:rect.maxZ}}};
+      });
     const easels=game.world.furniture.instances
       .filter(item=>item.prefabId==='easel'&&item.location==='home')
       .map(item=>{
@@ -5882,7 +5979,7 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:2.02,z:r.maxZ}}};
       });
     return pickWorldRayTarget(near,far,
-      [...residents,...finishedArt,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...kitchenAppliances,...easels,...movedVolumes,...blockers]);
+      [...residents,...finishedArt,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...kitchenAppliances,...easels,...outdoorBenches,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -5937,6 +6034,11 @@ function boot() {
       toast('Картина · открыть инвентарь, повесить или продать во вкладке «Навыки»');
     }
     else if(target?.kind==='object')select(target.id,target.instanceId);
+    else if(target?.kind==='outdoor'&&target.id==='bench'){
+      closeSocialContext();select(null);
+      if(scheduleCommand({type:'outdoor',instanceId:target.instanceId}))
+        toast(getActorName(game.selectedSim)+' запланировал(а) отдых на скамейке');
+    }
     else{
       closeSocialContext();select(null);
       const {near,far}=furnitureRay(pos);
@@ -6404,12 +6506,17 @@ function boot() {
       sofaVisualTargets.alex=alexDining?game.action.diningSeatInstanceId:
         alexReadingSeated?game.action.readingSeatInstanceId:
         (alexWatchSeat||game.action?.targetInstanceId)||null;
+    if(useId==='bench'&&game.action?.phase==='using')
+      benchVisualTargets.alex=game.action.targetInstanceId;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
-      (useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated||alexDining)&&
+      (useId==='sofa'||useId==='seat'||useId==='bench'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated||alexDining)&&
         bedStates.alex.progress===0&&!showerStates.alex.active,
       alexReadingStage?frameAnimDt*game.speed:frameAnimDt);
     const alexSeatBase=sofaTransitionPose(sofaStates.alex);
-    const seatPose=(purchasedSeatPrefab(game.world,sofaVisualTargets.alex)
+    const gardenSeatPose=benchVisualTargets.alex&&sofaStates.alex.progress>0
+      ?outdoorBenchPose(game.world,benchVisualTargets.alex,sofaStates.alex.progress):null;
+    if(!gardenSeatPose&&useId!=='bench')benchVisualTargets.alex=null;
+    const seatPose=gardenSeatPose||(purchasedSeatPrefab(game.world,sofaVisualTargets.alex)
       ?(alexDiningVisual&&alexDiningVisual.chairId===sofaVisualTargets.alex
         ?purchasedDiningSeatPose(game.world,sofaVisualTargets.alex,alexSeatBase,
           sofaStates.alex.progress,alexDiningVisual.side,alexDiningVisual.maxPull)
@@ -6419,7 +6526,7 @@ function boot() {
           {...alexSeatBase,x:alexSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.alex)},
         sofaVisualTargets.alex))||
       {...display,sofaWeight:0};
-    const seating=useId==='sofa'||useId==='seat'||Boolean(alexWatchSeat)||alexReadingSeated||alexDining||
+    const seating=useId==='sofa'||useId==='seat'||useId==='bench'||Boolean(alexWatchSeat)||alexReadingSeated||alexDining||
       sofaStates.alex.progress>0||alexDateSofa;
     if(!seating){sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;diningVisual.alex=null;}
     if(alexSeatInstanceId!==sofaVisualTargets.alex||
@@ -6575,12 +6682,17 @@ function boot() {
       sofaVisualTargets.mira=miraDining?game.otherSim.action.diningSeatInstanceId:
         miraReadingSeated?game.otherSim.action.readingSeatInstanceId:
         (miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
+    if(miraUseId==='bench'&&game.otherSim.action?.phase==='using')
+      benchVisualTargets.mira=game.otherSim.action.targetInstanceId;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
-      (miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated||miraDining)&&
+      (miraUseId==='sofa'||miraUseId==='seat'||miraUseId==='bench'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated||miraDining)&&
         bedStates.mira.progress===0&&!showerStates.mira.active,
       miraReadingStage?frameAnimDt*game.speed:frameAnimDt);
     const miraSeatBase=sofaTransitionPose(sofaStates.mira);
-    const miraSeatPose=(purchasedSeatPrefab(game.world,sofaVisualTargets.mira)
+    const gardenMiraPose=benchVisualTargets.mira&&sofaStates.mira.progress>0
+      ?outdoorBenchPose(game.world,benchVisualTargets.mira,sofaStates.mira.progress):null;
+    if(!gardenMiraPose&&miraUseId!=='bench')benchVisualTargets.mira=null;
+    const miraSeatPose=gardenMiraPose||(purchasedSeatPrefab(game.world,sofaVisualTargets.mira)
       ?(miraDiningVisual&&miraDiningVisual.chairId===sofaVisualTargets.mira
         ?purchasedDiningSeatPose(game.world,sofaVisualTargets.mira,miraSeatBase,
           sofaStates.mira.progress,miraDiningVisual.side,miraDiningVisual.maxPull)
@@ -6590,7 +6702,7 @@ function boot() {
           {...miraSeatBase,x:miraSeatBase.x+romanticSofaSlotOffset(romanticSofaSlots.mira)},
         sofaVisualTargets.mira))||
       {...miraDisplay,sofaWeight:0};
-    const miraSeating=miraUseId==='sofa'||miraUseId==='seat'||Boolean(miraWatchSeat)||miraReadingSeated||miraDining||
+    const miraSeating=miraUseId==='sofa'||miraUseId==='seat'||miraUseId==='bench'||Boolean(miraWatchSeat)||miraReadingSeated||miraDining||
       sofaStates.mira.progress>0||miraDateSofa;
     if(!miraSeating){sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;diningVisual.mira=null;}
     // Both residents' chair roots share the same reversible animation curve.
@@ -6708,7 +6820,7 @@ function boot() {
         !miraSeating&&!miraBedding&&!miraShower,
       social:socialUsing&&!pairedTv&&!pairedHobby?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
-      actionId:(miraUseId==='seat'||miraDining)?'sofa':miraUseId,
+      actionId:(miraUseId==='seat'||miraUseId==='bench'||miraDining)?'sofa':miraUseId,
       readingStage:pairedBooks?'reading':miraReadingStage,
       readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
       readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
@@ -6759,7 +6871,7 @@ function boot() {
       socialInitiator:socialUsing&&game.socialAction.initiator==='alex',
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
-      actionId:(useId==='seat'||alexDining)?'sofa':useId,
+      actionId:(useId==='seat'||useId==='bench'||alexDining)?'sofa':useId,
       readingStage:pairedBooks?'reading':alexReadingStage,
       readingStepElapsed:game.action?.readingStepElapsed??0,
       readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
@@ -7131,6 +7243,7 @@ function boot() {
     // Apply scene colors after the authoritative fixed-step clock tick.
     // No visual time advancement while paused, hidden or in Build/Furnish.
     const daylight=dayNightRenderer.update(game.calendar,game.minutes);
+    currentOutdoorDaylight=daylight;syncOutdoorLights(daylight);
     uiTimer+=dt;autosaveTime+=dt;
     if(uiTimer>.14){
       uiTimer=0;

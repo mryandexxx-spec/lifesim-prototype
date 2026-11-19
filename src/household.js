@@ -23,6 +23,7 @@ import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
 import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
+import {outdoorBench,outdoorBenchApproach,outdoorBenchAvailable} from './outdoor-interactions.js';
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
@@ -163,11 +164,22 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   // v1 commands migrate to deterministic original instance IDs once.
   for(const id of HOUSEHOLD_IDS){
     const sim=id==='alex'?root:mira;
-    if(sim.action&&sim.action.id!=='move'){
+    if(sim.action&&sim.action.id==='bench'){
+      const target=outdoorBenchApproach(root.world,sim.action.targetInstanceId);
+      const otherActor=getActor(root,id==='alex'?'mira':'alex');
+      if(!target||!outdoorBenchAvailable(root,id,sim.action.targetInstanceId)||
+        (sim.action.phase==='using'&&Math.hypot(
+          sim.position.x-target.x,sim.position.z-target.z)>.5)||
+        (sim.action.phase==='walking'&&!findPath(sim.position,target,root.world)))
+        sim.action=null;
+    }
+    if(sim.action&&sim.action.id!=='move'&&sim.action.id!=='bench'){
       const object=resolveActionFurniture(root.world,sim.action.id,sim.action.targetInstanceId);
       if(object)sim.action.targetInstanceId=object.instanceId;
       else sim.action=null; // no phantom action or silent rerouting to another item
     }
+    root.actionQueues.byResident[id]=root.actionQueues.byResident[id].filter(task=>
+      task.type!=='outdoor'||Boolean(outdoorBench(root.world,task.instanceId)));
     for(const task of root.actionQueues.byResident[id]){
       if(task.type!=='object'||task.targetInstanceId)continue;
       const object=resolveActionFurniture(root.world,task.actionId);
@@ -796,6 +808,19 @@ export function tickHousehold(root,minutes) {
         actor.position.x-target.x,actor.position.z-target.z)>.5)){
       actor.action=null;
       actor.event='Мойка недоступна или посуды больше нет';
+    }
+  }
+  // LOT-B3: only a physically valid, occupied bench can restore Fun.
+  // A removed/broken item or a teleported/restored resident never gets credit.
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),action=actor?.action;
+    if(action?.id!=='bench')continue;
+    const target=outdoorBenchApproach(root.world,action.targetInstanceId);
+    if(!target||!outdoorBenchAvailable(root,id,action.targetInstanceId)||
+      (action.phase==='using'&&Math.hypot(
+        actor.position.x-target.x,actor.position.z-target.z)>.5)||
+      (action.phase==='walking'&&!findPath(actor.position,target,root.world))){
+      actor.action=null;actor.event='Скамейка недоступна';
     }
   }
   // Kitchen preflight: a moved/stored source or an interrupted resident

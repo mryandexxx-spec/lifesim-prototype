@@ -8,6 +8,7 @@ import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
 import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-interaction.js';
 import {validFurnitureInstanceId} from './furniture-catalog.js';
+import {validOutdoorId} from './outdoor-catalog.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {insideLot} from './lot-surface.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
@@ -25,6 +26,9 @@ export const ACTIONS = Object.freeze({
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
   // F4D: sitting is a real physical activity, not an unearned skill or need bonus.
   seat: { label: 'Посидеть', need: 'fun', duration: 42, benefitPerMinute: 0, location: [0,-1.03] },
+  // LOT-B3: real timed outdoors leisure, never a grant for merely owning furniture.
+  bench: {label:'Отдохнуть на садовой скамейке',need:'fun',duration:42,
+    benefitPerMinute:.74,location:[0,0]},
   // F4F: a real fridge-to-purchased-chair dining journey; hunger only during bites.
   dining: { label:'Пообедать за столом',need:'hunger',duration:31,
     benefitPerMinute:1.55,location:[0,-1.5] },
@@ -133,8 +137,11 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       next.action.lampSwitched=true;
     if(data.action.id==='bed'&&validBedSlot(data.action.bedSlot))
       next.action.bedSlot=data.action.bedSlot;
-    if(validFurnitureInstanceId(data.action.targetInstanceId))
+    if(validFurnitureInstanceId(data.action.targetInstanceId)||
+       (data.action.id==='bench'&&validOutdoorId(data.action.targetInstanceId)))
       next.action.targetInstanceId=data.action.targetInstanceId;
+    if(data.action.id==='bench'&&!validOutdoorId(data.action.targetInstanceId))
+      next.action=null;
     // Optional H1 activity metadata. Unknown activities are not restorable.
     if(['hobby','music','paint'].includes(data.action.id)){
       const activity=getActivityDefinition(HOBBY_ACTIVITIES,data.action.activityId);
@@ -212,6 +219,7 @@ export function tick(state, minutes,world=state?.world??null) {
   // Sitting at an actual occupied sofa (resting or watching television)
   // suspends Energy decay while using it; standing TV viewing does NOT.
   const sitting=state.action?.id==='sofa'||
+    (state.action?.id==='bench'&&state.action.phase==='using')||
     (state.action?.id==='dining'&&state.action.phase==='using'&&state.action.diningStage==='eating')||
     (state.action?.id==='tv'&&Boolean(state.action.watchSeatInstanceId))||
     (state.action?.id==='hobby'&&state.action.readingStage==='reading'&&
@@ -300,7 +308,7 @@ export function tick(state, minutes,world=state?.world??null) {
     }
     // M2 affects enjoyment of optional rest, not animation time, eating,
     // sleep, shower privacy, or promises of physical self-care.
-    if(['sofa','tv','hobby'].includes(state.action.id))gained*=voluntaryMoodEfficiency(state,
+    if(['sofa','tv','hobby','bench'].includes(state.action.id))gained*=voluntaryMoodEfficiency(state,
       {type:'object',actionId:state.action.id});
     // Enjoying books is a taste; literature XP is earned separately by work.
     if(hobby)gained*=1+preferenceAffinity(state.personality,
@@ -317,7 +325,7 @@ export function tick(state, minutes,world=state?.world??null) {
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
-        (!['seat','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&

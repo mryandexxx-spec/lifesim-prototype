@@ -1830,6 +1830,9 @@ button.time-card:active {transform:translateY(1px);}
 .career-phone-worklife summary { cursor:pointer; }
 
 
+/* LOT-B3: third tab for garden seating and real dusk lamps reuses the
+   same 44px native pickers, preview and money-confirmation controls. */
+.outdoor-editor-tip strong{font-weight:800}
 /* LOT-B2: adaptive plant/fence controls in the existing mobile lot sheet. */
 .outdoor-feature-controls{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}
 .outdoor-feature-controls[hidden],.outdoor-feature-controls label[hidden]{display:none!important}

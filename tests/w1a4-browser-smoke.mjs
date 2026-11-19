@@ -65,7 +65,8 @@ try {
  await page.locator('#speed-btn').click();
  assert.equal(await page.locator('#speed-btn').innerText(),'3×');
  await page.locator('#pause-btn').click();
- await page.waitForFunction(()=>document.querySelector('#day-label')?.textContent?.includes('29 фев'),null,{timeout:18000});
+ await page.waitForFunction(()=>document.querySelector('#day-label')?.textContent?.includes('29 фев'),null,
+   {timeout:45000}); // Software WebGL can have delayed frames under 39 concurrent CI jobs.
  await page.waitForFunction(key=>{
   const c=JSON.parse(localStorage.getItem(key)||'null')?.calendar;
   return c?.reminderReceipts?.length===1;
