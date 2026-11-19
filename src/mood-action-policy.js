@@ -43,7 +43,8 @@ export function moodActionPolicy(resident,command,options={}){
   const mind=record(resident?.mind)?resident.mind:{memories:[],emotions:[]};
   const minutes=Number.isFinite(resident?.minutes)?Math.max(0,resident.minutes):480;
   const mood=calculateMood(needs,mind,minutes,resident?.personality,
-    environmentSnapshot(resident,options.world??resident?.world??null).delta).value;
+    environmentSnapshot(resident,options.world??resident?.world??null).delta,
+    resident?.workMoodContext??0).value;
   const personality=deriveAxes(resident?.personality);
   const threshold=effortThreshold(command,options);
   // A very depleted person does not force themselves into optional work merely
