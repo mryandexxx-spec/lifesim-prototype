@@ -6047,11 +6047,11 @@ function boot() {
         const rect=outdoorFeatureRect(item),def=OUTDOOR_CATALOG[item.itemId];
         if(!rect||!def)return null;
         const height=def.category==='tree'?3.10:
-          def.category==='light'?(item.itemId==='light.standing'?2.45:1.35):
+          def.category==='light'?(item.itemId==='light.standing'?3.05:1.85):
           def.category==='shrub'?1.12:
           def.category==='flower'?.48:
           def.category==='fence'?1.12:
-          item.itemId==='garden.bench'?.65:1.08;
+          item.itemId==='garden.bench'?1.20:1.24;
         return {kind:'outdoor',id:item.itemId,instanceId:item.instanceId,
           bounds:{min:{x:rect.minX,y:-.49,z:rect.minZ},
             max:{x:rect.maxX,y:height-.53,z:rect.maxZ}}};
