@@ -10,6 +10,7 @@ import {careerReadiness,recordCompletedCareerShift,recordMissedCareerShift,promo
 import {startWorkIncident,automaticWorkIncident} from './career-incidents.js';
 import {recordProfessionalShift} from './career-goals.js';
 import {creditCareerPaidLeave,careerTimeOffForShift,settleCareerTimeOff} from './career-timeoff.js';
+import {WORK_MODES,cleanWorkMode,newWorkNeeds,progressWorkNeeds,workNeedsReport} from './career-work-needs.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 const ACTIVE=new Set(['departing','working','returning']);
@@ -26,10 +27,11 @@ export function residentUnavailableForHome(root,id){
 export function residentAwayAtWork(root,id){
   return ['working','returning'].includes(residentWorkPhase(root,id));
 }
-function shiftSnapshot(shift){
+function shiftSnapshot(shift,mode='normal'){
   return {id:shift.id,employmentId:shift.employmentId,careerId:shift.careerId,
     start:shift.start,end:shift.end,hourlyCredits:shift.hourlyCredits,
-    phase:'pending',warn60:false,warn15:false,departedAt:null,readiness:null};
+    phase:'pending',warn60:false,warn15:false,departedAt:null,readiness:null,
+    workMode:cleanWorkMode(mode)};
 }
 function emit(messages,id,type,text){
   messages.push({residentId:id,type,text:NAMES[id]+': '+text});
@@ -69,6 +71,7 @@ function settle(root,contract,id,at){
     badges=recordProfessionalShift(root,id,shift);
   }
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
+    workMode:cleanWorkMode(shift.workMode),workReport:workNeedsReport(shift),
     outcome:'worked',salary:already?0:salary,
     workedMinutes:Math.round(worked),lateMinutes,finishedAt:at,
     grade:result?.grade??null,performanceDelta:result?.delta??null,
@@ -98,7 +101,7 @@ export function progressCareerWork(root,before,after){
       if(!planned||careerTimeOffForShift(contract,planned.id)||
         after<planned.start-60||contract.lastShift?.id===planned.id||
         root.careerSystem.settlementIds.includes(planned.id))continue;
-      shift=contract.currentShift=shiftSnapshot(planned);
+      shift=contract.currentShift=shiftSnapshot(planned,contract.workMode);
     }
     if(shift.phase==='returning')continue;
     if(shift.phase==='working'){
@@ -168,8 +171,29 @@ export function arriveCareerPortal(root,id,at=root?.minutes){
   const actor=actorFor(root,id);
   shift.readiness=careerReadiness(actor);
   shift.phase='working';
+  shift.workMode=cleanWorkMode(shift.workMode);
+  shift.workNeeds=newWorkNeeds(shift.departedAt);
   if(actor){actor.action=null;actor.activitySession=null;actor.event='На работе до '+clockAt(shift.end);}
   return true;
+}
+/** Selecting an option never grants an immediate need, skill or performance reward.
+ * A running shift changes prospectively; its completed minute accounting is immutable.
+ */
+export function selectCareerWorkMode(root,id,mode){
+  if(!Object.hasOwn(WORK_MODES,mode))return {ok:false,reason:'Неизвестный режим работы'};
+  const contract=root?.careerSystem?.byResident?.[id];
+  if(!contract)return {ok:false,reason:'Нет трудового договора'};
+  const shift=contract.currentShift;
+  if(shift?.phase==='working'){
+    progressWorkNeeds(root,root.minutes,root.minutes);
+    shift.workMode=mode;
+  }else if(shift?.phase==='returning'){
+    return {ok:false,reason:'Дождись возвращения домой'};
+  }else if(shift?.phase==='departing'){
+    return {ok:false,reason:'Смена уже начинается'};
+  }else if(shift?.phase==='pending')shift.workMode=mode;
+  contract.workMode=mode;
+  return {ok:true};
 }
 export function finishCareerReturn(root,id){
   const contract=root?.careerSystem?.byResident?.[id];
@@ -202,7 +226,7 @@ export function residentWorkStatus(root,id){
   if(shift?.phase==='working'){
     const earned=Math.round(Math.max(0,Math.min(at,shift.end)-shift.departedAt)*
       shift.hourlyCredits/60);
-    return {phase:'working',label:'На работе · до '+clockAt(shift.end)+' · заработано '+earned+' кр.',
+    return {phase:'working',label:'На работе · '+WORK_MODES[cleanWorkMode(shift.workMode)].label+' · до '+clockAt(shift.end)+' · заработано '+earned+' кр.',
       end:shift.end,earned};
   }
   if(shift?.phase==='departing')

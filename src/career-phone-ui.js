@@ -8,7 +8,8 @@ import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {professionalGoalsView} from './career-goals.js';
 import {careerRankForContract,specializationReadiness,chooseCareerSpecialization} from './career-specializations.js';
 import {seniorTrack} from './career-seniority.js';
-import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt} from './career-work.js';
+import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt,selectCareerWorkMode} from './career-work.js';
+import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-work-needs.js';
 import {calendarAt} from './calendar-core.js';
 import {createFinancePhoneUI} from './finance-phone-ui.js';
 import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff} from './career-timeoff.js';
@@ -150,6 +151,45 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       (current.lastShift.lateMinutes?' · опоздание '+current.lastShift.lateMinutes+' мин.':'')));
 
     body.append(facts);
+    const currentMode=cleanWorkMode(active?.workMode??current.workMode);
+    const modeDetails=element('details','career-work-modes');
+    modeDetails.open=active?.phase==='working';
+    modeDetails.append(element('summary','career-phone-notice',
+      '⚙️ Режим работы · '+WORK_MODES[currentMode].label));
+    modeDetails.append(element('p','career-phone-muted',
+      'Режим влияет на фактически отработанные минуты. Переключение не даёт мгновенных бонусов.'));
+    for(const mode of WORK_MODE_IDS){
+      const spec=WORK_MODES[mode];
+      const button=action((mode===currentMode?'✓ ':'')+spec.label,()=>{
+        const live=personRoot();if(!live)return;
+        const result=selectCareerWorkMode(live,who,mode);
+        if(!result.ok){notify(result.reason);return;}
+        save(true);notify('Режим работы: '+spec.label);render();
+      },'career-phone-secondary career-work-mode');
+      button.disabled=mode===currentMode||
+        ['departing','returning'].includes(active?.phase);
+      button.setAttribute('aria-pressed',String(mode===currentMode));
+      modeDetails.append(button,element('p','career-phone-muted',spec.description));
+    }
+    const report=workNeedsReport(active);
+    if(active?.phase==='working'){
+      const sim=who==='mira'?root.otherSim:root;
+      modeDetails.append(element('p','career-phone-notice',
+        'На работе: голод '+Math.round(sim.needs.hunger)+
+        ' · туалет '+Math.round(sim.needs.bladder)+
+        ' · общение '+Math.round(sim.needs.social)));
+      modeDetails.append(element('p','career-phone-muted',
+        'Обед: '+(report.meal?'был':'ещё нет')+
+        ' · туалет: '+report.toilet+
+        ' · разговоры: '+report.socialMinutes+' мин.'));
+    }
+    if(current.lastShift?.outcome==='worked'&&current.lastShift.workReport){
+      const r=current.lastShift.workReport;
+      modeDetails.append(element('p','career-phone-muted',
+        'Итог прошлой смены: обед '+(r.meal?'✓':'—')+
+        ' · туалет '+r.toilet+' · разговоры '+r.socialMinutes+' мин.'));
+    }
+    body.append(modeDetails);
     body.append(element('h3','career-phone-section-title','🏖 Отдых от работы'));
     const leave=current.timeOff||{balance:0,progress:0};
     body.append(element('p','career-phone-muted',

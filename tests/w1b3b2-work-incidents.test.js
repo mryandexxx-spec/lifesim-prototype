@@ -98,9 +98,12 @@ test('unanswered incident auto-resolves once before salary, never blocks work',(
   assert.ok(WORK_INCIDENTS.editorial.options.some(x=>x.id===option));
   tickHousehold(root,shift.end-root.minutes);
   const c=root.careerSystem.byResident.alex;
-  assert.equal(c.currentShift.incident.choiceId,option);
+  // W3-B: actual hunger/energy/social state evolves during this workday, so
+  // autonomous judgement at the end may differ from the pre-shift preview.
+  const resolved=c.currentShift.incident.choiceId;
+  assert.ok(WORK_INCIDENTS.editorial.options.some(x=>x.id===resolved));
   assert.equal(c.currentShift.incident.auto,true);
-  assert.equal(c.lastShift.incident.choiceId,option);
+  assert.equal(c.lastShift.incident.choiceId,resolved);
   assert.equal(c.lastShift.salary,112);
   assert.equal(root.shop.credits,wallet+112);
   assert.equal(root.careerSystem.settlementIds.length,1);

@@ -6,6 +6,7 @@ import {CAREER_RESIDENT_IDS} from './career-state.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {refreshMind} from './psychology.js';
+import {WORK_MODES,cleanWorkMode} from './career-work-needs.js';
 import {careerRankForContract,specializationReadiness} from './career-specializations.js';
 import {seniorPromotionReadiness,resetSeniorProof} from './career-seniority.js';
 
@@ -93,7 +94,8 @@ export function recordCompletedCareerShift(contract,actor,shift,workedMinutes,la
   const readiness=clip(Number.isFinite(shift.readiness)?shift.readiness:65);
   const plan=PLAN[contract.careerId]?.[contract.level];
   const skill=plan?.skill?currentSkillLevel(actor?.skills,HOBBY_SKILLS,plan.skill):0;
-  const delta=Math.round(3+6*fraction+(readiness-60)/20-
+  const modeBonus=shift.workNeeds?shift.workNeeds.modeScore/Math.max(1,duration):0;
+  const delta=Math.round(3+6*fraction+(readiness-60)/20+modeBonus-
     Math.min(8,lateMinutes/45)-(1-fraction)*8+Math.min(4,skill)*.5);
   const change=clip(delta,-10,12);
   contract.performance=clip(clip(contract.performance)+change);
@@ -105,9 +107,13 @@ export function recordCompletedCareerShift(contract,actor,shift,workedMinutes,la
   const energyLoss=Math.round((9+13*fraction)*fraction);
   const hygieneLoss=Math.round(7*fraction);
   if(actor?.needs){
-    actor.needs.energy=clip(actor.needs.energy-energyLoss);
-    actor.needs.hygiene=clip(actor.needs.hygiene-hygieneLoss);
-    actor.needs.fun=clip(actor.needs.fun-Math.round(3*fraction));
+    // New W3-B shifts already consumed energy/hygiene/fun minute-by-minute.
+    // Keep the legacy one-time debit only for direct/older settlement paths.
+    if(!shift.workNeeds){
+      actor.needs.energy=clip(actor.needs.energy-energyLoss);
+      actor.needs.hygiene=clip(actor.needs.hygiene-hygieneLoss);
+      actor.needs.fun=clip(actor.needs.fun-Math.round(3*fraction));
+    }
     refreshMind(actor);
   }
   const grade=change>=8&&readiness>=60?'удачный день':

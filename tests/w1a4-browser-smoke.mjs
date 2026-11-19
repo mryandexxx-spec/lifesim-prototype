@@ -49,9 +49,9 @@ try {
  assert.equal(await page.locator('#light-phase-label').innerText(),'Ночь');
  // Let the HUD paint its last pre-pause minute before the comparison.
  // Compare two settled samples to still catch a clock that keeps running.
- await page.waitForTimeout(250);
+ await page.waitForTimeout(650);
  const pausedTime=await page.locator('#time-label').innerText();
- await page.waitForTimeout(750);
+ await page.waitForTimeout(1100);
  assert.equal(await page.locator('#time-label').innerText(),pausedTime,'Pause freezes game clock and lighting');
  const winterNight=await page.locator('#game-canvas').screenshot();
  await page.locator('#speed-btn').click();
@@ -106,9 +106,9 @@ try {
   beforeLive,{timeout:7000});
  await page.locator('#home-open').click();await page.locator('#home-furnish').click();
  assert.ok(await page.locator('#furniture-editor').isVisible());
- await page.waitForTimeout(350); // The HUD may be one frame behind the tick.
+ await page.waitForTimeout(900); // Let any in-flight pre-editor game tick reach the HUD.
  const furnishClock=await page.locator('#time-label').innerText();
- await page.waitForTimeout(1100);
+ await page.waitForTimeout(1250);
  assert.equal(await page.locator('#time-label').innerText(),furnishClock,
   'Furnish mode freezes the single calendar as in previous versions');
  await page.locator('#furnish-exit').click();

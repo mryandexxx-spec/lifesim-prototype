@@ -187,7 +187,7 @@ test('W4-C: static Pages and touch interface contain the new bill module',()=>{
   const phone=readFileSync('src/finance-phone-ui.js','utf8');
   const game=readFileSync('src/game.js','utf8');
   assert.match(html,/src\/household-bills\.js/);
-  assert.match(pages,/cp src\/career-work\.js.*src\/household-bills\.js/);
+  assert.match(pages,/cp src\/career-work-needs\.js src\/career-work\.js.*src\/household-bills\.js/);
   assert.match(phone,/finance-bill-pay/);
   assert.match(phone,/Счета за дом/);
   assert.match(game,/billsNeedsPersistence/);
