@@ -61,6 +61,7 @@ jobs:
           node --check src/day-night-cycle.js
           node --check src/day-night-render.js
           node --check src/need-balance.js
+          node --check src/sleep-acceleration.js
           node --check src/navigation.js
           node --check src/lot-surface.js
           node --check src/outdoor-catalog.js
