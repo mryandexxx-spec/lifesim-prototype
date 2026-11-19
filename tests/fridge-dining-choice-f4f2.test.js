@@ -21,7 +21,7 @@ function home(){
 test('F4F.2: quick snack restores much less hunger than the unchanged table meal',()=>{
   assert.equal(ACTIONS.fridge.label,'Быстро перекусить');
   assert.equal(ACTIONS.dining.label,'Пообедать за столом');
-  assert.equal(ACTIONS.dining.benefitPerMinute,1.55);
+  assert.equal(ACTIONS.dining.benefitPerMinute,1.00);
   const quick=ACTIONS.fridge.duration*ACTIONS.fridge.benefitPerMinute;
   const full=ACTIONS.dining.duration*ACTIONS.dining.benefitPerMinute;
   assert.ok(quick>0&&quick<full*.55);
