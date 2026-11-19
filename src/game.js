@@ -478,12 +478,6 @@ function scheduleCommand(command,residentId=game.selectedSim){
       !findPath(person.position,{x:command.x,z:command.z},game.world)){
       toast('Путь к этой точке недоступен');return false;
     }
-    const pending=pendingActions(game.actionQueues,residentId);
-    if(pending.at(-1)?.type==='move'){
-      const replacement={x:Math.round(command.x*20)/20,z:Math.round(command.z*20)/20};
-      pending[pending.length-1]={...pending.at(-1),...replacement};
-      renderQueuePanel(true);save(true);return true;
-    }
   }
   if(command.type==='object'||command.type==='activity'){
     const definition=command.type==='activity'
@@ -5649,6 +5643,52 @@ function boot() {
       :'Готово: '+p.changedCells+' клеток · списано '+p.cost+' кр.');
     updateOutdoorPanel();
   });
+  // LOT-A UX: tapping terrain only offers an action; no queue mutation on tap.
+  // The pending point belongs to this transient panel, never persisted until confirmed.
+  let groundWalkOffer=null;
+  const groundWalkPanel=$('ground-walk-menu');
+  const closeGroundWalkMenu=()=>{
+    groundWalkOffer=null;groundWalkPanel.hidden=true;
+    $('ground-walk-action').disabled=true;
+  };
+  const openGroundWalkMenu=(point,ground)=>{
+    const id=game.selectedSim,actor=getActor(game,id);
+    if(residentUnavailableForHome(game,id)){
+      closeGroundWalkMenu();toast('Персонаж сейчас не на участке');return;
+    }
+    const requested={x:Math.round(ground.x*20)/20,z:Math.round(ground.z*20)/20};
+    const valid=isWalkable(requested.x,requested.z,game.world)?requested:null;
+    const nearest=valid||nearestWalkable(requested,game.world);
+    if(!nearest||(!valid&&Math.hypot(nearest.x-requested.x,nearest.z-requested.z)>.35)){
+      closeGroundWalkMenu();toast('Здесь нельзя пройти — выбери свободное место');return;
+    }
+    if(!findPath(actor.position,nearest,game.world)){
+      closeGroundWalkMenu();toast('Путь к этой точке недоступен');return;
+    }
+    groundWalkOffer={residentId:id,x:nearest.x,z:nearest.z};
+    const frame=document.querySelector('.app-shell').getBoundingClientRect();
+    groundWalkPanel.hidden=false;
+    const width=groundWalkPanel.offsetWidth||190,height=groundWalkPanel.offsetHeight||110;
+    const topInset=Math.max(70,Math.ceil($('calendar-anchor-toggle').getBoundingClientRect().bottom-frame.top)+10);
+    const bottomInset=Math.ceil($('dashboard').getBoundingClientRect().height)+18;
+    const x=Math.max(8,Math.min(point.x-frame.left+10,frame.width-width-8));
+    const y=Math.max(topInset,Math.min(point.y-frame.top-height/2,frame.height-bottomInset-height));
+    groundWalkPanel.style.left=x+'px';groundWalkPanel.style.top=y+'px';
+    $('ground-walk-action').disabled=false;
+  };
+  $('ground-walk-action').addEventListener('click',()=>{
+    const offer=groundWalkOffer;
+    closeGroundWalkMenu();
+    if(!offer)return;
+    if(scheduleCommand({type:'move',x:offer.x,z:offer.z},offer.residentId))
+      $('queue-feedback').textContent=getActorName(offer.residentId)+': команда «Идти сюда» добавлена в очередь';
+  });
+  $('ground-walk-close').addEventListener('click',closeGroundWalkMenu);
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&!groundWalkPanel.hidden){
+      event.preventDefault();closeGroundWalkMenu();
+    }
+  });
   const navigateOutdoorHistory=direction=>{
     if(!outdoorMode||!outdoorTimeline.length)return;
     const target=outdoorHistoryIndex+direction;
@@ -6022,6 +6062,7 @@ function boot() {
       if(warehouseOpen)setEditorView('edit');
       chooseFurniture(editorFurnitureAt(pos));return;
     }
+    closeGroundWalkMenu();
     const target=worldTargetAt(pos);
     if(target)confirmWorldTap(pos);
     if(target?.kind==='resident')openSocialContext(pos);
@@ -6044,29 +6085,12 @@ function boot() {
       const {near,far}=furnitureRay(pos);
       const ground=lotRaySurface(near,far,game.world);
       if(!ground)return; // Sky / off-lot: do not manufacture movement.
-      const id=game.selectedSim,actor=getActor(game,id);
-      if(residentUnavailableForHome(game,id)){
-        toast('Персонаж сейчас не на участке');return;
-      }
-      const requested={x:Math.round(ground.x*20)/20,z:Math.round(ground.z*20)/20};
-      const valid=isWalkable(requested.x,requested.z,game.world)?requested:null;
-      const nearest=valid||nearestWalkable(requested,game.world);
-      if(!valid&&Math.hypot(nearest.x-requested.x,nearest.z-requested.z)>.35){
-        toast('Здесь нельзя пройти — выбери свободное место');return;
-      }
-      if(!findPath(actor.position,nearest,game.world)){
-        toast('Путь к этой точке недоступен');return;
-      }
-      const walk={type:'move',x:nearest.x,z:nearest.z};
-      if(actor.action?.id==='move'&&!pendingActions(game.actionQueues,id).length){
-        actor.action.goal={x:nearest.x,z:nearest.z};
-        paths[id]={points:null,index:0,id:null};
-        actor.event='Идёт к новой точке';save(true);confirmWorldTap(pos);
-      }else if(scheduleCommand(walk,id))confirmWorldTap(pos);
+      openGroundWalkMenu(pos,ground);
     }
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
+    closeGroundWalkMenu();
     if(outdoorDrag?.pointerId===event.pointerId)clearOutdoorPending(true);
     if(buildDrag?.pointerId===event.pointerId){buildDrag=null;buildGhost.enabled=false;}
     if(holdGesture.pointerId===event.pointerId)cancelPendingGrab();
@@ -6077,13 +6101,14 @@ function boot() {
     shopSwipeRawPose=null;
   });
   window.addEventListener('blur',()=>{
-    cancelPendingGrab();
+    closeGroundWalkMenu();cancelPendingGrab();
     if(outdoorMode)clearOutdoorPending(true);
     buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
   });
   // Safari may suspend a background tab without a matching pointerup/blur.
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
+      closeGroundWalkMenu();
       if(outdoorMode)clearOutdoorPending(true);
       buildDrag=null;buildGhost.enabled=false;
       cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
