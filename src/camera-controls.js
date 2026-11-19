@@ -11,6 +11,9 @@ export const CAMERA_BOUNDS=Object.freeze({
   minPitch:24,maxPitch:68,minDistance:11,maxDistance:32,
   minX:-3.4,maxX:12.6,minZ:-2.9,maxZ:2.9
 });
+export const CAMERA_LOT_BOUNDS=Object.freeze({
+  minX:-8,maxX:22,minZ:-11,maxZ:11,minDistance:11,maxDistance:50
+});
 const valid=Number.isFinite;
 const panBounds={...CAMERA_BOUNDS};
 /** Expand only presentation camera for F5 build lots; reset when leaving build. */
