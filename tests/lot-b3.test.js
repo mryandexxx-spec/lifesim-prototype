@@ -103,3 +103,20 @@ test('B3 scene renderer includes owned garden furniture and lights',()=>{
   assert.ok(source.includes("def.category==='light'"),
     'both lamp SKUs must share the light rendering branch');
 });
+
+test('Outdoor 3D interactions open a contextual choice and never enqueue on tap',()=>{
+  const source=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  assert.match(source,/const outdoorTargets=\(game\.world\.outdoors\?\.features\|\|\[\]\)/,
+    'every outdoor feature category is eligible for a 3D hit target');
+  assert.match(source,/else if\(target\?\.kind==='outdoor'\)\{\s*closeSocialContext\(\);select\(null\);\s*openOutdoorActionMenu\(pos,target\);/,
+    '3D outdoor hits must be handled by the shared popup path');
+  assert.match(source,/offerWorldAction\(point,def\.name,'🪑 Отдохнуть'/,
+    'the physical bench must offer explicit rest selection');
+  assert.match(source,/offerWorldAction\(point,def\.name,'↗ Подойти'/,
+    'all other outdoor features offer an explicit queued approach');
+  assert.match(source,/scheduleCommand\(offer\.command,offer\.residentId\)/,
+    'only a contextual action-button confirmation enqueues the chosen command');
+  assert.match(html,/id="ground-walk-title"/);
+  assert.match(html,/id="ground-walk-action-label"/);
+});
