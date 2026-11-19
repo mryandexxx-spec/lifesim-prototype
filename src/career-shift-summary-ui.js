@@ -12,6 +12,17 @@ const duration=minutes=>{
 
 /** Immutable view model, built from the already settled canonical contract. */
 export function shiftSummaryForEvent(root,event){
+  if(event?.type==='dismissed'&&event?.termination&&NAMES[event.residentId]){
+    const ended=event.termination;
+    return Object.freeze({key:event.residentId+':'+ended.employmentId+':dismissed',
+      residentId:event.residentId,name:NAMES[event.residentId],
+      career:careerDefinition(ended.careerId)?.title||'Работа',
+      role:ended.role||'Сотрудник',dismissed:true,missed:false,
+      risk:ended.risk,retryAt:ended.retryAt,
+      salary:0,duration:'',period:'',grade:null,workReport:null,
+      lateMinutes:0,performance:0,performanceDelta:null,
+      detail:event.text||''});
+  }
   if(!root||!event||!['salary','missed'].includes(event.type)||!NAMES[event.residentId])return null;
   const contract=root.careerSystem?.byResident?.[event.residentId];
   const last=contract?.lastShift;
@@ -58,7 +69,8 @@ function el(tag,cls,text){
   return node;
 }
 /** Accessible, touch-sized single-focus modal, shown only on real tick transitions. */
-export function createCareerShiftSummaryUI({host,getRoot,shouldDefer=()=>false}){
+export function createCareerShiftSummaryUI({host,getRoot,shouldDefer=()=>false,
+  onDismissal=()=>{}}){
   const queue=createShiftSummaryQueue();
   const overlay=el('section','career-shift-summary-overlay');
   overlay.id='career-shift-summary';overlay.hidden=true;
@@ -84,10 +96,12 @@ export function createCareerShiftSummaryUI({host,getRoot,shouldDefer=()=>false})
   const isOpen=()=>!overlay.hidden;
   function dismiss(){
     if(!isOpen())return;
+    const dismissed=current?.dismissed,person=current?.residentId;
     overlay.hidden=true;current=null;
     const focus=previousFocus;previousFocus=null;
     if(focus?.isConnected&&typeof focus.focus==='function')focus.focus({preventScroll:true});
     flush();
+    if(dismissed)onDismissal(person);
   }
   done.addEventListener('click',dismiss);
   // A backdrop tap is an explicit dismissal, not a click-through to the 3D world.
@@ -107,11 +121,24 @@ export function createCareerShiftSummaryUI({host,getRoot,shouldDefer=()=>false})
     const next=queue.take();
     if(!next)return false;
     current=next;previousFocus=document.activeElement;
-    title.textContent=next.missed?'Смена пропущена':'Смена завершена';
+    title.textContent=next.dismissed?'Увольнение работодателем':
+      next.missed?'Смена пропущена':'Смена завершена';
     subtitle.textContent=next.name+' · '+next.career+' · '+next.role;
-    money.textContent='+'+next.salary+' кр.';
-    moneyLabel.textContent=next.missed?'Доход за смену: 0':'Начислено на общий счёт семьи';
+    money.textContent=next.dismissed?'Трудовой договор закрыт':'+'+next.salary+' кр.';
+    moneyLabel.textContent=next.dismissed?'Причина: повторные нарушения дисциплины':
+      next.missed?'Доход за смену: 0':'Начислено на общий счёт семьи';
     details.replaceChildren();
+    if(next.dismissed){
+      addRow('Дисциплинарный риск',next.risk+'/12');
+      addRow('Повторный отклик в профессию',
+        'Через 3 игровых дня после увольнения');
+      note.textContent='Другие профессии доступны сразу. Деньги, навыки и '+
+        'заработанные отпускные права сохранены. В смартфоне есть история работы.';
+      done.textContent='Посмотреть вакансии';
+      overlay.hidden=false;done.focus({preventScroll:true});
+      return true;
+    }
+    done.textContent='Продолжить';
     addRow('График',next.period);
     if(!next.missed)addRow('Отработано',next.duration);
     if(next.grade)addRow('Оценка',next.grade);
