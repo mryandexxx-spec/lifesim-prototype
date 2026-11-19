@@ -220,7 +220,11 @@ export function separateCareer(system,residentId,reason,atMinute){
     !['resigned','dismissed'].includes(reason))throw new RangeError('Invalid separation');
   const state=restoreCareerSystem(system);
   const contract=state.byResident[residentId];
-  if(!contract||contract.currentShift)return {ok:false,reason:'Сначала завершите смену'};
+  if(!contract||contract.currentShift&&contract.currentShift.phase!=='pending')
+    return {ok:false,reason:'Сначала завершите смену'};
+  // Resigning before departure is legal even when a 60-minute reminder created
+  // a pending shift; that shift must never later settle as an absence.
+  contract.currentShift=null;
   if(contract.discipline?.pendingDismissal)reason='dismissed';
   const risk=disciplineRisk(contract.discipline);
   const branchId=contract.specialization?.id||null;
