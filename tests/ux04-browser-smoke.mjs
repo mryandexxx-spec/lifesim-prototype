@@ -37,7 +37,7 @@ try{
   const ctx=await browser.newContext({viewport:{width:w,height:h},
     deviceScaleFactor:1,hasTouch:true,isMobile:true});
   await ctx.addInitScript(({key,root})=>{
-    localStorage.setItem(key,JSON.stringify(root));
+    if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(root));
     localStorage.setItem('lifesim.uiTour.v1','done');
   },{key:SAVE_KEY,root:game});
   const page=await ctx.newPage(),errors=[];
