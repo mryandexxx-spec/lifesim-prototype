@@ -3683,8 +3683,19 @@ function boot() {
     game.otherSim.position={x,z};
   }
   game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
-  const display={x:game.position.x,y:lotActorHeight(game.world,game.position),z:game.position.z,yaw:0,pitch:0,roll:0};
-  const miraDisplay={x:game.otherSim.position.x,y:lotActorHeight(game.world,game.otherSim.position),z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
+  // A saved swim may be restored while the simulation is paused. Seed the
+  // real render roots from the pure authoritative wet pose immediately: when
+  // frameAnimDt=0 the display spring intentionally cannot move at all.
+  const restoredAlexSwim=poolSwimVisualFrame(game.world,game.action);
+  const restoredMiraSwim=poolSwimVisualFrame(game.world,game.otherSim.action);
+  const display=restoredAlexSwim
+    ?{...restoredAlexSwim,roll:0}
+    :{x:game.position.x,y:lotActorHeight(game.world,game.position),
+      z:game.position.z,yaw:0,pitch:0,roll:0};
+  const miraDisplay=restoredMiraSwim
+    ?{...restoredMiraSwim,roll:0}
+    :{x:game.otherSim.position.x,y:lotActorHeight(game.world,game.otherSim.position),
+      z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
   if(new URLSearchParams(location.search).get('pool')==='qa'){
     // Read-only WebGL QA: assert physical avatar roots against canonical poses.
     const snapshot=(id,rig)=>{
