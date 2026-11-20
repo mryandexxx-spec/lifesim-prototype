@@ -1059,7 +1059,8 @@ export function tickHousehold(root,minutes) {
       before.goal&&Math.hypot(actor.position.x-before.goal.x,
         actor.position.z-before.goal.z)<=.45&&
       before.elapsed+minutes>=GARDEN_DURATION[before.actionId]){
-      if(settleGardenAction(root,id,before.instanceId,before.actionId))
+      if(settleGardenAction(root,id,before.instanceId,before.actionId)&&
+        ['water','inspect','admire'].includes(before.actionId))
         completeGardenExperience(root,id,before.instanceId,before.actionId);
     }
   }

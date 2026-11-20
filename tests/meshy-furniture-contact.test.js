@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {Mat4,Quat,Vec3} from 'playcanvas';
-import {MESHY_FURNITURE_SKUS,meshyFurnitureSpec,meshyFurnitureFit} from '../src/meshy-furniture-policy.js';
+import {MESHY_FURNITURE_SKUS,MESHY_ROOM_V2_SKUS,meshyFurnitureUrl,meshyFurnitureSpec,meshyFurnitureFit} from '../src/meshy-furniture-policy.js';
 import {FURNITURE_CATALOG,furnitureRenderOrigin} from '../src/furniture-catalog.js';
 import {SOFA_LAYOUT,SOFA_POSE} from '../src/pose-config.js';
 import {BED_LAYOUT,BED_SLOTS} from '../src/bed-layout.js';
@@ -11,7 +11,7 @@ import {PURCHASED_SEAT_PROFILES} from '../src/seat-furniture.js';
 // Decode the actual indexed triangles, including accessor and view offsets.
 // Accessor AABBs cannot distinguish a backrest or pillow from a support surface.
 function triangles(sku){
-  const bytes=readFileSync(new URL('../assets/furniture/meshy-room-v1/'+sku+'.glb',import.meta.url));
+  const bytes=readFileSync(new URL('../'+meshyFurnitureUrl(sku),import.meta.url));
   const length=bytes.readUInt32LE(12);
   const gltf=JSON.parse(bytes.toString('utf8',20,20+length));
   function accessor(index){
@@ -47,22 +47,22 @@ function surface(mesh,x,z){
   }
   return top;
 }
-for(const sku of MESHY_FURNITURE_SKUS)test('physical contact envelope: '+sku,()=>{
+for(const sku of [...MESHY_FURNITURE_SKUS,...MESHY_ROOM_V2_SKUS])test('physical contact envelope: '+sku,()=>{
   const {prefabId}=meshyFurnitureSpec(sku),def=FURNITURE_CATALOG[prefabId];
   const mesh=triangles(sku),{footprint:bounds,approach}=def;
   for(const t of mesh)for(const v of t){
     assert.ok(v.x>=bounds.minX-.002&&v.x<=bounds.maxX+.002);
     assert.ok(v.z>=bounds.minZ-.002&&v.z<=bounds.maxZ+.002);
-    if(prefabId==='rug')assert.ok(v.y>=0&&v.y<.026);
+    if(prefabId==='rug')assert.ok(v.y>=-1e-6&&v.y<.026);
   }
   if(approach)assert.equal(surface(mesh,approach.x,approach.z),-Infinity,'clear standing approach');
-  if(prefabId==='sofa'||prefabId==='armchair'){
+  if(prefabId==='sofa'||PURCHASED_SEAT_PROFILES[prefabId]){
     const isSofa=prefabId==='sofa',origin=furnitureRenderOrigin(prefabId);
-    const z=isSofa?SOFA_POSE.z-origin.z:PURCHASED_SEAT_PROFILES.armchair.seatZ;
-    const target=isSofa?SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2:PURCHASED_SEAT_PROFILES.armchair.seatHeight;
+    const z=isSofa?SOFA_POSE.z-origin.z:PURCHASED_SEAT_PROFILES[prefabId].seatZ;
+    const target=isSofa?SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2:PURCHASED_SEAT_PROFILES[prefabId].seatHeight;
     for(const x of isSofa?[-.63,0,.63]:[-.12,0,.12]){
       assert.ok(Math.abs(surface(mesh,x,z)-target)<.045,'occupied cushion at '+x);
-      assert.ok(surface(mesh,x,.34)>target+.12,'backrest behind resident');
+      assert.ok(surface(mesh,x,prefabId==='chair'?.40:.34)>target+.12,'backrest behind resident');
       assert.ok(surface(mesh,x,-.44)<target+.06,'knees clear the front edge');
     }
   }

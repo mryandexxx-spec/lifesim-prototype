@@ -42,7 +42,7 @@ export const MESHY_SEAT_RIG_PROFILE=Object.freeze({
   // 0.1504/0.1467 model units below respective animated ankle origins.
   soleDrops:Object.freeze([.15041,.14668]),
   frontClearance:.09, // shoe anchor just beyond front edge of seat, not under cushion
-  groundClearance:.010,
+  groundClearance:.066, // top of the finished room floor
   kneePoleForward:.60,
   kneePoleDown:Object.freeze([.33,.355]), // calibrated left/right knee bend from Mixamo bone lengths
   legs:Object.freeze([

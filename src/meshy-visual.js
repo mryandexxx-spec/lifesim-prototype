@@ -389,6 +389,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         anim.speed=0;
         anim.playing=true;
         anim.baseLayer.activeStateCurrentTime=meshySitClipTime(sofaWeight);
+        let contactSolved=false;
         if(seat && state.seatRuntime){
           try{
             const horizontalOffset=meshySofaOffset(sofaWeight,state.scale);
@@ -402,6 +403,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
                 horizontalOffset
               });
             state.sofaOffset=placed.offset;
+            contactSolved=true;
           }catch(error){
             // Keep the accepted 0.7b model rather than crashing gameplay if
             // a malformed furniture prefab or rig contact cannot be solved.
@@ -409,10 +411,13 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
               state.seatWarning=true;
               console.warn('Meshy contact solve fallback',error);
             }
-            state.seatRuntime=null;
+            // A newly loaded skin may still contain last frame's standing
+            // pelvis. Use the safe placement for this frame and retry once
+            // the animation system has evaluated the seated clip.
+            if(!(error instanceof RangeError))state.seatRuntime=null;
           }
         }
-        if(!seat||!state.seatRuntime){
+        if(!contactSolved){
           // Backward-compatibility fallback for missing rig bones or bad seat
           // metadata. The production sofa passes a SeatSurface by default.
           const correction=meshySofaOffset(sofaWeight,state.scale);

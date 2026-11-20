@@ -3,6 +3,11 @@
  */
 import {BUILD_LOT,BUILD_STEP,constructionContains} from './construction.js';
 import {GARDEN_LIMIT,isGardenItem,restoreGardens} from './gardening.js';
+import {POOL_MAX_CELLS,POOL_MAX_COMPONENTS,validPoolId,poolIdNumber,
+  canonicalPoolCells,poolComponents,poolCellBounds,poolWaterNear,poolRectOverlaps}
+  from './pool-topology.js';
+import {poolFixtureSite,validPoolFixture,POOL_FIXTURE_LIMIT,validPoolFixtureId}
+  from './pool-equipment.js';
 import {OUTDOOR_CATALOG,OUTDOOR_FEATURE_LIMIT,validOutdoorId,
   outdoorFeatureRect,outdoorRectsOverlap} from './outdoor-catalog.js';
 
@@ -39,12 +44,13 @@ export function outdoorCellCenter(cell){
     z:BUILD_LOT.minZ+(Math.floor(cell/OUTDOOR_GRID_WIDTH)+.5)*BUILD_STEP};
 }
 /** Reject trees under room floors/porches and outside the 32x24 plot. */
-export function outdoorFeatureFits(item,construction=null){
+export function outdoorFeatureFits(item,construction=null,outdoors=null){
   const rect=outdoorFeatureRect(item);
   if(!rect||!quarter(item.x)||!quarter(item.z)||
      rect.minX<BUILD_LOT.minX+.02||rect.maxX>BUILD_LOT.maxX-.02||
      rect.minZ<BUILD_LOT.minZ+.02||rect.maxZ>BUILD_LOT.maxZ-.02)
     return false;
+  if(outdoors&&poolRectOverlaps(outdoors,rect))return false;
   if(!construction)return true;
   // World ownership is tested across the complete rectangular footprint,
   // not only at the center of a large tree or bench.
@@ -98,6 +104,80 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
     raw.nextId<=10000000?raw.nextId:1;
   next.nextId=Math.min(10000000,Math.max(requestedId,greatestId+1));
   if(gardenCount)next.gardens=restoreGardens(raw.gardens,next.features,atGameMinute);
+  // A pre-pool v1 save must retain its EXACT historical outdoor JSON shape.
+  // Add the optional extension only after a pool-specific field was persisted.
+  // Reject only a damaged pool, never reset the home, garden or household.
+  const hasPoolExtension=['pools','nextPoolId','poolTxnSeq','poolFixtures','nextFixtureId']
+    .some(field=>Object.hasOwn(raw,field));
+  if(hasPoolExtension){
+    next.pools=[];next.nextPoolId=1;next.poolTxnSeq=0;
+    const accepted=new Set(),poolIds=new Set();
+  let largestPoolId=0,totalWater=0;
+  if(Array.isArray(raw.pools))for(const saved of raw.pools.slice(0,POOL_MAX_COMPONENTS*4)){
+    if(next.pools.length>=POOL_MAX_COMPONENTS)break;
+    const sorted=canonicalPoolCells(saved?.cells);
+    if(!validPoolId(saved?.poolId)||poolIds.has(saved.poolId)||!sorted||
+       totalWater+sorted.length>POOL_MAX_CELLS||
+       poolComponents(sorted).length!==1)continue;
+    let blocked=false;
+    for(const cell of sorted){
+      if(accepted.has(cell)){blocked=true;break;}
+      const b=poolCellBounds(cell);
+      if(rects.some(rect=>outdoorRectsOverlap(rect,b))){blocked=true;break;}
+      if(construction){
+        const q=.02;
+        const sites=[[b.minX+q,b.minZ+q],[b.maxX-q,b.minZ+q],
+          [b.minX+q,b.maxZ-q],[b.maxX-q,b.maxZ-q],
+          [(b.minX+b.maxX)/2,(b.minZ+b.maxZ)/2]];
+        if(sites.some(([x,z])=>constructionContains(construction,x,z))){
+          blocked=true;break;
+        }
+      }
+    }
+    if(blocked)continue;
+    poolIds.add(saved.poolId);
+    largestPoolId=Math.max(largestPoolId,poolIdNumber(saved.poolId));
+    totalWater+=sorted.length;
+    for(const cell of sorted)accepted.add(cell);
+    next.pools.push({poolId:saved.poolId,cells:sorted});
+  }
+  const wantedPoolId=Number.isSafeInteger(raw.nextPoolId)&&raw.nextPoolId>=1&&
+    raw.nextPoolId<=10000000?raw.nextPoolId:1;
+  next.nextPoolId=Math.min(10000000,Math.max(wantedPoolId,largestPoolId+1));
+  if(validRevision(raw.poolTxnSeq))next.poolTxnSeq=raw.poolTxnSeq;
+  // Keep D1a/legacy JSON exactly unchanged until the fixture extension exists.
+  // A broken fixture never invalidates a purchased basin, family or garden.
+  if(Object.hasOwn(raw,'poolFixtures')||Object.hasOwn(raw,'nextFixtureId')){
+    next.poolFixtures=[];next.nextFixtureId=1;
+    const fixtureIds=new Set(),occupiedEdges=new Set();
+    let greatestFixtureId=0;
+    if(Array.isArray(raw.poolFixtures))
+      for(const fixture of raw.poolFixtures.slice(0,POOL_FIXTURE_LIMIT*4)){
+        if(next.poolFixtures.length>=POOL_FIXTURE_LIMIT||
+           !validPoolFixture(fixture,next.pools)||fixtureIds.has(fixture.fixtureId))
+          continue;
+        const edge=fixture.edgeCell+':'+fixture.side;
+        if(occupiedEdges.has(edge))continue;
+        const pool=next.pools.find(p=>p.poolId===fixture.poolId);
+        const site=poolFixtureSite(pool,fixture.edgeCell,fixture.side,fixture.kind);
+        const point=site.dryApproach;
+        if(construction&&constructionContains(construction,point.x,point.z))continue;
+        const clearance={minX:point.x-.26,maxX:point.x+.26,
+          minZ:point.z-.26,maxZ:point.z+.26};
+        if(rects.some(rect=>outdoorRectsOverlap(clearance,rect)))continue;
+        fixtureIds.add(fixture.fixtureId);occupiedEdges.add(edge);
+        greatestFixtureId=Math.max(greatestFixtureId,
+          Number(fixture.fixtureId.slice(8)));
+        next.poolFixtures.push({fixtureId:fixture.fixtureId,poolId:fixture.poolId,
+          kind:fixture.kind,edgeCell:fixture.edgeCell,side:fixture.side,
+          purchasePriceCredits:fixture.purchasePriceCredits});
+      }
+    const wantedFixtureId=Number.isSafeInteger(raw.nextFixtureId)&&
+      raw.nextFixtureId>=1&&raw.nextFixtureId<=10000000?raw.nextFixtureId:1;
+    next.nextFixtureId=Math.min(10000000,
+      Math.max(wantedFixtureId,greatestFixtureId+1));
+  }
+  }
   return next;
 }
 const groundCache=new WeakMap();
@@ -124,6 +204,8 @@ export function lotSurfaceAt(world,x,z){
   if(!insideLot(x,z))return {kind:'outside',y:null,walkable:false};
   if(constructionContains(world,x,z))
     return {kind:'floor',y:HOUSE_SURFACE_Y,walkable:true};
+  const poolId=poolWaterNear(world?.outdoors,x,z);
+  if(poolId)return {kind:'pool-water',y:YARD_SURFACE_Y,walkable:false,poolId};
   return {kind:'yard',y:YARD_SURFACE_Y,walkable:true,ground:outdoorGroundKind(world?.outdoors,x,z)};
 }
 /** A real wall in the original cutaway room is still solid on west and north.
@@ -146,7 +228,7 @@ export function lotRaySurface(near,far,world){
   const dy=far.y-near.y;
   if(Math.abs(dy)<1e-9)return null;
   const options=[];
-  for(const [y,kind] of [[HOUSE_SURFACE_Y,'floor'],[YARD_SURFACE_Y,'yard']]){
+  for(const [y,kind] of [[HOUSE_SURFACE_Y,'floor'],[YARD_SURFACE_Y,'pool-water'],[YARD_SURFACE_Y,'yard']]){
     const t=(y-near.y)/dy;
     if(t<0||t>1)continue;
     const x=near.x+(far.x-near.x)*t,z=near.z+(far.z-near.z)*t;

@@ -37,7 +37,7 @@ test('real game pointermove moves shop preview only, not camera; 2-finger orbit 
  let lastMode=null;
  const ctx={
    window:{addEventListener(kind,fn){handlers[kind]=fn;}},
-   furnishMode:true,editDrag:null,holdGesture:{pending:false},
+   furnishMode:true,editDrag:null,ownedPlacement:null,holdGesture:{pending:false},
    cameraGesture:{count:()=>1,move(point,v,h,options){
       lastMode=options.oneFinger;
       return {view:v,changed:false,placementDelta:{dx:95,dy:45}};
@@ -71,7 +71,8 @@ test('real game pointermove moves shop preview only, not camera; 2-finger orbit 
  assert.equal(JSON.stringify(ctx.shopPose),JSON.stringify(frozen));
 });
 test('shop-only mode preserves existing furniture long hold and two-step unpaid confirmation',()=>{
- assert.match(game,/shopPlacing&&oneFingerMode==='pan'\s*\?'placement':oneFingerMode/);
+ assert.match(game,/oneFinger:furnishMode&&ownedPlacement/);
+  assert.match(game,/shopPlacing&&oneFingerMode==='pan'/);
  assert.match(game,/shopSwipeRawPose=dragShopPlacement\(view,shopSwipeRawPose\|\|shopPose/);
  assert.match(game,/shopSwipeRawPose=null; \/\/ next gesture starts/);
  assert.match(game,/shopPlacing=true;shopPose=null/);

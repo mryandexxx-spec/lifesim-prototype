@@ -1,7 +1,7 @@
 import {
   solveSeatRoot,blendSeatRoot,seatFootTargets,solveTwoBoneTargets,
   smoothContactWeight,solveSeatHeightCorrection,
-  seatGroundedAnkleTargets,rotateSeatVector
+  seatGroundedAnkleTargets
 } from './interaction-anchors.js';
 
 /**
@@ -57,6 +57,7 @@ export function createSkinnedSeatController({
    * the shoe goal in X/Z is calculated from the FURNITURE FRONT EDGE.
    * Neither datum needs tuning per character x sofa pair.
    */
+  const shoeRotation=new pc.Quat();
   function plantGroundedFeet({seat,weight,scale}){
     if(!footPlant||feet.length!==2||weight<=.62)return 0;
     const strength=smoothContactWeight((weight-.62)/.38);
@@ -68,9 +69,6 @@ export function createSkinnedSeatController({
       groundClearance:profile.groundClearance,
       sideSigns:profile.footSideSigns
     });
-    const forward=rotateSeatVector({
-      x:0,y:0,z:profile.kneePoleForward
-    },seat.yaw);
     let planted=0;
     for(let i=0;i<feet.length;i++){
       const leg=feet[i];
@@ -82,24 +80,22 @@ export function createSkinnedSeatController({
       // full actor trying to reach an anatomically impossible floor marker.
       if(Math.hypot(target.x-ankle.x,target.z-ankle.z)>.38 ||
         Math.abs(target.y-ankle.y)>.34)continue;
-      const kneePole={
-        x:hip.x+forward.x,
-        y:hip.y-profile.kneePoleDown[i],
-        z:hip.z+forward.z
-      };
       let solution;
       try{
         solution=solveTwoBoneTargets({
-          hip,knee,ankle,target,pole:kneePole,maxStretch:.995
+          hip,knee,ankle,target,pole:knee,maxStretch:.995
         });
       }catch(error){continue;}
       if(!solution.reachable)continue;
       // Smooth only in the final seating phase. The authored clip continues to
       // drive the walk, approach, sit, and rise until its feet can be planted.
-      const blend=strength*.95;
-      rotateTowards(leg.thigh,knee,solution.knee,blend,65);
+      // Bend in the plane of the authored knee. A fixed pole can become
+      // collinear with hip-to-ankle and swing the knee sideways on a low seat.
+      shoeRotation.copy(leg.ankle.getRotation());
+      rotateTowards(leg.thigh,knee,solution.knee,strength,85);
       const adjustedAnkle=leg.ankle.getPosition();
-      rotateTowards(leg.shin,adjustedAnkle,solution.ankle,blend,55);
+      rotateTowards(leg.shin,adjustedAnkle,solution.ankle,strength,85);
+      leg.ankle.setRotation(shoeRotation);
       planted++;
     }
     return planted;

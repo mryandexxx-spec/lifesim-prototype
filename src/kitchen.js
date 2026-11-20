@@ -1,5 +1,5 @@
 /** F4G original kitchen rules. PlayCanvas-free; all content data and v1-safe storage.
- * Pantry is a FREE PLAYTEST replenishment at dawn, not a career or shopping economy.
+ * C3b removes the free daily starter pantry replenishment.
  */
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {findPath} from './navigation.js';
@@ -8,11 +8,14 @@ export const KITCHEN_SCHEMA=1;
 export const COOKING_SKILL_ID='cooking';
 export const FRESH_MEAL_HUNGER_THRESHOLD=55;
 export const PANTRY_START=Object.freeze({vegetables:8,grains:8,dairy:8});
+export const KITCHEN_HERB_LIMIT=16;
+export const KITCHEN_HARVEST_UNITS=2;
 const recipe=(id,label,requires,minLevel,cookMinutes,portions,hungerFactor,color)=>
   Object.freeze({id,label,requires:Object.freeze({...requires}),minLevel,
     cookMinutes,prepMinutes:8,portions,hungerFactor,color});
 export const KITCHEN_RECIPES=Object.freeze({
   'cook.soup':recipe('cook.soup','Домашний овощной суп',{vegetables:2},0,25,3,1.08,'#d58d50'),
+  'cook.herb-soup':recipe('cook.herb-soup','Суп с садовыми травами',{vegetables:2,herbs:1},0,26,3,1.14,'#8caf73'),
   'cook.pancakes':recipe('cook.pancakes','Тёплые оладьи',{grains:2,dairy:1},0,23,3,1.12,'#e5c77a'),
   'cook.pasta':recipe('cook.pasta','Паста с овощами',{grains:2,vegetables:1},2,30,3,1.20,'#c7ba6f'),
   'cook.gratin':recipe('cook.gratin','Сливочная запеканка',{vegetables:2,dairy:2},4,37,4,1.32,'#ddad6f')
@@ -23,7 +26,7 @@ const finiteInt=n=>Number.isSafeInteger(n)&&n>=0;
 export const kitchenRecipe=id=>typeof id==='string'&&own(KITCHEN_RECIPES,id)
   ?KITCHEN_RECIPES[id]:null;
 export function newKitchen(){
-  return {schema:KITCHEN_SCHEMA,pantry:{...PANTRY_START},prepared:[],
+  return {schema:KITCHEN_SCHEMA,pantry:{...PANTRY_START,herbs:0},prepared:[],
     dirtyDishes:0,lastPantryDay:0};
 }
 export function restoreKitchen(raw){
@@ -31,7 +34,8 @@ export function restoreKitchen(raw){
   if(!raw||raw.schema!==KITCHEN_SCHEMA||typeof raw!=='object')return state;
   if(raw.pantry&&Object.keys(PANTRY_START).every(id=>
     finiteInt(raw.pantry[id])&&raw.pantry[id]<=30))
-    state.pantry=Object.fromEntries(Object.keys(PANTRY_START).map(id=>[id,raw.pantry[id]]));
+    state.pantry={...Object.fromEntries(Object.keys(PANTRY_START).map(id=>[id,raw.pantry[id]])),
+      herbs:finiteInt(raw.pantry.herbs)&&raw.pantry.herbs<=KITCHEN_HERB_LIMIT?raw.pantry.herbs:0};
   if(Array.isArray(raw.prepared)&&raw.prepared.length<=12){
     const combined=new Map();
     for(const entry of raw.prepared){
@@ -48,14 +52,12 @@ export function restoreKitchen(raw){
     state.lastPantryDay=raw.lastPantryDay;
   return state;
 }
-/** Test-only daily stock abstraction, never spend money or create infinite output on reload. */
+/** Legacy day watermark only: do not mint food at dawn. */
 export function replenishKitchen(kitchen,clockMinutes){
   if(!kitchen||!Number.isFinite(clockMinutes))return false;
   const day=Math.floor(Math.max(0,clockMinutes)/1440);
   if(day<=kitchen.lastPantryDay)return false;
   kitchen.lastPantryDay=day;
-  for(const id of Object.keys(PANTRY_START))
-    kitchen.pantry[id]=Math.max(kitchen.pantry[id],PANTRY_START[id]);
   return true;
 }
 export function canCookRecipe(kitchen,recipeId,level=0){
@@ -118,7 +120,7 @@ export function kitchenSummary(kitchen){
     kitchen.prepared.reduce((n,x)=>n+x.portions,0):0;
   const pantry=kitchen?.pantry||PANTRY_START;
   return {prepared,dirtyDishes:kitchen?.dirtyDishes||0,
-    supplies:Object.keys(PANTRY_START).map(id=>pantry[id]||0).join('/')};
+    supplies:Object.keys(PANTRY_START).map(id=>pantry[id]||0).join('/'),herbs:pantry.herbs||0};
 }
 const routeLength=(start,path)=>path.reduce((sum,p,i)=>{
   const from=i?path[i-1]:start;

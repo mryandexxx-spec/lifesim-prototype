@@ -14,6 +14,7 @@ class Vec3{
   dot(v){return this.x*v.x+this.y*v.y+this.z*v.z;}
 }
 class Quat{
+  copy(){return this;}
   setFromDirections(){return this;}
   mul2(){return this;}
   slerp(){return this;}
@@ -215,7 +216,7 @@ test('outlier pelvic transforms fail safely rather than moving the person metres
   close(idle.offset.y,0);
 });
 
-test('guarded sofa foot planting rotates ONLY thighs/shins, never relocates the mesh root',()=>{
+test('guarded sofa foot planting plants the legs and preserves shoe orientation without relocating the root',()=>{
   const env=environment({withLegBones:true});
   const controlled=createSkinnedSeatController({
     pc:env.pc,model:env.model,avatar:env.avatar,
@@ -228,7 +229,7 @@ test('guarded sofa foot planting rotates ONLY thighs/shins, never relocates the 
     horizontalOffset:offset
   });
   assert.equal(result.footChains,2,'both knees and ankles have reachable targets');
-  assert.equal(env.boneRotations,4,'two thighs and two shins adjusted, no entire-body rotation');
+  assert.equal(env.boneRotations,6,'two thigh/shin chains plus both shoe orientations');
   close(result.offset.x,offset.x);
   close(result.offset.z,offset.z);
   assert.ok(result.offset.y>.0&&result.offset.y<.10);

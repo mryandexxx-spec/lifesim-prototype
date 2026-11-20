@@ -70,6 +70,9 @@ jobs:
           node --check src/garden-presentation.js
            node --check src/garden-psychology.js
           node --check src/lot-surface.js
+          node --check src/pool-topology.js
+          node --check src/pool-equipment.js
+          node --check src/pool-editor.js
           node --check src/outdoor-catalog.js
           node --check src/outdoor-proposals.js
           node --check src/outdoor-interactions.js
@@ -86,9 +89,11 @@ jobs:
           node --check src/furniture-products.js
           node --check src/furniture-procedural-library.js
           node --check src/meshy-furniture-policy.js
+          node --check src/meshy-room-v2-data.js
           node --check src/meshy-furniture-visual.js
           node --check src/dining.js
           node --check src/kitchen.js
+          node --check src/kitchen-market.js
           node --check src/seat-furniture.js
           node --check src/furniture-interactions.js
           node --check src/furniture-thumbnails.js
@@ -120,6 +125,7 @@ jobs:
           node --check src/tv-interaction.js
           node --check src/tv-seating.js
           node --check src/tv-together.js
+          node --check src/furniture-owned-preview.js
           node --check src/furniture-placement-preview.js
           node --check src/furniture-transform.js
           node --check src/psychology.js
@@ -211,7 +217,10 @@ jobs:
           cp src/mobile-gesture-policy.js site/src/
           cp src/viewport-health.js site/src/
           cp src/construction.js site/src/
+          cp src/build-tool-palette.js site/src/
           cp src/lot-surface.js src/outdoor-catalog.js src/outdoor-proposals.js src/outdoor-interactions.js site/src/
+          cp src/pool-topology.js site/src/
+          cp src/pool-equipment.js src/pool-editor.js site/src/
           cp src/gardening.js site/src/
           cp src/garden-autonomy.js site/src/
           cp src/garden-presentation.js site/src/
@@ -226,10 +235,11 @@ jobs:
           cp src/mounted-lighting.js site/src/
           cp src/furniture-products.js src/furniture-procedural-library.js src/furniture-thumbnails.js src/seat-furniture.js src/dining.js src/furniture-interactions.js site/src/
           cp src/meshy-furniture-policy.js src/meshy-furniture-visual.js site/src/
+          cp src/meshy-room-v2-data.js site/src/
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
           cp src/object-once-ledger.js site/src/
-          cp src/kitchen.js src/hobby-content.js site/src/
+          cp src/kitchen.js src/kitchen-market.js src/hobby-content.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/
           cp src/painting.js site/src/
@@ -247,7 +257,7 @@ jobs:
           cp src/tv-interaction.js site/src/
           cp src/tv-seating.js site/src/
           cp src/tv-together.js site/src/
-          cp src/furniture-placement-preview.js site/src/
+          cp src/furniture-placement-preview.js src/furniture-owned-preview.js site/src/
           cp src/career-catalog.js src/career-scheduler.js src/career-state.js src/career-job-board.js src/career-phone-ui.js src/career-shift-summary-ui.js site/src/
           cp src/career-discipline.js src/career-timeoff.js src/career-worklife.js src/career-worklife-conflict.js site/src/
           cp src/career-work-needs.js src/career-work.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js src/finance-ledger.js src/finance-presentation.js src/finance-phone-ui.js src/household-bills.js site/src/
@@ -277,6 +287,10 @@ jobs:
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
           mkdir -p site/assets/furniture/meshy-room-v1/thumbnails
           cp assets/furniture/meshy-room-v1/thumbnails/*.png site/assets/furniture/meshy-room-v1/thumbnails/
+          mkdir -p site/assets/furniture/meshy-room-v2/thumbnails
+          cp assets/furniture/meshy-room-v2/*.glb site/assets/furniture/meshy-room-v2/
+          cp assets/furniture/meshy-room-v2/manifest.json site/assets/furniture/meshy-room-v2/
+          cp assets/furniture/meshy-room-v2/thumbnails/*.png site/assets/furniture/meshy-room-v2/thumbnails/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

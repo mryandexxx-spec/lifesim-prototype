@@ -137,6 +137,7 @@ test('Q2 GUI has an instance-specific render and hit-volume guard for sold origi
   assert.match(source,/\.\.\.origin,location:'storage'/);
   assert.match(source,/item\.instanceId===originalId&&item\.location==='home'/);
   assert.match(source,/furnitureBounds\(game\.world,volume\.fixtureType,\s*volume\.bounds,originalId\)/);
-  assert.match(source,/findStoredPlacement\(game\.world\.furniture,game\.shop/);
+  assert.match(source,/findOwnedPlacement\(game\.world\.furniture,game\.shop/);
+  assert.match(readFileSync(new URL('../src/furniture-owned-preview.js',import.meta.url),'utf8'),/findStoredPlacement\(world,shop,id,opts\)/);
   assert.match(source,/pending\.targetInstanceId/);
 });

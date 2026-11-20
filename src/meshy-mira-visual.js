@@ -390,7 +390,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         anim.speed=0;
         anim.playing=true;
         anim.baseLayer.activeStateCurrentTime=t;
-        if(seat&&!paused)state.seatRuntime?.plantGroundedFeet({
+        if(seat)state.seatRuntime?.plantGroundedFeet({
           seat,weight:sofaWeight,scale:state.base.scale
         });
         return true;

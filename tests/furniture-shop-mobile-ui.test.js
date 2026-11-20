@@ -38,7 +38,8 @@ test('F2.1 camera orbit/pan switch stays visible and entering shop defaults to p
   assert.match(game,/shopPreviousCameraMode=oneFingerMode;\s*oneFingerMode='pan';showCameraMode\(\)/);
   assert.match(game,/oneFingerMode=shopPreviousCameraMode;showCameraMode\(\)/);
   assert.match(game,/rotateButton\.addEventListener\('click'/);
-  assert.match(game,/oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'/);
+  assert.match(game,/oneFinger:furnishMode&&ownedPlacement/);
+  assert.match(game,/shopPlacing&&oneFingerMode==='pan'/);
 });
 test('F2.1 purchase preview is a real validatable 3D tap with red blocked place, never a charge',()=>{
   assert.match(game,/if\(shopOpen&&shopPlacing&&shopSelected\)\{\s*const floor=editorFloorAt\(pos\)/);
@@ -58,7 +59,7 @@ test('F2.1 selections come only from scene rays; warehouse has its own stored-it
   assert.match(game,/if\(shopOpen\|\|warehouseOpen\|\|!selectable\)furnitureGhost.enabled=false/);
   assert.match(game,/const editorFurnitureAt=pos=>/);
   assert.match(game,/chooseFurniture\(editorFurnitureAt\(pos\)\)/);
-  assert.match(game,/shopOpen\|\|warehouseOpen\|\|cameraGesture\.count\(\)!==1/);
+  assert.match(game,/shopOpen\|\|warehouseOpen\|\|ownedPlacement\|\|cameraGesture\.count\(\)!==1/);
   assert.match(game,/const renderWarehouse=\(\)=>\{/);
   assert.match(game,/item\.location==='storage'/);
   assert.match(game,/const restore=document\.createElement\('button'\)/);

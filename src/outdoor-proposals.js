@@ -11,6 +11,7 @@ import {furniturePoint} from './furniture-transform.js';
 import {BED_SLOTS} from './bed-layout.js';
 import {findPath,isWalkable,ACTOR_RADIUS} from './navigation.js';
 import {recordFinanceChange} from './finance-ledger.js';
+import {poolWaterNear} from './pool-topology.js';
 import {outdoorBenchApproach,outdoorBenchBusy} from './outdoor-interactions.js';
 import {GARDEN_LIMIT,isGardenItem,newGardenRecord,gardenApproach,gardenBusy} from './gardening.js';
 
@@ -51,8 +52,8 @@ export function previewOutdoorPaint(root,{from,to,kind}={}){
       const cell=j*OUTDOOR_GRID_WIDTH+i;
       const p=outdoorCellCenter(cell);
       // A painted yard cannot silently become a room floor or a roof.
-      if(root.world.construction&&
-         (awaitingFloor(root.world.construction,p)))continue;
+      if((root.world.construction&&awaitingFloor(root.world.construction,p))||
+         poolWaterNear(current,p.x,p.z))continue;
       const was=cells.get(cell)||'lawn';
       if(was===kind)continue;
       changed++;
@@ -103,7 +104,7 @@ function essentialGoals(root){
 /** Never revoke an existing essential route, including queued player moves.
  * Existing broken legacy layouts are tolerated, not rewritten or teleported.
  */
-function keepsExistingRoutes(root,nextOutdoors){
+export function keepsExistingRoutes(root,nextOutdoors){
   const after={...root.world,outdoors:nextOutdoors};
   const before=root.world;
   const goals=essentialGoals(root);
@@ -134,7 +135,7 @@ export function previewOutdoorFeature(root,itemId,{x,z,yaw=0}={}){
   const item={instanceId:'out-'+current.nextId,itemId,x,z,yaw,
     purchasePriceCredits:def.price};
   const rect=outdoorFeatureRect(item);
-  if(!outdoorFeatureFits(item,root.world.construction))return fail('blocked-or-outside');
+  if(!outdoorFeatureFits(item,root.world.construction,current))return fail('blocked-or-outside');
   if(current.features.some(f=>outdoorRectsOverlap(rect,outdoorFeatureRect(f))))
     return fail('overlap-outdoor');
   if(furnitureObstacles(root.world.furniture).some(f=>outdoorRectsOverlap(rect,f)))
@@ -221,7 +222,7 @@ export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose
       return fail('unchanged');
     const moved={...original,x:pose.x,z:pose.z,yaw:pose.yaw};
     const rect=outdoorFeatureRect(moved);
-    if(!outdoorFeatureFits(moved,root.world.construction))
+    if(!outdoorFeatureFits(moved,root.world.construction,current))
       return fail('blocked-or-outside');
     if(current.features.some(f=>f.instanceId!==instanceId&&
       outdoorRectsOverlap(rect,outdoorFeatureRect(f))))return fail('overlap-outdoor');
