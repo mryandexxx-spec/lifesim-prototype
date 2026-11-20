@@ -84,6 +84,7 @@ import {pairDynamic} from './social-dynamics.js';
 import {romanceStatus,romanceLoveDescription,romanceClimate,romanceAvailability,
   setRomancePreference,romancePreferenceSummary} from './romance.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
+import {effectiveSleepSpeed} from './sleep-acceleration.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
   CONVERSATION_MAX_TURNS} from './conversation-engine.js';
@@ -6502,7 +6503,10 @@ function boot() {
           game.socialAction?.shared||game.socialAction?.branchAction
           ?null:game.socialAction?.kind;
         const priorCalendarMinute=game.minutes;
-        const careerEvents=tickHousehold(game,.30 * game.speed)||[];
+        const careerEvents=tickHousehold(game,.30 * effectiveSleepSpeed(game,{
+          blocked:!frameActive||dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||
+            shiftSummary.isOpen()
+        }))||[];
         if(gardenStageSignature!==currentGardenStageSignature())
           renderOutdoorFeatures();
         // Persistent shift state, credited money and receipts must share one

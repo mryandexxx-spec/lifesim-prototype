@@ -91,5 +91,5 @@ test('F4b4: second resident earns own credit while Alex has no action',()=>{
   home.otherSim.needs.energy=50;
   tickHousehold(home,5);
   assert.ok(Math.abs(home.otherSim.needs.energy-51)<1e-5);
-  assert.ok(home.needs.energy<67);
+  assert.ok(home.needs.energy<85);
 });

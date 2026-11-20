@@ -16,7 +16,7 @@ const validId=id=>typeof id==='string'&&/^[a-zA-Z][a-zA-Z0-9_-]{0,47}$/.test(id)
  */
 export function socialNeedDecayRate(profile){
   const sociability=deriveAxes(profile).sociability;
-  return Math.max(.018,Math.min(.030,
+  return Math.max(.015,Math.min(.023,
     NEED_DECAY_PER_MINUTE.social+(sociability-.5)*SOCIAL_DECAY_PERSONALITY_SPREAD));
 }
 
