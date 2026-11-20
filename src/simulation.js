@@ -12,6 +12,7 @@ import {validOutdoorId} from './outdoor-catalog.js';
 import {NEED_DECAY_PER_MINUTE,SLEEP_MIN_MINUTES,SLEEP_MAX_MINUTES,SLEEP_WAKE_ENERGY,
   SELF_CARE_WISH_MAX_NEED,SELF_CARE_REPEAT_COOLDOWN_MINUTES} from './need-balance.js';
 import {insideLot} from './lot-surface.js';
+import {GARDEN_ACTIONS,GARDEN_DURATION} from './gardening.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
 import {kitchenRecipe} from './kitchen.js';
@@ -141,11 +142,11 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       next.action.bedSlot=data.action.bedSlot;
     if(next.action&&data.action.id==='garden'){
       if(!validOutdoorId(data.action.targetInstanceId)||
-         !['water','admire','inspect'].includes(data.action.gardenActionId)||
+         !GARDEN_ACTIONS.includes(data.action.gardenActionId)||
          !insideLot(data.action.gardenGoal?.x,data.action.gardenGoal?.z)||
          !Number.isFinite(data.action.elapsed)||
          data.action.elapsed<0||data.action.elapsed>=
-           (data.action.gardenActionId==='water'?15:8))next.action=null;
+           GARDEN_DURATION[data.action.gardenActionId])next.action=null;
       else{
         next.action.gardenActionId=data.action.gardenActionId;
         next.action.gardenGoal={x:data.action.gardenGoal.x,z:data.action.gardenGoal.z};
@@ -308,7 +309,7 @@ export function tick(state, minutes,world=state?.world??null) {
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
     const duration=state.action.id==='garden'
-      ?(state.action.gardenActionId==='water'?15:8):hobby?.timeBudget.targetMinutes??definition.duration;
+      ?(GARDEN_DURATION[state.action.gardenActionId]??definition.duration):hobby?.timeBudget.targetMinutes??definition.duration;
     const amount = state.action.id==='bed'?sleepMinutes:
       Math.min(minutes, Math.max(0, duration - state.action.elapsed));
     // Hunger rises only when eating, not before taking food from the shelf.
