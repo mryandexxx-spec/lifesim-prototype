@@ -23,6 +23,7 @@ import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
 import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
+import {validateRestoredPoolSwim,advancePoolSwim,requestPoolExit} from './pool-swim-runtime.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchAvailable} from './outdoor-interactions.js';
 import {gardenFeature,gardenApproach,gardenActionAllowed,restoreGardenRewards,
   advanceGardens,settleGardenAction,GARDEN_DURATION,
@@ -194,7 +195,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         a.gardenPlantedAt!==root.world.outdoors.gardens[a.targetInstanceId]?.plantedAt))sim.action=null;
     }
     if(sim.action&&sim.action.id!=='move'&&sim.action.id!=='bench'&&
-      sim.action.id!=='garden'){
+      sim.action.id!=='garden'&&sim.action.id!=='swim'){
       const object=resolveActionFurniture(root.world,sim.action.id,sim.action.targetInstanceId);
       if(object)sim.action.targetInstanceId=object.instanceId;
       else sim.action=null; // no phantom action or silent rerouting to another item
@@ -208,6 +209,9 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
       if(object)task.targetInstanceId=object.instanceId;
     }
   }
+  // One v1 swimming action per resident; reject corrupt/overlapping water slots
+  // only AFTER the canonical pools and both residents have been restored.
+  for(const id of HOUSEHOLD_IDS)validateRestoredPoolSwim(root,id);
   // A saved manual walk must still have a real destination on this lot.
   for(const id of HOUSEHOLD_IDS){
     const resident=getActor(root,id);
@@ -680,7 +684,8 @@ export function preemptAutomaticForManual(root,residentId){
   if(resident?.action?.automatic===true){
     removed.objectId=resident.action.id;
     removed.objectPhase=resident.action.phase;
-    resident.action=null;
+    if(removed.objectId==='swim')requestPoolExit(root,residentId,'manual-command');
+    else resident.action=null;
     resident.activitySession=null;
     resident.event='Выполняет поручение игрока';
   }
@@ -952,6 +957,18 @@ export function tickHousehold(root,minutes) {
   else tick(root,minutes,root.world);
   if(residentAwayAtWork(root,'mira'))other.minutes+=minutes;
   else tick(other,minutes,root.world);
+  // Pool movement and rewards run exactly once after natural need decay,
+  // never on UI frames, queue dispatch or inside the PlayCanvas renderer.
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id);
+    if(actor.action?.id==='swim'&&residentAwayAtWork(root,id))
+      requestPoolExit(root,id,'work-conflict');
+    if(!residentAwayAtWork(root,id)){
+      advancePoolSwim(root,id,minutes);
+      if(actor.action?.id==='swim'||actor.event==='Завершил плавание')
+        refreshMind(actor,root.world);
+    }
+  }
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),before=kitchenBefore[id];
     if(!before)continue;
