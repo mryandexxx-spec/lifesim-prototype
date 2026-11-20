@@ -31,6 +31,8 @@ import {previewOutdoorPaint,commitOutdoorPreview,
   previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from './outdoor-proposals.js';
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {poolBoundaryEdges,poolCellBounds} from './pool-topology.js';
+import {canBeginPoolSwim,beginPoolSwim,arrivePoolApproach,
+  SWIM_MAX_WAIT_MINUTES} from './pool-swim-runtime.js';
 import {POOL_FIXTURE_PRICES,poolHasExit} from './pool-equipment.js';
 import {previewPoolTiles,previewPoolFixture,previewPoolHistory,
   poolEditorSnapshot,commitPoolPreviewPersisted} from './pool-editor.js';
@@ -500,6 +502,7 @@ function taskLabel(task){
     task.actionId==='inspect'?'Осмотреть растение':
     task.actionId==='harvest'?'Собрать садовые травы':
     task.actionId==='replant'?'Посадить травы заново':'Полюбоваться садом';
+  if(task.type==='pool')return task.actionId==='jump'?'Прыгнуть и поплавать':'Плавать';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
@@ -597,7 +600,8 @@ function scheduleCommand(command,residentId=game.selectedSim){
       game.socialAction.shared.choiceId===command.choiceId))){
     toast('Этот подарок уже ожидает передачи');return false;
   }
-  const task=enqueueAction(game.actionQueues,residentId,command);
+  const queued=command.type==='pool'?{...command,queuedAt:game.minutes}:command;
+  const task=enqueueAction(game.actionQueues,residentId,queued);
   if(!task){toast('Не удалось добавить: очередь заполнена или действие недоступно');return false;}
   // A manual task has authority over the addressed person's spontaneous
   // action, including being the partner of an autonomous conversation.
@@ -3695,6 +3699,7 @@ function boot() {
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
   const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>{
+    if(id==='swim')return getActor(game,residentId)?.action?.dryApproach||null;
     if(id==='garden')return getActor(game,residentId)?.action?.gardenGoal||
       gardenApproach(game.world,targetInstanceId,getActor(game,residentId)?.position)?.goal||null;
     if(id==='move')return getActor(game,residentId)?.action?.goal||null;
@@ -3920,8 +3925,11 @@ function boot() {
     for(const id of HOUSEHOLD_IDS)for(const task of [...pendingActions(game.actionQueues,id)]){
       if(task.type==='garden'&&!gardenRequestStillValid(game,id,task.instanceId,task.actionId))
         if(removeQueuedAction(game.actionQueues,id,task.seq))expired++;
+      if(task.type==='pool'&&Number.isFinite(task.queuedAt)&&
+        game.minutes-task.queuedAt>=SWIM_MAX_WAIT_MINUTES)
+        if(removeQueuedAction(game.actionQueues,id,task.seq))expired++;
     }
-    if(expired){save(true);toast('Сад вырос: устаревшее действие убрано из очереди');}
+    if(expired){save(true);toast('Устаревшие действия удалены из очереди');}
     const refused=[];
     const started=dispatchActionQueues(game.actionQueues,{
       canStart(residentId,command){
@@ -3932,6 +3940,7 @@ function boot() {
         if(actor.action||sofaStates[residentId].progress>0||
           bedStates[residentId].progress>0||showerStates[residentId].active||
           toiletStates[residentId].active||fridgeLeaving[residentId])return false;
+        if(command.type==='pool')return canBeginPoolSwim(game,residentId,command);
         if(command.type==='activity'){
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
           return (!command.inventoryItemId||inventoryFor(game,residentId).some(item=>
@@ -4014,6 +4023,13 @@ function boot() {
           started=beginOutdoorBench(residentId,command.instanceId,true);
         else if(command.type==='garden')
           started=beginGardenAction(residentId,command.instanceId,command.actionId,true);
+        else if(command.type==='pool'){
+          const plan=beginPoolSwim(game,residentId,command);
+          if(plan){
+            paths[residentId]={id:'swim',points:plan.landPath,index:0};
+            restartAutonomyWait(residentId);started=true;
+          }
+        }
         else if(command.type==='move'){
           const actor=getActor(game,residentId),goal={x:command.x,z:command.z};
           const route=findPath(actor.position,goal,game.world);
@@ -7385,7 +7401,8 @@ function boot() {
                 }else if(resident.action.diningStage==='toSeat'){
                   arrive(resident);resident.action.diningStage='eating';
                 }
-              }else arrive(resident);
+              }else if(resident.action?.id==='swim')arrivePoolApproach(game,residentId);
+              else arrive(resident);
               paths[residentId]={points:null,index:0,id:null};
             }
           }
