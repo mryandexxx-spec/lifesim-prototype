@@ -26,4 +26,6 @@ jobs:
           git add src/meshy-room-v3-data.js
           git diff --cached --check
           git commit -m 'assets(meshy): pin real bounds and fit specs for 13 V3 GLBs'
+          git fetch origin feature/meshy-v3-live-20261120
+          git rebase origin/feature/meshy-v3-live-20261120
           git push origin HEAD:feature/meshy-v3-live-20261120
