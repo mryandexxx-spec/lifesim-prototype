@@ -51,7 +51,7 @@ test('live preview re-renders across residents and opens existing queue without 
     selectedName:()=>game.selectedSim,activeTaskLabel:()=>null,
     pendingActions:(qs,id)=>qs[id],
     taskLabel:task=>task.actionId,
-    planPreview,
+    planPreview,planButtonLabel:count=>'План · '+count,
     planTaskIcon:()=> '•',
     dialogueNeedsDecision:()=>false,
     closeInsightPanel:()=>{},setViewOpen:()=>{},setHomeOpen:()=>{},closeSocialContext:()=>{},

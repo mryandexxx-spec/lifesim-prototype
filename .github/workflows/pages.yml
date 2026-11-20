@@ -132,6 +132,7 @@ jobs:
           node --check src/dialogue-decision.js
           node --check src/world-interactions.js
           node --check src/plan-preview.js
+          node --check src/ux01-plan-ui.js
           node --check src/ui-layout.js
           node --check src/insight-presentation.js
           node --check src/required-choice-focus.js
@@ -200,7 +201,7 @@ jobs:
           mkdir -p site/src
           cp index.html character-lab.html character-lab-mira.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
           mkdir -p site/src
-          cp src/plan-preview.js src/ui-layout.js src/required-choice-focus.js site/src/
+          cp src/plan-preview.js src/ux01-plan-ui.js src/ui-layout.js src/required-choice-focus.js site/src/
           cp src/insight-presentation.js site/src/
           cp src/camera-gestures.js site/src/
           cp src/mobile-gesture-policy.js site/src/

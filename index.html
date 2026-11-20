@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3-q0-q1q4-lotc1-q5-20261120" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3-q0-q1q4-lotc1-q5-20261120-ux01-20261120" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/gardening.js":"./src/gardening.js?v=lot-c1-20261120-lot-c2b",
@@ -112,7 +112,7 @@
         <span class="brand-mark" aria-hidden="true">✦</span>
         <div><b>Блин<span>’С</span></b><small>сборка / 1.2u.17 · F4G.2 / H5c / H5b / F4F.2 · W1-B.3a · W4-A</small></div>
       </div>
-      <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">Очередь · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><button id="calendar-anchor-toggle" class="time-card" type="button" aria-live="off" aria-controls="calendar-anchor-panel" aria-expanded="false" aria-label="Открыть полный игровой календарь"><span id="day-label">День 1</span><strong id="time-label">08:00</strong><small id="light-phase-label">День</small></button></div>
+      <div class="topbar-actions"><button id="queue-toggle" type="button" aria-controls="queue-panel" aria-expanded="false">План · 0</button><span id="queue-feedback" class="visually-hidden" role="status" aria-live="polite"></span><button id="calendar-anchor-toggle" class="time-card" type="button" aria-live="off" aria-controls="calendar-anchor-panel" aria-expanded="false" aria-label="Открыть полный игровой календарь"><span id="day-label">День 1</span><strong id="time-label">08:00</strong><small id="light-phase-label">День</small></button></div>
     </header>
     <section id="calendar-anchor-panel" class="calendar-anchor-panel" hidden aria-label="Начальная дата игрового календаря">
       <div class="calendar-anchor-head"><strong>Дата в Блин’С</strong><button id="calendar-anchor-close" type="button" aria-label="Закрыть выбор даты">×</button></div>
@@ -128,6 +128,7 @@
     <section id="ground-walk-menu" class="ground-walk-menu" aria-label="Доступные действия" hidden>
       <div class="ground-walk-heading"><strong id="ground-walk-title">Действия на земле</strong><button id="ground-walk-close" type="button" aria-label="Закрыть действия">×</button></div>
       <p id="ground-walk-info" class="garden-action-status" hidden></p>
+      <p id="ground-walk-recipient" class="action-recipient">Алекс · добавить в план</p>
       <button id="ground-walk-action" type="button" disabled><span id="ground-walk-action-label">↗ Идти сюда</span><small>Добавить в очередь</small></button>
     </section>
     <div id="reaction-layer" class="reaction-layer" aria-label="Реакции жителей" aria-live="off"></div>
@@ -228,6 +229,7 @@
       </div>
     </section>
     <button id="plan-peek" class="scene-badge plan-peek" type="button" aria-controls="queue-panel" aria-expanded="false" aria-label="Открыть очередь действий">
+      <span class="plan-heading"><strong id="plan-label">План · 0</strong><span id="plan-resident">Алекс</span></span>
       <span class="plan-current"><span class="status-dot" aria-hidden="true"></span><span id="status-text">Свободное время</span><span class="plan-chevron" aria-hidden="true">›</span></span>
       <span id="plan-upcoming" class="plan-upcoming" aria-hidden="true" hidden></span>
     </button>
@@ -238,6 +240,7 @@
       <p id="tour-tip" class="tour-tip">Камера не отдаёт персонажу команд.</p>
       <div class="tour-actions"><button id="tour-skip" type="button">Пропустить</button><button id="tour-next" type="button">Дальше</button></div>
     </section>
+    <output id="queue-receipt" class="queue-receipt" role="status" aria-live="polite" hidden></output>
     <div class="hint" id="hint">Земля → «Идти сюда» → очередь · свайп — камера · два пальца — масштаб</div>
     <div id="furnish-placement-guide" class="furnish-placement-guide" role="status" aria-live="polite" hidden>
       <strong>📍 Размещаем: <span id="furnish-placing-name">Предмет</span></strong>
@@ -445,6 +448,7 @@
     <section class="action-sheet" id="action-sheet" hidden aria-label="Действие с предметом">
       <div class="action-header"><div><span id="action-category">Предмет</span><h2 id="action-title">Кровать</h2></div><button type="button" id="close-action" aria-label="Закрыть">×</button></div>
       <p id="action-description">Восстановить энергию</p>
+      <p id="action-recipient" class="action-recipient">Алекс · добавить в план</p>
       <label id="reading-content-field" class="music-style-field" for="reading-content-select" hidden>
         Какую книгу читать
         <select id="reading-content-select" aria-label="Книга для чтения">
@@ -543,8 +547,13 @@
       <div id="social-menu-options" class="conversation-options"></div>
     </section>
     <section id="queue-panel" class="queue-panel" hidden aria-label="Очередь действий выбранного жителя">
-      <div class="queue-head"><div><span class="eyebrow">ПЛАН НА ДЕНЬ</span><h2 id="queue-title">Очередь</h2></div>
+      <div class="queue-head"><div><span class="eyebrow">ЛИЧНЫЕ ПЛАНЫ</span><h2 id="queue-title">Очередь</h2></div>
         <button type="button" id="queue-close" aria-label="Закрыть очередь">×</button></div>
+      <div class="queue-resident-tabs" role="group" aria-label="Чей план просматривать, без переключения управления">
+        <button id="queue-alex" type="button" aria-pressed="true">Алекс · 0</button>
+        <button id="queue-mira" type="button" aria-pressed="false">Мира · 0</button>
+      </div>
+      <p id="queue-person-note" class="queue-person-note"></p>
       <div id="queue-active" class="queue-active"></div>
       <ol id="queue-items" class="queue-items"></ol>
       <p id="queue-empty" class="queue-hint" hidden>Пока ничего не запланировано</p>
@@ -641,7 +650,7 @@
       <span id="loading-status">Загружаем сцену и 3D-модели</span>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b-w4c-shift-summary-lotb1-q0-outdoor-context-q0-q1q4-q2-20261119-lotc1-q3b-20261120-q5-20261120-lot-c2a-20261120-ux00-20261120-lot-c2b-20261120"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b-w4c-shift-summary-lotb1-q0-outdoor-context-q0-q1q4-q2-20261119-lotc1-q3b-20261120-q5-20261120-lot-c2a-20261120-ux00-20261120-lot-c2b-20261120-ux01-20261120"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
