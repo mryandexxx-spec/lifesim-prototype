@@ -47,7 +47,7 @@ async function run(build,w,h){
  page.on('pageerror',e=>problems.push(build+' '+w+'x'+h+' page '+e.message));
  page.on('crash',()=>problems.push(build+' '+w+'x'+h+' crash'));
  page.on('requestfailed',r=>{
-  if(/\\/(src|vendor)\\//.test(r.url()))
+  if(r.url().includes('/src/') || r.url().includes('/vendor/'))
    problems.push(build+' '+w+'x'+h+' request '+r.url()+' '+r.failure()?.errorText);
  });
  try{
