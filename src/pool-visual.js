@@ -61,7 +61,9 @@ export function buildPoolVisualGeometry(outdoors){
         upper=[[b.minX,GROUND_Y,z],[b.maxX,GROUND_Y,z]];
         horizontal(output.rim,b.minX,b.maxX,z-.057,z+.057,GROUND_Y+.013);
       }
-      quad(output.walls,[lower[0],lower[1],upper[1],upper[0]],[0,0,1]);
+      const inward={west:[1,0,0],east:[-1,0,0],
+        north:[0,0,1],south:[0,0,-1]};
+      quad(output.walls,[lower[0],lower[1],upper[1],upper[0]],inward[side]);
     }
   }
   return {active:true,groups:output,waterCells:wet.size,boundaryEdges};
