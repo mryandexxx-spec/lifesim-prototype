@@ -46,7 +46,7 @@ export function createMeshyFurnitureVisual({pc,app,onError=()=>{},enabled=true})
   }
   function setBedCover(node,slot,unfold){
     const record=instances.get(node);
-    if(!record?.visual?.enabled||record.sku!=='bed.platform')return false;
+    if(!record?.visual?.enabled||!['bed.platform','bed.canopy'].includes(record.sku))return false;
     const part=record[slot]||(unfold>0?record[slot]=createCover(node,slot):null);
     if(part){
       part.enabled=unfold>0;

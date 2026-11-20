@@ -1,0 +1,256 @@
+{
+  "version": 3,
+  "asset_count": 13,
+  "source": "Meshy image-to-3d meshy-t2/meshy-n1",
+  "status": "optimized-static-asset-not-wired",
+  "scope": "visual assets staged only; runtime and shop integration separate",
+  "records": [
+    {
+      "sku": "bed.canopy",
+      "glb": "bed.canopy.glb",
+      "bytes": 480712,
+      "sha256": "675e6251f34a0249c0a85cb7d6a8d5652c21f3d6faa46a0a131252be0d551f4c",
+      "source_bytes": 2815436,
+      "saved_percent": 82.93,
+      "triangles": 4189,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 2604964,
+          "new_bytes": 270178,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "music.starter",
+      "glb": "music.starter.glb",
+      "bytes": 459240,
+      "sha256": "7e5368f119b1eef8c8cdef653bd158231c5881ac7da4b63c2a8661a85678b0f9",
+      "source_bytes": 3338632,
+      "saved_percent": 86.24,
+      "triangles": 3696,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 3165820,
+          "new_bytes": 286365,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "plant.amber",
+      "glb": "plant.amber.glb",
+      "bytes": 517372,
+      "sha256": "00d5e9a3a211c65496cd517354e618469aaa86f45e5a3d5de2fd2ea4150a0857",
+      "source_bytes": 3432128,
+      "saved_percent": 84.93,
+      "triangles": 4294,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 3226760,
+          "new_bytes": 311945,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "sofa.classic",
+      "glb": "sofa.classic.glb",
+      "bytes": 492424,
+      "sha256": "d3c2c29c37ac4b4eadd6b5e9dd890d2d047b142e16540a5f293e4602292c4a39",
+      "source_bytes": 2714304,
+      "saved_percent": 81.86,
+      "triangles": 4224,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 2513680,
+          "new_bytes": 291742,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "table.round",
+      "glb": "table.round.glb",
+      "bytes": 460220,
+      "sha256": "fe550877d1de04de169b0ab0973373508b0fc99755808350a2c7f6bdcf9c9f18",
+      "source_bytes": 3180616,
+      "saved_percent": 85.53,
+      "triangles": 3319,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 3021224,
+          "new_bytes": 300768,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "bookcase.open",
+      "glb": "bookcase.open.glb",
+      "bytes": 440968,
+      "sha256": "edeacb864a6634b75a2be369b62ce568cfa9bc1e3f612be8e568a2a5d2ac3679",
+      "source_bytes": 2689280,
+      "saved_percent": 83.6,
+      "triangles": 3731,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 2512556,
+          "new_bytes": 264183,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "chair.cross",
+      "glb": "chair.cross.glb",
+      "bytes": 484216,
+      "sha256": "e45f2ade1f0a17479239d5bc11cb44b3eae76561050ef787265de1b81c7966c1",
+      "source_bytes": 2972564,
+      "saved_percent": 83.71,
+      "triangles": 4212,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 2784104,
+          "new_bytes": 295693,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "stove.copper",
+      "glb": "stove.copper.glb",
+      "bytes": 384828,
+      "sha256": "f64794046369c63f4fb03b25b6f741c4abcb4330999d3907a10c975a8ba3347c",
+      "source_bytes": 1742208,
+      "saved_percent": 77.91,
+      "triangles": 2677,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 1599080,
+          "new_bytes": 241637,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "prep.stone",
+      "glb": "prep.stone.glb",
+      "bytes": 414308,
+      "sha256": "bf6c47a1d8451c669ffaadcfd7ce736e2daa74dc3abfdc9e87ecd18c2830c841",
+      "source_bytes": 1858692,
+      "saved_percent": 77.71,
+      "triangles": 3095,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 1702260,
+          "new_bytes": 257819,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "sink.steel",
+      "glb": "sink.steel.glb",
+      "bytes": 270888,
+      "sha256": "1c746df92945965314c16f68c255a561890cfc24f191185074aab2a9436d8968",
+      "source_bytes": 1345952,
+      "saved_percent": 79.87,
+      "triangles": 1222,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 1270064,
+          "new_bytes": 194938,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "easel.starter",
+      "glb": "easel.starter.glb",
+      "bytes": 433324,
+      "sha256": "c7bfcbbb3c66602dcf0a02ae8b3f98a512cddce587faf2a70ea39dd831a273a4",
+      "source_bytes": 1841496,
+      "saved_percent": 76.47,
+      "triangles": 4357,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 1634940,
+          "new_bytes": 226705,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "fixture.counter",
+      "glb": "fixture.counter.glb",
+      "bytes": 286008,
+      "sha256": "fdc193751b06b161cda4252554cc22a7eeec597005202e2518a35806d5378c95",
+      "source_bytes": 1649656,
+      "saved_percent": 82.66,
+      "triangles": 1690,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 1556920,
+          "new_bytes": 193209,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    },
+    {
+      "sku": "wardrobe.open",
+      "glb": "wardrobe.open.glb",
+      "bytes": 469732,
+      "sha256": "7bd1077ab6e315920dc38a92b46092ac97cabf1bb23e2948415708c6d9747990",
+      "source_bytes": 1722536,
+      "saved_percent": 72.73,
+      "triangles": 3989,
+      "texture_changes": [
+        {
+          "image_view": 2,
+          "old_bytes": 1514556,
+          "new_bytes": 261692,
+          "from_mime": "image/png",
+          "to_mime": "image/jpeg"
+        }
+      ],
+      "status": "optimized-static-asset-not-wired"
+    }
+  ]
+}

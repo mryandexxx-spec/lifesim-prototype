@@ -85,7 +85,7 @@ test('asset fit keeps each model inside canonical collision footprint',()=>{
  }
 });
 test('unknown, inherited and invalid values cannot accidentally overwrite v1 objects',()=>{
- for(const sku of ['',null,'sofa.classic','legacy.sofa','stove.copper','__proto__']){
+ for(const sku of ['',null,'legacy.sofa','__proto__']){
   assert.equal(meshyFurnitureSpec(sku),null);
   assert.equal(meshyFurnitureFit(sku),null);
  }
@@ -96,8 +96,8 @@ test('existing starter fixtures and old purchases receive cosmetic GLB aliases, 
  assert.equal(meshyStarterFurnitureSku('sofa'),'sofa.comfort');
  assert.equal(meshyStarterFurnitureSku('bed'),'bed.platform');
  assert.equal(meshyStarterFurnitureSku('plant'),'legacy.plant');
- for(const prefab of ['counter','__proto__'])
-  assert.equal(meshyStarterFurnitureSku(prefab),null);
+ assert.equal(meshyStarterFurnitureSku('counter'),'fixture.counter');
+ assert.equal(meshyStarterFurnitureSku('__proto__'),null);
  assert.equal(meshyFurnitureDisplaySku('legacy.sofa'),'sofa.comfort');
  assert.equal(meshyFurnitureDisplaySku('legacy.bed'),'bed.platform');
  assert.equal(meshyFurnitureDisplaySku('legacy.plant'),'legacy.plant');
