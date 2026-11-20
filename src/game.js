@@ -29,6 +29,11 @@ import {lotRaySurface,lotActorHeight,outdoorCellAt,OUTDOOR_GRID_WIDTH} from './l
 import {previewOutdoorPaint,commitOutdoorPreview,
   previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from './outdoor-proposals.js';
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
+import {poolBoundaryEdges,poolCellBounds} from './pool-topology.js';
+import {POOL_FIXTURE_PRICES} from './pool-equipment.js';
+import {previewPoolTiles,previewPoolFixture,previewPoolHistory,
+  poolEditorSnapshot,commitPoolPreviewPersisted} from './pool-editor.js';
+import {createPoolVisual} from './pool-visual.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
 import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
@@ -2380,6 +2385,8 @@ function boot() {
   const automaticDoors=[];
   const lotGround=box('LOT-A lawn',7,-.59,0,32,.12,24,mat('#8fb78b'));
   lotGround.enabled=true;
+  const poolVisual=createPoolVisual({pc,app,mat,box,lotGround});
+  poolVisual.sync(game.world?.outdoors);
   // B1: four *combined* meshes, not one entity per cell. Even the full
   // 1536-cell override limit produces at most four draw-call groups.
   const outdoorPaintMaterials={
@@ -2863,7 +2870,7 @@ function boot() {
     renderedConstruction=state;renderedWallMode=constructionWallMode;
     renderedRoofPreview=roofPreview;
     clearConstructionNodes();
-    lotGround.enabled=true;
+    lotGround.enabled=!(game.world?.outdoors?.pools||[]).some(p=>p.cells?.length);
     const raised=constructionWallMode!=='down';
     const height=BUILD_WALL_HEIGHTS[state.wallHeightClass||'normal'].value;
     const w=starterShellOffset(state,'west'),e=starterShellOffset(state,'east');
@@ -4036,7 +4043,7 @@ function boot() {
     game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
     alexSeatInstanceId=null;
     drawnDiningChairs.clear(); // reset returns every visual-only chair to its saved position
-    updateDecorNodes();renderOutdoorGround();renderOutdoorFeatures();
+    updateDecorNodes();poolVisual.sync(game.world?.outdoors);renderOutdoorGround();renderOutdoorFeatures();
     Object.assign(display,{...game.position,y:0,yaw:0,pitch:0,roll:0});
     Object.assign(miraDisplay,{...game.otherSim.position,y:0,yaw:0,pitch:0,roll:0});
     showerPrivacy.enabled=false;
@@ -5598,7 +5605,7 @@ function boot() {
     $('build-editor').hidden=true;
     $('build-toggle').setAttribute('aria-pressed','false');
     document.querySelector('.app-shell').dataset.buildMode='false';
-    lotGround.enabled=true;
+    lotGround.enabled=!(game.world?.outdoors?.pools||[]).some(p=>p.cells?.length);
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     syncConstructionRender(true);renderPauseButton();save(true);
   };
@@ -5926,6 +5933,24 @@ function boot() {
   // financial timeline. The saved authoritative root stays game, never a UI VM.
   let outdoorTool='paint',outdoorDrag=null,outdoorPending=null;
   let outdoorCategory='ground',outdoorPose=null,outdoorYaw=0;
+  // Pool history holds geometry/fixtures only. Never restore an old wallet,
+  // pay receipt, garden, or construction snapshot through pool undo.
+  let poolHistory=[],poolHistoryIndex=0;
+  const poolMode=()=>outdoorCategory==='pool';
+  const poolTool=()=>$('pool-tool').value;
+  const poolFixtureOperation=()=>$('pool-fixture-operation').value;
+  const poolFixtureOwned=()=>$('pool-fixture-owned').value;
+  const syncPoolOwned=()=>{
+    const chosen=poolFixtureOwned();
+    const options=(game.world.outdoors?.poolFixtures||[]).map(f=>{
+      const o=document.createElement('option');o.value=f.fixtureId;
+      o.textContent=({ladder:'Лестница',steps:'Ступени',board:'Трамплин'}[f.kind]||f.kind)+
+        ' · '+f.fixtureId;
+      return o;
+    });
+    $('pool-fixture-owned').replaceChildren(...options);
+    if(options.some(o=>o.value===chosen))$('pool-fixture-owned').value=chosen;
+  };
   const outdoorFeatureItems=OUTDOOR_PRODUCTS;
   const activeOutdoorItems=()=>outdoorFeatureItems.filter(item=>
     outdoorCategory==='garden'?item.category==='garden':
@@ -5984,38 +6009,68 @@ function boot() {
     'light-limit':'На участке уже установлено восемь фонарей',
     'garden-limit':'Для мобильного участка допускается не больше восьми грядок',
     'reserved-garden':'Сначала закончи садовое действие или удали его из очереди',
-    'unreachable-garden':'Оставь доступный подход к грядке для обоих жителей'
+    'unreachable-garden':'Оставь доступный подход к грядке для обоих жителей',
+    'pool-limit':'Допустимо до 512 водных клеток на участке',
+    'pool-component-limit':'Можно строить не более четырёх отдельных чаш',
+    'invalid-cells':'Неверное выделение клеток воды',
+    'duplicate-cells':'Повторяющиеся клетки в выделении',
+    'no-water-edge':'Сначала построй чашу и выбери её наружный бортик',
+    'unsafe-rim-or-landing':'Нужен свободный наружный бортик; для трамплина — 2×2 м воды',
+    'invalid-fixture-anchor':'Сначала перемести оборудование: оно потеряет опору',
+    'unwalkable-dry-approach':'Нужен свободный сухой подход',
+    'unreachable-exit':'Нужен доступный путь от жителей до бортика',
+    'reserved-pool':'Сначала заверши действие или очисти очередь бассейна',
+    'invalid-topology-or-fixture':'Бассейн пересекается с объектом или теряет безопасный выход',
+    'would-block-route':'Бассейн перекроет существующий путь',
+    'fixture-limit':'Достигнут лимит оборудования',
+    'missing-fixture':'Оборудование уже удалено',
+    'occupied-fixture-edge':'Этот бортик уже занят оборудованием',
+    'save-failed':'Не удалось сохранить; покупка отменена и деньги не списаны',
+    'invalid-history':'Невозможно безопасно отменить этот шаг'
   };
   const outdoorFeedback=(message,invalid=false)=>{
     $('outdoor-preview-text').textContent=message;
     $('outdoor-preview-text').dataset.invalid=String(invalid);
   };
   const updateOutdoorPanel=()=>{
+    outdoorCategory=$('outdoor-category').value;
     $('outdoor-balance').textContent='Баланс семьи: '+game.shop.credits+' кр.';
     $('outdoor-apply').disabled=!outdoorPending?.ok;
-    $('outdoor-undo').disabled=outdoorHistoryIndex===0;
-    $('outdoor-redo').disabled=outdoorHistoryIndex>=outdoorTimeline.length-1;
+    $('outdoor-undo').disabled=poolMode()?poolHistoryIndex===0:outdoorHistoryIndex===0;
+    $('outdoor-redo').disabled=poolMode()
+      ?poolHistoryIndex>=poolHistory.length-1
+      :outdoorHistoryIndex>=outdoorTimeline.length-1;
     $('outdoor-tool-paint').setAttribute('aria-pressed',String(outdoorTool==='paint'));
     $('outdoor-tool-camera').setAttribute('aria-pressed',String(outdoorTool==='camera'));
-    outdoorCategory=$('outdoor-category').value;
     document.querySelector('.outdoor-surface-choice[for="outdoor-ground-kind"]').hidden=outdoorCategory!=='ground';
-    $('outdoor-feature-controls').hidden=outdoorCategory==='ground';
+    $('pool-controls').hidden=!poolMode();
+    $('pool-fixture-controls').hidden=!poolMode()||
+      ['paint','erase'].includes(poolTool());
+    $('pool-fixture-owned-label').hidden=!poolMode()||
+      poolFixtureOperation()==='fixture-add';
+    $('outdoor-feature-controls').hidden=outdoorCategory==='ground'||poolMode();
     $('outdoor-feature-kind-label').hidden=outdoorCategory==='ground'||
       $('outdoor-feature-operation').value!=='place';
     $('outdoor-feature-owned-label').hidden=outdoorCategory==='ground'||
       $('outdoor-feature-operation').value==='place';
     $('outdoor-feature-rotate').disabled=outdoorCategory==='ground'||
       $('outdoor-feature-operation').value==='sell';
-    $('outdoor-apply').textContent=outdoorPending?.operation==='sell'
+    $('outdoor-apply').textContent=poolMode()
+      ?!outdoorPending?.ok?'✓ Подтвердить изменение'
+        :outdoorPending.cost<0?'✓ Продать · +'+(-outdoorPending.cost)+' кр.'
+          :'✓ Подтвердить · '+outdoorPending.cost+' кр.'
+      :outdoorPending?.operation==='sell'
       ?'✓ Продать · +'+(-outdoorPending.cost)+' кр.'
       :outdoorPending?.operation==='move'?'✓ Переместить бесплатно'
       :'✓ Купить и применить';
   };
   const clearOutdoorPending=(quiet=false)=>{
     outdoorDrag=null;outdoorPending=null;outdoorPaintGhost.enabled=false;outdoorPose=null;
-    if(!quiet)outdoorFeedback(outdoorCategory==='ground'
-      ?'Протяни пальцем прямоугольник по свободной земле'
-      :'Выбери предмет и коснись свободной земли. Поворот — отдельной кнопкой.');
+    if(!quiet)outdoorFeedback(poolMode()
+      ?'Вода: коснись и протяни прямоугольник. Оборудование: коснись бортика.'
+      :outdoorCategory==='ground'
+        ?'Протяни пальцем прямоугольник по свободной земле'
+        :'Выбери предмет и коснись свободной земли. Поворот — отдельной кнопкой.');
     updateOutdoorPanel();
   };
   const outdoorSurfaceAtScreen=point=>{
@@ -6040,6 +6095,86 @@ function boot() {
       ' клеток · стоимость '+p.cost+' кр. · нажми «Купить и применить»');
     else outdoorFeedback(outdoorReason[p.reason]||'Нельзя изменить этот участок',true);
     updateOutdoorPanel();return p;
+  };
+  const poolAt=(a,b)=>{
+    const start=outdoorCellAt(a?.x,a?.z),finish=outdoorCellAt(b?.x,b?.z);
+    if(start===null||finish===null)return [];
+    const width=OUTDOOR_GRID_WIDTH,x0=Math.min(start%width,finish%width),
+      x1=Math.max(start%width,finish%width),
+      z0=Math.min(Math.floor(start/width),Math.floor(finish/width)),
+      z1=Math.max(Math.floor(start/width),Math.floor(finish/width));
+    const cells=[];
+    for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++)cells.push(z*width+x);
+    return cells;
+  };
+  const poolPreview=(proposal,description)=>{
+    outdoorPending=proposal.ok?{...proposal,pool:true}:null;
+    if(proposal.ok)outdoorFeedback(description+' · площадь '+
+      proposal.areaSquareMetres+' м² · чаш '+proposal.basins+
+      ' · '+(proposal.cost<0?'возврат '+(-proposal.cost):'стоимость '+proposal.cost)+
+      ' кр. · подтверди');
+    else outdoorFeedback(outdoorReason[proposal.reason]||proposal.reason,true);
+    updateOutdoorPanel();
+  };
+  const previewPoolTilesOn=(a,b)=>{
+    const cells=poolAt(a,b);
+    const operation=poolTool()==='erase'?'erase':'paint';
+    const proposal=previewPoolTiles(game,{operation,cells});
+    poolPreview(proposal,operation==='erase'?'Убрать воду':'Добавить воду');
+  };
+  const nearestPoolEdge=point=>{
+    const all=(game.world.outdoors?.pools||[]).flatMap(p=>
+      poolBoundaryEdges(p.cells).map(edge=>({...edge,poolId:p.poolId})));
+    const candidates=all.map(e=>{
+      const b=poolCellBounds(e.cell);
+      if(!b)return null;
+      const x=e.side==='west'?b.minX:e.side==='east'?b.maxX:(b.minX+b.maxX)/2;
+      const z=e.side==='north'?b.minZ:e.side==='south'?b.maxZ:(b.minZ+b.maxZ)/2;
+      return {...e,distance:(point.x-x)**2+(point.z-z)**2};
+    }).filter(Boolean).sort((a,b)=>a.distance-b.distance);
+    return candidates[0]?.distance<=.8**2?candidates[0]:null;
+  };
+  const previewPoolFixtureOn=point=>{
+    const operation=poolFixtureOperation(),kind=poolTool(),
+      chosen=(game.world.outdoors?.poolFixtures||[]).find(f=>f.fixtureId===poolFixtureOwned());
+    const edge=operation==='fixture-remove'?null:nearestPoolEdge(point);
+    const proposal=operation==='fixture-remove'
+      ?previewPoolFixture(game,{operation,fixtureId:chosen?.fixtureId})
+      :previewPoolFixture(game,{operation,kind,
+        edgeCell:edge?.cell,side:edge?.side,fixtureId:chosen?.fixtureId});
+    poolPreview(proposal,operation==='fixture-remove'?'Продажа оборудования':
+      operation==='fixture-move'?'Перемещение оборудования':
+        'Установка оборудования '+(POOL_FIXTURE_PRICES[kind]||0)+' кр.');
+  };
+  const applyCommittedPool=(draft,{historyTarget=null}={})=>{
+    // Commit domain revalidates exact revision, wallet and canonical anchors,
+    // THEN attempts ONE localStorage write before any in-memory mutation.
+    const result=commitPoolPreviewPersisted(game,draft,next=>{
+      if(!bootReadyToSave)return false;
+      try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));return true;}
+      catch{return false;}
+    });
+    if(!result.ok){
+      clearOutdoorPending(true);
+      outdoorFeedback(outdoorReason[result.reason]||result.reason,true);return false;
+    }
+    game.world=result.root.world;game.shop=result.root.shop;
+    game.financialHistory=result.root.financialHistory;
+    if(historyTarget===null){
+      poolHistory=poolHistory.slice(0,poolHistoryIndex+1);
+      poolHistory.push(poolEditorSnapshot(game));poolHistoryIndex++;
+      if(poolHistory.length>50){poolHistory.shift();poolHistoryIndex--;}
+    }else poolHistoryIndex=historyTarget;
+    // Old outdoor undo snapshots cannot overwrite newly committed water.
+    outdoorTimeline=[outdoorSnapshot()];outdoorHistoryIndex=0;
+    poolVisual.sync(game.world.outdoors);renderOutdoorGround();
+    syncPoolOwned();updateFamilyBalance();
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    clearOutdoorPending(true);
+    outdoorFeedback(result.cost<0
+      ?'Принято: возвращено '+(-result.cost)+' кр. · сохранено'
+      :'Принято: списано '+result.cost+' кр. · сохранено');
+    updateOutdoorPanel();return true;
   };
   const outdoorSnap=n=>Math.round(n*4)/4;
   const showOutdoorFeatureGhost=(pose,valid=true)=>{
@@ -6094,6 +6229,7 @@ function boot() {
     if(buildMode)exitBuild();
     if(furnishMode)exitFurniture();
     outdoorMode=true;outdoorTool='paint';outdoorCategory='ground';
+    poolHistory=[poolEditorSnapshot(game)];poolHistoryIndex=0;syncPoolOwned();
     $('outdoor-category').value='ground';syncOutdoorFeatureCatalog();syncOutdoorOwned();
     setView({...view,centerX:7,centerZ:0,distance:43,pitch:60});
     setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
@@ -6117,9 +6253,20 @@ function boot() {
       :'Камера: свайп одним пальцем, масштаб и вращение двумя');
   });
   $('outdoor-ground-kind').addEventListener('change',()=>clearOutdoorPending());
+  $('pool-tool').addEventListener('change',()=>{
+    $('pool-fixture-operation').value='fixture-add';clearOutdoorPending();
+  });
+  $('pool-fixture-operation').addEventListener('change',()=>{
+    clearOutdoorPending();
+    if(poolFixtureOperation()==='fixture-remove')previewPoolFixtureOn(null);
+  });
+  $('pool-fixture-owned').addEventListener('change',()=>{
+    clearOutdoorPending();
+    if(poolFixtureOperation()==='fixture-remove')previewPoolFixtureOn(null);
+  });
   $('outdoor-category').addEventListener('change',()=>{
     outdoorCategory=$('outdoor-category').value;outdoorYaw=0;
-    clearOutdoorPending();syncOutdoorFeatureCatalog();syncOutdoorOwned();
+    clearOutdoorPending();syncOutdoorFeatureCatalog();syncOutdoorOwned();syncPoolOwned();
   });
   $('outdoor-feature-kind').addEventListener('change',()=>{
     outdoorYaw=0;clearOutdoorPending();
@@ -6150,6 +6297,7 @@ function boot() {
   $('outdoor-cancel').addEventListener('click',()=>clearOutdoorPending());
   $('outdoor-apply').addEventListener('click',()=>{
     if(!outdoorMode||!outdoorPending?.ok)return;
+    if(poolMode()){applyCommittedPool(outdoorPending);return;}
     const feature=Boolean(outdoorPending.operation);
     const p=feature?previewOutdoorFeatureEdit(game,{
       operation:outdoorPending.operation,itemId:outdoorPending.itemId,
@@ -6163,6 +6311,7 @@ function boot() {
     game.shop=result.root.shop;game.financialHistory=result.root.financialHistory;
     outdoorTimeline=outdoorTimeline.slice(0,outdoorHistoryIndex+1);
     outdoorTimeline.push(outdoorSnapshot());outdoorHistoryIndex++;
+    poolHistory=[poolEditorSnapshot(game)];poolHistoryIndex=0;
     if(outdoorTimeline.length>50){outdoorTimeline.shift();outdoorHistoryIndex--;}
     renderOutdoorGround();renderOutdoorFeatures();syncOutdoorOwned();updateFamilyBalance();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
@@ -6311,7 +6460,17 @@ function boot() {
     }
   });
   const navigateOutdoorHistory=direction=>{
-    if(!outdoorMode||!outdoorTimeline.length)return;
+    if(!outdoorMode)return;
+    if(poolMode()){
+      const target=poolHistoryIndex+direction;
+      if(target<0||target>=poolHistory.length)return;
+      const draft=previewPoolHistory(game,poolHistory[target]);
+      if(!draft.ok){
+        outdoorFeedback(outdoorReason[draft.reason]||draft.reason,true);return;
+      }
+      applyCommittedPool(draft,{historyTarget:target});return;
+    }
+    if(!outdoorTimeline.length)return;
     const target=outdoorHistoryIndex+direction;
     if(target<0||target>=outdoorTimeline.length)return;
     const before=outdoorTimeline[outdoorHistoryIndex],after=outdoorTimeline[target];
@@ -6399,19 +6558,24 @@ function boot() {
         cameraGesture.begin(point,now);return;
       }
       if(outdoorTool==='paint'&&cameraGesture.count()===0&&
-        (outdoorCategory==='ground'||$('outdoor-feature-operation').value!=='sell')){
+        (poolMode()?(['paint','erase'].includes(poolTool())||
+          poolFixtureOperation()!=='fixture-remove'):
+          outdoorCategory==='ground'||$('outdoor-feature-operation').value!=='sell')){
         const ground=outdoorSurfaceAtScreen(point);
-        if(ground?.kind==='yard'){
+        if(ground&&(ground.kind==='yard'||poolMode()&&ground.kind==='pool-water')){
           outdoorPending=null;
           outdoorDrag={pointerId:event.pointerId,from:ground,to:ground,last:point};
-          if(outdoorCategory==='ground')paintGhostFrom(ground,ground);
+          if(outdoorCategory==='ground'||poolMode()&&['paint','erase'].includes(poolTool()))
+            paintGhostFrom(ground,ground);
+          else if(poolMode())paintGhostFrom(ground,ground);
           else{
             outdoorPose={x:outdoorSnap(ground.x),z:outdoorSnap(ground.z),yaw:outdoorYaw};
             showOutdoorFeatureGhost(outdoorPose);
           }
-          outdoorFeedback(outdoorCategory==='ground'
-            ?'Выдели прямоугольник · после отпускания покажу цену'
-            :'Выбери место · после отпускания проверю проходы');
+          outdoorFeedback(poolMode()?'Выбери воду/бортик · после отпускания покажу цену':
+            outdoorCategory==='ground'
+              ?'Выдели прямоугольник · после отпускания покажу цену'
+              :'Выбери место · после отпускания проверю проходы');
           updateOutdoorPanel();
           return;
         }
@@ -6442,9 +6606,9 @@ function boot() {
     if(event.cancelable)event.preventDefault();
     const hit=outdoorSurfaceAtScreen(gesturePoint(event));
     outdoorDrag.last=gesturePoint(event);
-    if(hit?.kind==='yard'){
+    if(hit&&(hit.kind==='yard'||poolMode()&&hit.kind==='pool-water')){
       outdoorDrag.to=hit;
-      if(outdoorCategory==='ground')paintGhostFrom(outdoorDrag.from,outdoorDrag.to);
+      if(outdoorCategory==='ground'||poolMode())paintGhostFrom(outdoorDrag.from,outdoorDrag.to);
       else{
         outdoorPose={x:outdoorSnap(hit.x),z:outdoorSnap(hit.z),yaw:outdoorYaw};
         showOutdoorFeatureGhost(outdoorPose);
@@ -6691,7 +6855,10 @@ function boot() {
     if(outdoorMode){
       if(outdoorDrag?.pointerId===event.pointerId){
         const drag=outdoorDrag;outdoorDrag=null;
-        if(outdoorCategory==='ground')
+        if(poolMode()){
+          if(['paint','erase'].includes(poolTool()))previewPoolTilesOn(drag.from,drag.to);
+          else previewPoolFixtureOn(drag.to);
+        }else if(outdoorCategory==='ground')
           previewOutdoorSelection(drag.from,drag.to,$('outdoor-ground-kind').value);
         else previewOutdoorObject(outdoorPose);
       }else cameraGesture.end(gesturePoint(event),performance.now());
