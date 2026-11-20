@@ -71,6 +71,7 @@ import {describeObjectQualities,shopQualitySummary} from './object-quality-prese
 import {compareShopVariants,formatShopVariantComparison,chooseComparableVariant} from './object-quality-comparison.js';
 import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-preview.js';
+import {quoteOwnedPlacement,findOwnedPlacement} from './furniture-owned-preview.js';
 import {furnitureProduct,FURNITURE_APPEARANCES,FURNITURE_SHOP_TYPES,
   PROCEDURAL_NEW_PREFABS,PROCEDURAL_DEFAULT_SKU} from './furniture-products.js';
 import {proceduralFurnitureModel} from './furniture-procedural-library.js';
@@ -2187,12 +2188,19 @@ function boot() {
         else node.enabled=false;
         continue;
       }
-      node.enabled=item.location==='home';
+      const previewing=instanceId===previewId&&!!previewPose;
+      node.enabled=item.location==='home'||previewing;
       if(!node.enabled)continue;
-      const pose=instanceId===previewId&&previewPose?previewPose:item;
+      const pose=previewing?previewPose:item;
+      // A stored object is visible only as a transient ghost; no saved
+      // location, instanceId or mounted-light anchor is changed here.
+      const mount=previewing&&MOUNTED_LIGHTS[item.itemDefinitionId]
+        ?mountedAnchorAt(game.world.construction,item.itemDefinitionId,pose.x,pose.z):null;
       const mounted=MOUNTED_LIGHTS[item.itemDefinitionId]
-        ?lightingMountPose(game.world.construction,item.itemDefinitionId,item.mount):null;
-      node.setPosition(mounted?.x??pose.x,mounted?.y??0,mounted?.z??pose.z);
+        ?lightingMountPose(game.world.construction,item.itemDefinitionId,
+          mount||item.mount):null;
+      node.setPosition(previewing?(mounted?.x??pose.x):(mounted?.x??pose.x),
+        mounted?.y??0,previewing?(mounted?.z??pose.z):(mounted?.z??pose.z));
       node.setEulerAngles(0,-(mounted?.yaw??pose.yaw),0);
     }
     refreshSofaSeat();
@@ -4059,6 +4067,9 @@ function boot() {
   let selectedBuildOpening=null,selectedBuildRoof=null;
   const roofChoice={styleId:'roof.gable',materialId:'roof.slate',pitch:.38,eaves:.4};
   let shopOpen=false,warehouseOpen=false,shopSelected=null,shopPose=null;
+  // UX-02b is transient: the canonical root-v1 world and wallet are not
+  // touched until the player confirms a valid owned-item placement.
+  let ownedPlacement=null,ownedSwipeRawPose=null;
   let shopSelectedItemId=null; // stable SKU, independently from prefabId
   let shopManualPose=false,shopPreviousCameraMode=null;
   let shopPlacing=false,shopPreviewEntity=null,shopPreviewType=null;
@@ -4199,6 +4210,66 @@ function boot() {
     element.dataset.invalid=String(invalid);
   };
   const editorItem=id=>game.world.furniture.instances.find(i=>i.instanceId===id);
+  const ownedQuote=()=>ownedPlacement?quoteOwnedPlacement(
+    game.world.furniture,game.shop,ownedPlacement.kind,
+    ownedPlacement.instanceId,ownedPlacement.pose,editorContext()):null;
+  const renderOwnedPlacement=()=>{
+    const stage=ownedPlacement,box=$('furnish-owned-preview');
+    box.hidden=!stage;
+    $('furniture-editor').dataset.ownedPlacing=String(!!stage);
+    if(!stage)return;
+    const item=editorItem(stage.instanceId);
+    if(!item)return;
+    const quote=ownedQuote();
+    const changed=stage.kind==='restore'||item.x!==stage.pose.x||
+      item.z!==stage.pose.z||item.yaw!==stage.pose.yaw;
+    const canConfirm=!!quote?.ok&&changed;
+    $('furnish-owned-name').textContent=(stage.kind==='restore'?'Со склада · ':'Перестановка · ')+
+      editorLabel(stage.instanceId);
+    $('furnish-owned-status').textContent=!changed?'Передвинь предмет или поверни его':
+      quote?.ok?'✓ Подходит · '+(stage.kind==='restore'?'возврат бесплатный':'бесплатная перестановка'):
+      '✕ '+editorMessage(quote?.reason);
+    $('furnish-owned-status').dataset.invalid=String(changed&&!quote?.ok);
+    $('furnish-owned-confirm').disabled=!canConfirm;
+    $('furnish-owned-confirm').textContent=stage.kind==='restore'
+      ?'✓ Вернуть бесплатно':'✓ Подтвердить';
+    const rect=instanceRect(stage.pose,FURNITURE_CATALOG[item.prefabId].footprint);
+    furnitureGhost.setPosition((rect.minX+rect.maxX)/2,.075,(rect.minZ+rect.maxZ)/2);
+    furnitureGhost.setLocalScale(Math.max(.15,rect.maxX-rect.minX),.038,
+      Math.max(.15,rect.maxZ-rect.minZ));
+    furnitureGhost.render.material=canConfirm?ghostValid:ghostInvalid;
+    furnitureGhost.enabled=furnishMode;
+    updateDecorNodes(stage.instanceId,stage.pose);
+    $('hint').textContent=oneFingerMode==='orbit'
+      ?'Коснись пола для выбора места · два пальца — камера'
+      :'Перемещай предмет пальцем · два пальца — камера';
+  };
+  const cancelOwnedPlacement=(feedback=true)=>{
+    if(!ownedPlacement)return;
+    ownedPlacement=null;ownedSwipeRawPose=null;
+    editDrag=null;canvas.dataset.furnitureGrab='false';
+    furnitureGhost.enabled=false;
+    updateDecorNodes();renderFurnitureSelection();renderWarehouse();
+    if(feedback)editorFeedback('Отменено · мебель, склад и кошелёк без изменений');
+  };
+  const beginOwnedPlacement=(kind,id)=>{
+    if(!furnishMode||shopOpen||ownedPlacement)return false;
+    const item=editorItem(id);
+    if(!item||(kind==='move'?!canMoveFurniture(item):
+      kind!=='restore'||item.location!=='storage'))return false;
+    const initial=kind==='restore'
+      ?findOwnedPlacement(game.world.furniture,game.shop,kind,id,editorContext())
+      :{x:item.x,z:item.z,yaw:item.yaw};
+    ownedPlacement={kind,instanceId:id,pose:initial||
+      {x:item.x,z:item.z,yaw:item.yaw}};
+    ownedSwipeRawPose=null;
+    if(kind==='move')editSelectedId=id;
+    renderFurnitureSelection();
+    editorFeedback(kind==='restore'
+      ?'Примерка со склада · бесплатно. Выбери место и подтверди.':
+      'Перестановка · положение сохранится только после подтверждения.');
+    return true;
+  };
   const showGhost=(instanceId,pose=null,valid=true)=>{
     const item=editorItem(instanceId);
     if(!item||!canMoveFurniture(item)){furnitureGhost.enabled=false;return;}
@@ -4241,12 +4312,12 @@ function boot() {
     const selectable=!!item&&item.location==='home';
     lightControl.hidden=!selectable||!MOUNTED_LIGHTS[item?.itemDefinitionId];
     if(!lightControl.hidden)lightModeSelect.value=item.lightMode||'auto';
-    $('furnish-commands').hidden=!furnishMode||shopOpen||warehouseOpen||!selectable;
+    $('furnish-commands').hidden=!furnishMode||shopOpen||warehouseOpen||!selectable||!!ownedPlacement;
     // Unlike the former hidden selection-only turn button, this room toolbar
     // is always present. A native picker lets Safari users select items even
     // when the 3D ray is partly covered by another piece of furniture.
     const roomTools=$('furnish-room-tools');
-    roomTools.hidden=!furnishMode||shopOpen||warehouseOpen;
+    roomTools.hidden=!furnishMode||shopOpen||warehouseOpen||!!ownedPlacement;
     if(!roomTools.hidden){
       const picker=$('furnish-item-select');
       const prompt=document.createElement('option');
@@ -4264,6 +4335,7 @@ function boot() {
       picker.value=selectable&&canMoveFurniture(item)?item.instanceId:'';
     }
     $('furnish-rotate').disabled=!selectable||!canMoveFurniture(item);
+    $('furnish-move').disabled=!selectable||!canMoveFurniture(item);
     const tradable=selectable&&canTradeMarketInstance(item);
     const storeQuote=tradable?storeMarketItem(game.world.furniture,game.shop,
       item.instanceId,editorContext()):null;
@@ -4274,6 +4346,14 @@ function boot() {
     $('furnish-sell').disabled=!saleQuote?.ok;
     $('furnish-sell').textContent=saleQuote?.ok
       ?'Продать · +'+saleQuote.amount+' кр.':'Продать';
+    $('furnish-selected-card').textContent=selectable
+      ?editorLabel(item.instanceId)+' · '+(item.instanceId.startsWith('shop-')
+        ?'Куплено':'Исходная мебель')+' · В комнате':'Выбери предмет в комнате';
+    $('furnish-trade-status').textContent=!selectable?'':[
+      'Склад: '+(storeQuote?.ok?'бесплатно':editorMessage(storeQuote?.reason||'protected-item')),
+      'Продажа: '+(saleQuote?.ok?'+'+saleQuote.amount+' кр.':
+        editorMessage(saleQuote?.reason||'protected-item'))
+    ].join(' · ');
     $('furnish-store').title=storeQuote?.ok?'Поместить на склад бесплатно':
       editorMessage(storeQuote?.reason||'protected-item');
     $('furnish-sell').title=saleQuote?.ok?'Продажа с подтверждением':
@@ -4285,8 +4365,9 @@ function boot() {
       warehouseOpen?'Склад':item&&selectable
         ?'Обстановка · '+editorLabel(item.instanceId):'Обстановка';
     if(shopOpen||warehouseOpen||!selectable)furnitureGhost.enabled=false;
-    else showGhost(editSelectedId);
+    else if(!ownedPlacement)showGhost(editSelectedId);
     $('furnish-balance').textContent='Кредиты: '+game.shop.credits;
+    renderOwnedPlacement();
   };
   const chooseFurniture=id=>{
     const item=editorItem(id);
@@ -4297,7 +4378,7 @@ function boot() {
     else if(item&&!canMoveFurniture(item))
       editorFeedback(editorMessage('fixed-or-missing'),true);
     else if(item)
-      editorFeedback(editorLabel(id)+': удерживай 0,5 секунды для переноса или поверни кнопкой');
+      editorFeedback(editorLabel(id)+': нажми «Переставить» или удерживай палец 0,5 секунды');
     else editorFeedback('Коснись предмета на 3D-сцене или открой каталог');
   };
   // F4b2: store UI selects SKU identity; renderer/footprint still use prefab.
@@ -4477,27 +4558,23 @@ function boot() {
       const title=document.createElement('strong');
       title.textContent=furnitureProduct(item.itemDefinitionId)?.name||
         FURNITURE_CATALOG[item.prefabId].name;
+      const status=document.createElement('small');
+      status.className='furnish-storage-status';
+      const quote=sellMarketItem(game.world.furniture,game.shop,item.instanceId,editorContext());
+      status.textContent='На складе · возврат 0 кр. · №'+item.instanceId+
+        ' · продажа '+(quote.ok?'+'+quote.amount+' кр.':editorMessage(quote.reason));
       const restore=document.createElement('button');restore.type='button';
-      restore.textContent='↩ Вернуть';
-      restore.addEventListener('click',()=>{
-        const pose=findStoredPlacement(game.world.furniture,game.shop,
-          item.instanceId,editorContext());
-        if(!pose){
-          editorFeedback('Не найдено безопасного места: освободи место в комнате',true);
-          return;
-        }
-        if(!window.confirm('Вернуть «'+title.textContent+
-          '» в комнату без оплаты? Место проверено по маршрутам и коллизиям.'))return;
-        const result=restoreMarketItem(game.world.furniture,game.shop,
-          item.instanceId,pose,editorContext());
-        applyMarketTransaction(result,'Возвращено из склада без оплаты');
-      });
-      const sell=document.createElement('button');sell.type='button';sell.textContent='Продать';
+      restore.textContent='↩ Разместить';
+      restore.addEventListener('click',()=>beginOwnedPlacement('restore',item.instanceId));
+      const sell=document.createElement('button');sell.type='button';
+      sell.textContent=quote.ok?'Продать · +'+quote.amount:'Продать';
+      sell.disabled=!quote.ok;
       sell.addEventListener('click',()=>sellFurniture(item.instanceId));
-      card.append(title,restore,sell);list.append(card);
+      card.append(title,status,restore,sell);list.append(card);
     }
   };
   const setEditorView=mode=>{
+    if(ownedPlacement)cancelOwnedPlacement(false);
     if(mode==='shop'&&!shopOpen){
       shopPreviousCameraMode=oneFingerMode;
       oneFingerMode='pan';showCameraMode();
@@ -4724,11 +4801,7 @@ function boot() {
       editSelectedId,editorContext()),'На складе · деньги не списаны');
   });
   $('furnish-restore').addEventListener('click',()=>{
-    const item=game.world.furniture.instances.find(i=>i.instanceId===editSelectedId);
-    if(!furnishMode||!item)return;
-    applyMarketTransaction(restoreMarketItem(game.world.furniture,game.shop,
-      item.instanceId,{x:item.x,z:item.z,yaw:item.yaw},editorContext()),
-      'Снова в комнате · бесплатно');
+    if(editSelectedId)beginOwnedPlacement('restore',editSelectedId);
   });
   const sellFurniture=instanceId=>{
     const item=game.world.furniture.instances.find(i=>i.instanceId===instanceId);
@@ -4744,6 +4817,40 @@ function boot() {
       item.instanceId,editorContext()),'Продано · +'+resale+' кредитов');
   };
   $('furnish-sell').addEventListener('click',()=>sellFurniture(editSelectedId));
+  $('furnish-move').addEventListener('click',()=>{
+    if(editSelectedId)beginOwnedPlacement('move',editSelectedId);
+  });
+  $('furnish-owned-turn').addEventListener('click',()=>{
+    if(!ownedPlacement)return;
+    ownedPlacement.pose={...ownedPlacement.pose,
+      yaw:(ownedPlacement.pose.yaw+90)%360};
+    ownedSwipeRawPose=null;renderOwnedPlacement();
+  });
+  $('furnish-owned-auto').addEventListener('click',()=>{
+    if(!ownedPlacement)return;
+    const pose=findOwnedPlacement(game.world.furniture,game.shop,
+      ownedPlacement.kind,ownedPlacement.instanceId,editorContext());
+    if(!pose){editorFeedback('Безопасное место не найдено',true);return;}
+    ownedPlacement.pose=pose;ownedSwipeRawPose=null;renderOwnedPlacement();
+  });
+  $('furnish-owned-cancel').addEventListener('click',()=>cancelOwnedPlacement());
+  $('furnish-owned-confirm').addEventListener('click',()=>{
+    if(!ownedPlacement)return;
+    const stage=ownedPlacement,quote=ownedQuote();
+    const source=editorItem(stage.instanceId);
+    if(!quote?.ok){editorFeedback(editorMessage(quote?.reason),true);return;}
+    if(stage.kind==='move'){
+      if(source.x===stage.pose.x&&source.z===stage.pose.z&&source.yaw===stage.pose.yaw)return;
+      // The editor is the existing source of truth for reversible movement.
+      if(!commitFurniture(stage.instanceId,stage.pose))return;
+      ownedPlacement=null;ownedSwipeRawPose=null;renderFurnitureSelection();
+    }else{
+      if(!applyMarketTransaction(restoreMarketItem(game.world.furniture,game.shop,
+        stage.instanceId,stage.pose,editorContext()),'Со склада · бесплатно'))return;
+      ownedPlacement=null;ownedSwipeRawPose=null;
+      setEditorView('edit');chooseFurniture(stage.instanceId);
+    }
+  });
   const commitFurniture=(instanceId,pose)=>{
     if(!editSession||!furnishMode)return false;
     const result=editSession.commit(instanceId,pose,editorContext(true));
@@ -4797,12 +4904,15 @@ function boot() {
   $('furnish-rotate').addEventListener('click',()=>{
     const item=editorItem(editSelectedId);
     if(!furnishMode||!canMoveFurniture(item))return;
-    if(commitFurniture(item.instanceId,{x:item.x,z:item.z,yaw:(item.yaw+90)%360}))
-      editorFeedback(editorLabel(item.instanceId)+' · повёрнут на 90°');
+    if(beginOwnedPlacement('move',item.instanceId)){
+      ownedPlacement.pose={...ownedPlacement.pose,yaw:(ownedPlacement.pose.yaw+90)%360};
+      renderOwnedPlacement();
+    }
   });
   const exitFurniture=()=>{
     if(!furnishMode)return;
     cancelPendingGrab();
+    if(ownedPlacement)cancelOwnedPlacement(false);
     editDrag=null;canvas.dataset.furnitureGrab='false';
     cameraGesture.clear();
     furnishMode=false;editSelectedId=null;editSession=null;
@@ -4845,7 +4955,7 @@ function boot() {
     shopPose=null;shopManualPose=false;
     chooseFurniture(null);setEditorView('edit');
     renderPauseButton();
-    editorFeedback('Выбери мебель в списке или коснись её в 3D, затем нажми «Повернуть 90°». Для переноса удерживай палец 0,5 секунды.');
+    editorFeedback('Выбери мебель → «Переставить» → укажи место → «Подтвердить». Доступно удержание 0,5 с.');
   };
 
   // F5-A construction editor: separate transaction history, no change to Buy mode.
@@ -5654,6 +5764,7 @@ function boot() {
     const floor=editorFloorAt(gesturePoint(event));
     if(!floor)return false;
     chooseFurniture(id);
+    if(!beginOwnedPlacement('move',id))return false;
     editDrag={pointerId:event.pointerId,instanceId:id,
       lastPoint:gesturePoint(event),
       offsetX:item.x-floor.x,offsetZ:item.z-floor.z,
@@ -5672,35 +5783,30 @@ function boot() {
       z:snapFurnitureCoordinate(pt.z+editDrag.offsetZ),yaw:editDrag.pose.yaw};
     if(pose.x===editDrag.pose.x&&pose.z===editDrag.pose.z)return true;
     editDrag.pose=pose;
+    if(ownedPlacement?.instanceId===editDrag.instanceId)ownedPlacement.pose=pose;
     // Full A* validation is expensive on iPhone: only compute when the
     // snapped cell changes and not more than ten checks per second.
     if(performance.now()-editDrag.lastCheck<95){
-      updateDecorNodes(editDrag.instanceId,pose);
-      showGhost(editDrag.instanceId,pose,true);
+      renderOwnedPlacement();
       return true;
     }
     editDrag.lastCheck=performance.now();
-    const candidate=proposeFurnitureMove(game.world.furniture,editDrag.instanceId,pose,editorContext(true));
+    const candidate=ownedQuote();
     editDrag.valid=candidate.ok;
-    updateDecorNodes(editDrag.instanceId,pose);
-    showGhost(editDrag.instanceId,pose,candidate.ok);
+    renderOwnedPlacement();
     editorFeedback(candidate.ok?'Отпусти, чтобы поставить предмет сюда':
       editorMessage(candidate.reason),!candidate.ok);
     return true;
   };
   const endEditorDrag=event=>{
     if(!editDrag||editDrag.pointerId!==event.pointerId)return false;
-    const {instanceId,pose}=editDrag;
     editDrag=null;holdGesture.end(gesturePoint(event));
     canvas.dataset.furnitureGrab='false';
-    const item=editorItem(instanceId);
-    if(item&&(item.x!==pose.x||item.z!==pose.z))
-      commitFurniture(instanceId,pose);
-    else{updateDecorNodes();renderFurnitureSelection();}
-    return true;
+    // Releasing the touch NEVER mutates a save. Confirmation is explicit.
+    renderOwnedPlacement();return true;
   };
   const armFurnitureHold=(event,now)=>{
-    if(!furnishMode||shopOpen||warehouseOpen||cameraGesture.count()!==1)return;
+    if(!furnishMode||shopOpen||warehouseOpen||ownedPlacement||cameraGesture.count()!==1)return;
     const point=gesturePoint(event);
     const instanceId=editorFurnitureAt(point);
     const item=editorItem(instanceId);
@@ -6227,6 +6333,7 @@ function boot() {
     }
     if(furnishMode)cancelPendingGrab();
     if(furnishMode&&shopPlacing)shopSwipeRawPose=null;
+    if(furnishMode&&ownedPlacement)ownedSwipeRawPose=null;
     cameraGesture.begin(point,now);
     armFurnitureHold(event,now);
   });
@@ -6280,8 +6387,9 @@ function boot() {
       cancelPendingGrab();cameraGesture.clear();return;
     }
     const result=cameraGesture.move(gesturePoint(event),view,
-      canvas.clientHeight,{oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'
-        ?'placement':oneFingerMode});
+      canvas.clientHeight,{oneFinger:furnishMode&&ownedPlacement
+        ?'placement':furnishMode&&shopPlacing&&oneFingerMode==='pan'
+          ?'placement':oneFingerMode});
     if(result.placementDelta&&furnishMode&&shopPlacing&&shopPose){
       if(event.cancelable)event.preventDefault();
       const {dx,dy}=result.placementDelta;
@@ -6293,6 +6401,20 @@ function boot() {
           z:snapFurnitureCoordinate(shopSwipeRawPose.z),yaw:shopPose.yaw};
         if(pose.x!==shopPose.x||pose.z!==shopPose.z){
           shopPose=pose;shopManualPose=true;renderMarket();
+        }
+      }
+    }
+    if(result.placementDelta&&furnishMode&&ownedPlacement){
+      if(event.cancelable)event.preventDefault();
+      const {dx,dy}=result.placementDelta;
+      ownedSwipeRawPose=dragShopPlacement(view,ownedSwipeRawPose||ownedPlacement.pose,
+        dx,dy,canvas.clientHeight,'lot');
+      if(ownedSwipeRawPose){
+        const pose={x:snapFurnitureCoordinate(ownedSwipeRawPose.x),
+          z:snapFurnitureCoordinate(ownedSwipeRawPose.z),
+          yaw:ownedPlacement.pose.yaw};
+        if(pose.x!==ownedPlacement.pose.x||pose.z!==ownedPlacement.pose.z){
+          ownedPlacement.pose=pose;renderOwnedPlacement();
         }
       }
     }
@@ -6487,6 +6609,7 @@ function boot() {
       cancelPendingGrab();
     const pos=cameraGesture.end(gesturePoint(event),performance.now());
     shopSwipeRawPose=null; // next gesture starts from last snapped object pose
+    ownedSwipeRawPose=null;
     if(!pos||dialogueNeedsDecision(game))return;
     if(furnishMode){
       if(shopOpen&&shopPlacing&&shopSelected){
@@ -6496,6 +6619,15 @@ function boot() {
             yaw:shopPose?.yaw??0};
           shopSwipeRawPose=null;shopManualPose=true;renderMarket();
         }else editorFeedback('Коснись поверхности пола для размещения',true);
+        return;
+      }
+      if(ownedPlacement){
+        const floor=editorFloorAt(pos);
+        if(floor){
+          ownedPlacement.pose={x:snapFurnitureCoordinate(floor.x),
+            z:snapFurnitureCoordinate(floor.z),yaw:ownedPlacement.pose.yaw};
+          renderOwnedPlacement();
+        }else editorFeedback('Коснись пола или нажми «Найти место»',true);
         return;
       }
       if(warehouseOpen)setEditorView('edit');
@@ -6538,11 +6670,13 @@ function boot() {
     }
     cameraGesture.end(gesturePoint(event),performance.now(),{cancel:true});
     shopSwipeRawPose=null;
+    if(ownedPlacement)cancelOwnedPlacement(false);
   });
   window.addEventListener('blur',()=>{
     cancelPendingGrab();viewportHealth.markInput(performance.now());closeGroundWalkMenu();
     if(outdoorMode)clearOutdoorPending(true);
     buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
+    if(ownedPlacement)cancelOwnedPlacement(false);
   });
   // Safari may suspend a background tab without a matching pointerup/blur.
   document.addEventListener('visibilitychange',()=>{
@@ -6552,6 +6686,7 @@ function boot() {
       if(outdoorMode)clearOutdoorPending(true);
       buildDrag=null;buildGhost.enabled=false;
       cancelPendingGrab();cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
+      if(ownedPlacement)cancelOwnedPlacement(false);
     }
   });
   canvas.addEventListener('lostpointercapture',event=>{

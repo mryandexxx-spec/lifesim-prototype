@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3-q0-q1q4-lotc1-q5-20261120-ux01-20261120-ux02a-20261120" />
+  <link rel="stylesheet" href="./styles.css?v=ux02b-20261120-1.2u-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3-q0-q1q4-lotc1-q5-20261120-ux01-20261120-ux02a-20261120" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/gardening.js":"./src/gardening.js?v=lot-c1-20261120-lot-c2b",
@@ -88,6 +88,7 @@
       "./src/furniture-transform.js":"./src/furniture-transform.js?v=1.2v-f4d",
       "./src/navigation.js":"./src/navigation.js?v=1.2v-f4d-f5a",
       "./src/camera-controls.js":"./src/camera-controls.js?v=1.2v-f4d-f5a-q1",
+      "./src/furniture-owned-preview.js":"./src/furniture-owned-preview.js?v=ux02b-20261120",
       "./src/furniture-placement-preview.js":"./src/furniture-placement-preview.js?v=1.2v-f4d",
       "./src/seat-furniture.js":"./src/seat-furniture.js?v=1.2v-f4d-f4f1",
       "./src/dining.js":"./src/dining.js?v=1.2u-f4f1",
@@ -386,7 +387,7 @@
           </select>
         </label>
         <button type="button" id="furnish-rotate" class="furnish-room-rotate"
-          aria-label="Повернуть выбранную мебель на 90 градусов" disabled>⟳ Повернуть 90°</button>
+          aria-label="Повернуть выбранную мебель на 90 градусов с подтверждением" disabled>⟳ Повернуть 90°</button>
       </div>
       <div id="furnish-shop" class="furnish-shop" hidden aria-label="Каталог новых предметов">
         <div id="furnish-type-tabs" class="furnish-type-tabs" role="group"
@@ -435,12 +436,26 @@
         <p id="furnish-storage-empty">На складе пока пусто. Выбери предмет в комнате и нажми «В склад».</p>
         <div id="furnish-storage-list" class="furnish-storage-list" role="group" aria-label="Предметы на складе"></div>
       </div>
-      <div id="furnish-commands" class="furnish-commands" role="group" aria-label="Действия с мебелью, выбранной в 3D" hidden>
-
+      <div id="furnish-commands" class="furnish-commands" role="group" aria-label="Действия с выбранной мебелью" hidden>
+        <p id="furnish-selected-card" class="furnish-selected-card" role="status"></p>
+        <button type="button" id="furnish-move">↔ Переставить</button>
         <button type="button" id="furnish-store">📦 В склад</button>
         <button type="button" id="furnish-restore">↩ Из склада</button>
         <button type="button" id="furnish-sell">Продать</button>
+        <p id="furnish-trade-status" class="furnish-trade-status" role="status" aria-live="polite"></p>
       </div>
+      <section id="furnish-owned-preview" class="furnish-owned-preview" aria-label="Предварительное размещение своей мебели" hidden>
+        <strong id="furnish-owned-name">Мебель · примерка</strong>
+        <p id="furnish-owned-status" role="status" aria-live="polite"></p>
+        <div class="furnish-owned-tools">
+          <button type="button" id="furnish-owned-turn">⟳ Повернуть 90°</button>
+          <button type="button" id="furnish-owned-auto">⌖ Найти место</button>
+        </div>
+        <div class="furnish-owned-actions">
+          <button type="button" id="furnish-owned-confirm">✓ Подтвердить</button>
+          <button type="button" id="furnish-owned-cancel">✕ Отменить</button>
+        </div>
+      </section>
       <div class="furnish-editor-footer">
         <p id="furnish-feedback" class="furnish-feedback" role="status" aria-live="polite">Выбери предмет в 3D или открой каталог.</p>
         <div class="furnish-history" role="group" aria-label="История изменений">
