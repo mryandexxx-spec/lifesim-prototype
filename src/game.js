@@ -535,6 +535,16 @@ function scheduleCommand(command,residentId=game.selectedSim){
       toast('Скамейка недоступна или занята');return false;
     }
   }
+  if(command.type==='pool'){
+    const available=poolActionStatus(game,residentId,command.poolId,{
+      actionId:command.actionId,fixtureId:command.fixtureId||null
+    });
+    if(residentUnavailableForHome(game,residentId)||!available.available){
+      toast(residentUnavailableForHome(game,residentId)
+        ?'Персонаж сейчас не на участке':available.reason);
+      return false;
+    }
+  }
   if(command.type==='move'){
     const person=getActor(game,residentId);
     if(!person||residentUnavailableForHome(game,residentId)||
@@ -1504,7 +1514,13 @@ function renderQueuePanel(force=true){
       const social=game.socialAction;
       if(social&&(social.initiator===residentId||social.partner===residentId))
         cancelSocial(game);
-      else {
+      else if(getActor(game,residentId).action?.id==='swim'){
+        requestPoolExit(game,residentId,'cancelled');
+        paths[residentId]={points:null,index:0,id:null};
+        renderQueuePanel(true);save(true);
+        toast('Запрошен безопасный выход из бассейна');
+        return;
+      }else {
         getActor(game,residentId).action=null;
         getActor(game,residentId).activitySession=null;
       }
@@ -6501,8 +6517,18 @@ function boot() {
       const note=document.createElement('small');
       note.textContent=choice.available?'Добавить в очередь':choice.reason;
       button.append(title,note);
-      button.addEventListener('click',()=>
-        confirmWorldOffer(groundWalkOffer,choice.command));
+      button.addEventListener('click',()=>{
+        if(choice.actionId==='cancel-swim'&&groundWalkOffer){
+          const residentId=groundWalkOffer.residentId;
+          closeGroundWalkMenu();
+          if(requestPoolExit(game,residentId,'cancelled')){
+            renderQueuePanel(true);save(true);
+            toast('Персонаж безопасно выходит из бассейна');
+          }
+          return;
+        }
+        confirmWorldOffer(groundWalkOffer,choice.command);
+      });
       more.append(button);
     }
     groundWalkPanel.hidden=false;
@@ -6528,15 +6554,30 @@ function boot() {
     $('ground-walk-primary-reason').textContent=blocked
       ?'Недоступно: '+options.primaryReason:'';
   };
+  const openPoolActionMenu=(point,poolId,{fixtureId=null,kind=null}={})=>{
+    const residentId=game.selectedSim,actionId=kind==='board'?'jump':'swim';
+    const status=poolActionStatus(game,residentId,poolId,{actionId,fixtureId});
+    const command={type:'pool',poolId,actionId,...(fixtureId?{fixtureId}:{})};
+    const a=getActor(game,residentId)?.action;
+    const swimming=a?.id==='swim'&&a.poolId===poolId;
+    offerWorldAction(point,kind==='board'?'Трамплин бассейна':
+      kind==='ladder'?'Лестница бассейна':
+      kind==='steps'?'Ступени бассейна':'Бассейн · вода',
+      actionId==='jump'?'Прыгнуть и поплавать':'🏊 Плавать',
+      command,null,{
+        primaryAvailable:status.available,
+        primaryReason:status.reason,
+        info:swimming?poolActivityLabel(a):status.info,
+        choices:swimming?[{actionId:'cancel-swim',
+          label:'Прервать плавание · безопасный выход',available:true}]:[]
+      });
+  };
   const openGroundWalkMenu=(point,ground)=>{
     if(ground.kind==='pool-water'){
-      const hasExit=poolHasExit(game.world.outdoors,ground.poolId||
+      const poolId=ground.poolId||
         (game.world.outdoors?.pools||[]).find(p=>
-          p.cells.includes(outdoorCellAt(ground.x,ground.z)))?.poolId);
-      offerWorldAction(point,'Бассейн · вода','🏊 Плавание · появится в LOT-D2',
-        null,null,{primaryAvailable:false,
-          info:hasExit?'Чаша готова. Сейчас доступны строительство и просмотр. Плавание будет следующим этапом.'
-            :'Для будущего плавания добавь лестницу или ступени в редакторе участка.'});
+          p.cells.includes(outdoorCellAt(ground.x,ground.z)))?.poolId;
+      openPoolActionMenu(point,poolId);
       return;
     }
     const id=game.selectedSim,actor=getActor(game,id);
@@ -6963,7 +7004,7 @@ function boot() {
     const poolTargets=(game.world.outdoors?.poolFixtures||[]).map(item=>{
       const pose=poolFixtureVisualPose(item);
       if(!pose)return null;
-      return {kind:'pool-fixture',id:item.kind,fixtureId:item.fixtureId,
+      return {kind:'pool-fixture',id:item.kind,fixtureId:item.fixtureId,poolId:item.poolId,
         bounds:{min:{x:pose.x-.30,y:-.54,z:pose.z-.30},
           max:{x:pose.x+.30,y:.30,z:pose.z+.30}}};
     }).filter(Boolean);
@@ -7065,12 +7106,9 @@ function boot() {
       openOutdoorActionMenu(pos,target);
     }else if(target?.kind==='pool-fixture'){
       closeSocialContext();select(null);
-      offerWorldAction(pos,({
-        ladder:'Лестница бассейна',steps:'Ступени бассейна',
-        board:'Трамплин бассейна'})[target.id]||'Оборудование бассейна',
-      '🏊 Использовать · появится в LOT-D2',null,null,
-      {primaryAvailable:false,
-        info:'Оборудование установлено и сохранено. Купание и прыжки будут в следующем этапе.'});
+      openPoolActionMenu(pos,target.poolId,{
+        fixtureId:target.fixtureId,kind:target.id
+      });
     }
     else{
       closeSocialContext();select(null);
