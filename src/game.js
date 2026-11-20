@@ -2083,7 +2083,7 @@ function boot() {
     try{render();}finally{decorDrawing=previous;}
     // The original room uses saved starter instance IDs, not purchased SKU IDs.
     // Attach only when the real starter exists; keep gameplay scene roots intact.
-    if(!templateOnly&&current.location==='home')
+    if(!templateOnly)
       meshyFurniture.attach(node,meshyStarterFurnitureSku(prefabId));
   };
   const updateDecorNodes=(previewId=null,previewPose=null)=>{
