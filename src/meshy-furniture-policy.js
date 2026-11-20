@@ -86,3 +86,26 @@ export function meshyFurnitureFit(sku){
     mount:spec.mount
   });
 }
+
+
+/**
+ * Visual aliases for original saved furniture. This is NEVER written to
+ * household/world data: older saves retain the same instance IDs and SKUs.
+ * Only products whose prefab has a matching Meshy model can be substituted.
+ */
+export const MESHY_STARTER_SKUS=Object.freeze({
+  sofa:'sofa.comfort',
+  bed:'bed.platform',
+  plant:'legacy.plant'
+});
+export function meshyStarterFurnitureSku(prefabId){
+  return typeof prefabId==='string'&&
+    Object.hasOwn(MESHY_STARTER_SKUS,prefabId)
+    ?MESHY_STARTER_SKUS[prefabId]:null;
+}
+export function meshyFurnitureDisplaySku(itemId){
+  if(meshyFurnitureSpec(itemId))return itemId;
+  if(itemId==='legacy.sofa')return 'sofa.comfort';
+  if(itemId==='legacy.bed')return 'bed.platform';
+  return null;
+}
