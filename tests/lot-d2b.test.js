@@ -225,3 +225,31 @@ test('D2b pool FIFO persisted timestamp and cancellation during approach are bou
   assert.equal(s.action,null);
   assert.equal(s.otherSim.action,null);
 });
+
+
+test('D2b walking and queued swimmer become too exhausted before entering: never jump into pool',()=>{
+  const s=home();
+  const plan=beginPoolSwim(s,'alex',{poolId:'pool-1',actionId:'swim'});
+  assert.ok(plan);
+  s.needs.energy=29;
+  tickHousehold(s,1);
+  assert.equal(s.action,null);
+  assert.ok(isWalkable(s.position.x,s.position.z,s.world));
+  const t=home();begin(t);
+  t.needs.bladder=24;
+  tickHousehold(t,1);
+  assert.equal(t.action,null);
+  assert.ok(isWalkable(t.position.x,t.position.z,t.world));
+});
+
+test('D2b missing pool and fixture commands are pruned on reload; D2a queue gains finite timestamp',()=>{
+  const s=home();
+  enqueueAction(s.actionQueues,'alex',{type:'pool',poolId:'pool-1',actionId:'swim'});
+  const r=loadHousehold(copy(s));
+  assert.equal(r.actionQueues.byResident.alex.length,1);
+  assert.equal(r.actionQueues.byResident.alex[0].queuedAt,r.minutes);
+  const removed=copy(s);removed.world.outdoors.poolFixtures=[];
+  assert.equal(loadHousehold(removed).actionQueues.byResident.alex.length,0);
+  removed.world.outdoors.pools=[];
+  assert.equal(loadHousehold(removed).actionQueues.byResident.alex.length,0);
+});
