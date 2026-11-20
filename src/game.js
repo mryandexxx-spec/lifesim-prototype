@@ -5969,7 +5969,11 @@ function boot() {
     const frame=document.querySelector('.app-shell').getBoundingClientRect();
     const topInset=Math.max(70,Math.ceil(
       $('calendar-anchor-toggle').getBoundingClientRect().bottom-frame.top)+10);
-    const bottomInset=Math.ceil($('dashboard').getBoundingClientRect().height)+12;
+    // HUD floats above bottom navigation (including at 320px / landscape).
+    // Reserve the entire band from the actual HUD top to the shell bottom,
+    // not just the card height, or the garden sheet clips the HUD.
+    const dashboardTop=$('dashboard').getBoundingClientRect().top;
+    const bottomInset=Math.max(0,Math.ceil(frame.bottom-dashboardTop))+12;
     const pos=contextualPlacement({anchorX:point.x-frame.left,
       anchorY:point.y-frame.top,viewportWidth:frame.width,viewportHeight:frame.height,
       panelWidth:groundWalkPanel.offsetWidth||290,

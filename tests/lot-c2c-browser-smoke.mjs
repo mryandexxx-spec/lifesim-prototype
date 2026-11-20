@@ -91,7 +91,8 @@ try{
   assert.ok(bounds.x>=0&&bounds.x+bounds.width<=w+1);
   assert.ok(bounds.y>=0&&bounds.y+bounds.height<=h+1);
   assert.ok(!hud||bounds.y+bounds.height<=hud.y+1,
-   'garden sheet must not overlap mobile bottom HUD');
+   'garden sheet must not overlap mobile bottom HUD: '+JSON.stringify({
+     viewport:[w,h],menu:bounds,hud}));
   const first=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
   assert.equal(first.actionQueues.byResident.alex.length,0,'tap never enqueues');
   await page.screenshot({path:'lot-c2c-'+w+'x'+h+'-menu.png'});
@@ -134,6 +135,11 @@ try{
    await page.reload({waitUntil:'domcontentloaded'});
    await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
    assert.equal(await canvas.isVisible(),true);
+   // Reset from house camera to lot camera so every stage screenshot
+   // actually depicts the planted bed on the same stable viewpoint.
+   await page.locator('#home-open').click();
+   await page.locator('#home-outdoors').click();
+   await page.locator('#outdoor-exit').click();
    await page.screenshot({path:'lot-c2c-'+w+'x'+h+'-stage'+stage+'.png'});
   }
   console.log('C2c real WebGL '+w+'x'+h+': touch, menu, FIFO, reload, stages PASS');
