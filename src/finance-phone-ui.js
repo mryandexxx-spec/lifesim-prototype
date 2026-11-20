@@ -4,7 +4,7 @@
 import {financeAnalytics,financeAssessment,financeRows,financePeriod,
   FINANCE_PAGE_SIZE,credits} from './finance-presentation.js';
 import {calendarAt} from './calendar-core.js';
-import {householdBillView} from './household-bills.js';
+import {financeOverviewSnapshot,oncePerInvoice} from './ux07-finance-summary.js';
 
 const NS='http://www.w3.org/2000/svg';
 function el(tag,cls,text){
@@ -139,7 +139,8 @@ export function createFinancePhoneUI({body,payBill=()=>({ok:false,reason:'unavai
   function render(root){
     body.replaceChildren();
     const today=calendarAt(root.calendar,root.minutes).iso;
-    const active=financeAnalytics(root,applied);
+    const snapshot=financeOverviewSnapshot(root,applied);
+    const active=snapshot.active;
     const tabs=el('nav','finance-tabs');
     tabs.setAttribute('aria-label','Разделы финансов');
     for(const [id,label] of [['overview','Обзор'],['operations','Операции'],
@@ -157,7 +158,19 @@ export function createFinancePhoneUI({body,payBill=()=>({ok:false,reason:'unavai
         el('strong',null,credits(root.shop.credits)),
         el('span',null,'Общие деньги Алекса и Миры'));
       body.append(wallet);
-      const bill=householdBillView(root);
+      body.append(el('p','finance-ux07-bill-status',snapshot.billLine));
+      if(active.ok){
+        const summary=el('section','finance-ux07-summary');
+        summary.append(el('p','finance-period-range',snapshot.periodText));
+        const figures=el('div','finance-ux07-figures');
+        figures.append(amountField('Поступления',credits(active.income)),
+          amountField('Расходы',credits(active.expense)),
+          amountField('Итог',snapshot.netText));
+        summary.append(figures);
+        body.append(summary);
+        if(active.limited)body.append(note(active.coverageNote,'finance-coverage'));
+      }
+      const bill=snapshot.bill;
       const invoice=el('section','finance-bills');
       invoice.append(el('h3',null,'Счета за дом'),
         note('180 кр. каждые 7 игровых дней. Оплата вручную, без штрафов.'));
@@ -168,13 +181,13 @@ export function createFinancePhoneUI({body,payBill=()=>({ok:false,reason:'unavai
           invoice.append(note((bill.overdueCount?'Просрочено: '+bill.overdueCount+'. ':'')+
             'Срок старейшего счёта: '+(bill.oldestDueDate||'игровой день '+bill.oldestDueDay)+
             ' (включительно).'));
-          const pay=btn('Оплатить '+credits(bill.amount),()=>{
+          const pay=btn('Оплатить '+credits(bill.amount),oncePerInvoice(()=>{
             const response=payBill(root);
             billError=response.ok?'':response.reason==='insufficient-credits'?
               'Недостаточно кредитов для оплаты.':response.reason==='no-bill'?
               'Неоплаченных счетов нет.':'Не удалось провести платёж.';
             render(root);
-          },'finance-bill-pay');
+          }),'finance-bill-pay');
           pay.disabled=!bill.canPay;
           invoice.append(pay);
           if(!bill.canPay)invoice.append(note('Недостаточно средств для оплаты.'));
@@ -211,6 +224,19 @@ export function createFinancePhoneUI({body,payBill=()=>({ok:false,reason:'unavai
         },'finance-more'));
     }else{
       body.append(el('h2','finance-title','Аналитика периода'));
+      if(active.ok){
+        const summary=el('section','finance-ux07-summary finance-ux07-analytics-summary');
+        summary.append(el('p','finance-period-range',snapshot.periodText));
+        summary.append(note('Текущий баланс семьи: '+credits(snapshot.balance)+
+          '. Итоги только по записанным операциям этого периода.'));
+        const metrics=el('div','finance-kpis');
+        metrics.append(amountField('Поступления',credits(active.income)),
+          amountField('Расходы',credits(active.expense)),
+          amountField('Разница',snapshot.netText),
+          amountField('Операций',String(active.count)));
+        summary.append(metrics);
+        body.append(summary);
+      }else body.append(note(active.reason,'finance-error'));
       const pick=el('div','finance-period-presets');
       for(const [id,label] of [['7','7 дней'],['30','30 дней'],['all','Вся история'],
         ['custom','Свой период']]){
@@ -227,11 +253,14 @@ export function createFinancePhoneUI({body,payBill=()=>({ok:false,reason:'unavai
       body.append(pick);
       if(mode==='custom'){
         const dates=el('div','finance-dates');
+        dates.setAttribute('role','group');
+        dates.setAttribute('aria-label','Игровой период');
         for(const [id,label,key] of [['finance-date-start','С даты','start'],
             ['finance-date-end','По дату','end']]){
           const wrap=el('label','finance-date-field',label);
           const input=el('input');
           input.type='date';input.id=id;
+          input.setAttribute('aria-label',label);
           input.min=root.calendar.startCivilDate;input.max=today;
           input.value=key==='start'?customStart:customEnd;
           input.addEventListener('change',()=>{
@@ -250,18 +279,7 @@ export function createFinancePhoneUI({body,payBill=()=>({ok:false,reason:'unavai
         body.append(apply);
       }
       if(error)body.append(note(error,'finance-error'));
-      if(!active.ok){body.append(note(active.reason,'finance-error'));return;}
-      const title=el('p','finance-period-range','Период: '+
-        active.startDate+' — '+active.endDate);
-      body.append(title);
-      body.append(note('Текущий баланс семьи: '+credits(root.shop.credits)+
-        '. Итоги ниже — только за выбранный период.'));
-      const metrics=el('div','finance-kpis');
-      metrics.append(amountField('Поступления',credits(active.income)),
-        amountField('Расходы',credits(active.expense)),
-        amountField('Разница',(active.net>=0?'+':'−')+credits(Math.abs(active.net))),
-        amountField('Операций',String(active.count)));
-      body.append(metrics);
+      if(!active.ok)return;
       const chart1=el('section','finance-chart');
       renderBars(active,chart1);body.append(chart1);
       const chart2=el('section','finance-chart');
