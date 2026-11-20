@@ -2209,3 +2209,27 @@ button.time-card:active {transform:translateY(1px);}
 .build-tools button{min-height:48px;}
 @media(max-height:570px) and (orientation:landscape){.build-editor{max-height:65dvh}.build-editor .build-flow-hint{display:none}}
 @media(max-width:350px){.build-group-tabs button{min-width:85px;padding-inline:8px}.build-editor{gap:6px}}
+
+
+/* UX-04: quick landscape palette and persistent domain-derived price/area. */
+.outdoor-palette{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:5px;flex-shrink:0}
+.outdoor-editor .outdoor-palette button{padding:5px 3px;min-height:48px;
+  font-size:11px;line-height:1.2;overflow-wrap:anywhere}
+.outdoor-palette button[aria-pressed="true"]{background:#307956;
+  color:#fff;border-color:#307956}
+.outdoor-selection-summary{margin:0;padding:7px 9px;background:#e6f3e8;
+  border-radius:9px;color:#234d37;font-size:12px;font-weight:800;
+  line-height:1.35;flex-shrink:0}
+.outdoor-editor-actions{position:sticky;bottom:-1px;z-index:1;
+  padding:7px 0 3px;background:#f8fff6}
+.garden-action-unavailable{margin:5px 0 0;color:#9b4437;font-size:11px;
+  line-height:1.35;font-weight:700}
+@media(max-width:359px) and (orientation:portrait){
+  .outdoor-palette{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-height:570px) and (orientation:landscape){
+  .outdoor-editor{max-height:68dvh;left:10%;right:10%}
+  .outdoor-palette{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .outdoor-editor .outdoor-palette button{min-height:44px}
+}
