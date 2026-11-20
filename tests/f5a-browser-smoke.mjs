@@ -359,7 +359,9 @@ try{
   assert.deepEqual(afterExteriorReload.world.construction.materials.facade,
     porchSaved.world.construction.materials.facade);
   await clickBuild();
-  await page.locator('[data-build-walls="cut"]').waitFor();
+  // UX-03: after reload, View controls are collapsed but remain mounted.
+ // Verify saved cutaway state without requiring the drawer to be visible.
+ await page.locator('[data-build-walls="cut"]').waitFor({state:'attached'});
   assert.equal(await page.locator('[data-build-walls="cut"]').getAttribute('aria-pressed'),'true',
     'Entering a new build session must reset camera cutaway without changing wall height');
   await page.locator('#build-exit').click();
