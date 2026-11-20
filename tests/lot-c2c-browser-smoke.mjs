@@ -68,7 +68,12 @@ try{
   await tap();
   const menu=page.locator('#ground-walk-menu');
   await menu.waitFor({state:'visible',timeout:8000});
-  assert.match(await page.locator('#ground-walk-info').textContent(),/48\/72 ч роста/);
+  const openedTitle=await page.locator('#ground-walk-title').textContent();
+  const openedInfo=await page.locator('#ground-walk-info').textContent();
+  await page.screenshot({path:'lot-c2c-'+w+'x'+h+'-first-tap.png'});
+  assert.match(openedTitle,/Календула/,
+    'tapping the actual WebGL garden must not select ground or nearby scenery');
+  assert.match(openedInfo,/48\/72 ч роста/);
   assert.match(await page.locator('#ground-walk-wish').textContent(),/Желание Алекса/);
   assert.equal(await page.locator('#ground-walk-progress').getAttribute('value'),'67');
   assert.match(await page.locator('#ground-walk-action-label').textContent(),/Осмотреть/);
