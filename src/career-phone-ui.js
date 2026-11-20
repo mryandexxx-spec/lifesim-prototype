@@ -1056,16 +1056,19 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     beforeOpen();
     who=root.selectedSim;
     app=target==='finance'?'finance':'work';
-    // A new phone visit starts in the current context, not a stale old tab.
-    // Active interviews always return to their canonical locked application.
+    // Restore the same resident's screen on close/open. A live recruitment
+    // interview must still use its canonical application view on first open.
     const remembered=contexts[who];
-    section=!root.careerSystem?.byResident?.[who]&&
+    const defaultSection=!root.careerSystem?.byResident?.[who]&&
       root.recruitmentSystem?.byResident?.[who]?'applications':'vacancies';
-    view='list';chosen=null;historyId=null;
+    section=remembered?.section??defaultSection;
+    view=remembered?.view??'list';chosen=remembered?.chosen??null;
+    historyId=remembered?.historyId??null;
     lastFocus=document.activeElement;
     overlay.hidden=false;trigger.setAttribute('aria-expanded','true');
     financeTrigger?.setAttribute('aria-expanded','true');
     render();
+    if(remembered)body.scrollTop=remembered.scrollTop??0;
     onOpenChange(who);closeButton.focus({preventScroll:true});
   }
   function openIncident(residentId){
