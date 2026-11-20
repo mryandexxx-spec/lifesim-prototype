@@ -1,0 +1,73 @@
+name: Meshy batch 02 — import optimized GLBs and render shop previews
+on:
+  push:
+    branches:
+      - feature/meshy-room-batch02-20261120
+    paths:
+      - .github/workflows/meshy-batch02-ingest.yml
+permissions:
+  contents: write
+jobs:
+  import-and-render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Checkout exact isolated feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Retrieve fixed 58-file archive from temporary public staging
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --location --retry 4 --retry-all-errors --retry-delay 4 \
+            'https://sb-22qoxhwr73v2.vercel.run/meshy-batch02-public-patch.tar.gz' \
+            -o /tmp/meshy-batch02-patch.tar.gz
+          echo '80d267ac33909237ab4e849ad9a2bf6d3594d7f5ca80181e0dff85a7ec01491c  /tmp/meshy-batch02-patch.tar.gz' | sha256sum -c -
+          tar -tzf /tmp/meshy-batch02-patch.tar.gz | grep -q 'assets/furniture/meshy-room-v2/manifest.json'
+          tar -xzf /tmp/meshy-batch02-patch.tar.gz -C .
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          folder=Path('assets/furniture/meshy-room-v2')
+          manifest=json.loads((folder/'manifest.json').read_text())
+          assert len(manifest['records'])==35
+          for i,entry in enumerate(manifest['records'],1):
+            path=folder/(entry['slug']+'.glb')
+            payload=path.read_bytes()
+            assert len(payload)==entry['bytes'],entry['slug']+' size'
+            assert hashlib.sha256(payload).hexdigest()==entry['sha256'],entry['slug']+' digest'
+            assert payload[:4]==b'glTF'
+            print(i,entry['slug'],len(payload),'B verified')
+          PY
+      - name: Install pinned PlayCanvas and headless Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+      - name: Generate 35 real mesh thumbnails
+        run: |
+          mkdir -p assets/furniture/meshy-room-v2/thumbnails
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/meshy-batch02-http.log 2>&1 &
+          sleep 3
+          node tests/meshy-v2-thumbnail-generator.mjs
+          test "$(find assets/furniture/meshy-room-v2/thumbnails -name '*.png' | wc -l)" -eq 35
+      - name: Commit the game implementation, GLBs and shop images
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests tools index.html sw.js assets/furniture/meshy-room-v2
+          git diff --cached --check
+          git commit -m 'feat(meshy): integrate 35 optimized furniture assets and shop thumbnails'
+          git push origin HEAD:feature/meshy-room-batch02-20261120
+      - name: Run complete Node suite and verify shader/browser dependencies
+        run: |
+          npm test
+          node --check src/game.js
+          node --check src/meshy-furniture-policy.js
+          node --check src/meshy-room-v2-data.js
