@@ -68,6 +68,7 @@ jobs:
           node --check src/gardening.js
           node --check src/garden-autonomy.js
           node --check src/garden-presentation.js
+          node --check src/outdoor-ux04.js
            node --check src/garden-psychology.js
           node --check src/lot-surface.js
           node --check src/pool-topology.js
@@ -224,6 +225,7 @@ jobs:
           cp src/gardening.js site/src/
           cp src/garden-autonomy.js site/src/
           cp src/garden-presentation.js site/src/
+          cp src/outdoor-ux04.js site/src/
            cp src/garden-psychology.js site/src/
           cp src/furnished-room.js site/src/
           cp src/roof-construction.js site/src/
