@@ -123,8 +123,9 @@ async function run(build,w,h){
   assert.equal(await page.locator('#queue-items li').count(),alexPending);
   await page.locator('#queue-close').tap();
   await page.locator('#calendar-anchor-toggle').tap();
-  assert.equal(await page.locator('#calendar-anchor-panel').isVisible(),true);
-  await page.locator('#calendar-anchor-close').tap();
+  // The clock opens the full W1-A.3 calendar, not the nested date editor.
+  assert.equal(await page.locator('#life-calendar').isVisible(),true);
+  await page.locator('#lc-close').tap();
   await page.locator('#home-open').tap();
   assert.equal(await page.locator('#home-panel').isVisible(),true);
   await page.locator('#home-close').tap();
