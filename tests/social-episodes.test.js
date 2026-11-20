@@ -228,7 +228,7 @@ test('UI, workflow and current saved scheme expose stories without copying Sims 
   const workflow=text('../.github/workflows/pages.yml'),game=text('../src/social-graph.js');
   assert.ok(html.includes('id="mind-episodes"'));
   assert.ok(html.includes('сборка / 1.2'));
-  assert.ok(js.includes('latestEpisodes(memoryPair,game.selectedSim,game.minutes,3)'));
+  assert.ok(js.includes('latestEpisodes(memoryPair,mindInspectResident,game.minutes,3)'));
   assert.ok(js.includes('Доверие ещё восстанавливается'));
   assert.ok(workflow.includes('node --check src/social-episodes.js'));
   assert.ok(workflow.includes('src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js'));

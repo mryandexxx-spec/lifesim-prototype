@@ -295,7 +295,7 @@ test('H1 Safari integration exposes real touch, store, session, personal XP and 
   assert.match(game,/beginAction\(actionId,false,residentId,true,command\.targetInstanceId/);
   assert.match(game,/readingHasBook\(game\.action\)/);
   assert.match(html,/id="mind-reading-skill"/);
-  assert.match(game,/currentSkillLevel\(current\.skills,HOBBY_SKILLS,READING_SKILL_ID\)/);
+  assert.match(game,/currentSkillLevel\((?:current|readingActor)\.skills,HOBBY_SKILLS,READING_SKILL_ID\)/);
   assert.match(workflow,/node --check src\/hobby-reading\.js/);
   assert.match(workflow,/cp src\/hobby-reading\.js site\/src\//);
   assert.match(html,/src\/game\.js\?v=1\.2u/);

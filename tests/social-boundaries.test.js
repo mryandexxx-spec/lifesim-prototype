@@ -246,7 +246,7 @@ test('mobile scene and Pages include optional personal cue UI, not numeric thres
  assert.ok(html.includes('сборка / 1.2'));
  assert.ok(html.includes('id="mind-social-cues"'));
  assert.ok(html.includes('КАК ЛУЧШЕ ОБЩАТЬСЯ'));
- assert.ok(ui.includes('socialCommunicationNotes(game.socialGraph,game.selectedSim,otherId,3)'));
+ assert.ok(ui.includes('socialCommunicationNotes(game.socialGraph,mindInspectResident,otherId,3)'));
  assert.ok(ui.includes('Пока не замечено особенностей общения'));
  assert.ok(relation.includes('if(cueFromAnswer(turn.id,turn.accepted))'));
  assert.ok(graph.includes('restoreSocialCues(entry.cues'));
