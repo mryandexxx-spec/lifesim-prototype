@@ -188,7 +188,7 @@ test('F4b2 product appearance is applied only on the bought clone, not every pla
       location:'home',x:0,z:0,yaw:0}]}}},
     decorNodes:nodes,decorTemplates:new Map([['plant',{clone(){clones++;return node();}}]]),
     MARKET_OFFERS:[{prefabId:'plant'}],app:{root:{addChild(){}}},
-    applySkuModel:(node,id)=>style.push(id),meshyFurniture:{attach(){}},PROCEDURAL_DEFAULT_SKU:{},MOUNTED_LIGHTS:{},refreshSofaSeat(){}};
+    applySkuModel:(node,id)=>style.push(id),meshyFurnitureDisplaySku:()=>null,meshyFurniture:{attach(){}},PROCEDURAL_DEFAULT_SKU:{},MOUNTED_LIGHTS:{},refreshSofaSeat(){}};
   runInNewContext('(()=>{'+game.slice(start,end)+'\nupdateDecorNodes();})()',ctx,{timeout:1200});
   assert.equal(clones,1);
   assert.deepEqual(style,['plant.amber']);
