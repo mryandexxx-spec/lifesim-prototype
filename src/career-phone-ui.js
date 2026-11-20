@@ -10,6 +10,7 @@ import {professionalGoalsView} from './career-goals.js';
 import {careerRankForContract,specializationReadiness,chooseCareerSpecialization} from './career-specializations.js';
 import {seniorTrack} from './career-seniority.js';
 import {renderCareerMap} from './career-map-ui.js';
+import {phoneWorkLanding} from './ux06-phone-state.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt,selectCareerWorkMode} from './career-work.js';
 import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-work-needs.js';
 import {calendarAt} from './calendar-core.js';
@@ -51,7 +52,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   frame.tabIndex=-1;
   const header=element('header','career-phone-header');
   const heading=element('div','career-phone-heading');
-  const kicker=element('span','career-phone-kicker','СМАРТФОН · БЛИН’С');
+  const kicker=element('span','career-phone-kicker','ТЕЛЕФОН · БЛИН’С');
   const title=element('strong','career-phone-title','Работа Блин’С');
   title.id='career-phone-title';
   heading.append(kicker,title);
@@ -133,7 +134,18 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     card.append(element('strong',null,'💼 '+ids.length+' '+(ids.length===1?'решение':'решения')+' до конца смены'));
     card.append(element('span',null,NAMES[id]+' · '+label+
       ' · до '+clockAt(contract.currentShift.end)));
-    card.append(action('Решить',()=>openIncident(id),'career-phone-primary career-incident-open'));
+    card.append(action('Решить · '+NAMES[id],()=>openIncident(id),'career-phone-primary career-incident-open'));
+    // Both pending residents are reachable independently; just opening a card
+    // never changes the stored incident choice or the game clock.
+    for(const other of ids.filter(candidate=>candidate!==id)){
+      const c=root.careerSystem.byResident[other];
+      const detail=workScenario(c.careerId,c.currentShift.incident.scenarioId||'legacy');
+      card.append(element('span','career-phone-incident-other-label',
+        NAMES[other]+' · '+(detail?.title||'Рабочая ситуация')+
+        ' · до '+clockAt(c.currentShift.end)));
+      card.append(action('Решить · '+NAMES[other],()=>openIncident(other),
+        'career-incident-other'));
+    }
     incidentNotice.append(card);
   }
   function renderEmployed(root){
@@ -146,7 +158,47 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     const shift=nextCareerShift(root.calendar,current,root.minutes);
     const status=residentWorkStatus(root,who);
     const active=current.currentShift;
+    const landing=phoneWorkLanding({residentName:NAMES[who],contract:current,
+      statusLabel:status.label,shiftLabel:describeCareerShift(shift),
+      pendingIncident:Boolean(pendingWorkIncident(root,who)),
+      canDepart:active?.phase==='pending'&&root.minutes>=active.start-15});
+    const hero=element('section','career-phone-hero');
+    hero.setAttribute('aria-label','Сводка работы · '+NAMES[who]);
+    hero.append(element('strong','career-phone-hero-headline',landing.headline));
+    hero.append(element('p','career-phone-hero-description',landing.description));
+    hero.append(element('p','career-phone-hero-rate',
+      (careerRankForContract(current)?.title||'Должность')+' · '+
+      careerRankForContract(current)?.hourlyCredits+' кр./час'));
+    hero.append(action(landing.actionLabel,()=>{
+      if(landing.action==='incident'){openIncident(who);return;}
+      if(landing.action==='depart'){
+        const live=personRoot();if(!live)return;
+        const result=requestCareerDeparture(live,who,live.minutes);
+        if(!result.ok){notify(result.reason);return;}
+        save(true);notify(NAMES[who]+' идёт к выходу');render();return;
+      }
+      section='map';render();body.querySelector('#career-map-title')?.focus({preventScroll:true});
+    },'career-phone-primary career-phone-hero-main'));
+    const shortcuts=element('nav','career-phone-shortcuts');
+    shortcuts.setAttribute('aria-label','Быстрые разделы работы');
+    for(const [id,label] of [['map','Карта'],['contract','Договор'],
+      ['leave','Отпуск'],['worklog','Журнал']]){
+      const link=action(label,()=>{
+        if(id==='map'||id==='worklog'){
+          section=id;render();
+          if(id==='map')body.querySelector('#career-map-title')?.focus({preventScroll:true});
+          return;
+        }
+        const target=body.querySelector(id==='contract'?'#career-contract-facts':'#career-leave-details');
+        if(target?.tagName==='DETAILS')target.open=true;
+        target?.scrollIntoView({block:'start'});
+        target?.focus({preventScroll:true});
+      },'career-phone-shortcut');
+      link.dataset.target=id;shortcuts.append(link);
+    }
+    hero.append(shortcuts);body.append(hero);
     const facts=element('div','career-phone-facts');
+    facts.id='career-contract-facts';facts.tabIndex=-1;
     facts.append(element('span',null,'Ставка: '+careerRankForContract(current)?.hourlyCredits+' кр./час'));
     facts.append(element('span',null,'Следующая смена: '+describeCareerShift(shift)));
     facts.append(element('span',null,'Статус: '+status.label));
@@ -319,6 +371,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       },'career-phone-secondary'));
     }
     const leaveDetails=element('details','career-phone-leave');
+    leaveDetails.id='career-leave-details';leaveDetails.tabIndex=-1;
     leaveDetails.append(element('summary','career-phone-notice',
       'Выбрать дату отдыха (ближайшие смены)'));
     const dates=upcomingCareerTimeOff(root,who,6);
@@ -640,6 +693,8 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     const app=root.recruitmentSystem?.byResident?.[who];
     if(!app)return render();
     top('📨 '+NAMES[who]+' · МОЙ ОТКЛИК');
+    const landing=phoneWorkLanding({residentName:NAMES[who],recruitment:app});
+    body.append(element('p','career-phone-hero-inline',landing.headline));
     body.append(element('p','career-phone-muted','Отправлен: '+gameDueLabel(root,app.appliedAt)));
     body.append(element('h2','career-phone-section-title',
       careerDefinition(app.careerId)?.title||'Работа'));
@@ -789,6 +844,12 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   }
   function renderList(root){
     top('📱 '+NAMES[who]+' · открытые вакансии');
+    const landing=phoneWorkLanding({residentName:NAMES[who]});
+    const hero=element('section','career-phone-hero career-phone-looking');
+    hero.setAttribute('aria-label','Поиск работы · '+NAMES[who]);
+    hero.append(element('strong','career-phone-hero-headline',landing.headline));
+    hero.append(element('p','career-phone-hero-description',landing.description));
+    body.append(hero);
     const ended=root.careerSystem?.endedContracts?.[who]||[];
     if(ended.length){
       const last=ended.at(-1);
@@ -942,11 +1003,12 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     renderPendingNotice(root);
     const oldScroll=body.scrollTop;
     if(root.recruitmentSystem?.byResident?.[who]?.phase==='interview_active')app='work';
-    title.textContent=app==='finance'?'Финансы семьи':'Работа Блин’С';
+    title.textContent=app==='finance'?'Финансы · Семья':'Работа · '+NAMES[who];
     overlay.setAttribute('aria-label',app==='finance'?
       'Смартфон: финансы семьи':'Смартфон: работа Блин’С');
     for(const b of appTabs.querySelectorAll('button')){
       const selected=b.dataset.app===app;
+      b.textContent=b.dataset.app==='finance'?'Финансы · Семья':'Работа · '+NAMES[who];
       b.setAttribute('aria-pressed',String(selected));
       b.classList.toggle('career-phone-app-active',selected);
     }
@@ -967,7 +1029,8 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     const unread=Boolean(root.recruitmentSystem?.byResident?.[who]?.unread);
     const hasContract=!!root.careerSystem?.byResident?.[who];
     if(hasContract)nav.classList.add('career-phone-tabs-map');
-    const sections=[['vacancies','Вакансии'],['applications','Мои отклики'],['history','История']];
+    const sections=[['vacancies',hasContract?'Моя работа':'Вакансии'],
+      ['applications','Мои отклики'],['history','История']];
     if(hasContract)sections.push(['map','Карта']);
     for(const [id,label] of sections){
       const button=action(label+(id==='applications'&&unread?' ●':''),()=>{
@@ -993,14 +1056,16 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     beforeOpen();
     who=root.selectedSim;
     app=target==='finance'?'finance':'work';
+    // A new phone visit starts in the current context, not a stale old tab.
+    // Active interviews always return to their canonical locked application.
     const remembered=contexts[who];
-    section=remembered?.section||(root.recruitmentSystem?.byResident?.[who]?'applications':'vacancies');
-    view=remembered?.view||'list';chosen=remembered?.chosen??null;
-    historyId=remembered?.historyId??null;
+    section=!root.careerSystem?.byResident?.[who]&&
+      root.recruitmentSystem?.byResident?.[who]?'applications':'vacancies';
+    view='list';chosen=null;historyId=null;
     lastFocus=document.activeElement;
     overlay.hidden=false;trigger.setAttribute('aria-expanded','true');
     financeTrigger?.setAttribute('aria-expanded','true');
-    render();if(remembered)body.scrollTop=remembered.scrollTop||0;
+    render();
     onOpenChange(who);closeButton.focus({preventScroll:true});
   }
   function openIncident(residentId){
