@@ -16,6 +16,18 @@ const point=cell=>{
 const mix=(a,b,t)=>a+(b-a)*t;
 const toward=(a,b,t)=>({x:mix(a.x,b.x,t),z:mix(a.z,b.z,t)});
 const valid=p=>Number.isFinite(p?.x)&&Number.isFinite(p?.z);
+// Visual cache is per runtime action and invalidated by the outdoors object.
+// A 512-tile pathfinder must not run for two avatars on every WebGL frame.
+const laneCache=new WeakMap();
+function swimmingLane(world,action){
+  const outdoors=world?.outdoors,anchor=action.slotAnchor,target=action.slotCells?.at(-1);
+  const cached=laneCache.get(action);
+  if(cached&&cached.outdoors===outdoors&&cached.revision===outdoors?.revision&&
+    cached.anchor===anchor&&cached.target===target)return cached.path;
+  const path=findPoolWaterPath(world,action.poolId,anchor,target);
+  laneCache.set(action,{outdoors,revision:outdoors?.revision,anchor,target,path});
+  return path;
+}
 function section(path,index,progress=0){
   if(!Array.isArray(path)||!path.length)return null;
   const a=point(path[Math.min(path.length-1,Math.max(0,index))]);
@@ -67,7 +79,7 @@ export function poolSwimVisualFrame(world,action){
   if(action.stage==='swimming'){
     const anchor=action.slotAnchor;
     const target=action.slotCells?.at(-1);
-    const lane=findPoolWaterPath(world,action.poolId,anchor,target);
+    const lane=swimmingLane(world,action);
     if(!lane?.length)return null;
     const i=Math.max(0,Math.min(lane.length-1,Number.isSafeInteger(action.laneIndex)?action.laneIndex:0));
     const dir=action.laneDirection===-1?-1:1;
