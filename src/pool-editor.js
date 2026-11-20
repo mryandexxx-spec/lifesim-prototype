@@ -203,11 +203,11 @@ function plan(root,intent){
   if(overlap)return fail(overlap);
   const next={...current,revision:current.revision+1,pools,
     nextPoolId,poolTxnSeq:(current.poolTxnSeq||0)+1,poolFixtures:fixtures,nextFixtureId};
+  const fError=verifyFixtures(root,next,fixtures);
+  if(fError)return fail(fError);
   const restored=restoreOutdoorsWorld(next,root.world.construction,root.minutes);
   if(JSON.stringify(restored)!==JSON.stringify(next))
     return fail('invalid-topology-or-fixture');
-  const fError=verifyFixtures(root,next,fixtures);
-  if(fError)return fail(fError);
   if(!keepsExistingRoutes(root,next))return fail('would-block-route');
   const cost=totalCost(current,pools,fixtures);
   if(cost===null)return fail('invalid-value');
