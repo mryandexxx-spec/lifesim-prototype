@@ -134,6 +134,33 @@ export function stepAnimation(previous,signals,dt) {
     }else{
       armTarget=[5,8];
     }
+  }else if(action==='swim'){
+    // Both Meshy residents fall back to the calibrated procedural skeleton
+    // while in water (no independently verified imported swim clip).
+    // Only visual joints move; D2b owns every water cell and interruption.
+    const stage=signals?.swimStage;
+    const stroke=safe(signals?.swimStroke,t)*2.9;
+    const pulse=Math.sin(stroke),opposite=Math.sin(stroke+Math.PI);
+    if(stage==='waiting'){
+      armTarget=[4,-4];legTarget=[0,0];
+    }else if(stage==='entering'){
+      const dip=clamp(safe(signals?.swimStroke,0)/6,0,1);
+      legTarget=[-12-25*dip,12+12*dip];
+      kneeTarget=[24,30];
+      armTarget=[-32-18*dip,-28-22*dip];
+      elbowTarget=[-25,-23];
+    }else if(stage==='exiting'||stage==='recovering'){
+      armTarget=[-36+22*pulse,-44-18*pulse];
+      elbowTarget=[-33,-38];
+      legTarget=[20*opposite,20*pulse];
+      kneeTarget=[24,24];
+    }else{
+      // Readable alternating freestyle with slight flutter kick and recovery.
+      armTarget=[-45+42*pulse,-45+42*opposite];
+      elbowTarget=[-55-20*pulse,-55-20*opposite];
+      legTarget=[18*pulse,18*opposite];
+      kneeTarget=[17+7*Math.abs(pulse),17+7*Math.abs(opposite)];
+    }
   }else if(music){
     // The procedural fallback must visibly match Meshy listen vs dance.
     // These motions never translate the simulation root or bypass A*.

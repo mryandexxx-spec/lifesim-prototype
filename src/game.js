@@ -32,7 +32,9 @@ import {previewOutdoorPaint,commitOutdoorPreview,
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {poolBoundaryEdges,poolCellBounds} from './pool-topology.js';
 import {canBeginPoolSwim,beginPoolSwim,arrivePoolApproach,
-  SWIM_MAX_WAIT_MINUTES} from './pool-swim-runtime.js';
+  requestPoolExit,SWIM_MAX_WAIT_MINUTES} from './pool-swim-runtime.js';
+import {poolSwimVisualFrame} from './pool-swim-visual.js';
+import {poolActionStatus,poolActivityLabel} from './pool-touch-policy.js';
 import {POOL_FIXTURE_PRICES,poolHasExit} from './pool-equipment.js';
 import {previewPoolTiles,previewPoolFixture,previewPoolHistory,
   poolEditorSnapshot,commitPoolPreviewPersisted} from './pool-editor.js';
@@ -531,6 +533,16 @@ function scheduleCommand(command,residentId=game.selectedSim){
     if(!p||!outdoorBenchAvailable(game,residentId,command.instanceId)||
       !findPath(actor.position,p,game.world)){
       toast('Скамейка недоступна или занята');return false;
+    }
+  }
+  if(command.type==='pool'){
+    const available=poolActionStatus(game,residentId,command.poolId,{
+      actionId:command.actionId,fixtureId:command.fixtureId||null
+    });
+    if(residentUnavailableForHome(game,residentId)||!available.available){
+      toast(residentUnavailableForHome(game,residentId)
+        ?'Персонаж сейчас не на участке':available.reason);
+      return false;
     }
   }
   if(command.type==='move'){
@@ -1385,6 +1397,7 @@ function activeTaskLabel(id){
     return SOCIAL_ACTIONS[s.kind]?.label||'Общается';
   }
   const actor=getActor(game,id);
+  if(actor.action?.id==='swim')return poolActivityLabel(actor.action);
   return actor.action
     ?(actor.action.id==='music'
       ?getActivityDefinition(HOBBY_ACTIVITIES,actor.action.activityId)?.label
@@ -1501,7 +1514,12 @@ function renderQueuePanel(force=true){
       const social=game.socialAction;
       if(social&&(social.initiator===residentId||social.partner===residentId))
         cancelSocial(game);
-      else {
+      else if(getActor(game,residentId).action?.id==='swim'){
+        requestPoolExit(game,residentId,'cancelled');
+        renderQueuePanel(true);save(true);
+        toast('Запрошен безопасный выход из бассейна');
+        return;
+      }else {
         getActor(game,residentId).action=null;
         getActor(game,residentId).activitySession=null;
       }
@@ -3665,8 +3683,32 @@ function boot() {
     game.otherSim.position={x,z};
   }
   game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
-  const display={x:game.position.x,y:lotActorHeight(game.world,game.position),z:game.position.z,yaw:0,pitch:0,roll:0};
-  const miraDisplay={x:game.otherSim.position.x,y:lotActorHeight(game.world,game.otherSim.position),z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
+  // A saved swim may be restored while the simulation is paused. Seed the
+  // real render roots from the pure authoritative wet pose immediately: when
+  // frameAnimDt=0 the display spring intentionally cannot move at all.
+  const restoredAlexSwim=poolSwimVisualFrame(game.world,game.action);
+  const restoredMiraSwim=poolSwimVisualFrame(game.world,game.otherSim.action);
+  const display=restoredAlexSwim
+    ?{...restoredAlexSwim,roll:0}
+    :{x:game.position.x,y:lotActorHeight(game.world,game.position),
+      z:game.position.z,yaw:0,pitch:0,roll:0};
+  const miraDisplay=restoredMiraSwim
+    ?{...restoredMiraSwim,roll:0}
+    :{x:game.otherSim.position.x,y:lotActorHeight(game.world,game.otherSim.position),
+      z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
+  if(new URLSearchParams(location.search).get('pool')==='qa'){
+    // Read-only WebGL QA: assert physical avatar roots against canonical poses.
+    const snapshot=(id,rig)=>{
+      const actor=getActor(game,id),p=rig.avatar.getPosition();
+      return {stage:actor.action?.stage||null,
+        pose:poolSwimVisualFrame(game.world,actor.action),
+        avatar:{x:p.x,y:p.y,z:p.z},paused:game.paused,
+        waterElapsed:actor.action?.waterElapsed??null};
+    };
+    window.__LifeSimSwimVisualQA=()=>({
+      alex:snapshot('alex',alexRig),mira:snapshot('mira',miraRig)
+    });
+  }
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
@@ -6498,8 +6540,18 @@ function boot() {
       const note=document.createElement('small');
       note.textContent=choice.available?'Добавить в очередь':choice.reason;
       button.append(title,note);
-      button.addEventListener('click',()=>
-        confirmWorldOffer(groundWalkOffer,choice.command));
+      button.addEventListener('click',()=>{
+        if(choice.actionId==='cancel-swim'&&groundWalkOffer){
+          const residentId=groundWalkOffer.residentId;
+          closeGroundWalkMenu();
+          if(requestPoolExit(game,residentId,'cancelled')){
+            renderQueuePanel(true);save(true);
+            toast('Персонаж безопасно выходит из бассейна');
+          }
+          return;
+        }
+        confirmWorldOffer(groundWalkOffer,choice.command);
+      });
       more.append(button);
     }
     groundWalkPanel.hidden=false;
@@ -6525,15 +6577,30 @@ function boot() {
     $('ground-walk-primary-reason').textContent=blocked
       ?'Недоступно: '+options.primaryReason:'';
   };
+  const openPoolActionMenu=(point,poolId,{fixtureId=null,kind=null}={})=>{
+    const residentId=game.selectedSim,actionId=kind==='board'?'jump':'swim';
+    const status=poolActionStatus(game,residentId,poolId,{actionId,fixtureId});
+    const command={type:'pool',poolId,actionId,...(fixtureId?{fixtureId}:{})};
+    const a=getActor(game,residentId)?.action;
+    const swimming=a?.id==='swim'&&a.poolId===poolId;
+    offerWorldAction(point,kind==='board'?'Трамплин бассейна':
+      kind==='ladder'?'Лестница бассейна':
+      kind==='steps'?'Ступени бассейна':'Бассейн · вода',
+      actionId==='jump'?'Прыгнуть и поплавать':'🏊 Плавать',
+      command,null,{
+        primaryAvailable:status.available,
+        primaryReason:status.reason,
+        info:swimming?poolActivityLabel(a):status.info,
+        choices:swimming?[{actionId:'cancel-swim',
+          label:'Прервать плавание · безопасный выход',available:true}]:[]
+      });
+  };
   const openGroundWalkMenu=(point,ground)=>{
     if(ground.kind==='pool-water'){
-      const hasExit=poolHasExit(game.world.outdoors,ground.poolId||
+      const poolId=ground.poolId||
         (game.world.outdoors?.pools||[]).find(p=>
-          p.cells.includes(outdoorCellAt(ground.x,ground.z)))?.poolId);
-      offerWorldAction(point,'Бассейн · вода','🏊 Плавание · появится в LOT-D2',
-        null,null,{primaryAvailable:false,
-          info:hasExit?'Чаша готова. Сейчас доступны строительство и просмотр. Плавание будет следующим этапом.'
-            :'Для будущего плавания добавь лестницу или ступени в редакторе участка.'});
+          p.cells.includes(outdoorCellAt(ground.x,ground.z)))?.poolId;
+      openPoolActionMenu(point,poolId);
       return;
     }
     const id=game.selectedSim,actor=getActor(game,id);
@@ -6960,7 +7027,7 @@ function boot() {
     const poolTargets=(game.world.outdoors?.poolFixtures||[]).map(item=>{
       const pose=poolFixtureVisualPose(item);
       if(!pose)return null;
-      return {kind:'pool-fixture',id:item.kind,fixtureId:item.fixtureId,
+      return {kind:'pool-fixture',id:item.kind,fixtureId:item.fixtureId,poolId:item.poolId,
         bounds:{min:{x:pose.x-.30,y:-.54,z:pose.z-.30},
           max:{x:pose.x+.30,y:.30,z:pose.z+.30}}};
     }).filter(Boolean);
@@ -7062,12 +7129,9 @@ function boot() {
       openOutdoorActionMenu(pos,target);
     }else if(target?.kind==='pool-fixture'){
       closeSocialContext();select(null);
-      offerWorldAction(pos,({
-        ladder:'Лестница бассейна',steps:'Ступени бассейна',
-        board:'Трамплин бассейна'})[target.id]||'Оборудование бассейна',
-      '🏊 Использовать · появится в LOT-D2',null,null,
-      {primaryAvailable:false,
-        info:'Оборудование установлено и сохранено. Купание и прыжки будут в следующем этапе.'});
+      openPoolActionMenu(pos,target.poolId,{
+        fixtureId:target.fixtureId,kind:target.id
+      });
     }
     else{
       closeSocialContext();select(null);
@@ -7604,7 +7668,8 @@ function boot() {
     const pairedTvStand=pairedTv&&!alexWatchSeat
       ?{...pairedTv.places.alex,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
-    const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
+    const alexSwimFrame=poolSwimVisualFrame(game.world,game.action);
+    const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'&&useId!=='swim'
       ?(useId==='paint'
         ?easelPaintingPose(game.world,game.action?.targetInstanceId,game.position)
         :furniturePose(game.world,['taking','returning'].includes(alexReadingStage)?'bookcase':useId==='lamp'?'floorlamp':
@@ -7614,7 +7679,7 @@ function boot() {
             (game.action?.id==='cook'&&useId==='prep')
               ?game.action.prepInstanceId:game.action?.targetInstanceId)):null);
     const previousAlexXZ={x:display.x,z:display.z};
-    const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:{
+    const desired=alexToilet?alexToilet.pose:alexShower?alexShower.pose:bedding?bedPose:seating?seatPose:alexSwimFrame||{
       x:pose?pose.x:pairTargets?.a.x??game.position.x,
       y:pose?pose.y:animationStates.alex.walkBob+lotActorHeight(game.world,game.position),
       z:pose?pose.z:pairTargets?.a.z??game.position.z,
@@ -7651,6 +7716,8 @@ function boot() {
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
+      swimStage:alexSwimFrame?.stage||game.action?.stage,
+      swimStroke:alexSwimFrame?.stroke||0,
       musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
         game.action?.id==='music'?game.action.activityId:null,
       musicStyleId:pairedMusic?'music.calm':
@@ -7683,7 +7750,7 @@ function boot() {
     // Contact gait is phase-accurate only when the root dip is applied in
     // the SAME frame as its ankle joints; the old display spring lagged one.
     // Never override the directly controlled bed/sofa/shower interaction root.
-    if(!alexShower&&!alexToilet&&!bedding&&!seating&&!pose&&!socialUsing){
+    if(!alexShower&&!alexToilet&&!bedding&&!seating&&!pose&&!socialUsing&&!alexSwimFrame){
       display.y=approach(display.y,animationStates.alex.walkBob+
         lotActorHeight(game.world,game.position),10,frameAnimDt);
       avatar.setPosition(display.x,display.y,display.z);
@@ -7783,7 +7850,7 @@ function boot() {
     const pairedTvMiraStand=pairedTv&&!miraWatchSeat
       ?{...pairedTv.places.mira,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
-    const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
+    const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'&&miraUseId!=='swim'
       ?(miraUseId==='paint'
         ?easelPaintingPose(game.world,game.otherSim.action?.targetInstanceId,game.otherSim.position)
         :furniturePose(game.world,['taking','returning'].includes(miraReadingStage)?'bookcase':miraUseId==='lamp'?'floorlamp':
@@ -7793,7 +7860,8 @@ function boot() {
             (game.otherSim.action?.id==='cook'&&miraUseId==='prep')
               ?game.otherSim.action.prepInstanceId:game.otherSim.action?.targetInstanceId)):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
-    const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:{
+    const miraSwimFrame=poolSwimVisualFrame(game.world,game.otherSim.action);
+    const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:miraSwimFrame||{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
       y:miraPose?miraPose.y:animationStates.mira.walkBob+lotActorHeight(game.world,game.otherSim.position),
       z:miraPose?miraPose.z:pairTargets?.b.z??game.otherSim.position.z,
@@ -7826,6 +7894,8 @@ function boot() {
     animationStates.mira=stepAnimation(animationStates.mira,{
       id:'mira',walking:(miraWalking||Boolean(miraShower?.stepWeight>.015))&&!miraSeating&&!miraBedding,
       using:miraToilet?'toilet':miraShower?'shower':miraUseId,
+      swimStage:miraSwimFrame?.stage||game.otherSim.action?.stage,
+      swimStroke:miraSwimFrame?.stroke||0,
       musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
         game.otherSim.action?.id==='music'?game.otherSim.action.activityId:null,
       musicStyleId:pairedMusic?'music.calm':
@@ -7855,7 +7925,7 @@ function boot() {
       gait:miraShower?miraShower.gaitMeters*WALK_PHASE_PER_METER:miraGait,
       mood:game.otherSim.mind?.mood?.value,energy:game.otherSim.needs.energy
     },frameAnimDt);
-    if(!miraShower&&!miraToilet&&!miraBedding&&!miraSeating&&!miraPose&&!socialUsing){
+    if(!miraShower&&!miraToilet&&!miraBedding&&!miraSeating&&!miraPose&&!socialUsing&&!miraSwimFrame){
       miraDisplay.y=approach(miraDisplay.y,animationStates.mira.walkBob+
         lotActorHeight(game.world,game.otherSim.position),10,frameAnimDt);
       miraAvatar.setPosition(miraDisplay.x,miraDisplay.y,miraDisplay.z);
