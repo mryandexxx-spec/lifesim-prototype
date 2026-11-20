@@ -1,3 +1,4 @@
+import {MESHY_ROOM_V2_ENTRIES} from './meshy-room-v2-data.js';
 /**
  * Cosmetic Meshy furniture catalog. No SKU, ownership, price, A* obstacle,
  * action/seat contact, mount or save changes. Values below are audited from
@@ -40,14 +41,33 @@ export const MESHY_FURNITURE_SPECS=Object.freeze(Object.fromEntries(entries.map(
 )));
 export const MESHY_FURNITURE_SKUS=Object.freeze(Object.keys(MESHY_FURNITURE_SPECS));
 export const MESHY_FURNITURE_DISPLAY_HEIGHT=2.05; // same as Alex/Mira
+export const MESHY_ROOM_V2_SPECS=Object.freeze(Object.fromEntries(
+  MESHY_ROOM_V2_ENTRIES.map(item=>[item.sku,Object.freeze({
+    ...item,bounds:Object.freeze({min:Object.freeze(item.bounds.min),max:Object.freeze(item.bounds.max)})
+  })])));
+export const MESHY_ROOM_V2_SKUS=Object.freeze(Object.keys(MESHY_ROOM_V2_SPECS));
+
 
 export function meshyFurnitureSpec(sku){
-  return typeof sku==='string'&&Object.hasOwn(MESHY_FURNITURE_SPECS,sku)
-    ?MESHY_FURNITURE_SPECS[sku]:null;
+  if(typeof sku!=='string')return null;
+  if(Object.hasOwn(MESHY_FURNITURE_SPECS,sku))return MESHY_FURNITURE_SPECS[sku];
+  return Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)?MESHY_ROOM_V2_SPECS[sku]:null;
 }
 export function meshyFurnitureUrl(sku){
-  return meshyFurnitureSpec(sku)?MESHY_FURNITURE_DIR+sku+'.glb':null;
+  if(!meshyFurnitureSpec(sku))return null;
+  return Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)
+    ?'./assets/furniture/meshy-room-v2/'+MESHY_ROOM_V2_SPECS[sku].slug+'.glb'
+    :MESHY_FURNITURE_DIR+sku+'.glb';
 }
+/** Store thumbnails always use the same actual mesh as 3D placement. */
+export function meshyFurnitureThumbnailUrl(sku){
+  const spec=meshyFurnitureSpec(sku);
+  if(!spec)return null;
+  return Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)
+    ?'./assets/furniture/meshy-room-v2/thumbnails/'+spec.slug+'.png'
+    :'./assets/furniture/meshy-room-v1/thumbnails/'+sku+'.png';
+}
+
 /**
  * The fit spans the existing, conservative game footprint, preserving all
  * actual interaction approach points and never changing the physics.
@@ -69,6 +89,22 @@ export function meshyFurnitureFit(sku){
   const scale=flat
     ? {x:sx,y:depth/size[1],z:spec.height/size[2]}
     : {x:sx,y:spec.height/size[1],z:depth/size[2]};
+  // Rotation is a cosmetic pivot; the old collision footprint remains canonical.
+  const yaw=spec.rotationY||0;
+  if(Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)){
+    const rawCenter=side=>(min[side]+max[side])/2;
+    const v2scale={x:(yaw===90?depth:width)/size[0],
+      y:spec.height/size[1],z:(yaw===90?width:depth)/size[2]};
+    const cx=rawCenter(0)*v2scale.x,cz=rawCenter(2)*v2scale.z;
+    const y=spec.mount==='wall'?1.65-rawCenter(1)*v2scale.y
+      :spec.mount==='ceiling'?-max[1]*v2scale.y:-min[1]*v2scale.y;
+    const offset={x:-(yaw===90?cz:cx),y,
+      z:-(yaw===90?-cx:cz)};
+    return Object.freeze({sku,prefabId:spec.prefabId,rotationX:0,
+      rotationY:yaw,scale:Object.freeze(v2scale),offset:Object.freeze(offset),
+      footprint:Object.freeze({width,depth,height:spec.height}),
+      mount:spec.mount});
+  }
   // The root of purchased furniture is at its floor-cell center. Walllights
   // instead inherit the canonical C3 vertical wall mount and must be centered.
   const offset={
@@ -96,7 +132,9 @@ export function meshyFurnitureFit(sku){
 export const MESHY_STARTER_SKUS=Object.freeze({
   sofa:'sofa.comfort',
   bed:'bed.platform',
-  plant:'legacy.plant'
+  plant:'legacy.plant',
+  nightstand:'nightstand.open',table:'legacy.table',tv:'legacy.tv',
+  fridge:'fixture.fridge',shower:'fixture.shower',toilet:'fixture.toilet'
 });
 export function meshyStarterFurnitureSku(prefabId){
   return typeof prefabId==='string'&&
@@ -107,5 +145,6 @@ export function meshyFurnitureDisplaySku(itemId){
   if(meshyFurnitureSpec(itemId))return itemId;
   if(itemId==='legacy.sofa')return 'sofa.comfort';
   if(itemId==='legacy.bed')return 'bed.platform';
+  if(itemId==='legacy.nightstand')return 'nightstand.open';
   return null;
 }

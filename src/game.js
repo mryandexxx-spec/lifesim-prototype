@@ -78,7 +78,7 @@ import {furnitureProduct,FURNITURE_APPEARANCES,FURNITURE_SHOP_TYPES,
   PROCEDURAL_NEW_PREFABS,PROCEDURAL_DEFAULT_SKU} from './furniture-products.js';
 import {proceduralFurnitureModel} from './furniture-procedural-library.js';
 import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
-import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku} from './meshy-furniture-policy.js';
+import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnailUrl} from './meshy-furniture-policy.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -3369,7 +3369,15 @@ function boot() {
   // New prefab templates remain empty; modelKey builds the geometry only
   // for a purchased or staged object and never for existing save fixtures.
   for(const prefabId of PROCEDURAL_NEW_PREFABS)
-    withDecor(prefabId,()=>{});
+    withDecor(prefabId,()=>{
+      // A visible fallback when a decorative Meshy GLB cannot load offline.
+      if(prefabId.startsWith('mesh')){
+        const wide=prefabId==='meshlarge'?1.7:prefabId==='meshwall'?1.22:.52;
+        const height=prefabId==='meshtall'?1.6:prefabId==='meshwall'?.85:.5;
+        box('Meshy decor fallback '+prefabId,0,
+          prefabId==='meshwall'?1.65:height*.5,0,wide,height,.22,M.paleWood);
+      }
+    });
   box('entry mat',-.65,.042,3.45,1.45,.012,.60,M.mint);
   // Instantiate extra purchased decor from saved v1 furniture instances.
   updateDecorNodes();
@@ -4455,7 +4463,7 @@ function boot() {
       // The 32 unsupported SKUs keep authored procedural sketches.
       const photo=document.createElement('img');
       photo.className='furnish-sku-sketch furnish-meshy-thumb';
-      photo.src='./assets/furniture/meshy-room-v1/thumbnails/'+meshSku+'.png';
+      photo.src=meshyFurnitureThumbnailUrl(meshSku);
       photo.alt='';photo.decoding='async';photo.loading='lazy';
       photo.addEventListener('error',()=>{
         const svg=buildProductThumbnail({...offer,itemId:'__procedural__'});
@@ -7838,10 +7846,10 @@ function boot() {
         }
         continue;
       }
-      if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
+      if(!['dresser','wardrobe','mirror','fridge','shower','toilet'].includes(item.prefabId))continue;
       const weight=Math.max(0,...HOUSEHOLD_IDS.map(id=>
         furnitureUseWeight(getActor(game,id)?.action,item.instanceId)));
-      if(item.prefabId==='dresser'||item.prefabId==='wardrobe')
+      if(['dresser','wardrobe','fridge','shower','toilet'].includes(item.prefabId))
         meshyFurniture.useProcedural(node,weight>.005);
       const reposition=(part,dx=0,dz=0)=>{
         if(!part)return;
