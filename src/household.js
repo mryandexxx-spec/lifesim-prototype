@@ -24,6 +24,7 @@ import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
 import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
 import {validateRestoredPoolSwim,advancePoolSwim,requestPoolExit} from './pool-swim-runtime.js';
+import {poolHasExit} from './pool-equipment.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchAvailable} from './outdoor-interactions.js';
 import {gardenFeature,gardenApproach,gardenActionAllowed,restoreGardenRewards,
   advanceGardens,settleGardenAction,GARDEN_DURATION,
@@ -202,7 +203,15 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     }
     root.actionQueues.byResident[id]=root.actionQueues.byResident[id].filter(task=>
       (task.type!=='outdoor'||Boolean(outdoorBench(root.world,task.instanceId)))&&
-      (task.type!=='garden'||gardenRequestStillValid(root,id,task.instanceId,task.actionId)));
+      (task.type!=='garden'||gardenRequestStillValid(root,id,task.instanceId,task.actionId))&&
+      (task.type!=='pool'||((root.world.outdoors?.pools||[])
+        .some(p=>p.poolId===task.poolId)&&poolHasExit(root.world.outdoors,task.poolId)&&
+        (task.actionId!=='jump'||root.world.outdoors.poolFixtures
+          .some(f=>f.fixtureId===task.fixtureId&&f.poolId===task.poolId&&f.kind==='board')))));
+    // Legacy D2a commands have no queuedAt. Start a bounded 60-minute wait
+    // at restored time rather than letting an impossible entry wait forever.
+    for(const task of root.actionQueues.byResident[id])if(task.type==='pool'&&
+      !Number.isFinite(task.queuedAt))task.queuedAt=root.minutes;
     for(const task of root.actionQueues.byResident[id]){
       if(task.type!=='object'||task.targetInstanceId)continue;
       const object=resolveActionFurniture(root.world,task.actionId);
