@@ -1,0 +1,38 @@
+name: UX-07 — family finances and bill safety
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ux07:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Full Node regression and JS syntax
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+          node --check src/finance-phone-ui.js
+          node --check src/ux07-finance-summary.js
+          node --check tests/ux07-browser-smoke.mjs
+          npm test
+      - name: Four real PlayCanvas/WebGL iPhone viewports
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ux07.log 2>&1 &
+          sleep 3
+          node tests/ux07-browser-smoke.mjs
+      - name: Preserve UX-07 screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux07-finance-four-viewports
+          path: ux07-artifacts/
+          if-no-files-found: ignore
