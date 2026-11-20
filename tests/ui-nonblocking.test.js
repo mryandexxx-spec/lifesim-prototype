@@ -43,6 +43,8 @@ test('1.0o: successful enqueue is acknowledged in queue counter and never makes 
     onManualCommandQueued:()=>{},
     resolveActionFurniture:()=>({instanceId:'home-bed-1'}),
     renderQueuePanel:()=>calls.queue++,
+    commandReceipt:(name,label,n)=>name+' · в плане №'+n+': '+label,
+    queueReceiptTimer:null,setTimeout:()=>1,clearTimeout:()=>{},
     save:()=>calls.saves++,toast:msg=>calls.toasts.push(msg)
   };
   runInNewContext(extract('function taskLabel(task){','function queuedSocial('),scope);
