@@ -111,7 +111,8 @@ test('F4b9: actual browser renderMarket button selects real visible SKU without 
     replaceChildren(...nodes){this.children=[...nodes];},
     append(...nodes){this.children.push(...nodes);},
     addEventListener(k,fn){this['on'+k]=fn;},
-    focus(){this.focused=true;}
+    focus(){this.focused=true;},
+    click(){this.clicked=(this.clicked||0)+1;}
   });
   const elements=new Map();
   for(const id of ['hint','furnish-shop','furnish-warehouse','furnish-shop-toggle',
@@ -163,6 +164,7 @@ test('F4b9: actual browser renderMarket button selects real visible SKU without 
   assert.deepEqual(selected,['sofa.comfort']);
   assert.equal(state.shopSelectedItemId,'sofa.comfort');
   assert.equal(state.game.shop.credits,initialCredits);
-  assert.equal(state.shopPlacing,false);
-  assert.equal(buttons.find(b=>b.dataset.itemId==='sofa.comfort').focused,true);
+  assert.equal(state.shopPlacing,false,'mock button stages through separate Buy handler');
+  assert.equal(elements.get('furnish-buy').clicked,1,'one-tap preview handler activated');
+  assert.equal(elements.get('furnish-buy').focused,true);
 });
