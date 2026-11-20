@@ -276,6 +276,8 @@ jobs:
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
+          mkdir -p site/assets/furniture/meshy-room-v1/thumbnails
+          cp assets/furniture/meshy-room-v1/thumbnails/*.png site/assets/furniture/meshy-room-v1/thumbnails/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

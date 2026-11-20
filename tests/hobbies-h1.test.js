@@ -329,7 +329,8 @@ test('H1 browser boot builds hidden bookcase prefab without an installed origin.
   const factory=runInNewContext(gameSource.slice(start,end)+
     '\n({withDecor,decorNodes,decorTemplates})',{
       pc:{Entity},app:{root:{addChild:node=>added.push(node)}},
-      game:{world:{furniture:world}},furnitureRenderOrigin
+      game:{world:{furniture:world}},furnitureRenderOrigin,
+       meshyStarterFurnitureSku:()=>null,meshyFurniture:{attach(){}},
     });
   assert.doesNotThrow(()=>factory.withDecor('bookcase',()=>{}));
   assert.equal(factory.decorNodes.has(authored.instanceId),false);

@@ -36,7 +36,7 @@ test('actual PlayCanvas prefab staging fragment enables a real clone at known no
     shopPose:cameraPlacementPose({centerX:0,centerZ:0}),
     shopPreviewEntity:null,shopPreviewType:null,marketGhost:{enabled:false},
     decorTemplates:new Map([['plant',template]]),app:{root:{addChild(){added++;}}},applySkuModel(){},
-    meshyFurniture:{attach(){meshAttachments++;}}};
+    meshyFurnitureDisplaySku:()=>null,meshyFurniture:{attach(){meshAttachments++;}}};
   const block=game.slice(begin,end);
   runInNewContext('(()=>{'+block+'\nsyncShopPreviewEntity();})()',context,{timeout:1000});
   assert.equal(cloneCalls,1);
