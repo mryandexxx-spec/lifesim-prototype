@@ -236,6 +236,12 @@ export function advancePoolSwim(root,id,minutes){
   if(!p||!a.slotCells.every(c=>p.cells.includes(c))){
     recover(root,id,'removed-pool');return;
   }
+  // If needs become critical BEFORE entering water, remain safely dry.
+  if(['approaching','waiting'].includes(a.stage)&&
+    (actor.needs.energy<SWIM_START.energy||actor.needs.bladder<SWIM_START.bladder)){
+    cleanup(root,id,'Плавание отменено: сначала отдохнуть или в туалет');
+    return;
+  }
   if(a.stage==='approaching'){
     if(!entryOpen(root,a)||!findPath(actor.position,a.dryApproach,root.world))
       cleanup(root,id,'Вход в бассейн стал недоступен');
