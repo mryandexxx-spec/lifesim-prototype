@@ -245,7 +245,7 @@ test('UI and Pages carry the new knowledge implementation without exposing numer
   assert.ok(page.includes('сборка / 1.2'));
   assert.ok(page.includes('id="mind-discovery"'));
   assert.ok(page.includes('id="mind-discovery-person"'));
-  assert.ok(ui.includes('socialKnowledgeNotes(game.socialGraph,game.selectedSim,otherId,4)'));
+  assert.ok(ui.includes('socialKnowledgeNotes(game.socialGraph,mindInspectResident,otherId,4)'));
   assert.ok(ui.includes('Пока не узнал(а) предпочтения собеседника'));
   assert.ok(graph.includes('discoverPreference(pair,receipt'));
   assert.ok(graph.includes('restoreSocialKnowledge(entry.knowledge'));

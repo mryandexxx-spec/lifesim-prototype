@@ -1767,7 +1767,7 @@ function renderConversationPanel(force=true){
   $('conversation-title').textContent=session
     ?CONVERSATION_TOPICS[session.topic].label:'Выбери тему';
   $('conversation-subtitle').textContent=required
-    ?'⏸ '+getActorName(s.initiator)+' → '+getActorName(s.partner)+' · игровое время остановлено. Выбери ответ или заверши разговор'
+    ?'⏸ '+getActorName(s.initiator)+' → '+getActorName(s.partner) +' · Игровое время остановлено. Выбери ответ или заверши разговор'
     :session
       ?(s.phase==='walking'?'Персонажи идут навстречу':
         game.paused?'Сними паузу, чтобы жители встретились':
@@ -1813,11 +1813,6 @@ function renderConversationPanel(force=true){
   options.append(conversationButton('Завершить разговор',endPlayerConversation,true));
   if(required)requiredChoiceFocus.focusChoice(enteringRequired?0:formerFocusIndex);
 }
-const restoreRequiredDialogue=()=>{if(dialogueNeedsDecision(game))renderConversationPanel(true);};
-document.addEventListener('visibilitychange',()=>{
- if(!document.hidden)restoreRequiredDialogue();
-});
-window.addEventListener('pageshow',restoreRequiredDialogue);
 renderConversationPanel();
 renderSharedPanel();
 renderBranchPanel();
@@ -1986,6 +1981,11 @@ $('reset-btn').addEventListener('click', () => {
   closeInsightPanel();calendarUI.reset();resetRuntime(); restartAutonomyWait(); updateAutoButton(); updateResidentPicker();
   save(true); select(null); closeMindPanel(); toast('Новая игра началась');
 });
+const restoreRequiredDialogue=()=>{if(dialogueNeedsDecision(game))renderConversationPanel(true);};
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden)restoreRequiredDialogue();
+});
+window.addEventListener('pageshow',restoreRequiredDialogue);
 window.addEventListener('pagehide', () => save(true));
 window.addEventListener('visibilitychange', () => { if (document.hidden) save(true); });
 setInterval(() => save(true), 8000);
