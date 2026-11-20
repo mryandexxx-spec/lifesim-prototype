@@ -57,6 +57,7 @@ import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_
   compositionForArtwork,paintingSeedFromSession} from './painting.js';
 import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
   preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
+import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock} from './kitchen-market.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from './painting-gallery.js';
@@ -884,9 +885,12 @@ function select(id,instanceId=null) {
     const k=kitchenSummary(game.kitchen);
     $('action-description').textContent+=' · Готовых порций: '+k.prepared+
       ' · Грязных тарелок: '+k.dirtyDishes+
-      ' · Продукты (овощи/крупы/молоко): '+k.supplies;
+      ' · Продукты (овощи/крупы/молоко): '+k.supplies+
+      ' · Садовые травы: '+k.herbs+'/16';
   }
   $('fridge-prepared-field').hidden=id!=='fridge';
+  $('fridge-staple-field').hidden=id!=='fridge';
+  $('fridge-buy-button').hidden=id!=='fridge';
   if(id==='fridge'){
     const menu=$('fridge-prepared-select');
     menu.replaceChildren();
@@ -903,6 +907,7 @@ function select(id,instanceId=null) {
       menu.append(empty);
     }
     $('fridge-lunch-button').disabled=!meals.length;
+    renderKitchenRestock();
   }
   $('cooking-recipe-field').hidden=!['cook','fridge'].includes(id);
   if(id==='cook'||id==='fridge'){
@@ -943,6 +948,46 @@ function select(id,instanceId=null) {
     :ACTIONS[id].label;
   $('action-button').innerHTML = `${lampLabel} <span>↗</span>`;
 }
+// LOT-C3b fridge groceries are voluntary and separately confirmed.
+function renderKitchenRestock(){
+  if(selected!=='fridge')return;
+  const menu=$('fridge-staple-select');
+  for(const option of menu.options){
+    const qty=game.kitchen?.pantry?.[option.value]??0;
+    option.textContent=KITCHEN_RESTOCK_LABELS[option.value]+' · '+qty+'/30';
+  }
+  const quote=quoteKitchenRestock(game,menu.value);
+  const button=$('fridge-buy-button');
+  button.disabled=!quote.ok;
+  const labels={
+    'pantry-full':'Нет места для +5 продуктов',
+    'insufficient-credits':'Недостаточно кредитов',
+    'missing-fridge':'Холодильник недоступен'
+  };
+  button.textContent=quote.ok?'🛒 Купить +5 · 15 кр.':
+    (labels[quote.reason]||'Покупка недоступна');
+}
+$('fridge-staple-select').addEventListener('change',renderKitchenRestock);
+$('fridge-buy-button').addEventListener('click',()=>{
+  if(selected!=='fridge')return;
+  const itemId=$('fridge-staple-select').value;
+  const quote=quoteKitchenRestock(game,itemId);
+  if(!quote.ok){renderKitchenRestock();toast('Покупка недоступна');return;}
+  if(!window.confirm('Купить «'+quote.label+'» · +5 за 15 кредитов?'))return;
+  const transaction=proposeKitchenRestock(game,itemId,game.selectedSim);
+  if(!transaction.ok){renderKitchenRestock();toast('Баланс или запас изменились');return;}
+  const oldKitchen=game.kitchen,oldShop=game.shop,oldHistory=game.financialHistory;
+  game.kitchen=transaction.kitchen;game.shop=transaction.shop;
+  game.financialHistory=transaction.financialHistory;
+  // The whole monetary and stock state is committed as ONE localStorage snapshot.
+  if(!save(true)){
+    game.kitchen=oldKitchen;game.shop=oldShop;game.financialHistory=oldHistory;
+    toast('Не удалось сохранить покупку · списания нет');return;
+  }
+  updateFamilyBalance();select('fridge');
+  $('fridge-staple-select').value=itemId;renderKitchenRestock();
+  toast('Куплено: '+quote.label+' +5 · −15 кредитов');
+});
 const markers = {};
 for (const id of Object.keys(META)) {
   const el = document.createElement('button'); el.type = 'button';

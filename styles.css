@@ -2185,3 +2185,6 @@ button.time-card:active {transform:translateY(1px);}
     position:static;width:100%;box-sizing:border-box;
   }
 }
+
+/* LOT-C3b: native grocery picker uses a 46px touch target. */
+#fridge-staple-select{min-height:46px;}
