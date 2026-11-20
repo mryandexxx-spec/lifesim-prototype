@@ -121,6 +121,7 @@ jobs:
           node --check src/tv-interaction.js
           node --check src/tv-seating.js
           node --check src/tv-together.js
+          node --check src/furniture-owned-preview.js
           node --check src/furniture-placement-preview.js
           node --check src/furniture-transform.js
           node --check src/psychology.js
@@ -248,7 +249,7 @@ jobs:
           cp src/tv-interaction.js site/src/
           cp src/tv-seating.js site/src/
           cp src/tv-together.js site/src/
-          cp src/furniture-placement-preview.js site/src/
+          cp src/furniture-placement-preview.js src/furniture-owned-preview.js site/src/
           cp src/career-catalog.js src/career-scheduler.js src/career-state.js src/career-job-board.js src/career-phone-ui.js src/career-shift-summary-ui.js site/src/
           cp src/career-discipline.js src/career-timeoff.js src/career-worklife.js src/career-worklife-conflict.js site/src/
           cp src/career-work-needs.js src/career-work.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js src/finance-ledger.js src/finance-presentation.js src/finance-phone-ui.js src/household-bills.js site/src/

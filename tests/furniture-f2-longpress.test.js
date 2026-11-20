@@ -66,7 +66,7 @@ test('Game input: pickup only in timed callback, never on pointerdown, with shar
   assert.ok(down.includes('armFurnitureHold(event,now)'));
   assert.doesNotMatch(down,/startEditorDrag\(event\)/);
   assert.match(game,/const armFurnitureHold=\(event,now\)=>/);
-  assert.match(game,/if\(!furnishMode\|\|shopOpen\|\|warehouseOpen\|\|cameraGesture\.count\(\)!==1\)return/);
+  assert.match(game,/if\(!furnishMode\|\|shopOpen\|\|warehouseOpen\|\|ownedPlacement\|\|cameraGesture\.count\(\)!==1\)return/);
   assert.match(game,/furnitureHoldTimer=setTimeout\(\(\)=>\{/);
   assert.match(game,/furnitureHoldTimer=null;/);
   assert.match(game,/holdGesture\.activate\(performance\.now\(\)\)/);
@@ -90,9 +90,10 @@ test('Game input: iPhone cancelled/second touches never commit layout or suppres
 test('Old v1 save and M4/M5 remain intact; queued idle items can be repositioned',()=>{
   const src=read('../src/furniture-hold.js');
   assert.doesNotMatch(src,/localStorage|world\.furniture|save\(|document|window|playcanvas/);
-  assert.match(game,/commitFurniture\(instanceId,pose\)/);
+  assert.match(game,/commitFurniture\(stage\.instanceId,stage\.pose\)/);
+   assert.match(game,/Releasing the touch NEVER mutates a save/);
   assert.match(game,/refreshMind\(game\.otherSim,game\.world\)/);
-  assert.match(game,/proposeFurnitureMove\(game\.world\.furniture,editDrag\.instanceId,pose,editorContext\(true\)\)/);
+  assert.match(game,/const candidate=ownedQuote\(\)/);
   assert.match(game,/if\(furnishMode&&endEditorDrag\(event\)\)return/);
   assert.match(read('../src/simulation.js'),/lifesim\.room01\.v1/);
 });

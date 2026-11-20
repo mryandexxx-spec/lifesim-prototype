@@ -65,7 +65,17 @@ try{
     await page.locator('#furnish-warehouse-toggle').click();
     const storage=page.locator('#furnish-storage-list');
     assert.equal(await storage.locator('.furnish-storage-card').count(),1);
-    await storage.getByRole('button',{name:/Вернуть/}).click();
+    await storage.getByRole('button',{name:/Разместить/}).click();
+    assert.equal(await page.locator('#furnish-owned-preview').isVisible(),true,
+      'Returning a stored item must enter temporary 3D preview');
+    state=await saved();
+    assert.equal(state.world.furniture.instances.find(i=>i.instanceId===starterId).location,'storage',
+      'Stored item must stay stored until explicit confirmation');
+    assert.equal(state.shop.credits,seed.shop.credits);
+    await page.locator('#furnish-owned-auto').click();
+    assert.equal(await page.locator('#furnish-owned-confirm').isEnabled(),true,
+      'Find place should provide a valid route-safe position');
+    await page.locator('#furnish-owned-confirm').click();
     state=await saved();
     assert.equal(state.world.furniture.instances.find(i=>i.instanceId===starterId).location,'home');
     assert.equal(state.shop.credits,seed.shop.credits);

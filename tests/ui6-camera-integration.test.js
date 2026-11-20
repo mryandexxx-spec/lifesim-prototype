@@ -8,7 +8,8 @@ test('UI6 points camera at a pure session and defaults to one-finger pan',()=>{
  assert.match(src,/let oneFingerMode='pan'/);
  assert.match(src,/cameraGesture=createCameraGestureSession\(\)/);
  assert.match(src,/cameraGesture\.move\(gesturePoint\(event\),view,/);
- assert.match(src,/oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'/);
+ assert.match(src,/oneFinger:furnishMode&&ownedPlacement/);
+ assert.match(src,/shopPlacing&&oneFingerMode==='pan'/);
  assert.match(src,/if\(result.changed\)\{/);
  assert.match(src,/setView\(result.view\)/);
  assert.doesNotMatch(src,/let dragMode='pan'/);
