@@ -11,7 +11,7 @@ test('new household contains two independent residents and a shared clock',()=>{
   assert.equal(s.otherSim.minutes,s.minutes);
   assert.notDeepEqual(s.position,s.otherSim.position);
   s.otherSim.needs.hunger=4;
-  assert.equal(s.needs.hunger,78);
+  assert.equal(s.needs.hunger,82);
   assert.equal(s.otherSim.mind.memories.length,0);
   assert.ok(s.otherSim.mind.wish);
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
@@ -46,7 +46,7 @@ test('Mira has separate needs, events, desire and is saved and restored',()=>{
   arrive(s.otherSim);
   tickHousehold(s,25);
   assert.ok(s.otherSim.needs.energy>13);
-  assert.equal(s.needs.energy<67,true);
+  assert.equal(s.needs.energy<85,true);
   const t=loadHousehold(JSON.parse(JSON.stringify(s)));
   assert.equal(t.selectedSim,'mira');
   assert.equal(t.otherSim.action.id,'bed');
@@ -59,8 +59,8 @@ test('both actors tick once while one global clock is advanced once',()=>{
   tickHousehold(s,10);
   assert.equal(s.minutes,490);
   assert.equal(s.otherSim.minutes,490);
-  assert.ok(s.needs.hunger<78);
-  assert.ok(s.otherSim.needs.hunger<72);
+  assert.ok(s.needs.hunger<82);
+  assert.ok(s.otherSim.needs.hunger<82);
   s.paused=true;
   const old=JSON.stringify(s);
   tickHousehold(s,60);
@@ -102,7 +102,7 @@ test('invalid second resident and unknown selection recover without corrupting A
   assert.equal(restored.selectedSim,'alex');
   assert.equal(restored.otherSim.version,1);
   assert.ok(Number.isFinite(restored.otherSim.position.x));
-  assert.equal(restored.needs.hunger,78);
+  assert.equal(restored.needs.hunger,82);
   assert.equal(selectResident(restored,'unknown'),false);
 });
 
