@@ -70,7 +70,7 @@ jobs:
           node --check src/garden-presentation.js
            node --check src/garden-psychology.js
           node --check src/lot-surface.js
-          node --check src/pool-topology.js
+          node --check src/pool-topology.js\n          node --check src/pool-equipment.js\n          node --check src/pool-editor.js
           node --check src/outdoor-catalog.js
           node --check src/outdoor-proposals.js
           node --check src/outdoor-interactions.js
@@ -216,7 +216,7 @@ jobs:
           cp src/viewport-health.js site/src/
           cp src/construction.js site/src/
           cp src/lot-surface.js src/outdoor-catalog.js src/outdoor-proposals.js src/outdoor-interactions.js site/src/
-          cp src/pool-topology.js site/src/
+          cp src/pool-topology.js site/src/\n          cp src/pool-equipment.js src/pool-editor.js site/src/
           cp src/gardening.js site/src/
           cp src/garden-autonomy.js site/src/
           cp src/garden-presentation.js site/src/
