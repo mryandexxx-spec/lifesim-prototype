@@ -213,7 +213,7 @@ jobs:
           mkdir -p site/src
           cp src/plan-preview.js src/ui-layout.js src/required-choice-focus.js site/src/
           cp src/ux01-plan-ui.js site/src/
-          cp src/insight-presentation.js site/src/
+          cp src/insight-presentation.js src/ux05-character-ui.js site/src/
           cp src/camera-gestures.js site/src/
           cp src/mobile-gesture-policy.js site/src/
           cp src/viewport-health.js site/src/

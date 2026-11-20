@@ -5,6 +5,7 @@ import {planPreview,planTaskIcon} from './plan-preview.js';
 import {residentMoodInsight,socialReactionInsight,insightLayerPolicy} from './insight-presentation.js';
 import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
+import {characterCardSnapshot,oncePerButton} from './ux05-character-ui.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
@@ -716,11 +717,31 @@ document.addEventListener('keydown',event=>{
 },true);
 
 // H4 — read-only projection of saved personal XP into an accessible tab.
-let mindTab='overview',skillProfileKey='';
+let mindTab='overview',skillProfileKey='',mindInspectResident=game.selectedSim;
+function renderMindIdentity(){
+ const actor=getActor(game,mindInspectResident),id=mindInspectResident;
+ $('mind-person').textContent=getActorName(id).toUpperCase()+' / ЛИЧНОСТЬ';
+ $('mind-panel').setAttribute('aria-label','Карточка персонажа: '+getActorName(id));
+ $('mind-view-note').textContent=id===game.selectedSim
+  ?'Просмотр и управление: '+getActorName(id)
+  :'Просмотр: '+getActorName(id)+' · команды остаются у '+selectedName();
+ for(const member of HOUSEHOLD_IDS)
+  $('mind-view-'+member).setAttribute('aria-pressed',String(member===id));
+ $('mind-traits-label').textContent=traitLabels(actor.personality).join(' · ')||'Характер не выбран';
+ const likes=interestLabels(actor.personality,'likes'),dislikes=interestLabels(actor.personality,'dislikes');
+ $('mind-preferences-label').textContent=
+  (likes.length?'Любит: '+likes.join(', '):'')+
+  (dislikes.length?' · Не любит: '+dislikes.join(', '):'');
+}
+for(const id of HOUSEHOLD_IDS)$('mind-view-'+id).addEventListener('click',()=>{
+ if(dialogueNeedsDecision(game))return;
+ mindInspectResident=id;skillProfileKey='';renderMindIdentity();renderSkillsTab(true);
+});
+
 function renderSkillsTab(force=false){
   if(mindTab!=='skills'||$('mind-panel').hidden)return;
-  const actor=selectedActor(),rows=skillProfileRows(actor.skills,HOBBY_SKILLS);
-  const key=JSON.stringify([game.selectedSim,rows,actor.action?.phase,game.socialAction?.phase,actor.createdWorks]);
+  const actor=getActor(game,mindInspectResident),rows=skillProfileRows(actor.skills,HOBBY_SKILLS);
+  const key=JSON.stringify([mindInspectResident,rows,actor.action?.phase,game.socialAction?.phase,actor.createdWorks]);
   if(!force&&skillProfileKey===key)return;
   skillProfileKey=key;
   const list=$('mind-skills-list');list.replaceChildren();
@@ -776,6 +797,7 @@ function renderSkillsTab(force=false){
     name.textContent=(PAINT_SUBJECTS[work.contentId]?.label||'Картина')+
       ' · качество '+work.quality+'/100 · '+status;
     item.append(name);
+    if(mindInspectResident!==game.selectedSim){portfolio.append(item);continue;}
     const actions=document.createElement('div');actions.className='skill-work-actions';
     const command=(label,operation,slot=null)=>{
       const button=document.createElement('button');
@@ -844,7 +866,9 @@ function closeMindPanel() {
   $('mind-toggle').setAttribute('aria-expanded', 'false');
 }
 $('mind-toggle').addEventListener('click', () => {
+  if(dialogueNeedsDecision(game))return;
   const open = $('mind-panel').hidden;
+  if(open){mindInspectResident=game.selectedSim;renderMindIdentity();}
   $('mind-panel').hidden = !open;
   $('mind-toggle').setAttribute('aria-expanded', String(open));
   if (open){
@@ -854,6 +878,7 @@ $('mind-toggle').addEventListener('click', () => {
 });
 $('mind-close').addEventListener('click', closeMindPanel);
 $('wish-do-btn').addEventListener('click', () => {
+  if(mindInspectResident!==game.selectedSim||dialogueNeedsDecision(game))return;
   const id = selectedActor().mind?.wish?.id;
   const command=id?.startsWith('garden.')?gardenWishCommand(game,game.selectedSim):
     id?{type:'object',actionId:id}:null;
@@ -1234,13 +1259,24 @@ function renderSocialMenu(force=true){
   const titles={conversation:'Беседа',humor:'Юмор',friendship:'Дружба',
     romance:'Романтика',conflict:'Конфликт'};
   $('social-menu-title').textContent=titles[category]||'Общение';
-  $('social-menu-subtitle').textContent='Выбери взаимодействие с '+getActorName(targetId);
+  $('social-menu-subtitle').textContent=getActorName(game.selectedSim)+' → '+getActorName(targetId)+' · выбери действие, затем подтверди очередь';
   const options=$('social-menu-options');options.replaceChildren();
   const add=(label,request)=>{
+    const initiator=game.selectedSim;
     options.append(conversationButton(label,()=>{
-      if(scheduleCommand({targetId,...request})){
-        socialMenuCategory=null;renderSocialMenu();
-      }
+      options.querySelector('[data-ux05-confirm]')?.remove();
+      const box=document.createElement('div');box.className='social-confirm';
+      box.dataset.ux05Confirm='true';
+      const explanation=document.createElement('p');
+      explanation.textContent=getActorName(initiator)+' → '+getActorName(targetId)+
+        ' · '+label+'. Действие начнётся из личной очереди.';
+      const agree=conversationButton('В очередь · '+label,oncePerButton(()=>{
+        if(dialogueNeedsDecision(game)||game.selectedSim!==initiator)return false;
+        return scheduleCommand({targetId,...request},initiator);
+      }));
+      const cancel=conversationButton('Отмена',()=>box.remove(),true);
+      box.append(explanation,agree,cancel);options.append(box);
+      agree.focus({preventScroll:true});
     }));
   };
   const addTopic=id=>{
@@ -1251,6 +1287,9 @@ function renderSocialMenu(force=true){
     const found=availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
       .find(a=>a.id===id);
     if(found?.enabled)add(found.label,{type:'branch',actionId:id});
+    else if(found){const note=document.createElement('p');note.className='social-unavailable';
+      note.textContent=found.label+' · недоступно: '+(found.reason||'не выполнены условия');
+      options.append(note);}
   };
   if(category==='conversation'){
     add('Поговорить',{type:'social',actionId:'talk'});
@@ -1306,6 +1345,9 @@ function renderSocialMenu(force=true){
         ?{...action,enabled:false,reason:'Нужна свободная двуспальная кровать'}:action);
     for(const action of romanceActions){
       if(action.enabled)add(action.label,{type:'branch',actionId:action.id});
+      else{const note=document.createElement('p');note.className='social-unavailable';
+        note.textContent=action.label+' · недоступно: '+(action.reason||'не выполнены условия');
+        options.append(note);}
     }
     if(!romanceActions.some(action=>action.enabled)){
       const hint=document.createElement('p');
@@ -1653,7 +1695,7 @@ function conversationButton(label,callback,secondary=false){
   const button=document.createElement('button');
   button.type='button';button.textContent=label;
   button.className=secondary?'conversation-option secondary':'conversation-option';
-  button.addEventListener('click',callback);
+  button.addEventListener('click',dialogueNeedsDecision(game)?oncePerButton(callback):callback);
   return button;
 }
 // The mandatory UI is the ONLY interactive subtree while a reply is owed.
@@ -1699,6 +1741,7 @@ function renderConversationPanel(force=true){
   }
   panel.classList.toggle('dialogue-required',required);
   $('conversation-close').hidden=required;
+  $('conversation-kind').textContent=required?'ОБЯЗАТЕЛЬНЫЙ ВЫБОР · ВРЕМЯ ОСТАНОВЛЕНО':'ОБЫЧНАЯ БЕСЕДА';
   $('dialogue-backdrop').hidden=!required;
   if(required){
     panel.setAttribute('role','dialog');
@@ -1724,7 +1767,7 @@ function renderConversationPanel(force=true){
   $('conversation-title').textContent=session
     ?CONVERSATION_TOPICS[session.topic].label:'Выбери тему';
   $('conversation-subtitle').textContent=required
-    ?'⏸ Игровое время остановлено · выбери ответ или заверши разговор'
+    ?'⏸ '+getActorName(s.initiator)+' → '+getActorName(s.partner)+' · игровое время остановлено. Выбери ответ или заверши разговор'
     :session
       ?(s.phase==='walking'?'Персонажи идут навстречу':
         game.paused?'Сними паузу, чтобы жители встретились':
@@ -1770,6 +1813,11 @@ function renderConversationPanel(force=true){
   options.append(conversationButton('Завершить разговор',endPlayerConversation,true));
   if(required)requiredChoiceFocus.focusChoice(enteringRequired?0:formerFocusIndex);
 }
+const restoreRequiredDialogue=()=>{if(dialogueNeedsDecision(game))renderConversationPanel(true);};
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden)restoreRequiredDialogue();
+});
+window.addEventListener('pageshow',restoreRequiredDialogue);
 renderConversationPanel();
 renderSharedPanel();
 renderBranchPanel();
@@ -1862,19 +1910,12 @@ function updateResidentPicker() {
   $('resident-name').textContent=selectedName();
   updateCareerHud();updateFamilyBalance();refreshIncidentNotifications();
   $('avatar-symbol').textContent=game.selectedSim==='alex' ? '☺' : '✿';
-  $('mind-panel').setAttribute('aria-label','Внутренний мир: '+selectedName());
-  $('mind-person').textContent=selectedName().toUpperCase()+' / ВНУТРЕННИЙ МИР';
-  const personality=selectedActor().personality;
-  $('mind-traits-label').textContent=traitLabels(personality).join(' · ')||'Характер не выбран';
-  const likes=interestLabels(personality,'likes'),dislikes=interestLabels(personality,'dislikes');
-  $('mind-preferences-label').textContent=
-    (likes.length?'Любит: '+likes.join(', '):'')+
-    (dislikes.length?' · Не любит: '+dislikes.join(', '):'');
+  renderMindIdentity();
 }
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
     careerPhone.close({focus:false});setHomeOpen(false);setViewOpen(false);
-    selectResident(game,id);closeInsightPanel();
+    selectResident(game,id);mindInspectResident=id;closeInsightPanel();
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
     select(null); closeMindPanel();queueInspectResident=id; updateResidentPicker();renderSocialContext();
@@ -6797,7 +6838,7 @@ function boot() {
     if(target?.kind==='resident')openSocialContext(pos);
     else if(target?.kind==='artwork'){
       closeSocialContext();select(null);
-      game.selectedSim=target.work.ownerId;
+      mindInspectResident=target.work.ownerId;renderMindIdentity();
       $('mind-panel').hidden=false;
       $('mind-toggle').setAttribute('aria-expanded','true');
       setMindTab('skills');
@@ -8076,12 +8117,13 @@ function boot() {
       updateFamilyBalance();
       updateCareerHud(); // Live earned wages while shift is progressing.
       const skill=getSkillDefinition(HOBBY_SKILLS,READING_SKILL_ID);
-      const currentXP=current.skills?.xpById?.[READING_SKILL_ID]||0;
-      const level=currentSkillLevel(current.skills,HOBBY_SKILLS,READING_SKILL_ID);
+      const readingActor=getActor(game,mindInspectResident);
+      const currentXP=readingActor.skills?.xpById?.[READING_SKILL_ID]||0;
+      const level=currentSkillLevel(readingActor.skills,HOBBY_SKILLS,READING_SKILL_ID);
       const nextXP=skill.xpThresholds[level]??skill.xpThresholds.at(-1);
       $('mind-reading-skill').textContent='Литературная эрудиция · уровень '+level+
         '/'+skill.maxLevel+' · '+Math.floor(currentXP)+' / '+nextXP+' опыта'+
-        (current.action?.id==='hobby'&&current.action.phase==='using'?' · 📖 читает':'');
+        (readingActor.action?.id==='hobby'&&readingActor.action.phase==='using'?' · 📖 читает':'');
       if(!$('reading-content-field').hidden)updateReadingContentChoice();
       renderSkillsTab(false);
       const relation=game.relationship;
@@ -8158,23 +8200,44 @@ function boot() {
       const wishPlot=wishFeature&&OUTDOOR_CATALOG[wishFeature.itemId];
       const wishName=wish?wish.label+(wishPlot?' · '+wishPlot.name:''):null;
       $('wish-label').textContent=wish ? wish.symbol+' Хочет: '+wishName : 'Думает о будущем';
-      $('mind-mood-label').textContent=current.mind.mood.label+' · '+current.mind.mood.value+'/100';
-      $('mind-mood-bar').style.width=current.mind.mood.value+'%';
-      $('mind-mood-bar').style.background=moodView.color;
-      $('mind-mood-reasons').textContent=moodView.description;
-      $('mind-wish-label').textContent=wishName || 'Присматривается к миру';
-      $('wish-do-btn').disabled=!wish||Boolean(wishTarget&&!gardenWishCommand(game,game.selectedSim));
+      const mindCurrent=getActor(game,mindInspectResident);
+      const card=characterCardSnapshot(mindCurrent,{name:getActorName(mindInspectResident),world:game.world});
+      const moodCard=moodPresentation(mindCurrent,game.world);
+      const wishCard=mindCurrent.mind.wish&&WISHES[mindCurrent.mind.wish.id];
+      const wishTargetCard=mindCurrent.mind.wish?.targetInstanceId;
+      const featureCard=wishTargetCard&&game.world.outdoors?.features?.find(f=>f.instanceId===wishTargetCard);
+      const plotCard=featureCard&&OUTDOOR_CATALOG[featureCard.itemId];
+      $('mind-mood-label').textContent=card.mood+' · '+mindCurrent.mind.mood.value+'/100';
+      $('mind-mood-bar').style.width=mindCurrent.mind.mood.value+'%';
+      $('mind-mood-bar').style.background=moodCard.color;
+      $('mind-mood-reasons').textContent=moodCard.description;
+      $('mind-primary-need').textContent=card.primaryNeed;
+      $('mind-cause').textContent=card.reasons.join(' · ');
+      $('mind-wish-label').textContent=wishCard
+        ?wishCard.label+(plotCard?' · '+plotCard.name:''):'Сейчас нет конкретного желания';
+      $('wish-do-btn').disabled=mindInspectResident!==game.selectedSim||!wishCard||
+        Boolean(wishTargetCard&&!gardenWishCommand(game,mindInspectResident));
+      $('mind-wish-note').textContent=mindInspectResident===game.selectedSim
+        ?'Нажатие добавит действие в личную очередь'
+        :'Только просмотр · команды остаются у '+selectedName();
+      $('mind-action-current').textContent=activeTaskLabel(mindInspectResident)||
+        mindCurrent.event||'Свободное время';
+      const mindFuture=pendingActions(game.actionQueues,mindInspectResident);
+      $('mind-action-next').textContent=mindFuture.length
+        ?taskLabel({...mindFuture[0],residentId:mindInspectResident})+
+          (mindFuture.length>1?' · ещё '+(mindFuture.length-1):'')
+        :'Очередь пуста';
       if (!$('mind-panel').hidden) {
-        const feelings=visibleEmotions(current.mind,current.minutes,current.personality).slice(0,3);
+        const feelings=visibleEmotions(mindCurrent.mind,mindCurrent.minutes,mindCurrent.personality).slice(0,3);
         $('mind-emotions').textContent=feelings.length
           ?feelings.map(e=>e.icon+' '+e.label+' · '+e.intensity+'/100 · '+e.cause+
             ' · ещё '+Math.ceil(e.remaining)+' игр. мин.').join('\n')
           :'Сейчас нет сильных переживаний';
-        const perspective=getPerspective(game,game.selectedSim);
-        const branch=relationSummary(game.socialGraph,game.selectedSim,
-          game.selectedSim==='alex'?'mira':'alex');
+        const perspective=getPerspective(game,mindInspectResident);
+        const branch=relationSummary(game.socialGraph,mindInspectResident,
+          mindInspectResident==='alex'?'mira':'alex');
         $('mind-relation-stage').textContent='Ваша связь: '+branch.label;
-        $('mind-relation-name').textContent='К '+getActorName(game.selectedSim==='alex'?'mira':'alex');
+        $('mind-relation-name').textContent='К '+getActorName(mindInspectResident==='alex'?'mira':'alex');
         for(const axis of ['friendship','trust','tension']){
           const value=Math.round(perspective[axis]);
           $('mind-relation-'+axis).textContent=value+'/100';
@@ -8186,28 +8249,28 @@ function boot() {
           :'Общих событий пока мало';
         // Long-lived story events belong to the directed graph, not the
         // short (12-item) personal mood log or the old affinity bar.
-        const otherId=game.selectedSim==='alex'?'mira':'alex';
-        const memoryPair=getPair(game.socialGraph,game.selectedSim,otherId);
-        const dynamic=pairDynamic(memoryPair,game.selectedSim,game.minutes);
+        const otherId=mindInspectResident==='alex'?'mira':'alex';
+        const memoryPair=getPair(game.socialGraph,mindInspectResident,otherId);
+        const dynamic=pairDynamic(memoryPair,mindInspectResident,game.minutes);
         $('mind-dynamic').textContent=dynamic.label+' · '+dynamic.description;
-        const episodes=latestEpisodes(memoryPair,game.selectedSim,game.minutes,3);
-        const unresolved=episodeContext(game.socialGraph,game.selectedSim,otherId,game.minutes);
+        const episodes=latestEpisodes(memoryPair,mindInspectResident,game.minutes,3);
+        const unresolved=episodeContext(game.socialGraph,mindInspectResident,otherId,game.minutes);
         $('mind-episodes').textContent=episodes.length
           ?episodes.map(item=>'• '+item.label+' · '+readableTime(item.at).day).join('\n')+
             (unresolved.unresolved?'\n• Доверие ещё восстанавливается':'')
           :'Пока нет значимых совместных событий';
-        const learned=socialKnowledgeNotes(game.socialGraph,game.selectedSim,otherId,4);
+        const learned=socialKnowledgeNotes(game.socialGraph,mindInspectResident,otherId,4);
         $('mind-discovery-person').textContent='О '+getActorName(otherId);
         $('mind-discovery').textContent=learned.length
           ?learned.map(item=>'• '+item.text).join('\n')
           :'Пока не узнал(а) предпочтения собеседника';
-        const cues=socialCommunicationNotes(game.socialGraph,game.selectedSim,otherId,3);
+        const cues=socialCommunicationNotes(game.socialGraph,mindInspectResident,otherId,3);
         $('mind-social-cues').textContent=cues.length
           ?cues.map(item=>'• '+item.text).join('\n')
           :'Пока не замечено особенностей общения';
         const list=$('mind-memories');
         list.replaceChildren();
-        const memories=current.mind.memories.slice(-4).reverse();
+        const memories=mindCurrent.mind.memories.slice(-4).reverse();
         for (const entry of memories) {
           const li=document.createElement('li');
           li.textContent=(entry.fulfilled?'★ ':'• ')+MEMORY_TEXT[entry.id]+' · '+readableTime(entry.at).day;
