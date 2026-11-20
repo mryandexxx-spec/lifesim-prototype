@@ -49,7 +49,7 @@ try {
   const calendar=page.locator('#life-calendar');
   assert.equal(await calendar.locator('#lc-title').innerText(),'Сегодня');
   assert.equal(await calendar.locator('[data-lc-view="day"]').getAttribute('aria-pressed'),'true');
-  assert.match(await calendar.locator('#lc-selected').innerText(),/17 ноября 2026/);
+  assert.match(await calendar.locator('#lc-selected').innerText(),/17 ноя 2026/);
   for(const tab of ['Месяц','Неделя','День']){
    await calendar.getByRole('button',{name:tab,exact:true}).tap();
    assert.equal(await calendar.locator('[data-lc-view]').filter({hasText:tab}).getAttribute('aria-pressed'),'true');
@@ -75,14 +75,14 @@ try {
    assert.equal(saved.calendar.occurrenceOverrides.length,1);
   }
   await calendar.locator('#lc-today').tap();
-  assert.match(await calendar.locator('#lc-selected').innerText(),/17 ноября 2026/);
+  assert.match(await calendar.locator('#lc-selected').innerText(),/17 ноя 2026/);
   await calendar.locator('#lc-add').tap();
   const form=calendar.locator('#lc-event-form');
   assert.ok(await form.isVisible());
   await form.locator('input[name="title"]').fill('Новая заметка');
   await form.locator('input[name="date"]').fill('2026-11-17');
   await form.locator('#lc-event-back-top').tap();
-  assert.match(await calendar.locator('#lc-selected').innerText(),/17 ноября 2026/);
+  assert.match(await calendar.locator('#lc-selected').innerText(),/17 ноя 2026/);
   assert.equal(await calendar.locator('#lc-jump-date').inputValue(),'2026-11-17');
   await calendar.locator('#lc-add').tap();
   await form.locator('input[name="title"]').fill('Новая заметка');
