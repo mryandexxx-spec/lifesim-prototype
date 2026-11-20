@@ -16,11 +16,12 @@ const root=newHousehold('2026-11-20');
 root.paused=true;root.otherSim.paused=true;
 root.autonomy.enabled=false;root.otherSim.autonomy.enabled=false;
 root.kitchen.pantry.herbs=14;
-root.shop.credits=60;
+// Place the 110-credit bed at normal starting funds, then seed the grocery QA wallet.
 const proposed=previewOutdoorFeatureEdit(root,{operation:'place',
   itemId:'garden.herb.mint',pose:{x:8,z:-7,yaw:0}});
 assert.ok(proposed.ok,proposed.reason);
 const seed=commitOutdoorFeatureEdit(root,proposed).root;
+seed.shop.credits=60;
 const plot=seed.world.outdoors.features.find(f=>f.itemId==='garden.herb.mint');
 Object.assign(seed.world.outdoors.gardens[plot.instanceId],
   {progressWetMinutes:4320,evaluatedAt:seed.minutes});
