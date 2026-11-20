@@ -77,6 +77,7 @@ try{
       await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
       assert.equal((await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY))
         .careerSystem.byResident.alex.specialization.id,'infrastructure');
+      await page.locator('#career-phone-toggle').tap();
     }else{
       assert.equal((await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY))
         .careerSystem.byResident.alex.specialization.id,'logistics');
