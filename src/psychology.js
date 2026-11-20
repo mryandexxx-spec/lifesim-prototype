@@ -185,6 +185,11 @@ export function selectWish(state, except = null, world=state?.world??null) {
 export function refreshMind(state,world=state?.world??null) {
   if (!state.mind || typeof state.mind !== 'object') state.mind = createMind(state.minutes);
   pruneEmotions(state.mind,state.minutes);
+  // A demolished pool cannot leave an impossible water desire stuck on
+  // the HUD for eight in-game hours. Existing non-pool wishes are unchanged.
+  if(state.mind.wish?.id==='pool.swim'&&world?.outdoors&&
+    !(world.outdoors.pools||[]).some(p=>planPoolEntry(world,state.position,p.poolId)))
+    state.mind.wish=null;
   if (!state.mind.wish || state.minutes >= state.mind.wish.until) {
     const id = selectWish(state,null,world);
     state.mind.wish = { id, since: state.minutes, until: state.minutes + 480 };

@@ -154,11 +154,21 @@ test('D2d autonomous swimming is bounded per resident, deterministic, and cancel
   setHouseholdAutonomy(restored,false);
   assert.equal(restored.action.exitRequested,'autonomy-off');
   const disabled=loadHousehold(copy(restored));
-  assert.equal(disabled.action?.automatic,true,'pending safe exit survives disabled-autonomy reload');
-  toStage(disabled,'alex','exiting');
-  complete(disabled,'alex');
+  assert.equal(disabled.action?.automatic,true,'pending auto cancellation survives reload');
+  tickHousehold(disabled,1);
+  assert.equal(disabled.action,null,'dry waiting cancellation stays on dry land');
+  assert.ok(isWalkable(disabled.position.x,disabled.position.z,disabled.world));
   assert.equal(memory(disabled,'alex').length,0);
   assert.equal(disabled.poolAutoRoutine.byResident.alex.count,1);
+  // Only an already submerged swimmer needs the wet exit trajectory.
+  const wet=home();approach(wet);toStage(wet,'alex','swimming');
+  wet.action.automatic=true;
+  setHouseholdAutonomy(wet,false);
+  assert.equal(wet.action.exitRequested,'autonomy-off');
+  const wetReload=loadHousehold(copy(wet));
+  assert.equal(wetReload.action?.automatic,true);
+  complete(wetReload,'alex');
+  assert.equal(memory(wetReload,'alex').length,0);
 });
 
 test('D2d v1 old saves and malicious optional memory/autonomy data fail closed',()=>{
@@ -241,4 +251,14 @@ test('D2d disabled autonomy cancels dry walking and waiting without a wet telepo
     assert.deepEqual(s.position,land);
     assert.equal(memory(s,'alex').length,0);
   }
+});
+
+test('D2d water wish retires safely when player demolishes pool',()=>{
+  const s=home();
+  s.mind.wish={id:'pool.swim',since:s.minutes,until:s.minutes+480};
+  assert.ok(poolWishCommand(s,'alex'));
+  s.world.outdoors.pools=[];s.world.outdoors.poolFixtures=[];
+  tickHousehold(s,1);
+  assert.notEqual(s.mind.wish.id,'pool.swim');
+  assert.equal(poolWishCommand(s,'alex'),null);
 });
