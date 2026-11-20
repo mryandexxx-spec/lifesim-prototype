@@ -27,7 +27,7 @@ def chunks(path):
         if p+size>len(raw):raise ValueError('Truncated GLB chunk')
         value=raw[p:p+size];p+=size
         if tag==b'JSON':j=json.loads(value)
-        elif tag==b'BIN\\x00':binary=value
+        elif tag==b'BIN\x00':binary=value
         else:raise ValueError('Unknown GLB chunk '+repr(tag))
     if j is None or binary is None:raise ValueError('Expected JSON and BIN')
     if len(j.get('buffers',[]))!=1:raise ValueError('Only single-buffer GLB is supported')
@@ -88,7 +88,7 @@ def optimize(inp,out,limit=1024,quality=82):
     length=12+8+len(js)+8+len(rebuilt)
     encoded=(struct.pack('<4sII',b'glTF',2,length)+
              struct.pack('<I4s',len(js),b'JSON')+js+
-             struct.pack('<I4s',len(rebuilt),b'BIN\\x00')+rebuilt)
+             struct.pack('<I4s',len(rebuilt),b'BIN\x00')+rebuilt)
     Path(out).parent.mkdir(parents=True,exist_ok=True)
     Path(out).write_bytes(encoded)
     got,bin2=chunks(out)
