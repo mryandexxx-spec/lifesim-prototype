@@ -45,7 +45,7 @@ try{
     }else{
       await page.locator('[data-build-group-tab="'+group+'"]').click();
     }
-    await chooseBuildTool(''+type+'');
+    await page.locator('[data-build-tool="'+type+'"]').click();
   };
   await clickBuild();
  await chooseBuildTool('room-relocate');

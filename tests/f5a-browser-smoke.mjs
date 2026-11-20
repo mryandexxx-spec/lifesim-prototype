@@ -46,7 +46,7 @@ try{
     }else{
       await page.locator('[data-build-group-tab="'+group+'"]').click();
     }
-    await chooseBuildTool(''+type+'');
+    await page.locator('[data-build-tool="'+type+'"]').click();
   };
   await clickBuild();
  assert.equal(await page.locator('#build-toggle').getAttribute('aria-pressed'),'true');

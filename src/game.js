@@ -5482,7 +5482,7 @@ function boot() {
     if(buildGroupForTool(type)!=='view')showBuildGroup(buildGroupForTool(type));
     const selectedButton=document.querySelector('[data-build-tool="'+type+'"]');
     $('build-active-tool').textContent='Инструмент: '+
-      (selectedButton?.textContent?.replace(/^[^\\p{L}\\p{N}]+/u,'').trim()||type);
+      (selectedButton?.textContent?.replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'').trim()||type);
     const wantRoof=type.startsWith('roof-')||(type==='camera'&&roofPreview);
     if(roofPreview!==wantRoof){
       roofPreview=wantRoof;
