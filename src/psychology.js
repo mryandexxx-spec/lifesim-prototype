@@ -177,8 +177,9 @@ export function selectWish(state, except = null, world=state?.world??null) {
       preferenceAffinity(state.personality,'games')*5;
   }
   if (except && weights[except] !== undefined) weights[except] -= 22;
-  const ids=Object.keys(weights);
-  return ids.sort((a,b)=>weights[b]-weights[a]||ids.indexOf(a)-ids.indexOf(b))[0];
+  const priority=[...IDS,'pool.swim'].filter(id=>Object.hasOwn(weights,id));
+  return priority.sort((a,b)=>weights[b]-weights[a]||
+    IDS.concat('pool.swim').indexOf(a)-IDS.concat('pool.swim').indexOf(b))[0];
 }
 
 export function refreshMind(state,world=state?.world??null) {
@@ -204,7 +205,6 @@ export function rememberFirstPoolSwim(state,world=state?.world??null){
   refreshMind(state,world);
   return true;
 }
-/** Old v1 saves default to no milestone; malformed future timestamps ignored. */
 /** Normal wish closure for EVERY full safe swim, first memory only once. */
 export function completePoolSwimMind(state,world=state?.world??null){
   const fulfilled=state?.mind?.wish?.id==='pool.swim';
@@ -216,6 +216,7 @@ export function completePoolSwimMind(state,world=state?.world??null){
   }
   return first;
 }
+/** Old v1 saves default to no milestone; malformed future timestamps ignored. */
 export function restorePoolFirstSwimAt(raw,state){
   const saved=Number.isFinite(raw?.poolFirstSwimAt)&&raw.poolFirstSwimAt>=0&&
     raw.poolFirstSwimAt<=state.minutes?raw.poolFirstSwimAt:null;

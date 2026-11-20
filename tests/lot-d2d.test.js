@@ -9,6 +9,7 @@ import {poolAutoDraw,poolAutoChance,considerAutonomousPool,
 import {outdoorCellAt} from '../src/lot-surface.js';
 import {isWalkable} from '../src/navigation.js';
 import {selectWish} from '../src/psychology.js';
+import {poolWishCommand} from '../src/pool-touch-policy.js';
 const base=outdoorCellAt(18.25,8.25),copy=x=>JSON.parse(JSON.stringify(x));
 const cells=(w=4,h=4)=>Array.from({length:w*h},(_,i)=>
   base+Math.floor(i/w)*64+i%w).sort((a,b)=>a-b);
@@ -213,14 +214,31 @@ test('D2d wishes only offer reachable real pools and resolve on safe completed s
   s.needs.fun=24;s.needs.hunger=95;s.needs.hygiene=95;
   const wish=awaitWish(s);
   assert.ok(wish&&typeof wish==='string');
-  if(wish==='pool.swim'){
-    s.mind.wish={id:'pool.swim',since:s.minutes,until:s.minutes+480};
-    approach(s);toStage(s,'alex','swimming');
-    complete(s,'alex');
-    assert.notEqual(s.mind.wish.id,'pool.swim');
-    assert.equal(memory(s,'alex')[0].fulfilled,true);
-  }
+  s.mind.wish={id:'pool.swim',since:s.minutes,until:s.minutes+480};
+  const command=poolWishCommand(s,'alex');
+  assert.deepEqual(command,{type:'pool',poolId:'pool-1',actionId:'swim'});
+  approach(s);toStage(s,'alex','swimming');
+  complete(s,'alex');
+  assert.notEqual(s.mind.wish.id,'pool.swim');
+  assert.equal(memory(s,'alex')[0].fulfilled,true);
 });
 function awaitWish(state){
   return selectWish(state,null,state.world);
 }
+
+test('D2d disabled autonomy cancels dry walking and waiting without a wet teleport',()=>{
+  for(const stage of ['approaching','waiting']){
+    const s=home();
+    if(stage==='waiting')approach(s);
+    else assert.ok(beginPoolSwim(s,'alex',{poolId:'pool-1',actionId:'swim'}));
+    s.action.automatic=true;
+    const land=copy(s.position);
+    setHouseholdAutonomy(s,false);
+    assert.equal(s.action?.exitRequested,'autonomy-off');
+    tickHousehold(s,1);
+    assert.equal(s.action,null,stage+' must not enter water to cancel');
+    assert.ok(isWalkable(s.position.x,s.position.z,s.world));
+    assert.deepEqual(s.position,land);
+    assert.equal(memory(s,'alex').length,0);
+  }
+});

@@ -261,6 +261,12 @@ export function advancePoolSwim(root,id,minutes){
   if(actor.needs.energy<SWIM_EMERGENCY.energy||
     actor.needs.bladder<SWIM_EMERGENCY.bladder)
     a.exitRequested='urgent-needs';
+  // Auto-off may arrive while still on dry land. Never reroute an already
+  // cancelled, not-yet-entered person through a phantom wet exit.
+  if(a.exitRequested&&['approaching','waiting'].includes(a.stage)){
+    cleanup(root,id,'Плавание отменено до входа');
+    return;
+  }
   if(a.exitRequested&&!['exiting','recovering'].includes(a.stage)){
     a.stage='exiting';a.waitElapsed=0;a.exitWetPath=null;
   }
