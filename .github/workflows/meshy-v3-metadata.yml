@@ -1,0 +1,29 @@
+name: Meshy V3 — derive exact GLB visual bounds
+on:
+  push:
+    branches: [feature/meshy-v3-live-20261120]
+    paths:
+      - .github/workflows/meshy-v3-metadata.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  derive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Derive bounds from original geometry accessors
+        run: |
+          python3 tools/meshy-v3-metadata.py
+          test -s src/meshy-room-v3-data.js
+      - name: Commit model metadata without editing game data
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/meshy-room-v3-data.js
+          git diff --cached --check
+          git commit -m 'assets(meshy): pin real bounds and fit specs for 13 V3 GLBs'
+          git push origin HEAD:feature/meshy-v3-live-20261120
