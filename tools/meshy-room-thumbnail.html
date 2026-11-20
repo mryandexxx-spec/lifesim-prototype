@@ -41,7 +41,7 @@ try{
   try{
    const pivot=new pc.Entity('fit');
    pivot.setLocalPosition(fit.offset.x,fit.offset.y,fit.offset.z);
-   if(fit.rotationX)pivot.setLocalEulerAngles(fit.rotationX,0,0);
+   pivot.setLocalEulerAngles(fit.rotationX,fit.rotationY,0);
    const visual=asset.resource.instantiateRenderEntity();
    visual.setLocalScale(fit.scale.x,fit.scale.y,fit.scale.z);
    pivot.addChild(visual);app.root.addChild(pivot);
