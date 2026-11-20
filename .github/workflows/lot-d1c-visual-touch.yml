@@ -1,0 +1,39 @@
+name: LOT-D1c — pool hollow 3D and four mobile WebGL
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  d1c-visual-touch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked game and browser
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Unit geometry, existing pool transactions and complete Node regression
+        run: |
+          node --check src/game.js
+          node --check src/pool-visual.js
+          node --check tests/lot-d1c.test.js
+          node --check tests/lot-d1c-browser-smoke.mjs
+          node --test tests/lot-d1a.test.js tests/lot-d1b.test.js tests/lot-d1c.test.js
+          npm test
+      - name: Real PlayCanvas four viewport pool touch and localStorage
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-d1c-webgl.log 2>&1 &
+          sleep 3
+          node tests/lot-d1c-browser-smoke.mjs
+      - name: Verify deployed module copy
+        run: grep -F 'cp src/pool-visual.js site/src/' .github/workflows/pages.yml

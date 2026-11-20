@@ -2209,3 +2209,15 @@ button.time-card:active {transform:translateY(1px);}
 .build-tools button{min-height:48px;}
 @media(max-height:570px) and (orientation:landscape){.build-editor{max-height:65dvh}.build-editor .build-flow-hint{display:none}}
 @media(max-width:350px){.build-group-tabs button{min-width:85px;padding-inline:8px}.build-editor{gap:6px}}
+
+/* LOT-D1c: compact native touch controls in the existing outdoor sheet. */
+.pool-controls{display:grid;grid-template-columns:minmax(0,1fr);gap:5px}
+.pool-controls[hidden],.pool-fixture-controls[hidden],#pool-fixture-owned-label[hidden]{display:none!important}
+.pool-controls label,.pool-fixture-controls label{
+  display:flex;flex-direction:column;gap:3px;min-width:0;
+  font-size:11px;font-weight:750;color:#396b51;
+}
+.pool-controls select{width:100%;min-width:0}
+.pool-fixture-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.pool-controls small{font-size:10px;line-height:1.25;color:#496c5e}
+@media(max-width:380px){.pool-fixture-controls{grid-template-columns:minmax(0,1fr)}}
