@@ -9,6 +9,7 @@ import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {professionalGoalsView} from './career-goals.js';
 import {careerRankForContract,specializationReadiness,chooseCareerSpecialization} from './career-specializations.js';
 import {seniorTrack} from './career-seniority.js';
+import {renderCareerMap} from './career-map-ui.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt,selectCareerWorkMode} from './career-work.js';
 import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-work-needs.js';
 import {calendarAt} from './calendar-core.js';
@@ -180,6 +181,10 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     facts.append(element('span','career-phone-discipline-status',
       'Дисциплина: '+disciplineName+' · риск '+discipline.risk+'/12'));
     body.append(facts);
+    body.append(action('🗺 Карьерная карта · все 8 уровней и обе ветки',()=>{
+      section='map';render();
+      body.querySelector('#career-map-title')?.focus({preventScroll:true});
+    },'career-phone-primary career-map-open'));
     const life=element('details','career-phone-worklife');
     const satisfaction=jobSatisfaction(current,root.minutes);
     life.append(element('summary','career-phone-notice',
@@ -760,6 +765,28 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       section='applications';view='list';render();
     },'career-phone-primary'));
   }
+  function renderMap(root){
+    top('🗺 '+NAMES[who]+' · вся карьерная лестница');
+    const view=renderCareerMap({root,residentId:who,
+      onBack:()=>{section='vacancies';render();},
+      onChooseTrack:trackId=>{
+        const live=personRoot();if(!live)return;
+        const progress=specializationReadiness(live,who);
+        if(!progress?.canSwitch){
+          notify('Смена направления сейчас недоступна');render();return;
+        }
+        const target=progress.tracks.find(t=>t.id===trackId);
+        if(!target||!window.confirm('Выбрать «'+target.title+
+          '»? Уровень и заработанные деньги сохранятся.'))return;
+        const result=chooseCareerSpecialization(live,who,trackId);
+        if(!result.ok){notify(result.reason);render();return;}
+        save(true);notify(NAMES[who]+': выбрано направление «'+target.title+'»');
+        section='map';render();
+        body.querySelector('#career-map-title')?.focus({preventScroll:true});
+      }});
+    if(view)body.append(view);
+    else body.append(element('p','career-phone-notice','Нет действующей карьеры'));
+  }
   function renderList(root){
     top('📱 '+NAMES[who]+' · открытые вакансии');
     const ended=root.careerSystem?.endedContracts?.[who]||[];
@@ -928,7 +955,8 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       body.scrollTop=preserveScroll?oldScroll:0;
       return;
     }
-    if(section==='worklog')renderWorklog(root);
+    if(section==='map'&&root.careerSystem?.byResident?.[who])renderMap(root);
+    else if(section==='worklog')renderWorklog(root);
     else if(section==='history')renderHistory(root);
     else if(section==='applications')renderApplications(root);
     else if(root.careerSystem?.byResident?.[who])renderEmployed(root);
@@ -937,10 +965,15 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     const nav=element('nav','career-phone-tabs');
     nav.setAttribute('aria-label','Разделы смартфона');
     const unread=Boolean(root.recruitmentSystem?.byResident?.[who]?.unread);
-    for(const [id,label] of [['vacancies','Вакансии'],['applications','Мои отклики'],['history','История']]){
+    const hasContract=!!root.careerSystem?.byResident?.[who];
+    if(hasContract)nav.classList.add('career-phone-tabs-map');
+    const sections=[['vacancies','Вакансии'],['applications','Мои отклики'],['history','История']];
+    if(hasContract)sections.push(['map','Карта']);
+    for(const [id,label] of sections){
       const button=action(label+(id==='applications'&&unread?' ●':''),()=>{
         section=id;historyId=null;if(id==='vacancies')view='list';render();
-      },'career-phone-tab'+(section===id?' career-phone-tab-active':''));
+      },'career-phone-tab'+(section===id?' career-phone-tab-active':'')+
+        (id==='map'?' career-phone-map-tab':''));
       button.setAttribute('aria-pressed',String(section===id));
       if(id==='applications'&&unread)button.setAttribute('aria-label','Мои отклики: непрочитанный ответ');
       nav.append(button);
