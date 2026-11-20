@@ -4424,7 +4424,8 @@ function boot() {
       '✕ '+editorMessage(preview.reason)+' · подбери другое место свайпом';
     $('furnish-preview').textContent=previewLabel;
     $('furnish-preview').dataset.invalid=String(shopPlacing&&!!listing&&!suitable);
-    $('furnish-action-summary').textContent=shopPlacing
+    const purchaseSummary=$('furnish-action-summary');
+    if(purchaseSummary)purchaseSummary.textContent=shopPlacing
       ?'Примерка · '+(listing?.name||'предмет')+' · деньги не списаны'
       :listing?'Выбран: '+listing.name+' · '+listing.price+' кр.':'Выбери мебель для примерки';
     $('furnish-buy').textContent=shopPlacing?'✓ Купить и установить · '+(listing?.price??0)+' кр.':
