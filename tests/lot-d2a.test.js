@@ -120,6 +120,13 @@ test('LOT-D2a: board requires an independent exit and safe 2x2m landing',()=>{
   root.world.outdoors.poolFixtures.push(equipment('ladder',base,'north'));
   assert.equal(planPoolEntry(root.world,root.position,'pool-1',{jump:false})?.kind,'ladder');
   assert.equal(planPoolEntry(root.world,root.position,'pool-1',{jump:true})?.kind,'board');
+  assert.equal(planPoolEntry(root.world,root.position,'pool-1',
+    {jump:true,fixtureId:'fixture-2'})?.fixtureId,'fixture-2');
+  assert.equal(planPoolEntry(root.world,root.position,'pool-1',
+    {jump:true,fixtureId:'fixture-999'}),null,
+    'jump cannot silently choose a different board after an edit');
+  assert.equal(planPoolEntry(root.world,root.position,'pool-1',
+    {fixtureId:'fixture-2'}),null,'regular entry cannot use a springboard');
   assert.ok(poolAccessPoints(root.world,'pool-1',{board:true}).length===1);
   assert.ok(poolAccessPoints(root.world,'pool-1').every(p=>p.kind!=='board'));
   const exit=planPoolExit(root.world,'pool-1',cellEnd);
