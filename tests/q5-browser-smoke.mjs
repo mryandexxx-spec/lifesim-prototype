@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {newHousehold} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
-import {chooseCareerSpecialization} from '../src/career-specializations.js';
+import {chooseCareerSpecialization,specializationReadiness} from '../src/career-specializations.js';
+import {loadHousehold} from '../src/household.js';
 import {resetSeniorProof} from '../src/career-seniority.js';
 import {SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
@@ -11,6 +12,8 @@ import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 const seed=newHousehold('2026-11-16');
 seed.careerSystem=hireCareer(seed.careerSystem,'alex','city-services',480);
 seed.careerSystem=hireCareer(seed.careerSystem,'mira','editorial',480);
+// Seed between shifts so a guarded career transfer is genuinely allowed.
+seed.minutes=1200;seed.otherSim.minutes=1200;
 const contract=seed.careerSystem.byResident.alex;
 contract.level=4;contract.rankShifts=10;contract.performance=100;
 contract.workedShifts=20;
@@ -20,6 +23,10 @@ contract.seniorProofs=resetSeniorProof(contract,seed.minutes);
 seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
 seed.paused=true;seed.otherSim.paused=true;
 const startingCredits=seed.shop.credits;
+const reloaded=loadHousehold(JSON.parse(JSON.stringify(seed)));
+assert.equal(reloaded.careerSystem.byResident.alex.currentShift,null);
+assert.equal(specializationReadiness(reloaded,'alex').canSwitch,true,
+  'Canonical transfer must be permitted after save restoration');
 const browser=await chromium.launch({headless:true,args:[
   '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
   '--enable-unsafe-swiftshader','--disable-dev-shm-usage'
@@ -66,6 +73,15 @@ try{
     // The alternative stays present and may use the existing guarded command.
     if(width===390){
       await phone.locator('[data-node-id="infrastructure-5"]').tap();
+      if(await phone.locator('.career-map-choose').count()!==1){
+        const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+        const roles=await phone.locator('.career-map-inspector-status').innerText();
+        throw new Error('Q5 transfer guard unavailable in browser: '+
+          JSON.stringify({level:saved.careerSystem.byResident.alex.level,
+            currentShift:saved.careerSystem.byResident.alex.currentShift?.phase,
+            specialization:saved.careerSystem.byResident.alex.specialization,
+            workedShifts:saved.careerSystem.byResident.alex.workedShifts,roles}));
+      }
       await phone.locator('.career-map-choose').tap();
       const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
       assert.equal(saved.careerSystem.byResident.alex.specialization.id,'infrastructure');
