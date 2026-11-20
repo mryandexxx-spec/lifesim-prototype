@@ -168,8 +168,12 @@ try{
    assert.equal(saved.shop.credits,45);
    assert.equal(saved.kitchen.pantry.vegetables,13);
    assert.equal(saved.kitchen.pantry.herbs,14);
-   // Make the same ripe plot stock-blocked on reload, without changing the plot.
-   await page.evaluate(key=>{
+   // Pagehide autosave rewrites localStorage on reload. Inject this seeded
+   // capacity scenario in the NEW document before game.js reads the snapshot.
+   // Otherwise the previous live in-memory 14/16 state overwrites the fixture.
+   await context.addInitScript(key=>{
+     if(sessionStorage.getItem('lot-c3c-full-herbs')!=='armed')return;
+     sessionStorage.removeItem('lot-c3c-full-herbs');
      const x=JSON.parse(localStorage.getItem(key));
      x.kitchen.pantry.herbs=16;
      x.actionQueues.byResident.alex=[];
@@ -177,6 +181,7 @@ try{
      x.action=null;x.otherSim.action=null;
      localStorage.setItem(key,JSON.stringify(x));
    },SAVE_KEY);
+   await page.evaluate(()=>sessionStorage.setItem('lot-c3c-full-herbs','armed'));
    await page.reload({waitUntil:'domcontentloaded'});
    await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
    await lot();await tapPlot();
