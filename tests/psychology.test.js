@@ -68,7 +68,7 @@ test('wishes influence voluntary behavior once player exploration time has passe
   const s=newGame();
   assert.equal(autonomousChoice(s),null);
   s.minutes=570;
-  s.needs={hunger:90,energy:90,hygiene:90,fun:90};
+  s.needs={hunger:90,energy:90,hygiene:90,fun:70};
   assert.equal(autonomousChoice(s),s.mind.wish.id);
   assert.ok(psychologyScore(s,s.mind.wish.id)>0);
 });
