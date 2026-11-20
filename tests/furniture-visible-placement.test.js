@@ -25,7 +25,7 @@ test('actual PlayCanvas prefab staging fragment enables a real clone at known no
   const begin=game.indexOf('  const clearShopPreviewEntity=()=>{');
   const end=game.indexOf('  const renderMarket=()=>{',begin);
   assert.ok(begin>0&&end>begin);
-  let cloneCalls=0,destroyCalls=0,added=0;
+  let cloneCalls=0,destroyCalls=0,added=0,meshAttachments=0;
   const obj=()=>({enabled:false,at:null,yaw:null,
     setPosition(x,y,z){this.at={x,y,z};},
     setEulerAngles(x,y,z){this.yaw=y;},
@@ -35,7 +35,8 @@ test('actual PlayCanvas prefab staging fragment enables a real clone at known no
   const context={shopOpen:true,shopPlacing:true,shopSelected:'plant',shopSelectedItemId:'legacy.plant',
     shopPose:cameraPlacementPose({centerX:0,centerZ:0}),
     shopPreviewEntity:null,shopPreviewType:null,marketGhost:{enabled:false},
-    decorTemplates:new Map([['plant',template]]),app:{root:{addChild(){added++;}}},applySkuModel(){}};
+    decorTemplates:new Map([['plant',template]]),app:{root:{addChild(){added++;}}},applySkuModel(){},
+    meshyFurniture:{attach(){meshAttachments++;}}};
   const block=game.slice(begin,end);
   runInNewContext('(()=>{'+block+'\nsyncShopPreviewEntity();})()',context,{timeout:1000});
   assert.equal(cloneCalls,1);
@@ -43,7 +44,8 @@ test('actual PlayCanvas prefab staging fragment enables a real clone at known no
   assert.equal(context.shopPreviewEntity.enabled,true);
   assert.equal(context.shopPreviewEntity.at.x,0);
   assert.equal(context.shopPreviewEntity.at.z,0);
-  assert.equal(context.shopPreviewType,'plant');
+  assert.equal(context.shopPreviewType,'plant|legacy.plant');
+  assert.equal(meshAttachments,1);
   // Moving the camera never generates a second copy.
   context.shopPose=cameraPlacementPose({centerX:-2,centerZ:1},context.shopPose);
   runInNewContext('(()=>{'+block+'\nsyncShopPreviewEntity();})()',context,{timeout:1000});

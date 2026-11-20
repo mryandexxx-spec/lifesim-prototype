@@ -74,6 +74,7 @@ import {cameraPlacementPose,dragShopPlacement} from './furniture-placement-previ
 import {furnitureProduct,FURNITURE_APPEARANCES,FURNITURE_SHOP_TYPES,
   PROCEDURAL_NEW_PREFABS,PROCEDURAL_DEFAULT_SKU} from './furniture-products.js';
 import {proceduralFurnitureModel} from './furniture-procedural-library.js';
+import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -2006,6 +2007,12 @@ function boot() {
   // Data-only SKU colorways reuse the original prefab, navmesh and animation.
   // Only copied mesh instances are tinted; the authored original is unchanged.
   const variantMaterials=new Map();
+  // Meshy is a visual override only: original action, collision, price and saves stay canonical.
+  // ?furniture=legacy restores ALL procedural furniture for Safari diagnosis.
+  const furnitureVisualMode=new URLSearchParams(window.location.search).get('furniture');
+  const meshyFurniture=createMeshyFurnitureVisual({pc,app,
+    enabled:furnitureVisualMode!=='legacy'});
+  if(furnitureVisualMode==='qa')window.__LifeSimMeshyFurnitureStats=meshyFurniture.stats;
   const applyItemAppearance=(node,itemDefinitionId)=>{
     const style=FURNITURE_APPEARANCES[furnitureProduct(itemDefinitionId)?.appearanceId];
     if(!style||!node)return;
@@ -2169,6 +2176,8 @@ function boot() {
         node.addChild(glint);glint.enabled=false;
       }
       app.root.addChild(node);
+      meshyFurniture.attach(node,item.itemDefinitionId||
+        PROCEDURAL_DEFAULT_SKU[item.prefabId]);
       decorNodes.set(item.instanceId,node);
     }
     for(const [instanceId,node] of decorNodes){
@@ -4329,7 +4338,8 @@ function boot() {
     if(!shopOpen||!shopPlacing||!shopSelected){
       clearShopPreviewEntity();return;
     }
-    if(shopPreviewType!==shopSelected){
+    const requestedPreviewType=shopSelected+'|'+(shopSelectedItemId||'');
+    if(shopPreviewType!==requestedPreviewType){
       clearShopPreviewEntity();
       const template=decorTemplates.get(shopSelected);
       if(template){
@@ -4337,7 +4347,8 @@ function boot() {
         shopPreviewEntity.name='Unsaved furniture placement preview';
         if(shopSelectedItemId)applySkuModel(shopPreviewEntity,shopSelectedItemId);
         app.root.addChild(shopPreviewEntity);
-        shopPreviewType=shopSelected;
+        meshyFurniture.attach(shopPreviewEntity,shopSelectedItemId);
+        shopPreviewType=requestedPreviewType;
       }
     }
     if(shopPreviewEntity){
@@ -7570,6 +7581,8 @@ function boot() {
       if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
       const weight=Math.max(0,...HOUSEHOLD_IDS.map(id=>
         furnitureUseWeight(getActor(game,id)?.action,item.instanceId)));
+      if(item.prefabId==='dresser'||item.prefabId==='wardrobe')
+        meshyFurniture.useProcedural(node,weight>.005);
       const reposition=(part,dx=0,dz=0)=>{
         if(!part)return;
         let base=f4eOriginalPositions.get(part);
