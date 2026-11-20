@@ -1,0 +1,46 @@
+name: Meshy V3 — integration Node and four-viewport WebGL
+on:
+  push:
+    branches: [feature/meshy-v3-live-20261120]
+    paths:
+      - .github/workflows/meshy-v3-integration-checks.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned game dependencies
+        run: npm ci
+      - name: Run entire Node test suite and syntax validation
+        run: |
+          npm test
+          node --check src/game.js
+          node --check src/meshy-furniture-policy.js
+          node --check src/meshy-furniture-visual.js
+          node --check src/meshy-room-v3-data.js
+          node --test tests/meshy-v3-integration.test.js
+      - name: Install pinned browser
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+      - name: Render actual iPhone-size WebGL scenes with existing saved furniture
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/meshy-v3-game-http.log 2>&1 &
+          sleep 3
+          node tests/meshy-v3-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: meshy-v3-integration-browser-screens
+          path: meshy-v3-artifacts/
+          if-no-files-found: ignore
