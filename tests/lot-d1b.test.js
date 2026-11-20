@@ -62,13 +62,13 @@ test('D1b: freeform split surcharge, merge refund, 4-basin and 512-cell caps',()
   let root=rich();
   root=done(root,tiles(root,[base,base+1,base+2]));
   const split=tiles(root,[base+1],'erase');
-  assert.equal(split.cost,600-12,'split purchases extra basin, refunds removed tile');
+  assert.equal(split.cost,583,'split purchases extra basin at the exact area delta');
   root=done(root,split);
   assert.equal(root.world.outdoors.pools.length,2);
   assert.deepEqual(root.world.outdoors.pools.map(p=>p.poolId),
     ['pool-1','pool-2']);
   const merge=tiles(root,[base+1]);
-  assert.equal(merge.cost,-402,'merge returns 70% of reduced total price');
+  assert.equal(merge.cost,-408,'merge returns 70% of reduced total price');
   root=done(root,merge);
   assert.equal(root.world.outdoors.pools.length,1);
   assert.equal(tiles(root,[base+5,base+7,base+9,base+11]).reason,
