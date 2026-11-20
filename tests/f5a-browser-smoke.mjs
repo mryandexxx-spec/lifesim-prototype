@@ -163,6 +163,9 @@ try{
    'Original-wall window creates stable saved physical segments');
  // Real window frame must appear where the old wall was cut.
  await page.screenshot({path:'f5b3-original-wall-openings.png'});
+ // UX-03 visibility controls live inside the View drawer.
+ if(await page.locator('#build-view-panel').isHidden())
+   await page.locator('#build-view-trigger').click();
  await page.locator('[data-build-walls="up"]').click();
  await page.screenshot({path:'f5a-browser-build.png'});
  await page.locator('#build-exit').click();
