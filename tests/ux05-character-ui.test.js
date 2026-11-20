@@ -50,6 +50,7 @@ test('UX05 inspection switches only viewer and not selected commander',()=>{
  assert.ok(!source.slice(begin,end).includes('selectResident(game,id)'));
  assert.match(source,/mindInspectResident=id;skillProfileKey='';/);
  assert.match(source,/mindInspectResident!==game.selectedSim/);
+ assert.match(source,/\$\('wish-do-btn'\)\.disabled=true;/);
  assert.match(source,/getActor\(game,mindInspectResident\)/);
 });
 test('UX05 social command requires category option then explicit confirmation',()=>{

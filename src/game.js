@@ -735,7 +735,11 @@ function renderMindIdentity(){
 }
 for(const id of HOUSEHOLD_IDS)$('mind-view-'+id).addEventListener('click',()=>{
  if(dialogueNeedsDecision(game))return;
- mindInspectResident=id;skillProfileKey='';renderMindIdentity();renderSkillsTab(true);
+ mindInspectResident=id;skillProfileKey='';
+ // The former resident's active wish control must never remain tappable,
+ // even during the 140ms HUD refresh interval on Safari.
+ $('wish-do-btn').disabled=true;
+ renderMindIdentity();renderSkillsTab(true);
 });
 
 function renderSkillsTab(force=false){
