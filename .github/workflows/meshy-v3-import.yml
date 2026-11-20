@@ -1,0 +1,62 @@
+name: Meshy V3 — fetch and optimize 13 staged room GLBs
+on:
+  push:
+    branches:
+      - assets/meshy-room-v3-20261120
+    paths:
+      - tools/meshy-v3-import-sources.json
+permissions:
+  contents: write
+concurrency:
+  group: meshy-v3-import-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  fetch-optimize-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Checkout exact isolated branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned image encoder
+        run: python3 -m pip install 'Pillow==11.3.0'
+      - name: Fetch one GLB at a time, optimize, validate
+        id: ingest
+        run: |
+          set -euo pipefail
+          if test -e tools/meshy-v3-import-sources.json; then
+            python3 tools/ingest_meshy_props.py
+            echo "has_data=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Source links already consumed; no-op"
+            echo "has_data=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Remove expiring links and commit verified static GLBs
+        if: steps.ingest.outputs.has_data == 'true'
+        run: |
+          set -euo pipefail
+          test "$(find assets/furniture/meshy-room-v3 -name '*.glb' | wc -l)" -eq 13
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('assets/furniture/meshy-room-v3')
+          obj=json.loads((root/'manifest.json').read_text())
+          assert len(obj['records'])==13
+          for row in obj['records']:
+              data=(root/row['glb']).read_bytes()
+              assert data[:4]==b'glTF'
+              assert len(data)==row['bytes']
+              assert hashlib.sha256(data).hexdigest()==row['sha256']
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -- tools/meshy-v3-import-sources.json
+          git add assets/furniture/meshy-room-v3/
+          git diff --cached --check
+          git commit -m 'assets(meshy): add 13 optimized, checksum-verified V3 room GLBs'
+          git push origin HEAD:assets/meshy-room-v3-20261120
