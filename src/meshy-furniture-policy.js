@@ -1,0 +1,88 @@
+/**
+ * Cosmetic Meshy furniture catalog. No SKU, ownership, price, A* obstacle,
+ * action/seat contact, mount or save changes. Values below are audited from
+ * the exact optimized GLB POSITION accessors committed with this module.
+ *
+ * Source meshes are normalized by Meshy near [-0.5, +0.5]; these MUST be fit
+ * to LifeSim's meter-like world dimensions (Alex/Mira ~2.05m display height).
+ */
+import {FURNITURE_CATALOG} from './furniture-catalog.js';
+
+const entries=[
+ // sku, prefabId, desired height in LifeSim world units, raw bounds min/max
+ ['sofa.comfort','sofa',1.12,[-.500,-.246,-.208],[.500,.244,.211]],
+ ['sofa.loft','sofa',1.08,[-.500,-.228,-.214],[.500,.222,.215]],
+ ['armchair.wing','armchair',1.56,[-.375,-.500,-.390],[.374,.500,.389]],
+ ['armchair.shell','armchair',1.12,[-.500,-.500,-.420],[.500,.500,.419]],
+ ['bed.platform','bed',1.16,[-.397,-.263,-.500],[.398,.261,.500]],
+ ['bookcase.starter','bookcase',2.04,[-.322,-.500,-.218],[.324,.500,.216]],
+ ['dresser.reed','dresser',1.19,[-.428,-.500,-.247],[.424,.500,.247]],
+ ['floorlamp.tripod','floorlamp',2.04,[-.216,-.500,-.210],[.213,.500,.212]],
+ ['legacy.plant','plant',1.53,[-.398,-.500,-.235],[.397,.500,.231]],
+ ['mirror.panel','mirror',1.94,[-.214,-.500,-.154],[.203,.500,.153]],
+ ['plant.palm','plant',1.87,[-.336,-.500,-.340],[.337,.499,.338]],
+ // Meshy reconstructed flat woven rugs standing vertically. X rotation
+ // lays them flat; height is explicitly constrained to 2cm and walk-through.
+ ['rug.geo','rug',.018,[-.500,-.241,-.306],[.500,.242,.302]],
+ ['rug.weave','rug',.018,[-.500,-.287,-.032],[.500,.287,.032]],
+ // C3's authorized mount y/side remains authoritative; art centered on it.
+ ['sconce.halo','walllight',.57,[-.315,-.500,-.497],[.313,.500,.500]],
+ ['wardrobe.classic','wardrobe',2.24,[-.305,-.500,-.163],[.300,.500,.160]]
+];
+export const MESHY_FURNITURE_DIR='./assets/furniture/meshy-room-v1/';
+export const MESHY_FURNITURE_SPECS=Object.freeze(Object.fromEntries(entries.map(
+ ([sku,prefabId,height,min,max])=>[sku,Object.freeze({
+   sku,prefabId,height,
+   bounds:Object.freeze({min:Object.freeze([...min]),max:Object.freeze([...max])}),
+   orientation:prefabId==='rug'?'flat':'upright',
+   mount:prefabId==='walllight'?'wall':'floor'
+ })]
+)));
+export const MESHY_FURNITURE_SKUS=Object.freeze(Object.keys(MESHY_FURNITURE_SPECS));
+export const MESHY_FURNITURE_DISPLAY_HEIGHT=2.05; // same as Alex/Mira
+
+export function meshyFurnitureSpec(sku){
+  return typeof sku==='string'&&Object.hasOwn(MESHY_FURNITURE_SPECS,sku)
+    ?MESHY_FURNITURE_SPECS[sku]:null;
+}
+export function meshyFurnitureUrl(sku){
+  return meshyFurnitureSpec(sku)?MESHY_FURNITURE_DIR+sku+'.glb':null;
+}
+/**
+ * The fit spans the existing, conservative game footprint, preserving all
+ * actual interaction approach points and never changing the physics.
+ * Return scale axes in the ORIGINAL GLB's coordinate system. For rugs, a
+ * parent -90deg X pivot maps original Y->horizontal Z, Z->vertical Y.
+ */
+export function meshyFurnitureFit(sku){
+  const spec=meshyFurnitureSpec(sku);
+  if(!spec)return null;
+  const def=FURNITURE_CATALOG[spec.prefabId];
+  if(!def)throw Error('Missing footprint for '+sku);
+  const width=(def.footprint.maxX-def.footprint.minX)*.93;
+  const depth=(def.footprint.maxZ-def.footprint.minZ)*.93;
+  const {min,max}=spec.bounds;
+  const size=[0,1,2].map(i=>max[i]-min[i]);
+  if(size.some(x=>!Number.isFinite(x)||x<=0))throw Error('Invalid GLB bounds: '+sku);
+  const flat=spec.orientation==='flat';
+  const sx=width/size[0];
+  const scale=flat
+    ? {x:sx,y:depth/size[1],z:spec.height/size[2]}
+    : {x:sx,y:spec.height/size[1],z:depth/size[2]};
+  // The root of purchased furniture is at its floor-cell center. Walllights
+  // instead inherit the canonical C3 vertical wall mount and must be centered.
+  const offset={
+    x:-(min[0]+max[0])*scale.x/2,
+    y:flat ? -min[2]*scale.z+.006
+      :spec.mount==='wall' ? -(min[1]+max[1])*scale.y/2
+      :-min[1]*scale.y,
+    z:flat ? (min[1]+max[1])*scale.y/2
+      :-(min[2]+max[2])*scale.z/2
+  };
+  return Object.freeze({
+    sku,prefabId:spec.prefabId,rotationX:flat?-90:0,
+    scale:Object.freeze(scale),offset:Object.freeze(offset),
+    footprint:Object.freeze({width,depth,height:spec.height}),
+    mount:spec.mount
+  });
+}
