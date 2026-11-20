@@ -1,0 +1,55 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+html,body{margin:0;background:transparent;width:300px;height:225px;overflow:hidden}
+#viewer{width:300px;height:225px;display:block;background:transparent}
+</style></head><body><canvas id="viewer" width="300" height="225"></canvas>
+<script type="module">
+import * as pc from '../vendor/playcanvas.mjs';
+import {meshyFurnitureFit,meshyFurnitureUrl} from '../src/meshy-furniture-policy.js';
+const sku=new URLSearchParams(location.search).get('sku');
+const fit=meshyFurnitureFit(sku);
+window.__thumb={ready:false,error:null,sku};
+try{
+ if(!fit)throw Error('Unsupported SKU '+sku);
+ const canvas=document.getElementById('viewer');
+ const app=new pc.Application(canvas,{graphicsDeviceOptions:{
+  alpha:true,antialias:true,preserveDrawingBuffer:true}});
+ app.setCanvasFillMode(pc.FILLMODE_NONE);
+ app.setCanvasResolution(pc.RESOLUTION_FIXED,300,225);
+ app.scene.ambientLight=new pc.Color(.82,.82,.82);
+ const camera=new pc.Entity('camera');
+ camera.addComponent('camera',{clearColor:new pc.Color(0,0,0,0),
+  projection:pc.PROJECTION_ORTHOGRAPHIC,orthoHeight:Math.max(1.7,fit.footprint.height*1.12,
+    fit.footprint.width*.82,fit.footprint.depth*.93)});
+ app.root.addChild(camera);
+ const at=new pc.Vec3(0,fit.mount==='wall'?0:fit.footprint.height*.43,0);
+ camera.setPosition(3.3,2.9,4.2);
+ camera.lookAt(at);
+ const light=new pc.Entity('key light');
+ light.addComponent('light',{type:'directional',color:new pc.Color(1,1,1),
+  intensity:1.35,castShadows:false});
+ light.setEulerAngles(44,130,0);
+ app.root.addChild(light);
+ const rim=new pc.Entity('rim light');
+ rim.addComponent('light',{type:'directional',color:new pc.Color(.94,.97,1),
+  intensity:.6,castShadows:false});
+ rim.setEulerAngles(25,-55,0);
+ app.root.addChild(rim);
+ const asset=new pc.Asset('thumbnail-'+sku,'container',{url:'../'+meshyFurnitureUrl(sku).replace(/^\.\//,'')});
+ app.assets.add(asset);
+ asset.ready(()=>{
+  try{
+   const pivot=new pc.Entity('fit');
+   pivot.setLocalPosition(fit.offset.x,fit.offset.y,fit.offset.z);
+   if(fit.rotationX)pivot.setLocalEulerAngles(fit.rotationX,0,0);
+   const visual=asset.resource.instantiateRenderEntity();
+   visual.setLocalScale(fit.scale.x,fit.scale.y,fit.scale.z);
+   pivot.addChild(visual);app.root.addChild(pivot);
+   app.start();
+   let frames=0;
+   app.on('postrender',()=>{if(++frames===6)window.__thumb.ready=true});
+  }catch(e){window.__thumb.error=String(e)}
+ });
+ asset.once('error',e=>window.__thumb.error=String(e));
+ app.assets.load(asset);
+}catch(e){window.__thumb.error=String(e)}
+</script></body></html>

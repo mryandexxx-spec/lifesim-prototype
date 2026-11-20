@@ -5,7 +5,8 @@ import {createHash} from 'node:crypto';
 import {FURNITURE_PRODUCT_BY_ID} from '../src/furniture-products.js';
 import {FURNITURE_CATALOG} from '../src/furniture-catalog.js';
 import {MESHY_FURNITURE_SKUS,meshyFurnitureSpec,meshyFurnitureFit,
-  meshyFurnitureUrl,MESHY_FURNITURE_DISPLAY_HEIGHT} from '../src/meshy-furniture-policy.js';
+  meshyFurnitureUrl,MESHY_FURNITURE_DISPLAY_HEIGHT,meshyStarterFurnitureSku,
+  meshyFurnitureDisplaySku} from '../src/meshy-furniture-policy.js';
 
 const manifest=JSON.parse(readFileSync(new URL('../assets/furniture/meshy-room-v1/manifest.json',import.meta.url)));
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -88,4 +89,35 @@ test('unknown, inherited and invalid values cannot accidentally overwrite v1 obj
   assert.equal(meshyFurnitureSpec(sku),null);
   assert.equal(meshyFurnitureFit(sku),null);
  }
+});
+
+
+test('existing starter fixtures and old purchases receive cosmetic GLB aliases, not save migrations',()=>{
+ assert.equal(meshyStarterFurnitureSku('sofa'),'sofa.comfort');
+ assert.equal(meshyStarterFurnitureSku('bed'),'bed.platform');
+ assert.equal(meshyStarterFurnitureSku('plant'),'legacy.plant');
+ for(const prefab of ['nightstand','table','tv','fridge','toilet','shower','counter','__proto__'])
+  assert.equal(meshyStarterFurnitureSku(prefab),null);
+ assert.equal(meshyFurnitureDisplaySku('legacy.sofa'),'sofa.comfort');
+ assert.equal(meshyFurnitureDisplaySku('legacy.bed'),'bed.platform');
+ assert.equal(meshyFurnitureDisplaySku('legacy.plant'),'legacy.plant');
+ assert.equal(meshyFurnitureDisplaySku('rug.weave'),'rug.weave');
+ assert.equal(meshyFurnitureDisplaySku('chair.loft'),null);
+ assert.equal(meshyFurnitureDisplaySku('__proto__'),null);
+ const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+ assert.match(game,/if\(!templateOnly\)\s*meshyFurniture\.attach\(node,meshyStarterFurnitureSku\(prefabId\)\)/);
+ assert.match(game,/meshyFurniture\.attach\(node,meshyFurnitureDisplaySku\(item\.itemDefinitionId\)/);
+ assert.match(game,/photo\.src='\.\/assets\/furniture\/meshy-room-v1\/thumbnails\/'\+meshSku\+'\.png'/);
+});
+test('catalog thumbnails are rendered images for every actual GLB, including legacy aliases',()=>{
+ for(const sku of MESHY_FURNITURE_SKUS){
+  const path=new URL('../assets/furniture/meshy-room-v1/thumbnails/'+sku+'.png',import.meta.url);
+  const binary=readFileSync(path);
+  assert.ok(binary.length>1800,sku+' GLB-rendered thumbnail');
+  assert.equal(binary.subarray(0,8).toString('hex'),'89504e470d0a1a0a',sku+' PNG magic');
+  assert.equal(binary.readUInt32BE(16),300,sku+' width');
+  assert.equal(binary.readUInt32BE(20),225,sku+' height');
+ }
+ const pages=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
+ assert.match(pages,/cp assets\/furniture\/meshy-room-v1\/thumbnails\/\*\.png site\/assets\/furniture\/meshy-room-v1\/thumbnails\//);
 });

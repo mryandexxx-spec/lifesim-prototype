@@ -1,0 +1,42 @@
+name: Meshy starter room and GLB catalog preview QA
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  starter-catalog:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned PlayCanvas and browser
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Full Node tests, source syntax, 15 GLBs and 15 thumbnails
+        run: |
+          node --check src/game.js
+          node --check src/meshy-furniture-policy.js
+          node --check src/meshy-furniture-visual.js
+          node --check tests/meshy-starter-catalog-browser-smoke.mjs
+          node --test tests/meshy-room-integration.test.js
+          npm test
+      - name: Genuine mobile PlayCanvas WebGL existing home and catalog preview
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/meshy-starter.log 2>&1 &
+          sleep 3
+          node tests/meshy-starter-catalog-browser-smoke.mjs
+      - name: Retain mobile screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meshy-starter-catalog-mobile-qa
+          path: meshy-starter-catalog-artifacts/
+          if-no-files-found: ignore
