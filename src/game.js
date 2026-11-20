@@ -75,6 +75,7 @@ import {furnitureProduct,FURNITURE_APPEARANCES,FURNITURE_SHOP_TYPES,
   PROCEDURAL_NEW_PREFABS,PROCEDURAL_DEFAULT_SKU} from './furniture-products.js';
 import {proceduralFurnitureModel} from './furniture-procedural-library.js';
 import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
+import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku} from './meshy-furniture-policy.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -2080,6 +2081,10 @@ function boot() {
     const previous=decorDrawing;
     decorDrawing={origin,node};
     try{render();}finally{decorDrawing=previous;}
+    // The original room uses saved starter instance IDs, not purchased SKU IDs.
+    // Attach only when the real starter exists; keep gameplay scene roots intact.
+    if(!templateOnly&&current.location==='home')
+      meshyFurniture.attach(node,meshyStarterFurnitureSku(prefabId));
   };
   const updateDecorNodes=(previewId=null,previewPose=null)=>{
     const items=game.world.furniture.instances;
@@ -2176,8 +2181,8 @@ function boot() {
         node.addChild(glint);glint.enabled=false;
       }
       app.root.addChild(node);
-      meshyFurniture.attach(node,item.itemDefinitionId||
-        PROCEDURAL_DEFAULT_SKU[item.prefabId]);
+      meshyFurniture.attach(node,meshyFurnitureDisplaySku(item.itemDefinitionId)||
+        item.itemDefinitionId||PROCEDURAL_DEFAULT_SKU[item.prefabId]);
       decorNodes.set(item.instanceId,node);
     }
     for(const [instanceId,node] of decorNodes){
@@ -4347,7 +4352,8 @@ function boot() {
         shopPreviewEntity.name='Unsaved furniture placement preview';
         if(shopSelectedItemId)applySkuModel(shopPreviewEntity,shopSelectedItemId);
         app.root.addChild(shopPreviewEntity);
-        meshyFurniture.attach(shopPreviewEntity,shopSelectedItemId);
+        meshyFurniture.attach(shopPreviewEntity,
+          meshyFurnitureDisplaySku(shopSelectedItemId)||shopSelectedItemId);
         shopPreviewType=requestedPreviewType;
       }
     }
