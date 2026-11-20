@@ -23,6 +23,8 @@ try {
  await page.locator('#loading').waitFor({state:'hidden',timeout:30000});
  await page.locator('#calendar-anchor-toggle').click();
  assert.ok(await page.locator('#life-calendar').isVisible());
+ // UX-08 opens Today in day view; explicitly select the month for the legacy calendar assertion.
+ await page.locator('[data-lc-view="month"]').click();
  assert.ok(await page.locator('#lc-days .lc-date').count()>=28);
  await page.locator('[data-lc-view="week"]').click();
  assert.equal(await page.locator('#lc-days .lc-date').count(),7);
