@@ -2212,7 +2212,7 @@ button.time-card:active {transform:translateY(1px);}
 
 
 /* UX-04: quick landscape palette and persistent domain-derived price/area. */
-.outdoor-palette{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+.outdoor-palette{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
   gap:5px;flex-shrink:0}
 .outdoor-editor .outdoor-palette button{padding:5px 3px;min-height:48px;
   font-size:11px;line-height:1.2;overflow-wrap:anywhere}
@@ -2226,11 +2226,11 @@ button.time-card:active {transform:translateY(1px);}
 .garden-action-unavailable{margin:5px 0 0;color:#9b4437;font-size:11px;
   line-height:1.35;font-weight:700}
 @media(max-width:359px) and (orientation:portrait){
-  .outdoor-palette{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .outdoor-palette{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-height:570px) and (orientation:landscape){
   .outdoor-editor{max-height:68dvh;left:10%;right:10%}
-  .outdoor-palette{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .outdoor-palette{grid-template-columns:repeat(5,minmax(0,1fr))}
   .outdoor-editor .outdoor-palette button{min-height:44px}
 }
 
