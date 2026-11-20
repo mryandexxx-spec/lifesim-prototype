@@ -37,7 +37,7 @@ try {
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   page.on('requestfailed',r=>{
-   if(/\\/(src|vendor)\\//.test(r.url()))errors.push(r.url());
+   if(r.url().includes('/src/')||r.url().includes('/vendor/'))errors.push(r.url());
   });
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
