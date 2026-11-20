@@ -86,6 +86,7 @@ jobs:
           node --check src/furniture-products.js
           node --check src/furniture-procedural-library.js
           node --check src/meshy-furniture-policy.js
+          node --check src/meshy-room-v2-data.js
           node --check src/meshy-furniture-visual.js
           node --check src/dining.js
           node --check src/kitchen.js
@@ -228,6 +229,7 @@ jobs:
           cp src/mounted-lighting.js site/src/
           cp src/furniture-products.js src/furniture-procedural-library.js src/furniture-thumbnails.js src/seat-furniture.js src/dining.js src/furniture-interactions.js site/src/
           cp src/meshy-furniture-policy.js src/meshy-furniture-visual.js site/src/
+          cp src/meshy-room-v2-data.js site/src/
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
           cp src/object-once-ledger.js site/src/
@@ -279,6 +281,10 @@ jobs:
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
           mkdir -p site/assets/furniture/meshy-room-v1/thumbnails
           cp assets/furniture/meshy-room-v1/thumbnails/*.png site/assets/furniture/meshy-room-v1/thumbnails/
+          mkdir -p site/assets/furniture/meshy-room-v2/thumbnails
+          cp assets/furniture/meshy-room-v2/*.glb site/assets/furniture/meshy-room-v2/
+          cp assets/furniture/meshy-room-v2/manifest.json site/assets/furniture/meshy-room-v2/
+          cp assets/furniture/meshy-room-v2/thumbnails/*.png site/assets/furniture/meshy-room-v2/thumbnails/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
