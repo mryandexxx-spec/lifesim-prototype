@@ -26,6 +26,7 @@ try{
   page.on('pageerror',error=>faults.push(w+'x'+h+' '+error.message));
   page.on('requestfailed',r=>{
    if(r.url().includes('/assets/furniture/meshy-room-v1/')||
+     r.url().includes('/assets/furniture/meshy-room-v2/')||
      r.url().includes('/src/'))faults.push(w+'x'+h+' '+r.url()+' '+r.failure()?.errorText);
   });
   await page.goto('http://127.0.0.1:8765/?furniture=qa',
@@ -41,7 +42,7 @@ try{
   await page.locator('#home-furnish').tap();
   await page.locator('#furnish-shop-toggle').tap();
   const count=await page.locator('#furnish-stock img.furnish-meshy-thumb').count();
-  assert.ok(count>=15,'all Meshy SKU cards must have GLB renders: '+count);
+  assert.ok(count>=38,'all 15 original + 23 new catalog models need real thumbnails: '+count);
   for(const sku of ['legacy.sofa','legacy.bed','sofa.comfort','bed.platform','rug.geo',
    'plant.palm','sconce.halo']){
    const image=page.locator('#furnish-stock button[data-item-id="'+sku+'"] img.furnish-meshy-thumb');
@@ -55,8 +56,15 @@ try{
    const src=await image.getAttribute('src');
    assert.ok(src.endsWith('.png')&&src.includes('meshy-room-v1/thumbnails/'));
   }
-  assert.equal(await page.locator('#furnish-stock button[data-item-id="chair.loft"] svg.furnish-sku-sketch').count(),1,
+  assert.equal(await page.locator('#furnish-stock button[data-item-id="chair.cross"] svg.furnish-sku-sketch').count(),1,
     'unsupported SKU still has procedural fallback');
+  for(const sku of ['chair.loft','stove.modern','sink.farm','mesh.vanity_set',
+    'mesh.wall_art_triptych','mesh.hanging_plant']){
+    const photo=page.locator('#furnish-stock button[data-item-id="'+sku+'"] img.furnish-meshy-thumb');
+    assert.equal(await photo.count(),1,'true GLB preview must exist: '+sku);
+    assert.ok((await photo.getAttribute('src')).includes('meshy-room-v2/thumbnails/'),
+      sku+' should not show the old procedural gallery');
+  }
   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
   assert.equal(saved.version,1);
   assert.ok(saved.world.furniture.instances.some(i=>i.instanceId==='home-bed-1'));
@@ -75,5 +83,5 @@ try{
   'rollback must keep procedural preview for all SKUs');
  await legacyCtx.close();
  assert.deepEqual(faults,[],'no page/GLB errors');
- console.log('Starter sofa/bed/plant GLB + 15 real catalog thumbnails, landscape, save v1, rollback: PASS');
+ console.log('Starter+fixture GLBs, 15 prior+35 new Meshy catalog previews, landscape, save v1, rollback: PASS');
 }finally{await browser.close();}
