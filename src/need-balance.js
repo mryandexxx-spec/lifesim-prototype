@@ -12,14 +12,20 @@
  * Tune this single table with headless multi-hour / full-activity tests.
  */
 export const NEED_DECAY_PER_MINUTE=Object.freeze({
-  hunger:.035,   // 50.4 points / 24 game h
-  energy:.028,   // 40.32 points / 24 game h
-  hygiene:.018,  // 25.92 points / 24 game h
-  fun:.034,      // 48.96 points / 24 game h
-  bladder:.046,  // 66.24 points / 24 game h
-  social:.024    // 34.56 points / 24 game h before temperament
+  hunger:.030,   // Q3b: 43.20 points / 24 game h
+  energy:.041,   // Q3b: 59.04 points / 24 game h while awake
+  hygiene:.027,  // Q3b: 38.88 points / 24 game h
+  fun:.038,      // Q3b: 54.72 points / 24 game h
+  bladder:.037,  // Q3b: 53.28 points / 24 game h
+  social:.019    // Q3b: 27.36 points / 24 game h before temperament
 });
-export const SOCIAL_DECAY_PERSONALITY_SPREAD=.012;
+export const SOCIAL_DECAY_PERSONALITY_SPREAD=.008;
+// An uninterrupted nightly sleep is not an accelerated one-hour nap.
+export const SLEEP_MIN_MINUTES=420;
+export const SLEEP_MAX_MINUTES=540;
+export const SLEEP_WAKE_ENERGY=92;
+export const SELF_CARE_WISH_MAX_NEED=72;
+export const SELF_CARE_REPEAT_COOLDOWN_MINUTES=180;
 export const NEED_COMFORT_START=90;
 export const NEED_GREEN_BOUNDARY=75;
 export const NEED_MINIMUM_COMFORT_MINUTES=300;
