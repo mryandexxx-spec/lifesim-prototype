@@ -153,6 +153,7 @@ import {proposeFurnishedRoomMove,createHouseholdConstructionEditor} from './furn
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,residentGardenOpportunity,recordResidentGardenStart,
+  residentPoolOpportunity,recordResidentPoolStart,
   bedDestinationFor,preemptAutomaticForManual,
   nearestAvailableDiningTable } from './household.js';
 
@@ -7567,8 +7568,21 @@ function boot() {
             // LOT-C2a: lowest-priority optional gardening, never a manual FIFO task.
             // The existing idle delay, social/need selection and work guards run first.
             const gardenIdea=residentGardenOpportunity(game,residentId);
-            if(gardenIdea&&beginGardenAction(residentId,gardenIdea.instanceId,'water',false,true))
-              save(true);
+            const startedGarden=gardenIdea&&
+              beginGardenAction(residentId,gardenIdea.instanceId,'water',false,true);
+            if(startedGarden)save(true);
+            else{
+              const poolIdea=residentPoolOpportunity(game,residentId);
+              if(poolIdea){
+                const plan=beginPoolSwim(game,residentId,poolIdea);
+                if(plan){
+                  plan.action.automatic=true;
+                  paths[residentId]={id:'swim',points:plan.landPath,index:0};
+                  recordResidentPoolStart(game,residentId);
+                  restartAutonomyWait(residentId);save(true);
+                }
+              }
+            }
           }
         }
       }

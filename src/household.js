@@ -17,6 +17,7 @@ import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitche
   recordDirtyDish,washKitchenDishes} from './kitchen.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {refreshMind,rememberFirstPoolSwim,restorePoolFirstSwimAt} from './psychology.js';
+import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
@@ -113,6 +114,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.financialHistory=newFinancialHistory();
   state.gardenRewards=restoreGardenRewards(null);
   state.gardenRoutine=restoreGardenRoutine(null,state.minutes);
+  state.poolAutoRoutine=restorePoolAutoRoutine(null,state.minutes);
   state.gardenMilestones=restoreGardenMilestones(null,state.minutes);
   state.householdBills=newHouseholdBills(state.minutes);
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
@@ -160,8 +162,10 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   mira.paused=root.paused;
   mira.speed=root.speed;
   mira.autonomy.enabled=root.autonomy.enabled;
-  if (!root.autonomy.enabled && mira.action?.automatic) mira.action=null;
+  if (!root.autonomy.enabled && mira.action?.automatic &&
+      !(mira.action.id==='swim'&&mira.action.exitRequested)) mira.action=null;
   root.otherSim=mira;
+  root.poolAutoRoutine=restorePoolAutoRoutine(raw.poolAutoRoutine,root.minutes);
   restorePoolFirstSwimAt(raw,root);
   restorePoolFirstSwimAt(raw.otherSim,mira);
   applyWorkMoodContext(root);
@@ -1119,6 +1123,12 @@ export function recordResidentGardenStart(root,id,instanceId){
   return noteAutonomousGardenStart(root,id,instanceId);
 }
 
+export function residentPoolOpportunity(root,id='alex'){
+  return considerAutonomousPool(root,id);
+}
+export function recordResidentPoolStart(root,id){
+  return recordAutonomousPoolStart(root,id);
+}
 export function residentAutonomousChoice(root,id='alex') {
   if(residentUnavailableForHome(root,id))return null;
   if(root.socialAction||pendingActions(root.actionQueues,id).length)return null;
