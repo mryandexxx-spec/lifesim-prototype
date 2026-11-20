@@ -1415,7 +1415,7 @@ button.time-card:active {transform:translateY(1px);}
 .career-phone-facts span+span{border-top:1px solid #d6e6dc;padding-top:8px;}
 /* W1-B.2b.3: thumb-sized section tabs and scroll-safe, no double-tap page zoom. */
 .career-phone-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;
-  margin:8px 0 15px;position:sticky;top:-14px;z-index:2;background:#f8f6ee;padding:6px 0;}
+  margin:8px 0 15px;position:relative;z-index:0;background:#f8f6ee;padding:6px 0;}
 .career-phone-body .career-phone-tabs .career-phone-tab{min-height:48px;text-align:center;
   font-size:12px;line-height:1.2;padding:8px 4px;touch-action:manipulation;}
 .career-phone-body .career-phone-tabs .career-phone-tab-active{background:#377e69;color:#fff;
@@ -2277,3 +2277,25 @@ button.time-card:active {transform:translateY(1px);}
 .pool-fixture-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .pool-controls small{font-size:10px;line-height:1.25;color:#496c5e}
 @media(max-width:380px){.pool-fixture-controls{grid-template-columns:minmax(0,1fr)}}
+
+/* UX-06: context-first phone dashboard; no hidden/duplicate career controller. */
+.career-phone-header .career-phone-x{width:44px;height:44px;min-width:44px;min-height:44px;}
+.career-phone-hero{display:grid;gap:7px;padding:14px;margin:12px 0 16px;
+ border:1px solid #a6cdb8;border-radius:16px;background:linear-gradient(155deg,#e6f3e8,#f9fcf6);
+ color:#29483d;overflow-wrap:anywhere}
+.career-phone-hero-headline{font-size:18px;line-height:1.24}
+.career-phone-hero-description{font-size:13px;line-height:1.4;margin:0}
+.career-phone-hero-rate{font-size:12px;line-height:1.45;color:#53735d;margin:0}
+.career-phone-body .career-phone-hero-main{margin:5px 0 0;min-height:46px}
+.career-phone-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:5px}
+.career-phone-body .career-phone-shortcut{font-size:11px;min-height:44px;padding:6px 2px;
+ text-align:center;background:#fff;border:1px solid #b9d2c4;color:#375b4b;border-radius:10px}
+.career-phone-hero-inline{border-radius:10px;background:#e9f5e9;color:#265c46;
+ padding:10px 12px;font-size:14px;font-weight:800;margin:6px 0 10px}
+.career-phone-incident-banner .career-incident-other{width:100%;min-height:44px;
+ background:#fff;border:1px solid #c9846d;color:#8a4230;border-radius:10px;
+ font:800 13px 'DM Sans',sans-serif;touch-action:manipulation}
+.career-phone-incident-other-label{margin-top:5px;font-weight:700}
+@media(max-width:350px){.career-phone-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-height:600px){.career-phone-hero{padding:10px;margin:7px 0 10px}
+ .career-phone-shortcuts{gap:4px}.career-phone-header{padding:8px 12px}}
