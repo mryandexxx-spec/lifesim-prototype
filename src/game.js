@@ -2387,6 +2387,8 @@ function boot() {
   lotGround.enabled=true;
   const poolVisual=createPoolVisual({pc,app,mat,box,lotGround});
   poolVisual.sync(game.world?.outdoors);
+  if(new URLSearchParams(location.search).get('pool')==='qa')
+    window.__LifeSimPoolVisualStats=()=>poolVisual.stats();
   // B1: four *combined* meshes, not one entity per cell. Even the full
   // 1536-cell override limit produces at most four draw-call groups.
   const outdoorPaintMaterials={
