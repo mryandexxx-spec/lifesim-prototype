@@ -1,3 +1,4 @@
+import {MESHY_ROOM_V2_PRODUCTS} from './meshy-room-v2-data.js';
 /** F4b2 — canonical, UI/renderer-agnostic purchasable product data.
  * Product/SKU ID remains stable even when several products share one prefab.
  * New content lives here rather than in financial transactions or PlayCanvas.
@@ -151,6 +152,7 @@ const offered=[
     typeCategoryId:'type.creative.painting',
     description:'Рисование · личный навык живописи и сохранённые картины'},
 ];
+offered.push(...MESHY_ROOM_V2_PRODUCTS);
 export const FURNITURE_PRODUCTS=Object.freeze(offered.map(x=>Object.freeze({...x,
   ...(x.effects?{effects:Object.freeze(x.effects.map(e=>Object.freeze({...e})))}:{})})));
 export const FURNITURE_PRODUCT_BY_ID=Object.freeze(
@@ -217,6 +219,8 @@ export const FURNITURE_SHOP_TYPES=Object.freeze([
   {id:'type.decor.rugs',label:'Ковры',parentId:'type.decor'},
   {id:'type.decor.mirrors',label:'Зеркала',parentId:'type.decor'},
   {id:'type.decor.art',label:'Скульптуры',parentId:'type.decor'},
+  {id:'type.decor.wall',label:'Настенный декор',parentId:'type.decor'},
+  {id:'type.decor.collections',label:'Композиции и аксессуары',parentId:'type.decor'},
   {id:'type.creative',label:'Творчество',icon:'🎨'},
   {id:'type.creative.painting',label:'Живопись',parentId:'type.creative'},
   {id:'type.electronics',label:'Техника',icon:'▣'},
@@ -234,11 +238,13 @@ export const FURNITURE_TYPE_BY_PREFAB=Object.freeze({
   walllight:'type.lighting.wall',ceilinglight:'type.lighting.ceiling',
   tv:'type.electronics.tv',music:'type.electronics.music',
   easel:'type.creative.painting',
+  meshsmall:'type.decor.collections',meshmedium:'type.decor.collections',meshlarge:'type.decor.collections',
+  meshtall:'type.decor.collections',meshwall:'type.decor.wall',
   stove:'type.kitchen.stoves',prep:'type.kitchen.counters',sink:'type.kitchen.sinks'
 });
 export const PROCEDURAL_NEW_PREFABS=Object.freeze([
   'armchair','chair','diningtable','floorlamp','walllight','ceilinglight','rug',
-  'dresser','mirror','sculpture','wardrobe','easel','stove','prep','sink'
+  'dresser','mirror','sculpture','wardrobe','easel','stove','prep','sink','meshsmall','meshmedium','meshlarge','meshtall','meshwall'
 ]);
 export const PROCEDURAL_DEFAULT_SKU=Object.freeze(Object.fromEntries(
   PROCEDURAL_NEW_PREFABS.map(prefabId=>[

@@ -21,8 +21,9 @@ try{
   projection:pc.PROJECTION_ORTHOGRAPHIC,orthoHeight:Math.max(1.7,fit.footprint.height*1.12,
     fit.footprint.width*.82,fit.footprint.depth*.93)});
  app.root.addChild(camera);
- const at=new pc.Vec3(0,fit.mount==='wall'?0:fit.footprint.height*.43,0);
- camera.setPosition(3.3,2.9,4.2);
+ const at=new pc.Vec3(0,fit.mount==='wall'?
+  (sku.startsWith('mesh.')?1.65:0):fit.mount==='ceiling'?-.30:fit.footprint.height*.43,0);
+ camera.setPosition(3.3,at.y+2.9,4.2);
  camera.lookAt(at);
  const light=new pc.Entity('key light');
  light.addComponent('light',{type:'directional',color:new pc.Color(1,1,1),
