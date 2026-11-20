@@ -10,15 +10,26 @@ const fromTime=s=>/^\d{2}:\d{2}$/.test(s)?Number(s.slice(0,2))*60+Number(s.slice
 const addDays=(iso,n)=>toISODate(serialToCivil(civilToSerial(iso)+n));
 const showDate=iso=>{const d=parseCivilDate(iso);return d?d.day+' '+MONTHS_RU[d.month-1]+' '+d.year:'—';};
 const monthNames=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+/** Read-only selection projection. The root calendar and career contracts remain authoritative. */
+export function calendarAgendaSummary(root,iso){
+ if(!parseCivilDate(iso))return {events:[],holidays:[],shifts:[]};
+ return {
+  events:expandCalendarEvents(root.calendar,iso,iso),
+  holidays:expandHolidays(root.calendar,iso,iso),
+  shifts:calendarCareerShifts(root,iso,iso)
+ };
+}
 const markup=`
 <div class="lc-scrim" data-lc-close></div>
 <div class="lc-sheet" role="dialog" aria-modal="true" aria-labelledby="lc-title" tabindex="-1">
-<div class="lc-top"><div><small>Блин’С · расписание семьи</small><h2 id="lc-title">Календарь</h2></div><button id="lc-close" type="button" aria-label="Закрыть">✕</button></div>
-<div class="lc-controls"><button id="lc-prev">‹</button><strong id="lc-period"></strong><button id="lc-next">›</button><button id="lc-today">Сегодня</button></div>
-<div class="lc-tabs"><button data-lc-view="month">Месяц</button><button data-lc-view="week">Неделя</button><button data-lc-view="day">День</button></div>
+<div class="lc-top"><div><small>Блин’С · расписание семьи</small><h2 id="lc-title">Сегодня</h2></div><button id="lc-close" type="button" aria-label="Закрыть календарь">✕</button></div>
+<div class="lc-controls"><button id="lc-prev" type="button" aria-label="Предыдущий период">‹</button><strong id="lc-period"></strong><button id="lc-next" type="button" aria-label="Следующий период">›</button><button id="lc-today" type="button">Сегодня</button></div>
+<div class="lc-tabs" role="group" aria-label="Вид календаря"><button type="button" data-lc-view="month">Месяц</button><button type="button" data-lc-view="week">Неделя</button><button type="button" data-lc-view="day">День</button></div>
+<label class="lc-jump" for="lc-jump-date">Перейти к дате <input id="lc-jump-date" type="date" aria-label="Выбрать игровую дату"/></label>
 <div id="lc-browse">
  <div id="lc-days" class="lc-days"></div>
- <div class="lc-heading"><h3 id="lc-selected"></h3><button id="lc-add">+ Событие</button></div>
+ <div class="lc-heading"><h3 id="lc-selected" aria-live="polite"></h3><button id="lc-add" type="button">+ Событие</button></div>
+ <div id="lc-legend" class="lc-legend" aria-label="Сводка выбранной даты"></div>
  <div id="lc-agenda" class="lc-agenda"></div>
  <div class="lc-heading"><h3>Ближайшее</h3><button id="lc-add-holiday">+ Праздник</button></div>
  <div id="lc-upcoming" class="lc-upcoming"></div>
@@ -31,7 +42,7 @@ const markup=`
  <div id="lc-holidays"></div><button id="lc-anchor">Начальная дата игры</button><small>Изменить дату можно до появления событий и пользовательских праздников.</small></details>
 </div>
 <form id="lc-event-form" class="lc-form" hidden>
-<h3>Событие</h3>
+<div class="lc-form-toolbar"><button type="button" id="lc-event-back-top">← К дате</button><strong>Событие</strong><button type="submit" id="lc-event-done">Готово</button></div>
 <label>Название<input name="title" required maxlength="80"/></label>
 <label>Описание<textarea name="description" maxlength="280" rows="2"></textarea></label>
 <label>Дата<input name="date" type="date" required/></label>
@@ -50,7 +61,7 @@ const markup=`
 <div class="lc-form-actions"><button type="button" id="lc-event-back">Назад</button><button type="button" id="lc-event-delete">Удалить</button><button type="submit">Сохранить</button></div>
 </form>
 <form id="lc-holiday-form" class="lc-form" hidden>
-<h3>Праздник</h3><label>Название<input name="title" required maxlength="80"/></label>
+<div class="lc-form-toolbar"><button type="button" id="lc-holiday-back-top">← К дате</button><strong>Праздник</strong><button type="submit" id="lc-holiday-done">Готово</button></div><label>Название<input name="title" required maxlength="80"/></label>
 <div class="lc-fields"><label>Месяц<select name="month"><option value="1">Январь</option><option value="2">Февраль</option><option value="3">Март</option><option value="4">Апрель</option><option value="5">Май</option><option value="6">Июнь</option><option value="7">Июль</option><option value="8">Август</option><option value="9">Сентябрь</option><option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option></select></label>
 <label>День<input name="day" type="number" min="1" max="31" required/></label></div>
 <label class="lc-check"><input name="dayOffWork" type="checkbox"/> Нерабочий день (для карьеры)</label>
@@ -62,12 +73,30 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
  const wrap=document.createElement('section');wrap.id='life-calendar';wrap.className='life-calendar';wrap.hidden=true;wrap.innerHTML=markup;host.append(wrap);
  const el=id=>wrap.querySelector('#'+id),eventForm=el('lc-event-form'),holidayForm=el('lc-holiday-form');
  const field=(f,name)=>f.elements.namedItem(name),browse=el('lc-browse');
- let view='month',selected=null,editing=null,holidayEditing=null,cache='';
+ let view='day',selected=null,editing=null,holidayEditing=null,cache='',focusBeforeOpen=null;
  const today=()=>calendarAt(getRoot().calendar,getRoot().minutes).iso;
+ function syncViewport(){
+  if(wrap.hidden)return;
+  const viewport=window.visualViewport;
+  if(!viewport)return;
+  wrap.style.height=Math.max(240,Math.round(viewport.height))+'px';
+  wrap.style.top=Math.max(0,Math.round(viewport.offsetTop))+'px';
+ }
  function commit(calendar){setCalendar(calendar);cache='';}
- function close(){wrap.hidden=true;eventForm.hidden=true;holidayForm.hidden=true;editing=null;holidayEditing=null;onClose();}
+ function close({restoreFocus=true}={}){
+  if(wrap.hidden)return;
+  wrap.hidden=true;eventForm.hidden=true;holidayForm.hidden=true;
+  editing=null;holidayEditing=null;wrap.style.height='';wrap.style.top='';
+  onClose();
+  if(restoreFocus&&focusBeforeOpen?.isConnected)focusBeforeOpen.focus({preventScroll:true});
+  focusBeforeOpen=null;
+ }
  function back(){browse.hidden=false;eventForm.hidden=true;holidayForm.hidden=true;editing=null;holidayEditing=null;}
- function open(){selected=selected||today();wrap.hidden=false;back();cache='';render();el('lc-close').focus({preventScroll:true});}
+ function open(){
+  focusBeforeOpen=document.activeElement;
+  selected=today();view='day';wrap.hidden=false;back();cache='';render();
+  syncViewport();el('lc-close').focus({preventScroll:true});
+ }
  function move(n){
   const d=parseCivilDate(selected);
   if(view==='day')selected=addDays(selected,n);
@@ -92,6 +121,8 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
    JSON.stringify(c.occurrenceOverrides||[]),JSON.stringify(root.careerSystem?.byResident||{})].join('|');
   if(cache===key)return;cache=key;
   wrap.querySelectorAll('[data-lc-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lcView===view)));
+  el('lc-title').textContent=selected===now?'Сегодня':'Календарь';
+  el('lc-jump-date').value=selected;
   const from=view==='month'?toISODate({year:d.year,month:d.month,day:1}):
    view==='week'?addDays(selected,-weekdayFromSerial(civilToSerial(selected))):selected;
   const to=view==='month'?toISODate({year:d.year,month:d.month,day:daysInMonth(d.year,d.month)}):
@@ -121,17 +152,23 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
    }
   }else{const p=document.createElement('p');p.className='lc-day-summary';p.textContent=showDate(selected)+' · '+WEEKDAYS_RU[weekdayFromSerial(civilToSerial(selected))];grid.append(p);}
   el('lc-selected').textContent=showDate(selected)+(selected===now?' · сегодня':'')+(isCalendarDayOff(c,selected)?' · выходной':'');
+  const day=calendarAgendaSummary(root,selected);
+  el('lc-legend').replaceChildren();
+  for(const [label,count] of [['Событие',day.events.length],['Смена',day.shifts.length],['Праздник',day.holidays.length]]){
+   const item=document.createElement('span');item.textContent=label+' · '+count;
+   el('lc-legend').append(item);
+  }
   const agenda=el('lc-agenda');agenda.replaceChildren();
-  for(const h of holidays.filter(h=>h.iso===selected))
+  for(const h of day.holidays)
    agenda.append(row('✦ '+h.title,'Праздник'+(h.dayOffWork?' · нерабочий':''),()=>showHoliday(h),true));
-  for(const e of events.filter(e=>e.iso===selected))
-   agenda.append(row(e.title,(e.allDay?'Весь день':time(e.start)+'–'+time(e.end))+' · '+
+  for(const e of day.events)
+   agenda.append(row(e.title,'Событие · '+(e.allDay?'Весь день':time(e.start)+'–'+time(e.end))+' · '+
     (e.participants.length===2?'Алекс и Мира':e.participants[0]==='alex'?'Алекс':'Мира')+
     (e.repeat!=='none'?' · ↻':''),()=>showEvent(e)));
-  for(const w of work.filter(w=>w.iso===selected))
+  for(const w of day.shifts)
     agenda.append(row(w.timeOff==='paid'?'🌴 Оплачиваемый отпуск':
       w.timeOff==='unpaid'?'🏖 Отгул':'▣ Работа: '+w.title,
-      clockLabel(w.start)+'–'+clockLabel(w.end)+' · '+
+      'Смена · '+clockLabel(w.start)+'–'+clockLabel(w.end)+' · '+
       (w.residentId==='alex'?'Алекс':'Мира')+' · '+w.rankTitle,null));
   if(!agenda.childNodes.length){const p=document.createElement('p');p.textContent='На эту дату событий нет.';agenda.append(p);}
   const upcoming=el('lc-upcoming');upcoming.replaceChildren();
@@ -217,12 +254,17 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
  }
  el('lc-close').addEventListener('click',close);wrap.querySelector('[data-lc-close]').addEventListener('click',close);
  el('lc-prev').addEventListener('click',()=>move(-1));el('lc-next').addEventListener('click',()=>move(1));
- el('lc-today').addEventListener('click',()=>{selected=today();cache='';render();});
+ el('lc-today').addEventListener('click',()=>{selected=today();view='day';cache='';render();});
+ el('lc-jump-date').addEventListener('change',e=>{
+  if(parseCivilDate(e.target.value)){selected=e.target.value;cache='';render();}
+ });
  wrap.querySelectorAll('[data-lc-view]').forEach(b=>b.addEventListener('click',()=>{view=b.dataset.lcView;cache='';render();}));
  el('lc-add').addEventListener('click',()=>showEvent());el('lc-add-holiday').addEventListener('click',()=>showHoliday());
- el('lc-event-back').addEventListener('click',()=>{back();cache='';render();});
- el('lc-holiday-back').addEventListener('click',()=>{back();cache='';render();});
- el('lc-anchor').addEventListener('click',()=>{close();onAnchor();});
+ for(const id of ['lc-event-back','lc-event-back-top'])
+  el(id).addEventListener('click',()=>{back();cache='';render();el('lc-selected').focus?.({preventScroll:true});});
+ for(const id of ['lc-holiday-back','lc-holiday-back-top'])
+  el(id).addEventListener('click',()=>{back();cache='';render();});
+ el('lc-anchor').addEventListener('click',()=>{close({restoreFocus:false});onAnchor();});
  wrap.querySelectorAll('[data-weekend]').forEach(box=>box.addEventListener('change',()=>{
    const weekendDays=[...wrap.querySelectorAll('[data-weekend]:checked')]
      .map(node=>Number(node.dataset.weekend)).sort((a,b)=>a-b);
@@ -262,5 +304,7 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
   commit(removeHoliday(getRoot().calendar,holidayEditing.id));back();render();notify('Праздник изменён');
  });
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!wrap.hidden){e.preventDefault();close();}});
- return {open,close,tick:render,refresh:()=>{cache='';render();},reset:()=>{close();selected=null;cache='';}};
+ window.visualViewport?.addEventListener('resize',syncViewport);
+ window.visualViewport?.addEventListener('scroll',syncViewport);
+ return {open,close,tick:render,refresh:()=>{cache='';render();},reset:()=>{close();selected=null;view='day';cache='';}};
 }
