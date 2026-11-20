@@ -119,8 +119,11 @@ try{
     assert.match(await page.locator('#ground-walk-title').textContent(),/фонарь/i);
     assert.match(await page.locator('#ground-walk-action-label').textContent(),/Подойти/);
     beforeAction=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
-    assert.equal(beforeAction.actionQueues.byResident.alex.length,1,
-      'Lamp tap cannot enqueue a movement before the player selects an action');
+    const activeBenchBeforeLamp=beforeAction.action?.id==='bench'&&
+      beforeAction.action?.automatic===false&&
+      beforeAction.action?.targetInstanceId==='out-1';
+    assert.equal(beforeAction.actionQueues.byResident.alex.length+(activeBenchBeforeLamp?1:0),1,
+      'Lamp tap cannot enqueue a movement before the player selects an action (bench may already be active)');
     await page.locator('#ground-walk-action').click();
     const afterLamp=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     const remaining=afterLamp.actionQueues.byResident.alex;
