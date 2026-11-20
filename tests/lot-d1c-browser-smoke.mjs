@@ -107,6 +107,16 @@ try{
       JSON.parse(localStorage.getItem(key))?.world?.outdoors?.pools?.[0]?.cells?.length,
       SAVE_KEY),9);
     assert.equal((await page.evaluate(()=>window.__LifeSimPoolVisualStats?.()))?.hasPool,true);
+    // The reload restores CAMERA_INITIAL (center 0, pitch 47, distance 16.9).
+    // projectGround() above is intentionally calibrated to the OUTDOOR camera
+    // (center 7, pitch 60, distance 43). Re-enter and leave outdoor mode
+    // without editing to establish that same real camera before world tapping.
+    // A screen coordinate from the build camera must not be reused after reload.
+    await page.locator('#home-open').click();
+    await page.locator('#home-outdoors').click();
+    await page.locator('#outdoor-category').selectOption('pool');
+    await page.locator('#outdoor-exit').click();
+    await page.waitForTimeout(180); // one real camera render frame on slow CI
     // In Life mode water is picked as water, never offered as a land waypoint.
     // D1c does not enqueue a fake swimming action before the separate D2 stage.
     await touch([7.75,-6.75]);
