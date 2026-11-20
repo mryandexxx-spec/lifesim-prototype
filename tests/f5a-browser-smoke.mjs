@@ -1,3 +1,4 @@
+import {buildGroupForTool} from '../src/build-tool-palette.js';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {newHousehold,loadHousehold} from '../src/household.js';
@@ -37,17 +38,28 @@ try{
     if(await page.locator('#build-toggle').isVisible())await page.locator('#build-toggle').click();
     else{await page.locator('#home-open').click();await page.locator('#home-build').click();}
   };
+  const chooseBuildTool=async type=>{
+    const group=buildGroupForTool(type);
+    if(group==='view'){
+      if(await page.locator('#build-view-panel').isHidden())
+        await page.locator('#build-view-trigger').click();
+    }else{
+      await page.locator('[data-build-group-tab="'+group+'"]').click();
+    }
+    await chooseBuildTool(''+type+'');
+  };
   await clickBuild();
  assert.equal(await page.locator('#build-toggle').getAttribute('aria-pressed'),'true');
  assert.ok(await page.locator('#build-editor').isVisible());
- await page.locator('[data-build-tool="wall"]').click();
+ await chooseBuildTool('wall');
  assert.equal(await page.locator('[data-build-tool="wall"]').getAttribute('aria-pressed'),'true');
+ await page.locator('#build-view-trigger').click();
  await page.locator('[data-build-walls="down"]').click();
  assert.equal(await page.locator('[data-build-walls="down"]').getAttribute('aria-pressed'),'true');
  await page.locator('[data-build-walls="cut"]').click();
- await page.locator('[data-build-tool="remove-opening"]').click();
- await page.locator('[data-build-tool="move-wall"]').click();
- await page.locator('[data-build-tool="room"]').click();
+ await chooseBuildTool('remove-opening');
+ await chooseBuildTool('move-wall');
+ await chooseBuildTool('room');
  // Run an actual mobile-sized pointer transaction on an empty eastern ground patch.
  // The projection uses the exact initial camera pose set by the build editor.
  const project=(x,z)=>{
@@ -88,7 +100,7 @@ try{
  const wallTouch=project(18,0,1.4);
  assert.ok(wallTouch.x>10&&wallTouch.x<380&&wallTouch.y>120&&wallTouch.y<565,
    'Exterior wall must be reachable above the iPhone build panel');
- await page.locator('[data-build-tool="move-wall"]').click();
+ await chooseBuildTool('move-wall');
  await send('pointerdown',wallTouch,'canvas');
  await send('pointerup',wallTouch,'window');
  assert.ok(await page.locator('#build-wall-controls').isVisible(),
@@ -100,7 +112,7 @@ try{
  await page.locator('#build-apply').click();
  assert.ok(await page.locator('#build-wall-controls').isHidden(),
    'The selected edge ID must be cleared after wall geometry changes');
- await page.locator('[data-build-tool="camera"]').click();
+ await chooseBuildTool('camera');
  assert.equal(await page.locator('[data-build-tool="camera"]').getAttribute('aria-pressed'),'true');
  const beforePan=await page.locator('#game-canvas').screenshot();
  await send('pointerdown',{x:175,y:275},'canvas');
@@ -117,7 +129,7 @@ try{
  await clickBuild(); // restores the known initial build camera
  assert.equal(await page.locator('#build-starter-picker').count(),0,
    'The original home must not need a separate wall-side picker');
- await page.locator('[data-build-tool="move-wall"]').click();
+ await chooseBuildTool('move-wall');
  const oldNorth=project(11,-4.34);
  assert.ok(oldNorth.x>20&&oldNorth.x<375&&oldNorth.y>100&&oldNorth.y<540);
  await send('pointerdown',oldNorth,'canvas');
@@ -138,7 +150,7 @@ try{
  assert.ok(await page.locator('#build-pending').isVisible());
  await page.locator('#build-apply').click();
  // Place a real opening straight into the ORIGINAL back wall.
- await page.locator('[data-build-tool="window"]').click();
+ await chooseBuildTool('window');
  const starterOpeningTouch=project(11,-4.84);
  await send('pointerdown',starterOpeningTouch,'canvas');
  await send('pointerup',starterOpeningTouch,'window');
@@ -184,7 +196,7 @@ try{
  // F5-B: a real Safari-sized tap picks a floor style, stages a transaction,
  // renders a material and survives loading the same v1 save.
  await clickBuild();
- await page.locator('[data-build-tool="paint-room"]').click();
+ await chooseBuildTool('paint-room');
  assert.ok(await page.locator('#build-finish-picker').isVisible());
  await page.locator('[data-finish-id="floor.slate"]').click();
  const finishTouch=project(16,0);
@@ -205,7 +217,7 @@ try{
   // F5-B.2: actual touch on the published PlayCanvas opening editor, not
  // only headless domain functions. Build entry restores the default mobile pose.
  await clickBuild();
- await page.locator('[data-build-tool="arch"]').click();
+ await chooseBuildTool('arch');
  assert.ok(await page.locator('#build-opening-picker').isVisible());
  await page.locator('[data-opening-style="arch.wide"]').click();
  const portalTouch=project(18.5,0);
@@ -220,7 +232,7 @@ try{
  const arch=archSaved.world.construction.openings.find(o=>o.styleId==='arch.wide');
  assert.ok(arch,'New 2m arch persists its style');
  assert.equal(arch.edgeIds.length,4);
- await page.locator('[data-build-tool="change-opening"]').click();
+ await chooseBuildTool('change-opening');
  await send('pointerdown',portalTouch,'canvas');
  await send('pointerup',portalTouch,'window');
  assert.match(await page.locator('#build-opening-label').innerText(),/замену/);
@@ -238,7 +250,7 @@ try{
  assert.equal(restoredOpening.world.construction.openings.find(o=>o.id===arch.id)?.styleId,'door.double');
   // F5-B.4: actual mobile WebGL touch on ceiling/pattern and v1 save.
   await clickBuild();
-  await page.locator('[data-build-tool="paint-ceiling-room"]').click();
+  await chooseBuildTool('paint-ceiling-room');
   assert.equal(await page.locator('#build-ceiling-toggle').getAttribute('aria-pressed'),'true');
   await page.locator('[data-finish-id="ceiling.blue"]').click();
   const ceilingTap=project(16,0);
@@ -250,7 +262,7 @@ try{
   const ceilingSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
   assert.equal(ceilingSave.world.construction.materials.ceiling['32,0'],'ceiling.blue');
   await page.screenshot({path:'f5b4-ceiling-preview.png'});
-  await page.locator('[data-build-tool="paint-floor"]').click();
+  await chooseBuildTool('paint-floor');
   assert.equal(await page.locator('#build-ceiling-toggle').getAttribute('aria-pressed'),'false');
   await page.locator('[data-finish-id="floor.planks-z"]').click();
   await send('pointerdown',ceilingTap,'canvas');
@@ -268,7 +280,7 @@ try{
   assert.equal(restoredB4.world.construction.materials.floor['32,0'],'floor.planks-z');
   // F5-C.1: author a real roof, change its shape and reload with PlayCanvas.
   await clickBuild();
-  await page.locator('[data-build-tool="roof-auto"]').click();
+  await chooseBuildTool('roof-auto');
   assert.ok(await page.locator('#build-roof-picker').isVisible());
   assert.ok(await page.locator('#build-pending').isVisible(),
     'Auto roof must stage rather than commit immediately');
@@ -278,7 +290,7 @@ try{
   assert.ok(roofSave.world.construction.roofModules.length>=1);
   assert.equal(await page.locator('#build-roof-toggle').getAttribute('aria-pressed'),'true');
   await page.screenshot({path:'f5c1-auto-roof.png'});
-  await page.locator('[data-build-tool="roof-edit"]').click();
+  await chooseBuildTool('roof-edit');
   const roofTap=project(16,0);
   await send('pointerdown',roofTap,'canvas');
   await send('pointerup',roofTap,'window');
@@ -289,7 +301,8 @@ try{
   const hipSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
   assert.ok(hipSave.world.construction.roofModules.some(m=>m.styleId==='roof.hip'));
   await page.screenshot({path:'f5c1-hip-roof.png'});
-  await page.locator('#build-roof-toggle').click();
+  if(await page.locator('#build-view-panel').isHidden())await page.locator('#build-view-trigger').click();
+   await page.locator('#build-roof-toggle').click();
   assert.equal(await page.locator('#build-roof-toggle').getAttribute('aria-pressed'),'false');
   await page.locator('#build-exit').click();
   await page.reload({waitUntil:'domcontentloaded'});
@@ -301,7 +314,7 @@ try{
   assert.equal(await page.locator('#build-roof-toggle').getAttribute('aria-pressed'),'false',
     'A roof never covers the life view or starts visible by default');
   // F5-C.2: real wall/roof-height, facade and outdoor porch UI in Chromium WebGL.
-  await page.locator('[data-build-tool="paint-facade-all"]').click();
+  await chooseBuildTool('paint-facade-all');
   assert.ok(await page.locator('#build-finish-picker').isVisible());
   await page.locator('[data-finish-id="facade.brick"]').click();
   assert.ok(await page.locator('#build-pending').isVisible());
@@ -309,7 +322,7 @@ try{
   const facadeSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
   assert.ok(Object.values(facadeSave.world.construction.materials.facade)
     .includes('facade.brick'),'Exterior facade must save independently of wallpaper');
-  await page.locator('[data-build-tool="wall-height"]').click();
+  await chooseBuildTool('wall-height');
   assert.ok(await page.locator('#build-height-picker').isVisible());
   await page.locator('[data-wall-height="tall"]').click();
   assert.ok(await page.locator('#build-pending').isVisible());
@@ -317,7 +330,7 @@ try{
   const heightSave=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
   assert.equal(heightSave.world.construction.wallHeightClass,'tall');
   await page.screenshot({path:'f5c2-tall-facade.png'});
-  await page.locator('[data-build-tool="porch-add"]').click();
+  await chooseBuildTool('porch-add');
   assert.ok(await page.locator('#build-porch-picker').isVisible());
   await page.locator('[data-porch-finish="porch.wood"]').click();
   const frontDoor=project(18.5,0);

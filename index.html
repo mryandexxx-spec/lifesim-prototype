@@ -255,40 +255,58 @@
 
 
     <section id="build-editor" class="build-editor" aria-label="Строительство дома" hidden>
-      <div class="build-head"><div><small>F5-D.3a/объединение · ОДИН ЭТАЖ · СВОБОДНАЯ СТРОЙКА</small><h2>Строительство</h2></div><button type="button" id="build-exit">✓ В жизнь</button></div>
+      <div class="build-head"><div><small>ОДИН ЭТАЖ · РЕДАКТОР ДОМА</small><h2>Строительство</h2></div><button type="button" id="build-exit">✓ В жизнь</button></div>
       <p id="build-instruction">Камера: свайп одним пальцем передвигает дом, двумя — поворот и масштаб. Для строительства выбери инструмент.</p>
-      <div class="build-tools" role="group" aria-label="Инструменты строительства">
-        <button type="button" data-build-tool="camera" aria-pressed="true">✥ Камера · свайп</button>
-        <button type="button" data-build-tool="room">▣ Комната</button>
-        <button type="button" data-build-tool="room-duplicate">⧉ Копировать комнату</button>
-        <button type="button" data-build-tool="room-relocate">⇢ Перенести комнату</button>
-        <button type="button" data-build-tool="room-join">⇔ Объединить комнаты</button>
-        <button type="button" data-build-tool="move-wall">⇆ Перенести стену</button>
-        <button type="button" data-build-tool="floor">▤ Пол</button>
-        <button type="button" data-build-tool="wall">┃ Стена</button>
-        <button type="button" data-build-tool="paint-room">🎨 Пол комнаты</button>
-        <button type="button" data-build-tool="paint-floor">▦ Плитка пола</button>
-        <button type="button" data-build-tool="paint-wall">🖌 Обои / стены</button>
-        <button type="button" data-build-tool="paint-facade-all">🏠 Фасад целиком</button>
-        <button type="button" data-build-tool="paint-facade">▥ Фасадный участок</button>
-        <button type="button" data-build-tool="wall-height">⇡ Высота стен</button>
-        <button type="button" data-build-tool="paint-ceiling-room">▰ Потолок комнаты</button>
-        <button type="button" data-build-tool="paint-ceiling-tile">▤ Плитка потолка</button>
-        <button type="button" data-build-tool="sample-finish">◉ Пипетка</button>
-        <button type="button" data-build-tool="door">🚪 Дверь</button>
-        <button type="button" data-build-tool="window">▥ Окно</button>
-        <button type="button" data-build-tool="arch">⌒ Арка</button>
-        <button type="button" data-build-tool="change-opening">⇄ Заменить проём</button>
-        <button type="button" data-build-tool="erase-wall">⌫ Убрать участок стены</button>
-        <button type="button" data-build-tool="remove-opening">× Снять проём</button>
-        <button type="button" data-build-tool="remove-floor">− Убрать пол</button>
-        <button type="button" data-build-tool="roof-auto">⌂ Автокрыша</button>
-        <button type="button" data-build-tool="roof-add">▰ Секция крыши</button>
-        <button type="button" data-build-tool="roof-edit">✎ Изменить крышу</button>
-        <button type="button" data-build-tool="roof-remove">⌫ Убрать секцию</button>
-        <button type="button" data-build-tool="roof-clear">× Убрать крыши</button>
-        <button type="button" data-build-tool="porch-add">▱ Построить крыльцо</button>
-        <button type="button" data-build-tool="porch-remove">⌫ Убрать крыльцо</button>
+      <nav class="build-group-tabs" aria-label="Разделы строительства">
+        <button type="button" data-build-group-tab="room" aria-pressed="true" aria-controls="build-tools">Комната</button>
+        <button type="button" data-build-group-tab="walls" aria-pressed="false" aria-controls="build-tools">Стены и пол</button>
+        <button type="button" data-build-group-tab="openings" aria-pressed="false" aria-controls="build-tools">Проёмы</button>
+        <button type="button" data-build-group-tab="finishes" aria-pressed="false" aria-controls="build-tools">Отделка</button>
+        <button type="button" data-build-group-tab="roof" aria-pressed="false" aria-controls="build-tools">Крыша</button>
+        <button type="button" data-build-group-tab="porch" aria-pressed="false" aria-controls="build-tools">Крыльцо</button>
+      </nav>
+      <div class="build-tool-status"><output id="build-active-tool" aria-live="polite">Инструмент: Камера</output><button id="build-view-trigger" type="button" aria-expanded="false" aria-controls="build-view-panel">◉ Вид и камера</button></div>
+      <div id="build-view-panel" class="build-view-panel" hidden>
+        <div class="build-view-camera"><button type="button" data-build-tool="camera" aria-pressed="true">✥ Камера · свайп</button></div>
+        <div class="build-walls" role="group" aria-label="Видимость стен">
+        <button type="button" data-build-walls="up">Стены ↑</button>
+        <button type="button" data-build-walls="cut" aria-pressed="true">Срез</button>
+        <button type="button" data-build-walls="down">Стены ↓</button>
+        <button type="button" id="build-ceiling-toggle" aria-pressed="false">Потолок ◻</button>
+        <button type="button" id="build-roof-toggle" aria-pressed="false">Крыша ◇</button>
+      </div>
+      </div>
+      <div id="build-tools" class="build-tools" role="group" aria-label="Инструменты выбранного раздела">
+        <button type="button" data-build-tool="room" data-build-group="room">▣ Комната</button>
+        <button type="button" data-build-tool="room-duplicate" data-build-group="room">⧉ Копировать комнату</button>
+        <button type="button" data-build-tool="room-relocate" data-build-group="room">⇢ Перенести комнату</button>
+        <button type="button" data-build-tool="room-join" data-build-group="room">⇔ Объединить комнаты</button>
+        <button type="button" data-build-tool="move-wall" data-build-group="walls">⇆ Перенести стену</button>
+        <button type="button" data-build-tool="floor" data-build-group="walls">▤ Пол</button>
+        <button type="button" data-build-tool="wall" data-build-group="walls">┃ Стена</button>
+        <button type="button" data-build-tool="paint-room" data-build-group="finishes">🎨 Пол комнаты</button>
+        <button type="button" data-build-tool="paint-floor" data-build-group="finishes">▦ Плитка пола</button>
+        <button type="button" data-build-tool="paint-wall" data-build-group="finishes">🖌 Обои / стены</button>
+        <button type="button" data-build-tool="paint-facade-all" data-build-group="finishes">🏠 Фасад целиком</button>
+        <button type="button" data-build-tool="paint-facade" data-build-group="finishes">▥ Фасадный участок</button>
+        <button type="button" data-build-tool="wall-height" data-build-group="walls">⇡ Высота стен</button>
+        <button type="button" data-build-tool="paint-ceiling-room" data-build-group="finishes">▰ Потолок комнаты</button>
+        <button type="button" data-build-tool="paint-ceiling-tile" data-build-group="finishes">▤ Плитка потолка</button>
+        <button type="button" data-build-tool="sample-finish" data-build-group="finishes">◉ Пипетка</button>
+        <button type="button" data-build-tool="door" data-build-group="openings">🚪 Дверь</button>
+        <button type="button" data-build-tool="window" data-build-group="openings">▥ Окно</button>
+        <button type="button" data-build-tool="arch" data-build-group="openings">⌒ Арка</button>
+        <button type="button" data-build-tool="change-opening" data-build-group="openings">⇄ Заменить проём</button>
+        <button type="button" data-build-tool="erase-wall" data-build-group="walls">⌫ Убрать участок стены</button>
+        <button type="button" data-build-tool="remove-opening" data-build-group="openings">× Снять проём</button>
+        <button type="button" data-build-tool="remove-floor" data-build-group="walls">− Убрать пол</button>
+        <button type="button" data-build-tool="roof-auto" data-build-group="roof">⌂ Автокрыша</button>
+        <button type="button" data-build-tool="roof-add" data-build-group="roof">▰ Секция крыши</button>
+        <button type="button" data-build-tool="roof-edit" data-build-group="roof">✎ Изменить крышу</button>
+        <button type="button" data-build-tool="roof-remove" data-build-group="roof">⌫ Убрать секцию</button>
+        <button type="button" data-build-tool="roof-clear" data-build-group="roof">× Убрать крыши</button>
+        <button type="button" data-build-tool="porch-add" data-build-group="porch">▱ Построить крыльцо</button>
+        <button type="button" data-build-tool="porch-remove" data-build-group="porch">⌫ Убрать крыльцо</button>
       </div>
       <div id="build-opening-picker" class="build-opening-picker" hidden>
         <strong id="build-opening-label">Выбери вариант</strong>
@@ -347,7 +365,7 @@
         <strong id="build-room-label">Коснись прямоугольной комнаты для выбора</strong>
         <button type="button" id="build-room-turn">⟳ Поворот 0°</button>
         <button type="button" id="build-room-reset">Сброс выбора</button>
-        <small>Пока переносятся только пустые отдельные прямоугольные комнаты: стены, проёмы, пол, потолок и отделка. Мебель, жильцы, картины и крыльцо защищены.</small>
+        <small>Можно переносить отдельную прямоугольную комнату с доступной мебелью. Занятые предметы, картины, жители, крыльцо и перекрытые проходы блокируют перенос с указанием причины.</small>
       </div>
       <div id="build-wall-controls" class="build-wall-controls" hidden>
         <strong id="build-wall-label">Выбрана стена</strong>
@@ -355,14 +373,8 @@
         <button type="button" id="build-wall-contract">−0,5 м · внутрь</button>
         <button type="button" id="build-wall-deselect" aria-label="Снять выделение стены">×</button>
       </div>
-      <div id="build-pending" class="build-pending" hidden><strong>Подтвердить строительство?</strong><button id="build-apply" type="button">✓ Применить</button><button id="build-cancel" type="button">× Отмена</button></div>
-      <div class="build-bottom"><div class="build-walls" role="group" aria-label="Видимость стен">
-        <button type="button" data-build-walls="up">Стены ↑</button>
-        <button type="button" data-build-walls="cut" aria-pressed="true">Срез</button>
-        <button type="button" data-build-walls="down">Стены ↓</button>
-        <button type="button" id="build-ceiling-toggle" aria-pressed="false">Потолок ◻</button>
-        <button type="button" id="build-roof-toggle" aria-pressed="false">Крыша ◇</button>
-      </div><button type="button" id="build-undo" aria-label="Отменить строительство" disabled>↶</button>
+      <div id="build-pending" class="build-pending" hidden><strong id="build-pending-title">Подтвердить изменение?</strong><button id="build-apply" type="button">✓ Применить</button><button id="build-cancel" type="button">× Отмена</button></div>
+      <div class="build-bottom"><small class="build-flow-hint">Выбери инструмент → предпросмотр → подтверждение</small><button type="button" id="build-undo" aria-label="Отменить строительство" disabled>↶</button>
       <button type="button" id="build-redo" aria-label="Вернуть строительство" disabled>↷</button></div>
       <output id="build-feedback" class="build-feedback" role="status" aria-live="polite">Выбери инструмент и коснись участка</output>
     </section>

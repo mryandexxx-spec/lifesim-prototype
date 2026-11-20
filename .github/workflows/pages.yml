@@ -212,7 +212,7 @@ jobs:
           cp src/camera-gestures.js site/src/
           cp src/mobile-gesture-policy.js site/src/
           cp src/viewport-health.js site/src/
-          cp src/construction.js site/src/
+          cp src/construction.js src/build-tool-palette.js site/src/
           cp src/lot-surface.js src/outdoor-catalog.js src/outdoor-proposals.js src/outdoor-interactions.js site/src/
           cp src/gardening.js site/src/
           cp src/garden-autonomy.js site/src/
