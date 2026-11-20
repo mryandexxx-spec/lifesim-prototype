@@ -134,6 +134,6 @@ try{
  assert.deepEqual(problems,[]);
  writeFileSync('ux01-artifacts/measurements.json',JSON.stringify({
   baselineSha,comparison:'paused, identical root-v1 queue + camera + 4 real SwiftShader WebGL viewports',
-  screens},null,2)+'\\n');
+  screens},null,2)+'\n');
  console.log('UX-01 four-view baseline/candidate PlayCanvas WebGL PASS:',screens.length);
 }finally{await browser.close();}
