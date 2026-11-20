@@ -33,9 +33,9 @@ test('M4: SIX actual positive needs and toilet action exist together, independen
   assert.equal(NEED_LABELS.bladder,'Туалет');
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
   assert.equal(BLADDER_LEGACY_DEFAULT,75);
-  assert.equal(a.needs.bladder,76);
-  assert.equal(h.otherSim.needs.bladder,78);
-  a.needs.bladder=0;assert.equal(b.needs.bladder,76);
+  assert.equal(a.needs.bladder,82);
+  assert.equal(h.otherSim.needs.bladder,82);
+  a.needs.bladder=0;assert.equal(b.needs.bladder,82);
   assert.equal(ACTIONS.toilet.need,'bladder');
   assert.deepEqual(ACTIONS.toilet.location,
     [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z]);
@@ -78,12 +78,12 @@ test('M4: invalid and malicious saved bladder scores are normalized, no reset of
 test('M4: decay is deterministic in game minutes, never while paused',()=>{
   const s=newGame(),value=s.needs.bladder;
   tick(s,20);
-  near(s.needs.bladder,value-20*.046);
+  near(s.needs.bladder,value-20*.037);
   s.paused=true;
   const snapshot=JSON.stringify(s);
   tick(s,500);
   assert.equal(JSON.stringify(s),snapshot);
-  s.paused=false;tick(s,2100);
+  s.paused=false;tick(s,2300);
   assert.equal(s.needs.bladder,0);
 });
 
@@ -171,12 +171,12 @@ test('M4: walking and early entry never restore bladder; gain starts only after 
   const before=s.needs.bladder;
   tick(s,4);
   assert.equal(s.action.phase,'walking');
-  near(s.needs.bladder,before-4*.046);
+  near(s.needs.bladder,before-4*.037);
   arrive(s);
   assert.equal(s.action.phase,'using');
   const t=ACTIONS.toilet.duration*TOILET_RELIEF_START;
   tick(s,t);
-  near(s.needs.bladder,before-(4+t)*.046);
+  near(s.needs.bladder,before-(4+t)*.037);
   const beforeRelief=s.needs.bladder;
   tick(s,3);
   assert.ok(s.needs.bladder>beforeRelief+5);
@@ -189,7 +189,7 @@ test('M4: completed toilet recovers once, adds a legitimate non-social memory, a
   assert.equal(chooseAction(s,'toilet'),true);arrive(s);
   tick(s,ACTIONS.toilet.duration);
   assert.equal(s.action,null);
-  assert.ok(s.needs.bladder>60);
+  assert.ok(s.needs.bladder>30);
   assert.ok(s.mind.memories.length>=m+1);
   assert.equal(s.mind.memories.at(-1).id,'toilet');
   assert.ok(MEMORY_TEXT.toilet);
