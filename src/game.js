@@ -2083,6 +2083,10 @@ function boot() {
     try{render();}finally{decorDrawing=previous;}
     // The original room uses saved starter instance IDs, not purchased SKU IDs.
     // Attach only when the real starter exists; keep gameplay scene roots intact.
+    // A future purchase must clone authored (and fully enabled) parts even
+    // if the starter GLB has already loaded or its sleeper has unfolded a quilt.
+    if(!templateOnly&&meshyStarterFurnitureSku(prefabId))
+      decorTemplates.set(prefabId,node.clone());
     if(!templateOnly)
       meshyFurniture.attach(node,meshyStarterFurnitureSku(prefabId));
   };
@@ -7680,6 +7684,11 @@ function boot() {
         const trim=item.instanceId==='home-bed-1'
           ?quilts[slot].trim:node.findByName('duvet trim '+slot);
         if(!body||!trim)continue;
+        // The imported bed has a permanently made cover. Reveal each live
+        // quilt only while its own sleeper pulls it up; keep empty beds tidy.
+        if(meshyFurniture.hasModel(node)){
+          body.render.enabled=trim.render.enabled=progress>.96;
+        }
         body.setLocalPosition(bx+2.62,quilt.y,quilt.z+1.425);
         body.setLocalScale(1.02,.15,quilt.depth);
         trim.setLocalPosition(bx+2.62,quilt.y+.09,quilt.trimZ+1.425);

@@ -6,15 +6,26 @@
  * Source meshes are normalized by Meshy near [-0.5, +0.5]; these MUST be fit
  * to LifeSim's meter-like world dimensions (Alex/Mira ~2.05m display height).
  */
+import {SOFA_LAYOUT} from './pose-config.js';
+import {BED_LAYOUT} from './bed-layout.js';
+import {PURCHASED_SEAT_PROFILES} from './seat-furniture.js';
 import {FURNITURE_CATALOG} from './furniture-catalog.js';
+
+// The ratios are vertical ray intersections on the shipped triangles, measured
+// from the floor to the occupied cushion or mattress as a fraction of GLB height.
+// Fit art to the same support used by entry, exit, sleeping slots and foot IK.
+const sofaTop=SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2;
+const chairTop=PURCHASED_SEAT_PROFILES.armchair.seatHeight;
+const mattressTop=BED_LAYOUT.mattressY+BED_LAYOUT.mattressHeight/2;
+const frontAtPositiveZ=new Set(['sofa','armchair','mirror','dresser','wardrobe','walllight']);
 
 const entries=[
  // sku, prefabId, desired height in LifeSim world units, raw bounds min/max
- ['sofa.comfort','sofa',1.12,[-.500,-.246,-.208],[.500,.244,.211]],
- ['sofa.loft','sofa',1.08,[-.500,-.228,-.214],[.500,.222,.215]],
- ['armchair.wing','armchair',1.56,[-.375,-.500,-.390],[.374,.500,.389]],
- ['armchair.shell','armchair',1.12,[-.500,-.500,-.420],[.500,.500,.419]],
- ['bed.platform','bed',1.16,[-.397,-.263,-.500],[.398,.261,.500]],
+ ['sofa.comfort','sofa',sofaTop/.555,[-.500,-.246,-.208],[.500,.244,.211]],
+ ['sofa.loft','sofa',sofaTop/.535,[-.500,-.228,-.214],[.500,.222,.215]],
+ ['armchair.wing','armchair',chairTop/.41,[-.375,-.500,-.390],[.374,.500,.389]],
+ ['armchair.shell','armchair',chairTop/.565,[-.500,-.500,-.420],[.500,.500,.419]],
+ ['bed.platform','bed',mattressTop/.625,[-.397,-.263,-.500],[.398,.261,.500]],
  ['bookcase.starter','bookcase',2.04,[-.322,-.500,-.218],[.324,.500,.216]],
  ['dresser.reed','dresser',1.19,[-.428,-.500,-.247],[.424,.500,.247]],
  ['floorlamp.tripod','floorlamp',2.04,[-.216,-.500,-.210],[.213,.500,.212]],
@@ -71,16 +82,18 @@ export function meshyFurnitureFit(sku){
     : {x:sx,y:spec.height/size[1],z:depth/size[2]};
   // The root of purchased furniture is at its floor-cell center. Walllights
   // instead inherit the canonical C3 vertical wall mount and must be centered.
+  const rotationY=frontAtPositiveZ.has(spec.prefabId)?180:0;
+  const direction=rotationY?-1:1;
   const offset={
-    x:-(min[0]+max[0])*scale.x/2,
+    x:-direction*(min[0]+max[0])*scale.x/2,
     y:flat ? -min[2]*scale.z+.006
       :spec.mount==='wall' ? -(min[1]+max[1])*scale.y/2
       :-min[1]*scale.y,
     z:flat ? (min[1]+max[1])*scale.y/2
-      :-(min[2]+max[2])*scale.z/2
+      :-direction*(min[2]+max[2])*scale.z/2
   };
   return Object.freeze({
-    sku,prefabId:spec.prefabId,rotationX:flat?-90:0,
+    sku,prefabId:spec.prefabId,rotationX:flat?-90:0,rotationY,
     scale:Object.freeze(scale),offset:Object.freeze(offset),
     footprint:Object.freeze({width,depth,height:spec.height}),
     mount:spec.mount

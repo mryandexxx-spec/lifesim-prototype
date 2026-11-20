@@ -42,7 +42,7 @@ export function createMeshyFurnitureVisual({pc,app,onError=()=>{},enabled=true})
       if(!renderEntity)throw Error('Empty GLB '+sku);
       const pivot=new pc.Entity('Meshy furniture '+sku);
       pivot.setLocalPosition(fit.offset.x,fit.offset.y,fit.offset.z);
-      if(fit.rotationX)pivot.setLocalEulerAngles(fit.rotationX,0,0);
+      pivot.setLocalEulerAngles(fit.rotationX,fit.rotationY,0);
       renderEntity.setLocalScale(fit.scale.x,fit.scale.y,fit.scale.z);
       pivot.addChild(renderEntity);
       node.addChild(pivot);
@@ -68,6 +68,7 @@ export function createMeshyFurnitureVisual({pc,app,onError=()=>{},enabled=true})
   }
   return Object.freeze({
     attach,useProcedural,
+    hasModel:node=>Boolean(instances.get(node)?.visual?.enabled),
     stats:()=>Object.freeze({attached,failures,cachedSkus:assets.size})
   });
 }
