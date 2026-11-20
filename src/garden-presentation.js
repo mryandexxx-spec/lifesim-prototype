@@ -24,7 +24,7 @@ export function gardenActionSheet(root,residentId,instanceId){
     '/72 ч роста · '+(view.mature?'Созрело':wet?'Влаги на '+wet+' ч':'Нужен полив');
   const ids=view.mature?['admire']:view.stage>=1?['water','inspect']:['water'];
   const actions=ids.map(actionId=>{
-    const available=Boolean(route)&&!busy&&playerMayClaimGarden(root,residentId,instanceId,actionId);
+    const available=Boolean(route)&&playerMayClaimGarden(root,residentId,instanceId,actionId);
     const elapsed=Number.isFinite(view.lastWateredAt)?root.minutes-view.lastWateredAt:1e9;
     const reason=!route?'Нет свободного пути':
       busy?'Грядка занята или уже в очереди':

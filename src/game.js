@@ -6548,6 +6548,7 @@ function boot() {
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
+        const prevAlexGardenEvent=game.event,prevMiraGardenEvent=game.otherSim.event;
         const prevAlexLabel=game.action?.activityId
           ?getActivityDefinition(HOBBY_ACTIVITIES,game.action.activityId)?.label:null;
         const prevMiraLabel=game.otherSim.action?.activityId
@@ -6592,11 +6593,19 @@ function boot() {
             toast('📅 '+due.length+' напоминания: '+due.slice(0,2).map(item=>item.title).join(' · ')+
               (due.length>2?' · ещё '+(due.length-2):''));
         }
+        // Garden completion feedback uses canonical settlement receipt, never a tap or cancellation.
+        for(const [id,previous,oldEvent] of [
+          ['alex',prevAlex,prevAlexGardenEvent],['mira',prevMira,prevMiraGardenEvent]]){
+          const actor=getActor(game,id);
+          if(previous==='garden'&&actor.action?.id!=='garden'&&actor.event!==oldEvent&&
+            /^(Полил|Осмотрел|Полюбовался)/.test(actor.event))
+            toast(getActorName(id)+': '+actor.event);
+        }
         // A completed job frees its own resident; planned commands start only
         // after both participant states and render transition guards allow it.
         dispatchPlannedActions();
-        if(prevAlex && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex]?.label||'прогулку').toLowerCase());
-        if(prevMira && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira]?.label||'прогулку').toLowerCase());
+        if(prevAlex && prevAlex!=='garden' && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex]?.label||'прогулку').toLowerCase());
+        if(prevMira && prevMira!=='garden' && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira]?.label||'прогулку').toLowerCase());
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
       if(sharedBefore&&!game.socialAction)
         toast(getActor(game,sharedBefore).event);
@@ -7760,7 +7769,7 @@ function boot() {
       const wishFeature=wishTarget&&game.world.outdoors?.features?.find(f=>
         f.instanceId===wishTarget);
       const wishPlot=wishFeature&&OUTDOOR_CATALOG[wishFeature.itemId];
-      const wishName=wish?.label+(wishPlot?' · '+wishPlot.name:'');
+      const wishName=wish?wish.label+(wishPlot?' · '+wishPlot.name:''):null;
       $('wish-label').textContent=wish ? wish.symbol+' Хочет: '+wishName : 'Думает о будущем';
       $('mind-mood-label').textContent=current.mind.mood.label+' · '+current.mind.mood.value+'/100';
       $('mind-mood-bar').style.width=current.mind.mood.value+'%';
