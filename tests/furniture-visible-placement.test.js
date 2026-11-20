@@ -45,7 +45,7 @@ test('actual PlayCanvas prefab staging fragment enables a real clone at known no
   assert.equal(context.shopPreviewEntity.at.x,0);
   assert.equal(context.shopPreviewEntity.at.z,0);
   assert.equal(context.shopPreviewType,'plant|legacy.plant');
-  assert.equal(meshAttachments,1,'GLB renderer requests only one SKU per preview');
+  assert.equal(meshAttachments,1);
   // Moving the camera never generates a second copy.
   context.shopPose=cameraPlacementPose({centerX:-2,centerZ:1},context.shopPose);
   runInNewContext('(()=>{'+block+'\nsyncShopPreviewEntity();})()',context,{timeout:1000});
@@ -110,7 +110,7 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
   assert.equal(elements.get('furnish-placing-name').textContent,'Растение');
   assert.equal(visual.enabled,true,'placement outline must show after Buy');
   assert.equal(elements.get('furnish-preview-turn').disabled,false);
-  assert.match(elements.get('furnish-buy').textContent,/Установить/);
+  assert.match(elements.get('furnish-buy').textContent,/Купить и установить/);
 });
 test('shop selection and placement guidance is clear even when card list collapses',()=>{
   assert.match(game,/button.classList.toggle\('selected-product',active\)/);

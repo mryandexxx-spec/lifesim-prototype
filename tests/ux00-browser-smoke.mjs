@@ -70,9 +70,13 @@ async function run(build,w,h){
   const product=page.locator('#furnish-stock button[data-item-id]').first();
   await product.waitFor({state:'visible',timeout:10000});
   await product.click();
-  if(await page.locator('#furnish-buy').isEnabled()){
+  // UX-02a enters preview directly from the card. UX-00 baseline still uses
+  // its former card -> Buy path; compare the same *placement* state.
+  const placing=()=>page.locator('#furniture-editor').getAttribute('data-shop-placing');
+  if(await placing()!=='true'&&await page.locator('#furnish-buy').isEnabled())
    await page.locator('#furnish-buy').click();
-   assert.equal(await page.locator('#furniture-editor').getAttribute('data-shop-placing'),'true');
+  if(await placing()==='true'){
+   assert.equal(await placing(),'true');
    await snap(page,build,w,h,'placement');
    await page.locator('#furnish-place-cancel').click();
   }else{

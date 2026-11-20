@@ -2007,8 +2007,7 @@ function boot() {
   // Data-only SKU colorways reuse the original prefab, navmesh and animation.
   // Only copied mesh instances are tinted; the authored original is unchanged.
   const variantMaterials=new Map();
-  // Meshy replaces only the 15 purchased SKU appearances, never physics, saves,
-  // original default furniture or underlying authored contact/animation data.
+  // Meshy is a visual override only: original action, collision, price and saves stay canonical.
   const meshyFurniture=createMeshyFurnitureVisual({pc,app});
   const applyItemAppearance=(node,itemDefinitionId)=>{
     const style=FURNITURE_APPEARANCES[furnitureProduct(itemDefinitionId)?.appearanceId];
@@ -4415,10 +4414,10 @@ function boot() {
           shopSelectedItemId,other.itemId);
         if(!id)return;
         chooseShopProduct(id);
-        const selectedButton=[...$('furnish-stock').querySelectorAll('button')]
-          .find(button=>button.dataset.itemId===id);
-        if(selectedButton&&!selectedButton.hidden)
-          selectedButton.focus({preventScroll:true});
+        if(game.shop.credits>=shopListings.find(item=>item.itemId===id).price)
+          $('furnish-buy').click();
+        else editorFeedback('Недостаточно кредитов для выбранной модели',true);
+        $('furnish-buy').focus({preventScroll:true});
       });
       line.append(description,selectVariant);compareRows.append(line);
     }
@@ -4435,14 +4434,18 @@ function boot() {
       :null;
     const suitable=preview?.ok===true;
     const previewLabel=!listing?'Выбери товар в каталоге':
-      !shopPlacing?'Выбран: '+listing.name+' · '+listing.effectText+'. Нажми «Купить» — увидишь его в комнате.':
+      !shopPlacing?'Выбран: '+listing.name+' · '+listing.effectText+'. Коснись карточки для примерки или нажми «Примерить».':
       !shopPose?'Место не выбрано. Коснись пола или нажми «Найти место»':
       suitable?'✓ Место подходит · веди предмет пальцем, «Установить» для покупки':
       '✕ '+editorMessage(preview.reason)+' · подбери другое место свайпом';
     $('furnish-preview').textContent=previewLabel;
     $('furnish-preview').dataset.invalid=String(shopPlacing&&!!listing&&!suitable);
-    $('furnish-buy').textContent=shopPlacing?'✓ Установить · '+(listing?.price??0)+' кр.':
-      'Купить · '+(listing?.price??0)+' кр.';
+    const purchaseSummary=$('furnish-action-summary');
+    if(purchaseSummary)purchaseSummary.textContent=shopPlacing
+      ?'Примерка · '+(listing?.name||'предмет')+' · деньги не списаны'
+      :listing?'Выбран: '+listing.name+' · '+listing.price+' кр.':'Выбери мебель для примерки';
+    $('furnish-buy').textContent=shopPlacing?'✓ Купить и установить · '+(listing?.price??0)+' кр.':
+      'Примерить · '+(listing?.price??0)+' кр.';
     $('furnish-buy').disabled=shopPlacing?!suitable:
       !listing||game.shop.credits<listing.price;
     $('furnish-preview-turn').disabled=!shopPlacing||!shopPose;
@@ -4632,7 +4635,16 @@ function boot() {
     button.prepend(skuSketch);
     if(qualitySummary)button.append(quality);
     button.setAttribute('aria-pressed','false');
-    button.addEventListener('click',()=>chooseShopProduct(item.itemId));
+    button.addEventListener('click',()=>{
+      if(!furnishMode||!shopOpen||shopPlacing)return;
+      chooseShopProduct(item.itemId);
+      if(game.shop.credits<item.price){
+        editorFeedback('Недостаточно кредитов для «'+item.name+'»',true);return;
+      }
+      // Selecting a card opens the existing non-persistent 3D preview.
+      // The canonical Buy handler still charges only on explicit installation.
+      $('furnish-buy').click();
+    });
     $('furnish-stock').append(button);
   }
   renderShopFilteredItems();
