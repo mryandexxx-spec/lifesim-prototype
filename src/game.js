@@ -36,6 +36,7 @@ import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
 import {playerMayClaimGarden} from './garden-autonomy.js';
 import {gardenWishCommand} from './garden-psychology.js';
 import {gardenActionSheet} from './garden-presentation.js';
+import {OUTDOOR_PALETTE,describeOutdoorSelection} from './outdoor-ux04.js';
 import {BUILD_TOOL_GROUPS,buildGroupForTool,describeBuildPreview} from './build-tool-palette.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
@@ -6037,6 +6038,16 @@ function boot() {
     $('outdoor-tool-paint').setAttribute('aria-pressed',String(outdoorTool==='paint'));
     $('outdoor-tool-camera').setAttribute('aria-pressed',String(outdoorTool==='camera'));
     outdoorCategory=$('outdoor-category').value;
+    for(const button of document.querySelectorAll('[data-outdoor-palette]'))
+      button.setAttribute('aria-pressed',String(button.dataset.outdoorPalette===outdoorCategory));
+    $('outdoor-selection-summary').textContent=describeOutdoorSelection({
+      category:outdoorCategory,groundKind:$('outdoor-ground-kind').value,
+      itemId:$('outdoor-feature-operation').value==='place'
+        ?$('outdoor-feature-kind').value
+        :game.world.outdoors.features.find(i=>
+          i.instanceId===$('outdoor-feature-owned').value)?.itemId,
+      operation:$('outdoor-feature-operation').value,proposal:outdoorPending
+    });
     document.querySelector('.outdoor-surface-choice[for="outdoor-ground-kind"]').hidden=outdoorCategory!=='ground';
     $('outdoor-feature-controls').hidden=outdoorCategory==='ground';
     $('outdoor-feature-kind-label').hidden=outdoorCategory==='ground'||
@@ -6156,6 +6167,14 @@ function boot() {
       :'Камера: свайп одним пальцем, масштаб и вращение двумя');
   });
   $('outdoor-ground-kind').addEventListener('change',()=>clearOutdoorPending());
+  for(const item of OUTDOOR_PALETTE){
+    const button=document.querySelector('[data-outdoor-palette="'+item.id+'"]');
+    button.addEventListener('click',()=>{
+      if(!outdoorMode||$('outdoor-category').value===item.id)return;
+      $('outdoor-category').value=item.id;
+      $('outdoor-category').dispatchEvent(new Event('change',{bubbles:true}));
+    });
+  }
   $('outdoor-category').addEventListener('change',()=>{
     outdoorCategory=$('outdoor-category').value;outdoorYaw=0;
     clearOutdoorPending();syncOutdoorFeatureCatalog();syncOutdoorOwned();
@@ -6223,6 +6242,7 @@ function boot() {
     $('ground-walk-wish').hidden=true;
     $('ground-walk-progress').hidden=true;
     $('ground-walk-more').replaceChildren();
+    $('ground-walk-primary-reason').hidden=true;
     $('ground-walk-action').disabled=true;
   };
   const confirmWorldOffer=(offer,command)=>{
@@ -6282,6 +6302,10 @@ function boot() {
     groundWalkPanel.style.top=pos.y+'px';
     groundWalkPanel.style.maxHeight=pos.maxHeight+'px';
     $('ground-walk-action').disabled=options.primaryAvailable===false;
+    const blocked=options.primaryAvailable===false&&Boolean(options.primaryReason);
+    $('ground-walk-primary-reason').hidden=!blocked;
+    $('ground-walk-primary-reason').textContent=blocked
+      ?'Недоступно: '+options.primaryReason:'';
   };
   const openGroundWalkMenu=(point,ground)=>{
     const id=game.selectedSim,actor=getActor(game,id);
@@ -6316,7 +6340,7 @@ function boot() {
       offerWorldAction(point,sheet.name,first.label,first.command,feature.instanceId,{
         info:sheet.info,progress:sheet.progress,wish:sheet.wish,
         plantedAt:sheet.plantedAt,primaryAvailable:first.available,
-        choices:sheet.actions.slice(1)
+        primaryReason:first.reason,choices:sheet.actions.slice(1)
       });
       return;
     }
