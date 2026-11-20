@@ -23,7 +23,8 @@ import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
 import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
-import {validateRestoredPoolSwim,advancePoolSwim,requestPoolExit} from './pool-swim-runtime.js';
+import {validateRestoredPoolSwim,advancePoolSwim,requestPoolExit,
+  interruptPoolSwimForWork} from './pool-swim-runtime.js';
 import {poolHasExit} from './pool-equipment.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchAvailable} from './outdoor-interactions.js';
 import {gardenFeature,gardenApproach,gardenActionAllowed,restoreGardenRewards,
@@ -971,7 +972,7 @@ export function tickHousehold(root,minutes) {
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id);
     if(actor.action?.id==='swim'&&residentAwayAtWork(root,id))
-      requestPoolExit(root,id,'work-conflict');
+      interruptPoolSwimForWork(root,id);
     if(!residentAwayAtWork(root,id)){
       advancePoolSwim(root,id,minutes);
       if(actor.action?.id==='swim'||actor.event==='Завершил плавание')
