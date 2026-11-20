@@ -83,6 +83,18 @@ const original=[
   {prefabId:'wardrobe',instanceId:'template-wardrobe-1',name:'Гардероб',
     category:'Спальня',actionId:'wardrobe',capabilities:['clothing.organize'],templateOnly:true,
     x:0,z:0,rect:[-.91,.91,-.51,.51],approach:[0,-1.20]},
+  // Batch 02 inert decorations: no free instances or invented interactions.
+  {prefabId:'meshsmall',instanceId:'template-meshsmall-1',name:'Мелкий декор',
+    category:'Декор',capabilities:['decor'],templateOnly:true,x:0,z:0,rect:[-.30,.30,-.30,.30]},
+  {prefabId:'meshmedium',instanceId:'template-meshmedium-1',name:'Декоративный предмет',
+    category:'Декор',capabilities:['decor'],templateOnly:true,x:0,z:0,rect:[-.55,.55,-.48,.48]},
+  {prefabId:'meshlarge',instanceId:'template-meshlarge-1',name:'Декоративный комплект',
+    category:'Декор',capabilities:['decor'],templateOnly:true,x:0,z:0,rect:[-1.24,1.24,-.83,.83]},
+  {prefabId:'meshtall',instanceId:'template-meshtall-1',name:'Высокий декор',
+    category:'Декор',capabilities:['decor'],templateOnly:true,x:0,z:0,rect:[-.53,.53,-.51,.51]},
+  {prefabId:'meshwall',instanceId:'template-meshwall-1',name:'Настенная панель',
+    category:'Декор',capabilities:['decor'],templateOnly:true,walkThrough:true,
+    x:0,z:0,rect:[-.74,.74,-.14,.14]},
   // Template-only procedural 3D model: not gifted to existing saves and
   // never in initial world. Purchased copies have real individual instance IDs.
   {prefabId:'bookcase',instanceId:'template-bookcase-1',name:'Книжный шкаф',

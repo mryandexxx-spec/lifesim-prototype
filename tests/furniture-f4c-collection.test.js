@@ -20,13 +20,13 @@ const R=legacyObjectRegistry(),offers=selectShopCatalog();
 const text=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.36}]};
 test('F4C: original shop assortment plus the H5 functional easel',()=>{
-  assert.equal(FURNITURE_PRODUCTS.length,47);
-  assert.equal(offers.length,47);
+  assert.equal(FURNITURE_PRODUCTS.length,70);
+  assert.equal(offers.length,70);
   assert.equal(FURNITURE_LEGACY_OFFERS.length,6);
-  assert.equal(PROCEDURAL_NEW_PREFABS.length,15);
+  assert.equal(PROCEDURAL_NEW_PREFABS.length,20);
   assert.equal(ORIGINAL_FURNITURE.length,10);
-  assert.equal(marketListing().length,47);
-  assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,47);
+  assert.equal(marketListing().length,70);
+  assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,70);
   assert.equal(SHOP_START_CREDITS,5000);
   assert.equal(SHOP_SELL_PERCENT,70);
 });
@@ -85,7 +85,7 @@ test('F4C: interiors have functional category hierarchy without inventing action
   assert.ok(FURNITURE_SHOP_TYPES.some(x=>x.id==='type.storage.wardrobes'));
   assert.equal(selectShopCatalog({typeCategoryId:'type.seating'}).length,8);
   assert.equal(selectShopCatalog({typeCategoryId:'type.seating.armchairs'}).length,2);
-  assert.equal(selectShopCatalog({typeCategoryId:'type.decor.rugs'}).length,2);
+  assert.equal(selectShopCatalog({typeCategoryId:'type.decor.rugs'}).length,4);
   assert.equal(selectShopCatalog({typeCategoryId:'type.tables.dining'}).length,2);
   assert.equal(selectShopCatalog({typeCategoryId:'type.nonexistent'}).length,0);
   for(const p of ['armchair.wing','armchair.shell','chair.loft','chair.cross']){

@@ -50,7 +50,8 @@ function shade(hex,amount){
 }
 export function sketchFurnitureParts(prefabId,modelKey){
   const recipe=proceduralFurnitureModel(modelKey);
-  const baseline=base[prefabId]||[];
+  const baseline=base[prefabId]||
+    (typeof prefabId==='string'&&prefabId.startsWith('mesh')?base.table:[]);
   const hide=new Set(recipe?.hideBase||[]);
   const filtered=baseline.filter(p=>!hide.has(p.name));
   return Object.freeze([...filtered,...(recipe?.parts||[])].slice(0,48));

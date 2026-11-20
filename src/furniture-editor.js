@@ -9,7 +9,7 @@ import {restoreFurnitureShop} from './furniture-shop.js';
 export const F1_MOVEABLE_PREFABS=Object.freeze([
   'nightstand','table','tv','plant','bed','sofa','fridge','shower','toilet','bookcase','music',
   'armchair','chair','diningtable','floorlamp','walllight','ceilinglight','rug','dresser','mirror','sculpture','wardrobe','easel',
-  'stove','prep','sink'
+  'stove','prep','sink','meshsmall','meshmedium','meshlarge','meshtall','meshwall'
 ]);
 export const F1_GRID_STEP=.25;
 export function canMoveFurniture(instance){

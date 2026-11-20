@@ -96,18 +96,18 @@ test('existing starter fixtures and old purchases receive cosmetic GLB aliases, 
  assert.equal(meshyStarterFurnitureSku('sofa'),'sofa.comfort');
  assert.equal(meshyStarterFurnitureSku('bed'),'bed.platform');
  assert.equal(meshyStarterFurnitureSku('plant'),'legacy.plant');
- for(const prefab of ['nightstand','table','tv','fridge','toilet','shower','counter','__proto__'])
+ for(const prefab of ['counter','__proto__'])
   assert.equal(meshyStarterFurnitureSku(prefab),null);
  assert.equal(meshyFurnitureDisplaySku('legacy.sofa'),'sofa.comfort');
  assert.equal(meshyFurnitureDisplaySku('legacy.bed'),'bed.platform');
  assert.equal(meshyFurnitureDisplaySku('legacy.plant'),'legacy.plant');
  assert.equal(meshyFurnitureDisplaySku('rug.weave'),'rug.weave');
- assert.equal(meshyFurnitureDisplaySku('chair.loft'),null);
+ assert.equal(meshyFurnitureDisplaySku('chair.loft'),'chair.loft');
  assert.equal(meshyFurnitureDisplaySku('__proto__'),null);
  const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
  assert.match(game,/if\(!templateOnly\)\s*meshyFurniture\.attach\(node,meshyStarterFurnitureSku\(prefabId\)\)/);
  assert.match(game,/meshyFurniture\.attach\(node,meshyFurnitureDisplaySku\(item\.itemDefinitionId\)/);
- assert.match(game,/photo\.src='\.\/assets\/furniture\/meshy-room-v1\/thumbnails\/'\+meshSku\+'\.png'/);
+ assert.match(game,/photo\.src=meshyFurnitureThumbnailUrl\(meshSku\)/);
 });
 test('catalog thumbnails are rendered images for every actual GLB, including legacy aliases',()=>{
  for(const sku of MESHY_FURNITURE_SKUS){

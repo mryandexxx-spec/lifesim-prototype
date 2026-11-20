@@ -2,7 +2,7 @@
  * Bump CACHE_VERSION whenever a GLB is replaced at the same URL.
  * This is an optimization, not an offline guarantee for the full game.
  */
-const CACHE_VERSION='blins-models-v2-room-meshy';
+const CACHE_VERSION='blins-models-v3-room-meshy-batch02';
 const CACHE_PREFIX='blins-models-';
 const MODEL_FILES=new Set([
   'assets/characters/meshy-casual-v1.glb',
@@ -12,7 +12,8 @@ const MODEL_FILES=new Set([
     'bookcase.starter','dresser.reed','floorlamp.tripod','legacy.plant',
     'mirror.panel','plant.palm','rug.geo','rug.weave','sconce.halo',
     'wardrobe.classic'
-  ].map(sku=>'assets/furniture/meshy-room-v1/'+sku+'.glb')
+  ].map(sku=>'assets/furniture/meshy-room-v1/'+sku+'.glb'),
+  ...["nightstand_decor","vanity_set","coffee_table","tv_media_console","wall_art_triptych","dining_set","kitchen_sink_cabinet","kitchen_stove","cream_fridge","microwave_counter","pantry_shelf","glass_shower","bathroom_toilet","bathroom_sink_set","home_office_set","fluffy_rug","round_jute_rug","large_leaf_plant","snake_plant","small_potted_plant","hanging_plant","green_curtains","wooden_blinds","floating_shelf","white_radiator","wicker_hamper","wicker_storage_box","coat_rack","green_pendant_light","globe_chandelier","bedside_lamp","wooden_dining_chair","office_swivel_chair","counter_microwave","bathroom_towel_ring"].map(slug=>'assets/furniture/meshy-room-v2/'+slug+'.glb')
 ]);
 self.addEventListener('install',event=>{
   event.waitUntil(self.skipWaiting());
