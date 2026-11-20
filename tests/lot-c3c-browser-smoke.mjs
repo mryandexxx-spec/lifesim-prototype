@@ -103,7 +103,13 @@ try{
    assert.match(await page.locator('#ground-walk-title').textContent(),/Мята/i);
    assert.match(await page.locator('#ground-walk-info').textContent(),/Можно собрать/);
    assert.match(await page.locator('#ground-walk-info').textContent(),/14\/16/);
-   assert.match(await page.locator('#ground-walk-action-label').textContent(),/Собрать/);
+   // A legitimate C2b garden wish can promote Admire above Harvest.
+   // Choose harvest explicitly instead of assuming it is always the primary CTA.
+   const primaryHarvest=/Собрать/.test(await page.locator('#ground-walk-action-label').textContent());
+   const harvestButton=primaryHarvest?page.locator('#ground-walk-action'):
+     page.locator('#ground-walk-more [data-garden-action="harvest"]');
+   assert.equal(await harvestButton.count(),1,'harvest remains an explicit option');
+   assert.equal(await harvestButton.isEnabled(),true,'ripe herb capacity 14/16 is harvestable');
    const menu=await page.locator('#ground-walk-menu').boundingBox();
    const hud=await page.locator('#dashboard').boundingBox();
    assert.ok(menu.x>=0&&menu.x+menu.width<=w+1&&menu.y>=0&&
@@ -116,7 +122,7 @@ try{
    await page.locator('#ground-walk-close').tap();
    assert.equal((await persisted()).actionQueues.byResident.alex.length,0);
    await tapPlot();
-   await page.locator('#ground-walk-action').tap();
+   await harvestButton.tap();
    await page.waitForFunction(key=>{
      const x=JSON.parse(localStorage.getItem(key));
      return x.actionQueues?.byResident?.alex?.some(
