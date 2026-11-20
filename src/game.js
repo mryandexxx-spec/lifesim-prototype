@@ -35,6 +35,7 @@ import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
   gardenRequestStillValid} from './gardening.js';
 import {playerMayClaimGarden} from './garden-autonomy.js';
 import {gardenWishCommand} from './garden-psychology.js';
+import {gardenActionSheet} from './garden-presentation.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -2357,14 +2358,16 @@ function boot() {
   let gardenStageSignature='';
   const currentGardenStageSignature=()=>game.world.outdoors?.features
     ?.filter(f=>isGardenItem(f.itemId))
-    .map(f=>f.instanceId+':'+(gardenView(game.world.outdoors,f.instanceId,game.minutes)?.stage??0))
+    .map(f=>{const state=gardenView(game.world.outdoors,f.instanceId,game.minutes);
+      return f.instanceId+':'+(state?.stage??0)+':'+Number((state?.waterRemaining??0)>0);})
     .join('|')||'';
   const outdoorFeatureMaterials={
     bark:mat('#917256'),leaf:mat('#4d8960'),lightLeaf:mat('#7cac69'),
     darkLeaf:mat('#437956'),pink:mat('#dc9aa7'),white:mat('#f6eee0'),
     yellow:mat('#e9c767'),purple:mat('#8f77b6'),
     wood:mat('#af8967'),woodDark:mat('#846e54'),soil:mat('#6e8761'),
-    gardenSoil:mat('#6b4e3d'),orange:mat('#e5a352'),blue:mat('#7197d8')
+    gardenSoil:mat('#6b4e3d'),wetSoil:mat('#544536'),
+    drySoil:mat('#9a7252'),orange:mat('#e5a352'),blue:mat('#7197d8')
   };
   const renderOutdoorFeatures=()=>{
     for(const node of outdoorFeatureNodes.splice(0))node.destroy();
@@ -2379,11 +2382,13 @@ function boot() {
       const part=(shape,name,x,y,z,sx,sy,sz,color)=>
         primitive(shape,name,x,y,z,sx,sy,sz,outdoorFeatureMaterials[color],node);
       if(def.category==='garden'){
-        const stage=gardenView(game.world.outdoors,item.instanceId,game.minutes)?.stage??0;
+        const gardenState=gardenView(game.world.outdoors,item.instanceId,game.minutes);
+        const stage=gardenState?.stage??0;
         const herb=item.itemId.startsWith('garden.herb');
         const flowerColor=item.itemId.includes('calendula')?'orange':'blue';
         part('box','garden timber frame',0,.105,0,1.00,.21,1.00,'woodDark');
-        part('box','garden rich soil',0,.225,0,.86,.05,.86,'gardenSoil');
+        part('box','garden rich soil',0,.225,0,.86,.05,.86,
+          gardenState?.waterRemaining>0?'wetSoil':'drySoil');
         const spots=[[-.25,-.24],[.24,-.23],[-.22,.23],[.23,.23]];
         if(stage===0)for(const [x,z] of spots)
           part('sphere','sown seed mound',x,.255,z,.16,.05,.16,'soil');
@@ -2394,8 +2399,12 @@ function boot() {
             stage===1?.14:.29,.21,k%2?'leaf':'lightLeaf');
           if(stage>=2)part('sphere','upper leaves',x+.09,.24+height,z,
             herb?.24:.18,herb?.18:.17,herb?.22:.17,'lightLeaf');
-          if(stage===3&&!herb)part('sphere','blossom',x,.37+height,z,
-            .23,.18,.23,flowerColor);
+          if(stage===3&&!herb){
+            part('sphere','blossom petals',x,.37+height,z,.28,.16,.28,flowerColor);
+            part('sphere','flower center',x,.47+height,z,.10,.07,.10,'yellow');
+          }
+          if(stage===3&&herb)part('sphere','mature herb tips',x,.37+height,z,
+            .19,.10,.19,'lightLeaf');
         }
       }else if(def.category==='tree'){
         const scale=item.itemId==='tree.tall'?1.30:item.itemId==='tree.broad'?1.12:1;
@@ -5960,23 +5969,68 @@ function boot() {
   const closeGroundWalkMenu=()=>{
     groundWalkOffer=null;groundWalkPanel.hidden=true;
     $('ground-walk-info').hidden=true;
+    $('ground-walk-wish').hidden=true;
+    $('ground-walk-progress').hidden=true;
+    $('ground-walk-more').replaceChildren();
     $('ground-walk-action').disabled=true;
   };
-  const offerWorldAction=(point,heading,label,command,instanceId=null)=>{
-    groundWalkOffer={residentId:game.selectedSim,command,instanceId};
+  const confirmWorldOffer=(offer,command)=>{
+    closeGroundWalkMenu();
+    if(!offer||!command)return;
+    // A sold/replanted plant cannot acquire a stale queued action.
+    if(offer.instanceId&&!game.world.outdoors?.features?.some(
+      item=>item.instanceId===offer.instanceId))return;
+    if(Number.isFinite(offer.plantedAt)&&
+      gardenView(game.world.outdoors,offer.instanceId,game.minutes)?.plantedAt!==offer.plantedAt){
+      toast('Грядка изменилась — выбери действие заново');return;
+    }
+    scheduleCommand(command,offer.residentId);
+  };
+  const offerWorldAction=(point,heading,label,command,instanceId=null,options={})=>{
+    groundWalkOffer={residentId:game.selectedSim,command,instanceId,
+      plantedAt:options.plantedAt};
     $('ground-walk-title').textContent=heading;
     $('ground-walk-action-label').textContent=label;
     $('ground-walk-recipient').textContent=offerForName(getActorName(game.selectedSim));
-    $('ground-walk-info').hidden=true;
-    const frame=document.querySelector('.app-shell').getBoundingClientRect();
+    $('ground-walk-info').textContent=options.info||'';
+    $('ground-walk-info').hidden=!options.info;
+    $('ground-walk-wish').textContent=options.wish||'';
+    $('ground-walk-wish').hidden=!options.wish;
+    const progress=$('ground-walk-progress');
+    progress.hidden=!Number.isFinite(options.progress);
+    if(Number.isFinite(options.progress))progress.value=options.progress;
+    const more=$('ground-walk-more');more.replaceChildren();
+    for(const choice of options.choices||[]){
+      const button=document.createElement('button');
+      button.type='button';button.className='garden-choice';
+      button.dataset.gardenAction=choice.actionId;
+      button.disabled=!choice.available;
+      const title=document.createElement('span');title.textContent=choice.label;
+      const note=document.createElement('small');
+      note.textContent=choice.available?'Добавить в очередь':choice.reason;
+      button.append(title,note);
+      button.addEventListener('click',()=>
+        confirmWorldOffer(groundWalkOffer,choice.command));
+      more.append(button);
+    }
     groundWalkPanel.hidden=false;
-    const width=groundWalkPanel.offsetWidth||190,height=groundWalkPanel.offsetHeight||110;
-    const topInset=Math.max(70,Math.ceil($('calendar-anchor-toggle').getBoundingClientRect().bottom-frame.top)+10);
-    const bottomInset=Math.ceil($('dashboard').getBoundingClientRect().height)+18;
-    const x=Math.max(8,Math.min(point.x-frame.left+10,frame.width-width-8));
-    const y=Math.max(topInset,Math.min(point.y-frame.top-height/2,frame.height-bottomInset-height));
-    groundWalkPanel.style.left=x+'px';groundWalkPanel.style.top=y+'px';
-    $('ground-walk-action').disabled=false;
+    const frame=document.querySelector('.app-shell').getBoundingClientRect();
+    const topInset=Math.max(70,Math.ceil(
+      $('calendar-anchor-toggle').getBoundingClientRect().bottom-frame.top)+10);
+    // HUD floats above bottom navigation (including at 320px / landscape).
+    // Reserve the entire band from the actual HUD top to the shell bottom,
+    // not just the card height, or the garden sheet clips the HUD.
+    const dashboardTop=$('dashboard').getBoundingClientRect().top;
+    const bottomInset=Math.max(0,Math.ceil(frame.bottom-dashboardTop))+12;
+    const pos=contextualPlacement({anchorX:point.x-frame.left,
+      anchorY:point.y-frame.top,viewportWidth:frame.width,viewportHeight:frame.height,
+      panelWidth:groundWalkPanel.offsetWidth||290,
+      panelHeight:groundWalkPanel.scrollHeight||240,
+      topInset,bottomInset,edge:8});
+    groundWalkPanel.style.left=pos.x+'px';
+    groundWalkPanel.style.top=pos.y+'px';
+    groundWalkPanel.style.maxHeight=pos.maxHeight+'px';
+    $('ground-walk-action').disabled=options.primaryAvailable===false;
   };
   const openGroundWalkMenu=(point,ground)=>{
     const id=game.selectedSim,actor=getActor(game,id);
@@ -6005,27 +6059,14 @@ function boot() {
       toast('Персонаж сейчас не на участке');return;
     }
     if(isGardenItem(feature.itemId)){
-      const view=gardenView(game.world.outdoors,feature.instanceId,game.minutes);
-      if(!view)return;
-      const wet=Math.ceil(view.waterRemaining/60);
-      const info=view.label+' · '+Math.floor(view.progressWetMinutes/60)+
-        '/72 ч роста · '+(view.mature?'Созрело':
-          wet>0?'Влаги на '+wet+' ч':'Нужен полив');
-      const action=view.mature?'admire':'water';
-      const allowed=playerMayClaimGarden(game,id,feature.instanceId,action);
-      if(allowed&&gardenApproach(game.world,feature.instanceId,actor.position)){
-        offerWorldAction(point,def.name,action==='water'?'💧 Полить · 15 мин':
-          '🌼 Полюбоваться · 8 мин',
-          {type:'garden',instanceId:feature.instanceId,actionId:action},
-          feature.instanceId);
-      }else{
-        const plan=gardenApproach(game.world,feature.instanceId,actor.position);
-        if(!plan){toast('К грядке нет пути');return;}
-        offerWorldAction(point,def.name,'↗ Подойти',
-          {type:'move',x:plan.goal.x,z:plan.goal.z},feature.instanceId);
-      }
-      $('ground-walk-info').textContent=info;
-      $('ground-walk-info').hidden=false;
+      const sheet=gardenActionSheet(game,id,feature.instanceId);
+      if(!sheet||!sheet.actions.length)return;
+      const first=sheet.actions[0];
+      offerWorldAction(point,sheet.name,first.label,first.command,feature.instanceId,{
+        info:sheet.info,progress:sheet.progress,wish:sheet.wish,
+        plantedAt:sheet.plantedAt,primaryAvailable:first.available,
+        choices:sheet.actions.slice(1)
+      });
       return;
     }
     if(feature.itemId==='garden.bench'){
@@ -6048,15 +6089,9 @@ function boot() {
     offerWorldAction(point,def.name,'↗ Подойти',
       {type:'move',x:spot.x,z:spot.z},feature.instanceId);
   };
-  $('ground-walk-action').addEventListener('click',()=>{
-    const offer=groundWalkOffer;
-    closeGroundWalkMenu();
-    if(!offer)return;
-    // An edited/removed object must not turn an old popup into a phantom task.
-    if(offer.instanceId&&!game.world.outdoors?.features?.some(
-      item=>item.instanceId===offer.instanceId))return;
-    scheduleCommand(offer.command,offer.residentId);
-  });
+  $('ground-walk-action').addEventListener('click',()=>
+    confirmWorldOffer(groundWalkOffer,groundWalkOffer?.command));
+  canvas.addEventListener('pointerdown',closeGroundWalkMenu);
   $('ground-walk-close').addEventListener('click',closeGroundWalkMenu);
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&!groundWalkPanel.hidden){
@@ -6397,6 +6432,7 @@ function boot() {
           def.category==='shrub'?1.12:
           def.category==='flower'?.48:
           def.category==='fence'?1.12:
+          // Preserve C1's garden hit-volume while polishing its visual stages.
           item.itemId==='garden.bench'?1.20:1.24;
         return {kind:'outdoor',id:item.itemId,instanceId:item.instanceId,
           bounds:{min:{x:rect.minX,y:-.49,z:rect.minZ},
@@ -6564,6 +6600,7 @@ function boot() {
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       while(accumulator>=.10){
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
+        const prevAlexGardenEvent=game.event,prevMiraGardenEvent=game.otherSim.event;
         const prevAlexLabel=game.action?.activityId
           ?getActivityDefinition(HOBBY_ACTIVITIES,game.action.activityId)?.label:null;
         const prevMiraLabel=game.otherSim.action?.activityId
@@ -6608,11 +6645,19 @@ function boot() {
             toast('📅 '+due.length+' напоминания: '+due.slice(0,2).map(item=>item.title).join(' · ')+
               (due.length>2?' · ещё '+(due.length-2):''));
         }
+        // Garden completion feedback uses canonical settlement receipt, never a tap or cancellation.
+        for(const [id,previous,oldEvent] of [
+          ['alex',prevAlex,prevAlexGardenEvent],['mira',prevMira,prevMiraGardenEvent]]){
+          const actor=getActor(game,id);
+          if(previous==='garden'&&actor.action?.id!=='garden'&&actor.event!==oldEvent&&
+            /^(Полил|Осмотрел|Полюбовался)/.test(actor.event))
+            toast(getActorName(id)+': '+actor.event);
+        }
         // A completed job frees its own resident; planned commands start only
         // after both participant states and render transition guards allow it.
         dispatchPlannedActions();
-        if(prevAlex && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex]?.label||'прогулку').toLowerCase());
-        if(prevMira && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira]?.label||'прогулку').toLowerCase());
+        if(prevAlex && prevAlex!=='garden' && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex]?.label||'прогулку').toLowerCase());
+        if(prevMira && prevMira!=='garden' && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira]?.label||'прогулку').toLowerCase());
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
       if(sharedBefore&&!game.socialAction)
         toast(getActor(game,sharedBefore).event);
@@ -7772,13 +7817,18 @@ function boot() {
       $('mood-orbit').style.setProperty('--mood-tone',moodView.color);
       $('mood-label').textContent=current.mind.mood.label;
       const wish=current.mind.wish && WISHES[current.mind.wish.id];
-      $('wish-label').textContent=wish ? wish.symbol+' Хочет: '+wish.label : 'Думает о будущем';
+      const wishTarget=current.mind.wish?.targetInstanceId;
+      const wishFeature=wishTarget&&game.world.outdoors?.features?.find(f=>
+        f.instanceId===wishTarget);
+      const wishPlot=wishFeature&&OUTDOOR_CATALOG[wishFeature.itemId];
+      const wishName=wish?wish.label+(wishPlot?' · '+wishPlot.name:''):null;
+      $('wish-label').textContent=wish ? wish.symbol+' Хочет: '+wishName : 'Думает о будущем';
       $('mind-mood-label').textContent=current.mind.mood.label+' · '+current.mind.mood.value+'/100';
       $('mind-mood-bar').style.width=current.mind.mood.value+'%';
       $('mind-mood-bar').style.background=moodView.color;
       $('mind-mood-reasons').textContent=moodView.description;
-      $('mind-wish-label').textContent=wish?.label || 'Присматривается к миру';
-      $('wish-do-btn').disabled=!wish;
+      $('mind-wish-label').textContent=wishName || 'Присматривается к миру';
+      $('wish-do-btn').disabled=!wish||Boolean(wishTarget&&!gardenWishCommand(game,game.selectedSim));
       if (!$('mind-panel').hidden) {
         const feelings=visibleEmotions(current.mind,current.minutes,current.personality).slice(0,3);
         $('mind-emotions').textContent=feelings.length

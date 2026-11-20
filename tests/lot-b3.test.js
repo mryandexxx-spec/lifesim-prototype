@@ -115,8 +115,12 @@ test('Outdoor 3D interactions open a contextual choice and never enqueue on tap'
     'the physical bench must offer explicit rest selection');
   assert.match(source,/offerWorldAction\(point,def\.name,'↗ Подойти'/,
     'all other outdoor features offer an explicit queued approach');
-  assert.match(source,/scheduleCommand\(offer\.command,offer\.residentId\)/,
+  assert.match(source,/const confirmWorldOffer=\(offer,command\)=>/,
+    'the existing context menu must confirm the selected outdoor action');
+  assert.match(source,/scheduleCommand\(command,offer\.residentId\)/,
     'only a contextual action-button confirmation enqueues the chosen command');
+  assert.match(source,/confirmWorldOffer\(groundWalkOffer,groundWalkOffer\?\.command\)/,
+    'the primary outdoor action uses the same confirmation gate');
   assert.match(html,/id="ground-walk-title"/);
   assert.match(html,/id="ground-walk-action-label"/);
 });
