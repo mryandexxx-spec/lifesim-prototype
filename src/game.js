@@ -6092,7 +6092,8 @@ function boot() {
         ?$('outdoor-feature-kind').value
         :game.world.outdoors.features.find(i=>
           i.instanceId===$('outdoor-feature-owned').value)?.itemId,
-      operation:$('outdoor-feature-operation').value,proposal:outdoorPending
+      operation:$('outdoor-feature-operation').value,proposal:outdoorPending,
+      poolTool:poolTool(),poolOperation:poolFixtureOperation()
     });
     document.querySelector('.outdoor-surface-choice[for="outdoor-ground-kind"]').hidden=outdoorCategory!=='ground';
     $('pool-controls').hidden=!poolMode();
