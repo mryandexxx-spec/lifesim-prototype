@@ -1,0 +1,38 @@
+name: LOT-D2b — canonical swim simulation and mobile regression
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  swimming:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked PlayCanvas and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Verify pool runtime and complete regression suite
+        run: |
+          node --check src/pool-swim-runtime.js
+          node --check src/pool-navigation.js
+          node --check src/simulation.js
+          node --check src/household.js
+          node --check src/game.js
+          node --test tests/lot-d2b.test.js tests/lot-d2a.test.js tests/lot-d1a.test.js tests/lot-d1b.test.js tests/lot-d1c.test.js
+          npm test
+      - name: Genuine PlayCanvas/WebGL D1c regression on four mobile viewports
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-d2b-webgl.log 2>&1 &
+          sleep 3
+          node tests/lot-d1c-browser-smoke.mjs
