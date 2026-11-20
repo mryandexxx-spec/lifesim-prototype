@@ -152,7 +152,8 @@ try{
    saved=await persisted();
    assert.equal(saved.shop.credits,45,'only accepted purchase debits 15');
    assert.equal(saved.kitchen.pantry.vegetables,13,'one purchase adds exactly 5');
-   assert.equal(saved.financialHistory.entries.length,1);
+   assert.equal(saved.financialHistory.entries.length,
+     seed.financialHistory.entries.length+1,'garden and grocery purchases have distinct receipts');
    await page.screenshot({path:artifacts+'/groceries-'+w+'x'+h+'.png',
      animations:'disabled'});
    await page.reload({waitUntil:'domcontentloaded'});
