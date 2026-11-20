@@ -67,7 +67,7 @@ test('1.0q: simulation time and animation stop while player has decisions',()=>{
   assert.match(gameSource,/const active=!game\.paused&&!furnishMode&&!dialogueNeedsDecision\(game\)&&\s*!careerPhone\.interviewNeedsDecision\(\)&&!shiftSummary\.isOpen\(\)&&!document\.hidden;/);
   assert.ok(gameSource.includes('shiftSummary.flush();'));
   assert.ok(gameSource.includes('const animDt=active?dt:0;'));
-  assert.ok(gameSource.includes('tickHousehold(game,.30 * game.speed)'));
+  assert.ok(gameSource.includes('tickHousehold(game,.30 * effectiveSleepSpeed(game,'));
   assert.ok(gameSource.includes('renderPauseButton();'));
 });
 test('1.0q: UI choice can be confirmed despite manual pause without lifting saved pause',()=>{
