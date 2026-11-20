@@ -6,6 +6,8 @@ import {GARDEN_LIMIT,isGardenItem,restoreGardens} from './gardening.js';
 import {POOL_MAX_CELLS,POOL_MAX_COMPONENTS,validPoolId,poolIdNumber,
   canonicalPoolCells,poolComponents,poolCellBounds,poolWaterNear,poolRectOverlaps}
   from './pool-topology.js';
+import {poolFixtureSite,validPoolFixture,POOL_FIXTURE_LIMIT,validPoolFixtureId}
+  from './pool-equipment.js';
 import {OUTDOOR_CATALOG,OUTDOOR_FEATURE_LIMIT,validOutdoorId,
   outdoorFeatureRect,outdoorRectsOverlap} from './outdoor-catalog.js';
 
@@ -105,7 +107,7 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
   // A pre-pool v1 save must retain its EXACT historical outdoor JSON shape.
   // Add the optional extension only after a pool-specific field was persisted.
   // Reject only a damaged pool, never reset the home, garden or household.
-  const hasPoolExtension=['pools','nextPoolId','poolTxnSeq']
+  const hasPoolExtension=['pools','nextPoolId','poolTxnSeq','poolFixtures','nextFixtureId']
     .some(field=>Object.hasOwn(raw,field));
   if(hasPoolExtension){
     next.pools=[];next.nextPoolId=1;next.poolTxnSeq=0;
@@ -143,6 +145,38 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
     raw.nextPoolId<=10000000?raw.nextPoolId:1;
   next.nextPoolId=Math.min(10000000,Math.max(wantedPoolId,largestPoolId+1));
   if(validRevision(raw.poolTxnSeq))next.poolTxnSeq=raw.poolTxnSeq;
+  // Keep D1a/legacy JSON exactly unchanged until the fixture extension exists.
+  // A broken fixture never invalidates a purchased basin, family or garden.
+  if(Object.hasOwn(raw,'poolFixtures')||Object.hasOwn(raw,'nextFixtureId')){
+    next.poolFixtures=[];next.nextFixtureId=1;
+    const fixtureIds=new Set(),occupiedEdges=new Set();
+    let greatestFixtureId=0;
+    if(Array.isArray(raw.poolFixtures))
+      for(const fixture of raw.poolFixtures.slice(0,POOL_FIXTURE_LIMIT*4)){
+        if(next.poolFixtures.length>=POOL_FIXTURE_LIMIT||
+           !validPoolFixture(fixture,next.pools)||fixtureIds.has(fixture.fixtureId))
+          continue;
+        const edge=fixture.edgeCell+':'+fixture.side;
+        if(occupiedEdges.has(edge))continue;
+        const pool=next.pools.find(p=>p.poolId===fixture.poolId);
+        const site=poolFixtureSite(pool,fixture.edgeCell,fixture.side,fixture.kind);
+        const point=site.dryApproach;
+        if(construction&&constructionContains(construction,point.x,point.z))continue;
+        const clearance={minX:point.x-.26,maxX:point.x+.26,
+          minZ:point.z-.26,maxZ:point.z+.26};
+        if(rects.some(rect=>outdoorRectsOverlap(clearance,rect)))continue;
+        fixtureIds.add(fixture.fixtureId);occupiedEdges.add(edge);
+        greatestFixtureId=Math.max(greatestFixtureId,
+          Number(fixture.fixtureId.slice(8)));
+        next.poolFixtures.push({fixtureId:fixture.fixtureId,poolId:fixture.poolId,
+          kind:fixture.kind,edgeCell:fixture.edgeCell,side:fixture.side,
+          purchasePriceCredits:fixture.purchasePriceCredits});
+      }
+    const wantedFixtureId=Number.isSafeInteger(raw.nextFixtureId)&&
+      raw.nextFixtureId>=1&&raw.nextFixtureId<=10000000?raw.nextFixtureId:1;
+    next.nextFixtureId=Math.min(10000000,
+      Math.max(wantedFixtureId,greatestFixtureId+1));
+  }
   }
   return next;
 }
