@@ -13,11 +13,13 @@ import {getHobbyContent} from './hobby-content.js';
 import {HOBBY_ACTIVITIES,HOBBY_CONTENT} from './hobby-reading.js';
 import {kitchenRecipe} from './kitchen.js';
 import {insideLot} from './lot-surface.js';
+import {validPoolId} from './pool-topology.js';
+import {validPoolFixtureId} from './pool-equipment.js';
 import {validOutdoorId} from './outdoor-catalog.js';
 
 export const ACTION_QUEUE_SCHEMA=1;
 export const MAX_ACTION_QUEUE=12;
-export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity','move','outdoor','garden']);
+export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity','move','outdoor','garden','pool']);
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const count=n=>Number.isSafeInteger(n)&&n>=1&&n<=1000000000;
 const known=(o,k)=>typeof k==='string'&&Object.hasOwn(o,k);
@@ -31,6 +33,13 @@ export function sanitizeQueueCommand(id,raw,persons){
   if(type==='garden')return validOutdoorId(raw.instanceId)&&
     ['water','admire','inspect','harvest','replant'].includes(raw.actionId)
     ?{type:'garden',instanceId:raw.instanceId,actionId:raw.actionId}:null;
+  if(type==='pool'){
+    if(!validPoolId(raw.poolId)||!['swim','jump'].includes(raw.actionId)||
+      (raw.fixtureId!==undefined&&!validPoolFixtureId(raw.fixtureId))||
+      (raw.actionId==='jump'&&!raw.fixtureId))return null;
+    return {type:'pool',poolId:raw.poolId,actionId:raw.actionId,
+      ...(raw.fixtureId?{fixtureId:raw.fixtureId}:{})};
+  }
   if(type==='move'){
     if(!insideLot(raw.x,raw.z))return null;
     const x=Math.round(raw.x*20)/20,z=Math.round(raw.z*20)/20;
