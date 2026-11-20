@@ -249,5 +249,5 @@ test('F4G: Safari touch interaction, visual effects and deploy contain kitchen E
  assert.match(game,/F4G cooking pot/);
  assert.match(game,/kitchenAppliances=/);
  assert.match(workflow,/node --check src\/kitchen\.js/);
- assert.match(workflow,/cp src\/kitchen\.js src\/hobby-content\.js site\/src\//);
+ assert.match(workflow,/cp src\/kitchen\.js src\/kitchen-market\.js src\/hobby-content\.js site\/src\//);
 });
