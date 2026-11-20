@@ -1,0 +1,47 @@
+name: UX-00 — mobile baseline, onboarding and safe first boot
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ux00:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: a0162d62d7dbdb8b5ba1fb5d45371c3c36dd169a
+          path: ux00-baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node dependencies and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Source and test checks
+        run: |
+          node --check src/game.js
+          node --check src/ui-onboarding.js
+          node --check tests/ux00-browser-smoke.mjs
+          node --test tests/ui-onboarding.test.js tests/ux00-startup-contract.test.js
+          npm test
+      - name: Start two equivalent websites and compare all four mobile viewports
+        run: |
+          mkdir -p vendor ux00-baseline/vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          cp node_modules/playcanvas/build/playcanvas.mjs ux00-baseline/vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/ux00-candidate-http.log 2>&1 &
+          (cd ux00-baseline && python3 -m http.server 8766 --bind 127.0.0.1 > /tmp/ux00-baseline-http.log 2>&1) &
+          sleep 3
+          node tests/ux00-browser-smoke.mjs
+      - name: Keep paired screenshots and measured DOM coordinates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux00-before-after-mobile
+          path: ux00-artifacts/
+          if-no-files-found: ignore
