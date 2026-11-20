@@ -29,7 +29,7 @@ export function sanitizeQueueCommand(id,raw,persons){
   if(type==='outdoor')return validOutdoorId(raw.instanceId)
     ?{type:'outdoor',instanceId:raw.instanceId}:null;
   if(type==='garden')return validOutdoorId(raw.instanceId)&&
-    ['water','admire','inspect'].includes(raw.actionId)
+    ['water','admire','inspect','harvest','replant'].includes(raw.actionId)
     ?{type:'garden',instanceId:raw.instanceId,actionId:raw.actionId}:null;
   if(type==='move'){
     if(!insideLot(raw.x,raw.z))return null;
