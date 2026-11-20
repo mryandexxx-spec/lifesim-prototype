@@ -26,8 +26,7 @@ const validRevision=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000000;
 const quarter=n=>finite(n)&&Math.abs(n*4-Math.round(n*4))<1e-7;
 
 export function newOutdoorsWorld(){
-  return {schema:OUTDOORS_SCHEMA,revision:0,ground:[],features:[],nextId:1,
-    pools:[],nextPoolId:1,poolTxnSeq:0};
+  return {schema:OUTDOORS_SCHEMA,revision:0,ground:[],features:[],nextId:1};
 }
 /** Grid coordinates are canonical indices, not floats saved in 3072 objects. */
 export function outdoorCellAt(x,z){
@@ -103,9 +102,14 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
     raw.nextId<=10000000?raw.nextId:1;
   next.nextId=Math.min(10000000,Math.max(requestedId,greatestId+1));
   if(gardenCount)next.gardens=restoreGardens(raw.gardens,next.features,atGameMinute);
-  // Pools are optional in every existing root-v1 save. Reject only a damaged
-  // pool, never repair by overwriting the home, money, garden or furniture.
-  const accepted=new Set(),poolIds=new Set();
+  // A pre-pool v1 save must retain its EXACT historical outdoor JSON shape.
+  // Add the optional extension only after a pool-specific field was persisted.
+  // Reject only a damaged pool, never reset the home, garden or household.
+  const hasPoolExtension=['pools','nextPoolId','poolTxnSeq']
+    .some(field=>Object.hasOwn(raw,field));
+  if(hasPoolExtension){
+    next.pools=[];next.nextPoolId=1;next.poolTxnSeq=0;
+    const accepted=new Set(),poolIds=new Set();
   let largestPoolId=0,totalWater=0;
   if(Array.isArray(raw.pools))for(const saved of raw.pools.slice(0,POOL_MAX_COMPONENTS*4)){
     if(next.pools.length>=POOL_MAX_COMPONENTS)break;
@@ -139,6 +143,7 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
     raw.nextPoolId<=10000000?raw.nextPoolId:1;
   next.nextPoolId=Math.min(10000000,Math.max(wantedPoolId,largestPoolId+1));
   if(validRevision(raw.poolTxnSeq))next.poolTxnSeq=raw.poolTxnSeq;
+  }
   return next;
 }
 const groundCache=new WeakMap();

@@ -17,7 +17,8 @@ const base=at(18,8);
 const lshape=[base,base+1,base+2,base+64,base+128];
 function withPool(root,cells,poolId='pool-1'){
   root.world.outdoors={...root.world.outdoors,revision:root.world.outdoors.revision+1,
-    pools:[{poolId,cells:[...cells].sort((a,b)=>a-b)}],nextPoolId:Number(poolId.slice(5))+1};
+    pools:[{poolId,cells:[...cells].sort((a,b)=>a-b)}],
+    nextPoolId:Number(poolId.slice(5))+1,poolTxnSeq:0};
   return root;
 }
 test('LOT-D1a: original root-v1 save, credits and both actors remain intact',()=>{
@@ -159,5 +160,5 @@ test('LOT-D1a: pool overlapping existing feature or construction rejected, no du
   assert.equal(restored.world.outdoors.pools.length,0);
   assert.equal(restored.world.outdoors.features.length,1);
   assert.deepEqual(restored.shop,old.shop);
-  assert.equal(restoreOutdoorsWorld({schema:99}),newOutdoorsWorld());
+  assert.deepEqual(restoreOutdoorsWorld({schema:99}),newOutdoorsWorld());
 });
