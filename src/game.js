@@ -111,7 +111,7 @@ import {purchasedSeatPrefab,purchasedSeatPose,purchasedSeatSurface,
 import {diningSeatApproach,diningPlatePosition,diningChairPullLimit,
   diningChairPullOffset} from './dining.js';
 import {UTILITY_FURNITURE,UTILITY_ACTION_IDS,furnitureUseWeight,lampIsOn} from './furniture-interactions.js';
-import {MOUNTED_LIGHTS,lightingMountPose,mountedLightIsOn,setMountedLightMode,
+import {MOUNTED_LIGHTS,lightingMountPose,mountedAnchorAt,mountedLightIsOn,setMountedLightMode,
   mountedFixturesSurviveEdit,prioritizeVisibleLights} from './mounted-lighting.js';
 import {createMiraMeshyVisual} from './meshy-mira-visual.js?v=1.2t';
 import {hugMotion,hugPairTarget} from './romantic-hug.js';
@@ -2203,9 +2203,10 @@ function boot() {
         ?mountedAnchorAt(game.world.construction,item.itemDefinitionId,pose.x,pose.z):null;
       const mounted=MOUNTED_LIGHTS[item.itemDefinitionId]
         ?lightingMountPose(game.world.construction,item.itemDefinitionId,
-          mount||item.mount):null;
-      node.setPosition(previewing?(mounted?.x??pose.x):(mounted?.x??pose.x),
-        mounted?.y??0,previewing?(mounted?.z??pose.z):(mounted?.z??pose.z));
+          previewing?mount:item.mount):null;
+      // Invalid preview pose never teleports back to the saved wall mount.
+      // A missing anchor is displayed at the finger-selected draft pose.
+      node.setPosition(mounted?.x??pose.x,mounted?.y??0,mounted?.z??pose.z);
       node.setEulerAngles(0,-(mounted?.yaw??pose.yaw),0);
     }
     refreshSofaSeat();

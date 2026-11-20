@@ -113,3 +113,10 @@ test('UX-02b mobile DOM contract: no auto-drop commit, explicit visible controls
    assert.ok(html.includes('id="'+id+'"'),id);
  assert.match(css,/\.furnish-owned-preview button\{min-width:0;min-height:44px/);
 });
+
+test('UX-02b mounted-light preview uses exported mount lookup; invalid draft never falls back to saved anchor',()=>{
+ const source=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
+ assert.match(source,/import \{MOUNTED_LIGHTS,lightingMountPose,mountedAnchorAt/);
+ assert.match(source,/previewing\?mount:item\.mount/);
+ assert.doesNotMatch(source,/mount\|\|item\.mount/);
+});
