@@ -108,7 +108,7 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
   assert.equal(elements.get('furnish-placing-name').textContent,'Растение');
   assert.equal(visual.enabled,true,'placement outline must show after Buy');
   assert.equal(elements.get('furnish-preview-turn').disabled,false);
-  assert.match(elements.get('furnish-buy').textContent,/Установить/);
+  assert.match(elements.get('furnish-buy').textContent,/Купить и установить/);
 });
 test('shop selection and placement guidance is clear even when card list collapses',()=>{
   assert.match(game,/button.classList.toggle\('selected-product',active\)/);

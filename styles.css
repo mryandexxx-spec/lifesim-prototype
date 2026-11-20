@@ -2094,3 +2094,30 @@ button.time-card:active {transform:translateY(1px);}
 #ground-walk-close:focus-visible{outline:3px solid #2b7759;outline-offset:2px;}
 @media(max-height:480px){.ground-walk-menu{padding:7px 9px;}
   .garden-action-status{line-height:1.3}.garden-action-wish{padding:5px;}}
+
+/* UX-02a: primary purchase control stays within the visible mobile editor
+ * while the 47-SKU catalog scrolls. The 3D stage is a separate, smaller sheet. */
+.furniture-editor[data-editor-view="shop"] .furnish-purchase-actions{
+  position:sticky;bottom:0;z-index:6;flex:none;flex-wrap:wrap;
+  margin:0 -3px -3px;padding:10px 9px max(10px,env(safe-area-inset-bottom));
+  background:#fcfaf5;border:1px solid #b9d4c5;border-radius:15px;
+  box-shadow:0 -5px 17px #233f3229;
+}
+.furnish-action-summary{display:block;flex:0 0 100%;min-width:0;
+  color:#294f40;font-size:13px;font-weight:750;line-height:1.35;
+  overflow-wrap:anywhere;}
+.furniture-editor[data-editor-view="shop"] .furnish-market-bar > button,
+.furniture-editor[data-editor-view="shop"] .furnish-type-tabs button,
+.furniture-editor[data-editor-view="shop"] .furnish-catalog-filters select,
+.furniture-editor[data-editor-view="shop"] .furnish-search-label{min-height:44px;}
+.furniture-editor[data-editor-view="shop"] .furnish-variant-select,
+.furniture-editor[data-editor-view="shop"] .furnish-placement-controls button{min-height:44px;}
+.furniture-editor[data-editor-view="shop"] .furnish-purchase-actions #furnish-buy{
+  min-height:48px;font-size:15px;}
+.furniture-editor[data-editor-view="shop"] .furnish-purchase-actions #furnish-place-cancel{
+  min-height:48px;}
+@media(max-height:560px) and (orientation:landscape){
+  .furniture-editor[data-editor-view="shop"] .furnish-purchase-actions{
+    padding:5px 8px max(6px,env(safe-area-inset-bottom));}
+  .furnish-action-summary{font-size:12px;}
+}
