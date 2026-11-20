@@ -66,6 +66,7 @@ jobs:
           node --check src/sleep-acceleration.js
           node --check src/navigation.js
           node --check src/gardening.js
+          node --check src/garden-autonomy.js
           node --check src/lot-surface.js
           node --check src/outdoor-catalog.js
           node --check src/outdoor-proposals.js
@@ -206,6 +207,7 @@ jobs:
           cp src/construction.js site/src/
           cp src/lot-surface.js src/outdoor-catalog.js src/outdoor-proposals.js src/outdoor-interactions.js site/src/
           cp src/gardening.js site/src/
+          cp src/garden-autonomy.js site/src/
           cp src/furnished-room.js site/src/
           cp src/roof-construction.js site/src/
           cp src/exterior-construction.js site/src/

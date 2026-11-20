@@ -27,6 +27,7 @@ import {outdoorBench,outdoorBenchApproach,outdoorBenchAvailable} from './outdoor
 import {gardenFeature,gardenApproach,gardenActionAllowed,restoreGardenRewards,
   advanceGardens,settleGardenAction,GARDEN_DURATION,
   gardenRequestStillValid} from './gardening.js';
+import {restoreGardenRoutine,considerAutonomousGarden,noteAutonomousGardenStart} from './garden-autonomy.js';
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
@@ -107,6 +108,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.shop=newFurnitureShop();
   state.financialHistory=newFinancialHistory();
   state.gardenRewards=restoreGardenRewards(null);
+  state.gardenRoutine=restoreGardenRoutine(null,state.minutes);
   state.householdBills=newHouseholdBills(state.minutes);
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
@@ -135,6 +137,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.shop=restoreFurnitureShop(raw.shop);
   root.financialHistory=restoreFinancialHistory(raw.financialHistory);
   root.gardenRewards=restoreGardenRewards(raw.gardenRewards);
+  root.gardenRoutine=restoreGardenRoutine(raw.gardenRoutine,root.minutes);
   root.householdBills=restoreHouseholdBills(raw.householdBills,root.minutes);
   root.careerSystem=restoreCareerSystem(raw.careerSystem);
   root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem,root.minutes);
@@ -1058,6 +1061,17 @@ export function tickHousehold(root,minutes) {
   // One family calendar, one weekly bill cycle, never one charge per resident.
   const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
   return [...careerEvents,...billEvents];
+}
+
+/** Garden opportunity belongs to the SAME household brain, after social/self-care.
+ * It never inserts an automatic task into the player's FIFO queue.
+ */
+export function residentGardenOpportunity(root,id='alex'){
+  if(!root||residentUnavailableForHome(root,id))return null;
+  return considerAutonomousGarden(root,id);
+}
+export function recordResidentGardenStart(root,id,instanceId){
+  return noteAutonomousGardenStart(root,id,instanceId);
 }
 
 export function residentAutonomousChoice(root,id='alex') {
