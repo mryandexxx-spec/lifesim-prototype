@@ -39,18 +39,14 @@ function requirementRows(rule,careerId,actor,contract,immediate,readiness){
   if(rule.skill)rows.push({label:HOBBY_SKILLS.skills[rule.skill]?.label||rule.skill,
     target:rule.level,current:currentSkillLevel(actor?.skills,HOBBY_SKILLS,rule.skill),
     met:null,scope:'reference'});
-  const cases=rankScenes(rule,trackCase(careerId,rule));
+  const cases=rankScenes(rule);
   for(const caseId of cases)rows.push({
     label:'Успешная ситуация «'+(workScenario(careerId,caseId)?.title||caseId)+'»',
     target:1,current:null,met:null,scope:'rank-bound'
   });
   return rows;
 }
-function trackCase(careerId,rule){
-  const tracks=careerId&&rule?null:null;
-  return tracks;
-}
-function rankScenes(rule,unused){
+function rankScenes(rule){
   return Array.isArray(rule.scenes)?rule.scenes:
     rule.scenarioId?[rule.scenarioId]:[];
 }
@@ -76,8 +72,7 @@ function buildNode(root,id,career,contract,branch,readiness,rank,track=null){
   const rows=requirementRows(adjusted,career.id,actorFor(root,id),contract,
     immediate,readiness);
   // A selected rank 6 with no selection cannot claim progress.
-  const requirements=immediate&&readiness?.requirements?.length?
-    rows:rows;
+  const requirements=rows;
   return {id:track?track.id+'-'+rank.index:'common-'+rank.index,
     level:rank.index+1,title:rank.title,hourlyCredits:rank.hourlyCredits,
     branchId:track?.id||null,branchTitle:track?.title||null,
