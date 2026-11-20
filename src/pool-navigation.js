@@ -136,7 +136,9 @@ export function planPoolEntry(world,from,poolId,{jump=false,
     const wetPath=findPoolWaterPath(world,poolId,entry.waterCell,slot.anchorCell,
       {blockedCells:[...blocked].filter(c=>!slot.cells.includes(c))});
     if(!wetPath)continue;
-    const length=routeLength(entry.landPath,from)+wetPath.length*.5;
+    // Prefer a farther available lane on the same accessible entrance:
+    // the near-entry corridor remains free for a second swimmer.
+    const length=routeLength(entry.landPath,from)-wetPath.length*.2;
     if(length<score){
       score=length;
       choice={poolId,fixtureId:entry.fixtureId,kind:entry.kind,
