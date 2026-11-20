@@ -16,6 +16,14 @@ try{
   const seed=newHousehold('2026-11-20');
   seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
   seed.paused=true;seed.otherSim.paused=true;
+  // Existing pre-upgrade paid furniture stays physical and loads the matching
+  // GLB without changing its saved itemDefinitionId or purchase price.
+  seed.world.furniture.instances.push(
+   {instanceId:'shop-chair-1',prefabId:'chair',itemDefinitionId:'chair.loft',
+    purchasePriceCredits:110,x:1.75,z:3.5,yaw:0,location:'home'},
+   {instanceId:'shop-rug-2',prefabId:'rug',itemDefinitionId:'mesh.fluffy_rug',
+    purchasePriceCredits:170,x:0,z:2.25,yaw:0,location:'home'});
+
   const ctx=await browser.newContext({viewport:{width:w,height:h},
    isMobile:true,hasTouch:true,deviceScaleFactor:1});
   await ctx.addInitScript(({key,root})=>{
@@ -32,10 +40,12 @@ try{
   await page.goto('http://127.0.0.1:8765/?furniture=qa',
    {waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
-  await page.waitForFunction(()=>window.__LifeSimMeshyFurnitureStats?.().attached>=3,
+  await page.waitForFunction(()=>window.__LifeSimMeshyFurnitureStats?.().attached>=11,
    null,{timeout:60000});
   const attached=await page.evaluate(()=>window.__LifeSimMeshyFurnitureStats());
-  assert.equal(attached.failures,0,'original home Meshy GLB load');
+  assert.equal(attached.failures,0,'starter AND saved purchased model loads');
+  assert.ok(attached.attached>=11,'nine original fixtures + two paid legacy/current items');
+  assert.ok(attached.cachedSkus>=11,'old purchases use their exact visual SKU');
   assert.ok((await page.locator('#game-canvas').screenshot()).length>3000);
   await page.screenshot({path:'meshy-starter-catalog-artifacts/home-'+w+'x'+h+'.png'});
   await page.locator('#home-open').tap();
@@ -68,6 +78,9 @@ try{
   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
   assert.equal(saved.version,1);
   assert.ok(saved.world.furniture.instances.some(i=>i.instanceId==='home-bed-1'));
+  assert.ok(saved.world.furniture.instances.some(i=>
+    i.instanceId==='shop-chair-1'&&i.itemDefinitionId==='chair.loft'&&
+    i.purchasePriceCredits===110));
   await page.screenshot({path:'meshy-starter-catalog-artifacts/catalog-'+w+'x'+h+'.png'});
   await ctx.close();
  }
