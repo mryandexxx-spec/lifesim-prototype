@@ -8,7 +8,8 @@ export const OUTDOOR_PALETTE=Object.freeze([
   Object.freeze({id:'ground',label:'▦ Покрытия'}),
   Object.freeze({id:'plants',label:'🌳 Растения'}),
   Object.freeze({id:'garden',label:'🌱 Грядки'}),
-  Object.freeze({id:'objects',label:'🪑 Мебель и свет'})
+  Object.freeze({id:'objects',label:'🪑 Мебель и свет'}),
+  Object.freeze({id:'pool',label:'🏊 Бассейн'})
 ]);
 export const OUTDOOR_GROUND_LABELS=Object.freeze({
   lawn:'Газон',stone:'Каменная дорожка',gravel:'Гравий',
@@ -16,7 +17,22 @@ export const OUTDOOR_GROUND_LABELS=Object.freeze({
 });
 const size=n=>Number(n.toFixed(2)).toLocaleString('ru-RU');
 export function describeOutdoorSelection({category='ground',groundKind='lawn',
-  itemId='',operation='place',proposal=null}={}){
+  itemId='',operation='place',proposal=null,
+  poolTool='paint',poolOperation='fixture-add'}={}){
+  if(category==='pool'){
+    const names={paint:'Добавить воду',erase:'Убрать воду',
+      ladder:'Лестница',steps:'Ступени',board:'Низкий трамплин'};
+    const name=names[poolTool]||'Бассейн';
+    const action=poolTool==='paint'||poolTool==='erase'?name:
+      poolOperation==='fixture-remove'?'Продать оборудование':
+        poolOperation==='fixture-move'?'Переместить оборудование':name;
+    if(proposal?.ok&&Number.isFinite(proposal.cost))
+      return action+' · '+size(proposal.areaSquareMetres)+' м² · '+
+        (proposal.cost<0?'возврат '+(-proposal.cost):'стоимость '+proposal.cost)+
+        ' кр. к подтверждению';
+    return action+' · сетка 0,5 м · '+(
+      poolTool==='paint'||poolTool==='erase'?'выдели водные клетки':'коснись бортика');
+  }
   if(category==='ground'){
     const name=OUTDOOR_GROUND_LABELS[groundKind]||'Покрытие';
     const unit=OUTDOOR_GROUND_PRICE[groundKind]??0;
