@@ -149,7 +149,7 @@ test('D2b removal of pool or ladder during swim recovers to safe dry ground with
   const t=home();begin(t);reach(t);
   t.world.outdoors.poolFixtures=[];
   tickHousehold(t,1);
-  assert.equal(t.action.stage,'exiting');
+  assert.equal(t.action.stage,'recovering');
   for(let i=0;i<SWIM_MAX_WAIT_MINUTES+20&&t.action;i++)tickHousehold(t,1);
   assert.equal(t.action,null);
   assert.ok(isWalkable(t.position.x,t.position.z,t.world));
