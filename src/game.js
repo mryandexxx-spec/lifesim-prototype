@@ -1346,7 +1346,9 @@ function renderQueuePanel(force=true){
   const residentId=queueViewerResident(game.selectedSim,queueInspectResident);
   const pending=pendingActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
-  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,active,game.socialAction?.phase,
+  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,active,
+    HOUSEHOLD_IDS.map(id=>pendingActions(game.actionQueues,id).length),
+    game.socialAction?.phase,
     getActor(game,residentId).action?.phase,
     (game.socialAction?.eveningStage||game.socialAction?.eveningSofa)&&
       game.socialAction.phase==='using'

@@ -16,7 +16,9 @@ seed.paused=true;seed.otherSim.paused=true;
 seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
 enqueueAction(seed.actionQueues,'alex',{type:'object',actionId:'bed'});
 enqueueAction(seed.actionQueues,'alex',{type:'object',actionId:'fridge'});
+enqueueAction(seed.actionQueues,'alex',{type:'object',actionId:'shower'});
 enqueueAction(seed.actionQueues,'mira',{type:'object',actionId:'sofa'});
+enqueueAction(seed.actionQueues,'mira',{type:'object',actionId:'bed'});
 const browser=await chromium.launch({headless:true,args:[
  '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
  '--enable-unsafe-swiftshader','--disable-dev-shm-usage'
@@ -61,7 +63,18 @@ async function run(build,w,h){
    animations:'disabled'});
   screens.push({build,w,h,life:initial});
   if(build==='baseline')return;
-  assert.equal((await page.locator('#plan-label').innerText()).trim(),'План · 2');
+  // A real dispatcher can start a seeded command during initial recovery.
+  // Observe settled future FIFO, not a guessed seed count.
+  await page.locator('#view-toggle').tap();
+  await page.locator('#save-btn').tap();
+  await page.locator('#view-close').tap();
+  const beforeQueues=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+  const alexPending=beforeQueues.actionQueues.byResident.alex.length;
+  const miraPending=beforeQueues.actionQueues.byResident.mira.length;
+  assert.ok(alexPending>=2,'Alex retains at least two future tasks');
+  assert.ok(miraPending>=1,'Mira retains future tasks');
+  assert.equal((await page.locator('#plan-label').innerText()).trim(),
+   'План · '+alexPending);
   assert.match(await page.locator('#plan-resident').innerText(),/Алекс/);
   for(const id of ['#plan-peek','#pick-alex','#pick-mira','#pause-btn',
    '#speed-btn','#calendar-anchor-toggle','#home-open','#career-phone-toggle',
@@ -72,7 +85,7 @@ async function run(build,w,h){
   await page.locator('#plan-peek').tap();
   assert.equal(await page.locator('#queue-panel').isVisible(),true);
   assert.match(await page.locator('#queue-title').innerText(),/Алекс/);
-  assert.equal(await page.locator('#queue-items li').count(),2);
+  assert.equal(await page.locator('#queue-items li').count(),alexPending);
   for(const id of ['#queue-alex','#queue-mira','#queue-close']){
    const r=await page.locator(id).boundingBox();
    assert.ok(r?.width>=44&&r.height>=44,id+' must be touch-sized');
@@ -81,29 +94,33 @@ async function run(build,w,h){
   assert.equal(await page.locator('#queue-mira').getAttribute('aria-pressed'),'true');
   assert.equal(await page.locator('#pick-alex').getAttribute('aria-pressed'),'true',
    'inspecting Mira must not steal control');
-  assert.equal(await page.locator('#queue-items li').count(),1);
+  assert.equal(await page.locator('#queue-items li').count(),miraPending);
   assert.match(await page.locator('#queue-person-note').innerText(),/не переключает/);
   const untouched=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
-  assert.equal(untouched.actionQueues.byResident.alex.length,2);
-  assert.equal(untouched.actionQueues.byResident.mira.length,1);
+  assert.deepEqual(untouched.actionQueues.byResident.alex,
+   beforeQueues.actionQueues.byResident.alex);
+  assert.deepEqual(untouched.actionQueues.byResident.mira,
+   beforeQueues.actionQueues.byResident.mira);
   assert.equal(untouched.selectedSim,'alex');
   await page.screenshot({path:'ux01-artifacts/candidate-mira-plan-'+w+'x'+h+'.png',
    animations:'disabled'});
   // Remove a FUTURE Mira task: neither Alex FIFO nor active action changes.
   await page.locator('#queue-items li button').first().tap();
   const changed=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
-  assert.equal(changed.actionQueues.byResident.alex.length,2);
-  assert.equal(changed.actionQueues.byResident.mira.length,0);
+  assert.deepEqual(changed.actionQueues.byResident.alex,
+   beforeQueues.actionQueues.byResident.alex);
+  assert.equal(changed.actionQueues.byResident.mira.length,miraPending-1);
   assert.equal(changed.selectedSim,'alex');
   assert.equal(await page.locator('#queue-mira').getAttribute('aria-pressed'),'true');
   await page.locator('#queue-close').tap();
   await page.locator('#pick-mira').tap();
   assert.equal(await page.locator('#pick-mira').getAttribute('aria-pressed'),'true');
-  assert.equal((await page.locator('#plan-label').innerText()).trim(),'План · 0');
+  assert.equal((await page.locator('#plan-label').innerText()).trim(),
+   'План · '+(miraPending-1));
   await page.locator('#plan-peek').tap();
   await page.locator('#queue-alex').tap();
   assert.equal(await page.locator('#pick-mira').getAttribute('aria-pressed'),'true');
-  assert.equal(await page.locator('#queue-items li').count(),2);
+  assert.equal(await page.locator('#queue-items li').count(),alexPending);
   await page.locator('#queue-close').tap();
   await page.locator('#calendar-anchor-toggle').tap();
   assert.equal(await page.locator('#calendar-anchor-panel').isVisible(),true);
@@ -120,8 +137,9 @@ async function run(build,w,h){
   await page.locator('#save-btn').count(); // save remains in its existing menu
   const final=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
   assert.equal(final.version,1);
-  assert.equal(final.actionQueues.byResident.alex.length,2);
-  assert.equal(final.actionQueues.byResident.mira.length,0);
+  assert.deepEqual(final.actionQueues.byResident.alex,
+   beforeQueues.actionQueues.byResident.alex);
+  assert.equal(final.actionQueues.byResident.mira.length,miraPending-1);
   await page.screenshot({path:'ux01-artifacts/candidate-after-plan-'+w+'x'+h+'.png',
    animations:'disabled'});
  }finally{await ctx.close();}

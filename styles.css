@@ -2020,9 +2020,9 @@ button.time-card:active {transform:translateY(1px);}
 #plan-peek .plan-heading{display:flex;align-items:center;justify-content:space-between;
   gap:7px;min-width:0;width:100%}
 #plan-peek #plan-label{font-size:14px;font-weight:900;color:#214e3d;white-space:nowrap}
-#plan-peek #plan-resident{font-size:11px;font-weight:750;color:#3a765c;
+#plan-peek #plan-resident{font-size:12px;font-weight:750;color:#3a765c;
   min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#plan-peek .plan-current #status-text{font-size:11px;line-height:1.4}
+#plan-peek .plan-current #status-text{font-size:12px;line-height:1.4}
 #plan-peek[aria-expanded="true"]{outline:2px solid #347c60;outline-offset:1px}
 #plan-peek:focus-visible,#dashboard .resident-switch button:focus-visible,
 .queue-resident-tabs button:focus-visible,.queue-items button:focus-visible,
@@ -2042,7 +2042,7 @@ button.time-card:active {transform:translateY(1px);}
 .queue-resident-tabs button[aria-pressed="true"]{border-color:#357659;
   color:#19543a;background:#dfefdf}
 .queue-resident-tabs button[aria-pressed="true"]:before{content:"✓ ";font-weight:900}
-.queue-person-note{font-size:11px;line-height:1.4;color:#496854;margin:0 0 9px}
+.queue-person-note{font-size:12px;line-height:1.4;color:#496854;margin:0 0 9px}
 .queue-items li{font-size:12px;line-height:1.4;min-height:52px}
 .queue-items li button{min-width:62px;min-height:44px;
   padding:7px 9px;font-size:12px;font-weight:800}
@@ -2059,7 +2059,7 @@ button.time-card:active {transform:translateY(1px);}
 .queue-receipt[hidden]{display:none!important}
 .ground-walk-heading button{min-height:44px;min-width:44px}
 @media(max-width:370px){#plan-peek.plan-peek{width:min(226px,calc(100vw - 20px))}
-  #plan-peek #plan-resident{font-size:10px}}
+  #plan-peek #plan-resident{font-size:11px}}
 @media(max-height:560px) and (orientation:landscape){
   #plan-peek.plan-peek{top:calc(env(safe-area-inset-top) + 57px);
     width:min(245px,calc(100vw - 20px));max-width:245px}
