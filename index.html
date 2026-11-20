@@ -368,7 +368,7 @@
       </div>
       <p id="furnish-tip">Выбери мебель в списке или касанием в 3D. Удерживай палец 0,5 с для перемещения; для поворота используй кнопку «Повернуть 90°».</p>
       <div class="furnish-market-bar" role="group" aria-label="Разделы обстановки">
-        <button id="furnish-edit-toggle" type="button" aria-pressed="true">▦ Комната</button>
+        <button id="furnish-edit-toggle" type="button" aria-pressed="true">▦ В комнате</button>
         <button id="furnish-shop-toggle" type="button" aria-controls="furnish-shop" aria-expanded="false">🛍 Каталог</button>
         <button id="furnish-warehouse-toggle" type="button" aria-controls="furnish-warehouse" aria-expanded="false">📦 Склад <span id="furnish-storage-count">0</span></button>
         <output id="furnish-balance" aria-live="polite">Пробные кредиты: 5000</output>
@@ -414,13 +414,14 @@
           <div id="furnish-variant-rows"></div>
         </section>
         <p id="furnish-filter-empty" class="furnish-filter-empty" hidden>Таких товаров пока нет. Попробуй изменить фильтры.</p>
-        <p class="furnish-map-tip"><strong>1. Выбери товар → 2. Нажми «Купить» → 3. Найди место → 4. Установи.</strong> До установки деньги не списываются.</p>
+        <p class="furnish-map-tip"><strong>Выбери карточку → укажи место → поверни при необходимости → подтверди установку.</strong> До подтверждения деньги не списываются.</p>
         <div id="furnish-placement-controls" class="furnish-placement-controls">
           <button id="furnish-preview-turn" type="button" aria-label="Повернуть покупаемый предмет на 90 градусов">⟳ Предмет</button>
           <button id="furnish-preview-auto" type="button" aria-label="Найти свободное место для покупки">⌖ Найти место</button>
         </div>
         <p id="furnish-preview" role="status" aria-live="polite">Выбери товар. Выделенная карточка покажет, что именно покупаешь.</p>
         <div class="furnish-purchase-actions">
+          <span id="furnish-action-summary" class="furnish-action-summary" role="status" aria-live="polite">Выбери мебель для примерки</span>
           <button id="furnish-buy" type="button">Купить</button>
           <button id="furnish-place-cancel" type="button" hidden>✕ Отменить</button>
         </div>
