@@ -84,8 +84,8 @@ test('F4G: recipes gate by real supplies and per-resident cooking skill',()=>{
  assert.equal(restoreKitchen({...k,schema:1,prepared:[{recipeId:'rogue',portions:999}]}).prepared.length,0);
  assert.ok(!replenishKitchen(k,1000));
  assert.ok(replenishKitchen(k,1500));
- assert.equal(k.pantry.vegetables,8);
- assert.ok(!replenishKitchen(k,1501),'reload/extra calls cannot mint duplicate daily supplies');
+ assert.equal(k.pantry.vegetables,6,'C3b removes free daily food');
+ assert.ok(!replenishKitchen(k,1501),'no free daily food');
 });
 test('F4G: true three-station path and cooked portions are only minted on completion',()=>{
  const h=home(),plan=chooseKitchenPlan(h.world,h.position,'shop-stove-902');
@@ -249,5 +249,5 @@ test('F4G: Safari touch interaction, visual effects and deploy contain kitchen E
  assert.match(game,/F4G cooking pot/);
  assert.match(game,/kitchenAppliances=/);
  assert.match(workflow,/node --check src\/kitchen\.js/);
- assert.match(workflow,/cp src\/kitchen\.js src\/hobby-content\.js site\/src\//);
+ assert.match(workflow,/cp src\/kitchen\.js src\/kitchen-market\.js src\/hobby-content\.js site\/src\//);
 });

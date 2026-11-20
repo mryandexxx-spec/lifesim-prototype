@@ -1,0 +1,23 @@
+name: LOT-C3b — finite kitchen and paid groceries
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  kitchen-economy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          node --check src/kitchen.js
+          node --check src/kitchen-market.js
+          node --check src/household.js
+          node --check src/game.js
+      - name: C3b kitchen and garden regression
+        run: node --test tests/lot-c3b.test.js tests/f4g-kitchen.test.js tests/lot-c3a.test.js tests/lot-c2c-mobile.test.js
