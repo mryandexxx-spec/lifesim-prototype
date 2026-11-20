@@ -1,3 +1,4 @@
+import {bedSkinSupport,placeBedSkin} from './meshy-bed-runtime.js';
 import {MIRA_MESHY_URL,miraHasClips,miraClipFor,
   miraMeshPlacement,canShowMiraMeshy} from './meshy-mira-policy.js?v=1.2q';
 import {MIRA_SOFA_CLIP,MIRA_SOFA_DURATION,miraSofaClipTime,miraSofaOffset}
@@ -13,6 +14,12 @@ import {createMeshyKissController} from './meshy-kiss-runtime.js';
 import {createMeshyReadingController} from './meshy-reading-runtime.js?v=1.2t';
 import {createMeshyMusicController} from './meshy-music-runtime.js';
 import {createMeshyPaintingController} from './meshy-painting-runtime.js';
+
+import {createSkinnedSeatController} from './meshy-seat-runtime.js';
+import {MESHY_SEAT_RIG_PROFILE} from './meshy-visual-policy.js?v=1.2q';
+// Both GLBs use the same Mixamo bone names. These ankle-to-sole distances
+// come from Mira's skinned shoes in the last frame of Look_Back_and_Sit.
+const miraSeatProfile={...MESHY_SEAT_RIG_PROFILE,soleDrops:[.13940,.14058]};
 
 /** Read undeformed geometry AABBs, never pose-dependent meshInstance.aabb.
  * The validated female GLB has one original skinned mesh.
@@ -45,7 +52,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
     .filter(component=>!preserved.has(component.entity));
   const state={ready:false,status:'loading',error:null,
     root:null,model:null,clip:null,visible:false,base:null,
-    sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null,
+    seatRuntime:null,sofaReady:false,sofaOffset:{x:0,z:0},sofaRelease:null,
     bedReady:false,bedRuntime:null,fridgeRuntime:null,readingRuntime:null,musicRuntime:null,paintingRuntime:null,
     showerRuntime:null,hugRuntime:null,walkDuration:0,toiletReady:false};
   function attach(asset){
@@ -80,6 +87,12 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       model.anim.baseLayer.play('Idle_7');
       model.anim.playing=false;
       rig.avatar.addChild(root);
+      if(model.findByName)try{
+        state.seatRuntime=createSkinnedSeatController({
+          pc,model,avatar:rig.avatar,profile:miraSeatProfile,footIK:false,footPlant:true
+        });
+      }catch(error){console.warn('Mira seat foot contact unavailable',error);}
+
       // Female bed inherits the same mattress slot/path as the procedural
       // controller; source 'sleep' is an original authored lying animation.
       // Guard the post-Anim absolute hip quaternion to avoid double reclining.
@@ -252,8 +265,8 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
     get status(){return state.status;},
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
-      sofaBusy=false,sofaWeight=0,dt=0,hugFrame=null,kissFrame=null,
-      bedBusy=false,bedFrame=null,bedProgress=0,
+      sofaBusy=false,sofaWeight=0,seat=null,dt=0,hugFrame=null,kissFrame=null,
+      bedBusy=false,bedFrame=null,platformBed=false,bedProgress=0,
       showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,
       fridgeBusy=false,fridgeFrame=null,readingElapsed=null,
@@ -270,6 +283,11 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         paintingReady:Boolean(state.paintingRuntime?.ready),
         toiletBusy,toiletReady:state.toiletReady
       });
+      const support=platformBed?bedSkinSupport('mira',bedFrame):null;
+      if(state.root&&(support||state.bedSupported)){
+        placeBedSkin(state.root,support);
+        state.bedSupported=Boolean(support);
+      }
       if(state.visible!==show){
         for(const renderer of legacyRenderers)renderer.enabled=!show;
         if(state.root)state.root.enabled=show;
@@ -372,6 +390,9 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         anim.speed=0;
         anim.playing=true;
         anim.baseLayer.activeStateCurrentTime=t;
+        if(seat)state.seatRuntime?.plantGroundedFeet({
+          seat,weight:sofaWeight,scale:state.base.scale
+        });
         return true;
       }
       const bedding=actionId==='bed'||bedBusy;

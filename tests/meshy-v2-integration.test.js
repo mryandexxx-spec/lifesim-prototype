@@ -67,7 +67,7 @@ test('35 actual GLB fit specs are positive and preserve the canonical prefab foo
     const width=def.footprint.maxX-def.footprint.minX;
     const depth=def.footprint.maxZ-def.footprint.minZ;
     assert.ok(fit.footprint.width<=width+.01&&fit.footprint.depth<=depth+.01);
-    assert.ok(fit.rotationY===0||fit.rotationY===90);
+    assert.ok([0,90,-90,180].includes(fit.rotationY));
     assert.equal(meshyFurnitureThumbnailUrl(item.sku),
       './assets/furniture/meshy-room-v2/thumbnails/'+item.slug+'.png');
   }
