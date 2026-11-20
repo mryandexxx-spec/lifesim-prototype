@@ -27,7 +27,8 @@ jobs:
             'https://sb-22qoxhwr73v2.vercel.run/meshy-batch02-public-patch.tar.gz' \
             -o /tmp/meshy-batch02-patch.tar.gz
           echo '80d267ac33909237ab4e849ad9a2bf6d3594d7f5ca80181e0dff85a7ec01491c  /tmp/meshy-batch02-patch.tar.gz' | sha256sum -c -
-          tar -tzf /tmp/meshy-batch02-patch.tar.gz | grep -q 'assets/furniture/meshy-room-v2/manifest.json'
+          tar -tzf /tmp/meshy-batch02-patch.tar.gz > /tmp/meshy-batch02-filelist.txt
+          grep -q 'assets/furniture/meshy-room-v2/manifest.json' /tmp/meshy-batch02-filelist.txt
           tar -xzf /tmp/meshy-batch02-patch.tar.gz -C .
           python3 - <<'PY'
           import json,hashlib
