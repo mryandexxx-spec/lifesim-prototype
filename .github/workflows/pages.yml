@@ -85,6 +85,8 @@ jobs:
           node --check src/furniture-shop.js
           node --check src/furniture-products.js
           node --check src/furniture-procedural-library.js
+          node --check src/meshy-furniture-policy.js
+          node --check src/meshy-furniture-visual.js
           node --check src/dining.js
           node --check src/kitchen.js
           node --check src/seat-furniture.js
@@ -223,6 +225,7 @@ jobs:
           cp src/furniture-shop.js src/furniture-value.js site/src/
           cp src/mounted-lighting.js site/src/
           cp src/furniture-products.js src/furniture-procedural-library.js src/furniture-thumbnails.js src/seat-furniture.js src/dining.js src/furniture-interactions.js site/src/
+          cp src/meshy-furniture-policy.js src/meshy-furniture-visual.js site/src/
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
           cp src/object-once-ledger.js site/src/
@@ -269,6 +272,9 @@ jobs:
         run: |
           mkdir -p site/assets/characters
           cp assets/characters/meshy-casual-v1.glb assets/characters/meshy-mira-mobile-v1.glb site/assets/characters/
+          mkdir -p site/assets/furniture/meshy-room-v1
+          cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
+          cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
