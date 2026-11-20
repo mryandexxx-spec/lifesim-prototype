@@ -83,7 +83,8 @@ test('Placement retains 3D prefab and floor outline; swipe moves object without 
   assert.match(game,/shopPreviewEntity.name='Unsaved furniture placement preview'/);
   assert.match(game,/shopPreviewEntity.setPosition\(shopPose.x,0,shopPose.z\)/);
   assert.match(game,/shopPreviewEntity.setEulerAngles\(0,-shopPose.yaw,0\)/);
-  assert.match(game,/oneFinger:furnishMode&&shopPlacing&&oneFingerMode==='pan'/);
+  assert.match(game,/oneFinger:furnishMode&&ownedPlacement/);
+  assert.match(game,/shopPlacing&&oneFingerMode==='pan'/);
   assert.match(game,/shopSwipeRawPose=dragShopPlacement\(view,shopSwipeRawPose\|\|shopPose/);
   assert.doesNotMatch(game,/if\(furnishMode&&shopPlacing&&!pos\)moveShopPreviewToCamera/);
   assert.match(game,/const candidate=cameraPlacementPose\(view,shopPose(?:,'lot')?\)/);
