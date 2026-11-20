@@ -122,14 +122,16 @@ export function poolAccessPoints(world,poolId,{from=null,board=false,blockedFixt
 /** A planned swim requires both an independently usable EXIT and a land
  * approach to its entrance. The board never counts as an exit.
  */
-export function planPoolEntry(world,from,poolId,{jump=false,
+export function planPoolEntry(world,from,poolId,{jump=false,fixtureId=null,
   reservedCells=[],blockedFixtureIds=[]}={}){
   if(!from||!Number.isFinite(from.x)||!Number.isFinite(from.z)||
-    !poolHasExit(outdoorsOf(world),poolId))return null;
+    !poolHasExit(outdoorsOf(world),poolId)||
+    !poolAccessPoints(world,poolId,{from}).length)return null;
   const slots=poolSwimSlots(world,poolId,{reservedCells});
   if(!slots.length)return null;
   const points=poolAccessPoints(world,poolId,{
-    from,board:jump,blockedFixtureIds});
+    from,board:jump,blockedFixtureIds}).filter(access=>
+    !fixtureId||access.fixtureId===fixtureId);
   const blocked=excluded(reservedCells);
   let choice=null,score=Infinity;
   for(const entry of points)for(const slot of slots){
@@ -199,7 +201,7 @@ export function planPoolRecovery(world,poolId,fromCell){
 /** Only transient active swimmers occupy slots/anchors; no saved parallel
  * occupancy table is introduced. Queue command sequence retains FIFO order.
  */
-export function planPoolAdmission(root,residentId,poolId,{jump=false}={}){
+export function planPoolAdmission(root,residentId,poolId,{jump=false,fixtureId=null}={}){
   if(!root?.world||!['alex','mira'].includes(residentId))return null;
   const actor=residentId==='alex'?root:root.otherSim;
   if(!actor?.position||actor.action)return null;
@@ -219,6 +221,6 @@ export function planPoolAdmission(root,residentId,poolId,{jump=false}={}){
   if(own?.type==='pool'&&own.poolId===poolId&&
     earlier?.type==='pool'&&earlier.poolId===poolId&&
     Number.isSafeInteger(earlier.seq)&&earlier.seq<own.seq)return null;
-  return planPoolEntry(root.world,actor.position,poolId,{jump,
+  return planPoolEntry(root.world,actor.position,poolId,{jump,fixtureId,
     blockedFixtureIds,reservedCells});
 }
