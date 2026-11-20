@@ -88,7 +88,12 @@ try {
     await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
     assert.match(await page.locator('#ground-walk-title').textContent(),/Календула/);
     assert.match(await page.locator('#ground-walk-info').textContent(),/48\/72 ч роста/);
-    assert.match(await page.locator('#ground-walk-action-label').textContent(),/Полить/);
+    // C2c may promote an exact-plot inspect wish above watering. Both
+    // actions must remain available through explicit confirmation.
+    const primaryWater=(await page.locator('#ground-walk-action-label').textContent())
+      .includes('Полить');
+    if(!primaryWater)assert.equal(await page.locator(
+      '#ground-walk-more [data-garden-action="water"]').isEnabled(),true);
     let persisted=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     assert.equal(persisted.actionQueues.byResident.alex.length,0,
       'tap only opens garden menu, no action started');
@@ -98,7 +103,8 @@ try {
       'dismissal must not queue garden care');
     await tap();
     await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
-    await page.locator('#ground-walk-action').click();
+    if(primaryWater)await page.locator('#ground-walk-action').click();
+    else await page.locator('#ground-walk-more [data-garden-action="water"]').click();
     await page.waitForFunction(key=>{
       const state=JSON.parse(localStorage.getItem(key));
       return state.actionQueues?.byResident?.alex?.some(
