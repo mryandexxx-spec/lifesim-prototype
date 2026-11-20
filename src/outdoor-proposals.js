@@ -104,7 +104,7 @@ function essentialGoals(root){
 /** Never revoke an existing essential route, including queued player moves.
  * Existing broken legacy layouts are tolerated, not rewritten or teleported.
  */
-function keepsExistingRoutes(root,nextOutdoors){
+export function keepsExistingRoutes(root,nextOutdoors){
   const after={...root.world,outdoors:nextOutdoors};
   const before=root.world;
   const goals=essentialGoals(root);
