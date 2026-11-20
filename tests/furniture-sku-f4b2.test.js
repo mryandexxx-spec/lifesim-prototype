@@ -196,7 +196,7 @@ test('F4b2 product appearance is applied only on the bought clone, not every pla
 test('F4b2 iPhone UI retains two independent SKU selections even with same prefab',()=>{
   const game=src('../src/game.js');
   assert.match(game,/const active=button\.dataset\.itemId===shopSelectedItemId/);
-  assert.match(game,/button\.addEventListener\('click',\(\)=>chooseShopProduct\(item\.itemId\)\)/);
+  assert.match(game,/button\.addEventListener\('click',\(\)=>\{\s*if\(!furnishMode\|\|!shopOpen\|\|shopPlacing\)return;\s*chooseShopProduct\(item\.itemId\)/);
   assert.match(game,/const offer=shopListings\.find\(x=>x\.itemId===itemId\)/);
   assert.match(game,/const listing=shopListings\.find\(i=>i\.itemId===shopSelectedItemId\)/);
   assert.match(game,/buyMarketItem\(game\.world\.furniture,game\.shop,shopSelectedItemId/);
