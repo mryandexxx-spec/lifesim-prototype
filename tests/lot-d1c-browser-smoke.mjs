@@ -107,6 +107,13 @@ try{
       JSON.parse(localStorage.getItem(key))?.world?.outdoors?.pools?.[0]?.cells?.length,
       SAVE_KEY),9);
     assert.equal((await page.evaluate(()=>window.__LifeSimPoolVisualStats?.()))?.hasPool,true);
+    // In Life mode water is picked as water, never offered as a land waypoint.
+    // D1c does not enqueue a fake swimming action before the separate D2 stage.
+    await touch([7.75,-6.75]);
+    await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+    assert.match(await page.locator('#ground-walk-title').textContent(),/Бассейн/);
+    assert.equal(await page.locator('#ground-walk-action').isDisabled(),true);
+    await page.locator('#ground-walk-close').click();
     await context.close();
   }
   assert.deepEqual(errors,[]);
