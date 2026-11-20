@@ -38,7 +38,9 @@ export function sanitizeQueueCommand(id,raw,persons){
       (raw.fixtureId!==undefined&&!validPoolFixtureId(raw.fixtureId))||
       (raw.actionId==='jump'&&!raw.fixtureId))return null;
     return {type:'pool',poolId:raw.poolId,actionId:raw.actionId,
-      ...(raw.fixtureId?{fixtureId:raw.fixtureId}:{})};
+      ...(raw.fixtureId?{fixtureId:raw.fixtureId}:{}),
+      ...(Number.isFinite(raw.queuedAt)&&raw.queuedAt>=0&&raw.queuedAt<=10000000
+        ?{queuedAt:raw.queuedAt}:{})};
   }
   if(type==='move'){
     if(!insideLot(raw.x,raw.z))return null;
