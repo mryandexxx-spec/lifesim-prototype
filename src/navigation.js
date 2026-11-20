@@ -2,6 +2,7 @@
 import {FRIDGE_LAYOUT} from './fridge-interaction.js';
 import {BUILD_LOT,constructionContains,constructionWallAt} from './construction.js';
 import {insideLot,legacyLotWallAt,OUTDOORS_SCHEMA} from './lot-surface.js';
+import {poolWaterNear} from './pool-topology.js';
 import {outdoorFeatureObstacles} from './outdoor-catalog.js';
 import {newFurnitureWorld,furnitureObstacles} from './furniture-catalog.js';
 // F4D: eastward extension exactly doubles navigable floor area; old positions stay fixed.
@@ -36,7 +37,8 @@ function canWalk(x,z,obstacles){
 /** Obstacles include a walking clearance radius to protect the body. */
 export function isWalkable(x,z,layout=null){
   if(layout?.outdoors?.schema===OUTDOORS_SCHEMA&&layout?.construction?.schema===1)
-    return insideLot(x,z)&&!legacyLotWallAt(layout.construction,x,z,ACTOR_RADIUS)&&
+    return insideLot(x,z)&&!poolWaterNear(layout.outdoors,x,z,ACTOR_RADIUS)&&
+      !legacyLotWallAt(layout.construction,x,z,ACTOR_RADIUS)&&
       !constructionWallAt(layout,x,z,ACTOR_RADIUS)&&
       !obstaclesFor(layout).some(rect=>x>=rect.minX-ACTOR_RADIUS&&x<=rect.maxX+ACTOR_RADIUS&&
         z>=rect.minZ-ACTOR_RADIUS&&z<=rect.maxZ+ACTOR_RADIUS)&&
