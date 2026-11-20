@@ -487,7 +487,9 @@ function taskLabel(task){
   if(task.type==='move')return 'Идти в указанное место';
   if(task.type==='outdoor')return 'Отдохнуть на садовой скамейке';
   if(task.type==='garden')return task.actionId==='water'?'Полить грядку':
-    task.actionId==='inspect'?'Осмотреть растение':'Полюбоваться садом';
+    task.actionId==='inspect'?'Осмотреть растение':
+    task.actionId==='harvest'?'Собрать садовые травы':
+    task.actionId==='replant'?'Посадить травы заново':'Полюбоваться садом';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
@@ -2373,7 +2375,7 @@ function boot() {
   const currentGardenStageSignature=()=>game.world.outdoors?.features
     ?.filter(f=>isGardenItem(f.itemId))
     .map(f=>{const state=gardenView(game.world.outdoors,f.instanceId,game.minutes);
-      return f.instanceId+':'+(state?.stage??0)+':'+Number((state?.waterRemaining??0)>0);})
+      return f.instanceId+':'+(state?.stage??0)+':'+Number((state?.waterRemaining??0)>0)+':'+Number(state?.harvestedAt!==null&&state?.harvestedAt!==undefined);})
     .join('|')||'';
   const outdoorFeatureMaterials={
     bark:mat('#917256'),leaf:mat('#4d8960'),lightLeaf:mat('#7cac69'),
@@ -2408,16 +2410,17 @@ function boot() {
           part('sphere','sown seed mound',x,.255,z,.16,.05,.16,'soil');
         if(stage>0)for(const [k,[x,z]] of spots.entries()){
           const height=stage===1?.22:stage===2?.51:herb?.72:.66;
+          const harvested=herb&&gardenState?.harvestedAt!==null&&gardenState?.harvestedAt!==undefined;
           part('cylinder','green garden stem',x,.26+height/2,z,.055,height,.055,'darkLeaf');
-          part('sphere','garden leaves',x-.07,.34+height*.53,z,.22,
-            stage===1?.14:.29,.21,k%2?'leaf':'lightLeaf');
-          if(stage>=2)part('sphere','upper leaves',x+.09,.24+height,z,
+          part('sphere','garden leaves',x-.07,.34+height*.53,z,harvested?.14:.22,
+            stage===1?.14:harvested?.15:.29,harvested?.13:.21,k%2?'leaf':'lightLeaf');
+          if(stage>=2&&!harvested)part('sphere','upper leaves',x+.09,.24+height,z,
             herb?.24:.18,herb?.18:.17,herb?.22:.17,'lightLeaf');
           if(stage===3&&!herb){
             part('sphere','blossom petals',x,.37+height,z,.28,.16,.28,flowerColor);
             part('sphere','flower center',x,.47+height,z,.10,.07,.10,'yellow');
           }
-          if(stage===3&&herb)part('sphere','mature herb tips',x,.37+height,z,
+          if(stage===3&&herb&&!harvested)part('sphere','mature herb tips',x,.37+height,z,
             .19,.10,.19,'lightLeaf');
         }
       }else if(def.category==='tree'){
@@ -3668,7 +3671,9 @@ function boot() {
       actor.action=null;return false;
     }
     actor.event=actionId==='water'?'Идёт поливать растение':
-      actionId==='inspect'?'Идёт осмотреть растение':'Идёт полюбоваться садом';
+      actionId==='inspect'?'Идёт осмотреть растение':
+      actionId==='harvest'?'Идёт собирать урожай':
+      actionId==='replant'?'Идёт сажать травы заново':'Идёт полюбоваться садом';
     paths[actorId]={points:plan.path,index:0,id:'garden'};
     restartAutonomyWait(actorId);
     return true;
