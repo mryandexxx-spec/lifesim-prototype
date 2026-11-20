@@ -183,7 +183,7 @@
       <div class="view-panel-head"><strong>Дом</strong><button id="home-close" type="button" aria-label="Закрыть выбор редактора">×</button></div>
       <button id="home-furnish" type="button" aria-controls="furniture-editor">▦ Обстановка <small>Мебель, магазин и склад</small></button>
       <button id="home-build" type="button" aria-controls="build-editor">⌂ Строительство <small>Комнаты, стены и крыши</small></button>
-      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Покрытия, растения, грядки, мебель и освещение</small></button>
+      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Покрытия, бассейн, грядки и мебель</small></button>
     </section>
     <section id="outdoor-editor" class="outdoor-editor" aria-label="Благоустройство участка" hidden>
       <div class="outdoor-editor-head"><strong>🌿 Участок · Благоустройство</strong><button id="outdoor-exit" type="button">✓ В жизнь</button></div>
@@ -191,6 +191,7 @@
       <label class="outdoor-surface-choice" for="outdoor-category">Раздел
         <select id="outdoor-category">
           <option value="ground">▦ Покрытия</option>
+          <option value="pool">🏊 Бассейн · конструктор</option>
           <option value="plants">🌳 Растения и ограды</option>
           <option value="garden">🌱 Сад · грядки</option>
           <option value="objects">🪑 Мебель и свет</option>
@@ -209,6 +210,30 @@
           <option value="flowers">✿ Декоративный цветник · 12 кр./клетка</option>
         </select>
       </label>
+      <div id="pool-controls" class="pool-controls" hidden aria-label="Конструктор бассейна">
+        <label for="pool-tool">Бассейн · инструмент
+          <select id="pool-tool">
+            <option value="paint">▦ Добавить воду · 0,5 м</option>
+            <option value="erase">⌫ Убрать воду · 70% возврат</option>
+            <option value="ladder">↕ Лестница · 120 кр.</option>
+            <option value="steps">▤ Ступени · 180 кр.</option>
+            <option value="board">↗ Низкий трамплин · 400 кр.</option>
+          </select>
+        </label>
+        <div id="pool-fixture-controls" class="pool-fixture-controls" hidden>
+          <label for="pool-fixture-operation">Операция
+            <select id="pool-fixture-operation">
+              <option value="fixture-add">Купить и установить</option>
+              <option value="fixture-move">Переставить</option>
+              <option value="fixture-remove">Продать за 70%</option>
+            </select>
+          </label>
+          <label for="pool-fixture-owned" id="pool-fixture-owned-label" hidden>Установленное
+            <select id="pool-fixture-owned"></select>
+          </label>
+        </div>
+        <small>Форма свободная. Выходы ставятся вручную; плавание появится в LOT-D2.</small>
+      </div>
       <div id="outdoor-feature-controls" class="outdoor-feature-controls" hidden>
         <label for="outdoor-feature-operation">Действие
           <select id="outdoor-feature-operation">
