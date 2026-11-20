@@ -1516,7 +1516,6 @@ function renderQueuePanel(force=true){
         cancelSocial(game);
       else if(getActor(game,residentId).action?.id==='swim'){
         requestPoolExit(game,residentId,'cancelled');
-        paths[residentId]={points:null,index:0,id:null};
         renderQueuePanel(true);save(true);
         toast('Запрошен безопасный выход из бассейна');
         return;
