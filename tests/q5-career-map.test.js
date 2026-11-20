@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
 import {CAREER_CATALOG} from '../src/career-catalog.js';
-import {CAREER_SPECIALIZATIONS,careerRankForContract,chooseCareerSpecialization} from '../src/career-specializations.js';
+import {CAREER_SPECIALIZATIONS,careerRankForContract,chooseCareerSpecialization,specializationReadiness} from '../src/career-specializations.js';
 import {seniorRank,resetSeniorProof} from '../src/career-seniority.js';
 import {careerPromotionRule,promotionReadiness} from '../src/career-progression.js';
 import {careerMapView} from '../src/career-map.js';
@@ -116,7 +116,9 @@ test('Q5 legacy root-v1 saves, no branch, malformed extension, two contracts and
     const initial=JSON.stringify(saved);
     const map=careerMapView(saved,'alex'),other=careerMapView(saved,'mira');
     assert.equal(map.all.length,11);assert.equal(other.all.length,11);
-    assert.ok(map.tracks.every(t=>t.nodes[0].canChoose));
+    assert.equal(map.tracks.every(t=>t.nodes[0].canChoose),
+      specializationReadiness(saved,'alex').canSwitch,
+      'map cannot offer switching while the canonical work guard blocks it');
     assert.equal(JSON.stringify(saved),initial);
     assert.equal(saved.version,1);assert.equal(saved.shop.credits,old.shop.credits);
     assert.equal(saved.careerSystem.byResident.alex.level,4);
