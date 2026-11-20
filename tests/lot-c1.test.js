@@ -185,7 +185,10 @@ test('C1: UI and deploy contract includes distinct garden category, popup and 3D
   assert.match(game,/beginGardenAction/);
   assert.match(game,/gardenStageSignature/);
   assert.match(game,/part\('box','garden rich soil'/);
-  assert.match(game,/offerWorldAction\(point,def.name,action==='water'/);
+  assert.match(game,/const sheet=gardenActionSheet\(game,id,feature\.instanceId\)/,
+    'canonical garden state must drive tap actions');
+  assert.match(game,/offerWorldAction\(point,sheet\.name,first\.label,first\.command/,
+    'the garden choice opens a confirmation before any FIFO mutation');
   assert.match(pages,/cp src\/gardening\.js site\/src\//);
 });
 
