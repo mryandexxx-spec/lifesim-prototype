@@ -89,7 +89,8 @@ test('C2b: first real watering grants exactly one memory/emotion, no duplicates 
   activeGarden(game,id,'water');
   tickHousehold(game,15);
   assert.equal(game.gardenMilestones.byResident.alex.plots.length,1);
-  assert.equal(notes(game).length,0,'original milestone expired from 12-memory decay?');
+  assert.deepEqual(notes(game).map(x=>x.id),['garden.firstCare'],
+    'repeat watering never creates another first-care memory');
 });
 test('C2b: bloom seen physically once per actor/planting, no extra C1 Fun rewards',()=>{
   const root=place(newHousehold()),id=gardenId(root);
