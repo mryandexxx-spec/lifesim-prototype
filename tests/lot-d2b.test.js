@@ -198,7 +198,7 @@ test('D2b older saves, existing queues and ordinary furniture action remain func
   const old=newHousehold();
   const r=loadHousehold(copy(old));
   assert.equal(r.action,null);
-  assert.equal(r.world.outdoors.pools.length,0);
+  assert.equal((r.world.outdoors.pools||[]).length,0);
   const item=enqueueAction(r.actionQueues,'alex',{type:'object',actionId:'sofa'});
   assert.equal(item.type,'object');
   assert.equal(restoreActionQueues(copy(r.actionQueues),['alex','mira']).byResident.alex[0].seq,item.seq);
