@@ -115,8 +115,9 @@ const validSwimShape=a=>active(a)&&STAGES.includes(a.stage)&&
 
 /** v1 optional data: structural restore only; topology is checked AFTER world load. */
 export function sanitizeSwimAction(raw){
-  if(!validSwimShape(raw)||raw.automatic===true)return null;
-  const a={...raw,automatic:false,phase:raw.stage==='approaching'?'walking':'using',
+  if(!validSwimShape(raw)||(raw.automatic!==true&&raw.automatic!==false))return null;
+  const a={...raw,automatic:raw.automatic===true,
+    phase:raw.stage==='approaching'?'walking':'using',
     slotCells:[...raw.slotCells],entryWetPath:[...raw.entryWetPath],
     dryApproach:{...raw.dryApproach}};
   a.exitRequested=typeof raw.exitRequested==='string'?raw.exitRequested:null;

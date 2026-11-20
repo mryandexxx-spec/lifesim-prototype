@@ -16,7 +16,7 @@ import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitche
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
   recordDirtyDish,washKitchenDishes} from './kitchen.js';
 import {currentSkillLevel} from './skills-engine.js';
-import { refreshMind } from './psychology.js';
+import {refreshMind,rememberFirstPoolSwim,restorePoolFirstSwimAt} from './psychology.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
@@ -162,6 +162,8 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   mira.autonomy.enabled=root.autonomy.enabled;
   if (!root.autonomy.enabled && mira.action?.automatic) mira.action=null;
   root.otherSim=mira;
+  restorePoolFirstSwimAt(raw,root);
+  restorePoolFirstSwimAt(raw.otherSim,mira);
   applyWorkMoodContext(root);
   // Restored off-lot residents cannot resume a stale home action or grant
   // cooking/painting/social rewards after refreshing Safari midshift.
@@ -970,11 +972,14 @@ export function tickHousehold(root,minutes) {
   // Pool movement and rewards run exactly once after natural need decay,
   // never on UI frames, queue dispatch or inside the PlayCanvas renderer.
   for(const id of HOUSEHOLD_IDS){
-    const actor=getActor(root,id);
-    if(actor.action?.id==='swim'&&residentAwayAtWork(root,id))
+    const actor=getActor(root,id),wasSwimming=actor.action?.id==='swim';
+    if(wasSwimming&&residentAwayAtWork(root,id))
       interruptPoolSwimForWork(root,id);
     if(!residentAwayAtWork(root,id)){
       advancePoolSwim(root,id,minutes);
+      // Wet time alone is insufficient: the swimmer must safely exit.
+      if(wasSwimming&&!actor.action&&actor.event==='Завершил плавание')
+        rememberFirstPoolSwim(actor,root.world);
       if(actor.action?.id==='swim'||actor.event==='Завершил плавание')
         refreshMind(actor,root.world);
     }

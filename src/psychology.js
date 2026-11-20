@@ -56,7 +56,8 @@ export const MEMORY_TEXT = Object.freeze({
   'worklife.sharedInterrupted':'Жалеет о прерванном совместном отдыхе',
   'worklife.sharedDisappointed':'Огорчился из-за прерванного совместного отдыха',
   'garden.firstCare':'Впервые позаботился о растении',
-  'garden.firstBloomSeen':'Впервые полюбовался цветением'
+  'garden.firstBloomSeen':'Впервые полюбовался цветением',
+  'pool.firstSwim':'Впервые успешно проплыл в бассейне'
 });
 const IDS = ['bed','fridge','shower','sofa']; // targeted garden wishes require a garden
 const LIMIT = 12;
@@ -99,7 +100,8 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set(),scope='all'
       'worklife.resignation':-3,'worklife.resignationRelief':4,
       'worklife.sharedInterrupted':-6,
       'worklife.sharedDisappointed':-4,
-      'garden.firstCare':3,'garden.firstBloomSeen':7};
+      'garden.firstCare':3,'garden.firstBloomSeen':7,
+      'pool.firstSwim':6};
     const effect=Object.hasOwn(socialEffect,memory.id)
       ?socialEffect[memory.id]:memory.fulfilled?12:5;
     return sum+effect*strength;
@@ -178,6 +180,25 @@ export function refreshMind(state,world=state?.world??null) {
     state.personality,environmentSnapshot(state,world).delta,state.workMoodContext??0);
 }
 
+/** Safe completion only, once per person; optional root-v1 lifetime watermark. */
+export function rememberFirstPoolSwim(state,world=state?.world??null){
+  if(!state?.mind||!Number.isFinite(state.minutes)||state.minutes<0||
+    Number.isFinite(state.poolFirstSwimAt))return false;
+  state.poolFirstSwimAt=state.minutes;
+  const memory={id:'pool.firstSwim',at:state.minutes,fulfilled:false};
+  state.mind.memories=[...(state.mind.memories||[]),memory].slice(-12);
+  feelMemory(state,memory);
+  refreshMind(state,world);
+  return true;
+}
+/** Old v1 saves default to no milestone; malformed future timestamps ignored. */
+export function restorePoolFirstSwimAt(raw,state){
+  const saved=Number.isFinite(raw?.poolFirstSwimAt)&&raw.poolFirstSwimAt>=0&&
+    raw.poolFirstSwimAt<=state.minutes?raw.poolFirstSwimAt:null;
+  const memory=state.mind?.memories?.find(m=>m.id==='pool.firstSwim');
+  state.poolFirstSwimAt=saved??memory?.at??null;
+  return state.poolFirstSwimAt;
+}
 export function rememberAction(state, id) {
   const receipt=activityReceipt(id,state.minutes);
   // Toilet is completed essential care, not a frivolous generated wish.

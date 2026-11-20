@@ -192,7 +192,8 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     if(data.action.id==='tv'&&validFurnitureInstanceId(data.action.watchSeatInstanceId))
       next.action.watchSeatInstanceId=data.action.watchSeatInstanceId;
   }
-  if(data.action?.id==='swim')next.action=sanitizeSwimAction(data.action);
+  if(data.action?.id==='swim'&&(next.autonomy.enabled||data.action.automatic!==true))
+    next.action=sanitizeSwimAction(data.action);
   return next;
 }
 
