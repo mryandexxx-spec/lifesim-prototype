@@ -44,6 +44,7 @@ const adjacent=cell=>{
 };
 /** Deterministic 4-neighbour flood fill. Returns null only for invalid input. */
 export function poolComponents(cells){
+  if(Array.isArray(cells)&&cells.length===0)return [];
   const sorted=canonicalPoolCells(cells);
   if(!sorted)return null;
   const pending=new Set(sorted),result=[];
@@ -60,6 +61,7 @@ export function poolComponents(cells){
 }
 /** Each exterior edge belongs to a water tile, not a saved polygon or prefab. */
 export function poolBoundaryEdges(cells){
+  if(Array.isArray(cells)&&cells.length===0)return [];
   const sorted=canonicalPoolCells(cells);
   if(!sorted)return null;
   const set=new Set(sorted),edges=[];
