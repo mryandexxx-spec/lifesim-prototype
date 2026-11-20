@@ -2124,3 +2124,6 @@ button.time-card:active {transform:translateY(1px);}
 
 /* True Meshy GLB-rendered catalog thumbnails; the rest keep SVG sketches. */
 .furnish-stock img.furnish-meshy-thumb,.furnish-meshy-thumb{object-fit:contain;object-position:center;filter:drop-shadow(0 3px 5px rgba(38,49,44,.15));}
+
+/* LOT-C3b: native grocery picker uses a 46px touch target. */
+#fridge-staple-select{min-height:46px;}
