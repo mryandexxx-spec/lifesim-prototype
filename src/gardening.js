@@ -6,8 +6,8 @@ export const GARDEN_LIMIT=8;
 export const GARDEN_MATURE_MINUTES=4320;
 export const GARDEN_HYDRATION_MINUTES=2160;
 export const GARDEN_CARE_COOLDOWN=1440;
-export const GARDEN_ACTIONS=Object.freeze(['water','admire']);
-export const GARDEN_DURATION=Object.freeze({water:15,admire:8});
+export const GARDEN_ACTIONS=Object.freeze(['water','admire','inspect']);
+export const GARDEN_DURATION=Object.freeze({water:15,admire:8,inspect:8});
 export const GARDEN_LABELS=Object.freeze(['Посажено','Росток','Подросло','Цветёт']);
 const validMinute=n=>Number.isFinite(n)&&n>=0&&n<=10000000;
 const round=n=>Math.round(n*1000000)/1000000;
@@ -106,6 +106,7 @@ export function gardenRequestStillValid(root,residentId,instanceId,actionId){
   if(!GARDEN_ACTIONS.includes(actionId)||!gardenFeature(root?.world,instanceId))return false;
   const view=gardenView(root.world.outdoors,instanceId,root.minutes);
   if(!view)return false;
+  if(actionId==='inspect')return !view.mature&&view.stage>=1;
   if(actionId==='water')return !view.mature&&
     (view.lastWateredAt===null||root.minutes-view.lastWateredAt>=GARDEN_CARE_COOLDOWN);
   const rewards=restoreGardenRewards(root.gardenRewards);
@@ -129,6 +130,8 @@ export function settleGardenAction(root,residentId,instanceId,actionId){
       lastWateredAt:root.minutes,hydratedUntil:root.minutes+GARDEN_HYDRATION_MINUTES};
     actor.needs.energy=Math.max(0,actor.needs.energy-2);
     actor.event='Полил(а) грядку — растение растёт';
+  }else if(actionId==='inspect'){
+    actor.event='Осмотрел(а), как подросло растение';
   }else{
     const rewards=restoreGardenRewards(root.gardenRewards);
     rewards[residentId==='mira'?'miraLastAdmireAt':'alexLastAdmireAt']=root.minutes;

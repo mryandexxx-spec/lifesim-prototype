@@ -26,8 +26,9 @@ import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchAvailable} from './outdoor-interactions.js';
 import {gardenFeature,gardenApproach,gardenActionAllowed,restoreGardenRewards,
   advanceGardens,settleGardenAction,GARDEN_DURATION,
-  gardenRequestStillValid} from './gardening.js';
+  gardenRequestStillValid,gardenView} from './gardening.js';
 import {restoreGardenRoutine,considerAutonomousGarden,noteAutonomousGardenStart} from './garden-autonomy.js';
+import {restoreGardenMilestones,completeGardenExperience,refreshGardenWishes} from './garden-psychology.js';
 import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLifeStage} from './social-graph.js';
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
@@ -109,6 +110,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.financialHistory=newFinancialHistory();
   state.gardenRewards=restoreGardenRewards(null);
   state.gardenRoutine=restoreGardenRoutine(null,state.minutes);
+  state.gardenMilestones=restoreGardenMilestones(null,state.minutes);
   state.householdBills=newHouseholdBills(state.minutes);
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
@@ -138,6 +140,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.financialHistory=restoreFinancialHistory(raw.financialHistory);
   root.gardenRewards=restoreGardenRewards(raw.gardenRewards);
   root.gardenRoutine=restoreGardenRoutine(raw.gardenRoutine,root.minutes);
+  root.gardenMilestones=restoreGardenMilestones(raw.gardenMilestones,root.minutes);
   root.householdBills=restoreHouseholdBills(raw.householdBills,root.minutes);
   root.careerSystem=restoreCareerSystem(raw.careerSystem);
   root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem,root.minutes);
@@ -187,7 +190,8 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         a.gardenActionId,{ignoreReservation:true})&&
         (a.phase!=='using'||Math.hypot(sim.position.x-a.gardenGoal.x,
           sim.position.z-a.gardenGoal.z)<.45);
-      if(!valid)sim.action=null;
+      if(!valid||(Number.isFinite(a.gardenPlantedAt)&&
+        a.gardenPlantedAt!==root.world.outdoors.gardens[a.targetInstanceId]?.plantedAt))sim.action=null;
     }
     if(sim.action&&sim.action.id!=='move'&&sim.action.id!=='bench'&&
       sim.action.id!=='garden'){
@@ -387,6 +391,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
       used.push(slot);usedByBed.set(bed.instanceId,used);
     }else resident.action=null;
   }
+  refreshGardenWishes(root);
   return root;
 }
 
@@ -911,7 +916,9 @@ export function tickHousehold(root,minutes) {
   const gardenBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>{
     const a=getActor(root,id).action;
     return [id,a?.id==='garden'&&a.phase==='using'
-      ?{instanceId:a.targetInstanceId,actionId:a.gardenActionId,elapsed:a.elapsed}:null];
+      ?{instanceId:a.targetInstanceId,actionId:a.gardenActionId,
+          plantedAt:a.gardenPlantedAt,elapsed:a.elapsed,
+          goal:a.gardenGoal?{...a.gardenGoal}:null}:null];
   }));
   // Capture stages BEFORE the simulation. The completion tick may switch
   // reading→closing; it must not also consume a full closing interval.
@@ -1046,10 +1053,14 @@ export function tickHousehold(root,minutes) {
   advanceGardens(root.world.outdoors,root.minutes);
   for(const id of HOUSEHOLD_IDS){
     const before=gardenBefore[id],actor=getActor(root,id);
-    if(before&&!actor.action&&
+    const currentGarden=gardenView(root.world.outdoors,before?.instanceId,root.minutes);
+    if(before&&!actor.action&&currentGarden&&
+      (!Number.isFinite(before.plantedAt)||before.plantedAt===currentGarden.plantedAt)&&
+      before.goal&&Math.hypot(actor.position.x-before.goal.x,
+        actor.position.z-before.goal.z)<=.45&&
       before.elapsed+minutes>=GARDEN_DURATION[before.actionId]){
       if(settleGardenAction(root,id,before.instanceId,before.actionId))
-        refreshMind(actor,root.world);
+        completeGardenExperience(root,id,before.instanceId,before.actionId);
     }
   }
   // Both clocks remain identical (including when paused).
@@ -1058,6 +1069,7 @@ export function tickHousehold(root,minutes) {
     refreshMind(getActor(root,id),root.world);
   tickSocial(root,minutes);
   applyWorkMoodContext(root);
+  refreshGardenWishes(root);
   // One family calendar, one weekly bill cycle, never one charge per resident.
   const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
   return [...careerEvents,...billEvents];

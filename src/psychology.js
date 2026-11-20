@@ -13,7 +13,10 @@ export const WISHES = Object.freeze({
   bed: { label: 'Хорошенько выспаться', symbol: '☾' },
   fridge: { label: 'Вкусно перекусить', symbol: '◕' },
   shower: { label: 'Освежиться в душе', symbol: '✧' },
-  sofa: { label: 'Устроить уютный отдых', symbol: '♫' }
+  sofa: { label: 'Устроить уютный отдых', symbol: '♫' },
+  'garden.care':{label:'Позаботиться о растении',symbol:'☘'},
+  'garden.observe':{label:'Посмотреть, как подросло растение',symbol:'🌱'},
+  'garden.bloom':{label:'Полюбоваться цветением',symbol:'✿'}
 });
 export const MEMORY_TEXT = Object.freeze({
   bed: 'Выспался и набрался сил',
@@ -51,9 +54,11 @@ export const MEMORY_TEXT = Object.freeze({
   'worklife.resignation':'Волнуется после смены работы',
   'worklife.resignationRelief':'Почувствовал облегчение после ухода с работы',
   'worklife.sharedInterrupted':'Жалеет о прерванном совместном отдыхе',
-  'worklife.sharedDisappointed':'Огорчился из-за прерванного совместного отдыха'
+  'worklife.sharedDisappointed':'Огорчился из-за прерванного совместного отдыха',
+  'garden.firstCare':'Впервые позаботился о растении',
+  'garden.firstBloomSeen':'Впервые полюбовался цветением'
 });
-const IDS = Object.keys(WISHES);
+const IDS = ['bed','fridge','shower','sofa']; // targeted garden wishes require a garden
 const LIMIT = 12;
 const finite = n => Number.isFinite(n);
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -93,7 +98,8 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set(),scope='all'
       'worklife.dismissal':-14,'worklife.promotion':11,
       'worklife.resignation':-3,'worklife.resignationRelief':4,
       'worklife.sharedInterrupted':-6,
-      'worklife.sharedDisappointed':-4};
+      'worklife.sharedDisappointed':-4,
+      'garden.firstCare':3,'garden.firstBloomSeen':7};
     const effect=Object.hasOwn(socialEffect,memory.id)
       ?socialEffect[memory.id]:memory.fulfilled?12:5;
     return sum+effect*strength;
@@ -199,11 +205,17 @@ export function restoreMind(raw, state) {
         Object.hasOwn(MEMORY_TEXT,m.id) && finite(m.at) && m.at >= 0 && m.at <= state.minutes
       ).slice(-LIMIT).map(m => ({ id: m.id, at: m.at, fulfilled: m.fulfilled === true }));
     }
-    if (raw.wish && typeof raw.wish === 'object' && IDS.includes(raw.wish.id) &&
+    if (raw.wish && typeof raw.wish === 'object' && Object.hasOwn(WISHES,raw.wish.id) &&
       finite(raw.wish.since) && finite(raw.wish.until) && raw.wish.since >= 0 &&
       raw.wish.since <= state.minutes && raw.wish.until > state.minutes &&
       raw.wish.until <= state.minutes + 480) {
-      mind.wish = { id: raw.wish.id, since: raw.wish.since, until: raw.wish.until };
+      mind.wish = { id: raw.wish.id, since: raw.wish.since, until: raw.wish.until,
+        ...(raw.wish.id.startsWith('garden.')&&
+          typeof raw.wish.targetInstanceId==='string'&&
+          /^out-[1-9][0-9]*$/.test(raw.wish.targetInstanceId)&&
+          Number.isFinite(raw.wish.plantedAt)&&raw.wish.plantedAt>=0&&
+          raw.wish.plantedAt<=state.minutes
+          ?{targetInstanceId:raw.wish.targetInstanceId,plantedAt:raw.wish.plantedAt}:{}) };
     } else if (mind.memories.length) {
       mind.wish = null; // regenerate against recent history
     }
