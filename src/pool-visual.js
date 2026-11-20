@@ -21,9 +21,18 @@ export function buildPoolVisualGeometry(outdoors){
   if(!wet.size)return {active:false,groups:output,waterCells:0,boundaryEdges:0};
   // When a basin exists, replace the single solid lawn box with a lawn mesh
   // missing the excavated tiles: no buried green platform beneath the water.
-  for(let cell=0;cell<POOL_GRID_WIDTH*POOL_GRID_HEIGHT;cell++){
-    const b=poolCellBounds(cell);
-    if(!wet.has(cell))horizontal(output.lawn,b.minX,b.maxX,b.minZ,b.maxZ,GROUND_Y);
+  // Greedy row strips: a full 64x48 garden must not allocate 3072 quads
+  // whenever one tiny basin is added. Separate runs leave exact water holes.
+  for(let row=0;row<POOL_GRID_HEIGHT;row++){
+    let col=0;
+    while(col<POOL_GRID_WIDTH){
+      if(wet.has(row*POOL_GRID_WIDTH+col)){col++;continue;}
+      const first=col;
+      while(col<POOL_GRID_WIDTH&&!wet.has(row*POOL_GRID_WIDTH+col))col++;
+      const a=poolCellBounds(row*POOL_GRID_WIDTH+first);
+      const b=poolCellBounds(row*POOL_GRID_WIDTH+col-1);
+      horizontal(output.lawn,a.minX,b.maxX,a.minZ,b.maxZ,GROUND_Y);
+    }
   }
   let boundaryEdges=0;
   for(const cell of wet){
