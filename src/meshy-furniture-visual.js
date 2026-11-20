@@ -7,7 +7,7 @@
  */
 import {meshyFurnitureFit,meshyFurnitureUrl} from './meshy-furniture-policy.js';
 
-export function createMeshyFurnitureVisual({pc,app,onError=()=>{}}){
+export function createMeshyFurnitureVisual({pc,app,onError=()=>{},enabled=true}){
   const assets=new Map(),instances=new WeakMap();
   let failures=0,attached=0;
   function load(sku){
@@ -28,7 +28,7 @@ export function createMeshyFurnitureVisual({pc,app,onError=()=>{}}){
   }
   function attach(node,sku){
     const fit=meshyFurnitureFit(sku);
-    if(!fit||!node||instances.has(node))return false;
+    if(!enabled||!fit||!node||instances.has(node))return false;
     // Only hide old authored furniture, never working simulation overlays:
     // bulbs, transient plates, art, mirror glint, steam or selection outlines.
     const fallback=node.findComponents('render').filter(c=>

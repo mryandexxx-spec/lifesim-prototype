@@ -2008,7 +2008,11 @@ function boot() {
   // Only copied mesh instances are tinted; the authored original is unchanged.
   const variantMaterials=new Map();
   // Meshy is a visual override only: original action, collision, price and saves stay canonical.
-  const meshyFurniture=createMeshyFurnitureVisual({pc,app});
+  // ?furniture=legacy restores ALL procedural furniture for Safari diagnosis.
+  const furnitureVisualMode=new URLSearchParams(window.location.search).get('furniture');
+  const meshyFurniture=createMeshyFurnitureVisual({pc,app,
+    enabled:furnitureVisualMode!=='legacy'});
+  if(furnitureVisualMode==='qa')window.__LifeSimMeshyFurnitureStats=meshyFurniture.stats;
   const applyItemAppearance=(node,itemDefinitionId)=>{
     const style=FURNITURE_APPEARANCES[furnitureProduct(itemDefinitionId)?.appearanceId];
     if(!style||!node)return;

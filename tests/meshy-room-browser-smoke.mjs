@@ -42,11 +42,16 @@ try{
   try{
    const pending=page.waitForResponse(r=>
     r.url().includes('/assets/furniture/meshy-room-v1/'+sku+'.glb'),{timeout:65000});
-   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
+   await page.goto('http://127.0.0.1:8765/?furniture=qa',
+    {waitUntil:'domcontentloaded'});
    await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
    const response=await pending;
    assert.equal(response.status(),200,sku+' must fetch GLB');
-   await page.waitForTimeout(350); // allow PlayCanvas container instantiate
+   await page.waitForFunction(()=>
+    window.__LifeSimMeshyFurnitureStats?.().attached>=1,
+    {timeout:55000});
+   const visualStatus=await page.evaluate(()=>window.__LifeSimMeshyFurnitureStats());
+   assert.equal(visualStatus.failures,0,sku+' GLB instantiation');
    const bytes=await page.locator('#game-canvas').screenshot();
    assert.ok(bytes.length>2500,sku+' mobile WebGL canvas');
    const stored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
