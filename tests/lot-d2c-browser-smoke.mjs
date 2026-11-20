@@ -37,9 +37,9 @@ seed.position={...plan.action.dryApproach};
 assert.equal(arrivePoolApproach(seed,'alex'),true);
 for(let i=0;i<25&&seed.action?.stage!=='swimming';i++)tickHousehold(seed,1);
 assert.equal(seed.action?.stage,'swimming','save must contain an actually swimming resident');
-// Existing v1 loader intentionally starts unpaused even when the save had
-// paused=true. Exercise a real UI pause immediately after the splash instead.
-// This keeps WebGL assertions deterministic without changing save semantics.
+// Existing v1 loader intentionally starts unpaused. Pause only after the
+// live water root is synchronized: pausing before scene activation freezes
+// the interpolation, so a 3D root cannot converge to its canonical pose.
 const browser=await chromium.launch({headless:true,args:[
   '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
   '--enable-unsafe-swiftshader','--disable-dev-shm-usage'
@@ -58,7 +58,6 @@ try{
     page.on('crash',()=>errors.push(w+'x'+h+': WebGL crashed'));
     await page.goto('http://127.0.0.1:8765/?pool=qa',{waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
-    await page.locator('#pause-btn').click();
     // The outdoor camera shows the complete shore; no construction is mutated.
     await page.locator('#home-open').click();
     await page.locator('#home-outdoors').click();
@@ -70,6 +69,7 @@ try{
         Math.hypot(snap.avatar.x-snap.pose.x,snap.avatar.y-snap.pose.y,
           snap.avatar.z-snap.pose.z)<.15;
     },{timeout:20000});
+    await page.locator('#pause-btn').click();
     const visual=await page.evaluate(()=>window.__LifeSimSwimVisualQA());
     assert.equal(visual.alex.paused,true,'user pause holds swimming while inspecting WebGL');
     assert.equal(visual.alex.pose.stage,'swimming');
