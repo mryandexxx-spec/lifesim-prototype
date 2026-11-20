@@ -109,7 +109,8 @@ test('C2b: bloom seen physically once per actor/planting, no extra C1 Fun reward
   activeGarden(saved,id,'admire','alex');
   tickHousehold(saved,8);
   assert.equal(saved.gardenMilestones.byResident.alex.plots[0].firstBloomSeen,true);
-  assert.equal(notes(saved).filter(x=>x.id==='garden.firstBloomSeen').length,0);
+  assert.equal(notes(saved).filter(x=>x.id==='garden.firstBloomSeen').length,1,
+    'the original historical memory remains, but is not awarded a second time');
   activeGarden(saved,id,'admire','mira');
   tickHousehold(saved,8);
   assert.equal(notes(saved,'mira').filter(x=>x.id==='garden.firstBloomSeen').length,1);
