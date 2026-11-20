@@ -6647,12 +6647,21 @@ function boot() {
           game.socialAction?.shared||game.socialAction?.branchAction
           ?null:game.socialAction?.kind;
         const priorCalendarMinute=game.minutes;
+        const priorHerbStock=game.kitchen?.pantry?.herbs??0;
+        const priorGardenCredits=game.shop.credits;
         const careerEvents=tickHousehold(game,.30 * effectiveSleepSpeed(game,{
           blocked:!frameActive||dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||
             shiftSummary.isOpen()
         }))||[];
         if(gardenStageSignature!==currentGardenStageSignature())
           renderOutdoorFeatures();
+        // Crop + replant wallet, plot watermark and pantry must persist together
+        // immediately after actual physical completion (same rule as salary).
+        if(priorHerbStock!==(game.kitchen?.pantry?.herbs??0)||
+          ((prevAlex==='garden'||prevMira==='garden')&&
+            priorGardenCredits!==game.shop.credits)){
+          save(true);updateFamilyBalance();
+        }
         // Persistent shift state, credited money and receipts must share one
         // localStorage snapshot; never wait for the eight-second autosave.
         if(careerEvents.length){
