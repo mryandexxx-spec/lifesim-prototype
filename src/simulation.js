@@ -12,6 +12,7 @@ import {validOutdoorId} from './outdoor-catalog.js';
 import {NEED_DECAY_PER_MINUTE,SLEEP_MIN_MINUTES,SLEEP_MAX_MINUTES,SLEEP_WAKE_ENERGY,
   SELF_CARE_WISH_MAX_NEED,SELF_CARE_REPEAT_COOLDOWN_MINUTES} from './need-balance.js';
 import {insideLot} from './lot-surface.js';
+import {sanitizeSwimAction} from './pool-swim-runtime.js';
 import {GARDEN_ACTIONS,GARDEN_DURATION} from './gardening.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
@@ -22,6 +23,8 @@ import {preferenceAffinity} from './trait-catalog.js';
 export const PHYSICAL_NEEDS = Object.freeze(['hunger','energy','hygiene','fun','bladder']);
 export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
+  swim: {label:'Плавать в бассейне',need:'fun',duration:45,
+    benefitPerMinute:0,location:[0,0]},
   bed: { label: 'Поспать', need: 'energy', duration: SLEEP_MAX_MINUTES, benefitPerMinute: 0.102, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
   fridge: { label: 'Быстро перекусить', need: 'hunger', duration: 26, benefitPerMinute: 0.68, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.27, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
@@ -189,6 +192,7 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     if(data.action.id==='tv'&&validFurnitureInstanceId(data.action.watchSeatInstanceId))
       next.action.watchSeatInstanceId=data.action.watchSeatInstanceId;
   }
+  if(data.action?.id==='swim')next.action=sanitizeSwimAction(data.action);
   return next;
 }
 
@@ -199,6 +203,10 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
 export function setAutonomyEnabled(state, enabled) {
   state.autonomy.enabled = enabled === true;
   if (!state.autonomy.enabled && state.action?.automatic) {
+    if(state.action.id==='swim'){
+      state.action.exitRequested='autonomy-off';
+      return state.autonomy.enabled;
+    }
     state.action = null;
     state.event = 'Алекс ждёт указаний';
   }
@@ -267,6 +275,8 @@ export function tick(state, minutes,world=state?.world??null) {
   const social=Number.isFinite(state.needs.social)?state.needs.social:SOCIAL_NEED_LEGACY_DEFAULT;
   state.needs.social=clamp(social-socialNeedDecayRate(state.personality)*minutes);
   refreshMind(state,world);
+  // LOT-D2b swim stages and rewards are settled on the single household clock.
+  if(state.action?.id==='swim')return;
   if (state.action?.phase === 'using') {
     const definition = ACTIONS[state.action.id];
     // F4G: three physical kitchen stages. No hunger rewards while cooking,
