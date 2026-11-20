@@ -6,7 +6,9 @@ import {GARDEN_LIMIT,isGardenItem,restoreGardens} from './gardening.js';
 import {POOL_MAX_CELLS,POOL_MAX_COMPONENTS,validPoolId,poolIdNumber,
   canonicalPoolCells,poolComponents,poolCellBounds,poolWaterNear,poolRectOverlaps}
   from './pool-topology.js';
-import {poolFixtureSite,validPoolFixture,POOL_FIXTURE_LIMIT,validPoolFixtureId}\n  from './pool-equipment.js';\nimport {OUTDOOR_CATALOG,OUTDOOR_FEATURE_LIMIT,validOutdoorId,
+import {poolFixtureSite,validPoolFixture,POOL_FIXTURE_LIMIT,validPoolFixtureId}
+  from './pool-equipment.js';
+import {OUTDOOR_CATALOG,OUTDOOR_FEATURE_LIMIT,validOutdoorId,
   outdoorFeatureRect,outdoorRectsOverlap} from './outdoor-catalog.js';
 
 export const OUTDOORS_SCHEMA=1;
