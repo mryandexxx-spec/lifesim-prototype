@@ -6380,9 +6380,7 @@ function boot() {
           def.category==='shrub'?1.12:
           def.category==='flower'?.48:
           def.category==='fence'?1.12:
-          // The original C1 garden ray surface is verified in all four real
-          // mobile viewports; taller pick boxes can unexpectedly occlude an
-          // intended ground-plane touch in the isometric camera.
+          // Preserve C1's garden hit-volume while polishing its visual stages.
           item.itemId==='garden.bench'?1.20:1.24;
         return {kind:'outdoor',id:item.itemId,instanceId:item.instanceId,
           bounds:{min:{x:rect.minX,y:-.49,z:rect.minZ},

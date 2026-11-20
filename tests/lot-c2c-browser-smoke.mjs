@@ -54,6 +54,14 @@ try{
   assert.ok(await canvas.isVisible());
   assert.equal(await canvas.evaluate(c=>Boolean(c.getContext('webgl2')||c.getContext('webgl'))),true,
    'actual running PlayCanvas WebGL context');
+  // As in C1, the outdoor editor deliberately frames the whole lot before
+  // testing a 3D garden tap. A house-only opening camera does not have
+  // the same projection as the lot camera used below.
+  await page.locator('#home-open').click();
+  await page.locator('#home-outdoors').click();
+  assert.equal(await page.locator('#outdoor-editor').isVisible(),true);
+  await page.locator('#outdoor-exit').click();
+  assert.equal(await page.locator('#outdoor-editor').isVisible(),false);
   const rect=await canvas.evaluate(c=>{const r=c.getBoundingClientRect();
    return {x:r.left,y:r.top,width:r.width,height:r.height};});
   const pt=projected(rect.width,rect.height,bed.x,bed.z);
@@ -62,7 +70,7 @@ try{
    const c=document.getElementById('game-canvas');
    const send=(target,type)=>target.dispatchEvent(new PointerEvent(type,{
     pointerId:93,pointerType:'touch',isPrimary:true,bubbles:true,cancelable:true,
-    clientX:p.x,clientY:p.y,button:0,buttons:type==='pointerup'?0:1}));
+    clientX:p.x,clientY:p.y,button:0}));
    send(c,'pointerdown');send(window,'pointerup');
   },{x:rect.x+pt.x,y:rect.y+pt.y});
   await tap();
