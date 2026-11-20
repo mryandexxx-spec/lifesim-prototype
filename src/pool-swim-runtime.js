@@ -161,6 +161,16 @@ export function validateRestoredPoolSwim(root,id){
   return true;
 }
 
+/** Work has an authoritative scene transition: no resident can swim while away.
+ * Save the already credited need changes, release pool resources, keep dry anchor.
+ */
+export function interruptPoolSwimForWork(root,id){
+  const actor=actorFor(root,id);
+  if(!active(actor?.action))return false;
+  cleanup(root,id,'Плавание прервано: пора на работу');
+  return true;
+}
+
 /** Player abort, autonomy-mode switch or care request. A swimmer exits safely. */
 export function requestPoolExit(root,id,reason='cancelled'){
   const a=actorFor(root,id)?.action;
