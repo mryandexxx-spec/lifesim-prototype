@@ -3255,10 +3255,15 @@ function boot() {
   box('fridge upper door',-.55,0,.055,FRIDGE_LAYOUT.doorWidth,.91,.08,M.cream,fridgeHinge);
   box('door handle',-.94,.07,.13,.05,.31,.055,M.slate,fridgeHinge);
   });
-  box('kitchen cabinet',1.68,.46,-3.31,2.20,.91,.89,M.paleWood);
-  box('countertop',1.68,.95,-3.31,2.3,.11,1.01,M.cream);
-  box('sink',1.04,1.017,-3.31,.66,.012,.43,M.slate);
-  cylinder('faucet',1.0,1.20,-3.54,.06,.33,.06,M.slate);
+  // V3: original kitchen counter is a saved starter fixture, not an extra free product.
+  // Parent its old procedural parts to the canonical home-counter-1 so both
+  // old/new households receive the Meshy visual, while cupboards remain on the wall.
+  withDecor('counter',()=>{
+    box('kitchen cabinet',1.68,.46,-3.31,2.20,.91,.89,M.paleWood);
+    box('countertop',1.68,.95,-3.31,2.3,.11,1.01,M.cream);
+    box('sink',1.04,1.017,-3.31,.66,.012,.43,M.slate);
+    cylinder('faucet',1.0,1.20,-3.54,.06,.33,.06,M.slate);
+  });
   box('kitchen top cabinets',1.48,2.12,-4.02,2.1,.85,.55,M.mint);
   for(let i=0;i<2;i++) box('cabinet handle',.87+i*.9,2.12,-3.726,.20,.035,.04,M.paleWood);
   box('ceramic cup',2.29,1.08,-3.28,.24,.21,.24,M.pink);
@@ -7982,6 +7987,24 @@ function boot() {
         const size=Math.max(.07,1-a.elapsed/ACTIONS.dining.duration);
         dish.food.setLocalScale(.23*size,.075,.18*size);
       }
+    }
+    // V3 compatibility: action-specific authored parts own visible animation.
+    // Keep original procedural geometry for the active music/easel interaction,
+    // and for occupied new seats until their individual 3D contact is accepted.
+    for(const item of game.world.furniture.instances){
+      if(!['music','easel','sofa','chair'].includes(item.prefabId))continue;
+      if(item.prefabId==='sofa'&&item.itemDefinitionId!=='sofa.classic')continue;
+      if(item.prefabId==='chair'&&item.itemDefinitionId!=='chair.cross')continue;
+      const node=decorNodes.get(item.instanceId);
+      if(!node)continue;
+      const busy=item.location==='home'&&HOUSEHOLD_IDS.some(id=>{
+        const action=getActor(game,id)?.action;
+        if(action?.targetInstanceId!==item.instanceId)return false;
+        return item.prefabId==='music'?action.id==='music':
+          item.prefabId==='easel'?action.id==='paint':
+          ['seat','sofa','relax'].includes(action.id);
+      });
+      meshyFurniture.useProcedural(node,busy);
     }
     // Imported GLB roots are outside the legacy avatar hierarchy, hence
     // BOTH the skin preference and the procedural rig must hide off-lot sims.

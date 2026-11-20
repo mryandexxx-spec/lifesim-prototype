@@ -66,8 +66,11 @@ try{
    const src=await image.getAttribute('src');
    assert.ok(src.endsWith('.png')&&src.includes('meshy-room-v1/thumbnails/'));
   }
-  assert.equal(await page.locator('#furnish-stock button[data-item-id="chair.cross"] svg.furnish-sku-sketch').count(),1,
-    'unsupported SKU still has procedural fallback');
+  const upgraded=page.locator('#furnish-stock button[data-item-id="chair.cross"] img.furnish-meshy-thumb');
+  assert.equal(await upgraded.count(),1,'chair.cross uses its new real V3 GLB thumbnail');
+  assert.ok((await upgraded.getAttribute('src')).includes('meshy-room-v3/thumbnails/chair.cross.png'));
+  assert.equal(await page.locator('#furnish-stock button[data-item-id="sconce.leaf"] svg.furnish-sku-sketch').count(),1,
+    'not-yet-modeled walllight still has the procedural fallback');
   for(const sku of ['chair.loft','stove.modern','sink.farm','mesh.vanity_set',
     'mesh.wall_art_triptych','mesh.hanging_plant']){
     const photo=page.locator('#furnish-stock button[data-item-id="'+sku+'"] img.furnish-meshy-thumb');
