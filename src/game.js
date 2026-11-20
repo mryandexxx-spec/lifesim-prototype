@@ -3685,6 +3685,19 @@ function boot() {
   game.otherSim.position=nearestWalkable(game.otherSim.position,game.world);
   const display={x:game.position.x,y:lotActorHeight(game.world,game.position),z:game.position.z,yaw:0,pitch:0,roll:0};
   const miraDisplay={x:game.otherSim.position.x,y:lotActorHeight(game.world,game.otherSim.position),z:game.otherSim.position.z,yaw:0,pitch:0,roll:0};
+  if(new URLSearchParams(location.search).get('pool')==='qa'){
+    // Read-only WebGL QA: assert physical avatar roots against canonical poses.
+    const snapshot=(id,rig)=>{
+      const actor=getActor(game,id),p=rig.avatar.getPosition();
+      return {stage:actor.action?.stage||null,
+        pose:poolSwimVisualFrame(game.world,actor.action),
+        avatar:{x:p.x,y:p.y,z:p.z},paused:game.paused,
+        waterElapsed:actor.action?.waterElapsed??null};
+    };
+    window.__LifeSimSwimVisualQA=()=>({
+      alex:snapshot('alex',alexRig),mira:snapshot('mira',miraRig)
+    });
+  }
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
