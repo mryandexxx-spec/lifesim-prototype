@@ -4357,6 +4357,12 @@ function boot() {
       'Продажа: '+(saleQuote?.ok?'+'+saleQuote.amount+' кр.':
         editorMessage(saleQuote?.reason||'protected-item'))
     ].join(' · ');
+    // M15: a last bed is protected with guidance, not an obscure tooltip.
+    const lastBed=selectable&&item.prefabId==='bed'&&
+      (storeQuote?.reason==='last-essential'||saleQuote?.reason==='last-essential');
+    if(lastBed)$('furnish-trade-status').textContent=
+      'Одна кровать в доме. Чтобы убрать или продать её, сначала поставь другую.';
+    $('furnish-protected-shop').hidden=!lastBed;
     $('furnish-store').title=storeQuote?.ok?'Поместить на склад бесплатно':
       editorMessage(storeQuote?.reason||'protected-item');
     $('furnish-sell').title=saleQuote?.ok?'Продажа с подтверждением':
@@ -4835,6 +4841,18 @@ function boot() {
       item.instanceId,editorContext()),'Продано · +'+resale+' кредитов');
   };
   $('furnish-sell').addEventListener('click',()=>sellFurniture(editSelectedId));
+  $('furnish-protected-shop').addEventListener('click',()=>{
+    const item=editorItem(editSelectedId);
+    if(item?.prefabId!=='bed')return;
+    // M15: take the player to existing bed offers, without a second catalog.
+    shopRoomCategory=null;shopFunctionCategory=null;shopTypeCategory=null;
+    shopSearchText='кровать';
+    $('furnish-search').value=shopSearchText;
+    $('furnish-room-filter').value='';
+    $('furnish-function-filter').value='';
+    setEditorView('shop');renderShopFilteredItems();
+    editorFeedback('Выбери и поставь ещё одну кровать, чтобы продать исходную.');
+  });
   $('furnish-move').addEventListener('click',()=>{
     if(editSelectedId)beginOwnedPlacement('move',editSelectedId);
   });

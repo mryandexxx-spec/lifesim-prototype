@@ -39,6 +39,15 @@ try{
    assert.ok((await page.locator('#game-canvas').screenshot()).length>2000,'WebGL rendered');
    await page.locator('#home-open').tap();
    await page.locator('#home-furnish').tap();
+   // M15: an essential bed cannot disappear and explains the next step.
+   await page.locator('#furnish-item-select').selectOption('home-bed-1');
+   assert.equal(await page.locator('#furnish-sell').isEnabled(),false);
+   assert.match(await page.locator('#furnish-trade-status').innerText(),/Одна кровать/);
+   assert.equal(await page.locator('#furnish-protected-shop').isVisible(),true);
+   await page.locator('#furnish-protected-shop').tap();
+   assert.equal(await page.locator('#furniture-editor').getAttribute('data-editor-view'),'shop');
+   assert.match(await page.locator('#furnish-search').inputValue(),/кровать/);
+   await page.locator('#furnish-edit-toggle').tap();
    await page.locator('#furnish-item-select').selectOption('home-plant-1');
    const before=await snap(page);
    await page.locator('#furnish-move').tap();
@@ -52,6 +61,10 @@ try{
       cancel:{top:cancel.top,bottom:cancel.bottom,height:cancel.height}};
    });
    assert.ok(panel.confirm.height>=44&&panel.cancel.height>=44,'44px CTA targets');
+   if(w>h){
+     const x=await page.evaluate(()=>document.querySelector('#furniture-editor').getBoundingClientRect().left);
+     assert.ok(x>w*.48,'landscape M13: controls should dock right and expose left scene');
+   }
    assert.ok(panel.confirm.top>=panel.outer.top-1&&panel.confirm.bottom<=panel.outer.bottom+1,
      'confirm CTA must not require scrolling '+JSON.stringify(panel));
    await page.locator('#furnish-owned-auto').tap();

@@ -2163,3 +2163,25 @@ button.time-card:active {transform:translateY(1px);}
 
 /* True Meshy GLB-rendered catalog thumbnails; all other SKUs retain SVG. */
 .furnish-stock img.furnish-meshy-thumb,.furnish-meshy-thumb{object-fit:contain;object-position:center;filter:drop-shadow(0 3px 5px rgba(38,49,44,.15));}
+
+/* UX-02b atlas M13/M15: scene stays on the left in compact landscape,
+   with actual controls on the right; essential-bed guidance has an action. */
+.furnish-commands .furnish-protected-shop{min-height:44px;flex:0 0 100%;
+  background:#eaf2e1;color:#245c40;font-size:12px;}
+.furnish-commands .furnish-protected-shop[hidden]{display:none!important;}
+.furniture-editor .furnish-header button,
+.furniture-editor .furnish-market-bar > button,
+.furniture-editor .furnish-commands button,
+.furniture-editor .furnish-storage-card button{min-height:44px;}
+@media(max-height:480px) and (orientation:landscape){
+  .furniture-editor[data-owned-placing="true"]{
+    top:0;bottom:0;left:auto;right:0;
+    width:min(350px,43vw);box-sizing:border-box;max-height:100dvh;
+    border-radius:21px 0 0 21px;justify-content:center;
+    padding:10px max(12px,env(safe-area-inset-right))
+      max(10px,env(safe-area-inset-bottom)) 12px;
+  }
+  .furniture-editor[data-owned-placing="true"] .furnish-owned-preview{
+    position:static;width:100%;box-sizing:border-box;
+  }
+}

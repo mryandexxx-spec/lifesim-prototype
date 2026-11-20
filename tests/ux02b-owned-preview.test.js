@@ -105,6 +105,9 @@ test('UX-02b mobile DOM contract: no auto-drop commit, explicit visible controls
  assert.match(game,/if\(ownedPlacement\)cancelOwnedPlacement\(false\)/);
  assert.match(game,/const saleQuote=tradable\?sellMarketItem/);
  assert.match(game,/\$\('furnish-trade-status'\)\.textContent/);
+ assert.match(html,/id="furnish-protected-shop"/);
+ assert.match(game,/Одна кровать в доме/);
+ assert.match(css,/left:auto;right:0;/);
  for(const id of ['furnish-move','furnish-owned-preview','furnish-owned-auto',
    'furnish-owned-turn','furnish-owned-confirm','furnish-owned-cancel'])
    assert.ok(html.includes('id="'+id+'"'),id);
