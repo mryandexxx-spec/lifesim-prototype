@@ -104,9 +104,20 @@ try {
   };
   await clickBuild();
  assert.ok(await page.locator('#build-editor').isVisible());
- await page.waitForTimeout(350); // Let the last pre-build HUD time sample settle.
- const buildClock=await page.locator('#time-label').innerText();
- await page.waitForTimeout(1200);
+ // A pre-editor game tick can render late under heavily parallel SwiftShader CI.
+ // Wait for a stable HUD sample, then check that build mode stays frozen.
+ const stableBuildClock=async()=>{
+   let previous=await page.locator('#time-label').innerText();
+   for(let attempt=0;attempt<6;attempt++){
+     await page.waitForTimeout(800);
+     const current=await page.locator('#time-label').innerText();
+     if(current===previous)return current;
+     previous=current;
+   }
+   throw new Error('Build-mode HUD clock did not stabilize');
+ };
+ const buildClock=await stableBuildClock();
+ await page.waitForTimeout(1700);
  assert.equal(await page.locator('#time-label').innerText(),buildClock,
   'Build mode never advances the shared calendar');
  await page.locator('#build-exit').click();
