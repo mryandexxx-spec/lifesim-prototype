@@ -37,6 +37,10 @@ seed.position={...plan.action.dryApproach};
 assert.equal(arrivePoolApproach(seed,'alex'),true);
 for(let i=0;i<25&&seed.action?.stage!=='swimming';i++)tickHousehold(seed,1);
 assert.equal(seed.action?.stage,'swimming','save must contain an actually swimming resident');
+// Freeze while GLB assets initialize: a slow CI runner must not finish the
+// entire 45-minute swim behind the splash/loading overlay. This also verifies
+// the paused-load pose contract fixed by LOT-D2c.
+seed.paused=true;seed.otherSim.paused=true;
 const browser=await chromium.launch({headless:true,args:[
   '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
   '--enable-unsafe-swiftshader','--disable-dev-shm-usage'
@@ -67,7 +71,16 @@ try{
           snap.avatar.z-snap.pose.z)<.15;
     },{timeout:20000});
     const visual=await page.evaluate(()=>window.__LifeSimSwimVisualQA());
+    assert.equal(visual.alex.paused,true,'restored save stays paused');
     assert.equal(visual.alex.pose.stage,'swimming');
+    // Resume real game time briefly, assert that canonical wet travel advances,
+    // and pause again before taking an evidence screenshot.
+    await page.locator('#pause-btn').click();
+    await page.waitForFunction(before=>{
+      const current=window.__LifeSimSwimVisualQA?.().alex;
+      return current?.stage==='swimming'&&current.waterElapsed>before;
+    },visual.alex.waterElapsed,{timeout:14000});
+    await page.locator('#pause-btn').click();
     assert.ok(visual.alex.avatar.y<-.40,w+'x'+h+': avatar must be in water');
     assert.ok(Math.abs(visual.alex.avatar.x-seed.position.x)>.1,
       w+'x'+h+': not dry walking anchor');
