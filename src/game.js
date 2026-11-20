@@ -33,6 +33,7 @@ import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
 import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
   gardenRequestStillValid} from './gardening.js';
+import {playerMayClaimGarden} from './garden-autonomy.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -132,7 +133,8 @@ import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
 import {proposeFurnishedRoomMove,createHouseholdConstructionEditor} from './furnished-room.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
-  residentAutonomousChoice,bedDestinationFor,preemptAutomaticForManual,
+  residentAutonomousChoice,residentGardenOpportunity,recordResidentGardenStart,
+  bedDestinationFor,preemptAutomaticForManual,
   nearestAvailableDiningTable } from './household.js';
 
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
@@ -491,7 +493,7 @@ function scheduleCommand(command,residentId=game.selectedSim){
   if(command.type==='garden'){
     const actor=getActor(game,residentId);
     if(residentUnavailableForHome(game,residentId)||
-      !gardenActionAllowed(game,residentId,command.instanceId,command.actionId)||
+      !playerMayClaimGarden(game,residentId,command.instanceId,command.actionId)||
       !gardenApproach(game.world,command.instanceId,actor.position)){
       toast('Садовое действие недоступно или грядка занята');return false;
     }
@@ -577,6 +579,14 @@ function scheduleCommand(command,residentId=game.selectedSim){
   // action, including being the partner of an autonomous conversation.
   // Don't cancel anything if enqueue failed; keep older MANUAL plans intact.
   onManualCommandQueued(preemptAutomaticForManual(game,residentId));
+  // If the player claims a plot currently used autonomously by the OTHER
+  // resident, the automatic task yields after (never before) successful enqueue.
+  if(command.type==='garden')for(const otherId of HOUSEHOLD_IDS){
+    const other=getActor(game,otherId);
+    if(other?.action?.id==='garden'&&other.action.automatic===true&&
+      other.action.targetInstanceId===command.instanceId)
+      onManualCommandQueued(preemptAutomaticForManual(game,otherId));
+  }
   // Successful commands are visible in the queue counter, not in a floating
   // overlay over the game. Screen readers receive a nonblocking confirmation.
   renderQueuePanel(true);
@@ -3575,19 +3585,22 @@ function boot() {
     return started;
   };
 
-  const beginGardenAction=(actorId,instanceId,actionId,fromQueue=false)=>{
+  const beginGardenAction=(actorId,instanceId,actionId,fromQueue=false,automatic=false)=>{
     const actor=getActor(game,actorId);
     if(actor.action||game.socialAction||residentUnavailableForHome(game,actorId)||
       !gardenActionAllowed(game,actorId,instanceId,actionId,{ignoreReservation:fromQueue})){
-      if(!fromQueue)toast('Уход за грядкой сейчас недоступен');
+      if(!fromQueue&&!automatic)toast('Уход за грядкой сейчас недоступен');
       return false;
     }
     const plan=gardenApproach(game.world,instanceId,actor.position);
     if(!plan)return false;
-    if(!chooseAction(actor,'garden',false))return false;
+    if(!chooseAction(actor,'garden',automatic))return false;
     actor.action.targetInstanceId=instanceId;
     actor.action.gardenActionId=actionId;
     actor.action.gardenGoal=plan.goal;
+    if(automatic&&!recordResidentGardenStart(game,actorId,instanceId)){
+      actor.action=null;return false;
+    }
     actor.event=actionId==='water'?'Идёт поливать растение':'Идёт полюбоваться садом';
     paths[actorId]={points:plan.path,index:0,id:'garden'};
     restartAutonomyWait(actorId);
@@ -5941,7 +5954,7 @@ function boot() {
         '/72 ч роста · '+(view.mature?'Созрело':
           wet>0?'Влаги на '+wet+' ч':'Нужен полив');
       const action=view.mature?'admire':'water';
-      const allowed=gardenActionAllowed(game,id,feature.instanceId,action);
+      const allowed=playerMayClaimGarden(game,id,feature.instanceId,action);
       if(allowed&&gardenApproach(game.world,feature.instanceId,actor.position)){
         offerWorldAction(point,def.name,action==='water'?'💧 Полить · 15 мин':
           '🌼 Полюбоваться · 8 мин',
@@ -6791,6 +6804,13 @@ function boot() {
             toast(getActorName(residentId)+' берёт готовое: '+ready[0].label);
           }else if(idea && beginAction(idea,true,residentId))
             toast(getActorName(residentId)+' самостоятельно решил(а): '+ACTIONS[idea].label.toLowerCase());
+          else if(!idea&&!socialIdea){
+            // LOT-C2a: lowest-priority optional gardening, never a manual FIFO task.
+            // The existing idle delay, social/need selection and work guards run first.
+            const gardenIdea=residentGardenOpportunity(game,residentId);
+            if(gardenIdea&&beginGardenAction(residentId,gardenIdea.instanceId,'water',false,true))
+              save(true);
+          }
         }
       }
     }
