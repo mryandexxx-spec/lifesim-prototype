@@ -2212,7 +2212,7 @@ button.time-card:active {transform:translateY(1px);}
 
 
 /* UX-04: quick landscape palette and persistent domain-derived price/area. */
-.outdoor-palette{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+.outdoor-palette{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
   gap:5px;flex-shrink:0}
 .outdoor-editor .outdoor-palette button{padding:5px 3px;min-height:48px;
   font-size:11px;line-height:1.2;overflow-wrap:anywhere}
@@ -2226,11 +2226,11 @@ button.time-card:active {transform:translateY(1px);}
 .garden-action-unavailable{margin:5px 0 0;color:#9b4437;font-size:11px;
   line-height:1.35;font-weight:700}
 @media(max-width:359px) and (orientation:portrait){
-  .outdoor-palette{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .outdoor-palette{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-height:570px) and (orientation:landscape){
   .outdoor-editor{max-height:68dvh;left:10%;right:10%}
-  .outdoor-palette{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .outdoor-palette{grid-template-columns:repeat(5,minmax(0,1fr))}
   .outdoor-editor .outdoor-palette button{min-height:44px}
 }
 
@@ -2265,3 +2265,15 @@ button.time-card:active {transform:translateY(1px);}
 .social-confirm p{margin:0;font-size:12px;line-height:1.5;color:#355848;}
 .social-unavailable{padding:10px 11px;border-radius:11px;background:#f6f5f1;color:#79635a;font-size:12px;line-height:1.5;}
 @media(max-height:560px){.mind-panel{max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 142px);bottom:calc(env(safe-area-inset-bottom) + 124px);}}
+
+/* LOT-D1c: compact native touch controls in the existing outdoor sheet. */
+.pool-controls{display:grid;grid-template-columns:minmax(0,1fr);gap:5px}
+.pool-controls[hidden],.pool-fixture-controls[hidden],#pool-fixture-owned-label[hidden]{display:none!important}
+.pool-controls label,.pool-fixture-controls label{
+  display:flex;flex-direction:column;gap:3px;min-width:0;
+  font-size:11px;font-weight:750;color:#396b51;
+}
+.pool-controls select{width:100%;min-width:0}
+.pool-fixture-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.pool-controls small{font-size:10px;line-height:1.25;color:#496c5e}
+@media(max-width:380px){.pool-fixture-controls{grid-template-columns:minmax(0,1fr)}}

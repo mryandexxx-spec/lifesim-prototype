@@ -10,12 +10,15 @@ import {OUTDOOR_PALETTE,describeOutdoorSelection} from '../src/outdoor-ux04.js';
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const game=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
 const css=readFileSync(new URL('../styles.css',import.meta.url),'utf8');
-test('UX04 exact four-category palette, quote/confirm/cancel and safe queued actions',()=>{
-  assert.deepEqual(OUTDOOR_PALETTE.map(p=>p.id),['ground','plants','garden','objects']);
+test('UX04 original four lot categories plus D1c pool; quote/confirm/cancel and safe queues',()=>{
+  assert.deepEqual(OUTDOOR_PALETTE.map(p=>p.id),['ground','plants','garden','objects','pool']);
   for(const p of OUTDOOR_PALETTE)assert.match(html,
     new RegExp('data-outdoor-palette="'+p.id+'"'));
   assert.match(html,/id="outdoor-selection-summary"/);
   assert.match(html,/id="outdoor-confirmation"/);
+  assert.match(describeOutdoorSelection({category:'pool',poolTool:'paint'}),/0,5 м/);
+  assert.match(describeOutdoorSelection({category:'pool',poolTool:'ladder',
+    proposal:{ok:true,areaSquareMetres:3,cost:120}}),/3 м² · стоимость 120 кр/);
   assert.match(css,/\.outdoor-confirmation\{position:sticky/);
   assert.match(html,/id="ground-walk-primary-reason"/);
   assert.match(css,/\.outdoor-editor-actions\{position:sticky/);

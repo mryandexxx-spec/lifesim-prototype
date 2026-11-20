@@ -74,6 +74,7 @@ jobs:
           node --check src/pool-topology.js
           node --check src/pool-equipment.js
           node --check src/pool-editor.js
+          node --check src/pool-visual.js
           node --check src/outdoor-catalog.js
           node --check src/outdoor-proposals.js
           node --check src/outdoor-interactions.js
@@ -223,6 +224,7 @@ jobs:
           cp src/lot-surface.js src/outdoor-catalog.js src/outdoor-proposals.js src/outdoor-interactions.js site/src/
           cp src/pool-topology.js site/src/
           cp src/pool-equipment.js src/pool-editor.js site/src/
+          cp src/pool-visual.js site/src/
           cp src/gardening.js site/src/
           cp src/garden-autonomy.js site/src/
           cp src/garden-presentation.js site/src/

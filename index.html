@@ -10,7 +10,7 @@
   <title>Блин’С — симулятор жизни</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2u-ux02b-20261120-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3-q0-q1q4-lotc1-q5-20261120-ux01-20261120-ux02a-20261120-lot-c3b-20261120-ux03-20261120-ux04-20261120-ux05-20261120" />
+  <link rel="stylesheet" href="./styles.css?v=1.2u-ux02b-20261120-h4-h5-h5b-f4g2-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1b2a-phone-w1b3a-work-w1b2b3-w1b3b2-w1b3b3-w2a1-w2a2-w2a3-w2a4-comfort-c1-comfort-c2-c3-w4b-w4c-shift-summary-w3a-w3b-lotb1-lotb2-lotb3-q0-q1q4-lotc1-q5-20261120-ux01-20261120-ux02a-20261120-lot-c3b-20261120-ux03-20261120-ux04-20261120-lot-d1c-ux05-20261120" />
   <script type="importmap">
     {"imports":{"playcanvas":"./vendor/playcanvas.mjs",
       "./src/meshy-furniture-visual.js":"./src/meshy-furniture-visual.js?v=room-contact-1",
@@ -192,7 +192,7 @@
       <div class="view-panel-head"><strong>Дом</strong><button id="home-close" type="button" aria-label="Закрыть выбор редактора">×</button></div>
       <button id="home-furnish" type="button" aria-controls="furniture-editor">▦ Обстановка <small>Мебель, магазин и склад</small></button>
       <button id="home-build" type="button" aria-controls="build-editor">⌂ Строительство <small>Комнаты, стены и крыши</small></button>
-      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Покрытия, растения, грядки, мебель и освещение</small></button>
+      <button id="home-outdoors" type="button" aria-controls="outdoor-editor">🌿 Участок <small>Покрытия, бассейн, грядки и мебель</small></button>
     </section>
     <section id="outdoor-editor" class="outdoor-editor" aria-label="Благоустройство участка" hidden>
       <div class="outdoor-editor-head"><strong>🌿 Участок · Благоустройство</strong><button id="outdoor-exit" type="button">✓ В жизнь</button></div>
@@ -200,6 +200,7 @@
       <label class="outdoor-surface-choice" for="outdoor-category">Раздел
         <select id="outdoor-category">
           <option value="ground">▦ Покрытия</option>
+          <option value="pool">🏊 Бассейн · конструктор</option>
           <option value="plants">🌳 Растения и ограды</option>
           <option value="garden">🌱 Сад · грядки</option>
           <option value="objects">🪑 Мебель и свет</option>
@@ -210,6 +211,7 @@
         <button type="button" data-outdoor-palette="plants" aria-pressed="false">🌳 Растения</button>
         <button type="button" data-outdoor-palette="garden" aria-pressed="false">🌱 Грядки</button>
         <button type="button" data-outdoor-palette="objects" aria-pressed="false">🪑 Мебель и свет</button>
+        <button type="button" data-outdoor-palette="pool" aria-pressed="false">🏊 Бассейн</button>
       </div>
       <div class="outdoor-tool-bar" role="group" aria-label="Инструменты участка">
         <button id="outdoor-tool-paint" type="button" aria-pressed="true">▦ Рисовать</button>
@@ -224,6 +226,30 @@
           <option value="flowers">✿ Декоративный цветник · 12 кр./клетка</option>
         </select>
       </label>
+      <div id="pool-controls" class="pool-controls" hidden aria-label="Конструктор бассейна">
+        <label for="pool-tool">Бассейн · инструмент
+          <select id="pool-tool">
+            <option value="paint">▦ Добавить воду · 0,5 м</option>
+            <option value="erase">⌫ Убрать воду · 70% возврат</option>
+            <option value="ladder">↕ Лестница · 120 кр.</option>
+            <option value="steps">▤ Ступени · 180 кр.</option>
+            <option value="board">↗ Низкий трамплин · 400 кр.</option>
+          </select>
+        </label>
+        <div id="pool-fixture-controls" class="pool-fixture-controls" hidden>
+          <label for="pool-fixture-operation">Операция
+            <select id="pool-fixture-operation">
+              <option value="fixture-add">Купить и установить</option>
+              <option value="fixture-move">Переставить</option>
+              <option value="fixture-remove">Продать за 70%</option>
+            </select>
+          </label>
+          <label for="pool-fixture-owned" id="pool-fixture-owned-label" hidden>Установленное
+            <select id="pool-fixture-owned"></select>
+          </label>
+        </div>
+        <small>Форма свободная. Выходы ставятся вручную; плавание появится в LOT-D2.</small>
+      </div>
       <div id="outdoor-feature-controls" class="outdoor-feature-controls" hidden>
         <label for="outdoor-feature-operation">Действие
           <select id="outdoor-feature-operation">
