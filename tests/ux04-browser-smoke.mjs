@@ -84,6 +84,35 @@ try{
   await page.screenshot({path:'ux04-artifacts/garden-'+w+'x'+h+'.png'});
   await page.locator('#ground-walk-close').click();
   assert.equal(await page.locator('#ground-walk-menu').isVisible(),false);
+  // A second explicit tap + chosen water action is the only queue mutation.
+  await page.evaluate(p=>{
+    const c=document.getElementById('game-canvas');
+    const send=(target,type)=>target.dispatchEvent(new PointerEvent(type,{
+      pointerId:198,pointerType:'touch',isPrimary:true,bubbles:true,
+      cancelable:true,clientX:p.x,clientY:p.y,button:0}));
+    send(c,'pointerdown');send(window,'pointerup');
+  },{x:rect.x+pt.x,y:rect.y+pt.y});
+  await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+  const water=page.locator('#ground-walk-more [data-garden-action="water"]');
+  if(await water.count())await water.click();
+  else{
+    assert.match(await page.locator('#ground-walk-action-label').textContent(),/Полить/);
+    await page.locator('#ground-walk-action').click();
+  }
+  await page.waitForFunction(key=>{
+    const r=JSON.parse(localStorage.getItem(key));
+    return r.actionQueues.byResident.alex.some(a=>
+      a.type==='garden'&&a.actionId==='water')||
+      (r.action?.id==='garden'&&r.action.gardenActionId==='water');
+  },SAVE_KEY,{timeout:8000});
+  const queued=JSON.parse(await page.evaluate(k=>localStorage.getItem(k),SAVE_KEY));
+  assert.equal(queued.actionQueues.byResident.mira.length,0,'Mira queue untouched');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
+  const restored=JSON.parse(await page.evaluate(k=>localStorage.getItem(k),SAVE_KEY));
+  assert.equal(restored.version,1);
+  assert.ok(restored.actionQueues.byResident.alex.some(a=>a.actionId==='water')||
+    (restored.action?.id==='garden'&&restored.action.gardenActionId==='water'));
   assert.equal(errors.length,0,JSON.stringify(errors));
   await ctx.close();
  }

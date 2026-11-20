@@ -2233,3 +2233,16 @@ button.time-card:active {transform:translateY(1px);}
   .outdoor-palette{grid-template-columns:repeat(4,minmax(0,1fr))}
   .outdoor-editor .outdoor-palette button{min-height:44px}
 }
+
+/* UX-04 follow-up: keep selected tool, quote, feedback and confirmation together
+   at the sheet's visible bottom even while scrolling a dense mobile palette. */
+.outdoor-editor{max-height:min(58dvh,390px)}
+.outdoor-confirmation{position:sticky;bottom:0;z-index:3;
+  display:flex;flex-direction:column;gap:5px;flex-shrink:0;
+  padding:7px 0 3px;background:#f8fff6;
+  box-shadow:0 -5px 14px #f8fff6}
+.outdoor-confirmation .outdoor-editor-actions{position:static;padding:0}
+@media(max-height:570px) and (orientation:landscape){
+  .outdoor-editor{max-height:68dvh}
+  .outdoor-confirmation{gap:3px;padding-top:3px}
+}

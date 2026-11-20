@@ -15,6 +15,8 @@ test('UX04 exact four-category palette, quote/confirm/cancel and safe queued act
   for(const p of OUTDOOR_PALETTE)assert.match(html,
     new RegExp('data-outdoor-palette="'+p.id+'"'));
   assert.match(html,/id="outdoor-selection-summary"/);
+  assert.match(html,/id="outdoor-confirmation"/);
+  assert.match(css,/\.outdoor-confirmation\{position:sticky/);
   assert.match(html,/id="ground-walk-primary-reason"/);
   assert.match(css,/\.outdoor-editor-actions\{position:sticky/);
   assert.match(game,/primaryReason:first\.reason/);
