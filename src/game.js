@@ -4312,6 +4312,20 @@ function boot() {
   // no PlayCanvas instances are created while scrolling the store.
   const svgNS='http://www.w3.org/2000/svg';
   const buildProductThumbnail=offer=>{
+    const meshSku=meshyFurnitureDisplaySku(offer.itemId);
+    if(meshSku&&furnitureVisualMode!=='legacy'){
+      // These are real GLB renders baked once in CI, not UI-generated SVG.
+      // Unavailable images fall back to the existing procedural card preview.
+      const photo=document.createElement('img');
+      photo.className='furnish-sku-sketch furnish-meshy-thumb';
+      photo.src='./assets/furniture/meshy-room-v1/thumbnails/'+meshSku+'.png';
+      photo.alt='';photo.decoding='async';photo.loading='lazy';
+      photo.addEventListener('error',()=>{
+        const svg=buildProductThumbnail({...offer,itemId:'__procedural__'});
+        photo.replaceWith(svg);
+      },{once:true});
+      return photo;
+    }
     const svg=document.createElementNS(svgNS,'svg');
     svg.setAttribute('viewBox','0 0 92 76');
     svg.setAttribute('aria-hidden','true');
