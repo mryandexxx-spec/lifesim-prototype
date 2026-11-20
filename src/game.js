@@ -30,10 +30,10 @@ import {previewOutdoorPaint,commitOutdoorPreview,
   previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from './outdoor-proposals.js';
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {poolBoundaryEdges,poolCellBounds} from './pool-topology.js';
-import {POOL_FIXTURE_PRICES} from './pool-equipment.js';
+import {POOL_FIXTURE_PRICES,poolHasExit} from './pool-equipment.js';
 import {previewPoolTiles,previewPoolFixture,previewPoolHistory,
   poolEditorSnapshot,commitPoolPreviewPersisted} from './pool-editor.js';
-import {createPoolVisual} from './pool-visual.js';
+import {createPoolVisual,poolFixtureVisualPose} from './pool-visual.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
 import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
@@ -6396,6 +6396,16 @@ function boot() {
     $('ground-walk-action').disabled=options.primaryAvailable===false;
   };
   const openGroundWalkMenu=(point,ground)=>{
+    if(ground.kind==='pool-water'){
+      const hasExit=poolHasExit(game.world.outdoors,ground.poolId||
+        (game.world.outdoors?.pools||[]).find(p=>
+          p.cells.includes(outdoorCellAt(ground.x,ground.z)))?.poolId);
+      offerWorldAction(point,'Бассейн · вода','🏊 Плавание · появится в LOT-D2',
+        null,null,{primaryAvailable:false,
+          info:hasExit?'Чаша готова. Сейчас доступны строительство и просмотр. Плавание будет следующим этапом.'
+            :'Для будущего плавания добавь лестницу или ступени в редакторе участка.'});
+      return;
+    }
     const id=game.selectedSim,actor=getActor(game,id);
     if(residentUnavailableForHome(game,id)){
       closeGroundWalkMenu();toast('Персонаж сейчас не на участке');return;
@@ -6817,6 +6827,13 @@ function boot() {
       });
     // Every purchased outdoor item has a real 3D pick volume. Decorative
     // items offer a queued walk nearby; the bench offers queued rest.
+    const poolTargets=(game.world.outdoors?.poolFixtures||[]).map(item=>{
+      const pose=poolFixtureVisualPose(item);
+      if(!pose)return null;
+      return {kind:'pool-fixture',id:item.kind,fixtureId:item.fixtureId,
+        bounds:{min:{x:pose.x-.30,y:-.54,z:pose.z-.30},
+          max:{x:pose.x+.30,y:.30,z:pose.z+.30}}};
+    }).filter(Boolean);
     const outdoorTargets=(game.world.outdoors?.features||[])
       .map(item=>{
         const rect=outdoorFeatureRect(item),def=OUTDOOR_CATALOG[item.itemId];
@@ -6840,7 +6857,7 @@ function boot() {
           bounds:{min:{x:r.minX,y:0,z:r.minZ},max:{x:r.maxX,y:2.02,z:r.maxZ}}};
       });
     return pickWorldRayTarget(near,far,
-      [...residents,...finishedArt,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...kitchenAppliances,...easels,...outdoorTargets,...movedVolumes,...blockers]);
+      [...residents,...finishedArt,...sofaCopies,...bedCopies,...tvCopies,...bookshelves,...diningTables,...chairSeats,...musicStations,...kitchenAppliances,...easels,...outdoorTargets,...poolTargets,...movedVolumes,...blockers]);
   };
   let tapCueTimeout=null;
   const confirmWorldTap=pos=>{
@@ -6913,6 +6930,14 @@ function boot() {
     else if(target?.kind==='outdoor'){
       closeSocialContext();select(null);
       openOutdoorActionMenu(pos,target);
+    }else if(target?.kind==='pool-fixture'){
+      closeSocialContext();select(null);
+      offerWorldAction(pos,({
+        ladder:'Лестница бассейна',steps:'Ступени бассейна',
+        board:'Трамплин бассейна'})[target.id]||'Оборудование бассейна',
+      '🏊 Использовать · появится в LOT-D2',null,null,
+      {primaryAvailable:false,
+        info:'Оборудование установлено и сохранено. Купание и прыжки будут в следующем этапе.'});
     }
     else{
       closeSocialContext();select(null);
