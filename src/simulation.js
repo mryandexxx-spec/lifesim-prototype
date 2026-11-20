@@ -27,6 +27,7 @@ export const ACTIONS = Object.freeze({
   // F4D: sitting is a real physical activity, not an unearned skill or need bonus.
   seat: { label: 'Посидеть', need: 'fun', duration: 42, benefitPerMinute: 0, location: [0,-1.03] },
   // LOT-B3: real timed outdoors leisure, never a grant for merely owning furniture.
+  garden: {label:'Уход за садом',need:'fun',duration:15,benefitPerMinute:0,location:[0,0]},
   bench: {label:'Отдохнуть на садовой скамейке',need:'fun',duration:42,
     benefitPerMinute:.74,location:[0,0]},
   // F4F: a real fridge-to-purchased-chair dining journey; hunger only during bites.
@@ -137,10 +138,22 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       next.action.lampSwitched=true;
     if(data.action.id==='bed'&&validBedSlot(data.action.bedSlot))
       next.action.bedSlot=data.action.bedSlot;
+    if(next.action&&data.action.id==='garden'){
+      if(!validOutdoorId(data.action.targetInstanceId)||
+         !['water','admire'].includes(data.action.gardenActionId)||
+         !insideLot(data.action.gardenGoal?.x,data.action.gardenGoal?.z)||
+         !Number.isFinite(data.action.elapsed)||
+         data.action.elapsed<0||data.action.elapsed>=
+           (data.action.gardenActionId==='water'?15:8))next.action=null;
+      else{
+        next.action.gardenActionId=data.action.gardenActionId;
+        next.action.gardenGoal={x:data.action.gardenGoal.x,z:data.action.gardenGoal.z};
+      }
+    }
     if(validFurnitureInstanceId(data.action.targetInstanceId)||
-       (data.action.id==='bench'&&validOutdoorId(data.action.targetInstanceId)))
+       (['bench','garden'].includes(data.action.id)&&validOutdoorId(data.action.targetInstanceId)))
       next.action.targetInstanceId=data.action.targetInstanceId;
-    if(data.action.id==='bench'&&!validOutdoorId(data.action.targetInstanceId))
+    if(['bench','garden'].includes(data.action.id)&&!validOutdoorId(data.action.targetInstanceId))
       next.action=null;
     // Optional H1 activity metadata. Unknown activities are not restorable.
     if(['hobby','music','paint'].includes(data.action.id)){
@@ -276,7 +289,8 @@ export function tick(state, minutes,world=state?.world??null) {
     const hobby=['hobby','music','paint'].includes(state.action.id)
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
-    const duration=hobby?.timeBudget.targetMinutes??definition.duration;
+    const duration=state.action.id==='garden'
+      ?(state.action.gardenActionId==='admire'?8:15):hobby?.timeBudget.targetMinutes??definition.duration;
     const amount = Math.min(minutes, Math.max(0, duration - state.action.elapsed));
     // Hunger rises only when eating, not before taking food from the shelf.
     // Preserve the previous total benefit by concentrating it in the bite phase.
@@ -325,7 +339,7 @@ export function tick(state, minutes,world=state?.world??null) {
     refreshMind(state,world);
     state.action.elapsed += amount;
     if (state.action.elapsed >= duration ||
-        (!['seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&

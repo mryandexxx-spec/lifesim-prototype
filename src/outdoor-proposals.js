@@ -12,6 +12,7 @@ import {BED_SLOTS} from './bed-layout.js';
 import {findPath,isWalkable,ACTOR_RADIUS} from './navigation.js';
 import {recordFinanceChange} from './finance-ledger.js';
 import {outdoorBenchApproach,outdoorBenchBusy} from './outdoor-interactions.js';
+import {GARDEN_LIMIT,isGardenItem,newGardenRecord,gardenApproach,gardenBusy} from './gardening.js';
 
 const fail=reason=>({ok:false,reason});
 const integer=n=>Number.isSafeInteger(n)&&n>=0;
@@ -125,6 +126,8 @@ export function previewOutdoorFeature(root,itemId,{x,z,yaw=0}={}){
   if(!current)return fail('invalid-state');
   if(!def)return fail('unknown-item');
   if(current.features.length>=OUTDOOR_FEATURE_LIMIT)return fail('feature-limit');
+  if(isGardenItem(itemId)&&current.features.filter(f=>isGardenItem(f.itemId)).length>=GARDEN_LIMIT)
+    return fail('garden-limit');
   if(current.nextId>9999999)return fail('id-limit');
   if(def.light&&current.features.filter(f=>OUTDOOR_CATALOG[f.itemId]?.light).length>=8)
     return fail('light-limit');
@@ -144,8 +147,15 @@ export function previewOutdoorFeature(root,itemId,{x,z,yaw=0}={}){
   // Preview must use its *future* revision, never reuse an old walkability grid.
   if(current.revision>=100000000)return fail('revision-limit');
   const next={...current,revision:current.revision+1,nextId:current.nextId+1,
-    features:[...current.features,item]};
+    features:[...current.features,item],
+    ...(isGardenItem(itemId)?{gardens:{...(current.gardens||{}),
+      [item.instanceId]:newGardenRecord(root.minutes)}}:{})};
   if(!keepsExistingRoutes(root,next))return fail('would-block-route');
+  if(isGardenItem(itemId)){
+    const after={...root.world,outdoors:next};
+    if(!participantPositions(root).every(p=>Boolean(gardenApproach(after,item.instanceId,p))))
+      return fail('unreachable-garden');
+  }
   if(itemId==='garden.bench'){
     const approach=outdoorBenchApproach({...root.world,outdoors:next},item.instanceId);
     if(!approach||!isWalkable(approach.x,approach.z,{...root.world,outdoors:next})||
@@ -186,7 +196,7 @@ export function commitOutdoorPreview(root,proposal){
  * A stale preview cannot mint money or bypass topology/overlap checks.
  * Decor and boundaries never grant passive XP/need bonuses.
  */
-const b2Category=id=>['tree','shrub','flower','fence','furniture','light']
+const b2Category=id=>['tree','shrub','flower','fence','furniture','light','garden']
   .includes(OUTDOOR_CATALOG[id]?.category);
 export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose}={}){
   if(operation==='place'){
@@ -201,6 +211,7 @@ export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose
   if(!original||!b2Category(original.itemId))return fail('missing-instance');
   if(original.itemId==='garden.bench'&&outdoorBenchBusy(root,instanceId))
     return fail('reserved-bench');
+  if(isGardenItem(original.itemId)&&gardenBusy(root,instanceId))return fail('reserved-garden');
   if(current.revision>=100000000)return fail('revision-limit');
   let features;
   if(operation==='sell')features=current.features.filter(f=>f.instanceId!==instanceId);
@@ -222,9 +233,17 @@ export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose
       return fail('resident-blocked');
     features=current.features.map(f=>f.instanceId===instanceId?moved:f);
   }
-  const next={...current,revision:current.revision+1,features};
+  const next={...current,revision:current.revision+1,features,
+    ...(operation==='sell'&&isGardenItem(original.itemId)
+      ?{gardens:Object.fromEntries(Object.entries(current.gardens||{})
+        .filter(([id])=>id!==instanceId))}:{})};
   if(operation==='move'&&!keepsExistingRoutes(root,next))
     return fail('would-block-route');
+  if(operation==='move'&&isGardenItem(original.itemId)){
+    const after={...root.world,outdoors:next};
+    if(!participantPositions(root).every(p=>Boolean(gardenApproach(after,instanceId,p))))
+      return fail('unreachable-garden');
+  }
   if(operation==='move'&&original.itemId==='garden.bench'){
     const after={...root.world,outdoors:next};
     const approach=outdoorBenchApproach(after,instanceId);

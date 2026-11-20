@@ -113,7 +113,12 @@ try{
         root.action?.id==='bench';
     },SAVE_KEY,{timeout:8000});
     state=await save();
-    const before=state.actionQueues.byResident.alex.length;
+    const activeBenchCount=root=>Number(root.action?.id==='bench');
+    // An already-started task leaves FIFO by design; count BOTH queued and active.
+    const actionCount=root=>root.actionQueues.byResident.alex.filter(
+      task=>task.type==='outdoor').length+activeBenchCount(root);
+    const before=actionCount(state);
+    assert.equal(before,1,'bench command is exactly once, whether queued or active');
     // A cancelled gesture can never add a second movement, even over terrain.
     await page.evaluate(()=>{
       const canvas=document.getElementById('game-canvas');
@@ -122,8 +127,8 @@ try{
       canvas.dispatchEvent(new PointerEvent('pointerdown',options));
       window.dispatchEvent(new PointerEvent('pointercancel',{...options,buttons:0}));
     });
-    assert.equal((await save()).actionQueues.byResident.alex.length,before,
-      'pointercancel must not append commands');
+    assert.equal(actionCount(await save()),before,
+      'pointercancel must not append commands; queued→active is not lost work');
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
     const restored=await save();

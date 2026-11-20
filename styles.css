@@ -1941,3 +1941,7 @@ button.time-card:active {transform:translateY(1px);}
  width:100%;border-radius:10px;border:0;background:#a54f38;color:#fff;
  font-weight:800;font-size:14px;touch-action:manipulation;}
 #career-pending-incident-title:focus{outline:2px solid #a54f38;outline-offset:4px;}
+
+/* LOT-C1: compact plant status inside the existing outdoor tap popup. */
+.garden-action-status{font-size:.83rem;line-height:1.4;margin:.35rem .55rem .55rem;max-width:240px;overflow-wrap:anywhere}
+@media(max-width:420px){.garden-action-status{font-size:.78rem}}

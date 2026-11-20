@@ -31,6 +31,8 @@ import {previewOutdoorPaint,commitOutdoorPreview,
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
+import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
+  gardenRequestStillValid} from './gardening.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -470,6 +472,7 @@ function taskLabel(task){
   if(!task)return 'Неизвестное действие';
   if(task.type==='move')return 'Идти в указанное место';
   if(task.type==='outdoor')return 'Отдохнуть на садовой скамейке';
+  if(task.type==='garden')return task.actionId==='water'?'Полить грядку':'Полюбоваться садом';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
@@ -484,6 +487,14 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
+  if(command.type==='garden'){
+    const actor=getActor(game,residentId);
+    if(residentUnavailableForHome(game,residentId)||
+      !gardenActionAllowed(game,residentId,command.instanceId,command.actionId)||
+      !gardenApproach(game.world,command.instanceId,actor.position)){
+      toast('Садовое действие недоступно или грядка занята');return false;
+    }
+  }
   if(command.type==='outdoor'){
     const p=outdoorBenchApproach(game.world,command.instanceId);
     const actor=getActor(game,residentId);
@@ -2290,25 +2301,50 @@ function boot() {
     for(const light of outdoorLightNodes)
       light.light.intensity=brightness*(light.name.includes('standing')?1.75:1.15);
   };
+  let gardenStageSignature='';
+  const currentGardenStageSignature=()=>game.world.outdoors?.features
+    ?.filter(f=>isGardenItem(f.itemId))
+    .map(f=>f.instanceId+':'+(gardenView(game.world.outdoors,f.instanceId,game.minutes)?.stage??0))
+    .join('|')||'';
   const outdoorFeatureMaterials={
     bark:mat('#917256'),leaf:mat('#4d8960'),lightLeaf:mat('#7cac69'),
     darkLeaf:mat('#437956'),pink:mat('#dc9aa7'),white:mat('#f6eee0'),
     yellow:mat('#e9c767'),purple:mat('#8f77b6'),
-    wood:mat('#af8967'),woodDark:mat('#846e54'),soil:mat('#6e8761')
+    wood:mat('#af8967'),woodDark:mat('#846e54'),soil:mat('#6e8761'),
+    gardenSoil:mat('#6b4e3d'),orange:mat('#e5a352'),blue:mat('#7197d8')
   };
   const renderOutdoorFeatures=()=>{
     for(const node of outdoorFeatureNodes.splice(0))node.destroy();
     outdoorLightNodes.length=0;
     for(const item of game.world?.outdoors?.features||[]){
       const def=OUTDOOR_CATALOG[item.itemId];
-      if(!def||!['tree','shrub','flower','fence','furniture','light'].includes(def.category))continue;
+      if(!def||!['tree','shrub','flower','fence','furniture','light','garden'].includes(def.category))continue;
       const node=new pc.Entity('LOT-B2 '+item.instanceId+' '+item.itemId);
       node.setLocalPosition(item.x,-.53,item.z);
       node.setLocalEulerAngles(0,-item.yaw,0);
       app.root.addChild(node);outdoorFeatureNodes.push(node);
       const part=(shape,name,x,y,z,sx,sy,sz,color)=>
         primitive(shape,name,x,y,z,sx,sy,sz,outdoorFeatureMaterials[color],node);
-      if(def.category==='tree'){
+      if(def.category==='garden'){
+        const stage=gardenView(game.world.outdoors,item.instanceId,game.minutes)?.stage??0;
+        const herb=item.itemId.startsWith('garden.herb');
+        const flowerColor=item.itemId.includes('calendula')?'orange':'blue';
+        part('box','garden timber frame',0,.105,0,1.00,.21,1.00,'woodDark');
+        part('box','garden rich soil',0,.225,0,.86,.05,.86,'gardenSoil');
+        const spots=[[-.25,-.24],[.24,-.23],[-.22,.23],[.23,.23]];
+        if(stage===0)for(const [x,z] of spots)
+          part('sphere','sown seed mound',x,.255,z,.16,.05,.16,'soil');
+        if(stage>0)for(const [k,[x,z]] of spots.entries()){
+          const height=stage===1?.22:stage===2?.51:herb?.72:.66;
+          part('cylinder','green garden stem',x,.26+height/2,z,.055,height,.055,'darkLeaf');
+          part('sphere','garden leaves',x-.07,.34+height*.53,z,.22,
+            stage===1?.14:.29,.21,k%2?'leaf':'lightLeaf');
+          if(stage>=2)part('sphere','upper leaves',x+.09,.24+height,z,
+            herb?.24:.18,herb?.18:.17,herb?.22:.17,'lightLeaf');
+          if(stage===3&&!herb)part('sphere','blossom',x,.37+height,z,
+            .23,.18,.23,flowerColor);
+        }
+      }else if(def.category==='tree'){
         const scale=item.itemId==='tree.tall'?1.30:item.itemId==='tree.broad'?1.12:1;
         part('cylinder','trunk',0,.70*scale,0,.28,1.40*scale,.28,'bark');
         part('sphere','canopy',0,1.65*scale,0,def.width*1.08,.94*scale,def.depth*1.08,'leaf');
@@ -2373,6 +2409,7 @@ function boot() {
       }
     }
     syncOutdoorLights(currentOutdoorDaylight);
+    gardenStageSignature=currentGardenStageSignature();
   };
   renderOutdoorFeatures();
   const outdoorPaintGhost=box('LOT-B1 paint preview',0,-.509,0,.5,.025,.5,
@@ -3453,6 +3490,8 @@ function boot() {
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
   const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>{
+    if(id==='garden')return getActor(game,residentId)?.action?.gardenGoal||
+      gardenApproach(game.world,targetInstanceId,getActor(game,residentId)?.position)?.goal||null;
     if(id==='move')return getActor(game,residentId)?.action?.goal||null;
     if(id==='bench')return outdoorBenchApproach(game.world,targetInstanceId);
     if(id==='hobby:toSeat'){
@@ -3535,6 +3574,24 @@ function boot() {
     return started;
   };
 
+  const beginGardenAction=(actorId,instanceId,actionId,fromQueue=false)=>{
+    const actor=getActor(game,actorId);
+    if(actor.action||game.socialAction||residentUnavailableForHome(game,actorId)||
+      !gardenActionAllowed(game,actorId,instanceId,actionId,{ignoreReservation:fromQueue})){
+      if(!fromQueue)toast('Уход за грядкой сейчас недоступен');
+      return false;
+    }
+    const plan=gardenApproach(game.world,instanceId,actor.position);
+    if(!plan)return false;
+    if(!chooseAction(actor,'garden',false))return false;
+    actor.action.targetInstanceId=instanceId;
+    actor.action.gardenActionId=actionId;
+    actor.action.gardenGoal=plan.goal;
+    actor.event=actionId==='water'?'Идёт поливать растение':'Идёт полюбоваться садом';
+    paths[actorId]={points:plan.path,index:0,id:'garden'};
+    restartAutonomyWait(actorId);
+    return true;
+  };
   // LOT-B3: one genuine, timed seat reserved by exact outdoor ID.
   // Uses canonical A*, action simulation and FIFO, never a parallel clock.
   const beginOutdoorBench=(actorId,instanceId,fromQueue=false)=>{
@@ -3645,6 +3702,14 @@ function boot() {
   };
   dispatchPlannedActions=()=>{
     if(game.paused||dialogueNeedsDecision(game))return [];
+    // An unfinished plan can mature before its watering command is reached.
+    // Drop obsolete garden instructions without blocking subsequent FIFO tasks.
+    let expired=0;
+    for(const id of HOUSEHOLD_IDS)for(const task of [...pendingActions(game.actionQueues,id)]){
+      if(task.type==='garden'&&!gardenRequestStillValid(game,id,task.instanceId,task.actionId))
+        if(removeQueuedAction(game.actionQueues,id,task.seq))expired++;
+    }
+    if(expired){save(true);toast('Сад вырос: устаревшее действие убрано из очереди');}
     const refused=[];
     const started=dispatchActionQueues(game.actionQueues,{
       canStart(residentId,command){
@@ -3674,6 +3739,9 @@ function boot() {
               id!==residentId&&showerStates[id].active))&&
             !(command.actionId==='toilet'&&HOUSEHOLD_IDS.some(id=>
               id!==residentId&&toiletStates[id].active));
+        if(command.type==='garden')return gardenActionAllowed(game,residentId,
+          command.instanceId,command.actionId,{ignoreReservation:true})&&
+          Boolean(gardenApproach(game.world,command.instanceId,actor.position));
         if(command.type==='outdoor')return outdoorBenchAvailable(game,residentId,command.instanceId)&&
           Boolean(findPath(actor.position,outdoorBenchApproach(game.world,command.instanceId),game.world));
         if(command.type==='move')return isWalkable(command.x,command.z,game.world)&&
@@ -3732,6 +3800,8 @@ function boot() {
         }
         else if(command.type==='outdoor')
           started=beginOutdoorBench(residentId,command.instanceId,true);
+        else if(command.type==='garden')
+          started=beginGardenAction(residentId,command.instanceId,command.actionId,true);
         else if(command.type==='move'){
           const actor=getActor(game,residentId),goal={x:command.x,z:command.z};
           const route=findPath(actor.position,goal,game.world);
@@ -5566,6 +5636,7 @@ function boot() {
   let outdoorCategory='ground',outdoorPose=null,outdoorYaw=0;
   const outdoorFeatureItems=OUTDOOR_PRODUCTS;
   const activeOutdoorItems=()=>outdoorFeatureItems.filter(item=>
+    outdoorCategory==='garden'?item.category==='garden':
     outdoorCategory==='objects'?['furniture','light'].includes(item.category):
       ['tree','shrub','flower','fence'].includes(item.category));
   const syncOutdoorFeatureCatalog=()=>{
@@ -5618,7 +5689,10 @@ function boot() {
     'wallet-limit':'Баланс семьи достиг предела',
     'reserved-bench':'Сначала закончи отдых или удали заказ из очереди',
     'unreachable-bench':'Нельзя сесть: оставь подход и путь для обоих жителей',
-    'light-limit':'На участке уже установлено восемь фонарей'
+    'light-limit':'На участке уже установлено восемь фонарей',
+    'garden-limit':'Для мобильного участка допускается не больше восьми грядок',
+    'reserved-garden':'Сначала закончи садовое действие или удали его из очереди',
+    'unreachable-garden':'Оставь доступный подход к грядке для обоих жителей'
   };
   const outdoorFeedback=(message,invalid=false)=>{
     $('outdoor-preview-text').textContent=message;
@@ -5814,12 +5888,14 @@ function boot() {
   const groundWalkPanel=$('ground-walk-menu');
   const closeGroundWalkMenu=()=>{
     groundWalkOffer=null;groundWalkPanel.hidden=true;
+    $('ground-walk-info').hidden=true;
     $('ground-walk-action').disabled=true;
   };
   const offerWorldAction=(point,heading,label,command,instanceId=null)=>{
     groundWalkOffer={residentId:game.selectedSim,command,instanceId};
     $('ground-walk-title').textContent=heading;
     $('ground-walk-action-label').textContent=label;
+    $('ground-walk-info').hidden=true;
     const frame=document.querySelector('.app-shell').getBoundingClientRect();
     groundWalkPanel.hidden=false;
     const width=groundWalkPanel.offsetWidth||190,height=groundWalkPanel.offsetHeight||110;
@@ -5855,6 +5931,30 @@ function boot() {
     if(!feature||!def)return;
     if(residentUnavailableForHome(game,id)){
       toast('Персонаж сейчас не на участке');return;
+    }
+    if(isGardenItem(feature.itemId)){
+      const view=gardenView(game.world.outdoors,feature.instanceId,game.minutes);
+      if(!view)return;
+      const wet=Math.ceil(view.waterRemaining/60);
+      const info=view.label+' · '+Math.floor(view.progressWetMinutes/60)+
+        '/72 ч роста · '+(view.mature?'Созрело':
+          wet>0?'Влаги на '+wet+' ч':'Нужен полив');
+      const action=view.mature?'admire':'water';
+      const allowed=gardenActionAllowed(game,id,feature.instanceId,action);
+      if(allowed&&gardenApproach(game.world,feature.instanceId,actor.position)){
+        offerWorldAction(point,def.name,action==='water'?'💧 Полить · 15 мин':
+          '🌼 Полюбоваться · 8 мин',
+          {type:'garden',instanceId:feature.instanceId,actionId:action},
+          feature.instanceId);
+      }else{
+        const plan=gardenApproach(game.world,feature.instanceId,actor.position);
+        if(!plan){toast('К грядке нет пути');return;}
+        offerWorldAction(point,def.name,'↗ Подойти',
+          {type:'move',x:plan.goal.x,z:plan.goal.z},feature.instanceId);
+      }
+      $('ground-walk-info').textContent=info;
+      $('ground-walk-info').hidden=false;
+      return;
     }
     if(feature.itemId==='garden.bench'){
       // Revalidation of availability and route happens again on confirmation.
@@ -6403,6 +6503,8 @@ function boot() {
           ?null:game.socialAction?.kind;
         const priorCalendarMinute=game.minutes;
         const careerEvents=tickHousehold(game,.30 * game.speed)||[];
+        if(gardenStageSignature!==currentGardenStageSignature())
+          renderOutdoorFeatures();
         // Persistent shift state, credited money and receipts must share one
         // localStorage snapshot; never wait for the eight-second autosave.
         if(careerEvents.length){
