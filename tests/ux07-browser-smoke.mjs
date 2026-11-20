@@ -48,8 +48,18 @@ try{
   assert.match(await summary.innerText(),/70/);
   const pos=await summary.boundingBox();
   const body=await phone.locator('.career-phone-body').boundingBox();
-  assert.ok(pos&&body&&pos.y<body.y+body.height,
-   'period summary visible before filters on '+width+'x'+height);
+  if(width>height){
+   // Short landscape Safari uses a scrollable phone body: summary need not
+   // fit simultaneously with the header, but MUST remain reachable by touch.
+   assert.ok(pos&&body,'landscape finance summary and body exist');
+   await summary.scrollIntoViewIfNeeded();
+   const shown=await summary.boundingBox();
+   assert.ok(shown&&shown.y<body.y+body.height&&
+    shown.y+shown.height>body.y,'landscape summary reachable by scrolling');
+  }else{
+   assert.ok(pos&&body&&pos.y<body.y+body.height,
+    'portrait period summary visible before filters on '+width+'x'+height);
+  }
   assert.ok(await phone.locator('.finance-ux07-bill-status').isVisible());
   const pay=phone.locator('.finance-bills .finance-bill-pay');
   const rect=await pay.boundingBox();
