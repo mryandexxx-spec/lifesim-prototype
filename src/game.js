@@ -87,6 +87,7 @@ import {pairDynamic} from './social-dynamics.js';
 import {romanceStatus,romanceLoveDescription,romanceClimate,romanceAvailability,
   setRomancePreference,romancePreferenceSummary} from './romance.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
+import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
 import {effectiveSleepSpeed} from './sleep-acceleration.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
@@ -409,6 +410,8 @@ let socialContextVisible=false; // UI-only: no changes to the saved simulation.
 let socialAnchor=null; // CSS position from tapped world resident, never serialized.
 let socialMenuDisplayKey='';
 let queueVisible=false;
+let queueInspectResident=null;
+let queueReceiptTimer=null;
 let queueDisplayKey='';
 let planPeekKey='';
 let insightOpen=false,insightDisplayKey='';
@@ -594,11 +597,18 @@ function scheduleCommand(command,residentId=game.selectedSim){
       other.action.targetInstanceId===command.instanceId)
       onManualCommandQueued(preemptAutomaticForManual(game,otherId));
   }
-  // Successful commands are visible in the queue counter, not in a floating
-  // overlay over the game. Screen readers receive a nonblocking confirmation.
+  // One common, nonblocking receipt after an explicit furniture, ground or
+  // outdoor confirmation. The pending entry is counted exactly once.
   renderQueuePanel(true);
-  $('queue-feedback').textContent=getActorName(residentId)+': добавлено в очередь — '+
-    taskLabel({...task,residentId});
+  const position=pendingActions(game.actionQueues,residentId)
+    .findIndex(entry=>entry.seq===task.seq)+1;
+  const receipt=commandReceipt(getActorName(residentId),
+    taskLabel({...task,residentId}),position);
+  $('queue-feedback').textContent=receipt;
+  const receiptEl=$('queue-receipt');
+  receiptEl.textContent=receipt;receiptEl.hidden=false;
+  if(queueReceiptTimer!==null)clearTimeout(queueReceiptTimer);
+  queueReceiptTimer=setTimeout(()=>{receiptEl.hidden=true;queueReceiptTimer=null;},4200);
   save(true);
   if(command.type!=='object'&&command.type!=='activity'){
     // A confirmed queue entry closes only presentation, never the action.
@@ -858,6 +868,7 @@ function select(id,instanceId=null) {
   if (!id) return;
   $('action-category').textContent = META[id].category;
   $('action-title').textContent = META[id].title;
+  $('action-recipient').textContent=offerForName(getActorName(game.selectedSim));
   $('action-description').textContent = selectedFurnitureInstanceId
     ?(id==='bed'?'Сон в выбранной кровати · две независимые стороны и свой маршрут':
       id==='tv'?'Просмотр этого телевизора · с дивана, если он свободен и экран виден':
@@ -1301,6 +1312,8 @@ function renderPlanPeek(){
   if(key===planPeekKey)return;
   planPeekKey=key;
   $('status-text').textContent=plan.heading;
+  $('plan-label').textContent=planButtonLabel(pendingActions(game.actionQueues,residentId).length);
+  $('plan-resident').textContent='Управляешь: '+getActorName(residentId);
   const list=$('plan-upcoming');list.replaceChildren();
   for(const item of plan.upcoming){
     const chip=document.createElement('span');chip.className='plan-chip';
@@ -1320,32 +1333,43 @@ function renderPlanPeek(){
   list.hidden=plan.upcoming.length===0;
   const button=$('plan-peek');
   button.setAttribute('aria-expanded',String(queueVisible));
-  button.setAttribute('aria-label',plan.accessible);
+  button.setAttribute('aria-label',planButtonLabel(pendingActions(game.actionQueues,residentId).length)+' · '+plan.accessible);
 }
 $('plan-peek').addEventListener('click',()=>{
   if(dialogueNeedsDecision(game))return;
   setHomeOpen(false);closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);closeMindPanel();
+  queueInspectResident=game.selectedSim;
   queueVisible=!queueVisible;
   renderQueuePanel(true);
 });
 function renderQueuePanel(force=true){
   renderPlanPeek();
-  const residentId=game.selectedSim;
+  const residentId=queueViewerResident(game.selectedSim,queueInspectResident);
   const pending=pendingActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
-  const key=JSON.stringify([queueVisible,residentId,pending,active,game.socialAction?.phase,
+  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,active,
+    HOUSEHOLD_IDS.map(id=>pendingActions(game.actionQueues,id).length),
+    game.socialAction?.phase,
     getActor(game,residentId).action?.phase,
     (game.socialAction?.eveningStage||game.socialAction?.eveningSofa)&&
       game.socialAction.phase==='using'
       ?Math.floor(game.socialAction.elapsed/3):null]);
-  $('queue-toggle').textContent='Очередь · '+pending.length;
+  $('queue-toggle').textContent=planButtonLabel(pendingActions(game.actionQueues,game.selectedSim).length);
   if(!force&&key===queueDisplayKey)return;
   queueDisplayKey=key;
   $('queue-panel').hidden=!queueVisible;
   $('queue-toggle').setAttribute('aria-expanded',String(queueVisible));
   $('plan-peek').setAttribute('aria-expanded',String(queueVisible));
   if(!queueVisible)return;
-  $('queue-title').textContent='План: '+getActorName(residentId);
+  $('queue-title').textContent='План · '+getActorName(residentId);
+  for(const id of HOUSEHOLD_IDS){
+    $('queue-'+id).textContent=getActorName(id)+' · '+pendingActions(game.actionQueues,id).length;
+    $('queue-'+id).setAttribute('aria-pressed',String(id===residentId));
+  }
+  $('queue-person-note').textContent=residentId===game.selectedSim
+    ?'Сейчас управляешь: '+getActorName(game.selectedSim)+'.'
+    :'Просмотр плана '+getActorName(residentId)+'. Сейчас управляешь: '+
+       getActorName(game.selectedSim)+'. Просмотр не переключает управление.';
   const activeEl=$('queue-active');activeEl.replaceChildren();
   const label=document.createElement('div');
   label.textContent=active?'Сейчас: '+active:'Сейчас: свободен';
@@ -1386,11 +1410,14 @@ function renderQueuePanel(force=true){
     const name=document.createElement('span');
     name.textContent=(index+1)+'. '+taskLabel({...task,residentId});
     const remove=document.createElement('button');
-    remove.type='button';remove.textContent='×';
+    remove.type='button';remove.textContent='Убрать';
     remove.setAttribute('aria-label','Удалить из очереди: '+taskLabel({...task,residentId}));
     remove.addEventListener('click',()=>{
       if(removeQueuedAction(game.actionQueues,residentId,task.seq)){
+        $('queue-feedback').textContent=getActorName(residentId)+
+          ': убрано будущее действие — '+taskLabel({...task,residentId});
         renderQueuePanel(true);save(true);
+        $('queue-'+residentId).focus({preventScroll:true});
       }
     });
     li.append(name,remove);list.append(li);
@@ -1400,7 +1427,14 @@ function renderQueuePanel(force=true){
 $('queue-toggle').addEventListener('click',()=>{
   if(dialogueNeedsDecision(game))return;
   closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);closeMindPanel();
+  queueInspectResident=game.selectedSim;
   queueVisible=!queueVisible;renderQueuePanel();
+});
+for(const id of HOUSEHOLD_IDS)$('queue-'+id).addEventListener('click',()=>{
+  if(dialogueNeedsDecision(game))return;
+  queueInspectResident=id;
+  renderQueuePanel(true);
+  $('queue-'+id).focus({preventScroll:true});
 });
 $('queue-close').addEventListener('click',()=>{
   queueVisible=false;renderQueuePanel();
@@ -1791,7 +1825,7 @@ for (const id of HOUSEHOLD_IDS) {
     selectResident(game,id);closeInsightPanel();
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
-    select(null); closeMindPanel(); updateResidentPicker();renderSocialContext();
+    select(null); closeMindPanel();queueInspectResident=id; updateResidentPicker();renderSocialContext();
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
     renderSocialMenu();renderQueuePanel();save(true);
     toast('Теперь управляешь: '+selectedName());
@@ -5944,6 +5978,7 @@ function boot() {
       plantedAt:options.plantedAt};
     $('ground-walk-title').textContent=heading;
     $('ground-walk-action-label').textContent=label;
+    $('ground-walk-recipient').textContent=offerForName(getActorName(game.selectedSim));
     $('ground-walk-info').textContent=options.info||'';
     $('ground-walk-info').hidden=!options.info;
     $('ground-walk-wish').textContent=options.wish||'';

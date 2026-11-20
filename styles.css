@@ -2014,6 +2014,60 @@ button.time-card:active {transform:translateY(1px);}
 .career-map button:focus-visible,.career-map-inspector-heading:focus-visible,
 .career-map-title:focus-visible{outline:3px solid #1e6757;outline-offset:2px}
 
+/* UX-01 · M01/M02: clear selected resident, a real Plan · N entry and
+   dual-person read-only plan inspection (actions still target explicit owner). */
+#plan-peek.plan-peek{min-height:64px;gap:3px;padding:8px 11px}
+#plan-peek .plan-heading{display:flex;align-items:center;justify-content:space-between;
+  gap:7px;min-width:0;width:100%}
+#plan-peek #plan-label{font-size:14px;font-weight:900;color:#214e3d;white-space:nowrap}
+#plan-peek #plan-resident{font-size:12px;font-weight:750;color:#3a765c;
+  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#plan-peek .plan-current #status-text{font-size:12px;line-height:1.4}
+#plan-peek[aria-expanded="true"]{outline:2px solid #347c60;outline-offset:1px}
+#plan-peek:focus-visible,#dashboard .resident-switch button:focus-visible,
+.queue-resident-tabs button:focus-visible,.queue-items button:focus-visible,
+.ground-walk-menu button:focus-visible,.queue-panel button:focus-visible{
+  outline:3px solid #225a49;outline-offset:2px}
+#dashboard .resident-switch button[aria-pressed="true"]{
+  background:#245f4b;color:#fff;border:2px solid #154532;
+  box-shadow:0 0 0 2px #cfebd5;position:relative}
+#dashboard .resident-switch button[aria-pressed="true"]:before{content:"✓ ";font-weight:900}
+#dashboard .resident-switch button[aria-pressed="false"]{
+  background:#fff;color:#365a48;border-color:#b8d1c0}
+.queue-resident-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;margin:1px 0 8px}
+.queue-resident-tabs button{min-height:48px;padding:8px 7px;font-size:13px;
+  font-weight:850;color:#385b4a;background:#f4f7f2;
+  border:2px solid #d2e2d8;border-radius:12px;touch-action:manipulation}
+.queue-resident-tabs button[aria-pressed="true"]{border-color:#357659;
+  color:#19543a;background:#dfefdf}
+.queue-resident-tabs button[aria-pressed="true"]:before{content:"✓ ";font-weight:900}
+.queue-person-note{font-size:12px;line-height:1.4;color:#496854;margin:0 0 9px}
+.queue-items li{font-size:12px;line-height:1.4;min-height:52px}
+.queue-items li button{min-width:62px;min-height:44px;
+  padding:7px 9px;font-size:12px;font-weight:800}
+.queue-panel{top:calc(env(safe-area-inset-top) + 136px);
+  max-height:min(59dvh,490px);width:min(350px,calc(100vw - 20px));
+  right:max(10px,env(safe-area-inset-right))}
+.action-recipient{margin:5px 0 10px;font-size:12px;line-height:1.35;
+  font-weight:750;color:#356c52}
+.queue-receipt{position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 135px);
+  left:max(10px,env(safe-area-inset-left));width:min(295px,calc(100vw - 20px));
+  padding:10px 12px;border:1px solid #b8d6c2;border-radius:12px;
+  background:#effaf0f5;color:#245d40;font-size:12px;line-height:1.4;
+  font-weight:750;box-shadow:0 6px 20px #234b3530;pointer-events:none}
+.queue-receipt[hidden]{display:none!important}
+.ground-walk-heading button{min-height:44px;min-width:44px}
+@media(max-width:370px){#plan-peek.plan-peek{width:min(226px,calc(100vw - 20px))}
+  #plan-peek #plan-resident{font-size:11px}}
+@media(max-height:560px) and (orientation:landscape){
+  #plan-peek.plan-peek{top:calc(env(safe-area-inset-top) + 57px);
+    width:min(245px,calc(100vw - 20px));max-width:245px}
+  .queue-panel{top:calc(env(safe-area-inset-top) + 108px);
+    right:max(8px,env(safe-area-inset-right));max-height:calc(100dvh - 125px)}
+  .queue-receipt{top:calc(env(safe-area-inset-top) + 123px);max-width:210px}
+}
+
 /* LOT-C2c: garden touch sheet scrolls within a HUD-free region. */
 .ground-walk-menu{box-sizing:border-box;width:min(294px,calc(100% - 16px));
   overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
