@@ -11,6 +11,10 @@ test('UI7 concise, immutable original walkthrough and independent key',()=>{
  assert.match(UI_TOUR_STEPS[0].body,/Двумя пальцами вращай/);
  assert.match(UI_TOUR_STEPS[1].body,/коснись/);
  assert.match(UI_TOUR_STEPS[2].body,/очередь/);
+ assert.match(UI_TOUR_STEPS[1].body,/земли/);
+ assert.match(UI_TOUR_STEPS[1].body,/«Идти сюда»/);
+ assert.match(UI_TOUR_STEPS[1].hint,/«Меню» → «Подписи предметов»/);
+ assert.ok(UI_TOUR_STEPS.every(s=>!s.body.includes('Тап по земле — идти')&&!s.hint.includes('«ВИД»')));
 });
 test('UI7 replay is voluntary and returning visitors do not auto-repeat',()=>{
  const a=createUITour(),b=createUITour();

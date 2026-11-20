@@ -435,7 +435,11 @@ function toast(message,{incidentResidentId=null}={}) {
   clearTimeout(toastTimeout);
   toastTimeout=setTimeout(()=>el.classList.remove('show'),incidentResidentId?8000:2600);
 }
+// Never serialize a not-yet-rendered fallback household during a failed 3D boot.
+// The last valid on-device save stays byte-for-byte untouched until startup succeeds.
+let bootReadyToSave=false;
 function save(silent = false) {
+  if(!bootReadyToSave)return false;
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(game));
     if (!silent) toast('Игра сохранена на этом устройстве');
@@ -446,7 +450,7 @@ function save(silent = false) {
   }
 }
 // Fix the epoch at first migration, not on some later autosave after a phone date change.
-if(calendarNeedsPersistence||billsNeedsPersistence)save(true);
+// Save date/bill migrations only after graphics startup succeeds, never on a failed boot.
 // W1-A.3 mobile calendar: one household date and one persistence root.
 const datePanel=$('calendar-anchor-panel');
 const calendarUI=createCalendarUI({
@@ -3966,8 +3970,8 @@ function boot() {
       :'Вращать одним пальцем';
     rotateButton.querySelector('small').textContent=rotating?'ВРАЩЕНИЕ':'ПОВОРОТ';
     $('hint').textContent=rotating
-      ?'Тап — идти · один палец — вращение · два — масштаб'
-      :'Тап по земле — идти · свайп — камера · два пальца — масштаб';
+      ?'Земля → выбор «Идти сюда» · один палец — вращение · два — масштаб'
+      :'Земля → выбор «Идти сюда» · свайп — камера · два — масштаб';
   };
   rotateButton.addEventListener('click',()=>{
     oneFingerMode=oneFingerMode==='orbit'?'pan':'orbit';
@@ -7808,6 +7812,8 @@ function boot() {
   },18000);
   void loadingProgress.wait().then(({failed})=>{
     clearTimeout(loadingWatchdog);
+    bootReadyToSave=true;
+    if(calendarNeedsPersistence||billsNeedsPersistence)save(true);
     $('loading').hidden=true;
     let seen='done';
     try{seen=localStorage.getItem(UI_TOUR_STORAGE_KEY);}
@@ -7833,6 +7839,14 @@ void (async()=>{
   const heading=document.createElement('strong');
   heading.textContent='3D не запустился';
   const hint=document.createElement('span');
-  hint.textContent=String(error?.message||error).slice(0,170)+' · Обнови страницу в Safari.';
-  el.append(heading,hint);
+  hint.textContent='Мир не загрузился. Существующее сохранение не изменено. Проверь Safari и попробуй снова.';
+  const details=document.createElement('small');
+  details.className='startup-error-details';
+  details.textContent=String(error?.message||error).slice(0,170);
+  const retry=document.createElement('button');
+  retry.type='button';retry.id='startup-retry';retry.className='startup-retry';
+  retry.textContent='Повторить';
+  // No save(true) here: pagehide/visibility autosave is gated until ready.
+  retry.addEventListener('click',()=>window.location.reload());
+  el.append(heading,hint,details,retry);
 });
