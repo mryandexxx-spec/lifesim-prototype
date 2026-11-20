@@ -16,7 +16,7 @@ import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitche
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
   recordDirtyDish,washKitchenDishes} from './kitchen.js';
 import {currentSkillLevel} from './skills-engine.js';
-import {refreshMind,rememberFirstPoolSwim,restorePoolFirstSwimAt} from './psychology.js';
+import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
@@ -983,7 +983,7 @@ export function tickHousehold(root,minutes) {
       advancePoolSwim(root,id,minutes);
       // Wet time alone is insufficient: the swimmer must safely exit.
       if(wasSwimming&&!actor.action&&actor.event==='Завершил плавание')
-        rememberFirstPoolSwim(actor,root.world);
+        completePoolSwimMind(actor,root.world);
       if(actor.action?.id==='swim'||actor.event==='Завершил плавание')
         refreshMind(actor,root.world);
     }

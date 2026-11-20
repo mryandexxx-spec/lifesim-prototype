@@ -8,6 +8,7 @@ import {poolAutoDraw,poolAutoChance,considerAutonomousPool,
   recordAutonomousPoolStart,POOL_AUTO_POLICY} from '../src/pool-autonomy.js';
 import {outdoorCellAt} from '../src/lot-surface.js';
 import {isWalkable} from '../src/navigation.js';
+import {selectWish} from '../src/psychology.js';
 const base=outdoorCellAt(18.25,8.25),copy=x=>JSON.parse(JSON.stringify(x));
 const cells=(w=4,h=4)=>Array.from({length:w*h},(_,i)=>
   base+Math.floor(i/w)*64+i%w).sort((a,b)=>a-b);
@@ -55,6 +56,7 @@ test('D2d Alex and Mira earn independent, single first-swim memory only on dry c
     assert.equal(sim(s,id).mind.emotions.some(e=>e.source==='pool.firstSwim'),true);
   }
   const oldAt=s.poolFirstSwimAt;
+  s.needs.energy=95;s.needs.bladder=95;
   approach(s,'alex');toStage(s,'alex','swimming');complete(s,'alex');
   assert.equal(s.poolFirstSwimAt,oldAt);
   assert.equal(memory(s,'alex').length,1,'no duplicated mood receipt');
@@ -128,8 +130,8 @@ test('D2d one lane blocks overlapping admission; absent fixture recovers rather 
   s.world.outdoors.poolFixtures=[];
   const saved=copy(s);
   const restored=loadHousehold(saved);
-  assert.equal(restored.action?.id,'swim');
-  complete(restored,'alex',95);
+  assert.equal(restored.action,null,'a deleted exit on reload triggers safe dry recovery');
+  assert.ok(isWalkable(restored.position.x,restored.position.z,restored.world));
   assert.equal(memory(restored,'alex').length,0);
 });
 
@@ -137,7 +139,9 @@ test('D2d autonomous swimming is bounded per resident, deterministic, and cancel
   const s=home();
   assert.equal(poolAutoDraw('alex',4,'pool-1'),poolAutoDraw('alex',4,'pool-1'));
   assert.ok(poolAutoChance(s.personality)>=.12);
-  assert.equal(considerAutonomousPool(s,'alex'),null,'the initial wait cannot force a swim');
+  s.paused=true;
+  assert.equal(considerAutonomousPool(s,'alex'),null,'pause prevents autonomous offers');
+  s.paused=false;
   // A successful accepted automatic swim uses the same canonical runtime.
   approach(s);
   s.action.automatic=true;
@@ -200,3 +204,23 @@ test('D2d prolonged two-person swim/cancel/reload never overlaps slots or leaks 
   assert.equal(memory(s,'alex').length,1);
   assert.equal(s.version,1);
 });
+
+
+test('D2d wishes only offer reachable real pools and resolve on safe completed swim',()=>{
+  const old=newHousehold();old.needs.fun=35;
+  assert.notEqual((awaitWish(old)),'pool.swim');
+  const s=home();s.needs.energy=90;s.needs.bladder=90;
+  s.needs.fun=24;s.needs.hunger=95;s.needs.hygiene=95;
+  const wish=awaitWish(s);
+  assert.ok(wish&&typeof wish==='string');
+  if(wish==='pool.swim'){
+    s.mind.wish={id:'pool.swim',since:s.minutes,until:s.minutes+480};
+    approach(s);toStage(s,'alex','swimming');
+    complete(s,'alex');
+    assert.notEqual(s.mind.wish.id,'pool.swim');
+    assert.equal(memory(s,'alex')[0].fulfilled,true);
+  }
+});
+function awaitWish(state){
+  return selectWish(state,null,state.world);
+}

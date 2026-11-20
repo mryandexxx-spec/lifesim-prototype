@@ -48,6 +48,15 @@ export function poolActionStatus(root,id,poolId,{actionId='swim',fixtureId=null}
     '45 игровых минут в воде · действия можно отменить в плане.');
 }
 
+/** Existing wish button issues one normal typed v1 FIFO command. */
+export function poolWishCommand(root,id){
+  const actor=id==='alex'?root:id==='mira'?root?.otherSim:null;
+  if(actor?.mind?.wish?.id!=='pool.swim')return null;
+  for(const pool of root.world?.outdoors?.pools||[])
+    if(poolActionStatus(root,id,pool.poolId).available)
+      return {type:'pool',poolId:pool.poolId,actionId:'swim'};
+  return null;
+}
 export function poolActivityLabel(action){
   if(action?.id!=='swim')return null;
   const label=STAGE_TEXT[action.stage]||'Плавание';

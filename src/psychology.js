@@ -1,6 +1,7 @@
 /** Headless LifeSim personality, emotions, wishes and event memory. No DOM, engine or I/O. */
 import {deriveAxes,preferenceAffinity} from './trait-catalog.js';
 import {activityReceipt} from './sim-events.js';
+import {planPoolEntry} from './pool-navigation.js';
 import {environmentSnapshot,ENVIRONMENT_MOOD_LIMIT} from './environment-effects.js';
 import {feelMemory,pruneEmotions,restoreEmotions,emotionMoodImpact,memoryEmotionKey,visibleEmotions} from './emotion-engine.js';
 /** Deprecated public snapshot retained for older test/API consumers; gameplay uses per-resident profiles. */
@@ -16,7 +17,8 @@ export const WISHES = Object.freeze({
   sofa: { label: 'Устроить уютный отдых', symbol: '♫' },
   'garden.care':{label:'Позаботиться о растении',symbol:'☘'},
   'garden.observe':{label:'Посмотреть, как подросло растение',symbol:'🌱'},
-  'garden.bloom':{label:'Полюбоваться цветением',symbol:'✿'}
+  'garden.bloom':{label:'Полюбоваться цветением',symbol:'✿'},
+  'pool.swim':{label:'Поплавать в бассейне',symbol:'🏊'}
 });
 export const MEMORY_TEXT = Object.freeze({
   bed: 'Выспался и набрался сил',
@@ -150,7 +152,7 @@ export function calculateMood(needs, mind, minutes, personality = null,environme
 }
 
 /** Deterministic wish generation, allowing identical saves to produce identical behavior. */
-export function selectWish(state, except = null) {
+export function selectWish(state, except = null, world=state?.world??null) {
   const n = state.needs;
   const axes=axesFor(state),taste=tag=>preferenceAffinity(state.personality,tag);
   const hour = Math.floor((state.minutes % 1440) / 60);
@@ -165,15 +167,25 @@ export function selectWish(state, except = null) {
   for (const memory of (state.mind?.memories || []).slice(-4)) {
     if (weights[memory.id]!==undefined && state.minutes - memory.at < 180) weights[memory.id] -= 8;
   }
+  // Pool desire is optional, appears ONLY when a real safe pool lane can be
+  // reached. Never create it for old homes, decorative water, or critical needs.
+  if(except!=='pool.swim'&&world?.outdoors?.pools?.length&&
+     n.energy>=55&&n.bladder>=45&&n.fun<85&&
+     world.outdoors.pools.some(p=>
+       planPoolEntry(world,state.position,p.poolId)!==null)){
+    weights['pool.swim']=22+(100-n.fun)*.20+axes.creativity*8+
+      preferenceAffinity(state.personality,'games')*5;
+  }
   if (except && weights[except] !== undefined) weights[except] -= 22;
-  return IDS.slice().sort((a, b) => weights[b] - weights[a] || IDS.indexOf(a) - IDS.indexOf(b))[0];
+  const ids=Object.keys(weights);
+  return ids.sort((a,b)=>weights[b]-weights[a]||ids.indexOf(a)-ids.indexOf(b))[0];
 }
 
 export function refreshMind(state,world=state?.world??null) {
   if (!state.mind || typeof state.mind !== 'object') state.mind = createMind(state.minutes);
   pruneEmotions(state.mind,state.minutes);
   if (!state.mind.wish || state.minutes >= state.mind.wish.until) {
-    const id = selectWish(state);
+    const id = selectWish(state,null,world);
     state.mind.wish = { id, since: state.minutes, until: state.minutes + 480 };
   }
   state.mind.mood = calculateMood(state.needs, state.mind, state.minutes,
@@ -185,13 +197,25 @@ export function rememberFirstPoolSwim(state,world=state?.world??null){
   if(!state?.mind||!Number.isFinite(state.minutes)||state.minutes<0||
     Number.isFinite(state.poolFirstSwimAt))return false;
   state.poolFirstSwimAt=state.minutes;
-  const memory={id:'pool.firstSwim',at:state.minutes,fulfilled:false};
+  const memory={id:'pool.firstSwim',at:state.minutes,
+    fulfilled:state.mind.wish?.id==='pool.swim'};
   state.mind.memories=[...(state.mind.memories||[]),memory].slice(-12);
   feelMemory(state,memory);
   refreshMind(state,world);
   return true;
 }
 /** Old v1 saves default to no milestone; malformed future timestamps ignored. */
+/** Normal wish closure for EVERY full safe swim, first memory only once. */
+export function completePoolSwimMind(state,world=state?.world??null){
+  const fulfilled=state?.mind?.wish?.id==='pool.swim';
+  const first=rememberFirstPoolSwim(state,world);
+  if(fulfilled){
+    state.mind.wish={id:selectWish(state,'pool.swim',world),
+      since:state.minutes,until:state.minutes+480};
+    refreshMind(state,world);
+  }
+  return first;
+}
 export function restorePoolFirstSwimAt(raw,state){
   const saved=Number.isFinite(raw?.poolFirstSwimAt)&&raw.poolFirstSwimAt>=0&&
     raw.poolFirstSwimAt<=state.minutes?raw.poolFirstSwimAt:null;
