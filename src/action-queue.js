@@ -47,7 +47,7 @@ export function sanitizeQueueCommand(id,raw,persons){
     const x=Math.round(raw.x*20)/20,z=Math.round(raw.z*20)/20;
     return insideLot(x,z)?{type:'move',x,z}:null;
   }
-  if(type==='object'&&known(ACTIONS,raw.actionId)){
+  if(type==='object'&&raw.actionId!=='swim'&&known(ACTIONS,raw.actionId)){
     // Optional v1 queue intent: fridge chooses a table when action starts.
     if(raw.autoTable!==undefined&&
       (raw.actionId!=='dining'||raw.autoTable!==true||raw.targetInstanceId!==undefined))
