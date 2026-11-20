@@ -116,7 +116,7 @@ async function exercise(page){
  assert.ok(saved.world?.furniture,'saved furnished world survives');
  assert.ok(saved.careerSystem,'career system survives');
  assert.ok(saved.otherSim,'second resident survives');
- await tap(page,'#view-close');
+ // UX-08 closes the menu automatically after a successful save.
  assert.equal(await hidden('#view-panel'),true);
  assert.equal(await page.locator('#view-toggle').getAttribute('aria-expanded'),'false');
  await tap(page,'#home-open');
