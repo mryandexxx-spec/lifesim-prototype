@@ -19,7 +19,7 @@ test('D1c: L shape cuts exact lawn tiles and produces only exterior walls',()=>{
   const g=geometry([at,at+1,at+64]);
   assert.equal(g.active,true);
   assert.equal(g.waterCells,3);
-  assert.equal(quads(g.groups.lawn),3072-3);
+  assert.equal(quads(g.groups.lawn),50,'only 50 merged dry strips around a 3-tile L');
   assert.equal(quads(g.groups.water),3);
   assert.equal(quads(g.groups.floor),3);
   assert.equal(g.boundaryEdges,8);
@@ -35,7 +35,7 @@ test('D1c: concave 512-cell tile budget remains five batched groups',()=>{
   const cells=Array.from({length:512},(_,i)=>i);
   const g=geometry(cells);
   assert.equal(g.waterCells,512);
-  assert.equal(quads(g.groups.lawn),2560);
+  assert.equal(quads(g.groups.lawn),40,'full rows merge to one dry strip each');
   assert.equal(quads(g.groups.water),512);
   assert.equal(Object.keys(g.groups).length,5);
 });
