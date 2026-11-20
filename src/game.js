@@ -1274,12 +1274,23 @@ function renderSocialMenu(force=true){
   const targetId=game.selectedSim==='alex'?'mira':'alex';
   const status=relationSummary(game.socialGraph,game.selectedSim,targetId);
   const rev=game.socialGraph?.pairs?.[JSON.stringify([game.selectedSim,targetId].sort())]?.revision||0;
+  // A clock bucket used to rebuild all romance buttons every 30 game minutes.
+  // On touch devices that can destroy a button between touchstart and click,
+  // including the newly presented confirmation. Refresh only when a real
+  // eligibility condition changes (cooldown, day limit, relationship, etc.).
+  const romanceChoices=category==='romance'
+    ?availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
+      .filter(action=>action.category==='romance'):null;
   const key=JSON.stringify([category,game.selectedSim,status.friendship,status.rivalry,rev,
-    category==='romance'?Math.floor(game.minutes/30):null]);
+    romanceChoices?.map(action=>[action.id,action.enabled,action.reason])||null]);
   if(!force&&key===socialMenuDisplayKey)return;
+  const panel=$('social-menu-panel');
+  const sameCategory=panel.dataset.socialCategory===category;
+  const previousScroll=panel.scrollTop;
   socialMenuDisplayKey=key;
-  $('social-menu-panel').hidden=!category;
-  if(!category){$('social-menu-panel').classList.remove('context-popover');return;}
+  panel.hidden=!category;
+  panel.dataset.socialCategory=category||'';
+  if(!category){panel.classList.remove('context-popover');return;}
   scheduleSocialPosition();
   const titles={conversation:'Беседа',humor:'Юмор',friendship:'Дружба',
     romance:'Романтика',conflict:'Конфликт'};
@@ -1288,7 +1299,7 @@ function renderSocialMenu(force=true){
   const options=$('social-menu-options');options.replaceChildren();
   const add=(label,request)=>{
     const initiator=game.selectedSim;
-    options.append(conversationButton(label,()=>{
+    const choice=conversationButton(label,()=>{
       options.querySelector('[data-ux05-confirm]')?.remove();
       const box=document.createElement('div');box.className='social-confirm';
       box.dataset.ux05Confirm='true';
@@ -1300,9 +1311,14 @@ function renderSocialMenu(force=true){
         return scheduleCommand({targetId,...request},initiator);
       }));
       const cancel=conversationButton('Отмена',()=>box.remove(),true);
-      box.append(explanation,agree,cancel);options.append(box);
+      box.append(explanation,agree,cancel);
+      // Place confirmation immediately after the tapped choice. The romance
+      // list can be many screens tall; appending at its end hid all feedback.
+      choice.after(box);
+      box.scrollIntoView({block:'nearest',inline:'nearest'});
       agree.focus({preventScroll:true});
-    }));
+    });
+    options.append(choice);
   };
   const addTopic=id=>{
     const topic=CONVERSATION_TOPICS[id];
@@ -1364,8 +1380,7 @@ function renderSocialMenu(force=true){
         options.append(note);
       }
     }
-    const romanceActions=availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
-      .filter(action=>action.category==='romance')
+    const romanceActions=romanceChoices
       .map(action=>action.id==='romance.intimacy'&&!intimacyBedPlan(game,game.selectedSim)
         ?{...action,enabled:false,reason:'Нужна свободная двуспальная кровать'}:action);
     for(const action of romanceActions){
@@ -1386,6 +1401,8 @@ function renderSocialMenu(force=true){
     addBranch('rival.taunt');
     addBranch('rival.truce');
   }
+  // Preference updates should not throw the player's place in a long list.
+  if(sameCategory)panel.scrollTop=previousScroll;
 }
 function activeTaskLabel(id){
   const s=game.socialAction;
