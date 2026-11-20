@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {enqueueAction,restoreActionQueues,dispatchActionQueues} from '../src/action-queue.js';
+import {chooseAction} from '../src/simulation.js';
 import {outdoorCellAt} from '../src/lot-surface.js';
 import {isWalkable} from '../src/navigation.js';
 import {beginPoolSwim,canBeginPoolSwim,arrivePoolApproach,requestPoolExit,
@@ -201,6 +202,8 @@ test('D2b older saves, existing queues and ordinary furniture action remain func
   assert.equal((r.world.outdoors.pools||[]).length,0);
   const item=enqueueAction(r.actionQueues,'alex',{type:'object',actionId:'sofa'});
   assert.equal(item.type,'object');
+  assert.equal(enqueueAction(r.actionQueues,'alex',{type:'object',actionId:'swim'}),null);
+  assert.equal(chooseAction(r,'swim'),false,'generic action constructor must not bypass the pool planner');
   assert.equal(restoreActionQueues(copy(r.actionQueues),['alex','mira']).byResident.alex[0].seq,item.seq);
   tickHousehold(r,1);
   assert.equal(r.version,1);
