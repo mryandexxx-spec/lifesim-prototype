@@ -107,8 +107,10 @@ test('Q5 immediate requirements are the live canonical readiness; future thresho
 });
 test('Q5 legacy root-v1 saves, no branch, malformed extension, two contracts and finances survive',()=>{
   for(const career of CAREER_CATALOG){
-    const {root,contract}=family(career.id);
+    const {root}=family(career.id);
     root.careerSystem=hireCareer(root.careerSystem,'mira',career.id,480);
+    // hireCareer replaces the career system; never keep a stale contract reference.
+    const contract=root.careerSystem.byResident.alex;
     contract.level=4;contract.rankShifts=8;contract.performance=91;
     delete contract.specialization;delete contract.seniorProofs;
     delete root.careerSystem.professionalGoals;
