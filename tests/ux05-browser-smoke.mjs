@@ -5,6 +5,7 @@ import {mkdirSync} from 'node:fs';
 import {newHousehold} from '../src/household.js';
 import {startConversation,arriveSocial} from '../src/relationships.js';
 import {SAVE_KEY} from '../src/simulation.js';
+import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 const base=newHousehold('2026-11-20');
 base.paused=true;base.otherSim.paused=true;base.autonomy.enabled=false;
 const required=newHousehold('2026-11-20');
@@ -18,10 +19,10 @@ try{
  for(const [width,height] of [[390,844],[375,667],[320,568],[844,390]]){
   const context=await browser.newContext({viewport:{width,height},
    deviceScaleFactor:1,hasTouch:true,isMobile:true});
-  await context.addInitScript(({key,root})=>{
+  await context.addInitScript(({key,root,tour})=>{
    if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(root));
-   localStorage.setItem('lifesim.uiTour.v1','done');
-  },{key:SAVE_KEY,root:base});
+   localStorage.setItem(tour,'done');
+  },{key:SAVE_KEY,root:base,tour:UI_TOUR_STORAGE_KEY});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('requestfailed',req=>{if(req.url().includes('/src/'))errors.push(req.url());});
@@ -46,10 +47,10 @@ try{
   await context.close();
   const alt=await browser.newContext({viewport:{width,height},
    deviceScaleFactor:1,hasTouch:true,isMobile:true});
-  await alt.addInitScript(({key,root})=>{
+  await alt.addInitScript(({key,root,tour})=>{
    if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(root));
-   localStorage.setItem('lifesim.uiTour.v1','done');
-  },{key:SAVE_KEY,root:required});
+   localStorage.setItem(tour,'done');
+  },{key:SAVE_KEY,root:required,tour:UI_TOUR_STORAGE_KEY});
   const p=await alt.newPage();
   p.on('pageerror',error=>errors.push(error.message));
   await p.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
