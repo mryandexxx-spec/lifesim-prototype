@@ -39,6 +39,8 @@ jobs:
           node --check src/career-timeoff.js
           node --check src/career-state.js
           node --check src/career-job-board.js
+          node --check src/career-map.js
+          node --check src/career-map-ui.js
           node --check src/career-phone-ui.js
           node --check src/career-shift-summary-ui.js
           node --check src/career-recruitment.js
@@ -238,7 +240,7 @@ jobs:
           cp src/career-catalog.js src/career-scheduler.js src/career-state.js src/career-job-board.js src/career-phone-ui.js src/career-shift-summary-ui.js site/src/
           cp src/career-discipline.js src/career-timeoff.js src/career-worklife.js src/career-worklife-conflict.js site/src/
           cp src/career-work-needs.js src/career-work.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js src/finance-ledger.js src/finance-presentation.js src/finance-phone-ui.js src/household-bills.js site/src/
-          cp src/career-goals.js src/career-specializations.js src/career-seniority.js site/src/
+          cp src/career-goals.js src/career-specializations.js src/career-seniority.js src/career-map.js src/career-map-ui.js site/src/
           cp src/calendar-core.js src/calendar-events.js src/calendar-holidays.js src/calendar-reminders.js src/calendar-ui.js site/src/
           cp src/day-night-cycle.js src/day-night-render.js site/src/
           cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/trait-catalog.js src/sim-events.js src/emotion-engine.js src/mood-presentation.js src/social-perspective.js src/social-graph.js src/action-queue.js src/conversation-engine.js src/dialogue-decision.js src/world-interactions.js src/gifts-leisure.js src/household.js src/relationships.js src/social-reactions.js src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js src/interaction-anchors.js src/meshy-seat-runtime.js src/meshy-fridge-runtime.js src/meshy-bed-runtime.js src/meshy-shower-runtime.js src/loading-progress.js src/model-cache.js src/meshy-mira-visual.js src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js site/src/

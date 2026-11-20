@@ -33,6 +33,11 @@ const PLAN=Object.freeze({
   'civic-service':[{shifts:4,performance:68},{shifts:6,performance:80},
     {shifts:8,performance:83},{shifts:10,performance:88}]
 });
+/** Read-only reference to the SAME promotion plan used by promotionReadiness. */
+export function careerPromotionRule(careerId,fromLevel){
+  return Number.isInteger(fromLevel)&&fromLevel>=0&&fromLevel<4?
+    PLAN[careerId]?.[fromLevel]||null:null;
+}
 const SKILL_LABEL={cooking:'Кулинария',painting:'Живопись',literature:'Литературная эрудиция'};
 const actorFor=(root,id)=>id==='mira'?root?.otherSim:root;
 
