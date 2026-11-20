@@ -27,7 +27,7 @@ const inPool=(root,a)=>Boolean(pool(root,a.poolId)?.cells?.includes(a.waterCell)
 const otherFixture=(root,id,fixtureId)=>{
   const a=otherFor(root,id)?.action;
   return active(a)&&a.fixtureId===fixtureId&&
-    ['entering','exiting'].includes(a.stage);
+    (a.stage==='entering'||(a.stage==='exiting'&&Array.isArray(a.exitWetPath)));
 };
 const entryOpen=(root,a)=>poolAccessPoints(root.world,a.poolId,
   {blockedFixtureIds:[]}).some(p=>p.fixtureId===a.fixtureId);
@@ -50,7 +50,8 @@ const occupiedCells=(root,id)=>{
 };
 const otherBusyFixtures=(root,id)=>{
   const a=otherFor(root,id)?.action;
-  return active(a)&&['entering','exiting'].includes(a.stage)&&a.fixtureId
+  return active(a)&&(a.stage==='entering'||
+    (a.stage==='exiting'&&Array.isArray(a.exitWetPath)))&&a.fixtureId
     ?[a.fixtureId]:[];
 };
 
