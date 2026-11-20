@@ -248,10 +248,13 @@ export function advancePoolSwim(root,id,minutes){
   }
   if(a.stage==='entering'){
     if(!entryOpen(root,a)){recover(root,id,'lost-entry');return;}
+    const before=a.elapsed;
     a.elapsed+=minutes;
     const entryDuration=a.entryKind==='steps'?3:2;
     if(a.elapsed<entryDuration)return;
-    if(travelWet(a,a.entryWetPath,Math.max(0,a.elapsed-entryDuration))){
+    const wetMinutes=Math.max(0,a.elapsed-entryDuration)-
+      Math.max(0,before-entryDuration);
+    if(travelWet(a,a.entryWetPath,wetMinutes)){
       a.stage='swimming';a.elapsed=0;a.wetProgress=0;a.laneIndex=0;
       a.waterCell=a.slotAnchor;
       actor.event='Плавает';
