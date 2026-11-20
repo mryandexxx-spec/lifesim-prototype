@@ -63,7 +63,7 @@ export function progressWorkNeeds(root,before,after){
     const axes=deriveAxes(actor.personality);
     const readiness=Math.max(0,Math.min(100,Number.isFinite(shift.readiness)?shift.readiness:65));
     const duration=shift.end-shift.start;
-    const fatiguePerMinute=(.026+.015*Math.min(1,duration/480))*
+    const fatiguePerMinute=(.037+.015*Math.min(1,duration/480))*
       (1.12-(axes.resilience-.5)*.24)*(1.12-(readiness-50)/500)*mode.fatigue;
     const socialDecay=socialNeedDecayRate(actor.personality);
     for(let minute=start+1;minute<=limit;minute++){
@@ -71,8 +71,8 @@ export function progressWorkNeeds(root,before,after){
       needs.hunger=clamp(needs.hunger-NEED_DECAY_PER_MINUTE.hunger);
       needs.bladder=clamp(needs.bladder-NEED_DECAY_PER_MINUTE.bladder);
       needs.energy=clamp(needs.energy-fatiguePerMinute);
-      needs.hygiene=clamp(needs.hygiene-.014);
-      needs.fun=clamp(needs.fun-.0085*mode.fun);
+      needs.hygiene=clamp(needs.hygiene-.020);
+      needs.fun=clamp(needs.fun-.012*mode.fun);
       // Ordinary unnamed ambient conversations, diminishing near the comfort cap.
       const talk=Math.max(0,Math.min(1,(88-needs.social)/35))*
         (.082+(axes.sociability-.5)*.024)*mode.social;
@@ -82,12 +82,12 @@ export function progressWorkNeeds(root,before,after){
       if(!state.mealUsed&&duration>=300&&shift.end-shift.departedAt>=300&&
         minute>=Math.max(shift.start+duration*.5,shift.departedAt+120)){
         state.mealUsed=true;
-        needs.hunger=Math.min(80,needs.hunger+33);
+        needs.hunger=Math.min(82,needs.hunger+28);
       }
       const maxToilets=shift.end-shift.departedAt>=420?2:1;
-      if(needs.bladder<=39&&state.toiletCount<maxToilets&&
+      if(needs.bladder<=40&&state.toiletCount<maxToilets&&
         minute-state.lastToiletMinute>=120){
-        needs.bladder=Math.min(79,needs.bladder+43);
+        needs.bladder=Math.min(78,needs.bladder+32);
         state.toiletCount++;
         state.lastToiletMinute=minute;
       }
