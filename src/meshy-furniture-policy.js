@@ -1,4 +1,5 @@
 import {MESHY_ROOM_V2_ENTRIES} from './meshy-room-v2-data.js';
+import {MESHY_ROOM_V3_ENTRIES} from './meshy-room-v3-data.js';
 /**
  * Cosmetic Meshy furniture catalog. No SKU, ownership, price, A* obstacle,
  * action/seat contact, mount or save changes. Values below are audited from
@@ -57,15 +58,23 @@ export const MESHY_ROOM_V2_SPECS=Object.freeze(Object.fromEntries(
     ...item,bounds:Object.freeze({min:Object.freeze(item.bounds.min),max:Object.freeze(item.bounds.max)})
   })])));
 export const MESHY_ROOM_V2_SKUS=Object.freeze(Object.keys(MESHY_ROOM_V2_SPECS));
+export const MESHY_ROOM_V3_SPECS=Object.freeze(Object.fromEntries(
+  MESHY_ROOM_V3_ENTRIES.map(item=>[item.sku,Object.freeze({
+    ...item,bounds:Object.freeze({min:Object.freeze(item.bounds.min),max:Object.freeze(item.bounds.max)})
+  })])));
+export const MESHY_ROOM_V3_SKUS=Object.freeze(Object.keys(MESHY_ROOM_V3_SPECS));
 
 
 export function meshyFurnitureSpec(sku){
   if(typeof sku!=='string')return null;
   if(Object.hasOwn(MESHY_FURNITURE_SPECS,sku))return MESHY_FURNITURE_SPECS[sku];
-  return Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)?MESHY_ROOM_V2_SPECS[sku]:null;
+  if(Object.hasOwn(MESHY_ROOM_V2_SPECS,sku))return MESHY_ROOM_V2_SPECS[sku];
+  return Object.hasOwn(MESHY_ROOM_V3_SPECS,sku)?MESHY_ROOM_V3_SPECS[sku]:null;
 }
 export function meshyFurnitureUrl(sku){
   if(!meshyFurnitureSpec(sku))return null;
+  if(Object.hasOwn(MESHY_ROOM_V3_SPECS,sku))
+    return './assets/furniture/meshy-room-v3/'+sku+'.glb';
   return Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)
     ?'./assets/furniture/meshy-room-v2/'+MESHY_ROOM_V2_SPECS[sku].slug+'.glb'
     :MESHY_FURNITURE_DIR+sku+'.glb';
@@ -74,6 +83,8 @@ export function meshyFurnitureUrl(sku){
 export function meshyFurnitureThumbnailUrl(sku){
   const spec=meshyFurnitureSpec(sku);
   if(!spec)return null;
+  if(Object.hasOwn(MESHY_ROOM_V3_SPECS,sku))
+    return './assets/furniture/meshy-room-v3/thumbnails/'+sku+'.png';
   return Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)
     ?'./assets/furniture/meshy-room-v2/thumbnails/'+spec.slug+'.png'
     :'./assets/furniture/meshy-room-v1/thumbnails/'+sku+'.png';
@@ -111,7 +122,7 @@ export function meshyFurnitureFit(sku){
   const roomYaw={'legacy.tv':-90,'fixture.shower':90,'fixture.toilet':180,
     'chair.loft':180,'prep.oak':180,'sink.farm':180,'stove.modern':180};
   const yaw=roomYaw[sku]??spec.rotationY??0;
-  if(Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)){
+  if(Object.hasOwn(MESHY_ROOM_V2_SPECS,sku)||Object.hasOwn(MESHY_ROOM_V3_SPECS,sku)){
     const rawCenter=side=>(min[side]+max[side])/2;
     const height=sku==='chair.loft'?PURCHASED_SEAT_PROFILES.chair.seatHeight/.49:spec.height;
     const quarter=Math.abs(yaw)===90;
@@ -158,6 +169,7 @@ export const MESHY_STARTER_SKUS=Object.freeze({
   bed:'bed.platform',
   plant:'legacy.plant',
   nightstand:'nightstand.open',table:'legacy.table',tv:'legacy.tv',
+  counter:'fixture.counter',
   fridge:'fixture.fridge',shower:'fixture.shower',toilet:'fixture.toilet'
 });
 export function meshyStarterFurnitureSku(prefabId){
