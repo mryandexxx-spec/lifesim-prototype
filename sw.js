@@ -2,11 +2,17 @@
  * Bump CACHE_VERSION whenever a GLB is replaced at the same URL.
  * This is an optimization, not an offline guarantee for the full game.
  */
-const CACHE_VERSION='blins-models-v1';
+const CACHE_VERSION='blins-models-v2-room-meshy';
 const CACHE_PREFIX='blins-models-';
 const MODEL_FILES=new Set([
   'assets/characters/meshy-casual-v1.glb',
-  'assets/characters/meshy-mira-mobile-v1.glb'
+  'assets/characters/meshy-mira-mobile-v1.glb',
+  ...[
+    'sofa.comfort','sofa.loft','armchair.wing','armchair.shell','bed.platform',
+    'bookcase.starter','dresser.reed','floorlamp.tripod','legacy.plant',
+    'mirror.panel','plant.palm','rug.geo','rug.weave','sconce.halo',
+    'wardrobe.classic'
+  ].map(sku=>'assets/furniture/meshy-room-v1/'+sku+'.glb')
 ]);
 self.addEventListener('install',event=>{
   event.waitUntil(self.skipWaiting());
