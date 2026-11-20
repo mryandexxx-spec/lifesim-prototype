@@ -191,5 +191,5 @@ export function createSkinnedSeatController({
     };
   }
 
-  return {place,placeVertical,get validFootChains(){return feet.length;}};
+  return {place,placeVertical,plantGroundedFeet,get validFootChains(){return feet.length;}};
 }

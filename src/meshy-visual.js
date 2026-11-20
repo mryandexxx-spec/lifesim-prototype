@@ -5,7 +5,7 @@ import {canShowMeshy, meshClipFor, availableMeshClips,
 import {MESHY_SOFA_CLIP,meshySitClipTime,meshySofaOffset,meshySofaVerticalLift} from './meshy-sofa-pose.js';
 import {createSkinnedSeatController} from './meshy-seat-runtime.js';
 import {createMeshyFridgeController} from './meshy-fridge-runtime.js';
-import {createMeshyBedController} from './meshy-bed-runtime.js';
+import {createMeshyBedController,bedSkinSupport,placeBedSkin} from './meshy-bed-runtime.js';
 import {createMeshyShowerController,meshyShowerPose,showerWalkClipTime}
   from './meshy-shower-runtime.js';
 import {hasToiletSitClip,meshyToiletPose} from './meshy-toilet-pose.js';
@@ -244,7 +244,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
     get error(){return state.error;},
     update({preferred=false,paused=false,walking=false,social=null,actionId=null,
       sofaBusy=false,sofaWeight=0,seat=null,seatMode='vertical',dt=0,
-      bedBusy=false,bedFrame=null,showerBusy=false,showerFrame=null,
+      bedBusy=false,bedFrame=null,platformBed=false,showerBusy=false,showerFrame=null,
       toiletBusy=false,toiletFrame=null,fridgeBusy=false,
       socialInitiator=false,socialElapsed=null,hugFrame=null,kissFrame=null,fridgeFrame=null,
       worldMinutes=null,mood=null,energy=null,readingElapsed=null,
@@ -261,6 +261,11 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         showerReady:Boolean(state.showerRuntime?.ready),
         toiletBusy,toiletReady:state.toiletReady
       });
+      const support=platformBed?bedSkinSupport('alex',bedFrame):null;
+      if(state.root&&(support||state.bedSupported)){
+        placeBedSkin(state.root,support);
+        state.bedSupported=Boolean(support);
+      }
       if(state.visible!==useMeshy){
         for(const comp of legacyRenderers)comp.enabled=!useMeshy;
         if(state.root)state.root.enabled=useMeshy;

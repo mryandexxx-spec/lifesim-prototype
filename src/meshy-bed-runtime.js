@@ -2,6 +2,31 @@ import {BED_SLOTS} from './bed-layout.js';
 
 const clamp=n=>Number.isFinite(n)?Math.max(0,Math.min(1,n)):0;
 
+// Measured against the supplied skinned clips and the platform bed triangles.
+// Alex reclines from Idle_3; Mira's authored sleep clip already rotates her hips.
+// Offsets are in mattress coordinates, relative to the shared animation root.
+const sleepingSkinFit=Object.freeze({
+  alex:{pitch:-8,lift:.16,along:.29},
+  mira:{pitch:4,lift:.08,along:-.17}
+});
+
+export function bedSkinSupport(resident,frame){
+  const weight=clamp(frame?.bedReclineWeight);
+  const fit=sleepingSkinFit[resident];
+  if(!weight||!fit||!Number.isFinite(frame.pitch))return null;
+  // The visual is a child of the reclining avatar. Invert the parent's pitch
+  // so "lift" remains vertical at every stage and for every furniture yaw.
+  const angle=frame.pitch*Math.PI/180;
+  const c=Math.cos(angle),s=Math.sin(angle);
+  return {pitch:fit.pitch*weight,y:(c*fit.lift+s*fit.along)*weight,
+    z:(-s*fit.lift+c*fit.along)*weight};
+}
+
+export function placeBedSkin(root,support){
+  root.setLocalPosition(0,support?.y??0,support?.z??0);
+  root.setLocalEulerAngles(support?.pitch??0,0,0);
+}
+
 /**
  * Converts the existing mirrored side-entry timeline into conservative
  * local Mixamo joint offsets. The authoritative game bed transition ALREADY

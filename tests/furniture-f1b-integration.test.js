@@ -86,7 +86,8 @@ test('fridge door hinge, hand targets, water, quilt and Meshy seat are instance-
     "drop.setLocalPosition(-4.28+(i%5)*.22-showerOrigin.x",
     "body.setLocalPosition(bx+2.62,quilt.y",
     "const makeSofaSeat=(instanceId=null,romanticSlot=null)=>",
-    "refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId,alexSeatSlot);}"
+    "livingSofaSeat=makeSofaSeat(alexSeatInstanceId,alexSeatSlot)",
+    "miraSupport=miraSeatInstanceId?makeSofaSeat(miraSeatInstanceId,miraSeatSlot):null"
   ])assert.ok(scene.includes(phrase),phrase);
   assert.match(mesh,/const layoutNow=\(\)=>typeof layout==='function'\?layout\(\):layout/);
   assert.match(male,/layout:fridgeLayout\|\|undefined/);

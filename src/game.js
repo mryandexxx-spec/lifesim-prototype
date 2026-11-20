@@ -3346,7 +3346,11 @@ function boot() {
   };
   let alexSeatInstanceId=null,alexSeatSlot=null;
   let livingSofaSeat=makeSofaSeat();
-  refreshSofaSeat=()=>{livingSofaSeat=makeSofaSeat(alexSeatInstanceId,alexSeatSlot);};
+  let miraSeatInstanceId=null,miraSeatSlot=null,miraSupport=null;
+  refreshSofaSeat=()=>{
+    livingSofaSeat=makeSofaSeat(alexSeatInstanceId,alexSeatSlot);
+    miraSupport=miraSeatInstanceId?makeSofaSeat(miraSeatInstanceId,miraSeatSlot):null;
+  };
   const alexRig=createCharacterRig(rigContext,'alex');
   const miraRig=createCharacterRig(rigContext,'mira');
   // Visual-only experimental Alex skin. The procedural rig and every action
@@ -7067,7 +7071,7 @@ function boot() {
     const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'
       ?(useId==='paint'
         ?easelPaintingPose(game.world,game.action?.targetInstanceId,game.position)
-        :furniturePose(game.world,useId==='lamp'?'floorlamp':
+        :furniturePose(game.world,['taking','returning'].includes(alexReadingStage)?'bookcase':useId==='lamp'?'floorlamp':
           useId==='cook'?'stove':useId==='wash'?'sink':useId,
           ACTOR_POSES[useId],game.action?.id==='dining'||
             (game.action?.id==='cook'&&useId==='fridge')?null:
@@ -7222,6 +7226,13 @@ function boot() {
     const miraSeating=miraUseId==='sofa'||miraUseId==='seat'||miraUseId==='bench'||Boolean(miraWatchSeat)||miraReadingSeated||miraDining||
       sofaStates.mira.progress>0||miraDateSofa;
     if(!miraSeating){sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;diningVisual.mira=null;}
+    const miraMeshSeatId=miraSeating&&!gardenMiraPose&&seatFootPlantEnabled&&seatContactEnabled
+      ?sofaVisualTargets.mira??'home-sofa-1':null;
+    if(miraSeatInstanceId!==miraMeshSeatId||miraSeatSlot!==romanticSofaSlots.mira){
+      miraSeatInstanceId=miraMeshSeatId;
+      miraSeatSlot=romanticSofaSlots.mira;
+      miraSupport=miraMeshSeatId?makeSofaSeat(miraMeshSeatId,miraSeatSlot):null;
+    }
     // Both residents' chair roots share the same reversible animation curve.
     renderDiningChairOffsets();
     if(miraUseId==='bed')bedVisualTargets.mira=game.otherSim.action?.targetInstanceId??'home-bed-1';
@@ -7239,7 +7250,7 @@ function boot() {
     const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'
       ?(miraUseId==='paint'
         ?easelPaintingPose(game.world,game.otherSim.action?.targetInstanceId,game.otherSim.position)
-        :furniturePose(game.world,miraUseId==='lamp'?'floorlamp':
+        :furniturePose(game.world,['taking','returning'].includes(miraReadingStage)?'bookcase':miraUseId==='lamp'?'floorlamp':
           miraUseId==='cook'?'stove':miraUseId==='wash'?'sink':miraUseId,
           ACTOR_POSES[miraUseId],game.otherSim.action?.id==='dining'||
             (game.otherSim.action?.id==='cook'&&miraUseId==='fridge')?null:
@@ -7352,8 +7363,10 @@ function boot() {
       paintingFrame:miraUseId==='paint'?{phase:'using',elapsed:game.otherSim.action?.elapsed||0}:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
+      seat:miraMeshSeatId&&meshyFurniture.hasModel(decorNodes.get(miraMeshSeatId))?miraSupport:null,
       bedBusy:bedStates.mira.progress>0,
       bedFrame:miraBedPose,
+      platformBed:miraBedding&&meshyFurniture.hasModel(decorNodes.get(bedVisualTargets.mira)),
       bedProgress:bedStates.mira.progress,
       showerBusy:showerStates.mira.active,
       showerFrame:miraShower,
@@ -7409,6 +7422,7 @@ function boot() {
       seatMode,
       bedBusy:bedStates.alex.progress>0,
       bedFrame:bedPose,
+      platformBed:bedding&&meshyFurniture.hasModel(decorNodes.get(bedVisualTargets.alex)),
       showerBusy:showerStates.alex.active,
       showerFrame:alexShower,
       toiletBusy:toiletStates.alex.active,

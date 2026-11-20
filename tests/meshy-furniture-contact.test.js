@@ -77,3 +77,26 @@ for(const sku of MESHY_FURNITURE_SKUS)test('physical contact envelope: '+sku,()=
     }
   }
 });
+
+test('both imported sleep poses settle on the pillow and clear it on exit at every rotation',async()=>{
+  const {bedSkinSupport}=await import('../src/meshy-bed-runtime.js');
+  const {bedTransitionPose}=await import('../src/bed-transition.js');
+  // Final head joints relative to avatar, after each shipped clip's existing
+  // root-motion extraction and Mira's authored hip counter-rotation.
+  const heads={alex:new Vec3(.012,1.719,-.066),mira:new Vec3(-.024,1.222,-.166)};
+  for(const resident of Object.keys(heads))for(const slot of Object.values(BED_SLOTS)){
+    assert.equal(bedSkinSupport(resident,bedTransitionPose({slot:slot.id,progress:0})),null);
+    const pose=bedTransitionPose({slot:slot.id,progress:1}),fit=bedSkinSupport(resident,pose);
+    const local=new Quat().setFromEulerAngles(fit.pitch,0,0).transformVector(heads[resident]);
+    local.add(new Vec3(0,fit.y,fit.z));
+    const offset=new Quat().setFromEulerAngles(pose.pitch,0,0).transformVector(local);
+    const head=new Vec3(pose.x-BED_LAYOUT.centerX+offset.x,pose.y+offset.y,pose.z-BED_LAYOUT.centerZ+offset.z);
+    for(const angle of [0,90,180,270]){
+      const rotation=new Quat().setFromEulerAngles(0,angle,0);
+      const world=rotation.transformVector(head);
+      const pillow=rotation.transformVector(new Vec3(slot.x-BED_LAYOUT.centerX,.62,-.81));
+      assert.ok(Math.hypot(world.x-pillow.x,world.z-pillow.z)<.24,resident+' aligned with pillow');
+      assert.ok(world.y>pillow.y+.035&&world.y<pillow.y+.26,resident+' head clearance '+world.y);
+    }
+  }
+});
