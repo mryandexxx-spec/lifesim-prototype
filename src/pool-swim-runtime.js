@@ -141,6 +141,18 @@ export function validateRestoredPoolSwim(root,id){
     cleanup(root,id,'Плавание остановлено после загрузки: безопасное восстановление');
     return false;
   }
+  // Saved exit routes are transient. Recompute against the RESTORED world,
+  // rather than trusting unvalidated persisted waypoints or equipment tokens.
+  if(a.stage==='exiting'){
+    a.exitWetPath=null;a.wetPathIndex=0;a.wetProgress=0;
+  }
+  if(a.stage==='recovering'){
+    const rescue=planPoolRecovery(root.world,a.poolId,a.waterCell);
+    if(!rescue){cleanup(root,id,'Восстановление пути к суше');return false;}
+    a.exitWetPath=rescue.waterPath;
+    a.exitDryApproach=rescue.dryApproach;
+    a.wetPathIndex=0;a.wetProgress=0;
+  }
   if(a.stage==='approaching'&&!findPath(actor.position,a.dryApproach,root.world)){
     cleanup(root,id,'Подход к бассейну изменился');
     return false;
@@ -262,6 +274,11 @@ export function advancePoolSwim(root,id,minutes){
     return;
   }
   if(a.stage==='swimming'){
+    // Removed/sealed final exits never strand swimmers for another 45 minutes.
+    // A temporarily reserved shared ladder remains a valid exit, however.
+    if(!poolAccessPoints(root.world,a.poolId).length){
+      recover(root,id,'no-safe-exit');return;
+    }
     const delta=Math.min(minutes,Math.max(0,SWIM_MINUTES-a.waterElapsed));
     if(delta>0){
       if(!laneTravel(root,a,delta)){recover(root,id,'lane-invalid');return;}
