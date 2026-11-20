@@ -2299,3 +2299,29 @@ button.time-card:active {transform:translateY(1px);}
 @media(max-width:350px){.career-phone-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-height:600px){.career-phone-hero{padding:10px;margin:7px 0 10px}
  .career-phone-shortcuts{gap:4px}.career-phone-header{padding:8px 12px}}
+
+/* UX-07 M10: financial period and totals ahead of filters in narrow Safari. */
+.finance-tabs{position:relative;top:auto;z-index:0}
+.finance-ux07-bill-status{margin:8px 0 4px;padding:8px 11px;border-radius:10px;
+ background:#f5f8ee;border:1px solid #cbdccf;color:#315b45;
+ font-size:12px;line-height:1.35;font-weight:750}
+.finance-ux07-summary{min-width:0;margin:9px 0 12px;padding:11px;
+ border:1px solid #b8d9c4;background:#f3f8ef;border-radius:14px}
+.finance-ux07-summary .finance-period-range{margin:0 0 9px;line-height:1.35;
+ font-size:12px;overflow-wrap:anywhere}
+.finance-ux07-figures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.finance-ux07-summary .finance-kpi{padding:8px 5px;gap:4px}
+.finance-ux07-summary .finance-kpi strong{font-size:14px}
+.finance-ux07-summary .finance-kpi small{font-size:10px}
+.finance-ux07-analytics-summary .finance-note{margin:5px 0 9px}
+.finance-ux07-analytics-summary .finance-kpis{gap:5px}
+.finance-date-field input:focus-visible,.finance-action:focus-visible{
+ outline:3px solid #206c56;outline-offset:2px}
+@media(max-width:360px), (max-height:440px){
+ .finance-title{font-size:18px;margin:6px 0 9px}
+ .finance-wallet{padding:10px 12px;gap:3px}
+ .finance-wallet strong{font-size:23px}
+ .finance-ux07-summary{padding:8px;margin:7px 0 9px}
+ .finance-ux07-summary .finance-kpi strong{font-size:13px}
+ .finance-bills{padding:10px;margin:8px 0}
+}
