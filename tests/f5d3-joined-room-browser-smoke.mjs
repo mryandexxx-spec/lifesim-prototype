@@ -1,3 +1,4 @@
+import {buildGroupForTool} from '../src/build-tool-palette.js';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {newHousehold} from '../src/household.js';
@@ -34,8 +35,18 @@ try{
     if(await page.locator('#build-toggle').isVisible())await page.locator('#build-toggle').click();
     else{await page.locator('#home-open').click();await page.locator('#home-build').click();}
   };
+  const chooseBuildTool=async type=>{
+    const group=buildGroupForTool(type);
+    if(group==='view'){
+      if(await page.locator('#build-view-panel').isHidden())
+        await page.locator('#build-view-trigger').click();
+    }else{
+      await page.locator('[data-build-group-tab="'+group+'"]').click();
+    }
+    await page.locator('[data-build-tool="'+type+'"]').click();
+  };
   await clickBuild();
- await page.locator('[data-build-tool="room-join"]').click();
+ await chooseBuildTool('room-join');
  assert.equal(await page.locator('[data-build-tool="room-join"]').getAttribute('aria-pressed'),'true');
  const project=(x,z)=>{
   const yaw=42*Math.PI/180,pitch=64*Math.PI/180,distance=36;

@@ -36,6 +36,7 @@ import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
 import {playerMayClaimGarden} from './garden-autonomy.js';
 import {gardenWishCommand} from './garden-psychology.js';
 import {gardenActionSheet} from './garden-presentation.js';
+import {BUILD_TOOL_GROUPS,buildGroupForTool,describeBuildPreview} from './build-tool-palette.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -5247,7 +5248,11 @@ function boot() {
       return false;
     }
     pendingBuild=cmd;$('build-pending').hidden=false;
-    buildFeedback('Предварительный просмотр готов · нажми «Применить»');
+    const previewLabel=describeBuildPreview(cmd);
+    $('build-pending-title').textContent=previewLabel.title+(previewLabel.detail?' · '+previewLabel.detail:'');
+    $('build-apply').textContent=previewLabel.action;
+    buildFeedback((previewLabel.detail?previewLabel.detail+' · ':'')+
+      'Предпросмотр готов · подтвердить или отменить');
     return true;
   };
   $('build-apply').addEventListener('click',()=>{
@@ -5456,6 +5461,25 @@ function boot() {
       buildOpeningPalette.appendChild(button);
     }
   };
+  // UX-03: tool groups are a transient view of the original 31 command buttons.
+  // Switching a tab does not commit, discard, or change a staged ConstructionWorld edit.
+  const showBuildView=open=>{
+    $('build-view-panel').hidden=!open;
+    $('build-view-trigger').setAttribute('aria-expanded',String(open));
+  };
+  const showBuildGroup=id=>{
+    if(!BUILD_TOOL_GROUPS.some(group=>group.id===id))return;
+    document.querySelectorAll('[data-build-group-tab]').forEach(button=>
+      button.setAttribute('aria-pressed',String(button.dataset.buildGroupTab===id)));
+    document.querySelectorAll('#build-tools [data-build-tool]').forEach(button=>{
+      button.hidden=button.dataset.buildGroup!==id;
+    });
+    showBuildView(false);
+  };
+  document.querySelectorAll('[data-build-group-tab]').forEach(button=>
+    button.addEventListener('click',()=>showBuildGroup(button.dataset.buildGroupTab)));
+  $('build-view-trigger').addEventListener('click',()=>
+    showBuildView($('build-view-panel').hidden));
   const setBuildTool=type=>{
     clearBuildPending();resetBuildWallSelection();
     selectedBuildRoom=null;selectedBuildRoomInfo=null;buildRoomRotation=0;
@@ -5463,6 +5487,10 @@ function boot() {
     $('build-room-turn').textContent='⟳ Поворот 0°';
     selectedBuildOpening=null;selectedBuildRoof=null;
     buildTool=type;buildDrag=null;cameraGesture.clear();
+    if(buildGroupForTool(type)!=='view')showBuildGroup(buildGroupForTool(type));
+    const selectedButton=document.querySelector('[data-build-tool="'+type+'"]');
+    $('build-active-tool').textContent='Инструмент: '+
+      (selectedButton?.textContent?.replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'').trim()||type);
     const wantRoof=type.startsWith('roof-')||(type==='camera'&&roofPreview);
     if(roofPreview!==wantRoof){
       roofPreview=wantRoof;
@@ -5630,6 +5658,7 @@ function boot() {
     $('build-toggle').setAttribute('aria-pressed','true');
     closeTour();closeMindPanel();closeInsightPanel();closeSocialContext();
     select(null);setViewOpen(false);renderQueuePanel(true);
+    showBuildGroup('room');showBuildView(false);
     buildHistoryButtons();setBuildTool(buildTool);
     syncConstructionRender(true);renderPauseButton();
   };
