@@ -38,14 +38,16 @@ export function sanitizeQueueCommand(id,raw,persons){
       (raw.fixtureId!==undefined&&!validPoolFixtureId(raw.fixtureId))||
       (raw.actionId==='jump'&&!raw.fixtureId))return null;
     return {type:'pool',poolId:raw.poolId,actionId:raw.actionId,
-      ...(raw.fixtureId?{fixtureId:raw.fixtureId}:{})};
+      ...(raw.fixtureId?{fixtureId:raw.fixtureId}:{}),
+      ...(Number.isFinite(raw.queuedAt)&&raw.queuedAt>=0&&raw.queuedAt<=10000000
+        ?{queuedAt:raw.queuedAt}:{})};
   }
   if(type==='move'){
     if(!insideLot(raw.x,raw.z))return null;
     const x=Math.round(raw.x*20)/20,z=Math.round(raw.z*20)/20;
     return insideLot(x,z)?{type:'move',x,z}:null;
   }
-  if(type==='object'&&known(ACTIONS,raw.actionId)){
+  if(type==='object'&&raw.actionId!=='swim'&&known(ACTIONS,raw.actionId)){
     // Optional v1 queue intent: fridge chooses a table when action starts.
     if(raw.autoTable!==undefined&&
       (raw.actionId!=='dining'||raw.autoTable!==true||raw.targetInstanceId!==undefined))
