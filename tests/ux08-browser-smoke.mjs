@@ -64,7 +64,7 @@ try {
   if(width===390){
    await calendar.locator('#lc-agenda .lc-entry').filter({hasText:'Повтор Миры'}).tap();
    await calendar.locator('select[name="scope"]').selectOption('one');
-   await calendar.locator('input[name="title"]').fill('Повтор Миры — только сегодня');
+   await calendar.locator('#lc-event-form input[name="title"]').fill('Повтор Миры — только сегодня');
    const done=calendar.locator('#lc-event-done'),rect=await done.boundingBox();
    assert.ok(rect&&rect.width>=44&&rect.height>=44,'keyboard-friendly sticky Done');
    await done.tap();
