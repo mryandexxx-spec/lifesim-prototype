@@ -24,7 +24,8 @@ export const AXES=Object.freeze([
 ]);
 export const PREFERENCE_CATALOG=Object.freeze({
   books:'Книги',drawing:'Рисование',music:'Музыка',games:'Игры',
-  calm_leisure:'Тихий досуг',socializing:'Общение',cooking:'Готовка',parties:'Вечеринки'
+  calm_leisure:'Тихий досуг',socializing:'Общение',cooking:'Готовка',parties:'Вечеринки',
+  gardening:'Садоводство'
 });
 export const PROFILE_RULES=Object.freeze({minTraits:2,maxTraits:3,schema:1});
 export const DEMO_PROFILES=Object.freeze({

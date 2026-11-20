@@ -141,7 +141,7 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       next.action.bedSlot=data.action.bedSlot;
     if(next.action&&data.action.id==='garden'){
       if(!validOutdoorId(data.action.targetInstanceId)||
-         !['water','admire'].includes(data.action.gardenActionId)||
+         !['water','admire','inspect'].includes(data.action.gardenActionId)||
          !insideLot(data.action.gardenGoal?.x,data.action.gardenGoal?.z)||
          !Number.isFinite(data.action.elapsed)||
          data.action.elapsed<0||data.action.elapsed>=
@@ -149,6 +149,9 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       else{
         next.action.gardenActionId=data.action.gardenActionId;
         next.action.gardenGoal={x:data.action.gardenGoal.x,z:data.action.gardenGoal.z};
+        if(Number.isFinite(data.action.gardenPlantedAt)&&
+          data.action.gardenPlantedAt>=0&&data.action.gardenPlantedAt<=next.minutes)
+          next.action.gardenPlantedAt=data.action.gardenPlantedAt;
       }
     }
     if(validFurnitureInstanceId(data.action.targetInstanceId)||
@@ -305,7 +308,7 @@ export function tick(state, minutes,world=state?.world??null) {
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
     const duration=state.action.id==='garden'
-      ?(state.action.gardenActionId==='admire'?8:15):hobby?.timeBudget.targetMinutes??definition.duration;
+      ?(state.action.gardenActionId==='water'?15:8):hobby?.timeBudget.targetMinutes??definition.duration;
     const amount = state.action.id==='bed'?sleepMinutes:
       Math.min(minutes, Math.max(0, duration - state.action.elapsed));
     // Hunger rises only when eating, not before taking food from the shelf.

@@ -1,0 +1,42 @@
+name: LOT-C2b — Garden psychology, typed inspect and 30-day regression
+on:
+  pull_request:
+    paths:
+      - 'src/garden-psychology.js'
+      - 'src/psychology.js'
+      - 'src/emotion-engine.js'
+      - 'src/trait-catalog.js'
+      - 'src/gardening.js'
+      - 'src/action-queue.js'
+      - 'src/simulation.js'
+      - 'src/household.js'
+      - 'src/game.js'
+      - 'tests/lot-c2b-psychology.test.js'
+      - 'index.html'
+      - '.github/workflows/pages.yml'
+      - '.github/workflows/lot-c2b-garden-mind.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  c2b-psychology:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Garden source syntax
+        run: |
+          node --check src/garden-psychology.js
+          node --check src/psychology.js
+          node --check src/emotion-engine.js
+          node --check src/gardening.js
+          node --check src/household.js
+          node --check src/game.js
+      - name: C2b full 30-day and migration contracts
+        run: node --test tests/lot-c2b-psychology.test.js
+      - name: All headless game regressions
+        run: npm test

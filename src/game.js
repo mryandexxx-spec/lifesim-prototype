@@ -34,6 +34,7 @@ import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
 import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
   gardenRequestStillValid} from './gardening.js';
 import {playerMayClaimGarden} from './garden-autonomy.js';
+import {gardenWishCommand} from './garden-psychology.js';
 import {createConstructionEditor,proposeConstructionEdit,nearestConstructionEdge,constructionWallOutward,
   starterShellSegments,constructionWallSegments,constructionOpeningEdgeIds,starterShellOffset,BUILD_LOT,BUILD_FINISHES,BUILD_OPENING_STYLES,
   BUILD_DEFAULT_OPENING_STYLE,constructionOpeningStyle,constructionBounds,
@@ -479,7 +480,8 @@ function taskLabel(task){
   if(!task)return 'Неизвестное действие';
   if(task.type==='move')return 'Идти в указанное место';
   if(task.type==='outdoor')return 'Отдохнуть на садовой скамейке';
-  if(task.type==='garden')return task.actionId==='water'?'Полить грядку':'Полюбоваться садом';
+  if(task.type==='garden')return task.actionId==='water'?'Полить грядку':
+    task.actionId==='inspect'?'Осмотреть растение':'Полюбоваться садом';
   if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
@@ -834,7 +836,9 @@ $('mind-toggle').addEventListener('click', () => {
 $('mind-close').addEventListener('click', closeMindPanel);
 $('wish-do-btn').addEventListener('click', () => {
   const id = selectedActor().mind?.wish?.id;
-  if (id && scheduleCommand({type:'object',actionId:id})) {
+  const command=id?.startsWith('garden.')?gardenWishCommand(game,game.selectedSim):
+    id?{type:'object',actionId:id}:null;
+  if (command && scheduleCommand(command)) {
     closeMindPanel();
     toast(selectedName()+': в очереди желание — '+WISHES[id].label.toLowerCase());
   }
@@ -3602,10 +3606,12 @@ function boot() {
     actor.action.targetInstanceId=instanceId;
     actor.action.gardenActionId=actionId;
     actor.action.gardenGoal=plan.goal;
+    actor.action.gardenPlantedAt=game.world.outdoors.gardens[instanceId]?.plantedAt;
     if(automatic&&!recordResidentGardenStart(game,actorId,instanceId)){
       actor.action=null;return false;
     }
-    actor.event=actionId==='water'?'Идёт поливать растение':'Идёт полюбоваться садом';
+    actor.event=actionId==='water'?'Идёт поливать растение':
+      actionId==='inspect'?'Идёт осмотреть растение':'Идёт полюбоваться садом';
     paths[actorId]={points:plan.path,index:0,id:'garden'};
     restartAutonomyWait(actorId);
     return true;

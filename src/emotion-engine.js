@@ -50,7 +50,9 @@ export const EMOTION_SOURCES=Object.freeze({
   'worklife.resignation':Object.freeze({kind:'anxiety',cause:'Волнение после ухода с работы',mood:-3}),
   'worklife.resignationRelief':Object.freeze({kind:'calm',cause:'Облегчение после ухода с работы',mood:4}),
   'worklife.sharedInterrupted':Object.freeze({kind:'sadness',cause:'Пришлось прервать совместный отдых',mood:-6}),
-  'worklife.sharedDisappointed':Object.freeze({kind:'sadness',cause:'Совместный отдых прервался',mood:-4})
+  'worklife.sharedDisappointed':Object.freeze({kind:'sadness',cause:'Совместный отдых прервался',mood:-4}),
+  'garden.firstCare':Object.freeze({kind:'calm',cause:'Первый уход за растением',mood:3}),
+  'garden.firstBloomSeen':Object.freeze({kind:'inspiration',cause:'Первое цветение в саду',mood:7})
 });
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const isRecord=v=>Boolean(v)&&typeof v==='object'&&!Array.isArray(v);
