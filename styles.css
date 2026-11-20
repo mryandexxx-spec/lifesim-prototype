@@ -2326,7 +2326,6 @@ button.time-card:active {transform:translateY(1px);}
  .finance-bills{padding:10px;margin:8px 0}
 }
 
-
 /* UX-08 / M11-M12: a reachable one-handed calendar and grouped safe system menu. */
 #view-panel.view-panel{gap:12px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px)}
 #view-panel .menu-group,#view-panel .menu-danger{display:flex;flex-direction:column;gap:7px;border-top:1px solid #d9e4da;padding-top:10px}
