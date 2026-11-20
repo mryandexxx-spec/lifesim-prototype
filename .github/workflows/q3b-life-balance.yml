@@ -1,0 +1,44 @@
+name: Q3b — needs, night sleep and mobile WebGL regression
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  q3b-balance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Node + mobile Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Test exact Q3b regression and full project
+        run: |
+          node --check src/game.js
+          node --check src/simulation.js
+          node --check src/sleep-acceleration.js
+          node --check tests/q3b-browser-smoke.mjs
+          node --test tests/q3b-life-balance.test.js
+          npm test
+          node scripts/q3a-diagnostics.mjs > q3b-horizons.log
+          tail -n 4 q3b-horizons.log
+      - name: Test real PlayCanvas WebGL at four mobile sizes
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/q3b-http.log 2>&1 &
+          sleep 3
+          node tests/q3b-browser-smoke.mjs
+      - name: Preserve four real mobile screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: q3b-mobile-webgl
+          path: q3b-mobile-*.png
+          if-no-files-found: ignore
