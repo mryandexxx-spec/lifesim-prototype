@@ -29,8 +29,12 @@ const otherFixture=(root,id,fixtureId)=>{
   return active(a)&&a.fixtureId===fixtureId&&
     (a.stage==='entering'||(a.stage==='exiting'&&Array.isArray(a.exitWetPath)));
 };
+// A springboard is a legal *entry*, never an exit. The D2a planner
+// deliberately excludes boards from ordinary access points, so keep the
+// original entry kind when revalidating an already admitted jump.
 const entryOpen=(root,a)=>poolAccessPoints(root.world,a.poolId,
-  {blockedFixtureIds:[]}).some(p=>p.fixtureId===a.fixtureId);
+  {board:a.entryKind==='board',blockedFixtureIds:[]})
+  .some(p=>p.fixtureId===a.fixtureId);
 const cleanup=(root,id,message,point=null)=>{
   const actor=actorFor(root,id);
   if(!actor)return;
@@ -207,8 +211,10 @@ function recover(root,id,reason){
   actor.event='Безопасный выход из бассейна';
 }
 function travelWet(a,path,minutes,rate=.6){
-  if(!Array.isArray(path)||!path.length)return true;
-  // Progress over D2a 4-neighbour cell centres, never a coordinate jump.
+  if(!Array.isArray(path)||!path.length)return {done:true,unused:minutes};
+  // Reserve the actual time spent crossing water tiles. The spare portion
+  // of this tick may be used for a shore climb, but NOT the whole tick:
+  // advancing x3 must equal three x1 steps at the same game-minute boundary.
   let budget=minutes;
   while(a.wetPathIndex<path.length-1&&budget>0){
     const remaining=(1-a.wetProgress)*rate;
@@ -218,7 +224,8 @@ function travelWet(a,path,minutes,rate=.6){
       a.wetPathIndex++;a.wetProgress=0;a.waterCell=path[a.wetPathIndex];
     }
   }
-  return a.wetPathIndex>=path.length-1;
+  const done=a.wetPathIndex>=path.length-1;
+  return {done,unused:done?Math.max(0,budget):0};
 }
 function laneTravel(root,a,minutes){
   // Actual path through the dedicated slot, not an arbitrary animation offset.
@@ -290,7 +297,7 @@ export function advancePoolSwim(root,id,minutes){
     if(a.elapsed<entryDuration)return;
     const wetMinutes=Math.max(0,a.elapsed-entryDuration)-
       Math.max(0,before-entryDuration);
-    if(travelWet(a,a.entryWetPath,wetMinutes)){
+    if(travelWet(a,a.entryWetPath,wetMinutes).done){
       a.stage='swimming';a.elapsed=0;a.wetProgress=0;a.laneIndex=0;
       a.waterCell=a.slotAnchor;
       actor.event='Плавает';
@@ -336,15 +343,16 @@ export function advancePoolSwim(root,id,minutes){
       if(a.waitElapsed>=SWIM_MAX_WAIT_MINUTES)recover(root,id,'busy-exit');
       return;
     }
-    if(!travelWet(a,a.exitWetPath,minutes))return;
-    a.elapsed+=minutes;
+    const wet=travelWet(a,a.exitWetPath,minutes);
+    if(!wet.done)return;
+    a.elapsed+=wet.unused;
     if(a.elapsed<2)return;
     cleanup(root,id,a.exitRequested?'Вышел из бассейна досрочно':'Завершил плавание',
       a.exitDryApproach);
     return;
   }
   if(a.stage==='recovering'){
-    if(!travelWet(a,a.exitWetPath,minutes))return;
+    if(!travelWet(a,a.exitWetPath,minutes).done)return;
     cleanup(root,id,'Безопасно покинул бассейн',a.exitDryApproach);
   }
 }
