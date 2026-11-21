@@ -11,14 +11,14 @@ import {progressCareerWork,arriveCareerPortal} from '../src/career-work.js';
 
 const close=(a,b,epsilon=1e-5)=>assert.ok(Math.abs(a-b)<=epsilon, `${a} vs ${b}`);
 const copy=x=>JSON.parse(JSON.stringify(x));
-test('Q3b exact approved need rates, fresh household only, personality social spread',()=>{
+test('Q3b/R2 effective need rates, fresh household only, personality social spread',()=>{
   assert.deepEqual(NEED_DECAY_PER_MINUTE,
-    {hunger:.030,energy:.041,hygiene:.027,fun:.038,bladder:.037,social:.019});
+    {hunger:.023,energy:.028,hygiene:.020,fun:.026,bladder:.030,social:.016});
   const h=newHousehold();
   assert.deepEqual(h.needs,{hunger:82,energy:85,hygiene:80,fun:76,social:78,bladder:82});
   assert.deepEqual(h.otherSim.needs,{hunger:82,energy:88,hygiene:80,fun:78,social:76,bladder:82});
-  close(socialNeedDecayRate(h.personality),.019);
-  close(socialNeedDecayRate(h.otherSim.personality),.0214);
+  close(socialNeedDecayRate(h.personality),NEED_DECAY_PER_MINUTE.social);
+  close(socialNeedDecayRate(h.otherSim.personality),NEED_DECAY_PER_MINUTE.social+.0024);
   const old=copy(h);old.needs.energy=9;old.otherSim.needs.hunger=3;
   const restored=loadHousehold(old);
   assert.equal(restored.needs.energy,9);
@@ -59,7 +59,7 @@ test('Q3b clamp-at-100 sleep is chunk invariant, including awake remainder',()=>
   const a=newGame();a.needs.energy=78;chooseAction(a,'bed');arrive(a);
   const b=loadGame(copy(a));
   tick(a,480);for(let i=0;i<480;i++)tick(b,1);
-  close(a.needs.energy,97.54,1e-4);
+  close(a.needs.energy,100-60*NEED_DECAY_PER_MINUTE.energy,1e-4);
   close(a.needs.energy,b.needs.energy,1e-4);
   assert.equal(a.action,null);assert.equal(b.action,null);
 });
