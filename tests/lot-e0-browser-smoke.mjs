@@ -62,7 +62,7 @@ try{
     const page=await context.newPage(),errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     page.on('crash',()=>errors.push('renderer-crashed'));
-    await page.goto('http://127.0.0.1:8765/?lot-e0=qa',{waitUntil:'domcontentloaded'});
+    await page.goto('http://127.0.0.1:8765/?pool=qa&lot-e0=qa',{waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
     const gl=await page.evaluate(()=>{
       const canvas=document.querySelector('#game-canvas');
@@ -82,7 +82,8 @@ try{
       if(mode==='pool'){
         assert.equal(await page.locator('#pool-controls').isVisible(),true);
         const visual=await page.evaluate(()=>window.__LifeSimPoolVisualStats?.());
-        assert.equal(visual?.hasPool,true,'pool mesh missing in mixed world');
+        assert.ok(visual,'pool visual QA hook absent; pass pool=qa in URL');
+        assert.equal(visual.hasPool,true,'pool mesh missing in mixed world');
       }
     }
     await page.locator('#outdoor-exit').click();
