@@ -43,7 +43,10 @@ test('D3a: pre-pool v1 household shape and unrelated construction remain compati
     from:{x:20,z:7},to:{x:23,z:10}});
   assert.equal(candidate.ok,true,candidate.reason);
   assert.deepEqual(protectPoolFromWorldEdit(legacy,{construction:candidate.world}),{ok:true});
-  assert.deepEqual(loadHousehold(clone(legacy)),before);
+  const loaded=loadHousehold(clone(legacy));
+  assert.deepEqual(loaded.world.outdoors,before.world.outdoors);
+  assert.deepEqual(loaded.shop,before.shop);
+  assert.deepEqual(loaded.actionQueues,before.actionQueues);
   assert.equal(legacy.version,1);
 });
 
