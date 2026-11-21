@@ -17,20 +17,20 @@ test('balance contract has six genuine axes, one green boundary and playable com
   assert.deepEqual(Object.keys(NEED_DECAY_PER_MINUTE).sort(),[...NEEDS].sort());
   assert.equal(NEED_COMFORT_START,90);
   assert.equal(NEED_GREEN_BOUNDARY,NEED_TONES.at(-1).min);
-  assert.equal(NEED_MINIMUM_COMFORT_MINUTES,300);
+  assert.equal(NEED_MINIMUM_COMFORT_MINUTES,450);
   for(const id of NEEDS){
     assert.ok(NEED_DECAY_PER_MINUTE[id]>0);
     const duration=minutesUntilNeedThreshold(NEED_DECAY_PER_MINUTE[id]);
     assert.ok(duration>=NEED_MINIMUM_COMFORT_MINUTES,`${id} only ${duration} min`);
     assert.ok(duration<=1100,`${id} nearly immortal in green: ${duration} min`);
   }
-  close(minutesUntilNeedThreshold(NEED_DECAY_PER_MINUTE.bladder),15/.037);
+  close(minutesUntilNeedThreshold(NEED_DECAY_PER_MINUTE.bladder),15/NEED_DECAY_PER_MINUTE.bladder);
   assert.ok(SOCIAL_DECAY_PERSONALITY_SPREAD>0);
   assert.equal(minutesUntilNeedThreshold(0),null);
   assert.equal(minutesUntilNeedThreshold(-1),null);
   assert.equal(minutesUntilNeedThreshold(NaN),null);
 });
-test('1x: eight 35-40 minute actions can pass and all SIX 90-point needs stay green',()=>{
+test('1x: 450 game minutes of ordinary free time keeps all SIX 90-point needs green',()=>{
   const house=newHousehold();
   for(const actor of [house,house.otherSim])for(const need of NEEDS)actor.needs[need]=90;
   tickHousehold(house,NEED_MINIMUM_COMFORT_MINUTES);
@@ -42,8 +42,8 @@ test('1x: eight 35-40 minute actions can pass and all SIX 90-point needs stay gr
   // green freeze, rewards still require actual household events.
   tickHousehold(house,900);
   for(const actor of [house,house.otherSim]){
-    assert.ok(actor.needs.bladder<53);
-    assert.ok(actor.needs.hunger<60);
+    assert.ok(actor.needs.bladder<57);
+    assert.ok(actor.needs.hunger<66);
     assert.ok(actor.needs.hygiene<90);
   }
 });

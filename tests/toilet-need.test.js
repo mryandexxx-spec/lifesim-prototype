@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {NEED_DECAY_PER_MINUTE} from '../src/need-balance.js';
 import {ACTIONS,NEEDS,PHYSICAL_NEEDS,BLADDER_LEGACY_DEFAULT,
   SAVE_KEY,newGame,loadGame,chooseAction,arrive,tick,
   autonomousChoice} from '../src/simulation.js';
@@ -78,12 +79,14 @@ test('M4: invalid and malicious saved bladder scores are normalized, no reset of
 test('M4: decay is deterministic in game minutes, never while paused',()=>{
   const s=newGame(),value=s.needs.bladder;
   tick(s,20);
-  near(s.needs.bladder,value-20*.037);
+  near(s.needs.bladder,value-20*NEED_DECAY_PER_MINUTE.bladder);
   s.paused=true;
   const snapshot=JSON.stringify(s);
   tick(s,500);
   assert.equal(JSON.stringify(s),snapshot);
-  s.paused=false;tick(s,2300);
+  // Derive the zero crossing from the current canonical R2 decay rate.
+  s.paused=false;
+  tick(s,Math.ceil(s.needs.bladder/NEED_DECAY_PER_MINUTE.bladder)+1);
   assert.equal(s.needs.bladder,0);
 });
 
@@ -171,12 +174,12 @@ test('M4: walking and early entry never restore bladder; gain starts only after 
   const before=s.needs.bladder;
   tick(s,4);
   assert.equal(s.action.phase,'walking');
-  near(s.needs.bladder,before-4*.037);
+  near(s.needs.bladder,before-4*NEED_DECAY_PER_MINUTE.bladder);
   arrive(s);
   assert.equal(s.action.phase,'using');
   const t=ACTIONS.toilet.duration*TOILET_RELIEF_START;
   tick(s,t);
-  near(s.needs.bladder,before-(4+t)*.037);
+  near(s.needs.bladder,before-(4+t)*NEED_DECAY_PER_MINUTE.bladder);
   const beforeRelief=s.needs.bladder;
   tick(s,3);
   assert.ok(s.needs.bladder>beforeRelief+5);
