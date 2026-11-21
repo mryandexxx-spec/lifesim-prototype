@@ -1143,9 +1143,13 @@ export function residentAutonomousChoice(root,id='alex') {
   resident.autonomy.enabled=root.autonomy.enabled;
   resident.paused=root.paused;
   resident.minutes=root.minutes;
+  if(root.minutes<resident.autonomy.nextAt)return null;
+  // Essential self-care always takes precedence over housekeeping.
+  const urgent=Math.min(...['hunger','energy','bladder','hygiene'].map(
+    key=>resident.needs?.[key]??100))<25;
   // Dish care uses the same ordinary physical A*/FIFO wash action.
   // No instant count mutation, alternate economy or additional save field.
-  if(root.kitchen?.dirtyDishes>=DISH_AUTO_WASH_THRESHOLD&&
+  if(!urgent&&root.kitchen?.dirtyDishes>=DISH_AUTO_WASH_THRESHOLD&&
     furnitureAvailable(root,'wash',id))return 'wash';
   const proposal=autonomousChoice(resident);
   return proposal && furnitureAvailable(root,proposal,id) ? proposal : null;
