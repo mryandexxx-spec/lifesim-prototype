@@ -55,7 +55,7 @@ export function pickWorldRayTarget(near,far,targets){
   if(!Array.isArray(targets))return null;
   const found=[];
   for(const candidate of targets){
-    if(!candidate||candidate.visible===false||!['object','resident','blocker','outdoor'].includes(candidate.kind))continue;
+    if(!candidate||candidate.visible===false||!['object','resident','blocker','outdoor','pool-fixture','artwork'].includes(candidate.kind))continue;
     if(typeof candidate.id!=='string'||!candidate.id.trim())continue;
     const at=rayBoxHit(near,far,candidate.bounds);
     if(at!==null)found.push({target:candidate,at});
@@ -76,5 +76,11 @@ export function pickWorldRayTarget(near,far,targets){
   return best.target.kind==='blocker'?null:
     {kind:best.target.kind,id:best.target.id,
       ...(typeof best.target.instanceId==='string'
-        ?{instanceId:best.target.instanceId}:{})};
+        ?{instanceId:best.target.instanceId}:{}),
+      ...(best.target.kind==='pool-fixture' &&
+          typeof best.target.fixtureId==='string' &&
+          typeof best.target.poolId==='string'
+        ?{fixtureId:best.target.fixtureId,poolId:best.target.poolId}:{}),
+      ...(best.target.kind==='artwork'&&best.target.work
+        ?{work:best.target.work}:{})};
 }
