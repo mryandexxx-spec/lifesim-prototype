@@ -56,14 +56,33 @@ try{
      null,{timeout:8000});
    assert.equal(await page.locator('#trend-hunger').textContent(),'');
    assert.doesNotMatch(await page.locator('.need[data-need="hunger"]').getAttribute('aria-label'),/Снижается/);
+   // Resident selection is immediate but the numeric needs HUD re-renders
+   // on a 140 ms timer. Wait for the ACTUAL visible Mira value, not only the
+   // pressed button; otherwise the old Alex number (82) is briefly visible.
    await page.locator('#pick-mira').tap();
    assert.equal(await page.locator('#pick-mira').getAttribute('aria-pressed'),'true');
-   // Save pause flags do not persist; check independent high need rather
-   // than assuming exactly 95 after legitimate pre-pause game ticks.
+   await page.waitForFunction(()=>{
+     const chosen=document.querySelector('#resident-name')?.textContent;
+     const shown=Number(document.querySelector('#value-hunger')?.textContent);
+     return chosen==='Мира' && Number.isFinite(shown) && shown>=90;
+   },null,{timeout:8000,polling:50});
    const miraShown=Number(await page.locator('#value-hunger').textContent());
-   assert.ok(miraShown>=85,'Mira needs remain independently high: '+miraShown);
-   assert.match(await page.locator('.need[data-need="hunger"]').getAttribute('aria-label'),/Сытость \d+ из 100/);
+   assert.ok(miraShown>=90 && miraShown<=95,
+     'Mira real saved need should be near 95, not stale Alex HUD: '+miraShown);
+   assert.match(await page.locator('.need[data-need="hunger"]').getAttribute('aria-label'),
+     /Сытость 9[0-5] из 100/);
    assert.equal(await page.locator('#trend-hunger').getAttribute('data-direction'),'idle');
+   // Switching back must also render Alex's own, different stored need.
+   await page.locator('#pick-alex').tap();
+   await page.waitForFunction(()=>{
+     const chosen=document.querySelector('#resident-name')?.textContent;
+     const shown=Number(document.querySelector('#value-hunger')?.textContent);
+     return chosen==='Алекс'&&Number.isFinite(shown)&&shown<=85;
+   },null,{timeout:8000,polling:50});
+   assert.equal(await page.locator('#trend-hunger').getAttribute('data-direction'),'idle');
+   await page.locator('#pick-mira').tap();
+   await page.waitForFunction(()=>Number(document.querySelector('#value-hunger')?.textContent)>=90,
+     null,{timeout:8000,polling:50});
    const reduced=await page.evaluate(()=>{
     const i=document.querySelector('.need[data-need="hunger"] .meter i');
     return {animation:getComputedStyle(i).animationName,
