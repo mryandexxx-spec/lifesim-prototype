@@ -1,9 +1,5 @@
 name: Meshy V3 — derive exact GLB visual bounds
 on:
-  push:
-    branches: [feature/meshy-v3-live-20261120]
-    paths:
-      - .github/workflows/meshy-v3-metadata.yml
   workflow_dispatch:
 permissions:
   contents: write

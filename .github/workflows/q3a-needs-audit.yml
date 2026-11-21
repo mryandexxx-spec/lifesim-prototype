@@ -1,9 +1,5 @@
 name: Q3a read-only needs audit
 on:
-  pull_request:
-    paths:
-      - 'scripts/q3a-diagnostics.mjs'
-      - '.github/workflows/q3a-needs-audit.yml'
   workflow_dispatch:
 jobs:
   needs-audit:

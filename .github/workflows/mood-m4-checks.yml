@@ -1,8 +1,6 @@
 name: Mood M4 — usable toilet + bladder (branch-only, no deployment)
 on:
-  push:
-    branches:
-      - feature/mood-m4-20261115
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

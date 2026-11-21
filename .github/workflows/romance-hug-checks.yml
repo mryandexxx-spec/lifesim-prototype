@@ -1,7 +1,5 @@
 name: R1a paired hug checks
 on:
-  push:
-    branches: [feature/romance-hug-r1a-20261116]
   workflow_dispatch:
 permissions:
   contents: read

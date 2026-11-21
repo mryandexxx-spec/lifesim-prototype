@@ -1,8 +1,6 @@
 name: Mood M2 — branch-only validation (never deploy)
 on:
-  push:
-    branches:
-      - feature/mood-m2-20261115
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
