@@ -1,0 +1,37 @@
+name: UX-09 — cross-surface mobile accessibility audit
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ux09:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Complete Node regression, audit syntax and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+          node --check tests/ux09-browser-smoke.mjs
+          node --check tests/ux09-cross-surface.test.js
+          npm test
+      - name: Real WebGL cross-surface journey in four iPhone-size viewports
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ux09.log 2>&1 &
+          sleep 3
+          node tests/ux09-browser-smoke.mjs
+      - name: Preserve measurements, screenshots and triage findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux09-cross-surface-four-viewports
+          path: ux09-artifacts/
+          if-no-files-found: ignore
