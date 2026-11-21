@@ -15,7 +15,7 @@ const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
 export function planChanges(files,root=ROOT){
   const changed=[...new Set(files.map(normalize))].sort();
   const relevant=changed.some(f=>isCode(f)||f.startsWith('assets/'));
-  if(!relevant)return {tests:[],browser:false,changed};
+  if(!relevant)return {tests:[],browser:false,e5:false,changed};
   const allTests=readdirSync(path.join(root,'tests')).filter(f=>f.endsWith('.test.js')).map(f=>'tests/'+f);
   const selected=new Set(CORE);
   const changedSrc=changed.filter(f=>f.startsWith('src/')&&/\.(?:js|mjs)$/.test(f));
@@ -64,7 +64,8 @@ export function planChanges(files,root=ROOT){
   for(const [pattern,names] of extra)if(changed.some(f=>pattern.test(f)))
     for(const name of names)if(allTests.includes(name))selected.add(name);
   const tests=[...selected].filter(f=>allTests.includes(f)).sort();
-  return {tests,browser:changed.some(isUI),changed};
+  return {tests,browser:changed.some(isUI),
+    e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),changed};
 }
 
 function main(){
@@ -89,7 +90,9 @@ function main(){
     assert.equal(run.status,0,'Targeted Node tests failed');
   }
   console.log('Browser smoke:',plan.browser?'required':'not needed');
-  if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,'browser='+(plan.browser?'true':'false')+'\n');
+  console.log('LOT-E5 four-viewport deep check:',plan.e5?'required':'not needed');
+  if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
+    'browser='+(plan.browser?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n');
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main();
