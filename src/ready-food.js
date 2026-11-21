@@ -32,7 +32,7 @@ export function quoteReadyMeal(root,recipeId,channel){
      root.shop.credits>SHOP_MAX_CREDITS)
     return {ok:false,reason:'invalid-wallet'};
   if(root.shop.credits<price)return {ok:false,reason:'insufficient-credits',price};
-  if(!safe(root.minutes)||!Number.isSafeInteger(Math.floor(root.minutes))||
+  if(!Number.isFinite(root.minutes)||root.minutes<0||
      root.minutes>2_000_000_000)
     return {ok:false,reason:'invalid-clock'};
   return {ok:true,recipeId,channel,meal,price,current,reserved,
