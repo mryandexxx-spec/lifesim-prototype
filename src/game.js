@@ -8535,7 +8535,7 @@ function boot() {
         renderSharedPanel(false);
       const needNames={hunger:'Сытость',energy:'Энергия',hygiene:'Гигиена',
         fun:'Досуг',social:'Общение',bladder:'Туалет'};
-      const needTrends=needTrendTracker.observe(game,{paused:game.paused||furnishMode||buildMode||outdoorMode});
+      const needTrends=needTrendTracker.observe(game,{paused:game.paused||furnishMode||buildMode||outdoorMode,nowMs:performance.now()});
       const urgent=NEEDS.map(need=>({need,value:Math.round(current.needs[need])}))
         .filter(item=>item.value<55).sort((a,b)=>a.value-b.value).slice(0,2);
       $('urgent-needs').textContent=urgent.length
@@ -8554,8 +8554,10 @@ function boot() {
         const arrow=$('trend-'+need);
         arrow.textContent=trend.symbol;
         arrow.dataset.direction=trend.direction;
-        arrow.title=trend.label;
-        line.setAttribute('aria-label',needNames[need]+' '+val+' из 100. '+trend.label);
+        arrow.title=trend.visible?trend.label:'';
+        line.dataset.trend=trend.direction;
+        line.setAttribute('aria-label',needNames[need]+' '+val+' из 100'+
+          (trend.visible?'. '+trend.label:''));
         $('value-'+need).textContent=val;
       }
       const moodView=moodPresentation(current,game.world);

@@ -1,77 +1,76 @@
-/** HUD-R1: transient two-resident need trends. Read-only and never serialized.
- * Compare actual need values over game time, rather than guessing from the
- * passive decay constants: actions, sleep, work and social receipts all count.
+/** HUD-R1: ephemeral event arrows only while the *visible* need value changes.
+ * Comparison uses the same rounded percentage displayed by the real HUD.
+ * Passive decay stays quiet between one-point steps; a genuinely active
+ * recovery shows repeated ↑ events. Never modifies simulation/save state.
  */
-export const NEED_TREND_WINDOW_MINUTES=8;
-export const NEED_TREND_MIN_SPAN_MINUTES=3;
-const ENTER_RATE=.006;
-const EXIT_RATE=.003;
+export const NEED_TREND_FLASH_MS=1000;
+export const NEED_TREND_SAMPLE_GAP_MS=5000;
+export const NEED_TREND_MAX_GAME_GAP_MINUTES=60;
 const NEED_IDS=Object.freeze(['hunger','energy','hygiene','fun','social','bladder']);
 const RESIDENT_IDS=Object.freeze(['alex','mira']);
-const STATUS=Object.freeze({
-  up:Object.freeze({symbol:'↑',label:'Повышается'}),
-  down:Object.freeze({symbol:'↓',label:'Снижается'}),
-  flat:Object.freeze({symbol:'→',label:'Без изменений'}),
-  unknown:Object.freeze({symbol:'→',label:'Собираем данные'}),
-  paused:Object.freeze({symbol:'→',label:'Время остановлено'})
-});
-const abs=Math.abs;
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
-
-/** A new tracker is created on browser boot. Nothing is written to root-v1. */
+const idle=()=>({direction:'idle',symbol:'',label:'',visible:false});
+const arrow=direction=>({
+  direction,symbol:direction==='up'?'↑':'↓',
+  label:direction==='up'?'Повышается':'Снижается',visible:true
+});
+const toDisplay=value=>finite(value)?Math.round(Math.max(0,Math.min(100,value))):null;
+/** Return a read-only snapshot for both actors. nowMs uses browser elapsed
+ * milliseconds, not game time; pause/visibility explicitly clears flashes.
+ */
 export function createNeedTrendTracker(){
-  let rootRef=null;
-  const history={alex:[],mira:[]};
-  const previous={alex:{},mira:{}};
-  const clear=()=>{
-    for(const id of RESIDENT_IDS){history[id]=[];previous[id]={};}
-  };
-  const status=(direction,rate=0)=>({...STATUS[direction],direction,rate});
-  return {
-    reset(){rootRef=null;clear();},
-    observe(root,{paused=false}={}){
-      if(root!==rootRef){rootRef=root;clear();}
-      const minutes=root?.minutes;
-      const output={};
-      for(const id of RESIDENT_IDS){
-        const actor=id==='alex'?root:root?.otherSim;
-        const latest=history[id].at(-1);
-        if(!finite(minutes)||!actor?.needs){
-          history[id]=[];previous[id]={};
-          output[id]=Object.fromEntries(NEED_IDS.map(need=>[need,status('unknown')]));
-          continue;
-        }
-        // Load/reset/clock rewind and discontinuous jumps need a clean baseline.
-        if(latest&&(minutes<latest.minute-.001||minutes-latest.minute>60)){
-          history[id]=[];previous[id]={};
-        }
-        const values=Object.fromEntries(NEED_IDS.map(need=>[
-          need,finite(actor.needs[need])?actor.needs[need]:null
-        ]));
-        const records=history[id],last=records.at(-1);
-        if(last&&abs(last.minute-minutes)<.001)last.values=values;
-        else records.push({minute:minutes,values});
-        while(records.length>1&&records[1].minute<=minutes-NEED_TREND_WINDOW_MINUTES)
-          records.shift();
-        // A hard cap also guards long-running background sessions and x3.
-        while(records.length>80)records.shift();
-        const first=records[0],span=minutes-first.minute;
-        output[id]={};
-        for(const need of NEED_IDS){
-          if(paused){output[id][need]=status('paused');continue;}
-          if(span<NEED_TREND_MIN_SPAN_MINUTES||
-             !finite(first.values[need])||!finite(values[need])){
-            output[id][need]=status('unknown');continue;
-          }
-          const rate=(values[need]-first.values[need])/span;
-          const old=previous[id][need]||'flat';
-          const direction=rate>ENTER_RATE||(old==='up'&&rate>EXIT_RATE)?'up':
-            rate< -ENTER_RATE||(old==='down'&&rate< -EXIT_RATE)?'down':'flat';
-          previous[id][need]=direction;
-          output[id][need]=status(direction,rate);
-        }
-      }
-      return output;
-    }
-  };
+ let rootRef=null,lastMinute=null,lastAtMs=null;
+ const actors={alex:null,mira:null};
+ const previous={alex:{},mira:{}};
+ const clear=()=>{for(const id of RESIDENT_IDS){actors[id]=null;previous[id]={};}};
+ return {
+  reset(){rootRef=null;lastMinute=null;lastAtMs=null;clear();},
+  observe(root,{paused=false,nowMs=0}={}){
+   const minutes=root?.minutes;
+   const invalid= !finite(minutes)||!finite(nowMs);
+   const discontinuous=lastMinute!==null&&(
+     minutes<lastMinute-.001||minutes-lastMinute>NEED_TREND_MAX_GAME_GAP_MINUTES||
+     nowMs<lastAtMs||nowMs-lastAtMs>NEED_TREND_SAMPLE_GAP_MS);
+   if(root!==rootRef||invalid||discontinuous){
+     rootRef=root;clear();
+   }
+   lastMinute=finite(minutes)?minutes:null;
+   lastAtMs=finite(nowMs)?nowMs:null;
+   const result={};
+   for(const id of RESIDENT_IDS){
+     const actor=id==='alex'?root:root?.otherSim;
+     if(actor!==actors[id]){actors[id]=actor;previous[id]={};}
+     result[id]={};
+     for(const need of NEED_IDS){
+       const current=toDisplay(actor?.needs?.[need]);
+       const old=previous[id][need];
+       // No arrow on first sample, invalid needs, paused clock, or missing actor.
+       if(current===null){
+         previous[id][need]=null;
+         result[id][need]=idle();
+         continue;
+       }
+       const state=old??{value:current,direction:'idle',until:0};
+       if(paused||invalid){
+         previous[id][need]={value:current,direction:'idle',until:0};
+         result[id][need]=idle();
+         continue;
+       }
+       if(current!==state.value){
+         const direction=current>state.value?'up':'down';
+         previous[id][need]={value:current,direction,until:nowMs+NEED_TREND_FLASH_MS};
+         result[id][need]=arrow(direction);
+         continue;
+       }
+       if(state.until>nowMs&&state.direction!=='idle'){
+         result[id][need]=arrow(state.direction);
+       }else{
+         result[id][need]=idle();
+       }
+       previous[id][need]={...state,value:current};
+     }
+   }
+   return result;
+  }
+ };
 }
