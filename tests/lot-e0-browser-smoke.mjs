@@ -41,7 +41,7 @@ assert.equal(paint.ok,true,paint.reason);
 root=commitOutdoorPreview(root,paint).root;
 const garden=root.world.outdoors.features.find(x=>x.itemId==='garden.herb.mint');
 assert.ok(enqueueAction(root.actionQueues,'alex',{
-  type:'pool',poolId:'pool-1',actionId:'swim',fixtureId:'fixture-1'}));
+  type:'pool',poolId:'pool-1',actionId:'swim',fixtureId:'fixture-1',queuedAt:root.minutes}));
 assert.ok(enqueueAction(root.actionQueues,'mira',{
   type:'garden',instanceId:garden.instanceId,actionId:'water'}));
 
