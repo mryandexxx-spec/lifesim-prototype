@@ -115,11 +115,16 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
       for(const cell of sorted)occupiedPoolCells.add(cell);
       recoveredPools.push({poolId:saved.poolId,cells:sorted});
     }
-  const protectedWater={revision:next.revision,pools:recoveredPools};
+  // A completed pool transaction is the proof of purchased geometry.
+  // Historical D1a/legacy payloads with no transaction receipt retain the
+  // original feature-first conflict recovery rule for backwards compatibility.
+  const paidPool=Number.isSafeInteger(raw.poolTxnSeq)&&raw.poolTxnSeq>0;
+  const protectedWater={revision:next.revision,
+    pools:paidPool?recoveredPools:[]};
   // A validated paid ladder/steps exit has a dry approach clearance. A damaged
   // decorative object on that clearance must not invalidate the purchased exit.
   const protectedLandings=[],fixtureIds=new Set(),fixtureEdges=new Set();
-  if(hasPoolExtension&&Array.isArray(raw.poolFixtures))
+  if(paidPool&&hasPoolExtension&&Array.isArray(raw.poolFixtures))
     for(const fixture of raw.poolFixtures.slice(0,POOL_FIXTURE_LIMIT*4)){
       if(protectedLandings.length>=POOL_FIXTURE_LIMIT||
          !validPoolFixture(fixture,recoveredPools)||
@@ -163,7 +168,13 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
   // Reuse prevalidated basin candidates; decorative corruption cannot win
   // by changing the later restore order or introducing a fake purchase.
   if(hasPoolExtension){
-    next.pools=recoveredPools;
+    // Legacy roots without completed pool purchase receipts keep previously
+    // valid decorations when an overlapping unverified pool entry appears.
+    // Paid basins instead remain protected from optional corrupt decoration.
+    next.pools=paidPool?recoveredPools:recoveredPools.filter(pool=>
+      pool.cells.every(cell=>!rects.some(rect=>
+        outdoorRectsOverlap(rect,poolCellBounds(cell)))));
+    largestPoolId=Math.max(0,...next.pools.map(pool=>poolIdNumber(pool.poolId)));
     next.nextPoolId=1;
     next.poolTxnSeq=0;
   const wantedPoolId=Number.isSafeInteger(raw.nextPoolId)&&raw.nextPoolId>=1&&
