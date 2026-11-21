@@ -1,0 +1,42 @@
+name: LOT-E0 — mixed yard saves, FIFO and four mobile WebGL
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mixed-world-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install PlayCanvas and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Check E0 source and full root-v1 Node regression
+        run: |
+          node --check tests/lot-e0-mixed-world.test.js
+          node --check tests/lot-e0-browser-smoke.mjs
+          node --test tests/lot-e0-mixed-world.test.js
+          npm test
+      - name: Run real PlayCanvas WebGL mixed-world mobile viewport smoke
+        run: |
+          mkdir -p vendor artifacts/lot-e0
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-e0-http.log 2>&1 &
+          sleep 3
+          node tests/lot-e0-browser-smoke.mjs
+      - name: Upload E0 screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lot-e0-four-mobile-webgl
+          path: artifacts/lot-e0/
+          if-no-files-found: ignore
