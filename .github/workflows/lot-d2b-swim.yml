@@ -1,8 +1,5 @@
 name: LOT-D2b — canonical swim simulation and mobile regression
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

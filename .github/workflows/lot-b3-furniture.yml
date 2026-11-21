@@ -1,6 +1,5 @@
 name: LOT-B3 — garden bench, real rest and outdoor night lighting
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,8 +1,5 @@
 name: LOT-D2c — visible swimming and mobile pool touch
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

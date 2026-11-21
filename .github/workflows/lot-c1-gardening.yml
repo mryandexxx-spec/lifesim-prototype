@@ -1,6 +1,5 @@
 name: LOT-C1 — functional gardens and iPhone WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

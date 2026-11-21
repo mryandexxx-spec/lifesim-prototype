@@ -1,8 +1,5 @@
 name: LOT-C3b — finite kitchen and paid groceries
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 jobs:
   kitchen-economy:

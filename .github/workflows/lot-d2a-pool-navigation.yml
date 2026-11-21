@@ -1,8 +1,5 @@
 name: LOT-D2a — aquatic navigation, slots and four mobile WebGL
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
