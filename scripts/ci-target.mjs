@@ -8,7 +8,7 @@ const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
 const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
 const isUI=f=>/^(?:index\.html|styles\.css|sw\.js|assets\/)/.test(f)||
-  /^src\/(?:game\.js|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls)\.js)/.test(f)||
+  /^src\/(?:game\.js|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
   /^tests\/.*browser.*\.mjs$/.test(f);
 const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
 

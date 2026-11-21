@@ -7,6 +7,7 @@ import {feelMemory} from './emotion-engine.js';
 import {recordProfessionalIncident} from './career-goals.js';
 import {specializationDefinition,recordSpecializationIncident} from './career-specializations.js';
 import {seniorMissingScenes,recordSeniorIncident} from './career-seniority.js';
+import {CAREER_R1_SCENES} from './career-r1-scenes.js';
 
 const O=(id,text,feedback,performance,energy,fun,axis,memory,skill=null)=>
   Object.freeze({id,text,feedback,performance,energy,fun,axis,memory,skill});
@@ -101,7 +102,8 @@ export const WORK_INCIDENT_CATALOG=Object.freeze(Object.fromEntries(
         O('postpone','Перенести встречу для подготовки','Конфликт утих, но решение задержалось.',-1,2,4,'resilience','work.relief')])]
   }).map(([careerId,more])=>[careerId,Object.freeze([
     S('legacy',WORK_INCIDENTS[careerId].title,WORK_INCIDENTS[careerId].text,
-      'organization','pressure',WORK_INCIDENTS[careerId].options),...more
+      'organization','pressure',WORK_INCIDENTS[careerId].options),...more,
+    ...CAREER_R1_SCENES[careerId]
   ])])
 ));
 export const INCIDENT_HISTORY_LIMIT=12;
@@ -129,7 +131,10 @@ export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?
   const recent=history.slice(-4);
   const last=recent.at(-1)?.scenarioId;
   const track=specializationDefinition(contract?.careerId,contract?.specialization?.id);
-  const scores=bank.map((scene,index)=>{
+  const rankIndex=Number.isInteger(contract?.level)?contract.level:0;
+  const available=bank.filter(scene=>rankIndex>=(scene.minRank??0)&&
+    rankIndex<=(scene.maxRank??7));
+  const scores=available.map((scene,index)=>{
     const variety=(hash(shift.id+'|'+scene.id+'|'+id)%100)/20;
     const trait=(axes[scene.focus]-.5)*6;
     const condition=scene.tone==='pressure'?(energy>=55?1.5:-2)+(mood>=55?1:0):
@@ -143,8 +148,8 @@ export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?
     const senior=seniorMissingScenes(contract).includes(scene.id)?70:0;
     return variety+trait+condition+rank+skill-repetition+focus+senior-(last===scene.id?1000:0);
   });
-  const order=bank.map((_,index)=>index).sort((a,b)=>scores[b]-scores[a]||a-b);
-  return bank[order[0]].id;
+  const order=available.map((_,index)=>index).sort((a,b)=>scores[b]-scores[a]||a-b);
+  return available[order[0]]?.id??null;
 }
 export function restoreWorkIncident(shift,raw){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
