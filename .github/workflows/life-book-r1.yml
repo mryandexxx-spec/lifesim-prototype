@@ -1,0 +1,34 @@
+name: LIFE BOOK-R1 — ten original books and 4 mobile WebGL viewports
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  book-r1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate catalogue, preservation and whole Node suite
+        run: |
+          npm ci
+          node --check src/hobby-reading.js
+          node --check src/skill-presentation.js
+          node --check src/game.js
+          node --test tests/life-book-r1.test.js
+          npm test
+      - name: Install real mobile Chromium
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Four iPhone-size PlayCanvas WebGL and available book choices
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/book-r1-http.log 2>&1 &
+          sleep 3
+          node tests/life-book-r1-browser-smoke.mjs
