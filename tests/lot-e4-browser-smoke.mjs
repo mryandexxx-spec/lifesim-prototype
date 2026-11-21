@@ -51,6 +51,17 @@ function intent(data,id,type){
   Number.isFinite(data.world?.outdoors?.gardens?.[plot]?.lastWateredAt);
  assert.ok(queued||active||done,id+' '+type+' lost across WebGL scene/reload');
 }
+async function dismissShiftSummaries(page){
+ // Legitimate offscreen work may finish while the seeded night game boots.
+ // The real modal is intentionally blocking: close it through the visible
+ // Continue button, not force:true / DOM hidden flags / direct state mutation.
+ const panel=page.locator('#career-shift-summary');
+ for(let i=0;i<4&&await panel.isVisible();i++){
+  await panel.locator('.career-shift-summary-done').click();
+  await page.waitForTimeout(60);
+ }
+ assert.equal(await panel.isVisible(),false,'shift summary must be dismissed via UI');
+}
 function verify(data){
  assert.equal(data.version,1);
  assert.equal(data.otherSim.minutes,data.minutes);
@@ -135,6 +146,8 @@ try{
     await nightPage.goto('http://127.0.0.1:8765/?pool=qa&lot-e4=1',
      {waitUntil:'domcontentloaded'});
     await nightPage.locator('#loading').waitFor({state:'hidden',timeout:80000});
+    await nightPage.waitForTimeout(180);
+    await dismissShiftSummaries(nightPage);
     await nightPage.locator('#pause-btn').click();
     const nightState=async()=>nightPage.evaluate(async key=>{
      const saved=JSON.parse(localStorage.getItem(key));
@@ -155,6 +168,8 @@ try{
     await nightPage.screenshot({path:'artifacts/lot-e4/night-'+name+'.png'});
     await nightPage.reload({waitUntil:'domcontentloaded'});
     await nightPage.locator('#loading').waitFor({state:'hidden',timeout:80000});
+    await nightPage.waitForTimeout(180);
+    await dismissShiftSummaries(nightPage);
     await nightPage.locator('#pause-btn').click();
     const restored=await nightState();
     verify(restored.saved);
