@@ -48,8 +48,8 @@ export function marketListing(){
   }));
 }
 function reject(reason){return {ok:false,reason};}
-function context({lockedInstanceIds=[],residents=[],construction=null}={}){
-  return {lockedInstanceIds,residents,construction};
+function context({lockedInstanceIds=[],residents=[],construction=null,outdoors=null}={}){
+  return {lockedInstanceIds,residents,construction,outdoors};
 }
 function normalized(world,shop){
   return {world:restoreFurnitureWorld(world),shop:restoreFurnitureShop(shop)};

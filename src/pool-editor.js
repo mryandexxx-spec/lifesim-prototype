@@ -208,7 +208,7 @@ function plan(root,intent){
   const restored=restoreOutdoorsWorld(next,root.world.construction,root.minutes);
   if(JSON.stringify(restored)!==JSON.stringify(next))
     return fail('invalid-topology-or-fixture');
-  if(!keepsExistingRoutes(root,next))return fail('would-block-route');
+  if(!keepsExistingRoutes(root,next,{poolEditor:true}))return fail('would-block-route');
   const cost=totalCost(current,pools,fixtures);
   if(cost===null)return fail('invalid-value');
   if(root.shop.credits<cost)return fail('insufficient-credits');

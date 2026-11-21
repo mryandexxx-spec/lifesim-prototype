@@ -1,0 +1,43 @@
+name: LOT-D3a — pool safety across construction, furniture and yard editors
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cross-editor-domain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked simulation and browser
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Check modules, transactional boundaries and entire Node suite
+        run: |
+          node --check src/pool-cross-editor.js
+          node --check src/outdoor-proposals.js
+          node --check src/furniture-editor.js
+          node --check src/furnished-room.js
+          node --check src/game.js
+          node --check tests/lot-d3a.test.js
+          node --test tests/lot-d3a.test.js tests/lot-d1b.test.js tests/lot-d2d.test.js
+          npm test
+      - name: Regress genuine PlayCanvas WebGL pool touch on four mobile viewports
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-d3a-webgl.log 2>&1 &
+          sleep 3
+          node tests/lot-d1c-browser-smoke.mjs
+      - name: Ensure GitHub Pages ships the safety dependency
+        run: |
+          grep -F 'cp src/pool-equipment.js src/pool-editor.js site/src/' .github/workflows/pages.yml
+          grep -F 'cp src/pool-cross-editor.js site/src/' .github/workflows/pages.yml
