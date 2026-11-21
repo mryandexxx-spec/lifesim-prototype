@@ -71,6 +71,7 @@ jobs:
           node --check src/need-balance.js
           node --check src/sleep-acceleration.js
           node --check src/navigation.js
+          node --check src/garden-skill.js
           node --check src/gardening.js
           node --check src/garden-autonomy.js
           node --check src/garden-presentation.js
@@ -242,6 +243,7 @@ jobs:
           cp src/pool-cross-editor.js site/src/
           cp src/pool-visual.js site/src/
           cp src/pool-navigation.js src/pool-swim-runtime.js src/pool-autonomy.js site/src/
+          cp src/garden-skill.js site/src/
           cp src/gardening.js site/src/
           cp src/garden-autonomy.js site/src/
           cp src/garden-presentation.js site/src/

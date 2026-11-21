@@ -37,7 +37,8 @@ function start(root,id,person='alex'){
 }
 test('CHARISMA: canonical 0–10 skill, thresholds, cap and conservative social tiers',()=>{
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
-  assert.equal(Object.keys(HOBBY_SKILLS.skills).length,4);
+  assert.equal(Object.keys(HOBBY_SKILLS.skills).length,5);
+  assert.ok(HOBBY_SKILLS.skills.gardening,'canonical skill registry is extensible');
   assert.equal(HOBBY_SKILLS.skills.charisma.maxLevel,10);
   assert.equal(HOBBY_SKILLS.skills.charisma.group,'social');
   assert.equal(currentSkillLevel({schema:1,xpById:{charisma:149.9}},HOBBY_SKILLS,'charisma'),2);

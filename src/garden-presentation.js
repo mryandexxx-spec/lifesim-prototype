@@ -2,6 +2,9 @@
 import {OUTDOOR_CATALOG} from './outdoor-catalog.js';
 import {gardenFeature,gardenView,gardenApproach,gardenBusy,GARDEN_CARE_COOLDOWN,GARDEN_REPLANT_PRICE} from './gardening.js';
 import {KITCHEN_HERB_LIMIT,KITCHEN_HARVEST_UNITS} from './kitchen.js';
+import {HOBBY_SKILLS} from './hobby-reading.js';
+import {currentSkillLevel} from './skills-engine.js';
+import {GARDENING_SKILL_ID,gardenSkillBenefits,gardenHarvestUnits} from './garden-skill.js';
 import {playerMayClaimGarden} from './garden-autonomy.js';
 import {gardenWishEligible,GARDEN_WISHES} from './garden-psychology.js';
 import {WISHES} from './psychology.js';
@@ -24,11 +27,17 @@ export function gardenActionSheet(root,residentId,instanceId){
   const wet=hours(view.waterRemaining);
   const herb=feature.itemId.startsWith('garden.herb.');
   const stock=root?.kitchen?.pantry?.herbs??0;
+  const level=currentSkillLevel(person.skills,HOBBY_SKILLS,GARDENING_SKILL_ID);
+  const bonus=gardenSkillBenefits(level);
+  const units=gardenHarvestUnits(level,stock,KITCHEN_HERB_LIMIT,KITCHEN_HARVEST_UNITS);
   const cropStatus=herb&&view.mature
     ?' · '+(view.harvestedAt===null?'Можно собрать':'Урожай собран')+
       ' · Травы '+stock+'/'+KITCHEN_HERB_LIMIT:'';
   const info=view.label+' · '+Math.floor(view.progressWetMinutes/60)+
-    '/72 ч роста · '+(view.mature?'Созрело':wet?'Влаги на '+wet+' ч':'Нужен полив')+cropStatus;
+    '/72 ч роста · '+(view.mature?'Созрело':wet?'Влаги на '+wet+' ч':'Нужен полив')+cropStatus+
+    ' · Садоводство '+level+'/10'+
+    (bonus.hydrationBonusMinutes?' · полив +'+bonus.hydrationBonusMinutes/60+' ч':'')+
+    (bonus.extraHarvestUnits?' · урожай до +'+bonus.extraHarvestUnits:'');
   const ids=view.mature
     ?herb?[view.harvestedAt===null?'harvest':'replant','admire']:['admire']
     :view.stage>=1?['water','inspect']:['water'];
@@ -44,7 +53,9 @@ export function gardenActionSheet(root,residentId,instanceId){
        actionId==='replant'&&root?.shop?.credits<GARDEN_REPLANT_PRICE
          ?'Недостаточно средств для посадки':
        actionId==='admire'?'Любование уже было сегодня':'Пока недоступно';
-    return {actionId,label:LABELS[actionId],available,reason:available?'':reason,
+    return {actionId,label:actionId==='harvest'
+      ?'🌿 Собрать травы · +'+units+' · 12 мин':LABELS[actionId],
+      available,reason:available?'':reason,
       wished:actionId===desired,command:{type:'garden',instanceId,actionId}};
   });
   if(route&&!actions.some(a=>a.available))

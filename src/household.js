@@ -16,6 +16,7 @@ import {DISH_AUTO_WASH_THRESHOLD,COOKING_SKILL_ID,kitchenRecipe,newKitchen,resto
   takeKitchenServingDetails,hasKitchenServing,shouldEatFreshKitchenMeal,
   recordDirtyDish,washKitchenDishes} from './kitchen.js';
 import {currentSkillLevel} from './skills-engine.js';
+import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
@@ -963,6 +964,7 @@ export function tickHousehold(root,minutes) {
     return [id,a?.id==='garden'&&a.phase==='using'
       ?{instanceId:a.targetInstanceId,actionId:a.gardenActionId,
           plantedAt:a.gardenPlantedAt,elapsed:a.elapsed,
+          automatic:a.automatic===true,
           goal:a.gardenGoal?{...a.gardenGoal}:null}:null];
   }));
   // Capture stages BEFORE the simulation. The completion tick may switch
@@ -1140,9 +1142,18 @@ export function tickHousehold(root,minutes) {
       before.goal&&Math.hypot(actor.position.x-before.goal.x,
         actor.position.z-before.goal.z)<=.45&&
       before.elapsed+minutes>=GARDEN_DURATION[before.actionId]){
-      if(settleGardenAction(root,id,before.instanceId,before.actionId)&&
-        ['water','inspect','admire'].includes(before.actionId))
-        completeGardenExperience(root,id,before.instanceId,before.actionId);
+      if(settleGardenAction(root,id,before.instanceId,before.actionId)){
+        if(['water','inspect','admire'].includes(before.actionId))
+          completeGardenExperience(root,id,before.instanceId,before.actionId);
+        // The cleared action is the single completion receipt, preventing
+        // walking/queued/paused/canceled/autonomous/reload XP duplication.
+        const award=creditGardenPractice(actor.skills,HOBBY_SKILLS,before.actionId,
+          {automatic:before.automatic});
+        if(award){
+          actor.skills=award.progress;
+          if(award.gained>0)actor.event+=' · садоводство +'+award.gained+' XP';
+        }
+      }
     }
   }
   // Both clocks remain identical (including when paused).
