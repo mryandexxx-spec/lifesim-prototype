@@ -34,7 +34,7 @@ import {poolBoundaryEdges,poolCellBounds} from './pool-topology.js';
 import {canBeginPoolSwim,beginPoolSwim,arrivePoolApproach,
   requestPoolExit,SWIM_MAX_WAIT_MINUTES} from './pool-swim-runtime.js';
 import {poolSwimVisualFrame} from './pool-swim-visual.js';
-import {poolActionStatus,poolActivityLabel} from './pool-touch-policy.js';
+import {poolActionStatus,poolActivityLabel,poolWishCommand} from './pool-touch-policy.js';
 import {POOL_FIXTURE_PRICES,poolHasExit} from './pool-equipment.js';
 import {previewPoolTiles,previewPoolFixture,previewPoolHistory,
   poolEditorSnapshot,commitPoolPreviewPersisted} from './pool-editor.js';
@@ -153,6 +153,7 @@ import {proposeFurnishedRoomMove,createHouseholdConstructionEditor} from './furn
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,residentGardenOpportunity,recordResidentGardenStart,
+  residentPoolOpportunity,recordResidentPoolStart,
   bedDestinationFor,preemptAutomaticForManual,
   nearestAvailableDiningTable } from './household.js';
 
@@ -906,7 +907,8 @@ $('mind-close').addEventListener('click', closeMindPanel);
 $('wish-do-btn').addEventListener('click', () => {
   if(mindInspectResident!==game.selectedSim||dialogueNeedsDecision(game))return;
   const id = selectedActor().mind?.wish?.id;
-  const command=id?.startsWith('garden.')?gardenWishCommand(game,game.selectedSim):
+  const command=id==='pool.swim'?poolWishCommand(game,game.selectedSim):
+    id?.startsWith('garden.')?gardenWishCommand(game,game.selectedSim):
     id?{type:'object',actionId:id}:null;
   if (command && scheduleCommand(command)) {
     closeMindPanel();
@@ -7578,8 +7580,21 @@ function boot() {
             // LOT-C2a: lowest-priority optional gardening, never a manual FIFO task.
             // The existing idle delay, social/need selection and work guards run first.
             const gardenIdea=residentGardenOpportunity(game,residentId);
-            if(gardenIdea&&beginGardenAction(residentId,gardenIdea.instanceId,'water',false,true))
-              save(true);
+            const startedGarden=gardenIdea&&
+              beginGardenAction(residentId,gardenIdea.instanceId,'water',false,true);
+            if(startedGarden)save(true);
+            else{
+              const poolIdea=residentPoolOpportunity(game,residentId);
+              if(poolIdea){
+                const plan=beginPoolSwim(game,residentId,poolIdea);
+                if(plan){
+                  plan.action.automatic=true;
+                  paths[residentId]={id:'swim',points:plan.landPath,index:0};
+                  recordResidentPoolStart(game,residentId);
+                  restartAutonomyWait(residentId);save(true);
+                }
+              }
+            }
           }
         }
       }
@@ -8553,7 +8568,9 @@ function boot() {
       $('mind-wish-label').textContent=wishCard
         ?wishCard.label+(plotCard?' · '+plotCard.name:''):'Сейчас нет конкретного желания';
       $('wish-do-btn').disabled=mindInspectResident!==game.selectedSim||!wishCard||
-        Boolean(wishTargetCard&&!gardenWishCommand(game,mindInspectResident));
+        Boolean(wishTargetCard&&!gardenWishCommand(game,mindInspectResident))||
+        Boolean(mindCurrent.mind.wish?.id==='pool.swim'&&
+          !poolWishCommand(game,mindInspectResident));
       $('mind-wish-note').textContent=mindInspectResident===game.selectedSim
         ?'Нажатие добавит действие в личную очередь'
         :'Только просмотр · команды остаются у '+selectedName();

@@ -1,0 +1,306 @@
+/** LOT-D2d regression: canonical two-person water lifecycle, save and mood. */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {newHousehold,loadHousehold,tickHousehold,setHouseholdAutonomy} from '../src/household.js';
+import {beginPoolSwim,arrivePoolApproach,requestPoolExit,advancePoolSwim,SWIM_MINUTES} from '../src/pool-swim-runtime.js';
+import {poolSwimVisualFrame} from '../src/pool-swim-visual.js';
+import {poolAutoDraw,poolAutoChance,considerAutonomousPool,
+  recordAutonomousPoolStart,POOL_AUTO_POLICY} from '../src/pool-autonomy.js';
+import {outdoorCellAt} from '../src/lot-surface.js';
+import {isWalkable} from '../src/navigation.js';
+import {selectWish} from '../src/psychology.js';
+import {poolWishCommand} from '../src/pool-touch-policy.js';
+const base=outdoorCellAt(18.25,8.25),copy=x=>JSON.parse(JSON.stringify(x));
+const cells=(w=4,h=4)=>Array.from({length:w*h},(_,i)=>
+  base+Math.floor(i/w)*64+i%w).sort((a,b)=>a-b);
+const fixture=(kind,edgeCell=base,side='west',index=1)=>({
+  fixtureId:'fixture-'+index,poolId:'pool-1',kind,edgeCell,side,
+  purchasePriceCredits:{ladder:120,steps:180,board:400}[kind]
+});
+const sim=(s,id)=>id==='alex'?s:s.otherSim;
+function home({w=4,h=4,fixtures=[fixture('ladder')]}={}){
+  const s=newHousehold();
+  s.world.outdoors={...s.world.outdoors,revision:s.world.outdoors.revision+1,
+    pools:[{poolId:'pool-1',cells:cells(w,h)}],poolFixtures:fixtures};
+  return s;
+}
+function approach(s,id='alex',command={poolId:'pool-1',actionId:'swim'}){
+  const plan=beginPoolSwim(s,id,command);
+  assert.ok(plan,'real dry and wet admission');
+  sim(s,id).position={...plan.action.dryApproach};
+  assert.ok(arrivePoolApproach(s,id));
+  return plan.action;
+}
+function toStage(s,id,stage,limit=100,isolated=false){
+  const initial=sim(s,id).action&&{...sim(s,id).action};
+  for(let i=0;i<limit&&sim(s,id).action?.stage!==stage;i++){
+    if(isolated)advancePoolSwim(s,id,1);
+    else tickHousehold(s,1);
+  }
+  assert.equal(sim(s,id).action?.stage,stage,JSON.stringify({id,stage,limit,isolated,initialStage:initial?.stage,entryKind:initial?.entryKind,fixtureId:initial?.fixtureId,entryWetPathLength:initial?.entryWetPath?.length,finalAction:sim(s,id).action,event:sim(s,id).event}));
+  return sim(s,id).action;
+}
+function complete(s,id,limit=150){
+  for(let i=0;i<limit&&sim(s,id).action;i++)tickHousehold(s,1);
+  assert.equal(sim(s,id).action,null,'bounded dry exit');
+  assert.ok(isWalkable(sim(s,id).position.x,sim(s,id).position.z,s.world));
+}
+function memory(s,id){return sim(s,id).mind.memories.filter(m=>m.id==='pool.firstSwim');}
+
+test('D2d Alex and Mira earn independent, single first-swim memory only on dry completion',()=>{
+  const s=home();approach(s,'alex');toStage(s,'alex','swimming');
+  approach(s,'mira');toStage(s,'mira','swimming');
+  assert.equal(memory(s,'alex').length,0);
+  assert.equal(memory(s,'mira').length,0);
+  assert.ok(poolSwimVisualFrame(s.world,s.action));
+  assert.ok(poolSwimVisualFrame(s.world,s.otherSim.action));
+  complete(s,'alex');complete(s,'mira');
+  for(const id of ['alex','mira']){
+    assert.equal(memory(s,id).length,1);
+    assert.ok(Number.isFinite(sim(s,id).poolFirstSwimAt));
+    assert.equal(sim(s,id).mind.emotions.some(e=>e.source==='pool.firstSwim'),true);
+  }
+  const oldAt=s.poolFirstSwimAt;
+  s.needs.energy=95;s.needs.bladder=95;
+  approach(s,'alex');toStage(s,'alex','swimming');complete(s,'alex');
+  assert.equal(s.poolFirstSwimAt,oldAt);
+  assert.equal(memory(s,'alex').length,1,'no duplicated mood receipt');
+  const loaded=loadHousehold(copy(s));
+  assert.equal(loaded.poolFirstSwimAt,oldAt);
+  assert.equal(memory(loaded,'alex').length,1);
+  assert.equal(loaded.version,1);
+});
+
+test('D2d cancellation, missing exit and removed bowl grant no completion memory',()=>{
+  for(const mode of ['cancel','lost-exit','lost-pool']){
+    const s=home();approach(s);toStage(s,'alex','swimming');
+    tickHousehold(s,5);
+    if(mode==='cancel')requestPoolExit(s,'alex','player');
+    if(mode==='lost-exit')s.world.outdoors.poolFixtures=[];
+    if(mode==='lost-pool')s.world.outdoors.pools=[];
+    complete(s,'alex');
+    assert.equal(memory(s,'alex').length,0,mode);
+    assert.equal(s.poolFirstSwimAt,undefined);
+  }
+});
+
+test('D2d ladder, steps and feet-first board use the existing full contract',()=>{
+  const cases=[
+    {kind:'ladder',fixtures:[fixture('ladder')]},
+    {kind:'steps',fixtures:[fixture('steps')]},
+    {kind:'board',fixtures:[fixture('board',base+64,'west',2),
+      fixture('ladder',base,'north',1)]}
+  ];
+  for(const {kind,fixtures} of cases){
+    const s=home({fixtures}),request={poolId:'pool-1',actionId:kind==='board'?'jump':'swim',
+      ...(kind==='board'?{fixtureId:'fixture-2'}:{})};
+    const a=approach(s,'alex',request);
+    assert.equal(a.entryKind,kind);
+    toStage(s,'alex','swimming',100,true);
+    assert.equal(s.action.waterElapsed,0);
+    advancePoolSwim(s,'alex',SWIM_MINUTES);
+    assert.equal(s.action.stage,'exiting');
+    complete(s,'alex');
+    assert.equal(memory(s,'alex').length,1);
+  }
+});
+
+test('D2d crossing pause, 3x and all stage reloads retains canonical water state',()=>{
+  const s=home();approach(s);
+  for(const stage of ['waiting','entering','swimming','exiting']){
+    if(stage==='entering')advancePoolSwim(s,'alex',1);
+    if(stage==='swimming')toStage(s,'alex','swimming',100,true);
+    if(stage==='exiting')requestPoolExit(s,'alex','player');
+    const loaded=loadHousehold(copy(s));
+    assert.equal(loaded.action?.stage,stage,JSON.stringify({stage,before:s.action,after:loaded.action,event:loaded.event,position:loaded.position}));
+    assert.equal(loaded.action?.waterCell,s.action.waterCell);
+    assert.equal(loaded.shop.credits,s.shop.credits);
+  }
+  const copyPaused=copy(s);
+  s.paused=true;tickHousehold(s,10);
+  assert.equal(s.action.waterCell,copyPaused.action.waterCell);
+  s.paused=false;
+  const alternate=loadHousehold(copy(s));
+  tickHousehold(s,3);
+  for(let i=0;i<3;i++)tickHousehold(alternate,1);
+  assert.equal(s.action?.stage,alternate.action?.stage);
+  complete(s,'alex');
+  assert.equal(memory(s,'alex').length,0,'cancelled exit never counts');
+});
+
+test('D2d one lane blocks overlapping admission; absent fixture recovers rather than hangs',()=>{
+  const s=home({w:2,h:4});
+  approach(s);toStage(s,'alex','swimming');
+  assert.equal(beginPoolSwim(s,'mira',{poolId:'pool-1',actionId:'swim'}),null);
+  s.world.outdoors.poolFixtures=[];
+  const saved=copy(s);
+  const restored=loadHousehold(saved);
+  assert.equal(restored.action,null,'a deleted exit on reload triggers safe dry recovery');
+  assert.ok(isWalkable(restored.position.x,restored.position.z,restored.world));
+  assert.equal(memory(restored,'alex').length,0);
+});
+
+test('D2d autonomous swimming is bounded per resident, deterministic, and cancelable',()=>{
+  const s=home();
+  assert.equal(poolAutoDraw('alex',4,'pool-1'),poolAutoDraw('alex',4,'pool-1'));
+  assert.ok(poolAutoChance(s.personality)>=.12);
+  s.paused=true;
+  assert.equal(considerAutonomousPool(s,'alex'),null,'pause prevents autonomous offers');
+  s.paused=false;
+  // A successful accepted automatic swim uses the same canonical runtime.
+  approach(s);
+  s.action.automatic=true;
+  assert.equal(recordAutonomousPoolStart(s,'alex'),true);
+  assert.equal(s.poolAutoRoutine.byResident.alex.count,1);
+  const restored=loadHousehold(copy(s));
+  assert.equal(restored.action?.automatic,true);
+  assert.equal(restored.poolAutoRoutine.byResident.alex.count,1);
+  setHouseholdAutonomy(restored,false);
+  assert.equal(restored.action.exitRequested,'autonomy-off');
+  const disabled=loadHousehold(copy(restored));
+  assert.equal(disabled.action?.automatic,true,'pending auto cancellation survives reload');
+  tickHousehold(disabled,1);
+  assert.equal(disabled.action,null,'dry waiting cancellation stays on dry land');
+  assert.ok(isWalkable(disabled.position.x,disabled.position.z,disabled.world));
+  assert.equal(memory(disabled,'alex').length,0);
+  assert.equal(disabled.poolAutoRoutine.byResident.alex.count,1);
+  // Only an already submerged swimmer needs the wet exit trajectory.
+  const wet=home();approach(wet);toStage(wet,'alex','swimming');
+  wet.action.automatic=true;
+  setHouseholdAutonomy(wet,false);
+  assert.equal(wet.action.exitRequested,'autonomy-off');
+  const wetReload=loadHousehold(copy(wet));
+  assert.equal(wetReload.action?.automatic,true);
+  complete(wetReload,'alex');
+  assert.equal(memory(wetReload,'alex').length,0);
+});
+
+test('D2d v1 old saves and malicious optional memory/autonomy data fail closed',()=>{
+  const s=home();
+  const old=copy(s);
+  delete old.poolAutoRoutine;delete old.poolFirstSwimAt;
+  const loaded=loadHousehold(old);
+  assert.equal(loaded.version,1);
+  assert.equal(loaded.poolFirstSwimAt,null);
+  assert.equal(loaded.poolAutoRoutine.schema,1);
+  const corrupt=copy(s);
+  corrupt.poolFirstSwimAt=999999999;
+  corrupt.otherSim.poolFirstSwimAt=-99;
+  corrupt.poolAutoRoutine={schema:1,dayIndex:0,byResident:{
+    alex:{lastSlot:999999,count:999,lastStart:-100},
+    mira:{lastSlot:'oops',count:10,lastStart:Infinity}
+  }};
+  const recovered=loadHousehold(corrupt);
+  assert.equal(recovered.poolFirstSwimAt,null);
+  assert.equal(recovered.otherSim.poolFirstSwimAt,null);
+  assert.equal(recovered.poolAutoRoutine.byResident.alex.count,0);
+  assert.equal(recovered.poolAutoRoutine.byResident.mira.count,0);
+});
+
+test('D2d prolonged two-person swim/cancel/reload never overlaps slots or leaks actions',()=>{
+  let s=home();
+  for(let session=0;session<8;session++){
+    for(const id of ['alex','mira']){
+      const a=sim(s,id);
+      a.needs.energy=95;a.needs.bladder=95;a.needs.hunger=95;
+      a.needs.hygiene=95;a.needs.fun=35;
+    }
+    approach(s,'alex');toStage(s,'alex','swimming');
+    approach(s,'mira');toStage(s,'mira','swimming');
+    assert.equal(s.action.slotCells.some(c=>s.otherSim.action.slotCells.includes(c)),false);
+    s=loadHousehold(copy(s));
+    if(session%3===0)requestPoolExit(s,'mira','player');
+    for(let i=0;i<140&&(s.action||s.otherSim.action);i++)tickHousehold(s,1);
+    assert.equal(s.action,null,'Alex still exits');
+    assert.equal(s.otherSim.action,null,'Mira still exits');
+    assert.ok(isWalkable(s.position.x,s.position.z,s.world));
+    assert.ok(isWalkable(s.otherSim.position.x,s.otherSim.position.z,s.world));
+  }
+  assert.equal(memory(s,'alex').length,1);
+  assert.equal(s.version,1);
+});
+
+
+test('D2d wishes only offer reachable real pools and resolve on safe completed swim',()=>{
+  const old=newHousehold();old.needs.fun=35;
+  assert.notEqual((awaitWish(old)),'pool.swim');
+  const s=home();s.needs.energy=90;s.needs.bladder=90;
+  s.needs.fun=24;s.needs.hunger=95;s.needs.hygiene=95;
+  const wish=awaitWish(s);
+  assert.ok(wish&&typeof wish==='string');
+  s.mind.wish={id:'pool.swim',since:s.minutes,until:s.minutes+480};
+  const command=poolWishCommand(s,'alex');
+  assert.deepEqual(command,{type:'pool',poolId:'pool-1',actionId:'swim'});
+  approach(s);toStage(s,'alex','swimming');
+  complete(s,'alex');
+  assert.notEqual(s.mind.wish.id,'pool.swim');
+  assert.equal(memory(s,'alex')[0].fulfilled,true);
+});
+function awaitWish(state){
+  return selectWish(state,null,state.world);
+}
+
+test('D2d disabled autonomy cancels dry walking and waiting without a wet teleport',()=>{
+  for(const stage of ['approaching','waiting']){
+    const s=home();
+    if(stage==='waiting')approach(s);
+    else assert.ok(beginPoolSwim(s,'alex',{poolId:'pool-1',actionId:'swim'}));
+    s.action.automatic=true;
+    const land=copy(s.position);
+    setHouseholdAutonomy(s,false);
+    assert.equal(s.action?.exitRequested,'autonomy-off');
+    tickHousehold(s,1);
+    assert.equal(s.action,null,stage+' must not enter water to cancel');
+    assert.ok(isWalkable(s.position.x,s.position.z,s.world));
+    assert.deepEqual(s.position,land);
+    assert.equal(memory(s,'alex').length,0);
+  }
+});
+
+test('D2d water wish retires safely when player demolishes pool',()=>{
+  const s=home();
+  s.mind.wish={id:'pool.swim',since:s.minutes,until:s.minutes+480};
+  assert.ok(poolWishCommand(s,'alex'));
+  s.world.outdoors.pools=[];s.world.outdoors.poolFixtures=[];
+  tickHousehold(s,1);
+  assert.notEqual(s.mind.wish.id,'pool.swim');
+  assert.equal(poolWishCommand(s,'alex'),null);
+});
+
+
+test('D2d springboard remains a real entry during boarding and after v1 reload',()=>{
+  const s=home({fixtures:[fixture('board',base+64,'west',2),
+    fixture('ladder',base,'north',1)]});
+  approach(s,'alex',{poolId:'pool-1',actionId:'jump',fixtureId:'fixture-2'});
+  advancePoolSwim(s,'alex',1);
+  assert.equal(s.action?.stage,'entering');
+  const restored=loadHousehold(copy(s));
+  assert.equal(restored.action?.stage,'entering','board is validated as an entry, not as an exit');
+  for(let i=0;i<50&&s.action?.stage!=='swimming';i++)advancePoolSwim(s,'alex',1);
+  for(let i=0;i<50&&restored.action?.stage!=='swimming';i++)
+    advancePoolSwim(restored,'alex',1);
+  assert.equal(s.action?.stage,'swimming');
+  assert.equal(restored.action?.stage,'swimming');
+  assert.equal(restored.action?.entryKind,'board');
+  assert.ok(isWalkable(restored.position.x,restored.position.z,restored.world));
+});
+
+test('D2d shore climb charges only unused wet travel time at 1x or 3x',()=>{
+  const baseState=home();
+  approach(baseState);toStage(baseState,'alex','swimming');
+  requestPoolExit(baseState,'alex','player');
+  const large=loadHousehold(copy(baseState)),small=loadHousehold(copy(baseState));
+  for(let iteration=0;iteration<10;iteration++){
+    advancePoolSwim(large,'alex',3);
+    for(let j=0;j<3;j++)advancePoolSwim(small,'alex',1);
+    assert.equal(large.action?.stage,small.action?.stage,
+      'split/combined tick stage '+iteration);
+    assert.equal(large.action?.waterCell,small.action?.waterCell,
+      'no wet path shortcut '+iteration);
+    if(!large.action)break;
+    assert.ok(Math.abs((large.action.elapsed||0)-(small.action.elapsed||0))<1e-7);
+  }
+  assert.equal(large.action,null);
+  assert.equal(small.action,null);
+  assert.ok(isWalkable(large.position.x,large.position.z,large.world));
+});
