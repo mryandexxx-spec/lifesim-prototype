@@ -2058,6 +2058,24 @@ setInterval(() => save(true), 8000);
 function boot() {
   const app = new pc.Application(canvas, { graphicsDeviceOptions: { alpha: false, antialias: true, preserveDrawingBuffer: false } });
   app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+  // LOT-E1: read-only PlayCanvas 2.24 AppStats probe for automated profiling.
+  // Never activated for ordinary play, never writes game state/save or GPU flags.
+  if(new URLSearchParams(location.search).get('lot-e1')==='qa'){
+    const numeric=value=>Number.isFinite(value)?value:null;
+    window.__LifeSimE1Stats=()=>{
+      const s=app.stats;
+      return {
+        frameTimeMs:numeric(s?.frameTime),fps:numeric(s?.fps),
+        drawCallCount:numeric(s?.drawCallCount),
+        cpuUpdateMs:numeric(s?.cpuUpdateTime),
+        cpuRenderMs:numeric(s?.cpuRenderTime),
+        vramBytes:numeric(s?.vramTotalBytes),
+        gpuFrameMs:numeric(s?.gpuFrameTime),
+        canvasWidth:canvas.width,canvasHeight:canvas.height
+      };
+    };
+  }
+
   app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
   app.setCanvasResolution(pc.RESOLUTION_AUTO);
   app.scene.ambientLight = new pc.Color(0.69, 0.70, 0.70);
