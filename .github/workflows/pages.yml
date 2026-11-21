@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Reject automatic historical workflow reactivation
+        run: node scripts/ci-guard.mjs
       - name: Check game rules and browser source syntax
         run: |
           npm ci
