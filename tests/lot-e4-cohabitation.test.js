@@ -239,24 +239,46 @@ test('E4 seven actual game days: two jobs, water -> growth -> harvest -> replant
 test('E4 thirty days: repeated v1 reload mid-shift; settlement, finances and two residents stay bounded',()=>{
  const begin=performance.now();
  let {root,plot}=household(),reloads=0,events={salaries:0,bills:0,departures:0,returns:0};
+ const executed=[];
+ let hadSwim=false;
  const initial=root.shop.credits,initialRecords=root.financialHistory.entries.length;
  const walletOrigin=initial-root.financialHistory.entries.reduce((sum,e)=>sum+e.delta,0);
  for(let step=0;step<30*48;step++){
   workTransitions(root,events);
+  // Day 10: run a second genuinely joint home scenario *during* the long
+  // calendar/work/ledger stress, not merely a static outdoor shape fixture.
+  if(root.minutes===10*1440+1080){
+   for(const id of ['alex','mira']){
+    getActor(root,id).needs.energy=90;
+    getActor(root,id).needs.bladder=90;
+   }
+   queue(root,'alex',{type:'pool',poolId:'pool-1',actionId:'swim',fixtureId:'fixture-1'});
+   queue(root,'alex',{type:'move',x:16,z:6});
+   queue(root,'mira',{type:'garden',instanceId:plot,actionId:'water'});
+   queue(root,'mira',{type:'move',x:16,z:-6});
+  }
+  dispatchHeadless(root,executed);
   if(step===13){
    root.paused=true;
    const snap=copy(root);tickHousehold(root,180);
    assert.deepEqual(root,snap);root.paused=false;
   }
   const emitted=tickHousehold(root,30)||[];
+  hadSwim ||= root.action?.id==='swim'||Number.isFinite(root.poolFirstSwimAt);
   events.salaries+=emitted.filter(e=>e.type==='salary').length;
   events.bills+=emitted.filter(e=>e.type==='bill-issued').length;
-  if(step%24===0||step%48===47){
+  // Phase=working at day clock 12:00: preserve active shifts before pay.
+  if(step%48===8||step%48===47){
    root=reloadAndCompare(root);reloads++;
   }
   if(step%48===47)invariant(root);
  }
  assert.equal(root.minutes,480+30*1440);
+ assert.equal(executed.length,4,'all mid-month pool/garden/FIFO commands executed');
+ assert.equal(new Set(executed.map(x=>x.seq)).size,4);
+ assert.ok(hadSwim,'actual pool runtime advanced during month');
+ assert.ok(root.world.outdoors.gardens[plot].lastWateredAt!==null,
+  'mid-month water action settled while work and finance continued');
  assert.ok(events.salaries>=4,'work salary across month');
  assert.ok(events.departures>=4&&events.returns>=4,'shift lifecycle repeated');
  assert.equal(events.bills,4,'one bill on each weekly issue, not per resident');
@@ -272,9 +294,10 @@ test('E4 thirty days: repeated v1 reload mid-shift; settlement, finances and two
   'saved salary receipts cannot be regenerated');
  assert.equal(root.shop.credits,atEnd.shop.credits,'no phantom funds post reload');
  assert.equal(gardenView(root.world.outdoors,plot,root.minutes).mature,false,
-  'without watering, herbs never mature just from 30 calendar days');
+  'one real watering cannot produce three days of wet garden growth');
  console.log('LOT-E4 30-day combined:',JSON.stringify({days:30,
-  minutes:30*1440,checks:30, reloads, salaries:events.salaries,
+  minutes:30*1440,checks:30, reloads,queueStarted:executed.length,
+  swimStarted:hadSwim,watered:true,salaries:events.salaries,
   workDepartures:events.departures,workReturns:events.returns,
   bills:events.bills,receipts:root.financialHistory.entries.length,
   credits:root.shop.credits,elapsedMs:Math.round(performance.now()-begin)}));
