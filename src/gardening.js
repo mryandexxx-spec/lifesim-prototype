@@ -3,6 +3,9 @@ import {OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {findPath,isWalkable} from './navigation.js';
 import {recordFinanceChange} from './finance-ledger.js';
 import {KITCHEN_HARVEST_UNITS,KITCHEN_HERB_LIMIT} from './kitchen.js';
+import {HOBBY_SKILLS} from './hobby-reading.js';
+import {currentSkillLevel} from './skills-engine.js';
+import {GARDENING_SKILL_ID,gardenSkillBenefits,gardenHarvestUnits} from './garden-skill.js';
 
 export const GARDEN_LIMIT=8;
 export const GARDEN_MATURE_MINUTES=4320;
@@ -136,12 +139,16 @@ export function settleGardenAction(root,residentId,instanceId,actionId){
   if(!gardenActionAllowed(root,residentId,instanceId,actionId,{ignoreReservation:true}))return false;
   const actor=residentId==='mira'?root.otherSim:root;
   if(!actor)return false;
+  const skillLevel=currentSkillLevel(actor.skills,HOBBY_SKILLS,GARDENING_SKILL_ID);
   if(actionId==='harvest'){
-    root.kitchen.pantry.herbs+=KITCHEN_HARVEST_UNITS;
+    const units=gardenHarvestUnits(skillLevel,root.kitchen.pantry.herbs,
+      KITCHEN_HERB_LIMIT,KITCHEN_HARVEST_UNITS);
+    if(units<KITCHEN_HARVEST_UNITS)return false;
+    root.kitchen.pantry.herbs+=units;
     root.world.outdoors.gardens[instanceId]={
       ...advanceGardenRecord(root.world.outdoors.gardens[instanceId],root.minutes),
       harvestedAt:root.minutes};
-    actor.event='Собраны садовые травы · +'+KITCHEN_HARVEST_UNITS;
+    actor.event='Собраны садовые травы · +'+units;
     return true;
   }
   if(actionId==='replant'){
@@ -160,7 +167,8 @@ export function settleGardenAction(root,residentId,instanceId,actionId){
     const previous=root.world.outdoors.gardens[instanceId];
     const progressed=advanceGardenRecord(previous,root.minutes);
     root.world.outdoors.gardens[instanceId]={...progressed,
-      lastWateredAt:root.minutes,hydratedUntil:root.minutes+GARDEN_HYDRATION_MINUTES};
+      lastWateredAt:root.minutes,hydratedUntil:root.minutes+
+        GARDEN_HYDRATION_MINUTES+gardenSkillBenefits(skillLevel).hydrationBonusMinutes};
     actor.needs.energy=Math.max(0,actor.needs.energy-2);
     actor.event='Полил(а) грядку — растение растёт';
   }else if(actionId==='inspect'){

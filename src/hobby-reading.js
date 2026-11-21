@@ -27,6 +27,7 @@ export const readingBookMinLevel=contentId=>
   READING_BOOKS.find(book=>book.id===contentId)?.minLevel??null;
 export const READING_SKILL_ID='literature';
 export const CHARISMA_SKILL_ID='charisma';
+export const GARDENING_SKILL_ID='gardening';
 /** Modest bonuses only; never override consent or social policy. */
 export function charismaSocialBonus(progress){
   const level=currentSkillLevel(progress,HOBBY_SKILLS,CHARISMA_SKILL_ID);
@@ -60,6 +61,14 @@ export const HOBBY_SKILLS=createSkillRegistry({skills:[{
   id:CHARISMA_SKILL_ID,label:'Харизма',group:'social',maxLevel:10,
   xpThresholds:[35,85,150,240,350,485,650,850,1090,1360],
   practiceTags:['social.speech'],unlocks:[]
+},{
+  id:GARDENING_SKILL_ID,label:'Садоводство',group:'knowledge',maxLevel:10,
+  xpThresholds:[30,75,135,215,310,425,565,735,940,1190],
+  practiceTags:['garden.water','garden.harvest','garden.replant'],
+  unlocks:[{id:'garden.hydration-1',minLevel:3},
+    {id:'garden.yield-1',minLevel:6},
+    {id:'garden.hydration-2',minLevel:8},
+    {id:'garden.yield-2',minLevel:10}]
 }]});
 export const HOBBY_CONTENT=createHobbyContentCatalog({entries:[
   ...READING_BOOKS.map(book=>({id:book.id,kind:'book',label:book.label,
