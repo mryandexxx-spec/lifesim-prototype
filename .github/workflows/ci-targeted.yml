@@ -13,6 +13,7 @@ jobs:
     timeout-minutes: 25
     outputs:
       browser: ${{ steps.impact.outputs.browser }}
+      e5: ${{ steps.impact.outputs.e5 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,6 +53,16 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: LOT-E5 full four-viewport cross-mode release QA (only when E5 changes)
+        if: ${{ needs.targeted.outputs.e5 == 'true' }}
+        run: node tests/lot-e5-browser-smoke.mjs
+      - name: Upload LOT-E5 cross-mode release evidence
+        if: ${{ always() && needs.targeted.outputs.e5 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lot-e5-cross-mode-pr
+          path: artifacts/lot-e5/
+          if-no-files-found: ignore
       - name: Preserve boot screenshot on failure
         if: failure()
         uses: actions/upload-artifact@v4
