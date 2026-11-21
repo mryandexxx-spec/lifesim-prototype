@@ -70,7 +70,7 @@ export function createCameraGestureSession(){
       // Do not spin on sensor noise or when two fingers nearly overlap.
       const twist=previousPair.distance>=20&&nextPair.distance>=20&&
         Math.abs(rawTwist)>=.35
-        ?Math.max(-28,Math.min(28,rawTwist)):0;
+        ?Math.max(-45,Math.min(45,rawTwist)):0;
       previousPair=nextPair;
       // Parallel two-finger drag (midpoint) and true finger-pair twist
       // both rotate; pinch remains an independent zoom around the same view.
