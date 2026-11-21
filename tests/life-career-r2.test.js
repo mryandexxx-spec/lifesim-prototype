@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
+import {plannedCareerShift} from '../src/career-scheduler.js';
 import {CAREER_CATALOG} from '../src/career-catalog.js';
 import {CAREER_SPECIALIZATIONS,chooseCareerSpecialization} from '../src/career-specializations.js';
 import {CAREER_R2_SCENES} from '../src/career-r2-scenes.js';
@@ -96,11 +97,12 @@ test('two residents resolve separate specialist cases once, with intact credits 
     c.level=4;c.workedShifts=4;
     assert.equal(chooseCareerSpecialization(root,id,track).ok,true);
     c.level=5;
-    c.currentShift={id:c.employmentId+'@0@0',careerId:career,
-      start:0,end:480,duration:480,phase:'working',departedAt:0,
+    const actualShift=plannedCareerShift(root.calendar,c,1);
+    assert.ok(actualShift,'Both careers actually work on Tuesday');
+    c.currentShift={...actualShift,phase:'working',departedAt:actualShift.start,
       readiness:75,incident:null};
   }
-  root.minutes=245;root.otherSim.minutes=245;
+  root.minutes=2285;root.otherSim.minutes=2285;
   const funds=root.shop.credits,skills=copy(root.skills);
   for(const [id,career,scene] of [['alex','kitchen-studio','kitchen-tasting'],
     ['mira','editorial','editorial-grid']]){
@@ -129,6 +131,8 @@ test('verified promotion evidence keeps selection priority over recent repetitio
   const focused=workScenario('city-services','city-missing');
   const history=st.root.careerSystem.incidentHistory.alex;
   history.push({careerId:'city-services',scenarioId:'city-missing',choiceId:'trace',performanceDelta:4});
+  // A different latest incident avoids the original canonical no-immediate-repeat gate.
+  history.push({careerId:'city-services',scenarioId:'city-route',choiceId:'plan',performanceDelta:4});
   st.root.careerSystem.byResident.alex.workedShifts=8;
   assert.equal(selectWorkScenario(st.root,'alex'),'city-missing',
     'Missing genuine branch proof outranks repetition cooldown');
