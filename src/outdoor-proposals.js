@@ -16,6 +16,21 @@ import {outdoorBenchApproach,outdoorBenchBusy} from './outdoor-interactions.js';
 import {GARDEN_LIMIT,isGardenItem,newGardenRecord,gardenApproach,gardenBusy} from './gardening.js';
 
 const fail=reason=>({ok:false,reason});
+/** Canonical saves are JSON-safe, but restored optional extensions can have
+ * different object key insertion order (garden records precede pool fields).
+ * Comparing serialized text rejects otherwise identical valid transactions.
+ * Arrays retain exact order; records compare keys by identity and value.
+ */
+function sameJson(a,b){
+  if(Object.is(a,b))return true;
+  if(!a||!b||typeof a!=='object'||typeof b!=='object')return false;
+  if(Array.isArray(a)||Array.isArray(b))
+    return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&
+      a.every((value,i)=>sameJson(value,b[i]));
+  const keys=Object.keys(a);
+  return keys.length===Object.keys(b).length&&keys.every(key=>
+    Object.hasOwn(b,key)&&sameJson(a[key],b[key]));
+}
 const integer=n=>Number.isSafeInteger(n)&&n>=0;
 const participantPositions=root=>[root?.position,root?.otherSim?.position].filter(
   p=>Number.isFinite(p?.x)&&Number.isFinite(p?.z));
@@ -179,7 +194,7 @@ export function commitOutdoorPreview(root,proposal){
   // Exact projection cannot introduce unwhitelisted entries even when a
   // caller sends a damaged draft. The editor should still re-preview at apply.
   const verified=restoreOutdoorsWorld(proposal.outdoors,root.world.construction);
-  if(JSON.stringify(verified)!==JSON.stringify(proposal.outdoors))
+  if(!sameJson(verified,proposal.outdoors))
     return fail('invalid-projection');
   if(root.shop.credits<proposal.cost)return fail('insufficient-credits');
   const nextShop={...root.shop,credits:root.shop.credits-proposal.cost};
