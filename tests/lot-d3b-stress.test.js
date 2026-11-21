@@ -56,7 +56,9 @@ test('D3b: thirty days of shared clock, garden, pool, work, bills, reload and bo
   const garden=previewOutdoorFeatureEdit(root,{operation:'place',
     itemId:'garden.herb.mint',pose:{x:19,z:11,yaw:0}});
   assert.equal(garden.ok,true,garden.reason);
-  root=commitOutdoorFeatureEdit(root,garden).root;
+  const placed=commitOutdoorFeatureEdit(root,garden);
+  assert.equal(placed.ok,true,placed.reason);
+  root=placed.root;
   const start=root.minutes,seedBalance=root.shop.credits;
   const t0=performance.now();
   for(let day=0;day<30;day++){
