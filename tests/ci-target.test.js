@@ -17,6 +17,11 @@ test('camera modification routes precise touch regression and one browser smoke'
   assert.ok(plan.tests.includes('tests/camera-gestures.test.js'));
   assert.ok(plan.browser);
 });
+test('phone UI edits must run one-screen PlayCanvas smoke (CAREER-R1)',()=>{
+  assert.equal(planChanges(['src/career-phone-ui.js']).browser,true);
+  assert.equal(planChanges(['src/finance-phone-ui.js']).browser,true);
+  assert.equal(planChanges(['src/career-incidents.js']).browser,false);
+});
 test('finance edit retains the direct ledger guards',()=>{
   assert.ok(planChanges(['src/finance-ledger.js']).tests.includes('tests/w4a-finance.test.js'));
 });
