@@ -80,6 +80,60 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
     if(cells.size>=OUTDOOR_GROUND_LIMIT)break;
   }
   next.ground=[...cells].sort(([a],[b])=>a-b).map(([cell,kind])=>({cell,kind}));
+  // Recovery precedence: an individually valid saved pool is paid terrain.
+  // Restore its topology BEFORE optional decorative records, otherwise a
+  // corrupted stray feature can silently erase an already purchased basin.
+  // Invalid/overlapping/house-intersecting pool candidates claim no territory.
+  const hasPoolExtension=['pools','nextPoolId','poolTxnSeq','poolFixtures','nextFixtureId']
+    .some(field=>Object.hasOwn(raw,field));
+  const recoveredPools=[],occupiedPoolCells=new Set(),poolIds=new Set();
+  let largestPoolId=0,totalWater=0;
+  if(hasPoolExtension&&Array.isArray(raw.pools))
+    for(const saved of raw.pools.slice(0,POOL_MAX_COMPONENTS*4)){
+      if(recoveredPools.length>=POOL_MAX_COMPONENTS)break;
+      const sorted=canonicalPoolCells(saved?.cells);
+      if(!validPoolId(saved?.poolId)||poolIds.has(saved.poolId)||!sorted||
+         totalWater+sorted.length>POOL_MAX_CELLS||
+         poolComponents(sorted).length!==1)continue;
+      let blocked=false;
+      for(const cell of sorted){
+        if(occupiedPoolCells.has(cell)){blocked=true;break;}
+        if(construction){
+          const b=poolCellBounds(cell),q=.02;
+          const sites=[[b.minX+q,b.minZ+q],[b.maxX-q,b.minZ+q],
+            [b.minX+q,b.maxZ-q],[b.maxX-q,b.maxZ-q],
+            [(b.minX+b.maxX)/2,(b.minZ+b.maxZ)/2]];
+          if(sites.some(([x,z])=>constructionContains(construction,x,z))){
+            blocked=true;break;
+          }
+        }
+      }
+      if(blocked)continue;
+      poolIds.add(saved.poolId);
+      largestPoolId=Math.max(largestPoolId,poolIdNumber(saved.poolId));
+      totalWater+=sorted.length;
+      for(const cell of sorted)occupiedPoolCells.add(cell);
+      recoveredPools.push({poolId:saved.poolId,cells:sorted});
+    }
+  const protectedWater={revision:next.revision,pools:recoveredPools};
+  // A validated paid ladder/steps exit has a dry approach clearance. A damaged
+  // decorative object on that clearance must not invalidate the purchased exit.
+  const protectedLandings=[],fixtureIds=new Set(),fixtureEdges=new Set();
+  if(hasPoolExtension&&Array.isArray(raw.poolFixtures))
+    for(const fixture of raw.poolFixtures.slice(0,POOL_FIXTURE_LIMIT*4)){
+      if(protectedLandings.length>=POOL_FIXTURE_LIMIT||
+         !validPoolFixture(fixture,recoveredPools)||
+         fixtureIds.has(fixture.fixtureId))continue;
+      const edge=fixture.edgeCell+':'+fixture.side;
+      if(fixtureEdges.has(edge))continue;
+      const pool=recoveredPools.find(p=>p.poolId===fixture.poolId);
+      const point=poolFixtureSite(pool,fixture.edgeCell,fixture.side,fixture.kind)?.dryApproach;
+      if(!point||(construction&&constructionContains(construction,point.x,point.z)))
+        continue;
+      fixtureIds.add(fixture.fixtureId);fixtureEdges.add(edge);
+      protectedLandings.push({minX:point.x-.26,maxX:point.x+.26,
+        minZ:point.z-.26,maxZ:point.z+.26});
+    }
   const seen=new Set(),rects=[];
   let greatestId=0,gardenCount=0;
   if(Array.isArray(raw.features))for(const saved of raw.features.slice(0,OUTDOOR_FEATURE_LIMIT*4)){
@@ -87,10 +141,11 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
     if(!validOutdoorId(saved?.instanceId)||seen.has(saved.instanceId)||
        !OUTDOOR_CATALOG[saved?.itemId]||
        ![0,90,180,270].includes(saved.yaw)||
-       !outdoorFeatureFits(saved,construction)||
+       !outdoorFeatureFits(saved,construction,protectedWater)||
        !Number.isSafeInteger(saved.purchasePriceCredits)||
        saved.purchasePriceCredits<0||saved.purchasePriceCredits>1000000)continue;
     const rect=outdoorFeatureRect(saved);
+    if(protectedLandings.some(landing=>outdoorRectsOverlap(landing,rect)))continue;
     if(isGardenItem(saved.itemId)&&gardenCount>=GARDEN_LIMIT)continue;
     if(rects.some(prior=>outdoorRectsOverlap(prior,rect)))continue;
     if(isGardenItem(saved.itemId))gardenCount++;
@@ -104,43 +159,13 @@ export function restoreOutdoorsWorld(raw,construction=null,atGameMinute=null){
     raw.nextId<=10000000?raw.nextId:1;
   next.nextId=Math.min(10000000,Math.max(requestedId,greatestId+1));
   if(gardenCount)next.gardens=restoreGardens(raw.gardens,next.features,atGameMinute);
-  // A pre-pool v1 save must retain its EXACT historical outdoor JSON shape.
-  // Add the optional extension only after a pool-specific field was persisted.
-  // Reject only a damaged pool, never reset the home, garden or household.
-  const hasPoolExtension=['pools','nextPoolId','poolTxnSeq','poolFixtures','nextFixtureId']
-    .some(field=>Object.hasOwn(raw,field));
+  // A pre-pool v1 save retains its exact historical optional-field shape.
+  // Reuse prevalidated basin candidates; decorative corruption cannot win
+  // by changing the later restore order or introducing a fake purchase.
   if(hasPoolExtension){
-    next.pools=[];next.nextPoolId=1;next.poolTxnSeq=0;
-    const accepted=new Set(),poolIds=new Set();
-  let largestPoolId=0,totalWater=0;
-  if(Array.isArray(raw.pools))for(const saved of raw.pools.slice(0,POOL_MAX_COMPONENTS*4)){
-    if(next.pools.length>=POOL_MAX_COMPONENTS)break;
-    const sorted=canonicalPoolCells(saved?.cells);
-    if(!validPoolId(saved?.poolId)||poolIds.has(saved.poolId)||!sorted||
-       totalWater+sorted.length>POOL_MAX_CELLS||
-       poolComponents(sorted).length!==1)continue;
-    let blocked=false;
-    for(const cell of sorted){
-      if(accepted.has(cell)){blocked=true;break;}
-      const b=poolCellBounds(cell);
-      if(rects.some(rect=>outdoorRectsOverlap(rect,b))){blocked=true;break;}
-      if(construction){
-        const q=.02;
-        const sites=[[b.minX+q,b.minZ+q],[b.maxX-q,b.minZ+q],
-          [b.minX+q,b.maxZ-q],[b.maxX-q,b.maxZ-q],
-          [(b.minX+b.maxX)/2,(b.minZ+b.maxZ)/2]];
-        if(sites.some(([x,z])=>constructionContains(construction,x,z))){
-          blocked=true;break;
-        }
-      }
-    }
-    if(blocked)continue;
-    poolIds.add(saved.poolId);
-    largestPoolId=Math.max(largestPoolId,poolIdNumber(saved.poolId));
-    totalWater+=sorted.length;
-    for(const cell of sorted)accepted.add(cell);
-    next.pools.push({poolId:saved.poolId,cells:sorted});
-  }
+    next.pools=recoveredPools;
+    next.nextPoolId=1;
+    next.poolTxnSeq=0;
   const wantedPoolId=Number.isSafeInteger(raw.nextPoolId)&&raw.nextPoolId>=1&&
     raw.nextPoolId<=10000000?raw.nextPoolId:1;
   next.nextPoolId=Math.min(10000000,Math.max(wantedPoolId,largestPoolId+1));
