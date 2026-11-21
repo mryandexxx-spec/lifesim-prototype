@@ -114,35 +114,56 @@ try{
    verify(day.saved);
    assert.equal(day.phase,'day','day scene seeded at 12:00');
    await page.screenshot({path:'artifacts/lot-e4/day-'+name+'.png'});
-   // Reload a specifically saved NIGHT snapshot; never confuse this
-   // with 12 real hours of browser-side autonomous simulation.
-   await page.evaluate(({key,minutes})=>{
-    const saved=JSON.parse(localStorage.getItem(key));
-    saved.minutes=minutes;saved.otherSim.minutes=minutes;
-    // This is a freshly seeded NIGHT fixture, not 600 simulated minutes.
-    // Preserve real policy: an old pool FIFO expires after 60 game minutes;
-    // date the fixture's request at its new test starting clock instead.
-    for(const task of saved.actionQueues?.byResident?.alex||[])
-     if(task.type==='pool')task.queuedAt=minutes;
-    localStorage.setItem(key,JSON.stringify(saved));
-   },{key:SAVE_KEY,minutes:1320});
-   await page.reload({waitUntil:'domcontentloaded'});
-   await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
-   await page.locator('#pause-btn').click();
-   const night=await page.evaluate(async key=>{
-    const saved=JSON.parse(localStorage.getItem(key));
-    const {sampleWorldLighting}=await import('/src/day-night-cycle.js');
-    return {saved,phase:sampleWorldLighting(saved.calendar,saved.minutes).phase};
-   },SAVE_KEY);
-   verify(night.saved);
-   assert.equal(night.phase,'night','night scene seeded at 22:00');
-   assert.equal(night.saved.shop.credits,day.saved.shop.credits,
-    'day-night reload cannot debit family wallet');
-   assert.deepEqual(night.saved.financialHistory,day.saved.financialHistory,
-    'no phantom purchases or salary for a timestamp-only QA reload');
-   assert.equal((await page.evaluate(()=>window.__LifeSimPoolVisualStats?.()))?.hasPool,
-    true,'pool survived simultaneous household reload');
-   await page.screenshot({path:'artifacts/lot-e4/night-'+name+'.png'});
+   // The old test changed localStorage *behind a live WebGL instance*,
+   // which then re-saved its older day state on navigation. Create a separate
+   // browser context with a genuine night save BEFORE boot, then reload it.
+   // This checks the actual night scene instead of racing a live save timer.
+   const nightSeed=structuredClone(day.saved);
+   nightSeed.minutes=1320;nightSeed.otherSim.minutes=1320;
+   for(const task of nightSeed.actionQueues?.byResident?.alex||[])
+    if(task.type==='pool')task.queuedAt=1320;
+   const nightContext=await browser.newContext({viewport:{width:w,height:h},
+    deviceScaleFactor:1,isMobile:true,hasTouch:true});
+   try{
+    await nightContext.addInitScript(({key,record,tour})=>{
+     if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
+     localStorage.setItem(tour,'done');
+    },{key:SAVE_KEY,record:nightSeed,tour:UI_TOUR_STORAGE_KEY});
+    const nightPage=await nightContext.newPage();
+    nightPage.on('pageerror',e=>errors.push(e.message));
+    nightPage.on('crash',()=>errors.push('night renderer crash'));
+    await nightPage.goto('http://127.0.0.1:8765/?pool=qa&lot-e4=1',
+     {waitUntil:'domcontentloaded'});
+    await nightPage.locator('#loading').waitFor({state:'hidden',timeout:80000});
+    await nightPage.locator('#pause-btn').click();
+    const nightState=async()=>nightPage.evaluate(async key=>{
+     const saved=JSON.parse(localStorage.getItem(key));
+     const {sampleWorldLighting}=await import('/src/day-night-cycle.js');
+     return {saved,phase:sampleWorldLighting(saved.calendar,saved.minutes).phase};
+    },SAVE_KEY);
+    const night=await nightState();
+    verify(night.saved);
+    assert.ok(night.saved.minutes>=1320&&night.saved.minutes<1350,
+     name+' night clock must survive WebGL boot; got '+night.saved.minutes);
+    assert.equal(night.phase,'night','night scene seeded at 22:00');
+    assert.equal(night.saved.shop.credits,day.saved.shop.credits,
+     'night bootstrap cannot debit family wallet');
+    assert.deepEqual(night.saved.financialHistory,day.saved.financialHistory,
+     'night bootstrap cannot invent finance entries');
+    assert.equal((await nightPage.evaluate(()=>window.__LifeSimPoolVisualStats?.()))?.hasPool,
+     true,'night pool rendered alongside garden');
+    await nightPage.screenshot({path:'artifacts/lot-e4/night-'+name+'.png'});
+    await nightPage.reload({waitUntil:'domcontentloaded'});
+    await nightPage.locator('#loading').waitFor({state:'hidden',timeout:80000});
+    await nightPage.locator('#pause-btn').click();
+    const restored=await nightState();
+    verify(restored.saved);
+    assert.equal(restored.phase,'night',name+' persisted night remains night after reload');
+    assert.equal(restored.saved.shop.credits,night.saved.shop.credits);
+    assert.deepEqual(restored.saved.financialHistory,night.saved.financialHistory);
+   }finally{
+    await nightContext.close();
+   }
    assert.deepEqual(errors,[],name+' WebGL/javascript errors');
    report.push({viewport:name,webgl:gl.webgl,day:day.phase,night:night.phase,
     twoResidents:true,careers:2,manualFifo:true,garden:true,pool:true,
