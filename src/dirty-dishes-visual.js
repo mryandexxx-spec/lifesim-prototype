@@ -3,7 +3,6 @@
  * Four fixed stacks per real kitchen station, at most 8 plates per stack.
  */
 export const DISH_VISUAL_CAP=32;
-export const DISH_AUTO_WASH_THRESHOLD=6;
 const slots=Object.freeze([
   Object.freeze({x:-.37,z:.20}),
   Object.freeze({x:-.36,z:-.20}),
