@@ -270,7 +270,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         readingReady:Boolean(state.readingRuntime?.ready),
          musicBusy:musicFrame?.phase==='using',musicReady:Boolean(state.musicRuntime?.ready),
         paintingReady:Boolean(state.paintingRuntime?.ready),
-        outdoorReady:Boolean(state.outdoorRuntime),
+        outdoorReady:Boolean(state.outdoorRuntime)&&(actionId==='swim'||outdoorFrame?.kind==='water'),
         bedReady:Boolean(state.bedRuntime?.ready),
         showerReady:Boolean(state.showerRuntime?.ready),
         toiletBusy,toiletReady:state.toiletReady

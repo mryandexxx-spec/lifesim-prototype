@@ -294,7 +294,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
         readingReady:Boolean(state.readingRuntime?.ready),
         musicBusy:musicFrame?.phase==='using',musicReady:Boolean(state.musicRuntime?.ready),
         paintingReady:Boolean(state.paintingRuntime?.ready),
-        outdoorReady:Boolean(state.outdoorRuntime),
+        outdoorReady:Boolean(state.outdoorRuntime)&&(actionId==='swim'||outdoorFrame?.kind==='water'),
         toiletBusy,toiletReady:state.toiletReady
       });
       const support=platformBed?bedSkinSupport('mira',bedFrame):null;

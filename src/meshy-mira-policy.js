@@ -43,7 +43,7 @@ export function canShowMiraMeshy({preferred=false,ready=false,actionId=null,
   fridgeBusy=false,fridgeReady=false,readingReady=false,musicBusy=false,musicReady=false,outdoorReady=false,paintingReady=false,toiletBusy=false,toiletReady=false}={}){
   const eligible=actionId===null||['lamp','mirror','dresser','wardrobe','cook','prep','wash'].includes(actionId)||
     (actionId==='music'&&(!musicBusy||musicReady))||(actionId==='hobby'&&readingReady)||
-    (['swim','water'].includes(actionId)&&outdoorReady)||
+    (['swim','garden'].includes(actionId)&&outdoorReady)||
     (actionId==='paint'&&paintingReady)||
     (actionId==='sofa'&&sofaReady)||
     (actionId==='bed'&&bedReady)||(actionId==='fridge'&&fridgeReady)||

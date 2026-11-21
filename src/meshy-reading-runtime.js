@@ -111,8 +111,8 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     leaf.enabled=spreadVisible&&turn>0&&turn<1;
     if(leaf.enabled){
       const angle=Math.PI*turn;
-      leaf.setLocalPosition(.108*Math.cos(angle),.009+.108*Math.sin(angle),0);
-      leaf.setLocalEulerAngles(0,0,turn*180);
+      leaf.setLocalPosition(-.108*Math.cos(angle),.009+.108*Math.sin(angle),0);
+      leaf.setLocalEulerAngles(0,0,-turn*180);
     }
     if(spreadVisible){
       leftPage.setLocalEulerAngles(0,0,-(1-open)*65);
