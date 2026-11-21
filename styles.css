@@ -2426,3 +2426,11 @@ button.time-card:active {transform:translateY(1px);}
  #dashboard.dashboard .need output{font-size:10px}
  #dashboard .need-trend{flex-basis:9px;min-width:9px;width:9px;font-size:13px}
 }
+
+/* DISH-R1: compact always-readable count, no new persistent HUD panel. */
+.topbar #dish-alert{margin-right:7px;min-height:44px;min-width:57px;padding:7px 9px;
+ border:1px solid #d0c4ac;border-radius:13px;background:#fff7e9ed;color:#745132;
+ box-shadow:0 5px 15px #584b331c;font:800 13px system-ui,sans-serif;
+ white-space:nowrap;touch-action:manipulation;pointer-events:auto;}
+.topbar #dish-alert[hidden]{display:none!important;}
+@media(max-width:370px){.topbar #dish-alert{min-width:48px;padding:7px 6px;margin-right:4px;font-size:12px}}
