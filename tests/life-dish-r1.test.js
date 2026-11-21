@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold,chooseResidentAction,tickHousehold,
   residentAutonomousChoice,furnitureAvailable} from '../src/household.js';
-import {newKitchen,recordDirtyDish,washKitchenDishes} from '../src/kitchen.js';
-import {dirtyDishVisualPlan,DISH_VISUAL_CAP,DISH_AUTO_WASH_THRESHOLD} from '../src/dirty-dishes-visual.js';
+import {DISH_AUTO_WASH_THRESHOLD,newKitchen,recordDirtyDish,washKitchenDishes} from '../src/kitchen.js';
+import {dirtyDishVisualPlan,DISH_VISUAL_CAP} from '../src/dirty-dishes-visual.js';
 import {furnitureActionApproach} from '../src/furniture-catalog.js';
 import {arrive,ACTIONS,SAVE_KEY} from '../src/simulation.js';
 import {readFileSync} from 'node:fs';
