@@ -1,11 +1,5 @@
 name: F4E functional furniture regression
 on:
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'index.html'
-      - '.github/workflows/**'
   workflow_dispatch:
 permissions:
   contents: read
