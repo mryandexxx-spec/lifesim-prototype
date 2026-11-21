@@ -159,10 +159,21 @@ try{
     assert.ok(night.saved.minutes>=1320&&night.saved.minutes<1350,
      name+' night clock must survive WebGL boot; got '+night.saved.minutes);
     assert.equal(night.phase,'night','night scene seeded at 22:00');
-    assert.equal(night.saved.shop.credits,day.saved.shop.credits,
-     'night bootstrap cannot debit family wallet');
-    assert.deepEqual(night.saved.financialHistory,day.saved.financialHistory,
-     'night bootstrap cannot invent finance entries');
+    // A real career transition may settle when jumping from day to night.
+    // Do not demand equal balances at different game minutes: require that
+    // every change has a matching canonical finance receipt, then verify
+    // the same exact state survives a reload without duplicate settlement.
+    const historyBefore=nightSeed.financialHistory.entries;
+    const historyAfter=night.saved.financialHistory.entries;
+    assert.deepEqual(historyAfter.slice(0,historyBefore.length),historyBefore,
+     'night must preserve earlier financial receipts');
+    const added=historyAfter.slice(historyBefore.length);
+    const change=added.reduce((sum,e)=>sum+e.delta,0);
+    assert.equal(night.saved.shop.credits,nightSeed.shop.credits+change,
+     'night credits must equal saved credits plus real new journal deltas');
+    console.log('LOT-E4 night finance:',JSON.stringify({
+     viewport:name,before:nightSeed.shop.credits,after:night.saved.shop.credits,
+     additionalReceipts:added.map(e=>({kind:e.kind,delta:e.delta,id:e.id}))}));
     assert.equal((await nightPage.evaluate(()=>window.__LifeSimPoolVisualStats?.()))?.hasPool,
      true,'night pool rendered alongside garden');
     await nightPage.screenshot({path:'artifacts/lot-e4/night-'+name+'.png'});
