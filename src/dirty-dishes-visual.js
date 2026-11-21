@@ -24,9 +24,8 @@ export function dirtyDishVisualPlan(kitchen,world){
   // Once all home surfaces reach 32 plates, no more renderer entities can appear.
   const visible=[];
   for(let index=0;index<count;index++){
-    const station=surfaces[Math.floor(index/32)%surfaces.length];
-    const layerIndex=Math.floor(index/(32*surfaces.length));
-    const localIndex=(index%32+layerIndex)%32;
+    const station=surfaces[Math.min(surfaces.length-1,Math.floor(index/16))];
+    const localIndex=surfaces.length>1?index%16:index;
     const stack=Math.floor(localIndex/8),height=localIndex%8;
     const offset=slots[stack];
     // Every plate is centered above an existing furniture footprint, not an A* lane.
