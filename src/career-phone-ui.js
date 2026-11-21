@@ -20,7 +20,7 @@ import {quoteReadyMeal} from './ready-food.js';
 import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff,
   claimPortableCareerLeave} from './career-timeoff.js';
 import {payHouseholdBill} from './household-bills.js';
-import {workScenario,decideWorkIncident,workIncidentChoiceDescription,pendingWorkIncident} from './career-incidents.js';
+import {workScenario,decideWorkIncident,workIncidentChoiceDescription,pendingWorkIncident,workStoryFollowUp} from './career-incidents.js';
 import {jobSatisfaction,workLoadLabel,workLifeConflict} from './career-worklife.js';
 import {resolveWorkLifeConflict} from './career-worklife-conflict.js';
 import {MEMORY_TEXT} from './psychology.js';
@@ -415,7 +415,13 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
         heading.id='career-pending-incident-title';heading.tabIndex=-1;
       }
       body.append(heading);
-      if(Number.isInteger(scenario.minRank)&&Number.isInteger(scenario.maxRank)){
+      if(scenario.trackId){
+        const track=specializationDefinition(current.careerId,scenario.trackId);
+        body.append(element('p','career-phone-muted',
+          'История специализации · '+(track?.title||'Профильная задача')+
+          ' · ступени 6–8'+(workStoryFollowUp(root,who,scenario)?
+            ' · продолжение предыдущего решения':'')));
+      }else if(Number.isInteger(scenario.minRank)&&Number.isInteger(scenario.maxRank)){
         body.append(element('p','career-phone-muted',
           (scenario.minRank>=5?'История старшей должности':'История начала карьеры')+
           ' · ступени '+(scenario.minRank+1)+'–'+(scenario.maxRank+1)));
@@ -967,6 +973,8 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       if(!scenario||!option)continue;
       const card=element('article','career-phone-answer career-work-story');
       card.append(element('strong',null,scenario.title));
+      if(scenario.trackId)card.append(element('small',null,
+        'Специализация · '+(specializationDefinition(record.careerId,scenario.trackId)?.title||'')));
       card.append(element('small',null,(careerDefinition(record.careerId)?.title||'Работа')+
         ' · '+gameDueLabel(root,record.at)+
         ' · '+(record.auto?'Решил самостоятельно':'Выбор игрока')));

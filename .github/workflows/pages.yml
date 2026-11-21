@@ -58,6 +58,7 @@ jobs:
           node --check src/pool-swim-visual.js
           node --check src/pool-touch-policy.js
           node --check src/career-r1-scenes.js
+          node --check src/career-r2-scenes.js
           node --check src/career-incidents.js
           node --check src/career-progression.js
           node --check src/career-specializations.js
@@ -289,7 +290,7 @@ jobs:
           cp src/furniture-placement-preview.js src/furniture-owned-preview.js site/src/
           cp src/career-catalog.js src/career-scheduler.js src/career-state.js src/career-job-board.js src/career-phone-ui.js src/career-shift-summary-ui.js site/src/
           cp src/career-discipline.js src/career-timeoff.js src/career-worklife.js src/career-worklife-conflict.js site/src/
-          cp src/career-work-needs.js src/career-work.js src/career-r1-scenes.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js src/finance-ledger.js src/finance-presentation.js src/finance-phone-ui.js src/household-bills.js site/src/
+          cp src/career-work-needs.js src/career-work.js src/career-r1-scenes.js src/career-r2-scenes.js src/career-incidents.js src/career-progression.js src/career-recruitment.js src/career-interview-content.js src/finance-ledger.js src/finance-presentation.js src/finance-phone-ui.js src/household-bills.js site/src/
           cp src/career-goals.js src/career-specializations.js src/career-seniority.js src/career-map.js src/career-map-ui.js site/src/
           cp src/ux06-phone-state.js site/src/
           cp src/ux07-finance-summary.js site/src/
