@@ -1,0 +1,42 @@
+name: LOT-D3b — 30-day mixed life stress and four mobile WebGL recovery
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stress-and-mobile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned PlayCanvas and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: 30 game days, 100 pool edit/undo loops, exact v1 and full Node regression
+        run: |
+          node --check tests/lot-d3b-stress.test.js
+          node --check tests/lot-d3b-browser-smoke.mjs
+          node --test tests/lot-d3b-stress.test.js
+          npm test
+      - name: Real PlayCanvas WebGL mobile rotation, context recovery and reload
+        run: |
+          mkdir -p vendor artifacts/lot-d3b
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-d3b-webgl.log 2>&1 &
+          sleep 3
+          node tests/lot-d3b-browser-smoke.mjs
+      - name: Upload four viewport evidence and recovery report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lot-d3b-mobile-webgl-stress-evidence
+          path: artifacts/lot-d3b/
+          if-no-files-found: ignore
