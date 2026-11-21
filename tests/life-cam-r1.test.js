@@ -16,7 +16,7 @@ test('two-finger quarter twist rotates yaw while final midpoint stays fixed',()=
   assert.equal(g.begin(p(2,200,100),20),true);
   let s=g.move(p(1,150,50),before,844);
   s=g.move(p(2,150,150),s.view,844);
-  assert.ok(angleGap(s.view.yaw,before.yaw)>80,'a quarter twist needs a responsive yaw');
+  assert.ok(close(s.view.yaw,before.yaw+90),'clockwise quarter-turn must follow the fingers 1:1');
   assert.ok(close(s.view.pitch,before.pitch),'fixed midpoint must not tilt');
   assert.ok(close(s.view.distance,before.distance),'no lasting zoom if finger spacing unchanged');
   assert.ok(close(s.view.centerX,before.centerX));
@@ -91,4 +91,40 @@ test('1-finger navigation remains unchanged in life and placement modes',()=>{
   s=g.move(p(7,150,130),before,844,{oneFinger:'placement'});
   assert.equal(s.changed,false);
   assert.deepEqual(s.placementDelta,{dx:40,dy:20});
+});
+
+test('anchored twist follows either finger and is independent of sampling and pinch',()=>{
+  for(const direction of [-1,1]){
+    for(const samples of [1,12,600]){
+      for(const anchorId of [1,2]){
+        const g=createCameraGestureSession(),before=view();
+        const anchor=p(anchorId,180,220),movingId=3-anchorId;
+        const start=p(movingId,260,220);
+        for(const point of (anchorId===1?[anchor,start]:[start,anchor]))g.begin(point);
+        let current=before;
+        for(let i=1;i<=samples;i++){
+          const progress=i/samples,angle=direction*90*progress*Math.PI/180;
+          const radius=80+20*progress;
+          current=g.move(p(movingId,anchor.x+radius*Math.cos(angle),
+            anchor.y+radius*Math.sin(angle)),current,844).view;
+          if(progress*90>=.35){
+            assert.ok(angleGap(current.yaw,before.yaw+direction*90*progress)<1e-7);
+          }
+          assert.ok(close(current.pitch,before.pitch),'stationary finger contributes no drag tilt');
+        }
+        assert.ok(close(current.distance,before.distance*80/100));
+      }
+    }
+  }
+});
+
+test('a new pair uses current contact positions after a single-finger swipe',()=>{
+  const g=createCameraGestureSession();
+  g.begin(p(1,100,100));
+  const pan=g.move(p(1,160,100),view(),844).view;
+  g.begin(p(2,240,100));
+  const zoom=g.move(p(2,290,100),pan,844).view;
+  assert.ok(close(zoom.yaw,pan.yaw));
+  assert.ok(close(zoom.pitch,pan.pitch));
+  assert.ok(close(zoom.distance,pan.distance*80/130));
 });

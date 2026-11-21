@@ -30,6 +30,7 @@ jobs:
           cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/life-cam-r1-server.log 2>&1 &
           sleep 3
+          node tests/camera-twist-browser.mjs
           node tests/ux09-browser-smoke.mjs
       - name: Preserve actual four-size WebGL evidence
         if: always()
