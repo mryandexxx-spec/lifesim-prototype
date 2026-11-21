@@ -20,7 +20,6 @@ const metrics=values=>{
     // Keeping the pointer ordering stable makes twist sign deterministic.
     angle:Math.atan2(b.y-a.y,b.x-a.x)};
 };
-const moved=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
 /** begin/move/end/cancel accept numeric pointer IDs, CSS px, monotonic ms.
  * Any second pointer permanently disqualifies the existing tap until every
