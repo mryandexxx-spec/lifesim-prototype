@@ -15,6 +15,8 @@ import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt,select
 import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-work-needs.js';
 import {calendarAt} from './calendar-core.js';
 import {createFinancePhoneUI} from './finance-phone-ui.js';
+import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
+import {quoteReadyMeal} from './ready-food.js';
 import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff,
   claimPortableCareerLeave} from './career-timeoff.js';
 import {payHouseholdBill} from './household-bills.js';
@@ -40,6 +42,7 @@ function action(label,callback,kind=''){
 }
 export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,setCareerSystem,
   save,notify,onFundsChanged=()=>{},onOpenChange=()=>{},onIncidentChanged=()=>{},
+   onBuyReadyMeal=()=>({ok:false,reason:'unavailable'}),
   selectResident=()=>false,beforeOpen=()=>{},canOpen=()=>true}){
   const overlay=element('section','career-phone-overlay');
   overlay.id='career-phone-panel';overlay.hidden=true;
@@ -62,7 +65,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   const body=element('div','career-phone-body');
   const appTabs=element('nav','career-phone-apps');
   appTabs.setAttribute('aria-label','Приложения смартфона');
-  for(const [id,label] of [['work','Работа'],['finance','Финансы']]){
+  for(const [id,label] of [['work','Работа'],['finance','Финансы'],['food','Доставка']]){
     const tab=action(label,()=>{
       const root=personRoot();if(!root)return;
       if(id==='finance'&&root.recruitmentSystem?.byResident?.[who]?.phase==='interview_active'){
@@ -997,23 +1000,86 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       body.append(row);
     }
   }
+  /** FOOD-R1: the existing smartphone has a third app, not a separate overlay.
+   * This view reads only the canonical kitchen and shared wallet.
+   */
+  function renderReadyFood(root){
+    top('🛵 '+NAMES[who]+' · ДОСТАВКА ГОТОВОЙ ЕДЫ');
+    body.append(element('h2','career-phone-section-title','Заказать обед'));
+    body.append(element('p','career-phone-muted',
+      'Семья: '+root.shop.credits+' кр. · В холодильнике: '+
+      root.kitchen.prepared.reduce((n,x)=>n+x.portions,0)+
+      '/12 порций · Заказы: '+root.kitchen.deliveries.length+
+      '. Доставка через 18 игровых минут; на паузе ожидание не идёт.'));
+    const pending=root.kitchen.deliveries;
+    if(pending.length){
+      const orders=element('section','career-phone-facts');
+      orders.setAttribute('aria-label','Оплаченные заказы в пути');
+      orders.append(element('strong',null,'В пути · '+pending.length));
+      for(const order of pending){
+        const meal=readyMeal(order.recipeId);
+        orders.append(element('span',null,(meal?.label||'Заказ')+
+          ' · осталось '+Math.max(0,Math.ceil(order.dueAt-root.minutes))+
+          ' игровых мин.'));
+      }
+      body.append(orders);
+    }
+    const list=element('div','career-phone-list');
+    for(const id of READY_MEAL_IDS){
+      const meal=readyMeal(id),q=quoteReadyMeal(root,id,'phone');
+      const item=element('article','career-phone-card ready-food-card');
+      item.append(element('strong',null,meal.label));
+      item.append(element('small',null,'Сытость ×'+meal.hungerFactor.toFixed(2)+
+        ' · холодильник '+meal.fridgePrice+' кр. · доставка '+meal.deliveryPrice+' кр.'));
+      const labels={'insufficient-credits':'Недостаточно средств',
+        'storage-full':'Холодильник заполнен',
+        'missing-fridge':'Холодильник недоступен'};
+      const buy=action(q.ok?'🛵 Заказать · '+meal.deliveryPrice+' кр.':
+        (labels[q.reason]||'Заказ недоступен'),()=>{
+          const live=personRoot();if(!live)return;
+          const fresh=quoteReadyMeal(live,id,'phone');
+          if(!fresh.ok){notify('Заказ недоступен: баланс или место изменились');render();return;}
+          if(!window.confirm('Доставка «'+meal.label+'» за '+fresh.price+
+            ' кр.? Прибытие через 18 игровых минут.'))return;
+          const result=onBuyReadyMeal(id,'phone',who);
+          if(!result.ok){notify(result.reason==='save-failed'?
+            'Не удалось сохранить заказ · списания нет':'Заказ не оплачен');render();return;}
+          notify('🛵 Оплачено '+result.price+' кр. · доставка через 18 игровых минут');
+          render();
+        },'career-phone-primary ready-food-buy');
+      buy.disabled=!q.ok;
+      item.append(buy);list.append(item);
+    }
+    body.append(list);
+    body.append(element('p','career-phone-muted',
+      'Прибытие автоматически добавит порцию в общий холодильник. '+
+      'Чтобы поесть, выбери «Взять готовое» или обычный обед за столом. '+
+      'Приготовленная дома еда дешевле и развивает навык.'));
+  }
   function render({preserveScroll=false}={}){
     if(!opened())return;
     const root=personRoot();if(!root)return;
     renderPendingNotice(root);
     const oldScroll=body.scrollTop;
     if(root.recruitmentSystem?.byResident?.[who]?.phase==='interview_active')app='work';
-    title.textContent=app==='finance'?'Финансы · Семья':'Работа · '+NAMES[who];
-    overlay.setAttribute('aria-label',app==='finance'?
-      'Смартфон: финансы семьи':'Смартфон: работа Блин’С');
+    title.textContent=app==='finance'?'Финансы · Семья':
+      app==='food'?'Доставка · Блин’С':'Работа · '+NAMES[who];
+    overlay.setAttribute('aria-label',app==='finance'?'Смартфон: финансы семьи':
+      app==='food'?'Смартфон: доставка готовой еды':'Смартфон: работа Блин’С');
     for(const b of appTabs.querySelectorAll('button')){
       const selected=b.dataset.app===app;
-      b.textContent=b.dataset.app==='finance'?'Финансы · Семья':'Работа · '+NAMES[who];
+      b.textContent=b.dataset.app==='finance'?'Финансы · Семья':
+        b.dataset.app==='food'?'🛵 Доставка':'Работа · '+NAMES[who];
       b.setAttribute('aria-pressed',String(selected));
       b.classList.toggle('career-phone-app-active',selected);
     }
     if(app==='finance'){
       financeUI.render(root);
+      body.scrollTop=preserveScroll?oldScroll:0;
+      return;
+    }
+    if(app==='food'){
+      renderReadyFood(root);
       body.scrollTop=preserveScroll?oldScroll:0;
       return;
     }
@@ -1047,6 +1113,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   function open(target='work'){
     if(opened()){
       if(target==='finance'&&app!=='finance'){app='finance';render();return;}
+      if(target==='food'&&app!=='food'){app='food';render();return;}
       if(target==='work'&&app!=='work'){app='work';render();return;}
       close();return;
     }
@@ -1055,7 +1122,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     if(!NAMES[root?.selectedSim])return;
     beforeOpen();
     who=root.selectedSim;
-    app=target==='finance'?'finance':'work';
+    app=['finance','food'].includes(target)?target:'work';
     // Restore the same resident's screen on close/open. A live recruitment
     // interview must still use its canonical application view on first open.
     const remembered=contexts[who];
