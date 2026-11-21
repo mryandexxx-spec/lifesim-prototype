@@ -107,17 +107,9 @@ try{
     const pos=projectGround(rect.width,rect.height,8.1,-6.4);
     assert.ok(pos.x>8&&pos.x<rect.width-8&&pos.y>8&&pos.y<rect.height-8,
       'water point visible '+w+'x'+h);
-    await page.evaluate(({pos,rect})=>{
-      const canvas=document.getElementById('game-canvas');
-      for(const type of ['pointerdown','pointerup']){
-        const target=type==='pointerdown'?canvas:window;
-        target.dispatchEvent(new PointerEvent(type,{
-          pointerId:171,pointerType:'touch',isPrimary:true,bubbles:true,
-          cancelable:true,clientX:rect.x+pos.x,clientY:rect.y+pos.y,
-          button:0,buttons:type==='pointerdown'?1:0
-        }));
-      }
-    },{pos,rect});
+    // Use a genuine Chromium touch sequence. A synthetic pointerup on
+    // window does not reproduce the browser's pointer capture/gesture path.
+    await page.touchscreen.tap(rect.x+pos.x,rect.y+pos.y);
     await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
     assert.match(await page.locator('#ground-walk-title').textContent(),/Бассейн/);
     assert.match(await page.locator('#ground-walk-primary-reason').textContent(),/уже плавает/);
