@@ -415,6 +415,11 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
         heading.id='career-pending-incident-title';heading.tabIndex=-1;
       }
       body.append(heading);
+      if(Number.isInteger(scenario.minRank)&&Number.isInteger(scenario.maxRank)){
+        body.append(element('p','career-phone-muted',
+          (scenario.minRank>=5?'История старшей должности':'История начала карьеры')+
+          ' · ступени '+(scenario.minRank+1)+'–'+(scenario.maxRank+1)));
+      }
       body.append(element('p','career-phone-notice',scenario.title+' · '+scenario.text));
       if(incident.choiceId===null){
         body.append(element('p','career-phone-muted',
