@@ -7156,12 +7156,12 @@ function boot() {
         // zoomed-out iPhone. Expand only its selectable volume, never its
         // saved footprint, route blocker, physics or purchase placement.
         const small=def.walkThrough||item.itemId==='light.path';
-        const radius=small?.36:0;
+        const radius=small?0.36:0;
         return {kind:'outdoor',id:item.itemId,instanceId:item.instanceId,
           bounds:{min:{x:small?Math.min(rect.minX,item.x-radius):rect.minX,
             y:-.49,z:small?Math.min(rect.minZ,item.z-radius):rect.minZ},
             max:{x:small?Math.max(rect.maxX,item.x+radius):rect.maxX,
-              y:Math.max(height-.53,small?.12:-.53),
+              y:Math.max(height-.53,small?0.12:-.53),
               z:small?Math.max(rect.maxZ,item.z+radius):rect.maxZ}}};
       }).filter(Boolean);
     const easels=game.world.furniture.instances
