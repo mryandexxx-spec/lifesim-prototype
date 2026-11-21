@@ -106,7 +106,7 @@ try{
       if(/\/src\/|\/vendor\//.test(r.url()))errors.push('module '+r.url());
     });
     try{
-      await page.goto('http://127.0.0.1:8765/?lot-e5=1',
+      await page.goto('http://127.0.0.1:8765/?pool=qa&lot-e5=1',
         {waitUntil:'domcontentloaded'});
       await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
       const canvas=await assertCanvas(page,name+' initial Life');
