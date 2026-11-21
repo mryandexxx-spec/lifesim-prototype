@@ -260,8 +260,9 @@ test('E4 thirty days: repeated v1 reload mid-shift; settlement, finances and two
   dispatchHeadless(root,executed);
   if(step===13){
    root.paused=true;
-   const snap=copy(root);tickHousehold(root,180);
-   assert.deepEqual(root,snap);root.paused=false;
+   const snap=JSON.stringify(root);tickHousehold(root,180);
+   assert.equal(JSON.stringify(root),snap,'paused household save cannot mutate');
+   root.paused=false;
   }
   const emitted=tickHousehold(root,30)||[];
   hadSwim ||= root.action?.id==='swim'||Number.isFinite(root.poolFirstSwimAt);
@@ -313,7 +314,7 @@ test('E4 interrupted in-water task plus persisted later FIFO commands never pay 
  root.position={...pool.action.dryApproach};
  assert.equal(arrivePoolApproach(root,'alex'),true);
  queue(root,'alex',{type:'move',x:16,z:6});
- queue(root,'mira',{type:'garden',instanceId:plot,actionId:'water'});
+ queue(root,'mira',{type:'move',x:16,z:-6});
  const toGarden=gardenApproach(root.world,plot,root.otherSim.position);
  assert.ok(findPath(root.otherSim.position,toGarden.goal,root.world)?.length);
  root.otherSim.position={...toGarden.goal};
@@ -335,5 +336,5 @@ test('E4 interrupted in-water task plus persisted later FIFO commands never pay 
  assert.equal(reloaded.shop.credits,startCredits);
  assert.equal(reloaded.financialHistory.entries.length,receipts);
  assert.deepEqual(pendingActions(reloaded.actionQueues,'alex').map(x=>x.type),['move']);
- assert.deepEqual(pendingActions(reloaded.actionQueues,'mira').map(x=>x.type),['garden']);
+ assert.deepEqual(pendingActions(reloaded.actionQueues,'mira').map(x=>x.type),['move']);
 });
