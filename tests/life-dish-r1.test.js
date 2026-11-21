@@ -36,7 +36,8 @@ test('DISH-R1: physical layout follows furniture rotation, storage, purchase and
   const h=household();h.kitchen.dirtyDishes=32;
   const before=dirtyDishVisualPlan(h.kitchen,h.world);
   assert.equal(before.visible.length,32);
-  assert.ok(before.visible.every(p=>p.instanceId==='dish-sink'));
+  assert.equal(before.visible.filter(p=>p.instanceId==='dish-sink').length,16);
+  assert.equal(before.visible.filter(p=>p.instanceId==='dish-prep').length,16);
   h.world.furniture.instances.find(x=>x.instanceId==='dish-sink').location='storage';
   const fallback=dirtyDishVisualPlan(h.kitchen,h.world);
   assert.ok(fallback.visible.every(p=>p.instanceId==='dish-prep'));
