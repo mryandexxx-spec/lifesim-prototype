@@ -32,11 +32,12 @@ function approach(s,id='alex',command={poolId:'pool-1',actionId:'swim'}){
   return plan.action;
 }
 function toStage(s,id,stage,limit=100,isolated=false){
+  const initial=sim(s,id).action&&{...sim(s,id).action};
   for(let i=0;i<limit&&sim(s,id).action?.stage!==stage;i++){
     if(isolated)advancePoolSwim(s,id,1);
     else tickHousehold(s,1);
   }
-  assert.equal(sim(s,id).action?.stage,stage);
+  assert.equal(sim(s,id).action?.stage,stage,JSON.stringify({id,stage,limit,isolated,initialStage:initial?.stage,entryKind:initial?.entryKind,fixtureId:initial?.fixtureId,entryWetPathLength:initial?.entryWetPath?.length,finalAction:sim(s,id).action,event:sim(s,id).event}));
   return sim(s,id).action;
 }
 function complete(s,id,limit=150){
@@ -111,7 +112,7 @@ test('D2d crossing pause, 3x and all stage reloads retains canonical water state
     if(stage==='swimming')toStage(s,'alex','swimming',100,true);
     if(stage==='exiting')requestPoolExit(s,'alex','player');
     const loaded=loadHousehold(copy(s));
-    assert.equal(loaded.action?.stage,stage);
+    assert.equal(loaded.action?.stage,stage,JSON.stringify({stage,before:s.action,after:loaded.action,event:loaded.event,position:loaded.position}));
     assert.equal(loaded.action?.waterCell,s.action.waterCell);
     assert.equal(loaded.shop.credits,s.shop.credits);
   }
