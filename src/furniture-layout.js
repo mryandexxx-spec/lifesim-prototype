@@ -13,7 +13,7 @@ const validPose=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&[0,90,180,270]
 const overlap=(a,b)=>Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*
   Math.max(0,Math.min(a.maxZ,b.maxZ)-Math.max(a.minZ,b.minZ));
 /** Atomic and nonmutating. Busy/queued resources are supplied by the caller. */
-export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[],residents=[],construction=null}={}){
+export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[],residents=[],construction=null,outdoors=null}={}){
   const source=world?.furniture?.instances?world.furniture:world;
   if(!source||!Array.isArray(source.instances)||!validPose(pose))
     return {ok:false,reason:'invalid-pose'};
@@ -40,7 +40,7 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
     candidate.instances[index]?.z!==pose.z||
     candidate.instances[index]?.yaw!==pose.yaw)return {ok:false,reason:'invalid-pose'};
   const target=candidate.instances[index];
-  const nav=construction?{furniture:candidate,construction}:candidate;
+  const nav=construction?{furniture:candidate,construction,...(outdoors?{outdoors}:{})}:candidate;
   const boxes=furnitureObstacles(candidate);
   const mine=boxes.filter(box=>box.instanceId===instanceId);
   // Existing original shower/tables can have tiny legacy wall/footprint overlaps.
@@ -95,7 +95,7 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
     // A moved television must retain a real approach to its own screen.
     if(target.prefabId==='tv'){
       const watching=furnitureActionApproach(candidate,'tv',instanceId);
-      if(!watching||!findPath(person,watching,candidate))
+      if(!watching||!findPath(person,watching,nav))
         return {ok:false,reason:'unreachable-tv'};
     }
     // Either sleeping side must remain reachable for essential self-care.
