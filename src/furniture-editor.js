@@ -21,6 +21,7 @@ export function snapFurnitureCoordinate(n,step=F1_GRID_STEP){
   return Math.round(n/step)*step;
 }
 export function createFurnitureEditor(initial,initialShop=null,validateCandidate=null){
+  let validator=validateCandidate;
   const valid=restoreFurnitureWorld(initial);
   const copy=world=>restoreFurnitureWorld(world);
   let shop=initialShop?restoreFurnitureShop(initialShop):null;
@@ -44,7 +45,7 @@ export function createFurnitureEditor(initial,initialShop=null,validateCandidate
       return {ok:false,reason:'unchanged',...results()};
     const changed=proposeFurnitureMove(current,instanceId,pose,context);
     if(!changed.ok)return {...changed,...results()};
-    const safe=validateCandidate?.(changed.world);
+    const safe=validator?.(changed.world);
     if(safe&&!safe.ok)return {...safe,...results()};
     remember(changed.world);
     return {ok:true,...results()};
@@ -67,7 +68,9 @@ export function createFurnitureEditor(initial,initialShop=null,validateCandidate
     remember(transaction.world,transaction.shop);
     return {ok:true,instanceId:transaction.instanceId,amount:transaction.amount,...results()};
   }
-  return {state:results,commit,transactMarket,undo:()=>traverse(-1),redo:()=>traverse(1)};
+  return {state:results,commit,transactMarket,
+    setValidator(fn){validator=typeof fn==='function'?fn:null;},
+    undo:()=>traverse(-1),redo:()=>traverse(1)};
 }
 /** Pure ray vs floor for drag gestures; CSS pixels are interpreted in game adapter. */
 export function furnitureFloorPoint(near,far){
