@@ -231,6 +231,11 @@ test('COOK-R1: Safari source, stable IDs and no duplicate finance plumbing',()=>
   for(const id of Object.keys(KITCHEN_RECIPES))
     assert.match(html,new RegExp('value="'+id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"'));
   assert.match(html,/id="cook-recipe-quote"/);
+  for(const path of ['kitchen.js','kitchen-market.js','household.js',
+    'hobby-reading.js','simulation.js'])
+    assert.match(html,new RegExp('"\\./src/'+path.replace('.','\\.')+'\\?v=[^"\\n]*-cook-r1'));
+  assert.match(html,/styles\\.css\\?v=[^"\\n]*-cook-r1/);
+  assert.match(html,/src\\/game\\.js\\?v=[^"\\n]*-cook-r1/);
   assert.match(ui,/KITCHEN_QUALITIES\[meal.quality\]/);
   assert.match(ui,/renderCookRecipeQuote\(\)/);
   assert.match(ui,/quoteCookingRecipe\(id\)/);

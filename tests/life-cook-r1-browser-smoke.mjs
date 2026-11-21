@@ -46,8 +46,8 @@ try{
       await fridge.evaluate(node=>node.click());
       const inventory=page.locator('#fridge-prepared-select option');
       assert.equal(await inventory.count(),2);
-      assert.match(await inventory.nth(0).innerText(),/Отличное/);
-      assert.doesNotMatch(await inventory.nth(1).innerText(),/Домашнее|Вкусное|Отличное|Мастерское/);
+      assert.match(await inventory.nth(0).textContent(),/Отличное/);
+      assert.doesNotMatch(await inventory.nth(1).textContent(),/Домашнее|Вкусное|Отличное|Мастерское/);
       const menu=page.locator('#cooking-recipe-select');
       assert.equal(await menu.locator('option').count(),9);
       for(const id of ['cook.grain-bowl','cook.herb-noodles',
