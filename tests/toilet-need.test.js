@@ -84,7 +84,9 @@ test('M4: decay is deterministic in game minutes, never while paused',()=>{
   const snapshot=JSON.stringify(s);
   tick(s,500);
   assert.equal(JSON.stringify(s),snapshot);
-  s.paused=false;tick(s,2300);
+  // Derive the zero crossing from the current canonical R2 decay rate.
+  s.paused=false;
+  tick(s,Math.ceil(s.needs.bladder/NEED_DECAY_PER_MINUTE.bladder)+1);
   assert.equal(s.needs.bladder,0);
 });
 
