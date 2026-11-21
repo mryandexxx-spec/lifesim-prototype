@@ -266,3 +266,41 @@ test('D2d water wish retires safely when player demolishes pool',()=>{
   assert.notEqual(s.mind.wish.id,'pool.swim');
   assert.equal(poolWishCommand(s,'alex'),null);
 });
+
+
+test('D2d springboard remains a real entry during boarding and after v1 reload',()=>{
+  const s=home({fixtures:[fixture('board',base+64,'west',2),
+    fixture('ladder',base,'north',1)]});
+  approach(s,'alex',{poolId:'pool-1',actionId:'jump',fixtureId:'fixture-2'});
+  advancePoolSwim(s,'alex',1);
+  assert.equal(s.action?.stage,'entering');
+  const restored=loadHousehold(copy(s));
+  assert.equal(restored.action?.stage,'entering','board is validated as an entry, not as an exit');
+  for(let i=0;i<50&&s.action?.stage!=='swimming';i++)advancePoolSwim(s,'alex',1);
+  for(let i=0;i<50&&restored.action?.stage!=='swimming';i++)
+    advancePoolSwim(restored,'alex',1);
+  assert.equal(s.action?.stage,'swimming');
+  assert.equal(restored.action?.stage,'swimming');
+  assert.equal(restored.action?.entryKind,'board');
+  assert.ok(isWalkable(restored.position.x,restored.position.z,restored.world));
+});
+
+test('D2d shore climb charges only unused wet travel time at 1x or 3x',()=>{
+  const baseState=home();
+  approach(baseState);toStage(baseState,'alex','swimming');
+  requestPoolExit(baseState,'alex','player');
+  const large=loadHousehold(copy(baseState)),small=loadHousehold(copy(baseState));
+  for(let iteration=0;iteration<10;iteration++){
+    advancePoolSwim(large,'alex',3);
+    for(let j=0;j<3;j++)advancePoolSwim(small,'alex',1);
+    assert.equal(large.action?.stage,small.action?.stage,
+      'split/combined tick stage '+iteration);
+    assert.equal(large.action?.waterCell,small.action?.waterCell,
+      'no wet path shortcut '+iteration);
+    if(!large.action)break;
+    assert.ok(Math.abs((large.action.elapsed||0)-(small.action.elapsed||0))<1e-7);
+  }
+  assert.equal(large.action,null);
+  assert.equal(small.action,null);
+  assert.ok(isWalkable(large.position.x,large.position.z,large.world));
+});
