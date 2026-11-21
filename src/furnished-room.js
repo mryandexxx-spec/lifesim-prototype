@@ -110,6 +110,7 @@ export function proposeFurnishedRoomMove(household,command,context={}){
  * independently drifting stacks. Keeps existing construction editor API.
  */
 export function createHouseholdConstructionEditor(initial,initialFurniture,validateCandidate=null){
+  let validator=validateCandidate;
   let states=[{world:restoreConstructionWorld(initial),
     furniture:restoreFurnitureWorld(initialFurniture)}],index=0;
   const snapshot=()=>({world:restoreConstructionWorld(states[index].world),
@@ -117,6 +118,7 @@ export function createHouseholdConstructionEditor(initial,initialFurniture,valid
     canUndo:index>0,canRedo:index<states.length-1});
   return {
     state:snapshot,
+    setValidator(fn){validator=typeof fn==='function'?fn:null;},
     commit(command,context={}){
       const previous=states[index],move=command?.type==='room-relocate';
       const result=move
@@ -125,7 +127,7 @@ export function createHouseholdConstructionEditor(initial,initialFurniture,valid
             furniture:previous.furniture.instances});
       if(!result.ok)return {...result,...snapshot()};
       // Validate against the live household before storing a reversible edit.
-      const safe=validateCandidate?.(result.world,result.furniture||previous.furniture);
+      const safe=validator?.(result.world,result.furniture||previous.furniture);
       if(safe&&!safe.ok)return {...safe,...snapshot()};
       states=states.slice(0,index+1);
       states.push({world:result.world,furniture:result.furniture||previous.furniture});
