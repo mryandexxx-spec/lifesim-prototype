@@ -7136,8 +7136,10 @@ function boot() {
       const pose=poolFixtureVisualPose(item);
       if(!pose)return null;
       return {kind:'pool-fixture',id:item.kind,fixtureId:item.fixtureId,poolId:item.poolId,
-        bounds:{min:{x:pose.x-.30,y:-.54,z:pose.z-.30},
-          max:{x:pose.x+.30,y:.30,z:pose.z+.30}}};
+        // A ladder is only a few thin rails. Give its visible footprint a
+        // stable, bounded touch volume without changing pool world geometry.
+        bounds:{min:{x:pose.x-.38,y:-.54,z:pose.z-.38},
+          max:{x:pose.x+.38,y:.48,z:pose.z+.38}}};
     }).filter(Boolean);
     const outdoorTargets=(game.world.outdoors?.features||[])
       .map(item=>{
@@ -7150,9 +7152,17 @@ function boot() {
           def.category==='fence'?1.12:
           // Preserve C1's garden hit-volume while polishing its visual stages.
           item.itemId==='garden.bench'?1.20:1.24;
+        // A tiny flower/path lamp can render smaller than a finger on a
+        // zoomed-out iPhone. Expand only its selectable volume, never its
+        // saved footprint, route blocker, physics or purchase placement.
+        const small=def.walkThrough||item.itemId==='light.path';
+        const radius=small?.36:0;
         return {kind:'outdoor',id:item.itemId,instanceId:item.instanceId,
-          bounds:{min:{x:rect.minX,y:-.49,z:rect.minZ},
-            max:{x:rect.maxX,y:height-.53,z:rect.maxZ}}};
+          bounds:{min:{x:small?Math.min(rect.minX,item.x-radius):rect.minX,
+            y:-.49,z:small?Math.min(rect.minZ,item.z-radius):rect.minZ},
+            max:{x:small?Math.max(rect.maxX,item.x+radius):rect.maxX,
+              y:Math.max(height-.53,small?.12:-.53),
+              z:small?Math.max(rect.maxZ,item.z+radius):rect.maxZ}}};
       }).filter(Boolean);
     const easels=game.world.furniture.instances
       .filter(item=>item.prefabId==='easel'&&item.location==='home')
