@@ -1,7 +1,5 @@
 name: Manual priority and queue-stability preflight
 on:
-  push:
-    branches: [fix/manual-priority-sofa-queue-stability-20261116]
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,8 +1,5 @@
 name: LOT-E0 — mixed yard saves, FIFO and four mobile WebGL
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

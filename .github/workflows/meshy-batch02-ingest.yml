@@ -1,10 +1,6 @@
 name: Meshy batch 02 — import optimized GLBs and render shop previews
 on:
-  push:
-    branches:
-      - feature/meshy-room-batch02-20261120
-    paths:
-      - .github/workflows/meshy-batch02-ingest.yml
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:

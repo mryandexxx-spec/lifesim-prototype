@@ -1,8 +1,5 @@
 name: LOT-E3 — mobile camera and precise parcel touch selection
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

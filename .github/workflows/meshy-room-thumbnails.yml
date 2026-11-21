@@ -1,8 +1,5 @@
 name: Generate 15 real Meshy furniture catalog thumbnails
 on:
-  push:
-    branches: [fix/meshy-starter-and-catalog-20261120]
-    paths: [.github/workflows/meshy-room-thumbnails.yml]
   workflow_dispatch:
 permissions:
   contents: write
