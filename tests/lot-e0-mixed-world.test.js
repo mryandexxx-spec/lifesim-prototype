@@ -46,7 +46,7 @@ function mixedHousehold(){
   const plot=root.world.outdoors.features.find(f=>f.itemId==='garden.herb.mint');
   assert.ok(plot&&root.world.outdoors.gardens[plot.instanceId]);
   assert.ok(enqueueAction(root.actionQueues,'alex',{
-    type:'pool',poolId:'pool-1',actionId:'swim',fixtureId:'fixture-1'}));
+    type:'pool',poolId:'pool-1',actionId:'swim',fixtureId:'fixture-1',queuedAt:root.minutes}));
   assert.ok(enqueueAction(root.actionQueues,'alex',{
     type:'move',x:16,z:6}));
   assert.ok(enqueueAction(root.actionQueues,'mira',{
