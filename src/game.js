@@ -72,6 +72,7 @@ import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_
 import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
   preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
 import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock} from './kitchen-market.js';
+import {dirtyDishVisualPlan,DISH_VISUAL_CAP} from './dirty-dishes-visual.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from './painting-gallery.js';
@@ -1017,8 +1018,18 @@ function select(id,instanceId=null) {
   const lampLabel=id==='lamp'
     ?(lampIsOn(game?.world,selectedFurnitureInstanceId)?'Выключить торшер':'Включить торшер')
     :ACTIONS[id].label;
-  $('action-button').innerHTML = `${lampLabel} <span>↗</span>`;
+  $('action-button').disabled=id==='wash'&&!(game.kitchen?.dirtyDishes>0);
+  $('action-button').innerHTML=id==='wash'
+    ?'Помыть до '+Math.min(3,game.kitchen?.dirtyDishes||0)+' тарелок <span>↗</span>'
+    :`${lampLabel} <span>↗</span>`;
 }
+$('dish-alert').addEventListener('click',()=>{
+  if(dialogueNeedsDecision(game))return;
+  const sink=game.world.furniture.instances.find(item=>
+    item.prefabId==='sink'&&item.location==='home');
+  if(!sink){toast('Для мытья посуды нужна кухонная мойка');return;}
+  select('wash',sink.instanceId);
+});
 // LOT-C3b fridge groceries are voluntary and separately confirmed.
 function renderKitchenRestock(){
   if(selected!=='fridge')return;
@@ -2240,6 +2251,23 @@ function boot() {
     }
     applyItemAppearance(node,itemDefinitionId);
   };
+  // DISH-R1 porcelain: fixed 32-plate renderer pool for the entire scene.
+  // No plate is allocated by simulation ticks, saves or bought item clones.
+  const dishPorcelain=mat('#eee1ca'),dishLeftovers=mat('#aa7958');
+  const dirtyDishNodes=Array.from({length:DISH_VISUAL_CAP},(_,i)=>{
+    const plate=new pc.Entity('DISH-R1 porcelain '+i);
+    const rim=new pc.Entity('DISH-R1 ceramic rim '+i);
+    rim.addComponent('render',{type:'cylinder',material:dishPorcelain});
+    rim.setLocalScale(.25,.025,.25);
+    plate.addChild(rim);
+    const stain=new pc.Entity('DISH-R1 leftovers '+i);
+    stain.addComponent('render',{type:'sphere',material:dishLeftovers});
+    stain.setLocalScale(.10,.010,.085);
+    stain.setLocalPosition(.026,.017,-.008);
+    plate.addChild(stain);
+    app.root.addChild(plate);plate.enabled=false;
+    return plate;
+  });
   const decorNodes=new Map();
   // H5c: cache the 78 theme stroke entities per easel for Safari performance.
   const paintStrokeCache=new WeakMap();
@@ -2355,12 +2383,6 @@ function boot() {
         prepBowl.setLocalScale(.27,.10,.27);
         prepBowl.setLocalPosition(.26,1.035,-.21);
         node.addChild(prepBowl);prepBowl.enabled=false;
-      }
-      if(item.prefabId==='sink'){
-        const plate=new pc.Entity('F4G dirty plate');
-        plate.addComponent('render',{type:'cylinder',material:mat('#c8bb9c')});
-        plate.setLocalScale(.40,.055,.36);plate.setLocalPosition(.05,1.03,-.12);
-        node.addChild(plate);plate.enabled=false;
       }
       if(item.prefabId==='mirror'){
         const glint=new pc.Entity('F4E mirror highlight');
@@ -8237,10 +8259,25 @@ function boot() {
         if(chopped)chopped.enabled=active;
         const bowl=node.findByName('F4G prep bowl');
         if(bowl)bowl.enabled=active;
-      }else{
-        const dish=node.findByName('F4G dirty plate');
-        if(dish)dish.enabled=item.location==='home'&&game.kitchen?.dirtyDishes>0;
       }
+    }
+    // Every visible plate is mapped to the canonical count and real home
+    // stations on each render, including pause, reload and editor movement.
+    const dishPlan=dirtyDishVisualPlan(game.kitchen,game.world);
+    for(let i=0;i<DISH_VISUAL_CAP;i++){
+      const node=dirtyDishNodes[i],point=dishPlan.visible[i];
+      node.enabled=Boolean(point)&&!furnishMode;
+      if(point)node.setPosition(point.x,point.y,point.z);
+    }
+    const dishAlert=$('dish-alert');
+    dishAlert.hidden=dishPlan.count===0||furnishMode;
+    if(dishPlan.count>0){
+      const label=String(dishPlan.count);
+      if($('dish-alert-count').textContent!==label)
+        $('dish-alert-count').textContent=label;
+      const a11y='Грязных тарелок: '+label+'. Нажмите, чтобы открыть мойку';
+      if(dishAlert.getAttribute('aria-label')!==a11y)
+        dishAlert.setAttribute('aria-label',a11y);
     }
     // R5b never writes to the simulator. Tableware only follows existing
     // home furniture and vanishes instantly on refusal, exit or furnishing.
