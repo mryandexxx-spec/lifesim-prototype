@@ -2449,3 +2449,6 @@ button.time-card:active {transform:translateY(1px);}
 /* COOK-R1: concise, readable kitchen cost/quality quote on narrow Safari. */
 .cook-recipe-quote{display:block;max-width:100%;overflow-wrap:anywhere;
   font-size:12px;line-height:1.45;margin-top:8px;color:#4b6253}
+
+/* CHARISMA-R1: Safari thumb target beside the existing mirror action. */
+#mirror-speech-button{min-height:44px;touch-action:manipulation;}

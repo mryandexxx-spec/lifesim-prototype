@@ -13,6 +13,8 @@ export const UTILITY_FURNITURE=Object.freeze({
     duration:22,frontZ:-1.20,capability:'clothing.organize'})
 });
 export const UTILITY_ACTION_IDS=Object.freeze(Object.keys(UTILITY_FURNITURE));
+export const MIRROR_SPEECH_DURATION=24;
+export const MIRROR_SPEECH_XP=18;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,Number.isFinite(x)?x:a));
 const smooth=n=>{const t=clamp(n,0,1);return t*t*(3-2*t);};
 export function isUtilityAction(id){return Object.hasOwn(UTILITY_FURNITURE,id);}
@@ -22,7 +24,8 @@ export function isUtilityAction(id){return Object.hasOwn(UTILITY_FURNITURE,id);}
 export function furnitureUseWeight(action,instanceId){
   if(!action||!isUtilityAction(action.id)||action.id==='lamp'||
      action.phase!=='using'||action.targetInstanceId!==instanceId)return 0;
-  const duration=UTILITY_FURNITURE[action.id].duration;
+  const duration=action.id==='mirror'&&action.mirrorPractice===true
+    ?MIRROR_SPEECH_DURATION:UTILITY_FURNITURE[action.id].duration;
   const t=clamp(action.elapsed/duration,0,1);
   return smooth(t/.22)*smooth((1-t)/.22);
 }

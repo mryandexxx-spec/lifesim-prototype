@@ -64,7 +64,7 @@ import {newObjectOnceLedger,restoreObjectOnceLedger} from './object-once-ledger.
 import {legacyObjectRegistry} from './object-legacy-adapter.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
 import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
-import {switchLampAtArrival} from './furniture-interactions.js';
+import {switchLampAtArrival,MIRROR_SPEECH_DURATION,MIRROR_SPEECH_XP} from './furniture-interactions.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_WORKS_LIMIT,canPaintContent,restoreCreatedWorks,finishPainting} from './painting.js';
 import {chooseDiningSeat,diningSeatApproach} from './dining.js';
 
@@ -208,6 +208,14 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
       const object=resolveActionFurniture(root.world,sim.action.id,sim.action.targetInstanceId);
       if(object)sim.action.targetInstanceId=object.instanceId;
       else sim.action=null; // no phantom action or silent rerouting to another item
+    }
+    // Restored training still needs the exact real reachable mirror.
+    if(sim.action?.id==='mirror'&&sim.action.mirrorPractice===true){
+      const point=furnitureActionApproach(root.world,'mirror',sim.action.targetInstanceId);
+      if(!point||(sim.action.phase==='using'&&
+        Math.hypot(sim.position.x-point.x,sim.position.z-point.z)>.45)||
+        (sim.action.phase==='walking'&&!findPath(sim.position,point,root.world)))
+        sim.action=null;
     }
     root.actionQueues.byResident[id]=root.actionQueues.byResident[id].filter(task=>
       (task.type!=='outdoor'||Boolean(outdoorBench(root.world,task.instanceId)))&&
@@ -575,7 +583,8 @@ function validMusicSource(root,actor){
     activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)));
 }
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
-  activityId=null,contentId=null,musicPlan=null,inventoryItemId=null,recipeId=null) {
+  activityId=null,contentId=null,musicPlan=null,inventoryItemId=null,recipeId=null,
+  mirrorPractice=false) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(residentUnavailableForHome(root,residentId))return false;
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
@@ -632,6 +641,8 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   const slot=itemId==='bed'?bedSlotFor(root,residentId,item.instanceId):null;
   const chosen=chooseAction(resident,itemId,automatic);
   if(chosen)resident.action.targetInstanceId=item.instanceId;
+  if(chosen&&itemId==='mirror'&&mirrorPractice===true&&!automatic)
+    resident.action.mirrorPractice=true;
   if(chosen&&itemId==='hobby'){
     const session=createActivitySession(HOBBY_ACTIVITIES,{
       sessionId:'reading:'+residentId+':'+root.actionQueues.nextSeq+':'+Math.round(root.minutes*1000),
@@ -843,6 +854,16 @@ export function tickHousehold(root,minutes) {
   other.speed=root.speed;
   other.autonomy.enabled=root.autonomy.enabled;
   replenishKitchen(root.kitchen,root.minutes);
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),a=actor?.action;
+    if(a?.id!=='mirror'||a.mirrorPractice!==true)continue;
+    const point=furnitureActionApproach(root.world,'mirror',a.targetInstanceId);
+    if(!point||(a.phase==='using'&&
+      Math.hypot(actor.position.x-point.x,actor.position.z-point.z)>.45)||
+      (a.phase==='walking'&&!findPath(actor.position,point,root.world))){
+      actor.action=null;actor.event='Практика речи прервана: зеркало недоступно';
+    }
+  }
   // A removed/moved sink cannot clean dishes from afar or from storage.
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),action=actor?.action;
@@ -1015,6 +1036,19 @@ export function tickHousehold(root,minutes) {
             actor.event='Проголодался · берёт одну порцию «'+
               kitchenRecipe(before.recipeId).label+'»';
         }
+      }
+    }
+    if(before.id==='mirror'&&before.phase==='using'&&
+      before.action.mirrorPractice===true&&!actor.action&&
+      before.action.elapsed>=MIRROR_SPEECH_DURATION&&
+      actor.event===ACTIONS.mirror.label+' — готово'){
+      const point=furnitureActionApproach(root.world,'mirror',before.action.targetInstanceId);
+      if(point&&Math.hypot(actor.position.x-point.x,actor.position.z-point.z)<=.45){
+        const cap=HOBBY_SKILLS.skills.charisma.xpThresholds.at(-1);
+        const previous=actor.skills.xpById.charisma||0;
+        const next=Math.min(cap,previous+MIRROR_SPEECH_XP);
+        actor.skills.xpById.charisma=next;
+        actor.event='Речь отрепетирована · харизма +'+(next-previous)+' XP';
       }
     }
     if(before.id==='dining'&&before.phase==='using'&&

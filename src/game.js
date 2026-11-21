@@ -402,7 +402,7 @@ const META = {
   prep: {title:'Рабочая поверхность',category:'Кухня',description:'Подготовка ингредиентов происходит здесь во время готовки.',icon:'▤',anchor:[0,1.05,0]},
   wash: {title:'Кухонная мойка',category:'Кухня',description:'Вымыть накопившуюся после обедов посуду.',icon:'◉',anchor:[0,1.12,0]},
   lamp: { title:'Торшер',category:'Освещение',description:'Переключить настоящий свет после подхода к выбранному торшеру',icon:'☀',anchor:[0,1.3,0] },
-  mirror: { title:'Зеркало',category:'Уход за собой',description:'Подойти к зеркалу и привести себя в порядок',icon:'◇',anchor:[0,1.4,0] },
+  mirror: { title:'Зеркало',category:'Уход за собой',description:'Причесаться или репетировать речь перед настоящим зеркалом. Харизма растёт после 24 минут практики.',icon:'◇',anchor:[0,1.4,0] },
   dresser: { title:'Комод',category:'Хранение',description:'Подойти и открыть ящики или дверцы комода',icon:'▤',anchor:[0,.75,0] },
   wardrobe: { title:'Гардероб',category:'Хранение',description:'Подойти к шкафу и осмотреть одежду и полки',icon:'▥',anchor:[0,1.6,0] },
   tv: { title: 'Телевизор', category: 'Гостиная', description: 'Сядет на свободный диван с видом на экран или посмотрит стоя, если мест нет', icon: '▣', anchor: [3.5, 1.42, .36] },
@@ -533,7 +533,8 @@ function taskLabel(task){
     task.actionId==='harvest'?'Собрать садовые травы':
     task.actionId==='replant'?'Посадить травы заново':'Полюбоваться садом';
   if(task.type==='pool')return task.actionId==='jump'?'Прыгнуть и поплавать':'Плавать';
-  if(task.type==='object')return ACTIONS[task.actionId]?.label||'Предмет';
+  if(task.type==='object')return task.mirrorPractice===true
+    ?'Репетировать речь':ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
   if(task.type==='social')return SOCIAL_ACTIONS[task.actionId]?.label||'Общение';
@@ -1043,6 +1044,7 @@ function select(id,instanceId=null) {
   }
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
+  $('mirror-speech-button').hidden=id!=='mirror';
   $('fridge-lunch-button').hidden=id!=='fridge';
   $('fridge-cook-button').hidden=id!=='fridge';
   const lampLabel=id==='lamp'
@@ -1180,6 +1182,12 @@ $('item-labels-btn').addEventListener('click',()=>{
 });
 updateItemLabels();
 $('close-action').addEventListener('click', () => select(null));
+$('mirror-speech-button').addEventListener('click',()=>{
+  if(selected!=='mirror')return;
+  if(scheduleCommand({type:'object',actionId:'mirror',mirrorPractice:true,
+    ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}))
+    select(null);
+});
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
   if(selected==='paint'&&!canPaintContent(selectedActor().skills,HOBBY_SKILLS,
@@ -3971,7 +3979,7 @@ function boot() {
     return true;
   }
   beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null,
-    activityId=null,contentId=null,inventoryItemId=null,recipeId=null)=>{
+    activityId=null,contentId=null,inventoryItemId=null,recipeId=null,mirrorPractice=false)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
@@ -4001,7 +4009,7 @@ function boot() {
       return false;
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
-      activityId,contentId,musicPlan,inventoryItemId,recipeId);
+      activityId,contentId,musicPlan,inventoryItemId,recipeId,mirrorPractice);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
@@ -4232,7 +4240,7 @@ function boot() {
             :command.targetInstanceId;
           if(target||command.autoTable!==true)
             started=beginAction(command.actionId,false,residentId,true,target,
-              null,null,null,command.recipeId||null);
+              null,null,null,command.recipeId||null,command.mirrorPractice===true);
         }
         else if(command.type==='activity'){
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
