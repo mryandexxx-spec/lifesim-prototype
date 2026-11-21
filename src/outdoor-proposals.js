@@ -35,9 +35,6 @@ function sameJson(a,b){
 const integer=n=>Number.isSafeInteger(n)&&n>=0;
 const participantPositions=root=>[root?.position,root?.otherSim?.position].filter(
   p=>Number.isFinite(p?.x)&&Number.isFinite(p?.z));
-const integer=n=>Number.isSafeInteger(n)&&n>=0;
-const participantPositions=root=>[root?.position,root?.otherSim?.position].filter(
-  p=>Number.isFinite(p?.x)&&Number.isFinite(p?.z));
 function context(root){
   if(root?.version!==1||root?.world?.construction?.schema!==1||
      !integer(root?.shop?.credits)||root?.shop?.schema!==1||
