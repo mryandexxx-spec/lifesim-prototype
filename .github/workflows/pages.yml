@@ -261,7 +261,8 @@ jobs:
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
           cp src/object-once-ledger.js site/src/
-          cp src/kitchen.js src/kitchen-market.js src/ready-meal-catalog.js src/ready-food.js src/hobby-content.js site/src/
+          cp src/kitchen.js src/kitchen-market.js src/hobby-content.js site/src/
+          cp src/ready-meal-catalog.js src/ready-food.js site/src/
           cp src/dirty-dishes-visual.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/
