@@ -81,7 +81,9 @@ test('M3: social need decays only by real game minutes and stops completely on p
   tick(s,500);
   assert.equal(JSON.stringify(s),snap);
   s.paused=false;
-  tick(s,4500);
+  // Even at the slower R2 rate, unmet social need eventually empties.
+  const minutesToEmpty=Math.ceil(s.needs.social/socialNeedDecayRate(s.personality))+1;
+  tick(s,minutesToEmpty);
   assert.equal(s.needs.social,0);
   assert.ok(Number.isFinite(s.mind.mood.value));
 });
