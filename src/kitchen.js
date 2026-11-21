@@ -3,8 +3,10 @@
  */
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {findPath} from './navigation.js';
+import {readyMeal} from './ready-meal-catalog.js';
 
 export const KITCHEN_SCHEMA=1;
+export const KITCHEN_PREPARED_LIMIT=12;
 // Domain-side autonomous care threshold; presentation remains dependency-free.
 export const DISH_AUTO_WASH_THRESHOLD=6;
 export const COOKING_SKILL_ID='cooking';
@@ -25,11 +27,11 @@ export const KITCHEN_RECIPES=Object.freeze({
 const entries=Object.values(KITCHEN_RECIPES);
 const own=(obj,key)=>Object.hasOwn(obj||{},key);
 const finiteInt=n=>Number.isSafeInteger(n)&&n>=0;
-export const kitchenRecipe=id=>typeof id==='string'&&own(KITCHEN_RECIPES,id)
-  ?KITCHEN_RECIPES[id]:null;
+export const kitchenRecipe=id=>typeof id==='string'
+  ?(own(KITCHEN_RECIPES,id)?KITCHEN_RECIPES[id]:readyMeal(id)):null;
 export function newKitchen(){
   return {schema:KITCHEN_SCHEMA,pantry:{...PANTRY_START,herbs:0},prepared:[],
-    dirtyDishes:0,lastPantryDay:0};
+    deliveries:[],dirtyDishes:0,lastPantryDay:0};
 }
 export function restoreKitchen(raw){
   const state=newKitchen();
@@ -49,6 +51,23 @@ export function restoreKitchen(raw){
     state.prepared=[...combined].map(([recipeId,portions])=>({recipeId,portions}))
       .filter(x=>x.portions>0);
   }
+  // Save-v1 additive optional delivery queue. Paid slots survive reload; never mint
+  // unknown entries, duplicate order IDs, or stock beyond physical capacity.
+  if(Array.isArray(raw.deliveries)&&raw.deliveries.length<=KITCHEN_PREPARED_LIMIT){
+    const seen=new Set();
+    let reserved=state.prepared.reduce((n,x)=>n+x.portions,0);
+    for(const order of raw.deliveries){
+      if(!readyMeal(order?.recipeId)||typeof order.id!=='string'||
+         !/^ready-order-[1-9][0-9]*$/.test(order.id)||seen.has(order.id)||
+         !finiteInt(order.dueAt)||order.dueAt>2_000_000_000||
+         !finiteInt(order.orderedAt)||order.orderedAt>order.dueAt||
+         reserved>=KITCHEN_PREPARED_LIMIT)continue;
+      seen.add(order.id);
+      state.deliveries.push({id:order.id,recipeId:order.recipeId,
+        orderedAt:order.orderedAt,dueAt:order.dueAt});
+      reserved++;
+    }
+  }
   if(finiteInt(raw.dirtyDishes))state.dirtyDishes=Math.min(32,raw.dirtyDishes);
   if(finiteInt(raw.lastPantryDay)&&raw.lastPantryDay<=200000)
     state.lastPantryDay=raw.lastPantryDay;
@@ -63,12 +82,14 @@ export function replenishKitchen(kitchen,clockMinutes){
   return true;
 }
 export function canCookRecipe(kitchen,recipeId,level=0){
-  const recipe=kitchenRecipe(recipeId);
+  const recipe=own(KITCHEN_RECIPES,recipeId)?KITCHEN_RECIPES[recipeId]:null;
   return Boolean(recipe&&Number.isFinite(level)&&level>=recipe.minLevel&&
     Object.entries(recipe.requires).every(([id,count])=>
       finiteInt(kitchen?.pantry?.[id])&&kitchen.pantry[id]>=count)&&
     Array.isArray(kitchen?.prepared)&&
-    kitchen.prepared.reduce((n,x)=>n+x.portions,0)+recipe.portions<=12);
+    kitchen.prepared.reduce((n,x)=>n+x.portions,0)+
+      (Array.isArray(kitchen.deliveries)?kitchen.deliveries.length:0)+
+      recipe.portions<=KITCHEN_PREPARED_LIMIT);
 }
 export function finishKitchenRecipe(kitchen,recipeId,level=0){
   const recipe=kitchenRecipe(recipeId);
@@ -121,7 +142,8 @@ export function kitchenSummary(kitchen){
   const prepared=Array.isArray(kitchen?.prepared)?
     kitchen.prepared.reduce((n,x)=>n+x.portions,0):0;
   const pantry=kitchen?.pantry||PANTRY_START;
-  return {prepared,dirtyDishes:kitchen?.dirtyDishes||0,
+  return {prepared,deliveries:kitchen?.deliveries?.length||0,
+    dirtyDishes:kitchen?.dirtyDishes||0,
     supplies:Object.keys(PANTRY_START).map(id=>pantry[id]||0).join('/'),herbs:pantry.herbs||0};
 }
 const routeLength=(start,path)=>path.reduce((sum,p,i)=>{

@@ -16,6 +16,7 @@ import {DISH_AUTO_WASH_THRESHOLD,COOKING_SKILL_ID,kitchenRecipe,newKitchen,resto
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
   recordDirtyDish,washKitchenDishes} from './kitchen.js';
 import {currentSkillLevel} from './skills-engine.js';
+import {settleReadyMealDeliveries} from './ready-food.js';
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
@@ -1027,6 +1028,9 @@ export function tickHousehold(root,minutes) {
     }
   }
   replenishKitchen(root.kitchen,root.minutes);
+  // FOOD-R1: only elapsed game time can fulfill a paid delivery, once.
+  // This changes canonical stock, not an actor's A* or manual FIFO action.
+  settleReadyMealDeliveries(root);
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),completed=readyPaint[id];
     if(completed&&!actor.action&&actor.activitySession===completed.session){

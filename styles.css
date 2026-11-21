@@ -1677,7 +1677,7 @@ button.time-card:active {transform:translateY(1px);}
   #dashboard .family-balance-chip{min-width:94px}
 }
 /* The existing career dialog hosts two apps without losing career subnavigation. */
-.career-phone-apps{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:9px 12px;
+.career-phone-apps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:9px 10px;
   background:#eaf4ec;border-bottom:1px solid #d1dfd4;flex-shrink:0}
 .career-phone-app-tab{min-height:44px;border-radius:11px;border:1px solid #b6d3c4;
   background:#fff;color:#2b5a46;font:800 13px 'DM Sans',sans-serif;
@@ -2434,3 +2434,14 @@ button.time-card:active {transform:translateY(1px);}
  white-space:nowrap;touch-action:manipulation;pointer-events:auto;}
 .topbar #dish-alert[hidden]{display:none!important;}
 @media(max-width:370px){.topbar #dish-alert{min-width:48px;padding:7px 6px;margin-right:4px;font-size:12px}}
+
+/* FOOD-R1: three compact touch targets fit 320px portrait and landscape;
+   ordered meal cards scroll inside the existing safe-area phone sheet. */
+.career-phone-apps .career-phone-app-tab{min-width:0;min-height:44px;
+  font-size:clamp(11px,2.7vw,13px);overflow-wrap:anywhere;padding:6px 2px}
+.career-phone-body .ready-food-card{padding:13px;margin:0 0 11px;gap:9px;
+  min-width:0;max-width:100%;overflow-wrap:anywhere}
+.ready-food-card small{font-size:12px;line-height:1.5;color:#586b5e}
+.career-phone-body .ready-food-buy{min-height:48px;touch-action:manipulation;
+  text-align:center;margin-top:6px}
+.ready-food-buy:disabled{opacity:.62;cursor:default}
