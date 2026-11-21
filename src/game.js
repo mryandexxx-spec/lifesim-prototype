@@ -2268,6 +2268,13 @@ function boot() {
     app.root.addChild(plate);plate.enabled=false;
     return plate;
   });
+  // QA-only immutable-size pool probe. This is not simulation state.
+  if(new URLSearchParams(location.search).get('dish-r1')==='qa')
+    window.__LifeSimDishStats=()=>({
+      canonical:game.kitchen?.dirtyDishes??0,
+      visible:dirtyDishNodes.filter(node=>node.enabled).length,
+      poolSize:dirtyDishNodes.length
+    });
   const decorNodes=new Map();
   // H5c: cache the 78 theme stroke entities per easel for Safari performance.
   const paintStrokeCache=new WeakMap();
