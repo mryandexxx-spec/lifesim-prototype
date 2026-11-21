@@ -22,8 +22,12 @@ const baseline={sha:'a0162d62d7dbdb8b5ba1fb5d45371c3c36dd169a',
 const seed=newHousehold('2026-11-20');
 seed.paused=true;seed.otherSim.paused=true;
 seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
-enqueueAction(seed.actionQueues,'alex',{type:'object',actionId:'fridge'});
-enqueueAction(seed.actionQueues,'mira',{type:'object',actionId:'bed'});
+// Bootstrap can dispatch one queued action immediately even in a paused world.
+// Keep future tasks for BOTH residents while the active task is initialized.
+for(const actionId of ['bed','fridge','shower'])
+ assert.ok(enqueueAction(seed.actionQueues,'alex',{type:'object',actionId}));
+for(const actionId of ['sofa','bed'])
+ assert.ok(enqueueAction(seed.actionQueues,'mira',{type:'object',actionId}));
 mkdirSync('ux09-artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,args:[
  '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
@@ -82,7 +86,17 @@ try{
    await page.locator('#plan-peek').tap();
    assert.ok(await page.locator('#queue-panel').isVisible());
    assert.match(await page.locator('#queue-title').innerText(),/Алекс/);
-   assert.ok(await page.locator('#queue-items li').count()>=1);
+   // A bootstrapped active action is not shown among FUTURE tasks.
+   const restored=await state(page);
+   const alexFuture=restored.actionQueues.byResident.alex.length;
+   const miraFuture=restored.actionQueues.byResident.mira.length;
+   assert.ok(alexFuture>=2&&miraFuture>=1,
+    label+' must preserve future FIFO for both residents after bootstrap');
+   assert.equal(await page.locator('#queue-items li').count(),alexFuture);
+   await page.locator('#queue-mira').tap();
+   assert.equal(await page.locator('#queue-items li').count(),miraFuture);
+   assert.equal(await page.locator('#pick-alex').getAttribute('aria-pressed'),'true',
+    'inspection of Mira queue cannot select another resident');
    await page.locator('#queue-close').tap();
    steps.push('resident-plan');
 
