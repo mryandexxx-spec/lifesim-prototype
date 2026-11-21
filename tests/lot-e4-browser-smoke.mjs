@@ -119,6 +119,11 @@ try{
    await page.evaluate(({key,minutes})=>{
     const saved=JSON.parse(localStorage.getItem(key));
     saved.minutes=minutes;saved.otherSim.minutes=minutes;
+    // This is a freshly seeded NIGHT fixture, not 600 simulated minutes.
+    // Preserve real policy: an old pool FIFO expires after 60 game minutes;
+    // date the fixture's request at its new test starting clock instead.
+    for(const task of saved.actionQueues?.byResident?.alex||[])
+     if(task.type==='pool')task.queuedAt=minutes;
     localStorage.setItem(key,JSON.stringify(saved));
    },{key:SAVE_KEY,minutes:1320});
    await page.reload({waitUntil:'domcontentloaded'});
