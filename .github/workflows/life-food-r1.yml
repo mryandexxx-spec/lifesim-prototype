@@ -1,0 +1,38 @@
+name: LIFE FOOD-R1 — paid meals, delivery, four mobile WebGL viewports
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  food-r1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate exact food economy, saved stock, physical dining and regressions
+        run: |
+          npm ci
+          node --check src/ready-meal-catalog.js
+          node --check src/ready-food.js
+          node --check src/kitchen.js
+          node --check src/household.js
+          node --check src/career-phone-ui.js
+          node --check src/game.js
+          node --check tests/life-food-r1-browser-smoke.mjs
+          node --test tests/life-food-r1.test.js
+          npm test
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Four touch viewports and real PlayCanvas WebGL with two purchase channels
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/food-r1-http.log 2>&1 &
+          sleep 3
+          node tests/life-food-r1-browser-smoke.mjs

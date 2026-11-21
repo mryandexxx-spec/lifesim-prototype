@@ -72,6 +72,8 @@ import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_
 import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
   preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
 import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock} from './kitchen-market.js';
+import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
+import {quoteReadyMeal,proposeReadyMealPurchase} from './ready-food.js';
 import {dirtyDishVisualPlan,DISH_VISUAL_CAP} from './dirty-dishes-visual.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
@@ -474,6 +476,25 @@ function save(silent = false) {
     if (!silent) toast('Не удалось сохранить: браузер запретил хранилище');
     return false;
   }
+}
+// FOOD-R1: both checkout channels share one snapshot commit. Failed storage
+// restores all three parts, so no meal or debit can survive alone.
+let readyFoodPurchaseLocked=false;
+function buyReadyMeal(recipeId,channel,actorId=game.selectedSim){
+  if(readyFoodPurchaseLocked)return {ok:false,reason:'purchase-busy'};
+  readyFoodPurchaseLocked=true;
+  try{
+    const tx=proposeReadyMealPurchase(game,recipeId,channel,actorId);
+    if(!tx.ok)return tx;
+    const old={kitchen:game.kitchen,shop:game.shop,financialHistory:game.financialHistory};
+    game.kitchen=tx.kitchen;game.shop=tx.shop;game.financialHistory=tx.financialHistory;
+    if(!save(true)){
+      Object.assign(game,old);
+      return {ok:false,reason:'save-failed'};
+    }
+    updateFamilyBalance();
+    return tx;
+  }finally{readyFoodPurchaseLocked=false;}
 }
 // Fix the epoch at first migration, not on some later autosave after a phone date change.
 // Save date/bill migrations only after graphics startup succeeds, never on a failed boot.
@@ -963,6 +984,8 @@ function select(id,instanceId=null) {
   $('fridge-prepared-field').hidden=id!=='fridge';
   $('fridge-staple-field').hidden=id!=='fridge';
   $('fridge-buy-button').hidden=id!=='fridge';
+  $('fridge-ready-field').hidden=id!=='fridge';
+  $('fridge-ready-buy-button').hidden=id!=='fridge';
   if(id==='fridge'){
     const menu=$('fridge-prepared-select');
     menu.replaceChildren();
@@ -980,6 +1003,7 @@ function select(id,instanceId=null) {
     }
     $('fridge-lunch-button').disabled=!meals.length;
     renderKitchenRestock();
+    renderReadyPurchase();
   }
   $('cooking-recipe-field').hidden=!['cook','fridge'].includes(id);
   if(id==='cook'||id==='fridge'){
@@ -1069,6 +1093,40 @@ $('fridge-buy-button').addEventListener('click',()=>{
   updateFamilyBalance();select('fridge');
   $('fridge-staple-select').value=itemId;renderKitchenRestock();
   toast('Куплено: '+quote.label+' +5 · −15 кредитов');
+});
+// Ready meals use the same fridge inventory and the existing physical dining.
+function renderReadyPurchase(){
+  if(selected!=='fridge')return;
+  const menu=$('fridge-ready-select'),old=menu.value;
+  menu.replaceChildren();
+  for(const id of READY_MEAL_IDS){
+    const meal=readyMeal(id),row=document.createElement('option');
+    row.value=id;row.textContent=meal.label+' · '+meal.fridgePrice+' кр.';
+    menu.append(row);
+  }
+  if(READY_MEAL_IDS.includes(old))menu.value=old;
+  const quote=quoteReadyMeal(game,menu.value,'fridge');
+  const labels={'storage-full':'Холодильник заполнен (12)',
+    'insufficient-credits':'Недостаточно кредитов',
+    'missing-fridge':'Холодильник недоступен'};
+  const button=$('fridge-ready-buy-button');
+  button.disabled=!quote.ok;
+  button.textContent=quote.ok?'🥡 Купить порцию · '+quote.price+' кр.':
+    (labels[quote.reason]||'Покупка недоступна');
+}
+$('fridge-ready-select').addEventListener('change',renderReadyPurchase);
+$('fridge-ready-buy-button').addEventListener('click',()=>{
+  if(selected!=='fridge')return;
+  const id=$('fridge-ready-select').value,q=quoteReadyMeal(game,id,'fridge');
+  if(!q.ok){renderReadyPurchase();toast('Покупка недоступна');return;}
+  if(!window.confirm('Купить порцию «'+q.meal.label+'» за '+q.price+
+    ' кредитов?'))return;
+  const result=buyReadyMeal(id,'fridge');
+  if(!result.ok){renderReadyPurchase();toast(result.reason==='save-failed'?
+    'Не удалось сохранить покупку · списания нет':'Баланс или запас изменились');return;}
+  select('fridge');
+  $('fridge-ready-select').value=id;renderReadyPurchase();
+  toast('🥡 Куплено: '+q.meal.label+' · −'+q.price+' кр. Порция в холодильнике');
 });
 const markers = {};
 for (const id of Object.keys(META)) {
@@ -2006,6 +2064,7 @@ const careerPhone=createCareerPhoneUI({
     game.careerSystem=state;applyWorkMoodContext(game);calendarUI.refresh();
   },
   save,notify:toast,onFundsChanged:updateFamilyBalance,
+  onBuyReadyMeal:buyReadyMeal,
   onOpenChange:id=>updatePhoneProps(id),
   onIncidentChanged:()=>{updateCareerHud();refreshIncidentNotifications();},
   selectResident:id=>{
@@ -7360,10 +7419,17 @@ function boot() {
         const priorCalendarMinute=game.minutes;
         const priorHerbStock=game.kitchen?.pantry?.herbs??0;
         const priorGardenCredits=game.shop.credits;
+        const priorDeliveries=game.kitchen?.deliveries?.length||0;
         const careerEvents=tickHousehold(game,.30 * effectiveSleepSpeed(game,{
           blocked:!frameActive||dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||
             shiftSummary.isOpen()
         }))||[];
+        if(priorDeliveries>(game.kitchen?.deliveries?.length||0)){
+          // A paid order moved into the same physical fridge as cooked meals.
+          save(true);careerPhone.refresh();
+          if(selected==='fridge')select('fridge');
+          toast('🛵 Заказ доставлен! Готовая порция в холодильнике');
+        }
         if(gardenStageSignature!==currentGardenStageSignature())
           renderOutdoorFeatures();
         // Crop + replant wallet, plot watermark and pantry must persist together
