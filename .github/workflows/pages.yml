@@ -187,6 +187,7 @@ jobs:
           node --check src/mobile-gesture-policy.js
           node --check src/ui-onboarding.js
           node --check src/hud-panel.js
+          node --check src/need-trends.js
           node --check src/locomotion.js
           node --check src/bed-layout.js
           node --check src/bed-transition.js
@@ -246,6 +247,7 @@ jobs:
           cp src/exterior-construction.js site/src/
           cp src/ui-onboarding.js site/src/
           cp src/hud-panel.js site/src/
+          cp src/need-trends.js site/src/
           cp src/furniture-catalog.js src/furniture-layout.js src/furniture-editor.js src/furniture-transform.js src/furniture-hold.js site/src/
           cp src/furniture-shop.js src/furniture-value.js site/src/
           cp src/mounted-lighting.js site/src/

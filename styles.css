@@ -2373,3 +2373,56 @@ button.time-card:active {transform:translateY(1px);}
  .lc-sheet{padding-top:calc(env(safe-area-inset-top) + 6px)}
  .lc-top{margin-bottom:6px}.lc-form-toolbar{padding-top:4px;padding-bottom:4px}
 }
+
+/* HUD-R1 feedback v2: glyphs only appear at a visible, numeric step.
+ * The empty fixed-size slot avoids touch/layout jumps as a flash ends. */
+#dashboard.dashboard .need{gap:3px;min-width:0}
+#dashboard .need-trend{display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 10px;width:10px;min-width:10px;line-height:1;font-size:14px;
+  font-weight:850;opacity:0;pointer-events:none}
+#dashboard .need-trend[data-direction="up"]{opacity:1;color:#247b52;
+  animation:need-arrow-pop .45s ease-out}
+#dashboard .need-trend[data-direction="down"]{opacity:1;color:#aa5042;
+  animation:need-arrow-pop .45s ease-out}
+#dashboard.dashboard .need .meter i{
+  position:relative;transition:width .48s cubic-bezier(.2,.75,.25,1),
+    background-color .35s ease}
+#dashboard.dashboard .need[data-trend="up"] .meter i{
+  animation:need-fill-recover .9s ease-out}
+#dashboard.dashboard .need[data-trend="down"] .meter i{
+  animation:need-fill-drain .7s ease-out}
+#dashboard.dashboard .need[data-trend="up"] .meter i:after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(100deg,transparent 10%,#ffffff80 65%,transparent 100%);
+  animation:need-fill-shimmer .95s linear infinite}
+@keyframes need-arrow-pop{
+  from{transform:translateY(4px) scale(.6);opacity:.2}
+  60%{transform:translateY(-2px) scale(1.2)}
+  to{transform:translateY(0) scale(1);opacity:1}
+}
+@keyframes need-fill-recover{
+  0%{filter:brightness(1.18)}
+  45%{filter:brightness(1.35)}
+  100%{filter:brightness(1)}
+}
+@keyframes need-fill-drain{
+  0%{filter:saturate(1.25)}
+  100%{filter:saturate(1)}
+}
+@keyframes need-fill-shimmer{
+  from{transform:translateX(-100%)}
+  to{transform:translateX(100%)}
+}
+@media(prefers-reduced-motion:reduce){
+  #dashboard.dashboard .need .meter i{transition:none!important}
+  #dashboard.dashboard .need .meter i:after,
+  #dashboard.dashboard .need[data-trend] .meter i,
+  #dashboard .need-trend{animation:none!important;transition:none!important}
+}
+@media(max-width:370px){
+ #dashboard.dashboard .need{gap:2px}
+ #dashboard.dashboard .need-icon{font-size:13px}
+ #dashboard.dashboard .need-copy>span{font-size:10px}
+ #dashboard.dashboard .need output{font-size:10px}
+ #dashboard .need-trend{flex-basis:9px;min-width:9px;width:9px;font-size:13px}
+}
