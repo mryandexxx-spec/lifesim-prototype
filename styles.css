@@ -2445,3 +2445,7 @@ button.time-card:active {transform:translateY(1px);}
 .career-phone-body .ready-food-buy{min-height:48px;touch-action:manipulation;
   text-align:center;margin-top:6px}
 .ready-food-buy:disabled{opacity:.62;cursor:default}
+
+/* COOK-R1: concise, readable kitchen cost/quality quote on narrow Safari. */
+.cook-recipe-quote{display:block;max-width:100%;overflow-wrap:anywhere;
+  font-size:12px;line-height:1.45;margin-top:8px;color:#4b6253}
