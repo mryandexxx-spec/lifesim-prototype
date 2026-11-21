@@ -12,7 +12,9 @@ const metrics=values=>{
   if(values.length!==2)return null;
   const [a,b]=values;
   return {x:(a.x+b.x)/2,y:(a.y+b.y)/2,
-    distance:Math.hypot(a.x-b.x,a.y-b.y)};
+    distance:Math.hypot(a.x-b.x,a.y-b.y),
+    // Keeping the pointer ordering stable makes twist sign deterministic.
+    angle:Math.atan2(b.y-a.y,b.x-a.x)};
 };
 const moved=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
@@ -61,11 +63,23 @@ export function createCameraGestureSession(){
       if(!nextPair||!previousPair)return {view,changed:false};
       const dx=nextPair.x-previousPair.x,dy=nextPair.y-previousPair.y;
       const zoom=nextPair.distance-previousPair.distance;
+      // Wrapped [-pi,+pi] angle difference handles the +/-180 seam.
+      const angleDelta=Math.atan2(Math.sin(nextPair.angle-previousPair.angle),
+        Math.cos(nextPair.angle-previousPair.angle));
+      const rawTwist=angleDelta*180/Math.PI;
+      // Do not spin on sensor noise or when two fingers nearly overlap.
+      const twist=previousPair.distance>=20&&nextPair.distance>=20&&
+        Math.abs(rawTwist)>=.35
+        ?Math.max(-28,Math.min(28,rawTwist)):0;
       previousPair=nextPair;
-      const rotated=orbitCamera(view,dx,dy,2);
+      // Parallel two-finger drag (midpoint) and true finger-pair twist
+      // both rotate; pinch remains an independent zoom around the same view.
+      const orbited=orbitCamera(view,dx*1.3,dy*1.15,2);
+      const rotated=twist?{...orbited,
+        yaw:((orbited.yaw-twist*1.15)%360+360)%360}:orbited;
       const next=pinchCamera(rotated,
         nextPair.distance-zoom,nextPair.distance);
-      return {view:next,changed:dx!==0||dy!==0||zoom!==0};
+      return {view:next,changed:dx!==0||dy!==0||zoom!==0||twist!==0};
     }
     return {view,changed:false};
   }
