@@ -105,8 +105,10 @@ function essentialGoals(root){
 /** Never revoke an existing essential route, including queued player moves.
  * Existing broken legacy layouts are tolerated, not rewritten or teleported.
  */
-export function keepsExistingRoutes(root,nextOutdoors){
-  if(!protectPoolFromWorldEdit(root,{outdoors:nextOutdoors}).ok)return false;
+export function keepsExistingRoutes(root,nextOutdoors,{poolEditor=false}={}){
+  // Dedicated pool-editor owns water/fixtures and validates its own topology.
+  // Ordinary yard edits must never use this escape hatch.
+  if(!poolEditor&&!protectPoolFromWorldEdit(root,{outdoors:nextOutdoors}).ok)return false;
   const after={...root.world,outdoors:nextOutdoors};
   const before=root.world;
   const goals=essentialGoals(root);
