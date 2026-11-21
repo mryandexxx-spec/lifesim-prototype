@@ -26,6 +26,12 @@ export const READING_CONTENT_IDS=Object.freeze(READING_BOOKS.map(book=>book.id))
 export const readingBookMinLevel=contentId=>
   READING_BOOKS.find(book=>book.id===contentId)?.minLevel??null;
 export const READING_SKILL_ID='literature';
+export const CHARISMA_SKILL_ID='charisma';
+/** Modest bonuses only; never override consent or social policy. */
+export function charismaSocialBonus(progress){
+  const level=currentSkillLevel(progress,HOBBY_SKILLS,CHARISMA_SKILL_ID);
+  return level>=9?3:level>=6?2:level>=3?1:0;
+}
 import {PAINT_ACTIVITY_ID,PAINT_SKILL_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS} from './painting.js';
 export const MUSIC_ACTIVITY_ID='hobby.listen.music';
 export const MUSIC_DANCE_ACTIVITY_ID='hobby.dance.music';
@@ -50,6 +56,10 @@ export const HOBBY_SKILLS=createSkillRegistry({skills:[{
   unlocks:[{id:'cook.grain-bowl',minLevel:1},{id:'cook.pasta',minLevel:2},
     {id:'cook.herb-noodles',minLevel:3},{id:'cook.gratin',minLevel:4},
     {id:'cook.roast-tray',minLevel:5},{id:'cook.festival-pie',minLevel:7}]
+},{
+  id:CHARISMA_SKILL_ID,label:'Харизма',group:'social',maxLevel:10,
+  xpThresholds:[35,85,150,240,350,485,650,850,1090,1360],
+  practiceTags:['social.speech'],unlocks:[]
 }]});
 export const HOBBY_CONTENT=createHobbyContentCatalog({entries:[
   ...READING_BOOKS.map(book=>({id:book.id,kind:'book',label:book.label,

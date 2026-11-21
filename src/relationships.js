@@ -1,5 +1,6 @@
 /** Headless two-person social relationship simulation. */
 import { refreshMind } from './psychology.js';
+import {charismaSocialBonus} from './hobby-reading.js';
 import {creditCompletedSocialNeed} from './social-need.js';
 import {feelMemory} from './emotion-engine.js';
 import {evaluateSocialReaction} from './social-reactions.js';
@@ -257,9 +258,12 @@ function completeSocial(root,conversationScore=null){
   const reconciled=s.kind==='talk'&&canReconcile(root);
   // Old one-click talk/argue keep exact +8 / -12 / reconciliation +12.
   // A multi-turn talk has a single context-dependent signed result.
-  const gain=conversationScore===null
+  const gain=(conversationScore===null
     ?(reconciled?def.affinity+4:def.affinity)
-    :(reconciled?Math.max(4,conversationScore)+4:conversationScore);
+    :(reconciled?Math.max(4,conversationScore)+4:conversationScore))+
+    // Only a completed direct friendly talk (not romance or an argument).
+    (conversationScore===null&&s.kind==='talk'&&!s.branchAction&&!s.conversation
+      ?charismaSocialBonus(get(root,s.initiator)?.skills):0);
   root.relationship.affinity=clamp(root.relationship.affinity+gain,0,100);
   root.relationship.lastKind=s.kind;
   root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;

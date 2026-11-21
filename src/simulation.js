@@ -16,6 +16,7 @@ import {sanitizeSwimAction} from './pool-swim-runtime.js';
 import {GARDEN_ACTIONS,GARDEN_DURATION} from './gardening.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
+import {MIRROR_SPEECH_DURATION} from './furniture-interactions.js';
 import {kitchenRecipe,kitchenQualityId,kitchenServingMultiplier} from './kitchen.js';
 import {validReadingJourneyAction,finishReadingMinutes} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
@@ -143,6 +144,12 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     }
     if(next.action&&data.action.id==='lamp'&&data.action.lampSwitched===true)
       next.action.lampSwitched=true;
+    // Manual speech remains a verified physical mirror action in root v1.
+    if(next.action&&data.action.id==='mirror'&&data.action.mirrorPractice===true){
+      if(data.action.automatic===true||next.action.elapsed>=MIRROR_SPEECH_DURATION)
+        next.action=null;
+      else next.action.mirrorPractice=true;
+    }
     if(data.action.id==='bed'&&validBedSlot(data.action.bedSlot))
       next.action.bedSlot=data.action.bedSlot;
     if(next.action&&data.action.id==='garden'){
@@ -160,8 +167,10 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
           next.action.gardenPlantedAt=data.action.gardenPlantedAt;
       }
     }
-    if(validFurnitureInstanceId(data.action.targetInstanceId)||
-       (['bench','garden'].includes(data.action.id)&&validOutdoorId(data.action.targetInstanceId)))
+    // A rejected action has no target: corrupt v1 mirror practice must not
+    // crash household loading or revive its old object reservation.
+    if(next.action&&(validFurnitureInstanceId(data.action.targetInstanceId)||
+       (['bench','garden'].includes(data.action.id)&&validOutdoorId(data.action.targetInstanceId))))
       next.action.targetInstanceId=data.action.targetInstanceId;
     if(['bench','garden'].includes(data.action.id)&&!validOutdoorId(data.action.targetInstanceId))
       next.action=null;
@@ -322,7 +331,8 @@ export function tick(state, minutes,world=state?.world??null) {
     const hobby=['hobby','music','paint'].includes(state.action.id)
       ?getActivityDefinition(HOBBY_ACTIVITIES,state.action.activityId):null;
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
-    const duration=state.action.id==='garden'
+    const duration=state.action.id==='mirror'&&state.action.mirrorPractice===true
+      ?MIRROR_SPEECH_DURATION:state.action.id==='garden'
       ?(GARDEN_DURATION[state.action.gardenActionId]??definition.duration):hobby?.timeBudget.targetMinutes??definition.duration;
     const amount = state.action.id==='bed'?sleepMinutes:
       Math.min(minutes, Math.max(0, duration - state.action.elapsed));

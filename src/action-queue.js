@@ -68,11 +68,13 @@ export function sanitizeQueueCommand(id,raw,persons){
       return {type,actionId:'dining',recipeId:raw.recipeId,
         ...(raw.targetInstanceId?{targetInstanceId:raw.targetInstanceId}:{})};
     }
-    // No untrusted recipe metadata may alter old object tasks.
-    if(raw.recipeId!==undefined)return null;
-    return raw.targetInstanceId
-      ?{type,actionId:raw.actionId,targetInstanceId:raw.targetInstanceId}
-      :{type,actionId:raw.actionId};
+    // Whitelist one manual variation; other object tasks reject forged flags.
+    if(raw.recipeId!==undefined||
+      (raw.mirrorPractice!==undefined&&
+        (raw.actionId!=='mirror'||raw.mirrorPractice!==true)))return null;
+    return {type,actionId:raw.actionId,
+      ...(raw.targetInstanceId?{targetInstanceId:raw.targetInstanceId}:{}),
+      ...(raw.mirrorPractice===true?{mirrorPractice:true}:{})};
   }
   // Solo physical hobby queue commands do not have a social target.
   if(type==='activity'){

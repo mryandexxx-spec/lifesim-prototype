@@ -1,5 +1,6 @@
 /** Original, headless 0.9a conversation engine. Saves only validated IDs, no player text. */
 import {getPerspective} from './social-perspective.js';
+import {charismaSocialBonus} from './hobby-reading.js';
 import {episodeContext,getPair} from './social-graph.js';
 import {boundaryDisposition,cueConversationBias} from './social-boundaries.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
@@ -83,7 +84,9 @@ export function evaluateResponse(root,initiator,topic,id){
     compatibilityBias:socialCompatibility(partner.personality,
       (initiator==='alex'?root:root?.otherSim)?.personality).bias,
     styleBias:boundaryDisposition(partner.personality,id)+
-      cueConversationBias(getPair(root.socialGraph,initiator,partnerId),initiator,id)
+      cueConversationBias(getPair(root.socialGraph,initiator,partnerId),initiator,id)+
+      (a.tone==='sharp'?0:charismaSocialBonus(
+        (initiator==='alex'?root:root?.otherSim)?.skills))
   });
   return reaction?{accepted:reaction.accepted,confidence:reaction.confidence}:null;
 }
