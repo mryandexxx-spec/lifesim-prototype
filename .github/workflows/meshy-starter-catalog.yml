@@ -1,6 +1,5 @@
 name: Meshy starter room and GLB catalog preview QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

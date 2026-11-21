@@ -1,0 +1,95 @@
+import assert from 'node:assert/strict';
+import {execFileSync,spawnSync} from 'node:child_process';
+import {appendFileSync,existsSync,readFileSync,readdirSync} from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const ROOT=fileURLToPath(new URL('../',import.meta.url));
+const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
+const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
+const isUI=f=>/^(?:index\.html|styles\.css|sw\.js|assets\/)/.test(f)||
+  /^src\/(?:game\.js|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls)\.js)/.test(f)||
+  /^tests\/.*browser.*\.mjs$/.test(f);
+const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
+
+export function planChanges(files,root=ROOT){
+  const changed=[...new Set(files.map(normalize))].sort();
+  const relevant=changed.some(f=>isCode(f)||f.startsWith('assets/'));
+  if(!relevant)return {tests:[],browser:false,changed};
+  const allTests=readdirSync(path.join(root,'tests')).filter(f=>f.endsWith('.test.js')).map(f=>'tests/'+f);
+  const selected=new Set(CORE);
+  const changedSrc=changed.filter(f=>f.startsWith('src/')&&/\.(?:js|mjs)$/.test(f));
+  for(const f of changed)if(allTests.includes(f))selected.add(f);
+  const importsCache=new Map();
+  function importsOf(file){
+    if(importsCache.has(file))return importsCache.get(file);
+    const output=[];
+    const abs=path.join(root,file);
+    if(existsSync(abs)){
+      const source=readFileSync(abs,'utf8');
+      const expression=/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"](\.{1,2}\/[^'"]+)['"]/g;
+      for(const match of source.matchAll(expression)){
+        const item=match[1].split('?')[0];
+        let dependency=path.posix.normalize(path.posix.join(path.posix.dirname(file),item));
+        if(!path.posix.extname(dependency))dependency+='.js';
+        if(!dependency.startsWith('../')&&existsSync(path.join(root,dependency)))output.push(dependency);
+      }
+    }
+    importsCache.set(file,output);
+    return output;
+  }
+  function closure(file,seen=new Set()){
+    if(seen.has(file))return seen;
+    seen.add(file);
+    for(const dependency of importsOf(file))closure(dependency,seen);
+    return seen;
+  }
+  for(const file of allTests){
+    const deps=closure(file);
+    if(changedSrc.some(source=>deps.has(source)))selected.add(file);
+    for(const source of changedSrc){
+      const stem=path.posix.basename(source).replace(/\.m?js$/,'').replace(/-(?:ui|visual|engine|runtime|state|core)$/,'');
+      if(stem.length>=5&&file.toLowerCase().includes(stem.toLowerCase()))selected.add(file);
+    }
+  }
+  const extra=[
+    [/^src\/(?:camera-|mobile-gesture|world-interactions)/,['tests/camera-gestures.test.js','tests/ray-picking.test.js']],
+    [/^src\/(?:kitchen|ready-food|dining|household)/,['tests/f4g-kitchen.test.js','tests/life-food-r1.test.js']],
+    [/^src\/(?:finance-|household-bills)/,['tests/w4a-finance.test.js','tests/w4c-bills.test.js']],
+    [/^src\/(?:action-queue|navigation|simulation)/,['tests/manual-priority-queue-stability.test.js','tests/navigation.test.js']],
+    [/^src\/(?:pool-|gardening|outdoor-)/,['tests/lot-e2-overlap-recovery.test.js','tests/lot-c3c.test.js']],
+    [/^(?:\.github\/workflows\/|scripts\/ci-|tests\/ci-)/,['tests/ci-target.test.js']],
+    [/^\.github\/workflows\/pages\.yml$/,['tests/m4-release.test.js']]
+  ];
+  for(const [pattern,names] of extra)if(changed.some(f=>pattern.test(f)))
+    for(const name of names)if(allTests.includes(name))selected.add(name);
+  const tests=[...selected].filter(f=>allTests.includes(f)).sort();
+  return {tests,browser:changed.some(isUI),changed};
+}
+
+function main(){
+  const base=process.env.CI_BASE_SHA||execFileSync('git',['rev-parse','HEAD^'],{encoding:'utf8'}).trim();
+  const buffer=execFileSync('git',['diff','--name-only','-z',base+'...HEAD'],{encoding:'buffer'});
+  const changed=buffer.toString('utf8').split('\0').filter(Boolean);
+  const plan=planChanges(changed);
+  console.log('CI changed files:',JSON.stringify(plan.changed));
+  for(const file of plan.changed.filter(f=>/\.(?:js|mjs)$/.test(f)&&/^(?:src|tests|scripts)\//.test(f))){
+    if(!existsSync(path.join(ROOT,file)))continue;
+    console.log('Syntax:',file);
+    const checked=spawnSync(process.execPath,['--check',file],{cwd:ROOT,stdio:'inherit'});
+    assert.equal(checked.status,0,'JavaScript syntax failed: '+file);
+  }
+  for(const file of ['src/game.js','sw.js']){
+    const checked=spawnSync(process.execPath,['--check',file],{cwd:ROOT,stdio:'inherit'});
+    assert.equal(checked.status,0,'Critical startup syntax failed: '+file);
+  }
+  console.log('Selected Node regression files:',plan.tests.length,plan.tests.join(' '));
+  if(plan.tests.length){
+    const run=spawnSync(process.execPath,['--test',...plan.tests],{cwd:ROOT,stdio:'inherit'});
+    assert.equal(run.status,0,'Targeted Node tests failed');
+  }
+  console.log('Browser smoke:',plan.browser?'required':'not needed');
+  if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,'browser='+(plan.browser?'true':'false')+'\n');
+}
+
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main();

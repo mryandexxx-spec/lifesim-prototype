@@ -1,6 +1,5 @@
 name: W3-D — native work-life emotion and mobile QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

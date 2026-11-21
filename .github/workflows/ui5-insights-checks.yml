@@ -1,7 +1,5 @@
 name: UI5 grounded insights and nonblocking reaction checks (no deploy)
 on:
-  push:
-    branches: [feature/ui5-insights-20261115]
   workflow_dispatch:
 permissions:
   contents: read

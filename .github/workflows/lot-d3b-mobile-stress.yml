@@ -1,8 +1,5 @@
 name: LOT-D3b — 30-day mixed life stress and four mobile WebGL recovery
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,9 +1,6 @@
 name: R5a at-home romantic evening
 on:
-  push:
-    branches: [feature/r5a-home-romantic-evening-20261116]
-  pull_request:
-    paths: ['src/**', 'tests/romance-r5a.test.js']
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

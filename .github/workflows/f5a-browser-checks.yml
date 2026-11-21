@@ -1,40 +1,5 @@
 name: F5-A construction WebGL Safari-size smoke
 on:
-  push:
-    branches:
-      - feature/f5a-construction-20261117
-  pull_request:
-    paths:
-      - 'src/construction.js'
-      - 'src/furnished-room.js'
-      - 'src/roof-construction.js'
-      - 'src/exterior-construction.js'
-      - 'src/navigation.js'
-      - 'src/household.js'
-      - 'src/game.js'
-      - 'src/calendar-ui.js'
-      - 'src/calendar-events.js'
-      - 'src/calendar-reminders.js'
-      - 'src/calendar-holidays.js'
-      - 'tests/w1a3-browser-smoke.mjs'
-      - 'tests/w1a4-browser-smoke.mjs'
-      - 'tests/w1a4-calendar-integration.test.js'
-      - 'src/calendar-core.js'
-      - 'index.html'
-      - 'styles.css'
-      - 'tests/f5a-browser-smoke.mjs'
-      - 'tests/f5b-finishes.test.js'
-      - 'tests/f5b2-openings.test.js'
-      - 'tests/f5b3-starter-native.test.js'
-      - 'tests/f5b4-ceilings-patterns.test.js'
-      - 'tests/f5c1-roof.test.js'
-      - 'tests/f5c2-exteriors.test.js'
-      - 'tests/f5d1-rooms.test.js'
-      - 'tests/f5d1-browser-smoke.mjs'
-      - 'tests/f5d2-furnished-room.test.js'
-      - 'tests/f5d2-browser-smoke.mjs'
-      - 'tests/f5d3-joined-room-browser-smoke.mjs'
-      - '.github/workflows/f5a-browser-checks.yml'
   workflow_dispatch:
 permissions:
   contents: read

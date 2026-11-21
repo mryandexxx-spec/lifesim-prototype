@@ -1,6 +1,5 @@
 name: UX-02a — one-tap catalog and sticky mobile purchase WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

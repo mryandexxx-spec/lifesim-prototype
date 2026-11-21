@@ -1,6 +1,5 @@
 name: W3-A — time off and paid leave mobile WebGL QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

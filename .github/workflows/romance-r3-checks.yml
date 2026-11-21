@@ -1,13 +1,6 @@
 name: R3 romance boundaries and jealousy safety preflight
 on:
-  push:
-    branches: [feature/r3-integrate-over-f3-20261116]
-  pull_request:
-    paths:
-      - 'src/romance.js'
-      - 'src/social-graph.js'
-      - 'src/game.js'
-      - 'tests/romance-r3.test.js'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -1,20 +1,5 @@
 name: LOT-C2b — Garden psychology, typed inspect and 30-day regression
 on:
-  pull_request:
-    paths:
-      - 'src/garden-psychology.js'
-      - 'src/psychology.js'
-      - 'src/emotion-engine.js'
-      - 'src/trait-catalog.js'
-      - 'src/gardening.js'
-      - 'src/action-queue.js'
-      - 'src/simulation.js'
-      - 'src/household.js'
-      - 'src/game.js'
-      - 'tests/lot-c2b-psychology.test.js'
-      - 'index.html'
-      - '.github/workflows/pages.yml'
-      - '.github/workflows/lot-c2b-garden-mind.yml'
   workflow_dispatch:
 permissions:
   contents: read

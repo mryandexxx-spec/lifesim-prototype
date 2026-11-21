@@ -1,17 +1,6 @@
 name: H4 skill progression and unlocked literature regression
 on:
-  push:
-    branches: ['feature/h4-*', 'fix/h4-*']
-  pull_request:
-    paths:
-      - 'src/hobby-reading.js'
-      - 'src/skill-presentation.js'
-      - 'src/household.js'
-      - 'src/game.js'
-      - 'index.html'
-      - 'styles.css'
-      - 'tests/hobbies-h4.test.js'
-      - '.github/workflows/hobby-h4-checks.yml'
+  workflow_dispatch:
 jobs:
   regression:
     runs-on: ubuntu-latest

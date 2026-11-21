@@ -1,6 +1,5 @@
 name: LIFE NEEDS-R2 — moderate six-need economy and mobile WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

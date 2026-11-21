@@ -1,6 +1,5 @@
 name: LIFE NEEDS-R1 — quantitative household baseline
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

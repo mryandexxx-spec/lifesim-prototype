@@ -1,6 +1,5 @@
 name: Q3b — needs, night sleep and mobile WebGL regression
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

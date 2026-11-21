@@ -1,8 +1,5 @@
 name: LOT-C3a — finite herb harvest and replant
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 jobs:
   garden-harvest:

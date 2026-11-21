@@ -1,6 +1,5 @@
 name: W1-B.3b.2 workplace incidents iPhone-sized PlayCanvas QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

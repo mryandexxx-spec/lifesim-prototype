@@ -1,7 +1,5 @@
 name: Camera + Safari boot regression checks
 on:
-  push:
-    branches: [fix/camera-gestures-boot-20261116]
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,6 +1,5 @@
 name: LIFE FOOD-R1 — paid meals, delivery, four mobile WebGL viewports
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

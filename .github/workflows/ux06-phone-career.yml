@@ -1,6 +1,5 @@
 name: UX-06 — contextual phone and career
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

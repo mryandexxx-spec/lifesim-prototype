@@ -1,7 +1,6 @@
 name: F2.1b per-instance functional furniture preflight
 on:
-  push:
-    branches: [feature/f2b-instance-bed-slots-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

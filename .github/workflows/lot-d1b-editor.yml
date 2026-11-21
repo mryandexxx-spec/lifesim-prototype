@@ -1,6 +1,5 @@
 name: LOT-D1b — freeform pool economy, fixtures and safety
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

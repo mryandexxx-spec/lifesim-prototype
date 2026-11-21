@@ -1,7 +1,5 @@
 name: Furniture F1 edit mode preflight
 on:
-  push:
-    branches: [feature/furniture-f1-edit-20261116]
   workflow_dispatch:
 permissions:
   contents: read

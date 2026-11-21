@@ -1,8 +1,6 @@
 name: Mood M3 — Social need branch-only verification (NO DEPLOY)
 on:
-  push:
-    branches:
-      - feature/mood-m3-20261115
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

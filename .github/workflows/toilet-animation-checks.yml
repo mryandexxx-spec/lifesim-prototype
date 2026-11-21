@@ -1,7 +1,6 @@
 name: Toilet M4 authored sit and stand — branch only
 on:
-  push:
-    branches: [feature/toilet-m4-animations-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

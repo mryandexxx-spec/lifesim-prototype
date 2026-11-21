@@ -1,7 +1,6 @@
 name: F2.1b functional sofa preflight
 on:
-  push:
-    branches: [feature/f2b-functional-sofa-integrate-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

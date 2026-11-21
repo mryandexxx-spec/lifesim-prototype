@@ -1,6 +1,5 @@
 name: W4-A — unified finance ledger and mobile WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

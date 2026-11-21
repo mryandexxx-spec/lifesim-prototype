@@ -1,8 +1,5 @@
 name: LOT-C3c — four mobile WebGL and 30-day garden/kitchen integration
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

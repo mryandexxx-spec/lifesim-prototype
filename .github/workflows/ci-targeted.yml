@@ -1,0 +1,61 @@
+name: CI — change-aware Node and one-screen WebGL
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: targeted-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  targeted:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    outputs:
+      browser: ${{ steps.impact.outputs.browser }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Prevent automatic historical workflow fan-out
+        run: node scripts/ci-guard.mjs
+      - name: Syntax and dependency-aware affected Node tests
+        id: impact
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/ci-target.mjs
+  mobile-webgl-smoke:
+    needs: targeted
+    if: ${{ needs.targeted.outputs.browser == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install Chromium only when browser-facing code changed
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Real PlayCanvas startup at one iPhone viewport
+        run: |
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
+          sleep 3
+          node tests/ci-browser-boot.mjs
+      - name: Preserve boot screenshot on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-boot-390x844
+          path: artifacts/ci-boot/
+          if-no-files-found: ignore

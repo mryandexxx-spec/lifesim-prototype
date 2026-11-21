@@ -1,6 +1,5 @@
 name: W3-C — work discipline and rehire mobile QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

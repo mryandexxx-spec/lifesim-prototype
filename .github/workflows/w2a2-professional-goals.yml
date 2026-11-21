@@ -1,6 +1,5 @@
 name: W2-A.2 authentic professional goals 390x844 PlayCanvas QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

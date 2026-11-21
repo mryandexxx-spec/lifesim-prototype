@@ -1,8 +1,6 @@
 name: Mood M1 branch verification (tests only, NO DEPLOY)
 on:
-  push:
-    branches:
-      - feature/mood-m1-20261115
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -1,8 +1,5 @@
 name: LOT-E1 — mixed-yard A-star and four-view PlayCanvas performance
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

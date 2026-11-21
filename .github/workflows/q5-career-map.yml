@@ -1,6 +1,5 @@
 name: Q5 interactive career map — six jobs and four mobile WebGL viewports
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

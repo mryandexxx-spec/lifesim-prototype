@@ -1,6 +1,5 @@
 name: Comfort C1 readable night — mobile PlayCanvas QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

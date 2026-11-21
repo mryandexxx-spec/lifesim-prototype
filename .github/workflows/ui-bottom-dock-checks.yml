@@ -1,7 +1,5 @@
 name: Bottom HUD dock and collapse checks (no deploy)
 on:
-  push:
-    branches: [feature/ui-bottom-dock-on-f0-20261116]
   workflow_dispatch:
 permissions:
   contents: read

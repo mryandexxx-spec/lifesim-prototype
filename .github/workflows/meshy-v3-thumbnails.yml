@@ -1,8 +1,5 @@
 name: Meshy V3 — real GLB store thumbnails and model QA
 on:
-  push:
-    branches: [feature/meshy-v3-live-20261120]
-    paths: [.github/workflows/meshy-v3-thumbnails.yml]
   workflow_dispatch:
 permissions:
   contents: write

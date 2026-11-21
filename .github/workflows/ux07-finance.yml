@@ -1,6 +1,5 @@
 name: UX-07 — family finances and bill safety
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

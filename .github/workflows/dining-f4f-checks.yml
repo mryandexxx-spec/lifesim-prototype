@@ -1,23 +1,6 @@
 name: F4F functional dining regression
 on:
-  push:
-    branches: ['feature/f4f-*', 'fix/f4f-*']
-  pull_request:
-    paths:
-      - 'src/dining.js'
-      - 'src/seat-furniture.js'
-      - 'src/furniture-layout.js'
-      - 'tests/furniture-f4f-chair-clearance.test.js'
-      - 'src/game.js'
-      - 'src/household.js'
-      - 'src/simulation.js'
-      - 'src/furniture-catalog.js'
-      - 'src/music-movement.js'
-      - 'src/meshy-visual.js'
-      - 'src/meshy-mira-visual.js'
-      - 'src/animations.js'
-      - 'tests/furniture-f4f-dining.test.js'
-      - '.github/workflows/dining-f4f-checks.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

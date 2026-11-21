@@ -1,7 +1,5 @@
 name: F2.0 furniture long-press and camera gesture preflight
 on:
-  push:
-    branches: [feature/furniture-f2-longpress-20261116]
   workflow_dispatch:
 permissions: {contents: read}
 jobs:
