@@ -5196,8 +5196,8 @@ function boot() {
     if(dialogueNeedsDecision(game)){
       toast('Сначала выбери ответ или заверши разговор');return;
     }
-    editSession=createFurnitureEditor(game.world.furniture,game.shop,
-      furniture=>protectPoolFromWorldEdit(game,{furniture}));
+    editSession=createFurnitureEditor(game.world.furniture,game.shop);
+    editSession.setValidator(furniture=>protectPoolFromWorldEdit(game,{furniture}));
     // F5-D.2: reach built rooms across the 32×24 lot while arranging items.
     setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:100});
@@ -5808,9 +5808,9 @@ function boot() {
       toast('Сначала закончи текущее взаимодействие');return;
     }
     if(furnishMode)exitFurniture();
-    buildSession=createHouseholdConstructionEditor(game.world.construction,
-      game.world.furniture,(construction,furniture)=>
-        protectPoolFromWorldEdit(game,{construction,furniture}));
+    buildSession=createHouseholdConstructionEditor(game.world.construction,game.world.furniture);
+    buildSession.setValidator((construction,furniture)=>
+      protectPoolFromWorldEdit(game,{construction,furniture}));
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
     buildTool='camera';ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
