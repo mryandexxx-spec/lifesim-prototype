@@ -133,6 +133,7 @@ try{
    nightSeed.minutes=1320;nightSeed.otherSim.minutes=1320;
    for(const task of nightSeed.actionQueues?.byResident?.alex||[])
     if(task.type==='pool')task.queuedAt=1320;
+   let nightPhase=null;
    const nightContext=await browser.newContext({viewport:{width:w,height:h},
     deviceScaleFactor:1,isMobile:true,hasTouch:true});
    try{
@@ -159,6 +160,7 @@ try{
     assert.ok(night.saved.minutes>=1320&&night.saved.minutes<1350,
      name+' night clock must survive WebGL boot; got '+night.saved.minutes);
     assert.equal(night.phase,'night','night scene seeded at 22:00');
+    nightPhase=night.phase;
     // A real career transition may settle when jumping from day to night.
     // Do not demand equal balances at different game minutes: require that
     // every change has a matching canonical finance receipt, then verify
@@ -191,7 +193,8 @@ try{
     await nightContext.close();
    }
    assert.deepEqual(errors,[],name+' WebGL/javascript errors');
-   report.push({viewport:name,webgl:gl.webgl,day:day.phase,night:night.phase,
+   assert.equal(nightPhase,'night',name+' night viewport completed');
+   report.push({viewport:name,webgl:gl.webgl,day:day.phase,night:nightPhase,
     twoResidents:true,careers:2,manualFifo:true,garden:true,pool:true,
     speedToggled:true,saveReload:true,errorCount:errors.length});
   }finally{
