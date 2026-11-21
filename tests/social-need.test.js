@@ -73,7 +73,7 @@ test('M3: restored social values clamp, corrupt values use neutral rather than N
 test('M3: social need decays only by real game minutes and stops completely on pause',()=>{
   const s=newGame(),initial=s.needs.social;
   const rate=socialNeedDecayRate(s.personality);
-  assert.ok(rate>=.018&&rate<=.030);
+  assert.ok(rate>=.015&&rate<=.023,'social decay within personality bounds');
   tick(s,100);
   near(s.needs.social,initial-100*rate);
   s.paused=true;
