@@ -20,7 +20,8 @@ export function snapFurnitureCoordinate(n,step=F1_GRID_STEP){
   if(!Number.isFinite(n)||!Number.isFinite(step)||step<=0)return null;
   return Math.round(n/step)*step;
 }
-export function createFurnitureEditor(initial,initialShop=null){
+export function createFurnitureEditor(initial,initialShop=null,validateCandidate=null){
+  let validator=validateCandidate;
   const valid=restoreFurnitureWorld(initial);
   const copy=world=>restoreFurnitureWorld(world);
   let shop=initialShop?restoreFurnitureShop(initialShop):null;
@@ -44,12 +45,16 @@ export function createFurnitureEditor(initial,initialShop=null){
       return {ok:false,reason:'unchanged',...results()};
     const changed=proposeFurnitureMove(current,instanceId,pose,context);
     if(!changed.ok)return {...changed,...results()};
+    const safe=validator?.(changed.world);
+    if(safe&&!safe.ok)return {...safe,...results()};
     remember(changed.world);
     return {ok:true,...results()};
   }
   function traverse(direction){
     const target=index+direction;
     if(target<0||target>=timeline.length)return {ok:false,reason:'empty-history',...results()};
+    const safe=validateCandidate?.(timeline[target].world);
+    if(safe&&!safe.ok)return {...safe,...results()};
     index=target;revision++;
     current=copy({...timeline[index].world,revision});
     shop=timeline[index].shop?restoreFurnitureShop(timeline[index].shop):null;
@@ -58,10 +63,14 @@ export function createFurnitureEditor(initial,initialShop=null){
   function transactMarket(transaction){
     if(!shop||!transaction?.ok||!transaction?.world||!transaction?.shop)
       return {ok:false,reason:'invalid-transaction',...results()};
+    const safe=validateCandidate?.(transaction.world);
+    if(safe&&!safe.ok)return {...safe,...results()};
     remember(transaction.world,transaction.shop);
     return {ok:true,instanceId:transaction.instanceId,amount:transaction.amount,...results()};
   }
-  return {state:results,commit,transactMarket,undo:()=>traverse(-1),redo:()=>traverse(1)};
+  return {state:results,commit,transactMarket,
+    setValidator(fn){validator=typeof fn==='function'?fn:null;},
+    undo:()=>traverse(-1),redo:()=>traverse(1)};
 }
 /** Pure ray vs floor for drag gestures; CSS pixels are interpreted in game adapter. */
 export function furnitureFloorPoint(near,far){
