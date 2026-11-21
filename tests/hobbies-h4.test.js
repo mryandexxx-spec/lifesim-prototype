@@ -57,10 +57,11 @@ test('H4 invalid XP/old saves create no imaginary progress, no imaginary skill',
   assert.equal(skillProfileRows(broken,HOBBY_SKILLS)[0].xp,0);
   assert.equal(skillProfileRows({schema:1,xpById:{literature:-100}},HOBBY_SKILLS)[0].level,0);
   assert.equal(skillProfileRows({schema:1,xpById:{literature:'135'}},HOBBY_SKILLS)[0].level,0);
-  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS).length,4);
+  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS).length,5);
   assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS)[1].id,'painting');
   assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS)[2].id,'cooking');
   assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS)[3].id,'charisma');
+  assert.equal(skillProfileRows(newSkillProgress(),HOBBY_SKILLS)[4].id,'gardening');
 });
 
 test('H4 advanced authored literature is a real threshold-gated item content, not just a badge',()=>{
