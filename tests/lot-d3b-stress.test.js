@@ -54,7 +54,7 @@ const assertHousehold=(root)=>{
 test('D3b: thirty days of shared clock, garden, pool, work, bills, reload and bounded two-person state',()=>{
   let root=poolRoot();
   const garden=previewOutdoorFeatureEdit(root,{operation:'place',
-    itemId:'garden.herb.mint',pose:{x:23,z:8,yaw:0}});
+    itemId:'garden.herb.mint',pose:{x:19,z:11,yaw:0}});
   assert.equal(garden.ok,true,garden.reason);
   root=commitOutdoorFeatureEdit(root,garden).root;
   const start=root.minutes,seedBalance=root.shop.credits;
