@@ -1,6 +1,5 @@
 name: W4-C — household bills, payment and mobile WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

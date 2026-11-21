@@ -1,6 +1,5 @@
 name: W1-B.3a work shift iPhone-sized PlayCanvas smoke
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

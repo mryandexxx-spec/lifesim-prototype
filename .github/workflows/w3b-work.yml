@@ -1,6 +1,5 @@
 name: W3-B — work modes, needs and mobile PlayCanvas QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
