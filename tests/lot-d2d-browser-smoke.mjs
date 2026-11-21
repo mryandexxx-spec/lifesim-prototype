@@ -104,13 +104,31 @@ try{
       const b=canvas.getBoundingClientRect();
       return {x:b.left,y:b.top,width:b.width,height:b.height};
     });
-    const pos=projectGround(rect.width,rect.height,8.1,-6.4);
-    assert.ok(pos.x>8&&pos.x<rect.width-8&&pos.y>8&&pos.y<rect.height-8,
-      'water point visible '+w+'x'+h);
-    // Use a genuine Chromium touch sequence. A synthetic pointerup on
-    // window does not reproduce the browser's pointer capture/gesture path.
-    await page.touchscreen.tap(rect.x+pos.x,rect.y+pos.y);
-    await page.locator('#ground-walk-menu').waitFor({state:'visible',timeout:8000});
+    // Two actual swimmers occupy pick volumes above the pool centre.
+    // Touch a water-only corner first rather than accidentally selecting
+    // a resident, then try the other corners if a rig overlaps the ray.
+    // Every attempt uses a real Chromium touch; never bypass the game UI.
+    const waterSites=[[8.85,-5.65],[7.35,-5.65],[8.85,-7.15],
+      [7.35,-7.15],[8.1,-6.4]];
+    let opened=false;
+    const tapResults=[];
+    for(const [waterX,waterZ] of waterSites){
+      const pos=projectGround(rect.width,rect.height,waterX,waterZ);
+      if(!(pos.x>8&&pos.x<rect.width-8&&pos.y>8&&pos.y<rect.height-8)){
+        tapResults.push({waterX,waterZ,outside:true});continue;
+      }
+      await page.touchscreen.tap(rect.x+pos.x,rect.y+pos.y);
+      const shown=await page.locator('#ground-walk-menu').isVisible();
+      const title=shown?await page.locator('#ground-walk-title').textContent():'';
+      tapResults.push({waterX,waterZ,screen:pos,shown,title,
+        hit:await page.evaluate(({x,y})=>{
+          const el=document.elementFromPoint(x,y);
+          return el?.id||el?.tagName||null;
+        },{x:rect.x+pos.x,y:rect.y+pos.y})});
+      if(shown&&/Бассейн/.test(title||'')){opened=true;break;}
+    }
+    assert.ok(opened,w+'x'+h+': genuine water taps must open pool menu; '+
+      JSON.stringify({tapResults,visual}));
     assert.match(await page.locator('#ground-walk-title').textContent(),/Бассейн/);
     assert.match(await page.locator('#ground-walk-primary-reason').textContent(),/уже плавает/);
     assert.equal(await page.locator('#ground-walk-action').isDisabled(),true);
