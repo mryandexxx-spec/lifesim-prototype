@@ -1,5 +1,5 @@
 /** C3b: immutable, explicit grocery purchase, one family ledger and wallet. */
-import {PANTRY_START,KITCHEN_SCHEMA} from './kitchen.js';
+import {PANTRY_START,KITCHEN_SCHEMA,KITCHEN_RECIPES} from './kitchen.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
 import {recordFinanceChange} from './finance-ledger.js';
 export const KITCHEN_RESTOCK_UNITS=5;
@@ -39,4 +39,19 @@ export function proposeKitchenRestock(root,ingredientId,actorId=null){
     return {ok:false,reason:finance.reason||'invalid-finance'};
   return {...quote,kitchen,shop:finance.shop,
     financialHistory:finance.financialHistory,entry:finance.entry};
+}
+
+/** Display-only equivalent cost, NEVER a second debit for cooking.
+ * Staple purchases already charged 15 credits for 5 units; herbs are garden-grown.
+ */
+export function quoteCookingRecipe(recipeId){
+  const recipe=Object.hasOwn(KITCHEN_RECIPES,recipeId)?KITCHEN_RECIPES[recipeId]:null;
+  if(!recipe)return null;
+  const items=Object.entries(recipe.requires).map(([id,quantity])=>({
+    id,quantity,label:KITCHEN_RESTOCK_LABELS[id]||(id==='herbs'?'Садовые травы':id)
+  }));
+  const creditsEquivalent=items.reduce((sum,item)=>
+    sum+(item.id==='herbs'?0:item.quantity*KITCHEN_RESTOCK_PRICE/KITCHEN_RESTOCK_UNITS),0);
+  return {recipeId,items,creditsEquivalent,
+    perServing:Math.round(creditsEquivalent/recipe.portions*100)/100};
 }

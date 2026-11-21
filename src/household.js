@@ -13,7 +13,7 @@ import {progressWorkNeeds} from './career-work-needs.js';
 import {applyWorkMoodContext} from './career-worklife.js';
 import {DISH_AUTO_WASH_THRESHOLD,COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
-  takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
+  takeKitchenServingDetails,hasKitchenServing,shouldEatFreshKitchenMeal,
   recordDirtyDish,washKitchenDishes} from './kitchen.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
@@ -908,13 +908,15 @@ export function tickHousehold(root,minutes) {
     const action=getActor(root,id)?.action;
     if(action?.id==='dining'&&action.phase==='using'&&
       action.diningStage==='eating'&&!action.portionTaken){
-      const recipeId=takeKitchenServing(root.kitchen,action.selectedRecipeId??null);
-      if(action.selectedRecipeId&&!recipeId){
+      const serving=takeKitchenServingDetails(root.kitchen,action.selectedRecipeId??null);
+      if(action.selectedRecipeId&&!serving){
         getActor(root,id).action=null;
         getActor(root,id).event='Выбранное готовое блюдо закончилось';
         continue;
       }
-      action.cookedRecipeId=recipeId;
+      action.cookedRecipeId=serving?.recipeId??null;
+      if(serving?.quality&&serving.quality!=='normal')
+        action.cookedQuality=serving.quality;
       action.portionTaken=true;
     }
   }
