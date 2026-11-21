@@ -31,6 +31,7 @@ import {previewOutdoorPaint,commitOutdoorPreview,
   previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from './outdoor-proposals.js';
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {poolBoundaryEdges,poolCellBounds} from './pool-topology.js';
+import {protectPoolFromWorldEdit} from './pool-cross-editor.js';
 import {canBeginPoolSwim,beginPoolSwim,arrivePoolApproach,
   requestPoolExit,SWIM_MAX_WAIT_MINUTES} from './pool-swim-runtime.js';
 import {poolSwimVisualFrame} from './pool-swim-visual.js';
@@ -4382,6 +4383,7 @@ function boot() {
   const editorContext=(allowQueuedReposition=false)=>({
     lockedInstanceIds:lockedFurnitureIds(!allowQueuedReposition),
     construction:game.world.construction,
+    outdoors:game.world.outdoors,
     residents:HOUSEHOLD_IDS.map(id=>getActor(game,id).position)
   });
   const editorLabel=instanceId=>{
@@ -4396,6 +4398,9 @@ function boot() {
       'room-bounds':'Слишком близко к стене или за пределами комнаты',
       collision:'Здесь уже стоит другая мебель',
       'resident-blocked':'Здесь стоит житель — перемести предмет в другое место',
+      'pool-landing-blocked':'Предмет перекроет вход или выход из бассейна',
+      'pool-exit-unreachable':'После перестановки путь к бассейну станет недоступен',
+      'pool-water-overlap':'В этом месте уже построен бассейн',
       'unreachable-bed':'После переноса к кровати нельзя подойти',
       'unreachable-fridge':'После переноса нельзя добраться до холодильника',
       'unreachable-shower':'После переноса нельзя добраться до душа',
@@ -5191,7 +5196,8 @@ function boot() {
     if(dialogueNeedsDecision(game)){
       toast('Сначала выбери ответ или заверши разговор');return;
     }
-    editSession=createFurnitureEditor(game.world.furniture,game.shop);
+    editSession=createFurnitureEditor(game.world.furniture,game.shop,
+      furniture=>protectPoolFromWorldEdit(game,{furniture}));
     // F5-D.2: reach built rooms across the 32×24 lot while arranging items.
     setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:100});
@@ -5215,6 +5221,10 @@ function boot() {
   // F5-A construction editor: separate transaction history, no change to Buy mode.
   const buildingReason={
     'invalid-rectangle':'Протяни прямоугольник хотя бы 1×1 м',
+    'pool-water-overlap':'Нельзя строить дом или стену поверх воды бассейна',
+    'pool-landing-blocked':'Постройка перекроет вход или выход из бассейна',
+    'pool-exit-unreachable':'После строительства путь к бассейну станет недоступен',
+    'pool-editor-required':'Воду и оборудование изменяй только в редакторе бассейна',
     'wall-must-be-straight':'Стена должна идти по прямой оси сетки',
     'outside-floor':'Строить стены можно по контуру построенного пола',
     'lot-bounds':'За границами участка 32×24',
@@ -5324,7 +5334,10 @@ function boot() {
     if(!candidate.ok)return candidate;
     const guard=mountedFixturesSurviveEdit(game.world.construction,candidate.world,
       candidate.furniture||game.world.furniture);
-    return guard.ok?candidate:guard;
+    if(!guard.ok)return guard;
+    const poolGuard=protectPoolFromWorldEdit(game,{
+      construction:candidate.world,furniture:candidate.furniture||game.world.furniture});
+    return poolGuard.ok?candidate:poolGuard;
   };
   const buildCommand=(from,to)=>{
     if(buildTool==='roof-add')return {type:'roof-add',from,to,...roofChoice};
@@ -5381,7 +5394,8 @@ function boot() {
     const candidate=buildProposal(cmd);
     if(!candidate.ok){buildFeedback(buildingReason[candidate.reason]||candidate.reason,true);return false;}
     // Verify the essential pathways from BOTH residents after each transaction.
-    const candidateLayout={furniture:candidate.furniture||game.world.furniture,construction:candidate.world};
+    const candidateLayout={furniture:candidate.furniture||game.world.furniture,
+      construction:candidate.world,outdoors:game.world.outdoors};
     for(const id of HOUSEHOLD_IDS){
       const actor=getActor(game,id);
       for(const action of ['fridge','shower','toilet','bed']){
@@ -5794,7 +5808,9 @@ function boot() {
       toast('Сначала закончи текущее взаимодействие');return;
     }
     if(furnishMode)exitFurniture();
-    buildSession=createHouseholdConstructionEditor(game.world.construction,game.world.furniture);
+    buildSession=createHouseholdConstructionEditor(game.world.construction,
+      game.world.furniture,(construction,furniture)=>
+        protectPoolFromWorldEdit(game,{construction,furniture}));
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
     buildTool='camera';ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
