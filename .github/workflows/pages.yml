@@ -232,7 +232,8 @@ jobs:
           cp src/build-tool-palette.js site/src/
           cp src/lot-surface.js src/outdoor-catalog.js src/outdoor-proposals.js src/outdoor-interactions.js site/src/
           cp src/pool-topology.js site/src/
-          cp src/pool-equipment.js src/pool-editor.js src/pool-cross-editor.js site/src/
+          cp src/pool-equipment.js src/pool-editor.js site/src/
+          cp src/pool-cross-editor.js site/src/
           cp src/pool-visual.js site/src/
           cp src/pool-navigation.js src/pool-swim-runtime.js src/pool-autonomy.js site/src/
           cp src/gardening.js site/src/
