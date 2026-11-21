@@ -109,7 +109,8 @@ export function proposeFurnishedRoomMove(household,command,context={}){
 /** One undo/redo timeline for both construction and furniture, never two
  * independently drifting stacks. Keeps existing construction editor API.
  */
-export function createHouseholdConstructionEditor(initial,initialFurniture){
+export function createHouseholdConstructionEditor(initial,initialFurniture,validateCandidate=null){
+  let validator=validateCandidate;
   let states=[{world:restoreConstructionWorld(initial),
     furniture:restoreFurnitureWorld(initialFurniture)}],index=0;
   const snapshot=()=>({world:restoreConstructionWorld(states[index].world),
@@ -117,6 +118,7 @@ export function createHouseholdConstructionEditor(initial,initialFurniture){
     canUndo:index>0,canRedo:index<states.length-1});
   return {
     state:snapshot,
+    setValidator(fn){validator=typeof fn==='function'?fn:null;},
     commit(command,context={}){
       const previous=states[index],move=command?.type==='room-relocate';
       const result=move
@@ -124,12 +126,25 @@ export function createHouseholdConstructionEditor(initial,initialFurniture){
         :proposeConstructionEdit(previous.world,command,{...context,
             furniture:previous.furniture.instances});
       if(!result.ok)return {...result,...snapshot()};
+      // Validate against the live household before storing a reversible edit.
+      const safe=validator?.(result.world,result.furniture||previous.furniture);
+      if(safe&&!safe.ok)return {...safe,...snapshot()};
       states=states.slice(0,index+1);
       states.push({world:result.world,furniture:result.furniture||previous.furniture});
       index++;if(states.length>50){states.shift();index--;}
       return {...result,...snapshot()};
     },
-    undo(){if(index===0)return fail('empty-history');index--;return {ok:true,...snapshot()};},
-    redo(){if(index===states.length-1)return fail('empty-history');index++;return {ok:true,...snapshot()};}
+    undo(){
+      if(index===0)return fail('empty-history');
+      const candidate=states[index-1],safe=validateCandidate?.(candidate.world,candidate.furniture);
+      if(safe&&!safe.ok)return {...safe,...snapshot()};
+      index--;return {ok:true,...snapshot()};
+    },
+    redo(){
+      if(index===states.length-1)return fail('empty-history');
+      const candidate=states[index+1],safe=validateCandidate?.(candidate.world,candidate.furniture);
+      if(safe&&!safe.ok)return {...safe,...snapshot()};
+      index++;return {ok:true,...snapshot()};
+    }
   };
 }
