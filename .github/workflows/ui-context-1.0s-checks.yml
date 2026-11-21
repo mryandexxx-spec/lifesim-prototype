@@ -1,7 +1,5 @@
 name: UI 1.0s + M2 integrated branch checks (no deploy)
 on:
-  push:
-    branches: [feature/ui-contextual-1.0s-20261115]
   workflow_dispatch:
 permissions:
   contents: read

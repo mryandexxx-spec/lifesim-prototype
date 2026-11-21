@@ -1,7 +1,5 @@
 name: UI4 contextual menus and dialogue accessibility checks (no deploy)
 on:
-  push:
-    branches: [feature/ui4-context-view-20261115]
   workflow_dispatch:
 permissions:
   contents: read

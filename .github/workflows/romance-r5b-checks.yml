@@ -1,13 +1,6 @@
 name: R5b romantic evening visual preflight
 on:
-  push:
-    branches: [feature/r5b-visual-evening-vignette-20261116]
-  pull_request:
-    paths:
-      - 'src/romantic-evening-scene.js'
-      - 'src/game.js'
-      - 'src/animations.js'
-      - 'tests/romance-r5b.test.js'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

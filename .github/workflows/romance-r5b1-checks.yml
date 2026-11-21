@@ -1,9 +1,6 @@
 name: R5b.1 real two-person table rendezvous
 on:
-  push:
-    branches: [feature/r5b1-shared-table-arrival-20261116]
-  pull_request:
-    paths: ['src/**','tests/romance-r5b-rendezvous.test.js','.github/workflows/pages.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

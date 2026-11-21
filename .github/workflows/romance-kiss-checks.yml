@@ -1,7 +1,6 @@
 name: R1b kiss preflight with R1a regression
 on:
-  push:
-    branches: [feature/romance-kiss-r1b-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
