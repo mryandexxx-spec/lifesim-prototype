@@ -57,9 +57,17 @@ function assertResidentIntent(saved,id,kind){
   const active=kind==='pool'
     ?action?.id==='swim'&&action.poolId==='pool-1'
     :action?.id==='garden'&&action.targetInstanceId===garden.instanceId;
-  assert.ok(pending||active,
-    id+' '+kind+' command missing from both queue and active task: '+
-    JSON.stringify({paused:saved.paused,minutes:saved.minutes,queue,action}));
+  // A short garden action can legitimately finish during first-load and
+  // reload frames. Completion is proven by the canonical settled record,
+  // never by a timer or by assuming the queue is still populated.
+  const completed=kind==='garden'
+    ?Number.isFinite(saved.world?.outdoors?.gardens?.[garden.instanceId]?.lastWateredAt)
+    :Number.isFinite(saved.poolFirstSwimAt);
+  assert.ok(pending||active||completed,
+    id+' '+kind+' intent lost (not queued, running or receipted): '+
+    JSON.stringify({paused:saved.paused,minutes:saved.minutes,queue,action,
+      gardenLastWateredAt:saved.world?.outdoors?.gardens?.[garden.instanceId]?.lastWateredAt,
+      poolFirstSwimAt:saved.poolFirstSwimAt}));
 }
 
 const browser=await chromium.launch({headless:true,args:[
