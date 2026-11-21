@@ -1,7 +1,6 @@
 name: F2.1 shop layout and mobile camera preflight
 on:
-  push:
-    branches: [feature/furniture-shop-ui-1-1n-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

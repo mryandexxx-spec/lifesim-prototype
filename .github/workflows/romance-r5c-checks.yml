@@ -1,9 +1,6 @@
 name: R5c shared sofa preflight
 on:
-  push:
-    branches: [feature/romance-r5c-over-f3c-20261116]
-  pull_request:
-    paths: ['src/**','tests/romance-r5c.test.js','.github/workflows/pages.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

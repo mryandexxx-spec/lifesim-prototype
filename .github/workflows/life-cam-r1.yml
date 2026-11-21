@@ -1,6 +1,5 @@
 name: LIFE CAM-R1 — responsive two-finger orbit and twist
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

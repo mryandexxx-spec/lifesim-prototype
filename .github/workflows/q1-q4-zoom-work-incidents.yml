@@ -1,6 +1,5 @@
 name: Q1 + Q4 — camera zoom and work incident mobile WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

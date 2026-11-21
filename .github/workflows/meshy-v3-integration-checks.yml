@@ -1,9 +1,5 @@
 name: Meshy V3 — integration Node and four-viewport WebGL
 on:
-  push:
-    branches: [feature/meshy-v3-live-20261120]
-    paths:
-      - .github/workflows/meshy-v3-integration-checks.yml
   workflow_dispatch:
 permissions:
   contents: read

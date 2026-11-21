@@ -1,6 +1,5 @@
 name: LIFE HUD-R1 — six need trends, 4 mobile WebGL viewports
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

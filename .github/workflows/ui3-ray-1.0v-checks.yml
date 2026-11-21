@@ -1,7 +1,5 @@
 name: UI3 1.0v + M3 full regression checks (no deploy)
 on:
-  push:
-    branches: [feature/ui3-ray-1.0v-20261115]
   workflow_dispatch:
 permissions:
   contents: read

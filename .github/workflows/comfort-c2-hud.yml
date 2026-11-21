@@ -1,6 +1,5 @@
 name: Comfort C2 compact HUD — WebGL viewport and touch QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

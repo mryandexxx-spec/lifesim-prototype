@@ -1,7 +1,6 @@
 name: Shop buy-to-place preflight
 on:
-  push:
-    branches: [feature/f2-shop-pending-placement-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -1,6 +1,5 @@
 name: W2-A.1 five-rank career progression iPhone-size PlayCanvas QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

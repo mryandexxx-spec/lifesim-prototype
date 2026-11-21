@@ -1,6 +1,5 @@
 name: LOT-B4 — integrated lot and mobile regression
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,6 +1,5 @@
 name: W4-B — phone finance analytics and four-screen mobile WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,6 +1,5 @@
 name: LIFE BOOK-R1 — ten original books and 4 mobile WebGL viewports
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

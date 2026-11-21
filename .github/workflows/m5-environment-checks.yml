@@ -1,7 +1,6 @@
 name: M5 room environment mood — branch-only regressions
 on:
-  push:
-    branches: [feature/mood-m5-environment-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

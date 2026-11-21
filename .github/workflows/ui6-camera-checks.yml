@@ -1,7 +1,5 @@
 name: UI6 touch camera and no accidental interaction checks (no deploy)
 on:
-  push:
-    branches: [feature/ui6-camera-gestures-20261115]
   workflow_dispatch:
 permissions:
   contents: read

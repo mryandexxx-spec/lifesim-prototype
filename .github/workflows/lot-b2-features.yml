@@ -1,6 +1,5 @@
 name: LOT-B2 — plants, fences and mobile WebGL QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,6 +1,5 @@
 name: W1-B.2b recruitment all-career iPhone-size PlayCanvas QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

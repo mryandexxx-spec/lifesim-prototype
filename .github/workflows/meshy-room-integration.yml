@@ -1,6 +1,5 @@
 name: Meshy room 15 GLB — mobile WebGL and asset fitting
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,7 +1,6 @@
 name: R2 intimacy preflight with R1 hug/kiss and F2 regression
 on:
-  push:
-    branches: [chore/r2-accepted-remove-qa-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -1,8 +1,5 @@
 name: Furniture F0 domain and integration checks
 on:
-  push:
-    branches:
-      - feature/furniture-f0-foundation-20261116
   workflow_dispatch:
 permissions:
   contents: read

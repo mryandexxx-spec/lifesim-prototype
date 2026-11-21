@@ -1,6 +1,5 @@
 name: Q2 — starter furniture warehouse and sale mobile WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

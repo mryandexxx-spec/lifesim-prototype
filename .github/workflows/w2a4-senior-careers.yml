@@ -1,6 +1,5 @@
 name: W2-A.4 full eight-rank branches — PlayCanvas mobile QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

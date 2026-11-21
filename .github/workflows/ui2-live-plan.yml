@@ -1,7 +1,5 @@
 name: UI2 live plan branch checks (no deploy)
 on:
-  push:
-    branches: [feature/ui2-live-plan-20261115]
   workflow_dispatch:
 permissions:
   contents: read

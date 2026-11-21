@@ -1,7 +1,6 @@
 name: Needs comfort economy — branch only
 on:
-  push:
-    branches: [feature/needs-balance-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

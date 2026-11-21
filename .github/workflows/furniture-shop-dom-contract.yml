@@ -1,7 +1,6 @@
 name: F2 Safari shop DOM smoke and complete regression
 on:
-  push:
-    branches: [fix/f2-shop-dom-contract-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

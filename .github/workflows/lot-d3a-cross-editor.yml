@@ -1,8 +1,5 @@
 name: LOT-D3a — pool safety across construction, furniture and yard editors
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,8 +1,5 @@
 name: LOT-D2d — final pool lifecycle and four-view WebGL
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

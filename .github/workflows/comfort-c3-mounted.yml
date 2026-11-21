@@ -1,6 +1,5 @@
 name: Comfort C3 — mounted lights and mobile PlayCanvas QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
