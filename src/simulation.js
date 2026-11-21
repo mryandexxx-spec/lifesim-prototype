@@ -167,8 +167,10 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
           next.action.gardenPlantedAt=data.action.gardenPlantedAt;
       }
     }
-    if(validFurnitureInstanceId(data.action.targetInstanceId)||
-       (['bench','garden'].includes(data.action.id)&&validOutdoorId(data.action.targetInstanceId)))
+    // A rejected action has no target: corrupt v1 mirror practice must not
+    // crash household loading or revive its old object reservation.
+    if(next.action&&(validFurnitureInstanceId(data.action.targetInstanceId)||
+       (['bench','garden'].includes(data.action.id)&&validOutdoorId(data.action.targetInstanceId))))
       next.action.targetInstanceId=data.action.targetInstanceId;
     if(['bench','garden'].includes(data.action.id)&&!validOutdoorId(data.action.targetInstanceId))
       next.action=null;
