@@ -67,7 +67,8 @@ async function run(build,w,h){
   // Observe settled future FIFO, not a guessed seed count.
   await page.locator('#view-toggle').tap();
   await page.locator('#save-btn').tap();
-  await page.locator('#view-close').tap();
+  // UX-08 closes the system menu after successful manual save.
+  await page.locator('#view-panel').waitFor({state:'hidden'});
   const beforeQueues=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
   const alexPending=beforeQueues.actionQueues.byResident.alex.length;
   const miraPending=beforeQueues.actionQueues.byResident.mira.length;

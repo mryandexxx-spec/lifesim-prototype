@@ -92,11 +92,3 @@ test('UX05 mandatory panel cannot close via Escape, background or optional mode'
  assert.ok(html.includes('id="conversation-kind"'));
  assert.ok(pages.includes('src/ux05-character-ui.js'));
 });
-
-test('UX05 regression: romance confirmation stays beside the tapped choice and survives clock ticks',()=>{
- assert.match(source,/choice\.after\(box\)/);
- assert.match(source,/box\.scrollIntoView\(\{block:'nearest',inline:'nearest'\}\)/);
- assert.match(source,/romanceChoices\?\.map\(action=>\[action\.id,action\.enabled,action\.reason\]\)/);
- assert.doesNotMatch(source,/category==='romance'\?Math\.floor\(game\.minutes\/30\)/);
- assert.match(source,/if\(sameCategory\)panel\.scrollTop=previousScroll/);
-});

@@ -480,7 +480,8 @@ const calendarUI=createCalendarUI({
   notify:toast,
   onClose:()=>$('calendar-anchor-toggle').setAttribute('aria-expanded','false'),
   onAnchor:()=>{datePanel.hidden=false;$('calendar-anchor-date').value=calendarAt(game.calendar,game.minutes).iso;
-    $('calendar-anchor-toggle').setAttribute('aria-expanded','true');}
+    $('calendar-anchor-toggle').setAttribute('aria-expanded','true');
+    $('calendar-anchor-date').focus({preventScroll:true});}
 });
 function closeCalendarAnchorPanel(){datePanel.hidden=true;$('calendar-anchor-toggle').setAttribute('aria-expanded','false');}
 $('calendar-anchor-toggle').addEventListener('click',()=>{
@@ -2019,15 +2020,25 @@ createHudPanel({
     requestAnimationFrame(relayoutSocialPanels);
   }
 });
-$('save-btn').addEventListener('click', () => save());
+$('save-btn').addEventListener('click', () => {
+  if(save())setViewOpen(false,{restoreFocus:true});
+});
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
-  careerPhone.close({focus:false});shiftSummary.clear();
-  const enabled = game.autonomy.enabled;
-  game = newHousehold();
-  setHouseholdAutonomy(game, enabled); // Keep the player's chosen play style.
-  closeInsightPanel();calendarUI.reset();resetRuntime(); restartAutonomyWait(); updateAutoButton(); updateResidentPicker();
-  save(true); select(null); closeMindPanel(); toast('Новая игра началась');
+  // Never replace a running family when Safari cannot persist the new one.
+  const previous=game,enabled=game.autonomy.enabled;
+  const fresh=newHousehold();
+  setHouseholdAutonomy(fresh,enabled);
+  game=fresh;
+  if(!save(true)){
+    game=previous;
+    toast('Новая игра не начата: сохранение недоступно');
+    return;
+  }
+  careerPhone.close({focus:false});shiftSummary.clear();setViewOpen(false);
+  closeInsightPanel();calendarUI.reset();resetRuntime();restartAutonomyWait();
+  updateAutoButton();updateResidentPicker();select(null);closeMindPanel();
+  toast('Новая игра началась');
 });
 const restoreRequiredDialogue=()=>{if(dialogueNeedsDecision(game))renderConversationPanel(true);};
 document.addEventListener('visibilitychange',()=>{
