@@ -1,6 +1,5 @@
 name: UX-01 — mobile Life HUD, dual queue and WebGL comparison
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,6 +1,5 @@
 name: UX-03 — construction tool palette and mobile rooms
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

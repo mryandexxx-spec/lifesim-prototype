@@ -1,6 +1,5 @@
 name: UX-05 — resident card and required choices
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

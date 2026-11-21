@@ -1,6 +1,5 @@
 name: UX-00 — mobile baseline, onboarding and safe first boot
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

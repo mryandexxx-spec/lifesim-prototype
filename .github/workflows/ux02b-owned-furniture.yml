@@ -1,6 +1,5 @@
 name: UX-02b — owned furniture preview, storage and sale WebGL
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

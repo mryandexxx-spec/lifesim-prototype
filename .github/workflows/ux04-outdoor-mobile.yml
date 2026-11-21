@@ -1,6 +1,5 @@
 name: UX-04 — mobile lot palette and garden card
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

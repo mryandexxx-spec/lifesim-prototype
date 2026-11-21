@@ -1,7 +1,5 @@
 name: UI7 readability and first-use help checks (no deploy)
 on:
-  push:
-    branches: [feature/ui7-readable-onboarding-20261116]
   workflow_dispatch:
 permissions:
   contents: read
