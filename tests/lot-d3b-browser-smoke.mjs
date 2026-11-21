@@ -61,12 +61,18 @@ try{
     assert.equal(visual?.hasPool,true);
     await page.locator('#outdoor-exit').click();
 
-    // One-finger camera rotation mode is real interactive UI, not only CSS.
-    const rotate=page.locator('#rotate-camera-btn');
+    // UX-08 hides the legacy camera tray in regular play. The visible
+    // system-menu camera control forwards clicks to that same real toggle.
+    await page.locator('#view-toggle').click();
+    const rotate=page.locator('#menu-rotate-btn');
+    assert.equal(await rotate.isVisible(),true,'visible camera control in menu');
     await rotate.click();
     assert.equal(await rotate.getAttribute('aria-pressed'),'true');
+    assert.equal(await page.locator('#rotate-camera-btn').getAttribute('aria-pressed'),'true');
     await rotate.click();
     assert.equal(await rotate.getAttribute('aria-pressed'),'false');
+    assert.equal(await page.locator('#rotate-camera-btn').getAttribute('aria-pressed'),'false');
+    await page.locator('#view-close').click();
 
     // Emulate actual viewport rotation without remounting or deleting a save.
     const wasPortrait=height>width;
