@@ -12,6 +12,7 @@ import {BED_SLOTS} from './bed-layout.js';
 import {findPath,isWalkable,ACTOR_RADIUS} from './navigation.js';
 import {recordFinanceChange} from './finance-ledger.js';
 import {poolWaterNear} from './pool-topology.js';
+import {protectPoolFromWorldEdit} from './pool-cross-editor.js';
 import {outdoorBenchApproach,outdoorBenchBusy} from './outdoor-interactions.js';
 import {GARDEN_LIMIT,isGardenItem,newGardenRecord,gardenApproach,gardenBusy} from './gardening.js';
 
@@ -105,6 +106,7 @@ function essentialGoals(root){
  * Existing broken legacy layouts are tolerated, not rewritten or teleported.
  */
 export function keepsExistingRoutes(root,nextOutdoors){
+  if(!protectPoolFromWorldEdit(root,{outdoors:nextOutdoors}).ok)return false;
   const after={...root.world,outdoors:nextOutdoors};
   const before=root.world;
   const goals=essentialGoals(root);
@@ -181,6 +183,9 @@ export function commitOutdoorPreview(root,proposal){
   const verified=restoreOutdoorsWorld(proposal.outdoors,root.world.construction);
   if(JSON.stringify(verified)!==JSON.stringify(proposal.outdoors))
     return fail('invalid-projection');
+  // Never allow a forged or stale cross-mode draft to occlude a pool landing.
+  const poolGuard=protectPoolFromWorldEdit(root,{outdoors:verified});
+  if(!poolGuard.ok)return poolGuard;
   if(root.shop.credits<proposal.cost)return fail('insufficient-credits');
   const nextShop={...root.shop,credits:root.shop.credits-proposal.cost};
   const transaction=recordFinanceChange(root,nextShop,{
