@@ -39,4 +39,5 @@ jobs:
           node tests/lot-d1c-browser-smoke.mjs
       - name: Ensure GitHub Pages ships the safety dependency
         run: |
-          grep -F 'cp src/pool-equipment.js src/pool-editor.js src/pool-cross-editor.js site/src/' .github/workflows/pages.yml
+          grep -F 'cp src/pool-equipment.js src/pool-editor.js site/src/' .github/workflows/pages.yml
+          grep -F 'cp src/pool-cross-editor.js site/src/' .github/workflows/pages.yml
