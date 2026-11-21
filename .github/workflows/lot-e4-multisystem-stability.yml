@@ -1,0 +1,39 @@
+name: LOT-E4 — seven/thirty-day cohabitation and four WebGL viewports
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  multisystem-stability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned simulation and Chromium
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Seven and thirty game days plus regression suite
+        run: |
+          node --check tests/lot-e4-cohabitation.test.js
+          node --check tests/lot-e4-browser-smoke.mjs
+          node --test tests/lot-e4-cohabitation.test.js
+          npm test
+      - name: Real PlayCanvas WebGL and Save v1, four Safari-sized Chromium canvases
+        run: |
+          mkdir -p vendor artifacts/lot-e4
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-e4-webgl.log 2>&1 &
+          sleep 3
+          node tests/lot-e4-browser-smoke.mjs
+      - name: Upload report and day/night evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lot-e4-cohabitation-webgl-four-viewports
+          path: artifacts/lot-e4/
+          if-no-files-found: ignore
