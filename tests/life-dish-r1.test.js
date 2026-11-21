@@ -40,8 +40,13 @@ test('DISH-R1: physical layout follows furniture rotation, storage, purchase and
   assert.equal(before.visible.filter(p=>p.instanceId==='dish-prep').length,16);
   h.world.furniture.instances.find(x=>x.instanceId==='dish-sink').location='storage';
   const fallback=dirtyDishVisualPlan(h.kitchen,h.world);
-  assert.ok(fallback.visible.every(p=>p.instanceId==='dish-prep'));
+  assert.equal(fallback.visible.filter(p=>p.instanceId==='dish-prep').length,16);
+  assert.equal(fallback.visible.filter(p=>p.instanceId==='home-counter-1').length,16);
   h.world.furniture.instances.find(x=>x.instanceId==='dish-prep').location='storage';
+  const starterFallback=dirtyDishVisualPlan(h.kitchen,h.world);
+  assert.equal(starterFallback.visible.length,32);
+  assert.ok(starterFallback.visible.every(p=>p.instanceId==='home-counter-1'));
+  h.world.furniture.instances.find(x=>x.instanceId==='home-counter-1').location='storage';
   const noSurface=dirtyDishVisualPlan(h.kitchen,h.world);
   assert.equal(noSurface.visible.length,0);assert.equal(noSurface.unplaced,32);
   assert.equal(h.kitchen.dirtyDishes,32,'rendering cannot create or clear dishes');
@@ -49,6 +54,13 @@ test('DISH-R1: physical layout follows furniture rotation, storage, purchase and
   h.world.furniture.instances.find(x=>x.instanceId==='dish-sink').yaw=180;
   const rotated=dirtyDishVisualPlan(h.kitchen,h.world);
   assert.notEqual(rotated.visible[0].x,before.visible[0].x);
+});
+test('DISH-R1: original starter kitchen counter renders dishes before a separate sink purchase',()=>{
+  const h=newHousehold();h.kitchen.dirtyDishes=4;
+  const plan=dirtyDishVisualPlan(h.kitchen,h.world);
+  assert.equal(plan.visible.length,4);
+  assert.ok(plan.visible.every(x=>x.instanceId==='home-counter-1'));
+  assert.equal(furnitureAvailable(h,'wash','alex'),false);
 });
 test('DISH-R1: 32-cap, restore v1 and wash derive same 3D count without second state',()=>{
   const h=household();
