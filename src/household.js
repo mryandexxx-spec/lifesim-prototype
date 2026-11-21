@@ -11,6 +11,7 @@ import {newRecruitmentSystem,restoreRecruitmentSystem,progressCareerRecruitment}
 import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork} from './career-work.js';
 import {progressWorkNeeds} from './career-work-needs.js';
 import {applyWorkMoodContext} from './career-worklife.js';
+import {DISH_AUTO_WASH_THRESHOLD} from './dirty-dishes-visual.js';
 import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
@@ -1016,9 +1017,14 @@ export function tickHousehold(root,minutes) {
     }
     if(before.id==='dining'&&before.phase==='using'&&
       before.stage==='eating'&&!actor.action)recordDirtyDish(root.kitchen);
-    if(before.id==='wash'&&before.phase==='using'&&!actor.action){
-      const cleaned=washKitchenDishes(root.kitchen);
-      actor.event='Посуда вымыта: '+cleaned;
+    if(before.id==='wash'&&before.phase==='using'&&!actor.action&&
+      before.action?.elapsed>=ACTIONS.wash.duration){
+      const point=furnitureActionApproach(root.world,'wash',before.action.targetInstanceId);
+      // A cancelled, relocated or stored sink is never a completed wash.
+      if(point&&Math.hypot(actor.position.x-point.x,actor.position.z-point.z)<=.5){
+        const cleaned=washKitchenDishes(root.kitchen);
+        if(cleaned)actor.event='Посуда вымыта: '+cleaned;
+      }
     }
   }
   replenishKitchen(root.kitchen,root.minutes);
@@ -1133,10 +1139,14 @@ export function residentAutonomousChoice(root,id='alex') {
   if(residentUnavailableForHome(root,id))return null;
   if(root.socialAction||pendingActions(root.actionQueues,id).length)return null;
   const resident=getActor(root,id);
-  if (!root.autonomy.enabled || !resident) return null;
+  if (!root.autonomy.enabled || !resident || root.paused) return null;
   resident.autonomy.enabled=root.autonomy.enabled;
   resident.paused=root.paused;
   resident.minutes=root.minutes;
+  // Dish care uses the same ordinary physical A*/FIFO wash action.
+  // No instant count mutation, alternate economy or additional save field.
+  if(root.kitchen?.dirtyDishes>=DISH_AUTO_WASH_THRESHOLD&&
+    furnitureAvailable(root,'wash',id))return 'wash';
   const proposal=autonomousChoice(resident);
   return proposal && furnitureAvailable(root,proposal,id) ? proposal : null;
 }
