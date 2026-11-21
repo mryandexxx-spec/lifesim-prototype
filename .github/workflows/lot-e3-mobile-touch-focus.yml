@@ -1,0 +1,44 @@
+name: LOT-E3 — mobile camera and precise parcel touch selection
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile-touch-focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned simulation and WebGL dependencies
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Pure regressions and all unchanged save/queue/system contracts
+        run: |
+          node --check src/world-interactions.js
+          node --check src/camera-gestures.js
+          node --check src/game.js
+          node --check tests/lot-e3-browser-smoke.mjs
+          node --test tests/lot-e3-touch-focus.test.js tests/camera-gestures.test.js tests/life-cam-r1.test.js tests/ray-picking.test.js tests/lot-b3-ray.test.js
+          npm test
+      - name: Four genuine PlayCanvas WebGL touch and editor scenarios
+        run: |
+          mkdir -p vendor artifacts/lot-e3
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lot-e3-webgl.log 2>&1 &
+          sleep 3
+          node tests/lot-e3-browser-smoke.mjs
+      - name: Preserve four-size WebGL reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lot-e3-webgl-four-viewports
+          path: artifacts/lot-e3/
+          if-no-files-found: ignore

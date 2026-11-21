@@ -20,7 +20,6 @@ const metrics=values=>{
     // Keeping the pointer ordering stable makes twist sign deterministic.
     angle:Math.atan2(b.y-a.y,b.x-a.x)};
 };
-const moved=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
 /** begin/move/end/cancel accept numeric pointer IDs, CSS px, monotonic ms.
  * Any second pointer permanently disqualifies the existing tap until every
@@ -51,7 +50,9 @@ export function createCameraGestureSession(){
   function move(e,view,height,{oneFinger='pan'}={}){
     const p=point(e),old=p&&pointers.get(p.id);
     if(!old)return {view,changed:false};
-    const travel=old.travel+moved(old,p);
+    // Touch slop is the farthest displacement from contact origin, not
+    // the sum of tiny back-and-forth tremors (which made taps unselectable).
+    const travel=Math.max(old.travel,Math.hypot(p.x-old.originX,p.y-old.originY));
     pointers.set(p.id,{...old,x:p.x,y:p.y,travel});
     if(pointers.size===1&&!multiUsed){
       if(travel<TAP_SLOP_PX)return {view,changed:false};
@@ -100,7 +101,7 @@ export function createCameraGestureSession(){
     if(!old)return null;
     pointers.delete(p.id);
     const isTap=!cancel&&!multiUsed&&candidate?.id===p.id&&
-      old.travel+moved(old,p)<TAP_SLOP_PX&&
+      Math.max(old.travel,Math.hypot(p.x-old.originX,p.y-old.originY))<TAP_SLOP_PX&&
       finite(time)&&time>=candidate.time&&
       time-candidate.time<TAP_MAX_MS;
     if(pointers.size<2)previousPair=null;
