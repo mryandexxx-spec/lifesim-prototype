@@ -22,9 +22,33 @@ export const KITCHEN_RECIPES=Object.freeze({
   'cook.herb-soup':recipe('cook.herb-soup','Суп с садовыми травами',{vegetables:2,herbs:1},0,26,3,1.14,'#8caf73'),
   'cook.pancakes':recipe('cook.pancakes','Тёплые оладьи',{grains:2,dairy:1},0,23,3,1.12,'#e5c77a'),
   'cook.pasta':recipe('cook.pasta','Паста с овощами',{grains:2,vegetables:1},2,30,3,1.20,'#c7ba6f'),
-  'cook.gratin':recipe('cook.gratin','Сливочная запеканка',{vegetables:2,dairy:2},4,37,4,1.32,'#ddad6f')
+  'cook.gratin':recipe('cook.gratin','Сливочная запеканка',{vegetables:2,dairy:2},4,37,4,1.32,'#ddad6f'),
+  'cook.grain-bowl':recipe('cook.grain-bowl','Крупяная миска с овощами',{grains:2,vegetables:2},1,28,3,1.14,'#caa66a'),
+  'cook.herb-noodles':recipe('cook.herb-noodles','Лапша с садовыми травами',{grains:3,dairy:1,herbs:1},3,33,3,1.24,'#95ae70'),
+  'cook.roast-tray':recipe('cook.roast-tray','Овощи из печи',{vegetables:3,dairy:1,grains:1},5,39,4,1.36,'#d28b55'),
+  'cook.festival-pie':recipe('cook.festival-pie','Праздничный пирог с травами',{grains:3,dairy:2,herbs:2},7,44,4,1.43,'#dfb67c')
 });
-const entries=Object.values(KITCHEN_RECIPES);
+/** Only home-cooked batches receive a skill-derived bonus. Old v1 rows and
+ * purchased FOOD-R1 servings retain their original 1x factor. */
+export const KITCHEN_QUALITIES=Object.freeze({
+  normal:Object.freeze({id:'normal',label:'Домашнее',hungerMultiplier:1}),
+  good:Object.freeze({id:'good',label:'Вкусное',hungerMultiplier:1.08}),
+  excellent:Object.freeze({id:'excellent',label:'Отличное',hungerMultiplier:1.16}),
+  chef:Object.freeze({id:'chef',label:'Мастерское',hungerMultiplier:1.24})
+});
+export function cookingQuality(level=0){
+  return KITCHEN_QUALITIES[Number.isFinite(level)&&level>=9?'chef':
+    Number.isFinite(level)&&level>=6?'excellent':
+    Number.isFinite(level)&&level>=3?'good':'normal'];
+}
+export function kitchenQualityId(recipeId,quality){
+  return Object.hasOwn(KITCHEN_RECIPES,recipeId)&&
+    typeof quality==='string'&&Object.hasOwn(KITCHEN_QUALITIES,quality)
+      ?quality:'normal';
+}
+export function kitchenServingMultiplier(recipeId,quality){
+  return KITCHEN_QUALITIES[kitchenQualityId(recipeId,quality)].hungerMultiplier;
+}
 const own=(obj,key)=>Object.hasOwn(obj||{},key);
 const finiteInt=n=>Number.isSafeInteger(n)&&n>=0;
 export const kitchenRecipe=id=>typeof id==='string'
@@ -45,11 +69,14 @@ export function restoreKitchen(raw){
     for(const entry of raw.prepared){
       if(!kitchenRecipe(entry?.recipeId)||!finiteInt(entry.portions)||entry.portions>12)
         continue;
-      combined.set(entry.recipeId,Math.min(12,
-        (combined.get(entry.recipeId)||0)+entry.portions));
+      const quality=kitchenQualityId(entry.recipeId,entry.quality);
+      const key=entry.recipeId+'|'+quality;
+      const previous=combined.get(key);
+      combined.set(key,{recipeId:entry.recipeId,
+        portions:Math.min(12,(previous?.portions||0)+entry.portions),
+        ...(quality==='normal'?{}:{quality})});
     }
-    state.prepared=[...combined].map(([recipeId,portions])=>({recipeId,portions}))
-      .filter(x=>x.portions>0);
+    state.prepared=[...combined.values()].filter(x=>x.portions>0);
   }
   // Save-v1 additive optional delivery queue. Paid slots survive reload; never mint
   // unknown entries, duplicate order IDs, or stock beyond physical capacity.
@@ -95,17 +122,31 @@ export function finishKitchenRecipe(kitchen,recipeId,level=0){
   const recipe=kitchenRecipe(recipeId);
   if(!canCookRecipe(kitchen,recipeId,level))return false;
   for(const [id,count] of Object.entries(recipe.requires))kitchen.pantry[id]-=count;
-  const previous=kitchen.prepared.find(x=>x.recipeId===recipeId);
+  const quality=cookingQuality(level).id;
+  const previous=kitchen.prepared.find(x=>x.recipeId===recipeId&&
+    kitchenQualityId(x.recipeId,x.quality)===quality);
   if(previous)previous.portions+=recipe.portions;
-  else kitchen.prepared.push({recipeId,portions:recipe.portions});
+  else kitchen.prepared.push({recipeId,portions:recipe.portions,
+    ...(quality==='normal'?{}:{quality})});
   return true;
 }
 /** Fridge inventory: data-only rows shared by UI, selection and autonomous eating. */
 export function preparedKitchenMeals(kitchen){
-  return Array.isArray(kitchen?.prepared)?kitchen.prepared
-    .filter(item=>kitchenRecipe(item?.recipeId)&&finiteInt(item.portions)&&item.portions>0)
-    .map(item=>({recipeId:item.recipeId,label:kitchenRecipe(item.recipeId).label,
-      portions:item.portions,color:kitchenRecipe(item.recipeId).color})):[];
+  if(!Array.isArray(kitchen?.prepared))return [];
+  const grouped=new Map();
+  for(const item of kitchen.prepared){
+    if(!kitchenRecipe(item?.recipeId)||!finiteInt(item.portions)||item.portions===0)
+      continue;
+    const quality=kitchenQualityId(item.recipeId,item.quality);
+    const previous=grouped.get(item.recipeId);
+    if(previous){
+      previous.portions+=item.portions;
+      if(previous.quality!==quality)previous.quality='mixed';
+    }else grouped.set(item.recipeId,{recipeId:item.recipeId,
+      label:kitchenRecipe(item.recipeId).label,portions:item.portions,
+      color:kitchenRecipe(item.recipeId).color,quality});
+  }
+  return [...grouped.values()];
 }
 export function hasKitchenServing(kitchen,recipeId){
   return Boolean(kitchenRecipe(recipeId)&&preparedKitchenMeals(kitchen)
@@ -116,17 +157,23 @@ export function shouldEatFreshKitchenMeal(hunger,tableAvailable){
   return Number.isFinite(hunger)&&hunger<=FRESH_MEAL_HUNGER_THRESHOLD&&
     tableAvailable===true;
 }
-/** Only a confirmed eater at a valid chair consumes one chosen saved portion. */
-export function takeKitchenServing(kitchen,requestedRecipeId=null){
+/** One physical serving is taken only at the confirmed seated-eating stage.
+ * Legacy API returns the recipe ID; the new detailed variant also returns
+ * the quality of the exact batch, without discarding parallel stock. */
+export function takeKitchenServingDetails(kitchen,requestedRecipeId=null){
   if(!Array.isArray(kitchen?.prepared))return null;
   if(requestedRecipeId!==null&&!kitchenRecipe(requestedRecipeId))return null;
   const entry=kitchen.prepared.find(x=>x.portions>0&&kitchenRecipe(x.recipeId)&&
     (requestedRecipeId===null||x.recipeId===requestedRecipeId));
   if(!entry)return null;
+  const serving={recipeId:entry.recipeId,
+    quality:kitchenQualityId(entry.recipeId,entry.quality)};
   entry.portions--;
-  const id=entry.recipeId;
   kitchen.prepared=kitchen.prepared.filter(x=>x.portions>0);
-  return id;
+  return serving;
+}
+export function takeKitchenServing(kitchen,requestedRecipeId=null){
+  return takeKitchenServingDetails(kitchen,requestedRecipeId)?.recipeId??null;
 }
 export function recordDirtyDish(kitchen){
   if(kitchen&&finiteInt(kitchen.dirtyDishes))

@@ -69,9 +69,10 @@ import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_
 import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES,canPaintContent,
   compositionForArtwork,paintingSeedFromSession} from './painting.js';
-import {COOKING_SKILL_ID,kitchenRecipe,canCookRecipe,kitchenSummary,
+import {COOKING_SKILL_ID,kitchenRecipe,cookingQuality,canCookRecipe,kitchenSummary,
   preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
-import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock} from './kitchen-market.js';
+import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock,
+  quoteCookingRecipe} from './kitchen-market.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal,proposeReadyMealPurchase} from './ready-food.js';
 import {dirtyDishVisualPlan,DISH_VISUAL_CAP} from './dirty-dishes-visual.js';
@@ -1014,10 +1015,11 @@ function select(id,instanceId=null) {
       option.disabled=!recipe||!canCookRecipe(game.kitchen,recipe.id,level);
       option.textContent=recipe?recipe.label+(level<recipe.minLevel
         ?' · 🔒 уровень '+recipe.minLevel
-        :' · '+recipe.portions+' порции'):'Неизвестный рецепт';
+        :!option.disabled?' · '+recipe.portions+' порц.':' · нужны продукты или место'):'Неизвестный рецепт';
     }
     if(select.selectedOptions[0]?.disabled)
       select.value=[...select.options].find(o=>!o.disabled)?.value||'';
+    renderCookRecipeQuote();
   }
   $('music-style-field').hidden=id!=='music';
   $('reading-content-field').hidden=id!=='hobby';
@@ -1054,6 +1056,23 @@ $('dish-alert').addEventListener('click',()=>{
   if(!sink){toast('Для мытья посуды нужна кухонная мойка');return;}
   select('wash',sink.instanceId);
 });
+/** No purchase at cook completion. This quote describes already-paid pantry
+ * quantities and the quality bonus earned through real cooking practice. */
+function renderCookRecipeQuote(){
+  const node=$('cook-recipe-quote'),id=$('cooking-recipe-select').value;
+  const quote=quoteCookingRecipe(id);
+  if(!quote){node.textContent='Нет доступного рецепта';return;}
+  const level=currentSkillLevel(selectedActor().skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+  const quality=cookingQuality(level);
+  node.textContent='Расход при завершении: '+
+    quote.items.map(item=>item.label+' ×'+item.quantity).join(', ')+
+    ' · Эквивалент купленных продуктов: '+quote.creditsEquivalent+' кр. за партию ('+
+    quote.perServing+' кр./порция) · Качество «'+quality.label+'»: +'+
+    Math.round((quality.hungerMultiplier-1)*100)+'% сытости'+
+    (quote.items.some(item=>item.id==='herbs')?' · травы из своего сада':'')+
+    ' · При готовке второй раз кредиты не списываются.';
+}
+$('cooking-recipe-select').addEventListener('change',renderCookRecipeQuote);
 // LOT-C3b fridge groceries are voluntary and separately confirmed.
 function renderKitchenRestock(){
   if(selected!=='fridge')return;

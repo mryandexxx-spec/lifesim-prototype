@@ -16,7 +16,7 @@ import {sanitizeSwimAction} from './pool-swim-runtime.js';
 import {GARDEN_ACTIONS,GARDEN_DURATION} from './gardening.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
-import {kitchenRecipe} from './kitchen.js';
+import {kitchenRecipe,kitchenQualityId,kitchenServingMultiplier} from './kitchen.js';
 import {validReadingJourneyAction,finishReadingMinutes} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {preferenceAffinity} from './trait-catalog.js';
@@ -122,6 +122,8 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       data.action.portionTaken===true&&kitchenRecipe(data.action.cookedRecipeId)){
       next.action.portionTaken=true;
       next.action.cookedRecipeId=data.action.cookedRecipeId;
+      const quality=kitchenQualityId(data.action.cookedRecipeId,data.action.cookedQuality);
+      if(quality!=='normal')next.action.cookedQuality=quality;
     }
     // Kitchen journey is optional in the v1 save; malformed/stale state never
     // grants a dish, XP or phantom resources when restored.
@@ -331,7 +333,8 @@ export function tick(state, minutes,world=state?.world??null) {
         ??definition.benefitPerMinute))*amount;
     if(state.action.id==='dining'&&state.action.portionTaken===true){
       const cooked=kitchenRecipe(state.action.cookedRecipeId);
-      if(cooked)gained*=cooked.hungerFactor;
+      if(cooked)gained*=cooked.hungerFactor*
+        kitchenServingMultiplier(cooked.id,state.action.cookedQuality);
     }
     if(state.action.id==='fridge'){
       const eatFrom=definition.duration*FRIDGE_EAT_START;

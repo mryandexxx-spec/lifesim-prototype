@@ -47,7 +47,9 @@ export const HOBBY_SKILLS=createSkillRegistry({skills:[{
   id:'cooking',label:'Кулинария',group:'knowledge',maxLevel:10,
   xpThresholds:[22,56,100,165,240,335,455,610,805,1040],
   practiceTags:['food.cook'],
-  unlocks:[{id:'cook.pasta',minLevel:2},{id:'cook.gratin',minLevel:4}]
+  unlocks:[{id:'cook.grain-bowl',minLevel:1},{id:'cook.pasta',minLevel:2},
+    {id:'cook.herb-noodles',minLevel:3},{id:'cook.gratin',minLevel:4},
+    {id:'cook.roast-tray',minLevel:5},{id:'cook.festival-pie',minLevel:7}]
 }]});
 export const HOBBY_CONTENT=createHobbyContentCatalog({entries:[
   ...READING_BOOKS.map(book=>({id:book.id,kind:'book',label:book.label,
