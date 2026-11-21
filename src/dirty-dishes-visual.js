@@ -13,11 +13,13 @@ const slots=Object.freeze([
 export function dirtyDishVisualPlan(kitchen,world){
   const raw=kitchen?.dirtyDishes;
   const count=Number.isSafeInteger(raw)&&raw>=0?Math.min(DISH_VISUAL_CAP,raw):0;
+  // The starter kitchen counter supports visual plates before a sink purchase.
+  const order={sink:0,prep:1,counter:2};
   const surfaces=(world?.furniture?.instances||[])
-    .filter(item=>item.location==='home'&&['sink','prep'].includes(item.prefabId)&&
+    .filter(item=>item.location==='home'&&Object.hasOwn(order,item.prefabId)&&
       typeof item.instanceId==='string'&&Number.isFinite(item.x)&&
       Number.isFinite(item.z)&&[0,90,180,270].includes(item.yaw))
-    .sort((a,b)=>(a.prefabId==='sink'?0:1)-(b.prefabId==='sink'?0:1)||
+    .sort((a,b)=>order[a.prefabId]-order[b.prefabId]||
       a.instanceId.localeCompare(b.instanceId));
   if(!surfaces.length)return {count,visible:[],unplaced:count};
   // Keep the near sink visibly full before advancing to the preparation counter.
