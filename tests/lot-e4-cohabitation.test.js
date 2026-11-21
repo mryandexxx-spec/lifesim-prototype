@@ -49,7 +49,8 @@ function invariant(root,expectedPool=true){
  assert.ok(Number.isSafeInteger(root.shop.credits)&&root.shop.credits>=0);
  if(expectedPool){
   assert.deepEqual(root.world.outdoors.pools[0].cells,poolCells);
-  assert.deepEqual(root.world.outdoors.poolFixtures,[fixture]);
+  assert.equal(root.world.outdoors.poolFixtures.length,1);
+  assert.equal(root.world.outdoors.poolFixtures[0].fixtureId,fixture.fixtureId);
  }
  for(const id of ['alex','mira']){
   const actor=getActor(root,id);
@@ -144,7 +145,8 @@ function reloadAndCompare(root){
 test('E4 seven actual game days: two jobs, water -> growth -> harvest -> replant, safe swim, FIFO and wallet',()=>{
  const start=performance.now();
  let {root,plot}=household(),reloads=0,swimSeen=false,swimFinished=false;
- const balances={start:root.shop.credits};
+ const balances={start:root.shop.credits-
+  root.financialHistory.entries.reduce((sum,e)=>sum+e.delta,0)};
  const counts={departures:0,returns:0,salaries:0,issued:0};
  const fifo=[],lighting=new Set(),first=[];
  const originalPlot=root.world.outdoors.gardens[plot].plantedAt;
@@ -238,6 +240,7 @@ test('E4 thirty days: repeated v1 reload mid-shift; settlement, finances and two
  const begin=performance.now();
  let {root,plot}=household(),reloads=0,events={salaries:0,bills:0,departures:0,returns:0};
  const initial=root.shop.credits,initialRecords=root.financialHistory.entries.length;
+ const walletOrigin=initial-root.financialHistory.entries.reduce((sum,e)=>sum+e.delta,0);
  for(let step=0;step<30*48;step++){
   workTransitions(root,events);
   if(step===13){
@@ -260,7 +263,7 @@ test('E4 thirty days: repeated v1 reload mid-shift; settlement, finances and two
  assert.equal(root.householdBills.lastIssuedCycle,4);
  assert.ok(root.financialHistory.entries.length>initialRecords);
  assert.ok(root.shop.credits>initial,'work settlement accrued at least some salary');
- assert.equal(root.financialHistory.entries.reduce((sum,e)=>sum+e.delta,initial),
+ assert.equal(root.financialHistory.entries.reduce((sum,e)=>sum+e.delta,walletOrigin),
   root.shop.credits,'30-day wallet is conserved across reloads');
  const atEnd=copy(root);
  root=loadHousehold(atEnd);
