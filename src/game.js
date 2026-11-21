@@ -65,7 +65,7 @@ import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
 import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,findStoredPlacement,buyMarketItem,storeMarketItem,restoreMarketItem,sellMarketItem,canTradeMarketInstance} from './furniture-shop.js';
 import {recordFinanceChange} from './finance-ledger.js';
-import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_ADVANCED_CONTENT_ID,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
+import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_BOOKS,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES,canPaintContent,
   compositionForArtwork,paintingSeedFromSession} from './painting.js';
@@ -883,14 +883,27 @@ function setMindTab(tab){
 }
 for(const tab of ['overview','skills'])
   $('mind-tab-'+tab).addEventListener('click',()=>setMindTab(tab));
+/** Keep existing option nodes stable while Safari's native picker is open. */
 function updateReadingContentChoice(){
   const select=$('reading-content-select');
-  const option=select.querySelector('option[value="'+READING_ADVANCED_CONTENT_ID+'"]');
-  const unlocked=canReadHobbyContent(selectedActor().skills,READING_ADVANCED_CONTENT_ID);
-  option.disabled=!unlocked;
-  option.textContent='Пути старых городов · '+(unlocked?'освоено':'откроется на уровне 3');
-  if(!canReadHobbyContent(selectedActor().skills,select.value))select.value=READING_CONTENT_ID;
+  const progress=selectedActor().skills;
+  for(const book of READING_BOOKS){
+    let option=[...select.options].find(item=>item.value===book.id);
+    if(!option){
+      option=document.createElement('option');
+      option.value=book.id;
+      select.append(option);
+    }
+    const unlocked=canReadHobbyContent(progress,book.id);
+    const label=book.label+' · '+(unlocked
+      ?'доступно'
+      :'откроется на уровне '+book.minLevel);
+    if(option.textContent!==label)option.textContent=label;
+    if(option.disabled===unlocked)option.disabled=!unlocked;
+  }
+  if(!canReadHobbyContent(progress,select.value))select.value=READING_CONTENT_ID;
 }
+updateReadingContentChoice();
 function closeMindPanel() {
   $('mind-panel').hidden = true;
   $('mind-toggle').setAttribute('aria-expanded', 'false');

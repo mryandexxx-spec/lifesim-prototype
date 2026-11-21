@@ -1,6 +1,7 @@
 /** H4: pure, read-only per-resident skill selectors, independent of DOM and 3D. */
 import {deriveSkillLevel,getSkillDefinition} from './skill-registry.js';
 import {PAINT_SUBJECTS} from './painting.js';
+import {READING_BOOKS,READING_ADVANCED_CONTENT_ID} from './hobby-reading.js';
 
 const SKILL_GUIDANCE=Object.freeze({
   literature:'Читай книги у купленного книжного шкафа. Совместное чтение тоже развивает эрудицию.',
@@ -9,6 +10,9 @@ const SKILL_GUIDANCE=Object.freeze({
 });
 const UNLOCK_LABELS=Object.freeze({
   'books.read.classics':'Книга «Пути старых городов»',
+  ...Object.fromEntries(READING_BOOKS.filter(book=>
+    book.minLevel>0&&book.id!==READING_ADVANCED_CONTENT_ID)
+    .map(book=>[book.id,'Книга «'+book.label+'»'])),
   'cook.pasta':'Рецепт «Паста с овощами»',
   'cook.gratin':'Рецепт «Сливочная запеканка»'
 });
