@@ -40,9 +40,10 @@ export function miraMeshPlacement(bounds,targetHeight=MIRA_DISPLAY_HEIGHT){
 export function canShowMiraMeshy({preferred=false,ready=false,actionId=null,
   sofaBusy=false,sofaReady=false,
   bedBusy=false,bedReady=false,showerBusy=false,showerReady=false,
-  fridgeBusy=false,fridgeReady=false,readingReady=false,musicBusy=false,musicReady=false,paintingReady=false,toiletBusy=false,toiletReady=false}={}){
+  fridgeBusy=false,fridgeReady=false,readingReady=false,musicBusy=false,musicReady=false,outdoorReady=false,paintingReady=false,toiletBusy=false,toiletReady=false}={}){
   const eligible=actionId===null||['lamp','mirror','dresser','wardrobe','cook','prep','wash'].includes(actionId)||
     (actionId==='music'&&(!musicBusy||musicReady))||(actionId==='hobby'&&readingReady)||
+    (['swim','water'].includes(actionId)&&outdoorReady)||
     (actionId==='paint'&&paintingReady)||
     (actionId==='sofa'&&sofaReady)||
     (actionId==='bed'&&bedReady)||(actionId==='fridge'&&fridgeReady)||

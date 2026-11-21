@@ -64,5 +64,5 @@ export function furnitureBounds(world,prefabId,original,instanceId=null){
 export function fixtureContactLayout(world,kind,template){
   const handle=furniturePoint(world,kind,template.handle);
   const shelfTarget=furniturePoint(world,kind,template.shelfTarget);
-  return {...template,handle,shelfTarget};
+  return {...template,handle,shelfTarget,hinge:furniturePoint(world,kind,template.hinge)};
 }

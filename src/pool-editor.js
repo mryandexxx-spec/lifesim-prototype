@@ -3,7 +3,7 @@
  * Proposals are immutable; each Apply re-plans against the current root.
  */
 import {restoreOutdoorsWorld} from './lot-surface.js';
-import {poolCellBounds,poolComponents,poolWaterPrice,
+import {poolBoundaryEdges,poolCellBounds,poolComponents,poolWaterPrice,
   reconcilePoolComponents,POOL_MAX_CELLS,POOL_MAX_COMPONENTS,validPoolId}
   from './pool-topology.js';
 import {POOL_FIXTURE_PRICES,POOL_FIXTURE_LIMIT,poolFixtureSite,
@@ -230,6 +230,32 @@ export function previewPoolTiles(root,{operation,cells}={}){
 }
 export function previewPoolFixture(root,{operation,kind,edgeCell,side,fixtureId}={}){
   return plan(root,{operation,kind,edgeCell,side,fixtureId});
+}
+// A quarter turn selects the nearest usable edge of the next wall direction,
+// keeping the same basin, fixture identity, landing clearance and dry route.
+export function previewRotatedPoolFixture(root,fixture,operation){
+  const pool=root.world.outdoors.pools.find(p=>p.poolId===fixture?.poolId);
+  if(!pool)return fail('no-water-edge');
+  const cycle=['north','east','south','west'];
+  const origin=poolCellBounds(fixture.edgeCell);
+  const sides=poolBoundaryEdges(pool.cells);
+  const distance=edge=>{
+    const b=poolCellBounds(edge.cell);
+    return (origin.minX-b.minX)**2+(origin.minZ-b.minZ)**2;
+  };
+  const start=cycle.indexOf(fixture.side);
+  for(let i=1;i<4;i++){
+    const side=cycle[(start+i)%4];
+    const edges=sides.filter(e=>e.side===side&&
+      poolFixtureSite(pool,e.cell,side,fixture.kind)).sort((a,b)=>distance(a)-distance(b));
+    for(const edge of edges){
+      const draft=previewPoolFixture(root,{operation,kind:fixture.kind,fixtureId:fixture.fixtureId,
+        edgeCell:edge.cell,side});
+      if(draft.ok)return draft;
+      if(['reserved-pool','insufficient-credits'].includes(draft.reason))return draft;
+    }
+  }
+  return fail('unsafe-rim-or-landing');
 }
 export function previewPoolHistory(root,snapshot){
   return plan(root,{operation:'history',snapshot});

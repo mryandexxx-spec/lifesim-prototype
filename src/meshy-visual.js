@@ -1,3 +1,4 @@
+import {createOutdoorMotion} from './outdoor-character-motion.js';
 import {canShowMeshy, meshClipFor, availableMeshClips,
   MESHY_ASSET_URL, meshPlacement,MESHY_SEAT_RIG_PROFILE,
   ALEX_GREETING_CLIP,alexGreetingClipTime,ALEX_ALTERNATE_IDLE_CLIP,
@@ -184,6 +185,18 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         }
       }catch(error){console.warn('Alex reading rig unavailable',error);}
       try{
+        const outdoor=createOutdoorMotion({pc,model,avatar:rig.avatar});
+        if(outdoor){
+          if(!model.script)model.addComponent('script');
+          class OutdoorPostUpdate extends pc.Script{
+            static scriptName='blinsAlexOutdoorPostUpdate';
+            postUpdate(){outdoor.apply();}
+          }
+          model.script.create(OutdoorPostUpdate);
+          state.outdoorRuntime=outdoor;
+        }
+      }catch(error){console.warn('Outdoor character motion unavailable',error);}
+      try{
         const music=createMeshyMusicController({pc,model});
         if(music.ready&&pc.Script){
           if(!model.script)model.addComponent('script');
@@ -248,7 +261,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       toiletBusy=false,toiletFrame=null,fridgeBusy=false,
       socialInitiator=false,socialElapsed=null,hugFrame=null,kissFrame=null,fridgeFrame=null,
       worldMinutes=null,mood=null,energy=null,readingElapsed=null,
-      readingStage=null,readingStepElapsed=0,musicFrame=null,diningFrame=null,paintingFrame=null}={}){
+      readingStage=null,readingStepElapsed=0,outdoorFrame=null,musicFrame=null,diningFrame=null,paintingFrame=null}={}){
       requested=preferred;
       const useMeshy=canShowMeshy({
         preferred:requested&&(!hugFrame?.active||Boolean(state.hugRuntime?.ready))&&
@@ -257,6 +270,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         readingReady:Boolean(state.readingRuntime?.ready),
          musicBusy:musicFrame?.phase==='using',musicReady:Boolean(state.musicRuntime?.ready),
         paintingReady:Boolean(state.paintingRuntime?.ready),
+        outdoorReady:Boolean(state.outdoorRuntime),
         bedReady:Boolean(state.bedRuntime?.ready),
         showerReady:Boolean(state.showerRuntime?.ready),
         toiletBusy,toiletReady:state.toiletReady
@@ -274,6 +288,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       if(!useMeshy||!state.model){
         state.readingRuntime?.setFrame(null);
         state.musicRuntime?.setFrame(null);
+        state.outdoorRuntime?.setFrame(null);
         state.paintingRuntime?.setFrame(null);
         state.fridgeRuntime?.setFrame(null);
         state.hugRuntime?.setFrame(null);
@@ -288,13 +303,14 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         ?{active:true,stage:readingStage||'reading',
           elapsed:Number.isFinite(readingElapsed)?readingElapsed:0,
           stepElapsed:readingStepElapsed}:null,paused);
+      state.outdoorRuntime?.setFrame(outdoorFrame);
       state.musicRuntime?.setFrame(actionId==='music'?musicFrame:diningFrame,paused);
       state.paintingRuntime?.setFrame(actionId==='paint'?paintingFrame:null,paused);
       state.hugRuntime?.setFrame(hugFrame,paused);
       state.kissRuntime?.setFrame(kissFrame,paused);
       // Game updates the pose; postUpdate applies joint rotations after Anim.
       const fridge=actionId==='fridge'||fridgeBusy;
-      state.fridgeRuntime?.setFrame(fridge&&actionId==='fridge'?fridgeFrame:null);
+      state.fridgeRuntime?.setFrame(fridge&&actionId==='fridge'?fridgeFrame:null,paused);
       const bed=actionId==='bed'||bedBusy;
       state.bedRuntime?.setFrame(bed?bedFrame:null,paused);
       const shower=actionId==='shower'||showerBusy;
@@ -307,7 +323,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         const gait=phase?.walking===true;
         const target=gait?'Walking':'Idle_3';
         if(state.clip!==target){
-          anim.baseLayer.transition(target,.16);
+          anim.baseLayer.play(target);
           state.clip=target;
         }
         state.sofaRelease=null;
@@ -456,7 +472,9 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
            anim.baseLayer.transition('Idle_3',.18);state.clip='Idle_3';
          }
          state.sofaRelease=null;
-         state.model.setLocalPosition(state.base.x,state.base.y,state.base.z);
+         const motion=state.musicRuntime?.motion;
+         state.model.setLocalPosition(state.base.x+(motion?.hipShift||0),
+           state.base.y+(motion?.bodyLift||0),state.base.z);
          anim.speed=1;anim.playing=!paused;
          return true;
        }
@@ -518,6 +536,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
         state.sofaRelease=null;
         state.fridgeRuntime?.setFrame(null);
         state.musicRuntime?.setFrame(null);
+        state.outdoorRuntime?.setFrame(null);
         state.paintingRuntime?.setFrame(null);
         state.bedRuntime?.setFrame(null);
         state.showerRuntime?.setFrame(null);

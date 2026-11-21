@@ -134,9 +134,11 @@ export function stepAnimation(previous,signals,dt) {
     }else{
       armTarget=[5,8];
     }
+  }else if(signals?.watering){
+    const w=signals.watering.weight;
+    armTarget=[-14,-32-26*w];elbowTarget=[-12,-22-19*w];
   }else if(action==='swim'){
-    // Both Meshy residents fall back to the calibrated procedural skeleton
-    // while in water (no independently verified imported swim clip).
+    // Procedural skin uses the same saved stroke phase as the imported rigs.
     // Only visual joints move; D2b owns every water cell and interruption.
     const stage=signals?.swimStage;
     const stroke=safe(signals?.swimStroke,t)*2.9;

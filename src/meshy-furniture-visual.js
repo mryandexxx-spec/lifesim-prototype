@@ -76,7 +76,7 @@ export function createMeshyFurnitureVisual({pc,app,onError=()=>{},enabled=true})
     // Only hide old authored furniture, never working simulation overlays:
     // bulbs, transient plates, art, mirror glint, steam or selection outlines.
     const fallback=node.findComponents('render').filter(c=>
-      c.enabled&&!/^(F4E |C3 |F4G |H5 |R5b )/.test(c.entity?.name||''));
+      c.enabled&&!/^(shower mosaic |toilet privacy |fridge portion on shelf|F4E |C3 |F4G |H5 |R5b )/.test(c.entity?.name||''));
     const record={sku,fallback,visual:null,legacy:false};
     instances.set(node,record);
     load(sku).then(asset=>{
@@ -90,6 +90,23 @@ export function createMeshyFurnitureVisual({pc,app,onError=()=>{},enabled=true})
       renderEntity.setLocalScale(fit.scale.x,fit.scale.y,fit.scale.z);
       pivot.addChild(renderEntity);
       node.addChild(pivot);
+      // Apply the imported door motion outside the nonuniform fit scale.
+      // The frame and moving part retain their original textured triangles.
+      const partName={'fixture.fridge':'upper-door','fixture.shower':'sliding-panel',
+        'fixture.toilet':'flush-lever'}[sku];
+      const part=partName&&renderEntity.findByName(partName);
+      if(part){
+        const joint=new pc.Entity(partName+' joint');
+        const hingeX=sku==='fixture.fridge'?.24*fit.scale.x:0;
+        const hingeZ=sku==='fixture.fridge'?.14*fit.scale.z:0;
+        pivot.addChild(joint);
+        joint.setLocalPosition(hingeX,0,hingeZ);
+        part.reparent(joint);
+        part.setLocalPosition(-hingeX,0,-hingeZ);
+        part.setLocalScale(fit.scale.x,fit.scale.y,fit.scale.z);
+        record.part=joint;
+        record.travel=fit.scale.x*.32;
+      }
       record.visual=pivot;
       pivot.enabled=!record.legacy;
       for(const component of fallback)component.enabled=record.legacy;
@@ -114,6 +131,14 @@ export function createMeshyFurnitureVisual({pc,app,onError=()=>{},enabled=true})
   }
   return Object.freeze({
     attach,useProcedural,setBedCover,
+    setFixtureMotion(node,amount){
+      const r=instances.get(node);
+      if(!r?.part||r.amount===amount)return;
+      r.amount=amount;
+      if(r.sku==='fixture.fridge')r.part.setLocalEulerAngles(0,68*amount,0);
+      if(r.sku==='fixture.shower')r.part.setLocalPosition(-r.travel*amount,0,0);
+      if(r.sku==='fixture.toilet')r.part.setLocalPosition(0,-.024*amount,0);
+    },
     hasModel:node=>Boolean(instances.get(node)?.visual?.enabled),
     stats:()=>Object.freeze({attached,failures,cachedSkus:assets.size})
   });

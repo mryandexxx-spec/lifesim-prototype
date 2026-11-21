@@ -245,6 +245,7 @@ jobs:
           cp src/pool-navigation.js src/pool-swim-runtime.js src/pool-autonomy.js site/src/
           cp src/garden-skill.js site/src/
           cp src/gardening.js site/src/
+          cp src/outdoor-character-motion.js site/src/
           cp src/garden-autonomy.js site/src/
           cp src/garden-presentation.js site/src/
           cp src/outdoor-ux04.js site/src/
