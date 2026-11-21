@@ -32,7 +32,7 @@ test('42 stable work stories: R2 adds exactly one immutable scene per existing s
     assert.deepEqual(bank.slice(5),CAREER_R2_SCENES[id]);
     assert.deepEqual(bank.slice(5).map(s=>s.trackId),CAREER_SPECIALIZATIONS[id].map(t=>t.id));
     for(const scene of bank){
-      assert.ok(!ids.has(scene.id));ids.add(scene.id);count++;
+      assert.ok(!ids.has(id+':'+scene.id));ids.add(id+':'+scene.id);count++;
     }
     for(const scene of CAREER_R2_SCENES[id]){
       assert.equal(scene.minRank,5);assert.equal(scene.maxRank,7);
