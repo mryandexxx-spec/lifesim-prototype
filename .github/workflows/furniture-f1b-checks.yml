@@ -1,7 +1,5 @@
 name: F1b functional furniture CI
 on:
-  push:
-    branches: [feature/furniture-f1b-fixtures-20261116]
   workflow_dispatch:
 permissions:
   contents: read

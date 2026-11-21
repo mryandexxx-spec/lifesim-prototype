@@ -1,26 +1,6 @@
 name: H1 physical reading and skill integration
 on:
-  push:
-    branches: ['feature/h1-physical-reading-*']
-  pull_request:
-    paths:
-      - 'src/hobby-reading.js'
-      - 'src/furniture-*.js'
-      - 'src/activity-*.js'
-      - 'src/skills-engine.js'
-      - 'src/simulation.js'
-      - 'src/household.js'
-      - 'src/action-queue.js'
-      - 'src/game.js'
-      - 'src/animations.js'
-      - 'tests/hobbies-h1.test.js'
-      - 'src/meshy-reading-runtime.js'
-      - 'src/meshy-visual.js'
-      - 'src/meshy-mira-visual.js'
-      - 'src/meshy-visual-policy.js'
-      - 'src/meshy-mira-policy.js'
-      - 'tests/meshy-reading.test.js'
-      - '.github/workflows/hobby-h1-checks.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

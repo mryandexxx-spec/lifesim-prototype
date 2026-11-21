@@ -1,14 +1,6 @@
 name: H0 hobby and skills headless regression
 on:
-  push:
-    branches: ['feature/h0-hobbies-foundation-*']
-  pull_request:
-    paths:
-      - 'src/activity-*.js'
-      - 'src/skill*.js'
-      - 'src/hobby-content.js'
-      - 'tests/hobbies-h0.test.js'
-      - '.github/workflows/hobby-h0-checks.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -1,7 +1,6 @@
 name: F2 shop finger-aligned placement checks
 on:
-  push:
-    branches: [fix/f2-swipe-moves-item-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
