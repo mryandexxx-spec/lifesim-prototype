@@ -1,0 +1,34 @@
+name: CI — optional full regression and four-screen WebGL
+on:
+  workflow_dispatch:
+    inputs:
+      webgl:
+        description: Include the four-viewport Chromium/PlayCanvas recovery smoke
+        type: boolean
+        required: false
+        default: false
+permissions:
+  contents: read
+jobs:
+  full-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Full Node regression (manual only; Pages independently gates main)
+        run: npm test
+      - name: Optional four-viewport real WebGL recovery
+        if: ${{ inputs.webgl }}
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-full-http.log 2>&1 &
+          sleep 3
+          node tests/q0-viewport-browser-smoke.mjs
