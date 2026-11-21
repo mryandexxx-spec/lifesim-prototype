@@ -5,6 +5,8 @@ import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalo
 import {findPath} from './navigation.js';
 
 export const KITCHEN_SCHEMA=1;
+// Domain-side autonomous care threshold; presentation remains dependency-free.
+export const DISH_AUTO_WASH_THRESHOLD=6;
 export const COOKING_SKILL_ID='cooking';
 export const FRESH_MEAL_HUNGER_THRESHOLD=55;
 export const PANTRY_START=Object.freeze({vegetables:8,grains:8,dairy:8});
