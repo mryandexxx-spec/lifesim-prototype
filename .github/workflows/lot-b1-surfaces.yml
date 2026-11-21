@@ -1,6 +1,5 @@
 name: LOT-B1 — mobile landscaping paint & finance WebGL QA
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

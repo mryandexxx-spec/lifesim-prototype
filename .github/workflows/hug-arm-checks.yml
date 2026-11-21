@@ -1,7 +1,5 @@
 name: Hug arms visual runtime regression
 on:
-  push:
-    branches: [feature/hug-arm-motion-fix-20261116]
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,6 +1,5 @@
 name: LIFE DISH-R1 — canonical dirty plates and four mobile WebGL viewports
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

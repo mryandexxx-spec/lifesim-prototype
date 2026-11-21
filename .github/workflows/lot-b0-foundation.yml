@@ -1,6 +1,5 @@
 name: LOT-B0 — outdoor schema, topology and mobile compatibility
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

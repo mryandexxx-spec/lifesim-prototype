@@ -1,6 +1,5 @@
 name: LOT-A — mobile outdoor tap-to-walk & save regression
 on:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
