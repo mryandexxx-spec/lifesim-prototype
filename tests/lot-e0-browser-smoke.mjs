@@ -45,6 +45,23 @@ assert.ok(enqueueAction(root.actionQueues,'alex',{
 assert.ok(enqueueAction(root.actionQueues,'mira',{
   type:'garden',instanceId:garden.instanceId,actionId:'water'}));
 
+// The canonical v1 loader intentionally does NOT restore paused from disk:
+ // a queued command may already be running by the first rendered frame.
+ // Guard real intent (queued OR active), never assume a dispatch queue is static.
+function assertResidentIntent(saved,id,kind){
+  const queue=saved.actionQueues?.byResident?.[id]||[];
+  const pending=queue.some(item=>item.type===kind&&
+    (kind!=='pool'||item.poolId==='pool-1')&&
+    (kind!=='garden'||item.instanceId===garden.instanceId));
+  const action=id==='alex'?saved.action:saved.otherSim?.action;
+  const active=kind==='pool'
+    ?action?.id==='swim'&&action.poolId==='pool-1'
+    :action?.id==='garden'&&action.targetInstanceId===garden.instanceId;
+  assert.ok(pending||active,
+    id+' '+kind+' command missing from both queue and active task: '+
+    JSON.stringify({paused:saved.paused,minutes:saved.minutes,queue,action}));
+}
+
 const browser=await chromium.launch({headless:true,args:[
   '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
   '--enable-unsafe-swiftshader','--disable-dev-shm-usage'
@@ -64,6 +81,9 @@ try{
     page.on('crash',()=>errors.push('renderer-crashed'));
     await page.goto('http://127.0.0.1:8765/?pool=qa&lot-e0=qa',{waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+    // Saved pause is deliberately ephemeral. Freeze the *live* simulation
+    // through its real UI before editor navigation and state verification.
+    await page.locator('#pause-btn').click();
     const gl=await page.evaluate(()=>{
       const canvas=document.querySelector('#game-canvas');
       const bounds=canvas.getBoundingClientRect();
@@ -91,20 +111,24 @@ try{
     assert.equal(before.version,1);
     assert.equal(before.world.outdoors.pools[0].cells.length,16);
     assert.equal(before.world.outdoors.features.length,2);
-    assert.equal(before.actionQueues.byResident.alex[0].type,'pool');
-    assert.equal(before.actionQueues.byResident.mira[0].type,'garden');
+    assert.equal(before.paused,true,'explicit UI pause must freeze mixed test');
+    assertResidentIntent(before,'alex','pool');
+    assertResidentIntent(before,'mira','garden');
     await page.screenshot({path:'artifacts/lot-e0/mixed-'+width+'x'+height+'.png',
       fullPage:true});
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+    // Pause is intentionally not rehydrated from root-v1. Stop the next frame
+    // before comparing durable commands and active manual actions.
+    await page.locator('#pause-btn').click();
     const after=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     assert.equal(after.version,1);
     assert.equal(after.world.outdoors.pools[0].cells.length,16);
     assert.equal(after.world.outdoors.features.length,2);
     assert.equal(after.shop.credits,before.shop.credits,'reload must not charge again');
     assert.equal(after.financialHistory.entries.length,before.financialHistory.entries.length);
-    assert.equal(after.actionQueues.byResident.alex[0].type,'pool');
-    assert.equal(after.actionQueues.byResident.mira[0].type,'garden');
+    assertResidentIntent(after,'alex','pool');
+    assertResidentIntent(after,'mira','garden');
     assert.equal((await page.evaluate(()=>window.__LifeSimPoolVisualStats?.()))?.hasPool,true);
     assert.deepEqual(errors,[],'PlayCanvas/browser errors');
     report.push({viewport:width+'x'+height,webgl:true,
