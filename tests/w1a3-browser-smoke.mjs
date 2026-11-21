@@ -36,7 +36,7 @@ try {
  await page.locator('#lc-event-form [name="participants"]').selectOption('alex');
  await page.locator('#lc-event-form [name="repeat"]').selectOption('weekly');
  await page.locator('#lc-event-form [name="reminder"]').selectOption('15');
- await page.locator('#lc-event-form button[type=submit]').click();
+ await page.locator('#lc-event-done').click();
  assert.ok(await page.locator('#lc-agenda').getByText('Встреча Алекса').isVisible());
  const eventSave=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
  assert.equal(eventSave.calendar.events.length,1);
@@ -46,14 +46,14 @@ try {
  await page.locator('#lc-agenda .lc-entry').last().click();
  await page.locator('#lc-event-form [name="scope"]').selectOption('one');
  await page.locator('#lc-event-form [name="title"]').fill('Один особенный вторник');
- await page.locator('#lc-event-form button[type=submit]').click();
+ await page.locator('#lc-event-done').click();
  assert.ok(await page.locator('#lc-agenda').getByText('Один особенный вторник').isVisible());
  const overridden=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
  assert.equal(overridden.calendar.occurrenceOverrides.length,1);
  await page.locator('#lc-add-holiday').click();
  await page.locator('#lc-holiday-form [name="title"]').fill('Семейный выходной');
  await page.locator('#lc-holiday-form [name="dayOffWork"]').check();
- await page.locator('#lc-holiday-form button[type=submit]').click();
+ await page.locator('#lc-holiday-done').click();
  assert.ok(await page.locator('#lc-agenda').getByText('Семейный выходной').isVisible());
  await page.screenshot({path:'w1a3-mobile-calendar.png'});
  // W1-A.4: editing a FUTURE occurrence as a SERIES must keep the original anchor.
@@ -63,7 +63,7 @@ try {
  await page.locator('#lc-agenda').getByText('Встреча Алекса').click();
  assert.equal(await page.locator('#lc-event-form [name="date"]').inputValue(),'2026-11-17');
  await page.locator('#lc-event-form [name="title"]').fill('Еженедельная встреча');
- await page.locator('#lc-event-form button[type=submit]').click();
+ await page.locator('#lc-event-done').click();
  const seriesSaved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
  assert.equal(seriesSaved.calendar.events[0].date,'2026-11-17',
    'Editing a future occurrence must not move the series anchor');
@@ -74,7 +74,7 @@ try {
  assert.equal(await page.locator('#lc-event-form [name="date"]').inputValue(),'2026-11-24');
  await page.locator('#lc-event-form [name="participants"]').selectOption('mira');
  await page.locator('#lc-event-form [name="title"]').fill('Только для Миры');
- await page.locator('#lc-event-form button[type=submit]').click();
+ await page.locator('#lc-event-done').click();
  assert.ok(await page.locator('#lc-agenda').getByText('Только для Миры').isVisible());
  const oneSaved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
  assert.equal(oneSaved.calendar.events[0].date,'2026-11-17');
