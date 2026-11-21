@@ -14,6 +14,7 @@ import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './viewport-health.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
+import {createNeedTrendTracker} from './need-trends.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
 import {createDayNightRenderer} from './day-night-render.js';
@@ -216,6 +217,7 @@ audioButton.addEventListener('click',async()=>{
   refreshMusicAudioButton();
 });
 refreshMusicAudioButton();
+const needTrendTracker=createNeedTrendTracker();
 const selectedActor = () => getActor(game,game.selectedSim);
 const selectedName = () => getActorName(game.selectedSim);
 const visualQuery = new URLSearchParams(window.location.search).get('model') || '';
@@ -8533,6 +8535,7 @@ function boot() {
         renderSharedPanel(false);
       const needNames={hunger:'Сытость',energy:'Энергия',hygiene:'Гигиена',
         fun:'Досуг',social:'Общение',bladder:'Туалет'};
+      const needTrends=needTrendTracker.observe(game,{paused:game.paused||furnishMode||buildMode||outdoorMode});
       const urgent=NEEDS.map(need=>({need,value:Math.round(current.needs[need])}))
         .filter(item=>item.value<55).sort((a,b)=>a.value-b.value).slice(0,2);
       $('urgent-needs').textContent=urgent.length
@@ -8545,7 +8548,14 @@ function boot() {
         const bar=$('bar-'+need);
         bar.style.width=val+'%';
         bar.style.background=band.color;
-        bar.closest('.need').dataset.level=band.id;
+        const line=bar.closest('.need');
+        line.dataset.level=band.id;
+        const trend=needTrends[game.selectedSim][need];
+        const arrow=$('trend-'+need);
+        arrow.textContent=trend.symbol;
+        arrow.dataset.direction=trend.direction;
+        arrow.title=trend.label;
+        line.setAttribute('aria-label',needNames[need]+' '+val+' из 100. '+trend.label);
         $('value-'+need).textContent=val;
       }
       const moodView=moodPresentation(current,game.world);
