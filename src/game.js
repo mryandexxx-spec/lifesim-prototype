@@ -69,7 +69,7 @@ import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_
 import {skillProfileRows} from './skill-presentation.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES,canPaintContent,
   compositionForArtwork,paintingSeedFromSession} from './painting.js';
-import {COOKING_SKILL_ID,kitchenRecipe,cookingQuality,canCookRecipe,kitchenSummary,
+import {COOKING_SKILL_ID,kitchenRecipe,KITCHEN_QUALITIES,cookingQuality,canCookRecipe,kitchenSummary,
   preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
 import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock,
   quoteCookingRecipe} from './kitchen-market.js';
@@ -994,7 +994,11 @@ function select(id,instanceId=null) {
     for(const meal of meals){
       const option=document.createElement('option');
       option.value=meal.recipeId;
-      option.textContent=meal.label+' · '+meal.portions+' порц.';
+      const note=meal.recipeId.startsWith('cook.')
+        ?(meal.quality==='mixed'?'разное качество':
+          KITCHEN_QUALITIES[meal.quality]?.label):null;
+      option.textContent=meal.label+(note?' · '+note:'')+
+        ' · '+meal.portions+' порц.';
       menu.append(option);
     }
     if(!meals.length){

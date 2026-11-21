@@ -231,6 +231,7 @@ test('COOK-R1: Safari source, stable IDs and no duplicate finance plumbing',()=>
   for(const id of Object.keys(KITCHEN_RECIPES))
     assert.match(html,new RegExp('value="'+id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"'));
   assert.match(html,/id="cook-recipe-quote"/);
+  assert.match(ui,/KITCHEN_QUALITIES\[meal.quality\]/);
   assert.match(ui,/renderCookRecipeQuote\(\)/);
   assert.match(ui,/quoteCookingRecipe\(id\)/);
   assert.match(sim,/kitchenServingMultiplier\(cooked.id,state.action.cookedQuality\)/);

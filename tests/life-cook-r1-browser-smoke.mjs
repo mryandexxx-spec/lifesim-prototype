@@ -12,6 +12,10 @@ seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
 seed.paused=true;
 seed.skills.xpById.cooking=610; // level 8: four new recipes available
 seed.kitchen.pantry.herbs=8;
+seed.kitchen.prepared=[
+  {recipeId:'cook.soup',portions:1,quality:'excellent'},
+  {recipeId:'ready.garden-wrap',portions:1}
+];
 const browser=await chromium.launch({headless:true,args:[
   '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
   '--enable-unsafe-swiftshader','--disable-dev-shm-usage'
@@ -40,6 +44,10 @@ try{
       const fridge=page.locator('#hotspots .hotspot').filter({hasText:'Холодильник'});
       assert.equal(await fridge.count(),1);
       await fridge.evaluate(node=>node.click());
+      const inventory=page.locator('#fridge-prepared-select option');
+      assert.equal(await inventory.count(),2);
+      assert.match(await inventory.nth(0).innerText(),/Отличное/);
+      assert.doesNotMatch(await inventory.nth(1).innerText(),/Домашнее|Вкусное|Отличное|Мастерское/);
       const menu=page.locator('#cooking-recipe-select');
       assert.equal(await menu.locator('option').count(),9);
       for(const id of ['cook.grain-bowl','cook.herb-noodles',
