@@ -11,8 +11,7 @@ import {newRecruitmentSystem,restoreRecruitmentSystem,progressCareerRecruitment}
 import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork} from './career-work.js';
 import {progressWorkNeeds} from './career-work-needs.js';
 import {applyWorkMoodContext} from './career-worklife.js';
-import {DISH_AUTO_WASH_THRESHOLD} from './dirty-dishes-visual.js';
-import {COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
+import {DISH_AUTO_WASH_THRESHOLD,COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServing,hasKitchenServing,shouldEatFreshKitchenMeal,
   recordDirtyDish,washKitchenDishes} from './kitchen.js';
