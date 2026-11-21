@@ -106,6 +106,8 @@ jobs:
           node --check src/kitchen.js
           node --check src/dirty-dishes-visual.js
           node --check src/kitchen-market.js
+          node --check src/ready-meal-catalog.js
+          node --check src/ready-food.js
           node --check src/seat-furniture.js
           node --check src/furniture-interactions.js
           node --check src/furniture-thumbnails.js
@@ -259,7 +261,7 @@ jobs:
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
           cp src/object-once-ledger.js site/src/
-          cp src/kitchen.js src/kitchen-market.js src/hobby-content.js site/src/
+          cp src/kitchen.js src/kitchen-market.js src/ready-meal-catalog.js src/ready-food.js src/hobby-content.js site/src/
           cp src/dirty-dishes-visual.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/
