@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold,tickHousehold,setHouseholdAutonomy} from '../src/household.js';
-import {beginPoolSwim,arrivePoolApproach,requestPoolExit,SWIM_MINUTES} from '../src/pool-swim-runtime.js';
+import {beginPoolSwim,arrivePoolApproach,requestPoolExit,advancePoolSwim,SWIM_MINUTES} from '../src/pool-swim-runtime.js';
 import {poolSwimVisualFrame} from '../src/pool-swim-visual.js';
 import {poolAutoDraw,poolAutoChance,considerAutonomousPool,
   recordAutonomousPoolStart,POOL_AUTO_POLICY} from '../src/pool-autonomy.js';
@@ -31,8 +31,11 @@ function approach(s,id='alex',command={poolId:'pool-1',actionId:'swim'}){
   assert.ok(arrivePoolApproach(s,id));
   return plan.action;
 }
-function toStage(s,id,stage,limit=100){
-  for(let i=0;i<limit&&sim(s,id).action?.stage!==stage;i++)tickHousehold(s,1);
+function toStage(s,id,stage,limit=100,isolated=false){
+  for(let i=0;i<limit&&sim(s,id).action?.stage!==stage;i++){
+    if(isolated)advancePoolSwim(s,id,1);
+    else tickHousehold(s,1);
+  }
   assert.equal(sim(s,id).action?.stage,stage);
   return sim(s,id).action;
 }
@@ -92,9 +95,9 @@ test('D2d ladder, steps and feet-first board use the existing full contract',()=
       ...(kind==='board'?{fixtureId:'fixture-2'}:{})};
     const a=approach(s,'alex',request);
     assert.equal(a.entryKind,kind);
-    toStage(s,'alex','swimming',70);
+    toStage(s,'alex','swimming',100,true);
     assert.equal(s.action.waterElapsed,0);
-    tickHousehold(s,SWIM_MINUTES);
+    advancePoolSwim(s,'alex',SWIM_MINUTES);
     assert.equal(s.action.stage,'exiting');
     complete(s,'alex');
     assert.equal(memory(s,'alex').length,1);
@@ -104,8 +107,8 @@ test('D2d ladder, steps and feet-first board use the existing full contract',()=
 test('D2d crossing pause, 3x and all stage reloads retains canonical water state',()=>{
   const s=home();approach(s);
   for(const stage of ['waiting','entering','swimming','exiting']){
-    if(stage==='entering')tickHousehold(s,1);
-    if(stage==='swimming')toStage(s,'alex','swimming');
+    if(stage==='entering')advancePoolSwim(s,'alex',1);
+    if(stage==='swimming')toStage(s,'alex','swimming',100,true);
     if(stage==='exiting')requestPoolExit(s,'alex','player');
     const loaded=loadHousehold(copy(s));
     assert.equal(loaded.action?.stage,stage);
