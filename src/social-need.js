@@ -27,6 +27,8 @@ export function socialNeedDecayRate(profile){
  */
 export const SOCIAL_NEED_REWARDS=Object.freeze({
   'phone.call':6,
+  'sports.discuss':5,
+  'sports.disagree':3,
   talk:14,
   'conversation.talk':18,
   'acquaint.chat':13,
