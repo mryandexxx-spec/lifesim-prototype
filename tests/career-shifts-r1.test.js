@@ -2,12 +2,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CAREER_CATALOG} from '../src/career-catalog.js';
-import {CAREER_SPECIALIZATIONS} from '../src/career-specializations.js';
+import {CAREER_SPECIALIZATIONS,careerRankForContract} from '../src/career-specializations.js';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {hireCareer,restoreCareerSystem} from '../src/career-state.js';
 import {plannedCareerShift,nextCareerShift} from '../src/career-scheduler.js';
 import {approvedRankSchedule,migrateLegacyCareerSchedules,recordRankSchedulePromotion} from '../src/career-rank-schedules.js';
 import {careerVacancies,calendarCareerShifts} from '../src/career-job-board.js';
+import {progressCareerWork,arriveCareerPortal,finishCareerReturn} from '../src/career-work.js';
+import {tickHousehold} from '../src/household.js';
 
 const TIMES={
   'city-services':[[360,540],[420,480],[480,480],[480,480],[540,420],[540,420],[540,480],[540,480]],
@@ -42,6 +44,9 @@ test('approved A matrix has 48 rank profiles, valid original wages and strictly 
     for(let rank=0;rank<8;rank++){
       const schedule=approvedRankSchedule(career.id,rank);
       assert.ok(schedule,career.id+' rank '+rank);
+      const simulated={careerId:career.id,level:rank,
+        specialization:{id:CAREER_SPECIALIZATIONS[career.id][0].id}};
+      assert.equal(careerRankForContract(simulated)?.hourlyCredits,PAY[career.id][rank]);
       assert.equal(schedule.startMinute,TIMES[career.id][rank][0]);
       assert.equal(schedule.duration,TIMES[career.id][rank][1]);
       assert.equal(schedule.weekdays.length,rank>=6&&career.id!=='kitchen-studio'?4:5);
@@ -146,4 +151,33 @@ test('a nonworking holiday removes overnight shift by START date, not by its nex
   root.calendar.holidays.push({id:'h-testsunday',title:'Воскресенье',month:11,day:22,
     enabled:true,dayOffWork:true});
   assert.equal(plannedCareerShift(root.calendar,contract,6),null);
+});
+
+test('genuine R0 overnight work earns 9h salary once across Safari reload, no early phantom pay',()=>{
+  const root=newHousehold('2026-11-16');
+  const contract=employed(root,'civic-service');
+  const shift=plannedCareerShift(root.calendar,contract,2);
+  assert.ok(shift);
+  assert.equal(shift.end-shift.start,540);
+  assert.equal(shift.hourlyCredits,19);
+  root.minutes=shift.start;root.otherSim.minutes=shift.start;
+  progressCareerWork(root,shift.start-1,shift.start);
+  assert.equal(contract.currentShift.phase,'departing');
+  assert.equal(arriveCareerPortal(root,'alex',shift.start),true);
+  let restored=loadHousehold(JSON.parse(JSON.stringify(root)),'2026-11-16');
+  assert.equal(restored.careerSystem.byResident.alex.currentShift.phase,'working');
+  assert.equal(restored.shop.credits,5000);
+  tickHousehold(restored,538);
+  assert.equal(restored.shop.credits,5000,'overnight pay cannot arrive before real shift end');
+  tickHousehold(restored,2);
+  assert.equal(restored.shop.credits,5171,'9×19 credits, without fictional night bonus');
+  assert.equal(restored.careerSystem.settlementIds.filter(x=>x===shift.id).length,1);
+  assert.equal(restored.careerSystem.byResident.alex.lastShift.salary,171);
+  assert.equal(restored.careerSystem.byResident.alex.lastShift.workedMinutes,540);
+  assert.equal(restored.careerSystem.byResident.alex.currentShift.phase,'returning');
+  assert.equal(finishCareerReturn(restored,'alex'),true);
+  restored=loadHousehold(JSON.parse(JSON.stringify(restored)),'2026-11-16');
+  tickHousehold(restored,2);
+  assert.equal(restored.shop.credits,5171,'reload cannot pay the already-settled shift');
+  assert.equal(restored.careerSystem.settlementIds.filter(x=>x===shift.id).length,1);
 });
