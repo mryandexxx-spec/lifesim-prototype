@@ -184,7 +184,7 @@ export function restoreCareerSystem(raw){
   return state;
 }
 /** Pure hire transition. Gameplay/UI and attendance will call this adapter in W1-B.2. */
-export function hireCareer(system,residentId,careerId,atMinute){
+export function hireCareer(system,residentId,careerId,atMinute,{rankSchedules=false}={}){
   if(!CAREER_RESIDENT_IDS.includes(residentId)||!careerDefinition(careerId)||
     !validTime(atMinute))throw new RangeError('Invalid career hire');
   const state=restoreCareerSystem(system);
@@ -201,8 +201,10 @@ export function hireCareer(system,residentId,careerId,atMinute){
   const contract={residentId,employmentId:id,careerId,level,
     hiredAt:atMinute,status:'employed',performance:latest?60:50,currentShift:null,
     workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0,
-    timeOff,workMode:'normal',discipline:newCareerDiscipline(),workLife:newWorkLife(),
-    shiftSchedule:newShiftSchedule(atMinute)};
+    timeOff,workMode:'normal',discipline:newCareerDiscipline(),workLife:newWorkLife()};
+  // Explicit real-offer opt-in. Legacy programmatic fixtures keep the historical
+  // catalog schedule; only genuine new hiring gets the approved F schedule.
+  if(rankSchedules)contract.shiftSchedule=newShiftSchedule(atMinute);
   if(latest?.branchId&&specializationDefinition(careerId,latest.branchId)){
     contract.specialization={schema:1,id:latest.branchId,chosenAt:atMinute,
       workedShiftsAtChoice:0,focusReceiptId:null,focusScenarioId:null,focusAt:null};
