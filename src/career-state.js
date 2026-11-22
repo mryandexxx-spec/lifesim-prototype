@@ -10,6 +10,7 @@ import {newCareerDiscipline,restoreCareerDiscipline,disciplineRisk} from './care
 import {newWorkLife,restoreWorkLife} from './career-worklife.js';
 import {specializationDefinition} from './career-specializations.js';
 import {resetSeniorProof} from './career-seniority.js';
+import {restoreShiftSchedule,newShiftSchedule} from './career-rank-schedules.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -83,6 +84,8 @@ function cleanContract(raw,id){
       Math.max(0,Math.min(100,Math.round(raw.performance))):50,
     currentShift:null,workMode:cleanWorkMode(raw.workMode)};
   if(specialization)contract.specialization=specialization;
+  const shiftSchedule=restoreShiftSchedule(raw.shiftSchedule);
+  if(shiftSchedule)contract.shiftSchedule=shiftSchedule;
   const seniorProof=restoreSeniorProof(raw.seniorProofs,contract);
   if(seniorProof)contract.seniorProofs=seniorProof;
   contract.timeOff=restoreCareerTimeOff(raw.timeOff,contract.employmentId);
@@ -181,7 +184,7 @@ export function restoreCareerSystem(raw){
   return state;
 }
 /** Pure hire transition. Gameplay/UI and attendance will call this adapter in W1-B.2. */
-export function hireCareer(system,residentId,careerId,atMinute){
+export function hireCareer(system,residentId,careerId,atMinute,{rankSchedules=false}={}){
   if(!CAREER_RESIDENT_IDS.includes(residentId)||!careerDefinition(careerId)||
     !validTime(atMinute))throw new RangeError('Invalid career hire');
   const state=restoreCareerSystem(system);
@@ -199,6 +202,9 @@ export function hireCareer(system,residentId,careerId,atMinute){
     hiredAt:atMinute,status:'employed',performance:latest?60:50,currentShift:null,
     workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0,
     timeOff,workMode:'normal',discipline:newCareerDiscipline(),workLife:newWorkLife()};
+  // Explicit real-offer opt-in. Legacy programmatic fixtures keep the historical
+  // catalog schedule; only genuine new hiring gets the approved F schedule.
+  if(rankSchedules)contract.shiftSchedule=newShiftSchedule(atMinute,level);
   if(latest?.branchId&&specializationDefinition(careerId,latest.branchId)){
     contract.specialization={schema:1,id:latest.branchId,chosenAt:atMinute,
       workedShiftsAtChoice:0,focusReceiptId:null,focusScenarioId:null,focusAt:null};

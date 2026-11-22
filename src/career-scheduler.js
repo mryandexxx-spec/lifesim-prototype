@@ -3,6 +3,7 @@ import {civilToSerial,serialToCivil,toISODate,weekdayFromSerial,MINUTES_PER_GAME
 import {holidaysOnDate} from './calendar-holidays.js';
 import {careerDefinition,validCareerSchedule} from './career-catalog.js';
 import {careerRankForContract} from './career-specializations.js';
+import {careerScheduleAtDay} from './career-rank-schedules.js';
 
 const DAY=MINUTES_PER_GAME_DAY;
 function contractSchedule(contract){
@@ -10,14 +11,15 @@ function contractSchedule(contract){
   const career=careerDefinition(contract.careerId);
   if(!career||!careerRankForContract(contract)||
     !Number.isFinite(contract.hiredAt)||contract.hiredAt<0)return null;
-  return {career,schedule:career.schedule,rank:careerRankForContract(contract)};
+  return {career,rank:careerRankForContract(contract)};
 }
 /** Stable IDs are derived from contract + game day, never Date.now or frame count. */
 export function plannedCareerShift(calendar,contract,dayIndex){
   if(!Number.isSafeInteger(dayIndex)||dayIndex<0||dayIndex>3650000)return null;
   const candidate=contractSchedule(contract);
   if(!candidate||!calendar?.startCivilDate)return null;
-  const {career,schedule,rank}=candidate;
+  const {career,rank}=candidate;
+  const schedule=careerScheduleAtDay(contract,dayIndex);
   if(!validCareerSchedule(schedule))return null;
   let iso,weekday;
   try{

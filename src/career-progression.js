@@ -10,6 +10,7 @@ import {recordWorkLifePromotion,applyWorkMoodContext} from './career-worklife.js
 import {WORK_MODES,cleanWorkMode} from './career-work-needs.js';
 import {careerRankForContract,specializationReadiness} from './career-specializations.js';
 import {seniorPromotionReadiness,resetSeniorProof} from './career-seniority.js';
+import {recordRankSchedulePromotion} from './career-rank-schedules.js';
 
 const clip=(v,lo=0,hi=100)=>Math.max(lo,Math.min(hi,v));
 const count=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000?n:0;
@@ -85,6 +86,7 @@ export function promoteCareer(root,residentId){
   if(!goal||goal.maxLevel)return {ok:false,reason:'Достигнута верхняя должность'};
   if(!goal.ready)return {ok:false,reason:'Не выполнены условия повышения'};
   contract.level++;
+  recordRankSchedulePromotion(root,contract);
   contract.rankShifts=0;
   if(contract.level>=5)contract.seniorProofs=resetSeniorProof(contract,root.minutes);
   // Progress is earned separately at the next rank, never wiped to zero.
