@@ -61,3 +61,11 @@ test('NEEDS-FIX: changed needs loop or bed SKU routes actual PlayCanvas mobile b
   assert.equal(planChanges(['src/kitchen.js']).browser,false,
     'independent pantry changes should not schedule unrelated browser work');
 });
+
+test('MICRO-UX-R1 browser smoke is impact-gated, not run for every future UI edit',()=>{
+  assert.equal(planChanges(['src/micro-ux.js']).micro_ux,true);
+  assert.equal(planChanges(['src/camera-controls.js']).micro_ux,true);
+  assert.equal(planChanges(['tests/micro-ux-r1-browser-smoke.mjs']).micro_ux,true);
+  for(const source of ['src/kitchen.js','src/career-phone-ui.js','index.html'])
+    assert.equal(planChanges([source]).micro_ux,false,source);
+});

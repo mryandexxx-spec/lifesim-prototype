@@ -16,6 +16,7 @@ jobs:
       e5: ${{ steps.impact.outputs.e5 }}
       fixture_motion: ${{ steps.impact.outputs.fixture_motion }}
       integration_qa: ${{ steps.impact.outputs.integration_qa }}
+      micro_ux: ${{ steps.impact.outputs.micro_ux }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,6 +57,7 @@ jobs:
           sleep 3
           node tests/ci-browser-boot.mjs
       - name: MICRO-UX-R1 touch/menu and queue smoke at two mobile viewports
+        if: ${{ needs.targeted.outputs.micro_ux == 'true' }}
         run: node tests/micro-ux-r1-browser-smoke.mjs
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}
