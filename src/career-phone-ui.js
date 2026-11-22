@@ -15,7 +15,7 @@ import {renderCareerMap} from './career-map-ui.js';
 import {phoneWorkLanding} from './ux06-phone-state.js';
 import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt,selectCareerWorkMode} from './career-work.js';
 import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-work-needs.js';
-import {calendarAt} from './calendar-core.js';
+
 import {createFinancePhoneUI} from './finance-phone-ui.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal} from './ready-food.js';
