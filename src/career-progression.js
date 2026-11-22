@@ -2,7 +2,8 @@
  * Pure domain rules only: no real-world clock, DOM, currency mint or second XP.
  */
 import {careerDefinition} from './career-catalog.js';
-import {CAREER_RESIDENT_IDS} from './career-state.js';
+import {careerResidentIds} from './career-state.js';
+import {savedAdditionalActor} from './resident-activity-runtime.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {refreshMind} from './psychology.js';
@@ -40,7 +41,7 @@ export function careerPromotionRule(careerId,fromLevel){
     PLAN[careerId]?.[fromLevel]||null:null;
 }
 const SKILL_LABEL={cooking:'Кулинария',painting:'Живопись',literature:'Литературная эрудиция'};
-const actorFor=(root,id)=>id==='mira'?root?.otherSim:root;
+const actorFor=(root,id)=>id==='alex'?root:id==='mira'?root?.otherSim:savedAdditionalActor(root,id);
 
 export function careerReadiness(actor){
   const energy=clip(Number.isFinite(actor?.needs?.energy)?actor.needs.energy:50);
@@ -51,7 +52,7 @@ export function careerReadiness(actor){
 export function promotionReadiness(root,residentId){
   const contract=root?.careerSystem?.byResident?.[residentId];
   const career=careerDefinition(contract?.careerId);
-  if(!CAREER_RESIDENT_IDS.includes(residentId)||!contract||!career)return null;
+  if(!careerResidentIds(root?.careerSystem).includes(residentId)||!contract||!career)return null;
   const branch=contract.level===4?specializationReadiness(root,residentId):null;
   if(contract.level===4&&!branch?.selected)return {
     maxLevel:false,ready:false,needsSpecialization:true,rank:'Выбери специализацию',

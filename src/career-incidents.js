@@ -5,6 +5,7 @@ import {HOBBY_SKILLS} from './hobby-reading.js';
 import {refreshMind} from './psychology.js';
 import {feelMemory} from './emotion-engine.js';
 import {recordProfessionalIncident} from './career-goals.js';
+import {savedAdditionalActor} from './resident-activity-runtime.js';
 import {specializationDefinition,recordSpecializationIncident} from './career-specializations.js';
 import {seniorMissingScenes,recordSeniorIncident} from './career-seniority.js';
 import {CAREER_R1_SCENES} from './career-r1-scenes.js';
@@ -111,7 +112,7 @@ export const WORK_INCIDENT_CATALOG=Object.freeze(Object.fromEntries(
 export const INCIDENT_HISTORY_LIMIT=12;
 const valid=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
 const clip=(n,a=0,b=100)=>Math.max(a,Math.min(b,Number.isFinite(n)?n:50));
-const actorFor=(root,id)=>id==='mira'?root?.otherSim:root;
+const actorFor=(root,id)=>id==='alex'?root:id==='mira'?root?.otherSim:savedAdditionalActor(root,id);
 const hash=value=>{
   let h=2166136261;
   for(let i=0;i<value.length;i++)h=Math.imul(h^value.charCodeAt(i),16777619);

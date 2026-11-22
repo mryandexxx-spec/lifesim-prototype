@@ -195,7 +195,8 @@ export function dispatchAdditionalResidentQueues(root){
   const prepared=new Map();
   return dispatchActionQueues(root.actionQueues,{
     canStart(id,command){
-      if(!ids.has(id)||root.socialAction||
+      if(!ids.has(id)||['departing','waiting','working','returning'].includes(
+        root.careerSystem?.byResident?.[id]?.currentShift?.phase)||root.socialAction||
         [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))return false;
       const plan=prepareCommand(root,id,command);
       if(!plan)return false;
@@ -308,6 +309,8 @@ export function startAdditionalResidentAutonomy(root,id){
     queueHeads(root.actionQueues).some(({command})=>
       ['social','branch'].includes(command.type)&&command.targetId===id)||
     !residentIdsForSimulation(root).slice(2).includes(id)||
+    ['departing','waiting','working','returning'].includes(
+      root.careerSystem?.byResident?.[id]?.currentShift?.phase)||
     pendingActions(root.actionQueues,id).length)return false;
   const actor=savedAdditionalActor(root,id);
   if(!actor||actor.action)return false;
@@ -343,6 +346,14 @@ export function tickAdditionalResidents(root,minutes){
     actor.minutes=root.minutes-minutes;
     actor.paused=false;actor.speed=root.speed;
     actor.autonomy.enabled=root.autonomy.enabled;
+    // Away workers never receive a second home-need tick, A* step or FIFO
+    // action. Their work needs were advanced by the canonical career sweep.
+    if(['departing','waiting','working','returning'].includes(
+      root.careerSystem?.byResident?.[id]?.currentShift?.phase)){
+      actor.action=null;actor.activitySession=null;
+      actor.minutes=root.minutes;
+      continue;
+    }
     // Newly queued manual commands interrupt only this resident's automatic
     // routine. Blocked FIFO heads still suppress autonomous replacements.
     if(actor.action?.automatic&&

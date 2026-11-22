@@ -3,6 +3,7 @@
  */
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
+import {savedAdditionalActor} from './resident-activity-runtime.js';
 const realTime=n=>Number.isSafeInteger(n)&&n>=0&&n<=5256000000;
 const receiptPattern=/^(e[1-9]\d{0,8})@([0-9]+)@([0-9]+)#work$/;
 const SKILL_NAMES={cooking:'Кулинария',painting:'Живопись',literature:'Литературная эрудиция'};
@@ -65,8 +66,8 @@ export function seniorMissingScenes(contract){
 export function seniorPromotionReadiness(root,residentId){
   const contract=root?.careerSystem?.byResident?.[residentId];
   const rank=seniorNextRank(contract);
-  if(!rank||!['alex','mira'].includes(residentId))return null;
-  const rule=rank.requirements,actor=residentId==='mira'?root.otherSim:root;
+  if(!rank||!Object.hasOwn(root?.careerSystem?.byResident||{},residentId))return null;
+  const rule=rank.requirements,actor=residentId==='alex'?root:residentId==='mira'?root.otherSim:savedAdditionalActor(root,residentId);
   const skill=rule.skill?currentSkillLevel(actor?.skills,HOBBY_SKILLS,rule.skill):null;
   const needs=[
     {label:'Результативность',current:contract.performance,target:rule.performance,met:contract.performance>=rule.performance},

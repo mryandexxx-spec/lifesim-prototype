@@ -3,6 +3,7 @@
  * Rank=contract.level 0..7; tracks share hours, not names/rates.
  */
 import {careerDefinition,validCareerSchedule} from './career-catalog.js';
+import {careerResidentIds} from './career-state.js';
 import {civilToSerial,weekdayFromSerial,MINUTES_PER_GAME_DAY} from './calendar-core.js';
 
 const DAY=MINUTES_PER_GAME_DAY;
@@ -133,7 +134,7 @@ export function migrateLegacyCareerSchedules(root){
   const day=Math.floor(root.minutes/DAY);
   if(!validDay(day))return false;
   let changed=false;
-  for(const id of ['alex','mira']){
+  for(const id of careerResidentIds(root.careerSystem)){
     const contract=root.careerSystem.byResident[id];
     if(!contract||restoreShiftSchedule(contract.shiftSchedule))continue;
     let effective=nextMondayAfter(day,root.calendar);

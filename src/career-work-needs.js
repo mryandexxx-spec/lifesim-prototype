@@ -5,6 +5,7 @@
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
 import {socialNeedDecayRate} from './social-need.js';
 import {deriveAxes} from './trait-catalog.js';
+import {residentIdsForSimulation,savedAdditionalActor} from './resident-activity-runtime.js';
 
 export const WORK_MODES=Object.freeze({
   effort:Object.freeze({label:'Стараться',description:'Больше результативности, но быстрее накапливаются усталость и напряжение. Меньше общения.',performance:3,fatigue:1.42,fun:1.4,social:.22,strain:1.65}),
@@ -15,7 +16,7 @@ export const WORK_MODES=Object.freeze({
 export const WORK_MODE_IDS=Object.freeze(Object.keys(WORK_MODES));
 export const cleanWorkMode=value=>Object.hasOwn(WORK_MODES,value)?value:'normal';
 const clamp=value=>Math.max(0,Math.min(100,value));
-const actorFor=(root,id)=>id==='mira'?root?.otherSim:root;
+const actorFor=(root,id)=>id==='alex'?root:id==='mira'?root?.otherSim:savedAdditionalActor(root,id);
 const safeInt=(v,min,max,fallback)=>Number.isSafeInteger(v)&&v>=min&&v<=max?v:fallback;
 
 /** Optional v1 extension. Missing / corrupted data never rewinds a shift or invents breaks. */
@@ -50,7 +51,7 @@ export function workNeedsReport(shift){
  */
 export function progressWorkNeeds(root,before,after){
   if(!root||root.paused||!Number.isFinite(before)||!Number.isFinite(after)||after<=before)return;
-  for(const id of ['alex','mira']){
+  for(const id of residentIdsForSimulation(root)){
     const shift=root.careerSystem?.byResident?.[id]?.currentShift;
     const actor=actorFor(root,id);
     if(!actor?.needs||!shift||shift.phase!=='working')continue;
