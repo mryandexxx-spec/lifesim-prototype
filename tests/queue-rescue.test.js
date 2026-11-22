@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand,
   SOCIAL_WALK_STALL_MINUTES} from '../src/queue-rescue.js';
 import {newActionQueues,enqueueAction,restoreActionQueues,pendingActions,
-  blockedActions,parkQueuedHead,retryBlockedAction,removeBlockedAction,MAX_ACTION_QUEUE} from '../src/action-queue.js';
+  blockedActions,parkQueuedHead,parkInterruptedAction,retryBlockedAction,
+  removeBlockedAction,MAX_ACTION_QUEUE} from '../src/action-queue.js';
 import {readFileSync} from 'node:fs';
 import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {SAVE_KEY} from '../src/simulation.js';
@@ -150,4 +151,20 @@ test('7/30-day save/reload stress keeps parked manual plans and second resident 
     assert.equal(pendingActions(root.actionQueues,'alex').length,2);
     assert.equal(loadHousehold(structuredClone(root)).actionQueues.byResident.alex.length,2);
   }
+});
+
+test('accepted manual social invitation is saved to review tray when future FIFO is full',()=>{
+  const q=newActionQueues(['alex','mira']);
+  for(let i=0;i<MAX_ACTION_QUEUE;i++)
+    assert.ok(enqueueAction(q,'alex',{type:'object',actionId:'bed'}));
+  const before=pendingActions(q,'alex').map(x=>x.seq);
+  const accepted={type:'conversation',targetId:'mira',topicId:'support'};
+  assert.equal(enqueueAction(q,'alex',accepted),null);
+  const saved=parkInterruptedAction(q,'alex',accepted,'unreachable-route',480);
+  assert.ok(saved);
+  assert.deepEqual(pendingActions(q,'alex').map(x=>x.seq),before);
+  assert.equal(blockedActions(q,'alex')[0].type,'conversation');
+  assert.equal(blockedActions(restoreActionQueues(structuredClone(q),['alex','mira']),
+    'alex')[0].topicId,'support');
+  assert.equal(retryBlockedAction(q,'alex',saved.seq),null);
 });
