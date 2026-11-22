@@ -21,7 +21,8 @@ export function outdoorBenchApproach(world,instanceId){
 }
 export function outdoorBenchBusy(root,instanceId){
   return [root,root?.otherSim].some(actor=>
-    actor?.action?.id==='bench'&&actor.action.targetInstanceId===instanceId)||
+    (actor?.action?.id==='bench'&&actor.action.targetInstanceId===instanceId)||
+    (actor?.action?.id==='dining'&&actor.action.diningSeatInstanceId===instanceId))||
     Object.values(root?.actionQueues?.byResident||{}).some(tasks=>
       Array.isArray(tasks)&&tasks.some(t=>
         t.type==='outdoor'&&t.instanceId===instanceId));
@@ -29,7 +30,8 @@ export function outdoorBenchBusy(root,instanceId){
 export function outdoorBenchAvailable(root,residentId,instanceId){
   if(!outdoorBench(root?.world,instanceId))return false;
   const other=residentId==='alex'?root?.otherSim:root;
-  return !(other?.action?.id==='bench'&&other.action.targetInstanceId===instanceId);
+  return !(other?.action?.id==='bench'&&other.action.targetInstanceId===instanceId) &&
+    !(other?.action?.id==='dining'&&other.action.diningSeatInstanceId===instanceId);
 }
 const ease=x=>{const p=Math.max(0,Math.min(1,x));return p*p*(3-2*p);};
 export function outdoorBenchPose(world,instanceId,progress){
