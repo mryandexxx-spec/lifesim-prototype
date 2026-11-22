@@ -13,6 +13,16 @@ import {resetSeniorProof} from './career-seniority.js';
 import {restoreShiftSchedule,newShiftSchedule} from './career-rank-schedules.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
+const EXTRA_ID=/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/;
+/** Only explicitly saved additional resident IDs can join the v1 career map.
+ * Loading from disk always passes the population whitelist. In-memory
+ * transitions preserve exactly that validated map without extra clocks.
+ */
+export function careerResidentIds(system,additionalIds=null){
+  const entries=additionalIds===null?Object.keys(system?.byResident||{}):additionalIds;
+  const extras=[...new Set(entries.filter(id=>EXTRA_ID.test(id)))].slice(0,2);
+  return [...CAREER_RESIDENT_IDS,...extras];
+}
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
 const validEmployeeId=id=>typeof id==='string'&&/^e[1-9]\d{0,8}$/.test(id);
 function cleanWorkShift(raw,contract){
@@ -148,29 +158,34 @@ function cleanEndedContracts(raw,id){
   }
   return entries;
 }
-export function newCareerSystem(){
-  return {schema:CAREER_SCHEMA,nextEmploymentId:1,byResident:{alex:null,mira:null},
-    settlementIds:[],incidentIds:[],incidentHistory:{alex:[],mira:[]},
+export function newCareerSystem(additionalIds=[]){
+  const ids=careerResidentIds(null,additionalIds);
+  return {schema:CAREER_SCHEMA,nextEmploymentId:1,
+    byResident:Object.fromEntries(ids.map(id=>[id,null])),
+    settlementIds:[],incidentIds:[],
+    incidentHistory:Object.fromEntries(ids.map(id=>[id,[]])),
     professionalGoals:newProfessionalGoals(),
-    endedContracts:{alex:[],mira:[]},portableLeave:{alex:0,mira:0}};
+    endedContracts:Object.fromEntries(ids.map(id=>[id,[]])),
+    portableLeave:Object.fromEntries(ids.map(id=>[id,0]))};
 }
-export function restoreCareerSystem(raw){
-  const state=newCareerSystem();
+export function restoreCareerSystem(raw,additionalIds=null){
+  const residentIds=careerResidentIds(raw,additionalIds);
+  const state=newCareerSystem(residentIds);
   if(!raw||raw.schema!==CAREER_SCHEMA||typeof raw.byResident!=='object'||!raw.byResident)return state;
   const ids=new Set();
-  for(const id of CAREER_RESIDENT_IDS){
+  for(const id of residentIds){
     const entry=cleanContract(raw.byResident[id],id);
     if(entry&&!ids.has(entry.employmentId)){
       state.byResident[id]=entry;ids.add(entry.employmentId);
     }
   }
-  for(const id of CAREER_RESIDENT_IDS){
+  for(const id of residentIds){
     state.endedContracts[id]=cleanEndedContracts(raw.endedContracts?.[id],id);
     const portable=raw.portableLeave?.[id];
     state.portableLeave[id]=Number.isSafeInteger(portable)&&portable>=0&&portable<=64?portable:0;
   }
   const max=Math.max(0,...[...ids].map(x=>Number(x.slice(1))),
-    ...CAREER_RESIDENT_IDS.flatMap(id=>
+    ...residentIds.flatMap(id=>
       state.endedContracts[id].map(x=>Number(x.employmentId.slice(1)))));
   const next=raw.nextEmploymentId;
   state.nextEmploymentId=Number.isSafeInteger(next)&&next>max&&next<=999999999
@@ -181,13 +196,13 @@ export function restoreCareerSystem(raw){
   }
   if(Array.isArray(raw.incidentIds))state.incidentIds=[...new Set(raw.incidentIds.filter(x=>
     typeof x==='string'&&x.length<=102&&/^e[1-9]\d{0,8}@[0-9]+@[0-9]+#work$/.test(x)))].slice(-256);
-  for(const id of CAREER_RESIDENT_IDS)state.incidentHistory[id]=cleanWorkHistory(raw.incidentHistory?.[id]);
+  for(const id of residentIds)state.incidentHistory[id]=cleanWorkHistory(raw.incidentHistory?.[id]);
   state.professionalGoals=restoreProfessionalGoals(raw.professionalGoals,state);
   return state;
 }
 /** Pure hire transition. Gameplay/UI and attendance will call this adapter in W1-B.2. */
 export function hireCareer(system,residentId,careerId,atMinute,{rankSchedules=false}={}){
-  if(!CAREER_RESIDENT_IDS.includes(residentId)||!careerDefinition(careerId)||
+  if(!careerResidentIds(system).includes(residentId)||!careerDefinition(careerId)||
     !validTime(atMinute))throw new RangeError('Invalid career hire');
   const state=restoreCareerSystem(system);
   if(state.byResident[residentId])throw new Error('Resident already employed');
@@ -216,7 +231,7 @@ export function hireCareer(system,residentId,careerId,atMinute,{rankSchedules=fa
   return state;
 }
 export function resignCareer(system,residentId){
-  if(!CAREER_RESIDENT_IDS.includes(residentId))throw new RangeError('Invalid resident');
+  if(!careerResidentIds(system).includes(residentId))throw new RangeError('Invalid resident');
   const state=restoreCareerSystem(system);
   state.byResident[residentId]=null;
   return state;
@@ -226,7 +241,7 @@ export function resignCareer(system,residentId){
  * Handles resignation and employer dismissal identically for earned career/leave.
  */
 export function separateCareer(system,residentId,reason,atMinute){
-  if(!CAREER_RESIDENT_IDS.includes(residentId)||!validArchiveTime(Math.floor(atMinute))||
+  if(!careerResidentIds(system).includes(residentId)||!validArchiveTime(Math.floor(atMinute))||
     !['resigned','dismissed'].includes(reason))throw new RangeError('Invalid separation');
   const state=restoreCareerSystem(system);
   const contract=state.byResident[residentId];
