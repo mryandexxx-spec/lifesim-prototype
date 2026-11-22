@@ -55,7 +55,7 @@ export function careerVacancies(root,residentId){
         clockLabel(schedule.startMinute+schedule.duration)+
         (schedule.startMinute+schedule.duration>=1440?' (+1 день)':''),
       nextShift:shift,firstShiftLabel:describeCareerShift(shift),
-      shiftCredits:Math.round(rank.hourlyCredits*career.schedule.duration/60)
+      shiftCredits:Math.round(rank.hourlyCredits*schedule.duration/60)
     });
   });
 }
