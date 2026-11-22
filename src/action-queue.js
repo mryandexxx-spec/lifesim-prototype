@@ -114,8 +114,12 @@ export function sanitizeQueueCommand(id,raw,persons){
     if(raw.choiceId==='tv'){
       if(raw.targetInstanceId!==undefined&&!validFurnitureInstanceId(raw.targetInstanceId))
         return null;
+      if(raw.sportsMatchId!==undefined&&(
+        typeof raw.sportsMatchId!=='string'||
+        !/^(?:[a-z0-9-]+:)?\d+-\d+-\d+$/.test(raw.sportsMatchId)))return null;
       return {type,targetId,mode:'leisure',choiceId:'tv',
-        targetInstanceId:raw.targetInstanceId||'home-tv-1'};
+        targetInstanceId:raw.targetInstanceId||'home-tv-1',
+        ...(raw.sportsMatchId?{sportsMatchId:raw.sportsMatchId}:{})};
     }
     if(['books','music'].includes(raw.choiceId)){
       if(raw.targetInstanceId!==undefined&&(

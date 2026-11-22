@@ -55,6 +55,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   onSelectSportsClub=()=>({ok:false,reason:'unavailable'}),
   onReadSportsNews=()=>({ok:false,reason:'unavailable'}),
   onWatchSportsMatch=()=>({ok:false,reason:'unavailable'}),
+  onInviteSportsMatch=()=>({ok:false,reason:'unavailable'}),
   selectResident=()=>false,beforeOpen=()=>{},canOpen=()=>true}){
   const overlay=element('section','career-phone-overlay');
   overlay.id='career-phone-panel';overlay.hidden=true;
@@ -1237,7 +1238,19 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
         if(result.ok)close({focus:false});else render();
       },'career-phone-primary sports-watch-match');
       watch.disabled=!model.watch;
-      card.append(watch);body.append(card);
+      card.append(watch);
+      const invite=action('👥 Пригласить смотреть матч вместе',()=>{
+        const live=personRoot();if(!live)return;
+        const current=sportsPhoneView(live,who);
+        if(!current?.watch){notify('Матч или телевизор недоступны');render();return;}
+        const result=onInviteSportsMatch(who,current.watch.tvId,current.watch.matchId);
+        notify(result.ok?'👥 Совместный просмотр добавлен в очередь':
+          'Нельзя пригласить сейчас: проверь работу, действия и телевизор');
+        if(result.ok)close({focus:false});else render();
+      },'career-phone-secondary sports-watch-together');
+      invite.disabled=!model.watch;
+      card.append(invite);
+      body.append(card);
     }
     if(model.unread.length){
       const card=element('section','career-phone-card sports-phone-news');
@@ -1309,6 +1322,14 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
         grid.append(button);
       }
       card.append(grid);
+      if(model.sharedMemories.length){
+        const past=element('section','sports-phone-shared-memories');
+        past.append(element('strong',null,'👥 Совместные просмотры'));
+        for(const memory of model.sharedMemories.slice(0,3))
+          past.append(element('small',null,'⚽ '+memory.matchTitle+
+            ' · вместе '+memory.watchedMinutes+' игровых мин.'));
+        card.append(past);
+      }
       if(model.nextFavorite){
         const m=model.nextFavorite;
         card.append(element('small',null,

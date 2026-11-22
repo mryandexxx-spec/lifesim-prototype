@@ -54,5 +54,12 @@ export function sportsPhoneView(root,id){
   upcoming,results,unread,
   nextFavorite:nextFavorite?formatMatch(nextFavorite):null,
   seasonHistory:Array.isArray(root.sportsWorld.history)
-   ?root.sportsWorld.history.slice(-3).reverse():[]};
+   ?root.sportsWorld.history.slice(-3).reverse():[],
+  sharedMemories:(root.sportsSharedWatch?.memories||[]).slice(-8).reverse()
+    .map(r=>({matchId:r.matchId,at:r.at,
+      matchTitle:byId.has(r.matchId)
+        ?sportsTeam(byId.get(r.matchId).home)?.short+' — '+
+         sportsTeam(byId.get(r.matchId).away)?.short
+        :'Матч прошлого сезона',
+      watchedMinutes:Math.round(r.watchedMinutes)}))};
 }

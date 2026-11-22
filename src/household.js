@@ -23,6 +23,7 @@ import {newPhoneCalls,restorePhoneCalls,progressPhoneCalls} from './phone-calls.
 import {newSportsWorld,restoreSportsWorld,advanceSportsWorld,sportsFixtures} from './sports-league.js';
 import {newSportsFan,restoreSportsFan,readSportsNews} from './sports-fandom.js';
 import {sportsAutoIntent} from './sports-autonomy.js';
+import {newSportsSharedWatch,restoreSportsSharedWatch,observeSharedSportsWatch} from './sports-shared-watch.js';
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
@@ -131,6 +132,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.socialAction=null;
   state.phoneCalls=newPhoneCalls();
   state.sportsWorld=newSportsWorld(state);
+  state.sportsSharedWatch=newSportsSharedWatch();
   state.sportsFan=newSportsFan();
   state.otherSim.sportsFan=newSportsFan();
   applyWorkMoodContext(state);
@@ -387,6 +389,8 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   if(!raw.socialGraph||!Object.hasOwn(raw.socialGraph,'lifeStages'))
     for(const id of HOUSEHOLD_IDS)setLifeStage(root.socialGraph,id,'adult');
   root.socialAction=loadSocialAction(raw.socialAction,root);
+  // R2-C optional saved v1 co-watch receipt: after physical social restoration.
+  root.sportsSharedWatch=restoreSportsSharedWatch(raw.sportsSharedWatch,root);
   // F4D: reject ambiguous/corrupt saved double-seat reservations before
   // either sim can resume the physical sitting action.
   const occupiedChairs=new Set();
@@ -1054,6 +1058,9 @@ export function tickHousehold(root,minutes) {
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
   const pairMinutes=paired?Math.min(minutes,Math.max(0,
     sharedDuration(root.socialAction.shared)-root.socialAction.elapsed)):0;
+  // Only consenting, separated, arrived residents viewing a real live football
+  // game can leave a bounded memory; no second Fun/Social/pay receipt.
+  observeSharedSportsWatch(root,watchMinutes);
   // Toggle after the real A* arrival, never when walking/queued/paused.
   // Capture state before tick completion so short actions cannot miss it.
   switchLampAtArrival(root.world,root);
