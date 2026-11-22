@@ -37,6 +37,8 @@ test('CAS-01.1 directory preserves original actors and exposes independent propo
   actor3.needs.hunger=9;
   assert.equal(actor4.needs.hunger,82);
   assert.deepEqual(clone(root),before,'read-only directory must not mutate saved household');
+  const later=createResidentDirectory(root,[{id:'resident_10',actor:newGame()}]);
+  assert.deepEqual(later.ids,['alex','mira','resident_10']);
   assert.equal(Object.hasOwn(root,'population'),false,
     'extra identities here are a test seam, not live saved residents');
 });
@@ -50,6 +52,7 @@ test('CAS-01.1 rejects a fifth member, reserved ID, duplicate and invalid additi
     [{id:'mira',actor:fresh()}],
     [{id:'resident_3',actor:fresh()},{id:'resident_3',actor:fresh()}],
     [{id:'bad id',actor:fresh()}],
+    [{id:'resident_03',actor:fresh()}],
     [{id:'resident_3',actor:null}],
     [{id:'resident_3',actor:{version:100}}]
   ])assert.throws(()=>createResidentDirectory(root,entries),/Invalid|duplicate|limit/);
