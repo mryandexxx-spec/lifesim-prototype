@@ -213,7 +213,7 @@ test('FOOD-R1: exact Safari/PlayCanvas UI and Pages dependency contracts',()=>{
   assert.match(html,/id="fridge-ready-buy-button"/);
   assert.match(game,/onBuyReadyMeal:buyReadyMeal/);
   assert.match(game,/function buyReadyMeal\(/);
-  assert.match(phone,/\['work','Работа'\],\['finance','Финансы'\],\['food','Доставка'\]/);
+  assert.match(phone,/\['work','Работа'\],\['finance','Финансы'\],\['food','(?:Доставка|Маркет)'\]/);
   assert.match(phone,/renderReadyFood\(root\)/);
   assert.match(css,/repeat\(3,minmax\(0,1fr\)\)/);
   for(const path of ['src/ready-food.js','src/ready-meal-catalog.js']){

@@ -20,6 +20,7 @@ import {currentSkillLevel} from './skills-engine.js';
 import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
 import {settlePantryDeliveries} from './kitchen-market.js';
+import {newHomeMarket,restoreHomeMarket,settleHomeDeliveries} from './marketplace-home.js';
 import {newPhoneCalls,restorePhoneCalls,progressPhoneCalls} from './phone-calls.js';
 import {newSportsWorld,restoreSportsWorld,advanceSportsWorld,sportsFixtures} from './sports-league.js';
 import {newSportsFan,restoreSportsFan,readSportsNews} from './sports-fandom.js';
@@ -124,6 +125,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   // F2.1 optional root-v1 extension. Old households get test credits only once.
   state.shop=newFurnitureShop();
   state.financialHistory=newFinancialHistory();
+  state.homeMarket=newHomeMarket();
   state.gardenRewards=restoreGardenRewards(null);
   state.gardenRoutine=restoreGardenRoutine(null,state.minutes);
   state.poolAutoRoutine=restorePoolAutoRoutine(null,state.minutes);
@@ -161,6 +163,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.kitchen=restoreKitchen(raw.kitchen);
   root.shop=restoreFurnitureShop(raw.shop);
   root.financialHistory=restoreFinancialHistory(raw.financialHistory);
+  root.homeMarket=restoreHomeMarket(raw.homeMarket);
   root.gardenRewards=restoreGardenRewards(raw.gardenRewards);
   root.gardenRoutine=restoreGardenRoutine(raw.gardenRoutine,root.minutes);
   root.gardenMilestones=restoreGardenMilestones(raw.gardenMilestones,root.minutes);
@@ -1177,6 +1180,7 @@ export function tickHousehold(root,minutes) {
   // This changes canonical stock, not an actor's A* or manual FIFO action.
   settleReadyMealDeliveries(root);
   settlePantryDeliveries(root);
+  settleHomeDeliveries(root);
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),completed=readyPaint[id];
     if(completed&&!actor.action&&actor.activitySession===completed.session){
