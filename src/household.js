@@ -219,7 +219,9 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         a.gardenPlantedAt!==root.world.outdoors.gardens[a.targetInstanceId]?.plantedAt))sim.action=null;
     }
     if(sim.action&&sim.action.id!=='move'&&sim.action.id!=='bench'&&
-      sim.action.id!=='garden'&&sim.action.id!=='swim'&&sim.action.id!=='grill'){
+      sim.action.id!=='garden'&&sim.action.id!=='swim'&&sim.action.id!=='grill'&&
+      !(sim.action.id==='dining'&&root.world.outdoors.features.some(x=>
+        x.itemId==='garden.table'&&x.instanceId===sim.action.targetInstanceId))){
       const object=resolveActionFurniture(root.world,sim.action.id,sim.action.targetInstanceId);
       if(object)sim.action.targetInstanceId=object.instanceId;
       else sim.action=null; // no phantom action or silent rerouting to another item
