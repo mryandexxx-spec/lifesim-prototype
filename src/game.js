@@ -86,6 +86,7 @@ import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock,
   quoteCookingRecipe,proposePantryDelivery} from './kitchen-market.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal,proposeReadyMealPurchase} from './ready-food.js';
+import {proposeHomeDelivery} from './marketplace-home.js';
 import {dirtyDishVisualPlan,DISH_VISUAL_CAP} from './dirty-dishes-visual.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
@@ -550,6 +551,24 @@ function buyPantryDelivery(ingredientId,actorId=game.selectedSim){
     updateFamilyBalance();
     return tx;
   }finally{pantryPurchaseLocked=false;}
+}
+// STAVKA-R2: phone furniture purchases are paid once, then delivered into
+// existing owned warehouse via simulation; never directly placed in the room.
+let homeDeliveryPurchaseLocked=false;
+function buyHomeDelivery(itemId,actorId=game.selectedSim){
+  if(homeDeliveryPurchaseLocked)return {ok:false,reason:'purchase-busy'};
+  homeDeliveryPurchaseLocked=true;
+  try{
+    const tx=proposeHomeDelivery(game,itemId,actorId);
+    if(!tx.ok)return tx;
+    const old={homeMarket:game.homeMarket,shop:game.shop,
+      financialHistory:game.financialHistory};
+    game.homeMarket=tx.homeMarket;game.shop=tx.shop;
+    game.financialHistory=tx.financialHistory;
+    if(!save(true)){Object.assign(game,old);return {ok:false,reason:'save-failed'};}
+    updateFamilyBalance();
+    return tx;
+  }finally{homeDeliveryPurchaseLocked=false;}
 }
 // Fix the epoch at first migration, not on some later autosave after a phone date change.
 // Save date/bill migrations only after graphics startup succeeds, never on a failed boot.
@@ -2249,6 +2268,7 @@ const careerPhone=createCareerPhoneUI({
   save,notify:toast,onFundsChanged:updateFamilyBalance,
   onBuyReadyMeal:buyReadyMeal,
   onBuyPantryDelivery:buyPantryDelivery,
+  onBuyHomeDelivery:buyHomeDelivery,
   onStartCall:(from,to)=>{
     const previous=structuredClone(game.phoneCalls);
     const result=startPhoneCall(game,from,to);
