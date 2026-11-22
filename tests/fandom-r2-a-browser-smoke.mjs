@@ -58,7 +58,7 @@ try{
     const after=JSON.parse(await page.evaluate(k=>localStorage.getItem(k),SAVE_KEY));
     assert.equal(after.version,1);
     assert.equal(after.needs.fun,before.needs.fun,'no immediate remote phone Fun reward');
-    assert.equal(after.action?.id,'tv',false);
+    assert.notEqual(after.action?.id,'tv','phone stream must not forge physical TV use');
     assert.deepEqual(after.sportsWorld.results,before.sportsWorld.results);
     assert.deepEqual(errors,[],'browser errors at '+width+'x'+height);
     await page.screenshot({path:'artifacts/fandom-r2-a/mobile-'+width+'.png'});
