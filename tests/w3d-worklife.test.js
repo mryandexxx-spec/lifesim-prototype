@@ -102,7 +102,7 @@ test('W3-D: emotional caps apply only to work and preserve strong personal sadne
 test('W3-D: real manual action warning exactly once; still valid after restore',()=>{
   const {root,shift}=prepared();
   root.minutes=shift.start-14;root.otherSim.minutes=root.minutes;
-  root.action={id:'sofa',phase:'using',elapsed:5,automatic:false};
+  root.action={id:'cook',phase:'using',elapsed:5,automatic:false};
   progressCareerWork(root,shift.start-61,root.minutes);
   assert.ok(workLifeConflict(root,'alex'));
   assert.equal(root.careerSystem.byResident.alex.workLife.conflictNotifiedShiftId,
@@ -114,18 +114,18 @@ test('W3-D: real manual action warning exactly once; still valid after restore',
 test('W3-D: finish preserves action; leave cancels only active one, not FIFO',()=>{
   const {root,shift}=prepared();
   root.minutes=shift.start-12;root.otherSim.minutes=root.minutes;
-  root.action={id:'sofa',phase:'using',elapsed:5,automatic:false};
+  root.action={id:'cook',phase:'using',elapsed:5,automatic:false};
   root.actionQueues.byResident.alex=[{type:'object',actionId:'fridge'}];
   progressCareerWork(root,shift.start-61,root.minutes);
   const finished=resolveWorkLifeConflict(root,'alex','finish');
   assert.equal(finished.ok,true);
-  assert.equal(root.action.id,'sofa');
+  assert.equal(root.action.id,'cook');
   assert.equal(root.actionQueues.byResident.alex.length,1);
   assert.equal(resolveWorkLifeConflict(root,'alex','finish').ok,false);
   // Fresh scenario permits explicit leave with no silently erased FIFO.
   const second=prepared(),r=second.root;
   r.minutes=second.shift.start-12;r.otherSim.minutes=r.minutes;
-  r.action={id:'sofa',phase:'using',elapsed:5,automatic:false};
+  r.action={id:'cook',phase:'using',elapsed:5,automatic:false};
   r.actionQueues.byResident.alex=[{type:'object',actionId:'fridge'}];
   progressCareerWork(r,second.shift.start-61,r.minutes);
   assert.equal(resolveWorkLifeConflict(r,'alex','leave').ok,true);
@@ -136,21 +136,22 @@ test('W3-D: finish preserves action; leave cancels only active one, not FIFO',()
 test('W3-D: legal unpaid time off only before shift; no work-life regret',()=>{
   const {root,shift}=prepared();
   root.minutes=shift.start-10;root.otherSim.minutes=root.minutes;
-  root.action={id:'sofa',phase:'using',elapsed:0,automatic:false};
+  root.action={id:'cook',phase:'using',elapsed:0,automatic:false};
   progressCareerWork(root,shift.start-61,root.minutes);
   const outcome=resolveWorkLifeConflict(root,'alex','timeoff');
   assert.equal(outcome.ok,true);
   assert.equal(root.careerSystem.byResident.alex.timeOff.bookings.at(-1).type,'unpaid');
   assert.equal(root.mind.memories.length,0);
-  assert.equal(root.action.id,'sofa');
+  assert.equal(root.action.id,'cook');
 });
 test('W3-D: real manually interrupted shared leisure gives two memories, never affinity',()=>{
   const {root,shift}=prepared();
   root.minutes=shift.start-8;root.otherSim.minutes=root.minutes;
-  progressCareerWork(root,shift.start-61,root.minutes);
+  // A genuine ongoing shared session is not automatically interrupted for work.
   root.socialAction={kind:'talk',initiator:'alex',partner:'mira',
     phase:'using',elapsed:5,automatic:false,
     shared:{mode:'leisure',choiceId:'tv',tvConsent:true}};
+  progressCareerWork(root,shift.start-61,root.minutes);
   const relation=root.relationship.affinity;
   const result=resolveWorkLifeConflict(root,'alex','leave');
   assert.equal(result.ok,true);
@@ -163,7 +164,10 @@ test('W3-D: real manually interrupted shared leisure gives two memories, never a
 test('W3-D: queued invite is not a family interruption; idle worker no conflict',()=>{
   const {root,shift}=prepared();
   root.minutes=shift.start-8;root.otherSim.minutes=root.minutes;
+  root.action={id:'cook',phase:'using',elapsed:5,automatic:false};
   progressCareerWork(root,shift.start-61,root.minutes);
+  // A finished/cancelled important task no longer creates a family conflict.
+  root.action=null;
   assert.equal(workLifeConflict(root,'alex'),null);
   root.socialAction={kind:'talk',initiator:'alex',partner:'mira',
     phase:'walking',elapsed:0,automatic:false,
