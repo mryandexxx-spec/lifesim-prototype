@@ -11,4 +11,14 @@ export const SPORTS_TEAMS=Object.freeze([
   Object.freeze({id:'moon-foxes',name:'Лунные Лисы',short:'Лисы',color:'#8C72BA',style:'counter',strength:53}),
   Object.freeze({id:'steppe-sails',name:'Степные Паруса',short:'Паруса',color:'#369A9F',style:'passing',strength:49})
 ]);
-export const sportsTeam=id=>SPORTS_TEAMS.find(t=>t.id===id)||null;
+/** R2: declared independent leagues; more can be registered without rewriting the
+ * currently saved single-league schema. There is deliberately only one active
+ * league until the owner approves additional content and save migration.
+ */
+export const SPORTS_LEAGUES=Object.freeze([
+  Object.freeze({id:SPORTS_LEAGUE_ID,name:'Лига Блин’С',sport:'football',
+    teams:SPORTS_TEAMS,duration:SPORTS_DURATION,legacyFixtureIds:true})
+]);
+export const sportsLeague=id=>SPORTS_LEAGUES.find(league=>league.id===id)||null;
+export const sportsTeam=(id,leagueId=SPORTS_LEAGUE_ID)=>
+  (sportsLeague(leagueId)?.teams||[]).find(team=>team.id===id)||null;

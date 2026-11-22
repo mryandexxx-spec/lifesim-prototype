@@ -3,7 +3,7 @@
  */
 import {SPORTS_TEAMS,sportsTeam} from './sports-catalog.js';
 import {sportsFixtures,matchAt,standings} from './sports-league.js';
-import {sportsWatchOpportunity} from './sports-tv.js';
+import {sportsWatchOpportunity,sportsBroadcastFrame} from './sports-tv.js';
 import {calendarAt} from './calendar-core.js';
 const names={alex:'Алекс',mira:'Мира'};
 const formatTime=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
@@ -40,6 +40,7 @@ export function sportsPhoneView(root,id){
   color:sportsTeam(x.teamId)?.color||'#999'}));
  const nextFavorite=club?fixtures.find(m=>m.kickoff>now&&[m.home,m.away].includes(club)):null;
  return {seasonId:root.sportsWorld.seasonId,teams:SPORTS_TEAMS,
+  rounds:(SPORTS_TEAMS.length-1)*2,broadcast:sportsBroadcastFrame(root),
   selectedResident:id,residentName:names[id],favoriteTeamId:club,
   favorite:club?sportsTeam(club):null,
   fanIntensity:fan?.fanIntensity??0,

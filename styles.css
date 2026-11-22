@@ -2591,3 +2591,15 @@ button.time-card:active {transform:translateY(1px);}
  .sports-phone-clubs{gap:5px}
  .career-phone-body .sports-phone-team{font-size:11px;padding:6px 4px}
 }
+
+/* FANDOM-R2-A: one original Canvas2D TV/phone feed, no new 3D renderer. */
+.sports-phone-stream{gap:9px}
+.sports-phone-stream-canvas{display:block;width:100%;height:auto;max-width:512px;
+  aspect-ratio:512/312;border:2px solid #436c58;border-radius:12px;background:#102923}
+.sports-phone-stream-status{font-size:12px;font-weight:800;color:#28553f}
+.career-phone-body .sports-watch-mobile{min-height:44px;max-width:100%}
+.sports-phone-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:360px){
+  .career-phone-body .sports-phone-tab{font-size:10px;padding:6px 1px}
+  .sports-phone-stream-status{font-size:11px}
+}
