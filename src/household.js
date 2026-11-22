@@ -809,6 +809,14 @@ export function preemptAutomaticForManual(root,residentId){
 export function setHouseholdAutonomy(root,enabled) {
   setAutonomyEnabled(root,enabled);
   if (root.otherSim) setAutonomyEnabled(root.otherSim,enabled);
+  for(const id of residentIdsForSimulation(root).slice(2)){
+    const actor=savedAdditionalActor(root,id);
+    if(!actor)continue;
+    actor.autonomy.enabled=root.autonomy.enabled;
+    if(!root.autonomy.enabled&&actor.action?.automatic){
+      actor.action=null;actor.event='Ждёт указаний';
+    }
+  }
   if(!root.autonomy.enabled&&root.socialAction?.automatic)cancelSocial(root);
   return root.autonomy.enabled;
 }
