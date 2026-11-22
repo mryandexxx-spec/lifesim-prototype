@@ -40,13 +40,13 @@ function first(state){
   return shift.incident;
 }
 
-test('all six careers own three distinct original workplace scenarios with stable IDs and choices',()=>{
+test('all six careers preserve three original workplace scenarios and add two rank-aware stories',()=>{
   assert.deepEqual(Object.keys(WORK_INCIDENT_CATALOG).sort(),
     CAREER_CATALOG.map(c=>c.id).sort());
   const ids=new Set(),titles=new Set();
   for(const career of CAREER_CATALOG){
     const scenes=WORK_INCIDENT_CATALOG[career.id];
-    assert.equal(scenes.length,3);
+    assert.equal(scenes.length,7);
     assert.equal(scenes[0].title,WORK_INCIDENTS[career.id].title);
     assert.deepEqual(scenes[0].options,WORK_INCIDENTS[career.id].options);
     for(const scene of scenes){
@@ -63,7 +63,7 @@ test('all six careers own three distinct original workplace scenarios with stabl
       }
     }
   }
-  assert.equal(ids.size,18);
+  assert.equal(ids.size,42);
 });
 test('first situation retains W1-B.3b.2 behavior, later shifts differ without immediate repeats',()=>{
   for(const career of CAREER_CATALOG){
