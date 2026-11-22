@@ -63,6 +63,18 @@ export function pinchCamera(view,previousDistance,nextDistance){
   return {...view,distance:clamp(view.distance*previousDistance/nextDistance,
     panBounds.minDistance,panBounds.maxDistance)};
 }
+/** Transient cinematic recenter, isolated from orbit/zoom and game saves. */
+export function stepCameraFocus(view,target,seconds,rate=4.8){
+  if(!view||!Number.isFinite(view.centerX)||!Number.isFinite(view.centerZ)||
+    !Number.isFinite(target?.x)||!Number.isFinite(target?.z)||
+    !Number.isFinite(seconds)||seconds<=0)return view;
+  const w=1-Math.exp(-Math.max(.1,rate)*Math.min(seconds,.12));
+  return {...view,
+    centerX:clamp(view.centerX+(clamp(target.x,panBounds.minX,panBounds.maxX)-view.centerX)*w,
+      panBounds.minX,panBounds.maxX),
+    centerZ:clamp(view.centerZ+(clamp(target.z,panBounds.minZ,panBounds.maxZ)-view.centerZ)*w,
+      panBounds.minZ,panBounds.maxZ)};
+}
 export function wheelCamera(view,dy){
   if(!valid(dy))return {...view};
   return {...view,distance:clamp(view.distance+dy*.012,

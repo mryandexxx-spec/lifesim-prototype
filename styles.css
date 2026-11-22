@@ -2452,3 +2452,12 @@ button.time-card:active {transform:translateY(1px);}
 
 /* CHARISMA-R1: Safari thumb target beside the existing mirror action. */
 #mirror-speech-button{min-height:44px;touch-action:manipulation;}
+
+/* MICRO-UX-R1: no GPU particles, no interaction capture, reduced-motion safe. */
+.sleep-zzz{position:absolute;z-index:18;pointer-events:none;user-select:none;
+  transform:translate(-50%,-100%);color:#f5faff;font-weight:850;font-size:19px;
+  letter-spacing:.09em;text-shadow:0 2px 4px #24315c,0 0 10px #354d9f;
+  animation:micro-sleep-breathe 2.2s ease-in-out infinite}
+.sleep-zzz[hidden]{display:none}
+@keyframes micro-sleep-breathe{0%,100%{opacity:.65}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.sleep-zzz{animation:none}}

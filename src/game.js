@@ -9,8 +9,9 @@ import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {characterCardSnapshot,oncePerButton} from './ux05-character-ui.js';
 import {createLoadingProgress} from './loading-progress.js';
 import {registerModelCache} from './model-cache.js';
-import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds} from './camera-controls.js';
+import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds,stepCameraFocus} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
+import {sleepZzzVisible,dismissOnCanvasTap} from './micro-ux.js';
 import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './viewport-health.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
@@ -419,6 +420,7 @@ const META = {
     icon:'♫',anchor:[0,1.1,0]}
 };
 
+let focusSelectedCamera=()=>false; // Bound once to the live PlayCanvas camera in boot.
 let updatePhoneProps=()=>{}; // Cosmetic phone mesh is bound when the 3D rigs exist.
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
 let buildMode=false; // F5-A separate pause-on-editor; house geometry persists, UI mode does not.
@@ -2123,7 +2125,7 @@ function updateResidentPicker() {
 for (const id of HOUSEHOLD_IDS) {
   $('pick-'+id).addEventListener('click',()=>{
     careerPhone.close({focus:false});setHomeOpen(false);setViewOpen(false);
-    selectResident(game,id);mindInspectResident=id;closeInsightPanel();
+    selectResident(game,id);mindInspectResident=id;focusSelectedCamera(id);closeInsightPanel();
     conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
     socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
     select(null); closeMindPanel();queueInspectResident=id; updateResidentPicker();renderSocialContext();
@@ -2133,6 +2135,11 @@ for (const id of HOUSEHOLD_IDS) {
   });
 }
 updateResidentPicker();
+// Tap the HUD name for focus; the containing mind button keeps its original behavior.
+$('resident-name').addEventListener('click',event=>{
+  event.preventDefault();event.stopPropagation();
+  focusSelectedCamera(game.selectedSim);
+});
 // W1-B.3a: the existing phone now shows live shift presence, pay and attendance.
 const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
@@ -3841,6 +3848,7 @@ function boot() {
   const reactionBadges=createReactionBadges($('reaction-layer'));
   const reactionRigs={alex:alexRig,mira:miraRig};
   const moodOrbit=$('mood-orbit');
+  const sleepZzz=Object.fromEntries(HOUSEHOLD_IDS.map(id=>[id,$('sleep-zzz-'+id)]));
   let feedbackRoot=game;
   // Water drops are local to the physical shower, including all quarter turns.
   const showerOrigin=ORIGINAL_FURNITURE.find(i=>i.prefabId==='shower');
@@ -4520,9 +4528,21 @@ function boot() {
     camera.lookAt(cameraTarget);
   }
   function setView(next){Object.assign(view,next);cameraUpdate();}
+  let cameraFocus=null;
+  focusSelectedCamera=id=>{
+    if(!HOUSEHOLD_IDS.includes(id)||buildMode||furnishMode||outdoorMode)return false;
+    if(residentAwayAtWork(game,id)){
+      toast(getActorName(id)+' сейчас на работе — камера осталась на участке');
+      return false;
+    }
+    const point=getActor(game,id)?.position;
+    if(!Number.isFinite(point?.x)||!Number.isFinite(point?.z))return false;
+    cameraFocus={id,remaining:1.35};
+    return true;
+  };
   cameraUpdate();
   $('reset-camera-btn').addEventListener('click',()=>{
-    setView(CAMERA_INITIAL);
+    cameraFocus=null;setView(CAMERA_INITIAL);
     // Camera reset must not teleport a pending shop object.
     toast('Камера сброшена');
   });
@@ -7011,6 +7031,16 @@ function boot() {
     confirmWorldOffer(groundWalkOffer,groundWalkOffer?.command));
   canvas.addEventListener('pointerdown',closeGroundWalkMenu);
   $('ground-walk-close').addEventListener('click',closeGroundWalkMenu);
+  // Click follows a confirmed tap; swipes, pinches and long holds do not click.
+  document.addEventListener('click',event=>{
+    if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||
+      shiftSummary.isOpen()||furnishMode||buildMode||outdoorMode)return;
+    if(event.target?.closest?.(
+      '#game-canvas, #action-sheet, #social-context, #ground-walk-menu, #hotspots'))return;
+    if(selected!==null||socialContextVisible||!groundWalkPanel.hidden){
+      closeGroundWalkMenu();closeSocialContext();select(null);
+    }
+  });
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&!groundWalkPanel.hidden){
       event.preventDefault();closeGroundWalkMenu();
@@ -7071,6 +7101,7 @@ function boot() {
   },true);
 
   canvas.addEventListener('pointerdown',event=>{
+    cameraFocus=null;
     viewportHealth.markInput(performance.now());
     if(event.pointerType==='mouse'&&event.button!==0)return;
     if(dialogueNeedsDecision(game))return;
@@ -7235,6 +7266,7 @@ function boot() {
       }
     }
     if(result.changed){
+      cameraFocus=null;
       if(event.cancelable)event.preventDefault();
       // Two-finger orbit/pinch never teleports a shop item.
       setView(result.view);
@@ -7444,6 +7476,7 @@ function boot() {
     if(furnishMode&&holdGesture.pointerId===event.pointerId)
       cancelPendingGrab();
     const pos=cameraGesture.end(gesturePoint(event),performance.now());
+    const hadOptionalMenu=selected!==null||socialContextVisible||!groundWalkPanel.hidden;
     shopSwipeRawPose=null; // next gesture starts from last snapped object pose
     ownedSwipeRawPose=null;
     if(!pos||dialogueNeedsDecision(game))return;
@@ -7493,6 +7526,8 @@ function boot() {
     }
     else{
       closeSocialContext();select(null);
+      if(dismissOnCanvasTap({tap:true,target:'empty',modal:false,
+        editing:false,menuOpen:hadOptionalMenu}))return;
       const {near,far}=furnitureRay(pos);
       const ground=lotRaySurface(near,far,game.world);
       if(!ground)return; // Sky / off-lot: do not manufacture movement.
@@ -7540,7 +7575,7 @@ function boot() {
     shopSwipeRawPose=null;
   });
   canvas.addEventListener('wheel',event=>{
-    event.preventDefault();
+    cameraFocus=null;event.preventDefault();
     setView(wheelCamera(view,event.deltaY));
   },{passive:false});
   canvas.addEventListener('contextmenu',event=>event.preventDefault());
@@ -7551,6 +7586,20 @@ function boot() {
   app.on('update',dt=>{
     viewportHealth.markUpdate(performance.now());
     dt=Math.min(dt,.06);
+    if(cameraFocus){
+      if(buildMode||furnishMode||outdoorMode||cameraGesture.count()||
+        residentAwayAtWork(game,cameraFocus.id))cameraFocus=null;
+      else{
+        const actor=getActor(game,cameraFocus.id);
+        if(!Number.isFinite(actor?.position?.x)||!Number.isFinite(actor?.position?.z))
+          cameraFocus=null;
+        else{
+          setView(stepCameraFocus(view,actor.position,dt));
+          cameraFocus.remaining-=dt;
+          if(cameraFocus.remaining<=0)cameraFocus=null;
+        }
+      }
+    }
     // Cosmetic 0.3s phone raise/reveal; never affects animation controller or clock.
     for(const [id,phone] of Object.entries(phoneMeshes))if(phone.enabled&&phoneReveal[id]<1){
       phoneReveal[id]=Math.min(1,phoneReveal[id]+dt*3.8);
@@ -8854,6 +8903,24 @@ function boot() {
         mira:!showerStates.mira.active&&!toiletStates.mira.active}});
     // A persistent ORIGINAL orbit belongs only to the selected resident;
     // social response icons take priority, and privacy must not leak position.
+    // Two lightweight screen-space glyphs follow the existing animated head.
+    for(const id of HOUSEHOLD_IDS){
+      const el=sleepZzz[id],actor=getActor(game,id);
+      const rig=reactionRigs[id],head=rig?.head||rig?.avatar;
+      const shown=sleepZzzVisible(actor,residentAwayAtWork(game,id)||
+        furnishMode||buildMode||outdoorMode||showerStates[id]?.active||
+        toiletStates[id]?.active);
+      if(!shown||!head?.getPosition){el.hidden=true;continue;}
+      const p=head.getPosition(),hasHead=Boolean(rig?.head?.getPosition);
+      const point=new pc.Vec3(p.x,p.y+(hasHead?.56:2.20),p.z);
+      const position=camera.camera.worldToScreen(point);
+      const behind=camera.camera.viewMatrix.transformPoint(point).z>=0;
+      const visible=!behind&&position.x>=15&&position.x<=canvas.clientWidth-15&&
+        position.y>=45&&position.y<=canvas.clientHeight-95;
+      el.hidden=!visible;
+      if(visible){el.style.left=position.x+'px';el.style.top=position.y+'px';}
+      el.style.animationPlayState=game.paused?'paused':'running';
+    }
     const orbitRig=reactionRigs[game.selectedSim];
     const orbitHead=orbitRig?.head||orbitRig?.avatar;
     if(!orbitHead?.getPosition||showerStates[game.selectedSim]?.active||
