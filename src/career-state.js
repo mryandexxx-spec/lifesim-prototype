@@ -22,14 +22,16 @@ function cleanWorkShift(raw,contract){
   if(!Number.isSafeInteger(start)||start<contract.hiredAt||start<0||
     !Number.isSafeInteger(end)||end-start<60||end-start>720||
     id!==contract.employmentId+'@'+Math.floor(start/1440)+'@'+start||
-    !['pending','departing','working','returning'].includes(phase)||
+    !['pending','departing','waiting','working','returning'].includes(phase)||
     raw.employmentId!==contract.employmentId||
     raw.careerId!==contract.careerId||hourlyCredits!==expectedRate||
     (['working','returning'].includes(phase)&&
-      (!validTime(departedAt)||departedAt<start||departedAt>end)))return null;
+      (!validTime(departedAt)||departedAt<start||departedAt>end))||
+    (phase==='waiting'&&(!validTime(departedAt)||departedAt>start||
+      departedAt<start-60)))return null;
   const shift={id,employmentId:contract.employmentId,careerId:contract.careerId,
     start,end,hourlyCredits,phase,warn60:raw.warn60===true,warn15:raw.warn15===true,
-    departedAt:['working','returning'].includes(phase)?departedAt:null,
+    departedAt:['waiting','working','returning'].includes(phase)?departedAt:null,
     readiness:Number.isFinite(raw.readiness)?Math.max(0,Math.min(100,Math.round(raw.readiness))):null};
   shift.workMode=cleanWorkMode(raw.workMode??contract.workMode);
   if(phase==='working'||phase==='returning')shift.workNeeds=restoreWorkNeeds(raw.workNeeds,shift);

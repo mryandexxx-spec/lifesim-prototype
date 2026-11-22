@@ -14,9 +14,11 @@ import {startWorkIncident,automaticWorkIncident} from './career-incidents.js';
 import {recordProfessionalShift} from './career-goals.js';
 import {creditCareerPaidLeave,careerTimeOffForShift,settleCareerTimeOff} from './career-timeoff.js';
 import {WORK_MODES,cleanWorkMode,newWorkNeeds,progressWorkNeeds,workNeedsReport} from './career-work-needs.js';
+import {nearestWalkable,findPath} from './navigation.js';
+import {enqueueAction} from './action-queue.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
-const ACTIVE=new Set(['departing','working','returning']);
+const ACTIVE=new Set(['departing','waiting','working','returning']);
 const CASH_LIMIT=SHOP_MAX_CREDITS;
 const validMinute=n=>Number.isFinite(n)&&n>=0;
 const actorFor=(root,id)=>id==='mira'?root?.otherSim:root;
@@ -28,7 +30,60 @@ export function residentUnavailableForHome(root,id){
   return ACTIVE.has(residentWorkPhase(root,id));
 }
 export function residentAwayAtWork(root,id){
-  return ['working','returning'].includes(residentWorkPhase(root,id));
+  return ['waiting','working','returning'].includes(residentWorkPhase(root,id));
+}
+/** Only the single household clock determines travel time. The route estimate
+ * uses the same pure A* and 1.65 metres/s walking pace as game.js at 1x.
+ * One screen second = three game minutes; keep 15 min of arrival buffer.
+ */
+export function careerDepartureLeadMinutes(root,id){
+  if(!CAREER_RESIDENT_IDS.includes(id))return 60;
+  const actor=actorFor(root,id);
+  if(!actor?.position||!root?.world)return 60;
+  const target=nearestWalkable({x:-.65,z:3.45},root.world);
+  const points=findPath(actor.position,target,root.world);
+  if(!Array.isArray(points))return 60;
+  let distance=0,previous=actor.position;
+  for(const point of points){
+    distance+=Math.hypot(point.x-previous.x,point.z-previous.z);
+    previous=point;
+  }
+  return Math.max(20,Math.min(60,Math.ceil(distance*3/1.65+15)));
+}
+/** Never erase an accepted manual task when a shift is due. Only ordinary,
+ * replayable, non-atomic household tasks can move to the original FIFO tail.
+ * Uninterruptible conversations, cooking and mandatory choices may be late.
+ */
+function deferOrdinaryWorkAction(root,id,actor){
+  const a=actor.action;
+  if(!a||a.automatic)return true;
+  let request=null;
+  if(['bed','sofa','seat','tv','fridge','shower','toilet','mirror','dresser','wardrobe','lamp'].includes(a.id)){
+    request={type:'object',actionId:a.id,
+      ...(a.targetInstanceId?{targetInstanceId:a.targetInstanceId}:{}),
+      ...(a.id==='mirror'&&a.mirrorPractice===true?{mirrorPractice:true}:{}),
+      ...(a.id==='tv'&&a.tvTalk===true?{tvTalk:true}:{})};
+  }else if(['hobby','music','paint'].includes(a.id)&&a.targetInstanceId&&a.activityId){
+    request={type:'activity',activityId:a.activityId,contentId:a.contentId,
+      targetInstanceId:a.targetInstanceId,
+      ...(a.inventoryItemId?{inventoryItemId:a.inventoryItemId}:{})};
+  }else if(a.id==='bench'&&a.targetInstanceId){
+    request={type:'outdoor',instanceId:a.targetInstanceId};
+  }
+  if(!request||!root.actionQueues||!enqueueAction(root.actionQueues,id,request))
+    return false;
+  actor.action=null;
+  actor.activitySession=null;
+  actor.event='Откладывает домашнее дело до возвращения с работы';
+  return true;
+}
+function enterWorkingPhase(root,id,shift){
+  const actor=actorFor(root,id);
+  shift.phase='working';
+  shift.departedAt=shift.start;
+  shift.workMode=cleanWorkMode(shift.workMode);
+  shift.workNeeds=newWorkNeeds(shift.start);
+  if(actor)actor.event='На работе до '+clockAt(shift.end);
 }
 function shiftSnapshot(shift,mode='normal'){
   return {id:shift.id,employmentId:shift.employmentId,careerId:shift.careerId,
@@ -138,6 +193,11 @@ export function progressCareerWork(root,before,after){
         root.careerSystem.settlementIds.includes(planned.id))continue;
       shift=contract.currentShift=shiftSnapshot(planned,contract.workMode);
     }
+    if(shift.phase==='waiting'){
+      if(after<shift.start)continue;
+      enterWorkingPhase(root,id,shift);
+      emit(messages,id,'work-start','начал смену вовремя после раннего прибытия');
+    }
     if(shift.phase==='returning')continue;
     if(shift.phase==='working'){
       if(startWorkIncident(root,id,after)&&after<shift.end)
@@ -175,31 +235,35 @@ export function progressCareerWork(root,before,after){
       disciplineNotices(messages,id,discipline);
       continue;
     }
-    // Waiting for an active MANUAL action is deliberate; never silently delete
-    // player FIFO instructions. Automatic tasks can be interrupted for work.
-    if(shift.phase==='pending'&&after>=shift.start){
-      if(noteWorkLifeConflict(root,id,after))
-        emit(messages,id,'worklife','смена началась во время личного занятия · выбор в смартфоне');
+    // Approved 1A: leave ahead of time and safely defer ordinary personal
+    // actions to the original persistent FIFO. Never cancel an atomic action,
+    // a mandatory choice, or an active social session to fake punctuality.
+    if(shift.phase==='pending'&&after>=shift.start-careerDepartureLeadMinutes(root,id)){
       if(actor.action?.automatic){
         actor.action=null;actor.activitySession=null;
+      }else if(actor.action){
+        deferOrdinaryWorkAction(root,id,actor);
       }
       if(!actor.action&&!root.socialAction){
         shift.phase='departing';
-        actor.event='Собирается на работу';
-        emit(messages,id,'depart','выходит на работу');
-      }else if(before<shift.start){
-        emit(messages,id,'late','рабочая смена началась, заверши домашнее действие, чтобы выйти');
+        actor.event='Идёт к выходу на работу';
+        emit(messages,id,'depart',after<shift.start
+          ?'выходит заранее, чтобы успеть к началу смены':'выходит на работу');
+      }else if(after>=shift.start&&before<shift.start){
+        if(noteWorkLifeConflict(root,id,after))
+          emit(messages,id,'worklife','смена началась во время важного действия · выбор в смартфоне');
+        else emit(messages,id,'late','смена началась, важное действие ещё выполняется');
       }
     }
   }
   return messages;
 }
-/** Explicit departure is usable up to 15 game minutes before scheduled start. */
+/** Manual departure can begin after the T-60 reminder (even earlier than auto departure). */
 export function requestCareerDeparture(root,id,at=root?.minutes){
   const contract=root?.careerSystem?.byResident?.[id],shift=contract?.currentShift;
   const actor=actorFor(root,id);
   if(!shift||shift.phase!=='pending'||!validMinute(at)||
-    at<shift.start-15||at>=shift.end||!actor||actor.action||root.socialAction)
+    at<shift.start-60||at>=shift.end||!actor||actor.action||root.socialAction)
     return {ok:false,reason:'Сначала заверши текущее действие или дождись начала смены'};
   shift.phase='departing';
   actor.event='Идёт к выходу на работу';
@@ -209,13 +273,18 @@ export function arriveCareerPortal(root,id,at=root?.minutes){
   const shift=root?.careerSystem?.byResident?.[id]?.currentShift;
   if(!shift||shift.phase!=='departing'||!validMinute(at))return false;
   if(at>=shift.end)return false;
-  shift.departedAt=Math.max(shift.start,at);
   const actor=actorFor(root,id);
   shift.readiness=careerReadiness(actor);
-  shift.phase='working';
-  shift.workMode=cleanWorkMode(shift.workMode);
-  shift.workNeeds=newWorkNeeds(shift.departedAt);
-  if(actor){actor.action=null;actor.activitySession=null;actor.event='На работе до '+clockAt(shift.end);}
+  if(at<shift.start){
+    shift.departedAt=at;
+    shift.phase='waiting';
+    if(actor){actor.action=null;actor.activitySession=null;
+      actor.event='Прибыл заранее · ждёт начала смены';}
+  }else{
+    enterWorkingPhase(root,id,shift);
+    // Late arrival is the only condition that reduces paid shift minutes.
+    shift.departedAt=at;
+  }
   return true;
 }
 /** Selecting an option never grants an immediate need, skill or performance reward.
@@ -229,6 +298,8 @@ export function selectCareerWorkMode(root,id,mode){
   if(shift?.phase==='working'){
     progressWorkNeeds(root,root.minutes,root.minutes);
     shift.workMode=mode;
+  }else if(shift?.phase==='waiting'){
+    return {ok:false,reason:'Смена ещё не началась'};
   }else if(shift?.phase==='returning'){
     return {ok:false,reason:'Дождись возвращения домой'};
   }else if(shift?.phase==='departing'){
@@ -266,6 +337,9 @@ export function residentWorkStatus(root,id){
   const contract=root?.careerSystem?.byResident?.[id];
   if(!contract)return null;
   const shift=contract.currentShift,at=root.minutes;
+  if(shift?.phase==='waiting')
+    return {phase:'waiting',label:'Ожидает начала смены · '+clockAt(shift.start)+'–'+clockAt(shift.end),
+      start:shift.start,end:shift.end};
   if(shift?.phase==='working'){
     const earned=Math.round(Math.max(0,Math.min(at,shift.end)-shift.departedAt)*
       shift.hourlyCredits/60);
