@@ -33,7 +33,7 @@ export function createResidentDirectory(root,proposed=[]){
   const seenActors=new Set(entries.values());
   for(const item of proposed){
     const id=item?.id,actor=item?.actor;
-    if(!validPersonId(id)||!/^resident_[3-9][0-9]{0,7}$/.test(id)||
+    if(!validPersonId(id)||!/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/.test(id)||
       !isRecord(actor)||actor.version!==1)
       throw new TypeError('Invalid proposed CAS resident');
     if(entries.has(id)||seenActors.has(actor))
