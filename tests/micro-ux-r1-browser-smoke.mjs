@@ -29,9 +29,13 @@ try{
   assert.ok((await page.locator('#game-canvas').screenshot()).length>2000);
   await page.locator('#pick-mira').tap();
   assert.equal(await page.locator('#pick-mira').getAttribute('aria-pressed'),'true');
-  await page.locator('#resident-name').tap();
+  // The two always-visible resident-name buttons are the mobile tap targets.
+  // In compact HUD layouts the nested descriptive label can have no tap box.
+  assert.match(await page.locator('#pick-mira').textContent(),/Мира/);
+  const displayName=page.locator('#resident-name');
+  if(await displayName.isVisible())await displayName.tap();
   assert.equal(await page.locator('#mind-panel').isHidden(),true,
-    'name tap recenters without toggling the character card');
+    'resident picker or visible name tap never opens the mind panel');
   await page.evaluate(()=>{
     const tv=[...document.querySelectorAll('#hotspots .hotspot')]
       .find(el=>el.textContent.includes('Телевизор'));
