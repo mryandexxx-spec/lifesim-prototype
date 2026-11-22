@@ -109,7 +109,8 @@ import {latestEpisodes} from './social-episodes.js';
 import {pairDynamic} from './social-dynamics.js';
 import {romanceStatus,romanceLoveDescription,romanceClimate,romanceAvailability,
   setRomancePreference,romancePreferenceSummary} from './romance.js';
-import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX_ACTION_QUEUE} from './action-queue.js';
+import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX_ACTION_QUEUE,
+  blockedActions,parkQueuedHead,retryBlockedAction,removeBlockedAction} from './action-queue.js';
 import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand} from './queue-rescue.js';
 import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
 import {effectiveSleepSpeed} from './sleep-acceleration.js';
@@ -1605,23 +1606,26 @@ function renderQueuePanel(force=true){
   renderPlanPeek();
   const residentId=queueViewerResident(game.selectedSim,queueInspectResident);
   const pending=pendingActions(game.actionQueues,residentId);
+  const blocked=blockedActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
   const headWait=inspectQueueWait(residentId);
-  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,active,headWait,
+  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,blocked,active,headWait,
     HOUSEHOLD_IDS.map(id=>pendingActions(game.actionQueues,id).length),
     game.socialAction?.phase,
     getActor(game,residentId).action?.phase,
     (game.socialAction?.eveningStage||game.socialAction?.eveningSofa)&&
       game.socialAction.phase==='using'
       ?Math.floor(game.socialAction.elapsed/3):null]);
-  $('queue-toggle').textContent=planButtonLabel(pendingActions(game.actionQueues,game.selectedSim).length);
+  $('queue-toggle').textContent=planButtonLabel(pendingActions(game.actionQueues,game.selectedSim).length)+
+    (blockedActions(game.actionQueues,game.selectedSim).length?' · ⚠':'');
   if(!force&&key===queueDisplayKey)return;
   queueDisplayKey=key;
   $('queue-panel').hidden=!queueVisible;
   $('queue-toggle').setAttribute('aria-expanded',String(queueVisible));
   $('plan-peek').setAttribute('aria-expanded',String(queueVisible));
   if(!queueVisible)return;
-  $('queue-title').textContent='План · '+getActorName(residentId);
+  $('queue-title').textContent='План · '+getActorName(residentId)+
+    (blocked.length?' · отложено: '+blocked.length:'');
   for(const id of HOUSEHOLD_IDS){
     $('queue-'+id).textContent=getActorName(id)+' · '+pendingActions(game.actionQueues,id).length;
     $('queue-'+id).setAttribute('aria-pressed',String(id===residentId));
@@ -1692,7 +1696,39 @@ function renderQueuePanel(force=true){
     });
     li.append(name,remove);list.append(li);
   }
-  $('queue-empty').hidden=pending.length>0;
+  const reasons={
+    'missing-target':'предмет отсутствует или убран',
+    'unreachable-route':'нет маршрута к цели',
+    'invalid-destination':'точка больше не доступна',
+    'unavailable-gift':'подарок или книга отсутствует'
+  };
+  for(const task of blocked){
+    const li=document.createElement('li');
+    const name=document.createElement('span');
+    name.textContent='Отложено · '+taskLabel({...task,residentId})+
+      ' — '+(reasons[task.blockedReason]||'требуется проверка');
+    const retry=document.createElement('button');retry.type='button';
+    retry.textContent='Повторить';
+    retry.setAttribute('aria-label','Вернуть в очередь: '+taskLabel({...task,residentId}));
+    retry.addEventListener('click',()=>{
+      const result=retryBlockedAction(game.actionQueues,residentId,task.seq,game.minutes);
+      if(!result){toast('Очередь заполнена. Убери ненужное задание.');return;}
+      $('queue-feedback').textContent='Задание возвращено в конец плана: '+
+        taskLabel({...result,residentId});
+      renderQueuePanel(true);save(true);
+    });
+    const remove=document.createElement('button');remove.type='button';
+    remove.textContent='Убрать';
+    remove.setAttribute('aria-label','Удалить отложенное: '+taskLabel({...task,residentId}));
+    remove.addEventListener('click',()=>{
+      if(removeBlockedAction(game.actionQueues,residentId,task.seq)){
+        $('queue-feedback').textContent='Отложенное задание удалено по твоей команде';
+        renderQueuePanel(true);save(true);
+      }
+    });
+    li.append(name,retry,remove);list.append(li);
+  }
+  $('queue-empty').hidden=pending.length>0||blocked.length>0;
 }
 $('queue-toggle').addEventListener('click',()=>{
   if(dialogueNeedsDecision(game))return;
@@ -4193,8 +4229,51 @@ function boot() {
         (session.branchAction?.id==='romance.evening'&&
           (session.eveningStage||session.eveningSofa)&&session.partner===residentId));
   };
+  const impossibleQueuedHead=(residentId,task)=>{
+    if(!task)return null;
+    if(task.type==='object'&&task.autoTable!==true&&
+      !resolveActionFurniture(game.world,task.actionId,task.targetInstanceId))
+      return 'missing-target';
+    if(task.type==='activity'){
+      const activity=getActivityDefinition(HOBBY_ACTIVITIES,task.activityId);
+      const kind=activity?.requiredCapabilities.includes('music.playback')?'music':
+        activity?.requiredCapabilities.includes('art.paint')?'paint':'hobby';
+      if(!resolveActionFurniture(game.world,kind,task.targetInstanceId))
+        return 'missing-target';
+      if(task.inventoryItemId&&!inventoryFor(game,residentId).some(x=>
+        x.id===task.inventoryItemId&&x.type==='book'))return 'unavailable-gift';
+    }
+    if(task.type==='shared'&&task.mode==='gift'&&
+      !inventoryFor(game,residentId).some(x=>x.id===task.choiceId))
+      return 'unavailable-gift';
+    if(task.type==='shared'&&task.mode==='leisure'&&
+      ['music','books','tv'].includes(task.choiceId)&&
+      task.targetInstanceId&&!resolveActionFurniture(game.world,
+        task.choiceId==='books'?'hobby':task.choiceId,task.targetInstanceId))
+      return 'missing-target';
+    if(task.type==='outdoor'&&!outdoorBenchApproach(game.world,task.instanceId))
+      return 'missing-target';
+    if(task.type==='move'&&!isWalkable(task.x,task.z,game.world))
+      return 'invalid-destination';
+    return null;
+  };
   dispatchPlannedActions=()=>{
     if(game.paused||dialogueNeedsDecision(game))return [];
+    // Only proven-impossible commands move to a visible, saved review tray.
+    // Busy furniture, another person's plan and temporary work never qualify.
+    let parked=0;
+    for(const id of HOUSEHOLD_IDS){
+      const head=pendingActions(game.actionQueues,id)[0];
+      const reason=impossibleQueuedHead(id,head);
+      if(head&&reason&&parkQueuedHead(game.actionQueues,id,head.seq,reason,game.minutes)){
+        routeRetryAt.delete(head.seq);routeFailures.delete(head.seq);parked++;
+      }
+    }
+    if(parked){
+      const message='Недоступные задания сохранены как отложенные в плане. Остальная очередь продолжит работу.';
+      $('queue-feedback').textContent=message;
+      renderQueuePanel(true);save(true);toast(message);
+    }
     // An unfinished plan can mature before its watering command is reached.
     // Drop obsolete garden instructions without blocking subsequent FIFO tasks.
     let expired=0;
@@ -4336,6 +4415,14 @@ function boot() {
           routeRetryAt.set(command.seq,performance.now()+900);
           const count=(routeFailures.get(command.seq)||0)+1;
           routeFailures.set(command.seq,count);
+          if(count>=5&&parkQueuedHead(game.actionQueues,residentId,command.seq,
+            'unreachable-route',game.minutes)){
+            routeRetryAt.delete(command.seq);routeFailures.delete(command.seq);
+            const notice=getActorName(residentId)+
+              ': путь недоступен; задание сохранено в «Отложено». Остальной план может продолжаться.';
+            $('queue-feedback').textContent=notice;
+            renderQueuePanel(true);save(true);toast(notice);
+          }
           if(count===3){
             const musicBlocked=command.type==='activity'&&[MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID].includes(command.activityId);
             const message=getActorName(residentId)+
