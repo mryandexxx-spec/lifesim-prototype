@@ -26,7 +26,7 @@ const PAY={
   'civic-service':[19,43,85,100,122,134,150,170]
 };
 function employed(root,careerId){
-  root.careerSystem=hireCareer(root.careerSystem,'alex',careerId,root.minutes);
+  root.careerSystem=hireCareer(root.careerSystem,'alex',careerId,root.minutes,{rankSchedules:true});
   return root.careerSystem.byResident.alex;
 }
 function setRank(contract,level){
