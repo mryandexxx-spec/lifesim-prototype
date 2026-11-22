@@ -770,7 +770,7 @@ function scheduleCommand(command,residentId=game.selectedSim){
   renderQueuePanel(true);
   const position=pendingActions(game.actionQueues,residentId)
     .findIndex(entry=>entry.seq===task.seq)+1;
-  const receipt=commandReceipt(getActorName(residentId),
+  const receipt=commandReceipt(residentDisplayName(game,residentId)||getActorName(residentId),
     taskLabel({...task,residentId}),position);
   $('queue-feedback').textContent=receipt;
   const receiptEl=$('queue-receipt');
@@ -9960,7 +9960,7 @@ function boot() {
       if(visible){el.style.left=position.x+'px';el.style.top=position.y+'px';}
       el.style.animationPlayState=game.paused?'paused':'running';
     }
-    const orbitRig=reactionRigs[game.selectedSim];
+    const orbitRig=reactionRigs[activeHudResident()];
     const orbitHead=orbitRig?.head||orbitRig?.avatar;
     if(!orbitHead?.getPosition||showerStates[game.selectedSim]?.active||
        toiletStates[game.selectedSim]?.active||
