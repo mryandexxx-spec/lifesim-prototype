@@ -30,7 +30,7 @@ test('BATCH2-C full-energy natural wake supersedes minimum duration while keepin
   assert.equal(SLEEP_MIN_MINUTES,480);assert.equal(SLEEP_WAKE_ENERGY,100);
   let s=newGame();s.needs.energy=78;chooseAction(s,'bed');arrive(s);
   tick(s,100);assert.equal(s.action?.id,'bed');assert.equal(s.action.elapsed,100);
-  close(s.needs.energy,97,'sleep gains 19 energy without simultaneous awake decay');
+  close(s.needs.energy,97);
   tick(s,20);assert.equal(s.action,null);
   assert.ok(s.needs.energy>99.8,'full reserve reached and waking remainder starts awake decay');
   s=newGame();s.needs.energy=0;chooseAction(s,'bed');arrive(s);
