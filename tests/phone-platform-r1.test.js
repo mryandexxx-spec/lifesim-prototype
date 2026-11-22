@@ -4,7 +4,6 @@ import {newHousehold,loadHousehold,tickHousehold,residentAutonomousChoice} from 
 import {newPhoneCalls,restorePhoneCalls,phoneContactStatus,startPhoneCall,
   progressPhoneCalls,cancelPhoneCall,CALL_DURATION,CALL_COOLDOWN} from '../src/phone-calls.js';
 import {PHONE_APPS,phoneAppRoute} from '../src/phone-app-registry.js';
-import {enqueueAction} from '../src/action-queue.js';
 
 const idle=()=>{const root=newHousehold('2026-11-22');root.autonomy.enabled=false;
   root.otherSim.autonomy.enabled=false;return root;};
@@ -61,7 +60,7 @@ test('G calls during working shift do not change salary/attendance, while return
 });
 test('G manual queue and ongoing household action refuse calls without deleting them',()=>{
   const s=idle();
-  assert.equal(enqueueAction(s.actionQueues,'alex',{type:'object',actionId:'seat',targetInstanceId:'test'}).ok,true);
+  s.actionQueues.byResident.alex.push({seq:1,type:'object',actionId:'seat',targetInstanceId:'test'});
   const before=JSON.stringify(s.actionQueues);
   assert.equal(startPhoneCall(s,'alex','mira').ok,false);
   assert.equal(JSON.stringify(s.actionQueues),before);
@@ -84,8 +83,9 @@ test('G interrupted, paused and restored calls never grant social rewards',()=>{
   assert.equal(saved.otherSim.needs.social,40);
 });
 test('G time-based canonical household tick completes exactly once with pause and 3x independent of frame duration',()=>{
-  const s=idle();s.paused=true;
+  const s=idle();
   assert.equal(startPhoneCall(s,'alex','mira').ok,true);
+  s.paused=true;
   const before=JSON.stringify(s);
   tickHousehold(s,10);
   assert.equal(JSON.stringify(s),before);

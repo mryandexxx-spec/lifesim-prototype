@@ -21,6 +21,7 @@ jobs:
       fridge_ux: ${{ steps.impact.outputs.fridge_ux }}
       grill_r1: ${{ steps.impact.outputs.grill_r1 }}
       career_shifts: ${{ steps.impact.outputs.career_shifts }}
+      phone_platform: ${{ steps.impact.outputs.phone_platform }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,6 +90,9 @@ jobs:
           name: career-shifts-r1-mobile-pr
           path: artifacts/career-shifts-r1/
           if-no-files-found: ignore
+      - name: PHONE-PLATFORM-R1 real in-game phone home and calls at two mobile WebGL viewports
+        if: ${{ needs.targeted.outputs.phone_platform == 'true' }}
+        run: node tests/phone-platform-r1-browser-smoke.mjs
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}
         run: node tests/fixture-motion-browser-smoke.mjs
