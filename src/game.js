@@ -7039,7 +7039,8 @@ function boot() {
   };
   $('ground-walk-action').addEventListener('click',()=>
     confirmWorldOffer(groundWalkOffer,groundWalkOffer?.command));
-  canvas.addEventListener('pointerdown',closeGroundWalkMenu);
+  // Do not dismiss a ground context on pointerdown: the user may pan,
+  // pinch, long-hold or cancel. endPointer dismisses only a completed tap.
   $('ground-walk-close').addEventListener('click',closeGroundWalkMenu);
   // Click follows a confirmed tap; swipes, pinches and long holds do not click.
   document.addEventListener('click',event=>{
@@ -7604,7 +7605,13 @@ function boot() {
         if(!Number.isFinite(actor?.position?.x)||!Number.isFinite(actor?.position?.z))
           cameraFocus=null;
         else{
-          setView(stepCameraFocus(view,actor.position,dt));
+          // Rendered location differs from the path endpoint while asleep,
+          // seated, swimming or in an authored physical action pose.
+          const rig=cameraFocus.id==='alex'?avatar:miraAvatar;
+          const rendered=rig?.getPosition?.();
+          const target=Number.isFinite(rendered?.x)&&Number.isFinite(rendered?.z)
+            ?rendered:actor.position;
+          setView(stepCameraFocus(view,target,dt));
           cameraFocus.remaining-=dt;
           if(cameraFocus.remaining<=0)cameraFocus=null;
         }

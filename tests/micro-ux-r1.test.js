@@ -137,6 +137,10 @@ test('MICRO mobile source contract: name focus, Zzz overlay, separate TV action,
   assert.match(game,/focusSelectedCamera\(id\)/);
   assert.match(game,/sleepZzzVisible\(/);
   assert.match(game,/dismissOnCanvasTap\(/);
+  assert.doesNotMatch(game,/canvas\.addEventListener\('pointerdown',closeGroundWalkMenu\)/,
+    'long press/swipe may not dismiss a ground menu at pointerdown');
+  assert.match(game,/const rendered=rig\?\.getPosition/,
+    'camera follows actual rendered bed/sleep/seat pose');
   assert.match(game,/tv-talk-button/);
   assert.match(html,/id="tv-talk-button"/);
   assert.match(html,/micro-ux-r1/);
