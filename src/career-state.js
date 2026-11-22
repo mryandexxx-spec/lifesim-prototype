@@ -204,7 +204,7 @@ export function hireCareer(system,residentId,careerId,atMinute,{rankSchedules=fa
     timeOff,workMode:'normal',discipline:newCareerDiscipline(),workLife:newWorkLife()};
   // Explicit real-offer opt-in. Legacy programmatic fixtures keep the historical
   // catalog schedule; only genuine new hiring gets the approved F schedule.
-  if(rankSchedules)contract.shiftSchedule=newShiftSchedule(atMinute);
+  if(rankSchedules)contract.shiftSchedule=newShiftSchedule(atMinute,level);
   if(latest?.branchId&&specializationDefinition(careerId,latest.branchId)){
     contract.specialization={schema:1,id:latest.branchId,chosenAt:atMinute,
       workedShiftsAtChoice:0,focusReceiptId:null,focusScenarioId:null,focusAt:null};
