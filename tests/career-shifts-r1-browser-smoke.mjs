@@ -57,6 +57,19 @@ try{
     // Native date inputs may not dispatch change until blur in mobile Chromium.
     await page.locator('#lc-jump-date').dispatchEvent('change');
     await page.waitForFunction(()=>document.querySelector('#lc-selected')?.textContent?.includes('22'));
+    const calendarProbe=await page.evaluate(async key=>{
+      const day=document.getElementById('lc-agenda');
+      const root=JSON.parse(localStorage.getItem(key));
+      const {calendarCareerShifts}=await import('./src/career-job-board.js');
+      return {selected:document.getElementById('lc-selected').textContent,
+        dayHTML:day.innerHTML.slice(0,900),dayInnerText:day.innerText,
+        browseHidden:document.getElementById('lc-browse').hidden,
+        dateValue:document.getElementById('lc-jump-date').value,
+        original:calendarCareerShifts(root,'2026-11-22','2026-11-22').map(w=>({
+          id:w.id,start:w.start,end:w.end,overnight:w.overnight
+        }))};
+    },SAVE_KEY);
+    console.log('F R1 calendar browser probe',JSON.stringify(calendarProbe));
     const agenda=await page.locator('#lc-agenda').innerText();
     assert.match(agenda,/20:00–05:00 \(\+1 день\)/,
       'Sunday-origin civic overnight ends Monday without a second event');
