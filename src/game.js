@@ -47,6 +47,8 @@ import {previewPoolTiles,previewPoolFixture,previewRotatedPoolFixture,previewPoo
 import {createPoolVisual,poolFixtureVisualPose} from './pool-visual.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
+import {GRILL_RECIPES,grillRecipe,grillApproach,grillAvailable,
+  canGrillRecipe,chooseOutdoorDining} from './grill-r1.js';
 import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
   gardenRequestStillValid} from './gardening.js';
 import {playerMayClaimGarden} from './garden-autonomy.js';
@@ -557,6 +559,7 @@ function taskLabel(task){
   if(!task)return 'Неизвестное действие';
   if(task.type==='move')return 'Идти в указанное место';
   if(task.type==='outdoor')return 'Отдохнуть на садовой скамейке';
+  if(task.type==='grill')return 'Гриль: '+(grillRecipe(task.recipeId)?.label||'готовка');
   if(task.type==='garden')return task.actionId==='water'?'Полить грядку':
     task.actionId==='inspect'?'Осмотреть растение':
     task.actionId==='harvest'?'Собрать садовые травы':
@@ -578,6 +581,16 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
+  if(command.type==='grill'){
+    const actor=getActor(game,residentId);
+    const point=grillApproach(game.world,command.instanceId);
+    const level=currentSkillLevel(actor?.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+    if(residentUnavailableForHome(game,residentId)||!point||
+      !canGrillRecipe(game.kitchen,command.recipeId,level)||
+      !findPath(actor.position,point,game.world)){
+      toast('Гриль недоступен: проверь продукты, навык, место и проход');return false;
+    }
+  }
   if(command.type==='garden'){
     const actor=getActor(game,residentId);
     if(residentUnavailableForHome(game,residentId)||
@@ -1158,7 +1171,7 @@ function renderKitchenRestock(){
     'insufficient-credits':'Недостаточно кредитов',
     'missing-fridge':'Холодильник недоступен'
   };
-  button.textContent=quote.ok?'🛒 Купить +5 · 15 кр.':
+  button.textContent=quote.ok?'🛒 Купить +'+quote.units+' · '+quote.price+' кр.':
     (labels[quote.reason]||'Покупка недоступна');
 }
 $('fridge-staple-select').addEventListener('change',renderKitchenRestock);
@@ -1167,7 +1180,7 @@ $('fridge-buy-button').addEventListener('click',()=>{
   const itemId=$('fridge-staple-select').value;
   const quote=quoteKitchenRestock(game,itemId);
   if(!quote.ok){renderKitchenRestock();toast('Покупка недоступна');return;}
-  if(!window.confirm('Купить «'+quote.label+'» · +5 за 15 кредитов?'))return;
+  if(!window.confirm('Купить «'+quote.label+'» · +'+quote.units+' за '+quote.price+' кредитов?'))return;
   const transaction=proposeKitchenRestock(game,itemId,game.selectedSim);
   if(!transaction.ok){renderKitchenRestock();toast('Баланс или запас изменились');return;}
   const oldKitchen=game.kitchen,oldShop=game.shop,oldHistory=game.financialHistory;
@@ -1180,7 +1193,7 @@ $('fridge-buy-button').addEventListener('click',()=>{
   }
   updateFamilyBalance();select('fridge');
   $('fridge-staple-select').value=itemId;renderKitchenRestock();
-  toast('Куплено: '+quote.label+' +5 · −15 кредитов');
+  toast('Куплено: '+quote.label+' +'+quote.units+' · −'+quote.price+' кредитов');
 });
 // Ready meals use the same fridge inventory and the existing physical dining.
 function renderReadyPurchase(){
@@ -4088,6 +4101,12 @@ function boot() {
       gardenApproach(game.world,targetInstanceId,getActor(game,residentId)?.position)?.goal||null;
     if(id==='move')return getActor(game,residentId)?.action?.goal||null;
     if(id==='bench')return outdoorBenchApproach(game.world,targetInstanceId);
+    if(id==='grill'){
+      const a=getActor(game,residentId)?.action;
+      return ['toFridgeStore','storing'].includes(a?.grillStage)
+        ?furnitureActionApproach(game.world,'fridge')
+        :grillApproach(game.world,targetInstanceId);
+    }
     if(id==='hobby:toSeat'){
       const reader=getActor(game,residentId);
       return reader?.action?.id==='hobby'
@@ -4212,6 +4231,27 @@ function boot() {
     actor.event='Идёт отдыхать на садовой скамейке';
     restartAutonomyWait(actorId);return true;
   };
+  const beginOutdoorGrill=(actorId,instanceId,recipeId,fromQueue=false)=>{
+    const actor=getActor(game,actorId),point=grillApproach(game.world,instanceId);
+    const level=currentSkillLevel(actor?.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+    if(!actor||actor.action||game.socialAction||
+      residentUnavailableForHome(game,actorId)||!point||
+      !grillAvailable(game,actorId,instanceId)||
+      !canGrillRecipe(game.kitchen,recipeId,level)){
+      if(!fromQueue)toast('Гриль занят, нет продуктов или рецепт пока недоступен');
+      return false;
+    }
+    if(!buildRoute('grill',actorId,instanceId)){
+      if(!fromQueue)toast('Нет маршрута к грилю');
+      return false;
+    }
+    if(!chooseAction(actor,'grill',false))return false;
+    actor.action.targetInstanceId=instanceId;
+    actor.action.recipeId=recipeId;
+    actor.action.grillStage='cooking';
+    actor.event='Идёт к грилю: '+grillRecipe(recipeId).label;
+    restartAutonomyWait(actorId);return true;
+  };
   // Meet beside the other resident at a walkable, reachable point.
   beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null,branchId=null,fromQueue=false)=>{
     if(residentUnavailableForHome(game,actorId)||
@@ -4324,6 +4364,8 @@ function boot() {
       task.targetInstanceId&&!resolveActionFurniture(game.world,
         task.choiceId==='books'?'hobby':task.choiceId,task.targetInstanceId))
       return 'missing-target';
+    if(task.type==='grill'&&!grillApproach(game.world,task.instanceId))
+      return 'missing-target';
     if(task.type==='outdoor'&&!outdoorBenchApproach(game.world,task.instanceId))
       return 'missing-target';
     if(task.type==='move'&&!isWalkable(task.x,task.z,game.world))
@@ -4388,6 +4430,10 @@ function boot() {
               id!==residentId&&showerStates[id].active))&&
             !(command.actionId==='toilet'&&HOUSEHOLD_IDS.some(id=>
               id!==residentId&&toiletStates[id].active));
+        if(command.type==='grill')return grillAvailable(game,residentId,command.instanceId)&&
+          canGrillRecipe(game.kitchen,command.recipeId,
+            currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID))&&
+          Boolean(findPath(actor.position,grillApproach(game.world,command.instanceId),game.world));
         if(command.type==='garden')return gardenActionAllowed(game,residentId,
           command.instanceId,command.actionId,{ignoreReservation:true})&&
           Boolean(gardenApproach(game.world,command.instanceId,actor.position));
@@ -4450,6 +4496,8 @@ function boot() {
         }
         else if(command.type==='outdoor')
           started=beginOutdoorBench(residentId,command.instanceId,true);
+        else if(command.type==='grill')
+          started=beginOutdoorGrill(residentId,command.instanceId,command.recipeId,true);
         else if(command.type==='garden')
           started=beginGardenAction(residentId,command.instanceId,command.actionId,true);
         else if(command.type==='pool'){
@@ -7954,6 +8002,10 @@ function boot() {
                 }else if(resident.action.cookStage==='toFridgeStore'){
                   arrive(resident);resident.action.cookStage='storing';
                 }
+              }else if(resident.action?.id==='grill'){
+                arrive(resident);
+                resident.action.grillStage=resident.action.grillStage==='toFridgeStore'
+                  ?'storing':'cooking';
               }else if(resident.action?.id==='dining'){
                 if(resident.action.diningStage==='toFridge'){
                   arrive(resident);resident.action.diningStage='taking';
