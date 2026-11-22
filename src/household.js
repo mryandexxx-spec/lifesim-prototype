@@ -1319,7 +1319,7 @@ export function tickHousehold(root,minutes) {
       }
     }
   }
-  applyWorkMoodContext(root);
+  applyWorkMoodContext(root,{additional:true});
   refreshGardenWishes(root);
   // One family calendar, one weekly bill cycle, never one charge per resident.
   const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
