@@ -109,7 +109,8 @@ import {latestEpisodes} from './social-episodes.js';
 import {pairDynamic} from './social-dynamics.js';
 import {romanceStatus,romanceLoveDescription,romanceClimate,romanceAvailability,
   setRomancePreference,romancePreferenceSummary} from './romance.js';
-import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
+import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX_ACTION_QUEUE} from './action-queue.js';
+import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand} from './queue-rescue.js';
 import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
 import {effectiveSleepSpeed} from './sleep-acceleration.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
@@ -447,6 +448,7 @@ let debugTapAt=0;
 let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let onManualCommandQueued = () => {};
+let inspectQueueWait=()=>null;
 let toastTimeout;
 function toast(message,{incidentResidentId=null}={}) {
   const el=$('toast');
@@ -1604,7 +1606,8 @@ function renderQueuePanel(force=true){
   const residentId=queueViewerResident(game.selectedSim,queueInspectResident);
   const pending=pendingActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
-  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,active,
+  const headWait=inspectQueueWait(residentId);
+  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,active,headWait,
     HOUSEHOLD_IDS.map(id=>pendingActions(game.actionQueues,id).length),
     game.socialAction?.phase,
     getActor(game,residentId).action?.phase,
@@ -1631,6 +1634,11 @@ function renderQueuePanel(force=true){
   const label=document.createElement('div');
   label.textContent=active?'Сейчас: '+active:'Сейчас: свободен';
   activeEl.append(label);
+  if(pending.length&&headWait){
+    const wait=document.createElement('div');wait.className='shared-progress-text';
+    wait.textContent='Первое задание ожидает: '+headWait+'. Задание сохранено. Можно исправить причину или убрать его кнопкой ниже.';
+    activeEl.append(wait);
+  }
   const evening=game.socialAction?.branchAction?.id==='romance.evening'&&
     (game.socialAction?.eveningStage||game.socialAction?.eveningSofa);
   if(evening&&active){
@@ -3929,6 +3937,43 @@ function boot() {
   // head, including up to eight A* social approaches. On mobile this can
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
+  let socialWalkGuard=newSocialWalkGuard();
+  let lastRescueOverflowSeq=null;
+  inspectQueueWait=residentId=>{
+    const task=pendingActions(game.actionQueues,residentId)[0];
+    if(!task)return null;
+    if(dialogueNeedsDecision(game))return 'нужно выбрать реплику в незавершённом диалоге';
+    if(game.paused)return 'игра на паузе';
+    if(game.socialAction)return 'выполняется общая встреча (‘'+game.socialAction.phase+'’)';
+    if(residentUnavailableForHome(game,residentId))return 'персонаж на работе или возвращается';
+    const actor=getActor(game,residentId);
+    if(actor?.action)return 'завершается текущее действие';
+    if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0||
+       showerStates[residentId].active||toiletStates[residentId].active||
+       fridgeLeaving[residentId])return 'завершается анимация выхода из предмета';
+    if(task.targetId){
+      if(residentUnavailableForHome(game,task.targetId))
+        return 'собеседник на работе или возвращается';
+      const partner=getActor(game,task.targetId);
+      if(partner?.action)return 'собеседник завершает своё действие';
+      if((pendingActions(game.actionQueues,task.targetId)[0]?.seq??Infinity)<task.seq)
+        return 'у собеседника есть более ранний личный план';
+      if(['alex','mira'].includes(task.targetId)&&
+        (sofaStates[task.targetId].progress>0||bedStates[task.targetId].progress>0||
+         showerStates[task.targetId].active||toiletStates[task.targetId].active||
+         fridgeLeaving[task.targetId]))
+        return 'собеседник завершает анимацию';
+    }
+    if(routeFailures.get(task.seq)>=3)
+      return 'подход не найден; можно изменить расстановку мебели или убрать это задание';
+    if(task.type==='object'&&task.actionId!=='dining'&&
+       !furnitureAvailable(game,task.actionId,residentId,task.targetInstanceId))
+      return 'нужный предмет сейчас занят или отсутствует';
+    if(task.type==='object'&&task.autoTable===true&&
+       !nearestAvailableDiningTable(game,residentId))
+      return 'нет доступного стола со свободным стулом';
+    return null;
+  };
   const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>{
     if(id==='swim')return getActor(game,residentId)?.action?.dryApproach||null;
     if(id==='garden')return getActor(game,residentId)?.action?.gardenGoal||
@@ -4329,6 +4374,7 @@ function boot() {
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
     renderSocialMenu();renderQueuePanel();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    socialWalkGuard=newSocialWalkGuard();lastRescueOverflowSeq=null;
     benchVisualTargets.alex=null;benchVisualTargets.mira=null;
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
@@ -7730,6 +7776,55 @@ function boot() {
           sofaStates[id].progress===0&&bedStates[id].progress===0&&
           !showerStates[id].active&&!toiletStates[id].active&&!fridgeLeaving[id];
       }))arriveSocial(game);
+      // QUEUE-RESCUE-R1: a social walk can otherwise retain the shared lock
+      // forever while BOTH manual FIFOs and work departure wait for it.
+      // Only a truly stationary walking phase is rescued, never a dialogue
+      // awaiting a choice or a paused/ongoing physical social activity.
+      const stranded=inspectSocialWalk(socialWalkGuard,game.socialAction,
+        {alex:game.position,mira:game.otherSim.position},.30,{
+          paused:game.paused,
+          partnerAway:HOUSEHOLD_IDS.some(id=>residentUnavailableForHome(game,id))
+        });
+      if(stranded&&game.socialAction){
+        const stalledSocial=game.socialAction;
+        const replay=recoverableSocialCommand(stalledSocial);
+        const full=replay&&pendingActions(game.actionQueues,stalledSocial.initiator).length>=MAX_ACTION_QUEUE;
+        if(full){
+          // Never discard an accepted manual request when a full FIFO cannot
+          // store it. Show one actionable warning and let the player free a slot.
+          const seq=game.actionQueues.nextSeq;
+          if(lastRescueOverflowSeq!==seq){
+            lastRescueOverflowSeq=seq;
+            $('queue-feedback').textContent='Не удалось восстановить встречу: очередь полна. Убери одно из будущих заданий.';
+            toast('Очередь полна · открой план и убери лишнее действие');
+          }
+        }else{
+          cancelSocial(game);
+          for(const id of HOUSEHOLD_IDS){
+            paths[id]={points:null,index:0,id:null};
+            getActor(game,id).event='Встреча прервана: подход не завершён';
+          }
+          socialWalkGuard=newSocialWalkGuard();
+          let restored=false;
+          if(replay){
+            const task=enqueueAction(game.actionQueues,stalledSocial.initiator,replay);
+            if(task){
+              restored=true;
+              // Give the scene time to settle before retrying the same path.
+              routeRetryAt.set(task.seq,performance.now()+5000);
+              routeFailures.set(task.seq,3);
+            }
+          }
+          restartAutonomyWait();
+          const message=replay
+            ?restored
+              ?'Встреча зависла при подходе и отложена в конец плана. Остальные действия сохранены.'
+              :'Встреча прервана; восстановить задание не удалось. Проверь план.'
+            :'Зависшая автоматическая встреча прервана. Персонажи снова могут действовать.';
+          $('queue-feedback').textContent=message;
+          renderQueuePanel(true);save(true);toast(message);
+        }
+      }
       // Real active-time wait is independent for each sim and unaffected by game speed.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
