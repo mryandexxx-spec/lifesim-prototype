@@ -6,7 +6,7 @@ import {CAREER_SPECIALIZATIONS} from '../src/career-specializations.js';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {hireCareer,restoreCareerSystem} from '../src/career-state.js';
 import {plannedCareerShift,nextCareerShift} from '../src/career-scheduler.js';
-import {approvedRankSchedule,migrateLegacyCareerSchedules} from '../src/career-rank-schedules.js';
+import {approvedRankSchedule,migrateLegacyCareerSchedules,recordRankSchedulePromotion} from '../src/career-rank-schedules.js';
 import {careerVacancies,calendarCareerShifts} from '../src/career-job-board.js';
 
 const TIMES={
@@ -114,4 +114,34 @@ test('new vacancy uses true R0 rank timetable rather than old static catalog hou
   assert.equal(civic.hours,'20:00–05:00 (+1 день)');
   assert.equal(civic.duration,540);
   assert.equal(kitchen.hours,'17:00–02:00 (+1 день)');
+});
+
+test('promoting after an already finished shift never offers another shift for that workday',()=>{
+  const root=newHousehold('2026-11-16'),contract=employed(root,'city-services');
+  const old=plannedCareerShift(root.calendar,contract,0);
+  assert.equal(old.start,360);
+  assert.equal(old.end,900);
+  root.minutes=925; // The resident has already finished R0 and returned home.
+  contract.lastShift={id:old.id,start:old.start,end:old.end,outcome:'worked',
+    salary:135,workedMinutes:540,lateMinutes:0,finishedAt:900};
+  contract.level=1;
+  assert.equal(recordRankSchedulePromotion(root,contract),true);
+  assert.equal(plannedCareerShift(root.calendar,contract,0).id,old.id);
+  const next=nextCareerShift(root.calendar,contract,root.minutes);
+  assert.equal(next.dayIndex,1);
+  assert.equal(next.start,1440+420);
+  assert.equal(next.end-next.start,480);
+  const same=loadHousehold(JSON.parse(JSON.stringify(root)),'2026-11-16');
+  assert.equal(plannedCareerShift(same.calendar,same.careerSystem.byResident.alex,0).id,old.id);
+  assert.equal(plannedCareerShift(same.calendar,same.careerSystem.byResident.alex,1).start,next.start);
+});
+test('a nonworking holiday removes overnight shift by START date, not by its next-day end',()=>{
+  const root=newHousehold('2026-11-16'),contract=employed(root,'civic-service');
+  const sunday=plannedCareerShift(root.calendar,contract,6);
+  assert.ok(sunday);
+  root.calendar.holidays=[{id:'h-testmonday',title:'Понедельник',month:11,day:23,enabled:true,dayOffWork:true}];
+  assert.equal(plannedCareerShift(root.calendar,contract,6)?.id,sunday.id);
+  root.calendar.holidays.push({id:'h-testsunday',title:'Воскресенье',month:11,day:22,
+    enabled:true,dayOffWork:true});
+  assert.equal(plannedCareerShift(root.calendar,contract,6),null);
 });
