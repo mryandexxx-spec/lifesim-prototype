@@ -15,7 +15,7 @@ const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
 export function planChanges(files,root=ROOT){
   const changed=[...new Set(files.map(normalize))].sort();
   const relevant=changed.some(f=>isCode(f)||f.startsWith('assets/'));
-  if(!relevant)return {tests:[],browser:false,e5:false,changed};
+  if(!relevant)return {tests:[],browser:false,e5:false,integration_qa:false,changed};
   const allTests=readdirSync(path.join(root,'tests')).filter(f=>f.endsWith('.test.js')).map(f=>'tests/'+f);
   const selected=new Set(CORE);
   const changedSrc=changed.filter(f=>f.startsWith('src/')&&/\.(?:js|mjs)$/.test(f));
