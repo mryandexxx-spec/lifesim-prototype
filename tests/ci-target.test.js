@@ -113,3 +113,14 @@ test('FRIDGE-UX-R2 only runs dedicated dual-viewport UI smoke for affected sourc
   for(const source of ['src/ready-food.js','src/kitchen.js','src/career-phone-ui.js'])
     assert.equal(planChanges([source]).fridge_ux,false,source);
 });
+
+test('CAS-00 browser baseline selectively activates four-viewport real PlayCanvas profiling',()=>{
+  const profile=planChanges(['tests/cas-00-browser-baseline.mjs']);
+  assert.equal(profile.browser,true,'browser script must force real WebGL boot');
+  assert.equal(profile.cas_baseline,true,'dedicated four-size branch must run');
+  assert.ok(profile.tests.includes('tests/household.test.js'),'baseline protects legacy residents');
+  for(const path of ['README.md','src/kitchen.js','tests/cas-00-save-baseline.test.js']){
+    assert.equal(Boolean(planChanges([path]).cas_baseline),false,
+      'unrelated edits must not schedule full profile: '+path);
+  }
+});

@@ -14,6 +14,7 @@ jobs:
     outputs:
       browser: ${{ steps.impact.outputs.browser }}
       parcel_editor: ${{ steps.impact.outputs.parcel_editor }}
+      cas_baseline: ${{ steps.impact.outputs.cas_baseline }}
       e5: ${{ steps.impact.outputs.e5 }}
       fixture_motion: ${{ steps.impact.outputs.fixture_motion }}
       integration_qa: ${{ steps.impact.outputs.integration_qa }}
@@ -169,6 +170,16 @@ jobs:
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}
         run: node tests/fixture-motion-browser-smoke.mjs
+      - name: CAS-00 real two-resident WebGL baseline across four mobile viewports and warm reload
+        if: ${{ needs.targeted.outputs.cas_baseline == 'true' }}
+        run: node tests/cas-00-browser-baseline.mjs
+      - name: Preserve CAS-00 two-resident performance report and real mobile frames
+        if: ${{ always() && needs.targeted.outputs.cas_baseline == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-00-mobile-baseline
+          path: artifacts/cas-00/
+          if-no-files-found: ignore
       - name: LOT-E5 full four-viewport cross-mode release QA (only when E5 changes)
         if: ${{ needs.targeted.outputs.e5 == 'true' }}
         run: node tests/lot-e5-browser-smoke.mjs
