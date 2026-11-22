@@ -131,7 +131,14 @@ try{
   await scene(studio,async page=>{
     await page.waitForFunction(()=>{
       const brush=sceneRoot.findByName('H5a hand-held wooden brush');
-      const image=node=>node?.enabled&&node.render?.material?.diffuseMap?.getSource()?.width===256;
+      const image=node=>{
+        const canvas=node?.render?.material?.diffuseMap?.getSource();
+        if(!node?.enabled||canvas?.width!==256)return false;
+        const pixels=canvas.getContext('2d').getImageData(56,70,128,110).data;
+        const colors=new Set();
+        for(let i=0;i<pixels.length;i+=32)colors.add((pixels[i]<<16)|(pixels[i+1]<<8)|pixels[i+2]);
+        return colors.size>90;
+      };
       return brush?.enabled&&image(sceneRoot.findByName('H5 paint surface'))&&
         image(sceneRoot.findByName('Finished painted linen'));
     });
