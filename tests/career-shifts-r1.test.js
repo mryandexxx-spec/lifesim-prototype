@@ -117,7 +117,9 @@ test('new vacancy uses true R0 rank timetable rather than old static catalog hou
 });
 
 test('promoting after an already finished shift never offers another shift for that workday',()=>{
-  const root=newHousehold('2026-11-16'),contract=employed(root,'city-services');
+  const root=newHousehold('2026-11-16');
+  root.minutes=0;root.otherSim.minutes=0; // Hire BEFORE the approved 06:00 R0 start.
+  const contract=employed(root,'city-services');
   const old=plannedCareerShift(root.calendar,contract,0);
   assert.equal(old.start,360);
   assert.equal(old.end,900);
