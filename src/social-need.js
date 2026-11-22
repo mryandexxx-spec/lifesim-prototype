@@ -26,6 +26,7 @@ export function socialNeedDecayRate(profile){
  * cancelled/unfinished turns never reach the recorder.
  */
 export const SOCIAL_NEED_REWARDS=Object.freeze({
+  'phone.call':6,
   talk:14,
   'conversation.talk':18,
   'acquaint.chat':13,

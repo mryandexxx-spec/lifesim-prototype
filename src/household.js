@@ -19,6 +19,7 @@ import {DISH_AUTO_WASH_THRESHOLD,COOKING_SKILL_ID,kitchenRecipe,newKitchen,resto
 import {currentSkillLevel} from './skills-engine.js';
 import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
+import {newPhoneCalls,restorePhoneCalls,progressPhoneCalls} from './phone-calls.js';
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
@@ -125,6 +126,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.householdBills=newHouseholdBills(state.minutes);
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
+  state.phoneCalls=newPhoneCalls();
   applyWorkMoodContext(state);
   return state;
 }
@@ -362,6 +364,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
       return work;
     });
   }
+  root.phoneCalls=restorePhoneCalls(raw.phoneCalls,root.minutes);
   root.relationship=loadRelationship(raw.relationship,root.minutes,{
     alex:root.mind.memories,mira:mira.mind.memories
   });
@@ -1240,11 +1243,12 @@ export function tickHousehold(root,minutes) {
   for(const id of HOUSEHOLD_IDS)if(residentAwayAtWork(root,id))
     refreshMind(getActor(root,id),root.world);
   tickSocial(root,minutes);
+  const phoneEvents=progressPhoneCalls(root,root.minutes);
   applyWorkMoodContext(root);
   refreshGardenWishes(root);
   // One family calendar, one weekly bill cycle, never one charge per resident.
   const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
-  return [...careerEvents,...billEvents];
+  return [...careerEvents,...phoneEvents,...billEvents];
 }
 
 /** Garden opportunity belongs to the SAME household brain, after social/self-care.
@@ -1266,7 +1270,7 @@ export function recordResidentPoolStart(root,id){
 }
 export function residentAutonomousChoice(root,id='alex') {
   if(residentUnavailableForHome(root,id))return null;
-  if(root.socialAction||pendingActions(root.actionQueues,id).length)return null;
+  if(root.socialAction||root.phoneCalls?.active||pendingActions(root.actionQueues,id).length)return null;
   const resident=getActor(root,id);
   if (!root.autonomy.enabled || !resident || root.paused) return null;
   resident.autonomy.enabled=root.autonomy.enabled;
