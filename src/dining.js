@@ -115,6 +115,7 @@ export function isPermittedDiningTuck(world,one,two){
  * Does not change the physical/nav footprint or v1 save coordinates.
  */
 export function diningChairPullLimit(world,tableId,seatId){
+  if(typeof tableId==='string'&&tableId.startsWith('out-'))return 0;
   if(!diningSeatMatches(world,tableId,seatId))return 0;
   const seat=resolveActionFurniture(world,'seat',seatId);
   const others=furnitureObstacles(world).filter(x=>
