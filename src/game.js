@@ -8,6 +8,8 @@ import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {characterCardSnapshot,oncePerButton} from './ux05-character-ui.js';
 import {createLoadingProgress} from './loading-progress.js';
+import {fridgeViewModel} from './fridge-ui.js';
+import {createFridgeR2UI} from './fridge-ui-dom.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds,stepCameraFocus} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
@@ -983,12 +985,43 @@ $('wish-do-btn').addEventListener('click', () => {
     toast(selectedName()+': в очереди желание — '+WISHES[id].label.toLowerCase());
   }
 });
+const fridgeR2UI=createFridgeR2UI({
+  document,
+  readModel:()=>fridgeViewModel(game,currentSkillLevel(
+    selectedActor().skills,HOBBY_SKILLS,COOKING_SKILL_ID)),
+  readName:()=>getActorName(game.selectedSim),
+  onAction:(kind,id)=>{
+    if(selected!=='fridge')return;
+    // Preserve the existing authoritative queue and financial handlers.
+    // Every click remains subject to their live stock, wallet and save guards.
+    if(kind==='snack')$('action-button').click();
+    else if(kind==='eat'){
+      if(!hasKitchenServing(game.kitchen,id)){
+        toast('Порция уже недоступна');return;
+      }
+      $('fridge-prepared-select').value=id;
+      $('fridge-lunch-button').click();
+    }else if(kind==='cook'){
+      $('cooking-recipe-select').value=id;
+      $('fridge-cook-button').click();
+    }else if(kind==='buy-ready'){
+      $('fridge-ready-select').value=id;
+      $('fridge-ready-buy-button').click();
+    }else if(kind==='buy-staples'){
+      $('fridge-staple-select').value=id;
+      $('fridge-buy-button').click();
+    }
+  }
+});
+const renderFridgeR2=()=>fridgeR2UI.render();
 function select(id,instanceId=null) {
   if (id){
     closeInsightPanel();closeMindPanel();closeSocialContext();setViewOpen(false);
     queueVisible=false;renderQueuePanel(true);
   }
+  const wasFridge=selected==='fridge';
   selected = id;
+  fridgeR2UI.show(id==='fridge',{reset:!wasFridge});
   selectedFurnitureInstanceId=['sofa','seat','dining','cook','prep','wash','bed','tv','hobby','music','paint',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
   for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
@@ -1083,6 +1116,7 @@ function select(id,instanceId=null) {
   $('action-button').innerHTML=id==='wash'
     ?'Помыть до '+Math.min(3,game.kitchen?.dirtyDishes||0)+' тарелок <span>↗</span>'
     :`${lampLabel} <span>↗</span>`;
+  if(id==='fridge')renderFridgeR2();
 }
 $('dish-alert').addEventListener('click',()=>{
   if(dialogueNeedsDecision(game))return;
