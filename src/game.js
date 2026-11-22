@@ -7419,6 +7419,16 @@ function boot() {
       camera.camera.rect=new pc.Vec4(0,0,fraction,1);
     }else{
       const fraction=Math.max(.45,Math.min(1,(panel.top-surface.top-8)/surface.height));
+      // Preserve apparent world scale when bottom tray changes height.
+      // Otherwise entering a draft makes the house jump and grow on screen.
+      if(parcel.lastViewportFraction){
+        const ratio=fraction/parcel.lastViewportFraction;
+        if(Number.isFinite(ratio)&&Math.abs(ratio-1)>.001){
+          view.distance=Math.max(5.5,Math.min(100,view.distance*ratio));
+          cameraUpdate();
+        }
+      }
+      parcel.lastViewportFraction=fraction;
       camera.camera.rect=new pc.Vec4(0,1-fraction,1,fraction);
     }
   }
@@ -7465,7 +7475,7 @@ function boot() {
     setHomeOpen(false);closeGroundWalkMenu();cameraFocus=null;
     oneFingerMode='pan';showCameraMode();cameraGesture.clear();
     idleParcel();
-    setView(fresh?parcelCamera({...view,centerX:7,centerZ:0,
+    setView(fresh?parcelCamera({...view,centerX:5,centerZ:0,
       distance:canvas.clientHeight>=canvas.clientWidth?54:42},true):cameraBefore);
     renderParcel();
   }

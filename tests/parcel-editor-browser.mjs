@@ -75,8 +75,12 @@ try{
   await worldTap(1.25,-8.75);await worldTap(3.75,-7.25);await tap('cancel');
   assert.equal((await root()).shop.credits,seed.shop.credits-32);
   await tap('section:house');await tap('group:room');await tap('pick:room');
+  // The initial editor focuses the house; deliberate zoom-out exposes the
+  // east extension for a new room without burying the home at initial load.
+  await tap('zoom-out');await tap('zoom-out');
   await worldTap(16,-6);await worldTap(19,-4);
-  assert.equal(await action('apply').isEnabled(),true);
+  assert.equal(await action('apply').isEnabled(),true,
+    'Build preview: '+await page.locator('#parcel-editor output').textContent());
   await tap('apply');assert.ok((await root()).world.construction.revision>0);
   const built=(await root()).world.construction.floorCells.length;
   await tap('undo');
