@@ -7691,7 +7691,7 @@ function boot() {
         fail(proposal.reason||'pool-history-price-mismatch');return;
       }
       const result=commitPoolPreviewPersisted(game,proposal,next=>{
-        if(!bootReadyToSave)return false;
+        if(!canWriteGameSave())return false;
         try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));return true;}
         catch{return false;}
       });
