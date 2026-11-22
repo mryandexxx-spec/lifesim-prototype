@@ -1,0 +1,196 @@
+/** CAS-01.8: reproducible multiday, 2-4-resident soak; no PlayCanvas or save schema writes. */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {performance} from 'node:perf_hooks';
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {SAVE_KEY,newGame,NEEDS} from '../src/simulation.js';
+import {newHousehold,loadHousehold,tickHousehold,getActor,setHouseholdAutonomy} from '../src/household.js';
+import {residentIdsForSimulation} from '../src/resident-activity-runtime.js';
+import {acceptCareerOffer} from '../src/career-job-board.js';
+import {nextCareerShift} from '../src/career-scheduler.js';
+import {enqueueAction,pendingActions,MAX_ACTION_QUEUE} from '../src/action-queue.js';
+import {queueAddressedSocial} from '../src/resident-social-runtime.js';
+import {getPair} from '../src/social-graph.js';
+import {findPath,isWalkable} from '../src/navigation.js';
+import {FINANCE_HISTORY_LIMIT} from '../src/finance-ledger.js';
+
+const copy=x=>JSON.parse(JSON.stringify(x));
+const NAMES=['Вера','Игорь'];
+function home(n=4,{remote=false,autonomy=true}={}){
+  const raw=newHousehold('2026-11-23');
+  if(n>2){
+    const residentsById={},linksByResident={
+      alex:{familyId:'family_1',dwellingId:'dwelling_1'},
+      mira:{familyId:'family_1',dwellingId:'dwelling_1'}};
+    for(let i=3;i<=n;i++){
+      const id='resident_'+i,actor=newGame();
+      actor.personality.name=NAMES[i-3];
+      actor.position={x:1.2+(i-3)*.9,z:1.2};
+      residentsById[id]={id,identity:{firstName:NAMES[i-3],lastName:'Тест',lifeStage:'adult'},actor};
+      linksByResident[id]={familyId:'family_'+i,
+        dwellingId:remote&&i===n?'dwelling_2':'dwelling_1'};
+    }
+    raw.population={schema:1,nextResidentSerial:n+1,residentsById,linksByResident,kinship:[]};
+  }
+  const result=loadHousehold(copy(raw));
+  setHouseholdAutonomy(result,autonomy);
+  return result;
+}
+function hire(root,id,careerId){
+  const offer=acceptCareerOffer(root,id,careerId);
+  assert.equal(offer.ok,true,offer.reason);
+  root.careerSystem=offer.careerSystem;
+  return offer.contract;
+}
+function invariant(root,ids){
+  assert.equal(root.version,1);
+  assert.equal(root.socialGraph?.schema,1);
+  assert.deepEqual(residentIdsForSimulation(root),ids);
+  assert.ok(Number.isFinite(root.minutes)&&root.minutes>=0);
+  assert.ok(Number.isSafeInteger(root.shop.credits)&&root.shop.credits>=0);
+  assert.ok(root.financialHistory.entries.length<=FINANCE_HISTORY_LIMIT);
+  assert.ok(root.actionQueues.nextSeq>0);
+  for(const id of ids){
+    const actor=getActor(root,id);
+    assert.ok(actor&&actor.version===1,id+' actor identity');
+    for(const need of NEEDS)assert.ok(Number.isFinite(actor.needs[need])&&
+      actor.needs[need]>=0&&actor.needs[need]<=100,
+      id+' '+need+' must stay within 0..100, got '+actor.needs[need]);
+    assert.ok(Number.isFinite(actor.position.x)&&Number.isFinite(actor.position.z),id+' finite position');
+    const pending=pendingActions(root.actionQueues,id);
+    assert.ok(pending.length<=MAX_ACTION_QUEUE,id+' queue cap');
+    const seq=pending.map(a=>a.seq);
+    assert.deepEqual([...seq].sort((a,b)=>a-b),seq,id+' FIFO order');
+    assert.equal(new Set(seq).size,seq.length,id+' no duplicate queue IDs');
+  }
+  const journal=root.financialHistory.entries;
+  assert.equal(new Set(journal.map(e=>e.id)).size,journal.length,'unique financial receipts');
+  assert.ok(journal.every(e=>Number.isSafeInteger(e.delta)&&Number.isSafeInteger(e.balanceAfter)));
+  const settlement=root.careerSystem.settlementIds;
+  assert.equal(new Set(settlement).size,settlement.length,'one canonical settlement per shift');
+  const salary=journal.filter(e=>e.kind==='salary');
+  assert.equal(new Set(salary.map(e=>e.sourceId)).size,salary.length,'no double salary');
+  assert.ok(salary.every(e=>settlement.includes(e.sourceId)),'each salary must have a completed shift');
+}
+test('CAS-01.8 v1 legacy 2 persons and remote third/fourth stay stable across ticks and reload',()=>{
+  assert.equal(SAVE_KEY,'lifesim.room01.v1');
+  const old=newHousehold('2026-11-23');
+  const serialized=JSON.stringify(old);
+  let root=loadHousehold(copy(old));
+  assert.equal(JSON.stringify(old),serialized,'preflight must not mutate old snapshot');
+  tickHousehold(root,20);
+  root=loadHousehold(copy(root));
+  assert.equal(Object.hasOwn(root,'population'),false);
+  invariant(root,['alex','mira']);
+  const away=home(4,{remote:true,autonomy:false});
+  const awayBefore=copy(away.population.residentsById.resident_4.actor.needs);
+  for(let i=0;i<48;i++)tickHousehold(away,30);
+  invariant(away,['alex','mira','resident_3']);
+  assert.deepEqual(away.population.residentsById.resident_4.actor.needs,awayBefore,
+    'saved inhabitant of another dwelling is inert, not silently deleted');
+  const resumed=loadHousehold(copy(away));
+  assert.equal(resumed.version,1);
+  assert.deepEqual(resumed.population.linksByResident,away.population.linksByResident);
+  invariant(resumed,['alex','mira','resident_3']);
+});
+test('CAS-01.8 eight-game-day 4-person autonomy, FIFO, day/night shifts, finance and v1 reload soak',()=>{
+  let root=home(4);
+  const ids=['alex','mira','resident_3','resident_4'];
+  hire(root,'resident_3','business-center');
+  hire(root,'resident_4','civic-service');
+  const day=nextCareerShift(root.calendar,root.careerSystem.byResident.resident_3,root.minutes);
+  const night=nextCareerShift(root.calendar,root.careerSystem.byResident.resident_4,root.minutes);
+  assert.ok(day&&night&&day.start%1440<night.start%1440);
+  assert.ok(night.end>Math.floor(night.start/1440)*1440+1440,
+    'civic rank 0 works across midnight');
+  const first=enqueueAction(root.actionQueues,'resident_3',{type:'move',x:1.2,z:1.2});
+  const second=enqueueAction(root.actionQueues,'resident_3',{type:'move',x:1.4,z:1.2});
+  assert.ok(first&&second&&first.seq<second.seq);
+  const start=root.minutes, samples=[],reloaded=[];
+  const total=8*1440,step=20;
+  for(let elapsed=step;elapsed<=total;elapsed+=step){
+    const before=root.minutes,t0=performance.now();
+    tickHousehold(root,step);
+    samples.push(performance.now()-t0);
+    assert.equal(root.minutes,before+step,'exactly one root clock per tick');
+    if(elapsed%240===0)invariant(root,ids);
+    if(elapsed%1440===0){
+      const snapshot=copy(root),oldJson=JSON.stringify(snapshot);
+      root=loadHousehold(snapshot);
+      assert.equal(JSON.stringify(snapshot),oldJson,'reload never mutates serialized input');
+      assert.equal(root.shop.credits,snapshot.shop.credits,'no reload payout');
+      assert.deepEqual(root.careerSystem.settlementIds,snapshot.careerSystem.settlementIds);
+      invariant(root,ids);
+      reloaded.push(elapsed/1440);
+    }
+  }
+  assert.equal(root.minutes,start+total);
+  invariant(root,ids);
+  const salary=root.financialHistory.entries.filter(e=>e.kind==='salary');
+  assert.ok(salary.some(e=>e.actorId==='resident_3'),'day worker must complete a shift');
+  assert.ok(salary.some(e=>e.actorId==='resident_4'),'overnight worker must complete a shift');
+  assert.ok(root.careerSystem.settlementIds.length>=salary.length);
+  const pre=copy(root);
+  const repeat=loadHousehold(copy(pre));
+  tickHousehold(repeat,1);
+  assert.equal(repeat.financialHistory.entries.filter(e=>e.kind==='salary').length,salary.length,
+    'reload plus next tick cannot mint a second paycheck');
+  const sorted=samples.sort((a,b)=>a-b);
+  const result={environment:'Node 22 headless simulation, not device FPS',days:8,
+    persons:4,steps:samples.length,gameMinutes:total,
+    perfMs:{median:+sorted[Math.floor(sorted.length/2)].toFixed(2),
+      p95:+sorted[Math.ceil(sorted.length*.95)-1].toFixed(2),
+      max:+sorted.at(-1).toFixed(2)},
+    salaryReceipts:salary.length,settlements:root.careerSystem.settlementIds.length,
+    savedReloadDays:reloaded,saveBytes:JSON.stringify(root).length,
+    finalBalance:root.shop.credits,iPhoneSafariVerified:false};
+  assert.ok(result.saveBytes<4000000,'bounded root-v1 snapshot after prolonged play');
+  mkdirSync('artifacts/cas-01-8',{recursive:true});
+  writeFileSync('artifacts/cas-01-8/node.json',JSON.stringify(result,null,2));
+  console.log('CAS-01.8 8-day headless soak '+JSON.stringify(result));
+});
+test('CAS-01.8 3 residents survive multi-day autonomous simulation and resume',()=>{
+  let root=home(3),start=root.minutes;
+  for(let i=0;i<72;i++){
+    tickHousehold(root,30);
+    if(i%12===0)invariant(root,['alex','mira','resident_3']);
+  }
+  root=loadHousehold(copy(root));
+  invariant(root,['alex','mira','resident_3']);
+  assert.equal(root.minutes,start+2160);
+});
+function placePair(root,idA,idB){
+  const a=getActor(root,idA),b=getActor(root,idB);
+  for(let x=-4;x<=3;x+=.5)for(let z=-3;z<=3;z+=.5){
+    const p={x,z},q={x:x+1.05,z};
+    const others=['alex','mira','resident_3','resident_4'].filter(id=>id!==idA&&id!==idB);
+    if(!isWalkable(p.x,p.z,root.world)||!isWalkable(q.x,q.z,root.world)||
+      !findPath(p,q,root.world)||others.some(id=>[p,q].some(point=>
+        Math.hypot(point.x-getActor(root,id).position.x,point.z-getActor(root,id).position.z)<1.2)))continue;
+    a.position=p;b.position=q;return;
+  }
+  assert.fail('no genuine walkable rendezvous');
+}
+test('CAS-01.8 concurrent FIFO and real addressed social survives mid-session save with exactly one reward',()=>{
+  let root=home(4,{autonomy:false});
+  placePair(root,'resident_3','resident_4');
+  const a=getActor(root,'resident_3'),b=getActor(root,'resident_4');
+  a.needs.social=30;b.needs.social=30;
+  assert.ok(queueAddressedSocial(root,'resident_3','resident_4','talk'));
+  tickHousehold(root,.1);
+  assert.equal(root.additionalSocial?.phase,'using');
+  tickHousehold(root,5);
+  const before=root.socialGraph.nextSeq;
+  root=loadHousehold(copy(root));
+  assert.equal(root.additionalSocial?.phase,'using');
+  tickHousehold(root,13);
+  const pair=getPair(root.socialGraph,'resident_3','resident_4');
+  assert.equal(pair?.events.length,1,'one genuine social receipt after completed session');
+  assert.equal(root.socialGraph.nextSeq,before+1);
+  assert.ok(getActor(root,'resident_3').needs.social>30);
+  assert.ok(getActor(root,'resident_4').needs.social>30);
+  tickHousehold(root,5);
+  assert.equal(getPair(root.socialGraph,'resident_3','resident_4').events.length,1,
+    'next tick and resume cannot replay social reward');
+  invariant(root,['alex','mira','resident_3','resident_4']);
+});
