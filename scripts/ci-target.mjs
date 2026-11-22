@@ -74,7 +74,9 @@ export function planChanges(files,root=ROOT){
     /^(?:src\/fridge-ui(?:-dom)?\.js|tests\/fridge-ux-r2-browser-smoke\.mjs)$/.test(f));
   const grill_r1=changed.some(f=>
     /^(?:src\/grill-(?:r1|catalog)\.js|tests\/grill-r1-browser-smoke\.mjs)$/.test(f));
-  return {tests,browser:changed.some(isUI),micro_ux,load_truth,fridge_ux,grill_r1,
+  const career_shifts=changed.some(f=>
+    /^(?:src\/career-rank-schedules\.js|tests\/career-shifts-r1-browser-smoke\.mjs)$/.test(f));
+  return {tests,browser:changed.some(isUI)||career_shifts,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,
     e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),changed};
 }
@@ -104,6 +106,7 @@ function main(){
   console.log('LOAD-TRUTH-R1 two-viewport stages:',plan.load_truth?'required':'not needed');
   console.log('FRIDGE-UX-R2 two-viewport touch:',plan.fridge_ux?'required':'not needed');
   console.log('GRILL-R1 two-viewport physical cooking/market:',plan.grill_r1?'required':'not needed');
+  console.log('CAREER-SHIFTS-R1 two-viewport phone and calendar:',plan.career_shifts?'required':'not needed');
   console.log('LOT-E5 four-viewport deep check:',plan.e5?'required':'not needed');
   console.log('P4 Life Systems four-viewport integration:',plan.integration_qa?'required':'not needed');
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
@@ -113,7 +116,8 @@ function main(){
     'micro_ux='+(plan.micro_ux?'true':'false')+'\n'+
     'load_truth='+(plan.load_truth?'true':'false')+'\n'+
     'fridge_ux='+(plan.fridge_ux?'true':'false')+'\n'+
-    'grill_r1='+(plan.grill_r1?'true':'false')+'\n');
+    'grill_r1='+(plan.grill_r1?'true':'false')+'\n'+
+    'career_shifts='+(plan.career_shifts?'true':'false')+'\n');
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main();
