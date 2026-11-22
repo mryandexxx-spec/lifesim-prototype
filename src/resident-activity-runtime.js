@@ -9,7 +9,7 @@ import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './na
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {BED_SLOT_IDS,BED_SLOTS,validBedSlot} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
-import {dispatchActionQueues,pendingActions} from './action-queue.js';
+import {dispatchActionQueues,pendingActions,queueHeads} from './action-queue.js';
 
 export const ADDITIONAL_OBJECT_ACTIONS=Object.freeze([
   'bed','sofa','fridge','shower','toilet','seat','tv','mirror','dresser','wardrobe'
@@ -195,7 +195,8 @@ export function dispatchAdditionalResidentQueues(root){
   const prepared=new Map();
   return dispatchActionQueues(root.actionQueues,{
     canStart(id,command){
-      if(!ids.has(id)||root.socialAction)return false;
+      if(!ids.has(id)||root.socialAction||
+        [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))return false;
       const plan=prepareCommand(root,id,command);
       if(!plan)return false;
       prepared.set(id,plan);return true;
@@ -302,7 +303,11 @@ export function prepareAdditionalResidents(root){
  */
 export function startAdditionalResidentAutonomy(root,id){
   if(!root?.autonomy?.enabled||root.paused||root.socialAction||
-    root.phoneCalls?.active||!residentIdsForSimulation(root).slice(2).includes(id)||
+    root.phoneCalls?.active||
+    [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id)||
+    queueHeads(root.actionQueues).some(({command})=>
+      ['social','branch'].includes(command.type)&&command.targetId===id)||
+    !residentIdsForSimulation(root).slice(2).includes(id)||
     pendingActions(root.actionQueues,id).length)return false;
   const actor=savedAdditionalActor(root,id);
   if(!actor||actor.action)return false;
