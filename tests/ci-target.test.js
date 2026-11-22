@@ -69,3 +69,14 @@ test('MICRO-UX-R1 browser smoke is impact-gated, not run for every future UI edi
   for(const source of ['src/kitchen.js','src/career-phone-ui.js','index.html'])
     assert.equal(planChanges([source]).micro_ux,false,source);
 });
+
+test('LOAD-TRUTH-R1 reserves dedicated two-viewport WebGL only for loader changes',()=>{
+  const core=planChanges(['src/loading-progress.js']);
+  assert.equal(core.browser,false,'pure tracking logic is independent of renderer');
+  assert.equal(core.load_truth,true);
+  const smoke=planChanges(['tests/load-truth-r1-browser-smoke.mjs']);
+  assert.equal(smoke.browser,true);
+  assert.equal(smoke.load_truth,true);
+  for(const name of ['index.html','src/kitchen.js','src/career-phone-ui.js'])
+    assert.equal(planChanges([name]).load_truth,false,name);
+});
