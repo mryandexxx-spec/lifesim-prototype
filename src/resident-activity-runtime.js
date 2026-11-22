@@ -16,7 +16,6 @@ export const ADDITIONAL_OBJECT_ACTIONS=Object.freeze([
 ]);
 const owned=(v,k)=>Object.prototype.hasOwnProperty.call(v||{},k);
 const extraPattern=/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/;
-const routes=new WeakMap();
 const gap=ACTOR_RADIUS*2-.015;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const extraEntries=root=>Object.entries(root?.population?.residentsById||{})
@@ -36,11 +35,26 @@ const actors=root=>residentIdsForSimulation(root).map(id=>[
   id,id==='alex'?root:id==='mira'?root.otherSim:savedAdditionalActor(root,id)
 ]).filter(([,actor])=>actor?.position);
 const others=(root,id)=>actors(root).filter(([other])=>other!==id);
+const segmentDistance=(p,a,b)=>{
+  const dx=b.x-a.x,dz=b.z-a.z,scale=dx*dx+dz*dz;
+  const t=scale<1e-12?0:Math.max(0,Math.min(1,
+    ((p.x-a.x)*dx+(p.z-a.z)*dz)/scale));
+  return distance(p,{x:a.x+dx*t,z:a.z+dz*t});
+};
 export function residentCollisionFree(root,id,point){
   if(!Number.isFinite(point?.x)||!Number.isFinite(point?.z))return false;
   return others(root,id).every(([other,actor])=>{
     const phase=root?.careerSystem?.byResident?.[other]?.currentShift?.phase;
     return ['working','waiting'].includes(phase)||distance(actor.position,point)>=gap;
+  });
+}
+export function residentSegmentClear(root,id,from,to,{additionalOnly=false}={}){
+  if(!Number.isFinite(from?.x)||!Number.isFinite(to?.x))return false;
+  return others(root,id).every(([other,actor])=>{
+    if(additionalOnly&&!extraPattern.test(other))return true;
+    const phase=root?.careerSystem?.byResident?.[other]?.currentShift?.phase;
+    return ['working','waiting'].includes(phase)||
+      segmentDistance(actor.position,from,to)>=gap;
   });
 }
 /** A legacy action cannot steal an additional resident's occupied resource. */
@@ -174,7 +188,6 @@ export function dispatchAdditionalResidentQueues(root){
         Object.assign(actor.action,{targetInstanceId:plan.targetInstanceId,
           ...(plan.bedSlot?{bedSlot:plan.bedSlot}:{})});
       }
-      routes.delete(actor);
       return true;
     }
   });
@@ -196,13 +209,14 @@ function advanceExtraPosition(root,id,actor,goal,minutes){
     const point={x:actor.position.x+(next.x-actor.position.x)*step/d,
       z:actor.position.z+(next.z-actor.position.z)*step/d};
     if(!isClearLine(actor.position,point,root.world))return false;
-    if(!residentCollisionFree(root,id,point)){
+    if(!residentSegmentClear(root,id,actor.position,point)){
       // Choose a safe perpendicular bypass only if A* still reaches the goal.
       const ux=(next.x-actor.position.x)/d,uz=(next.z-actor.position.z)/d;
       const alternatives=[1,-1].map(side=>({
         x:actor.position.x-uz*side*step,z:actor.position.z+ux*side*step}));
       const detour=alternatives.find(p=>isWalkable(p.x,p.z,root.world)&&
-        isClearLine(actor.position,p,root.world)&&residentCollisionFree(root,id,p)&&
+        isClearLine(actor.position,p,root.world)&&
+        residentSegmentClear(root,id,actor.position,p)&&
         findPath(p,goal,root.world));
       if(detour){actor.position=detour;remaining-=step;}
       break;
