@@ -38,7 +38,7 @@ test('C3b 30 days cannot refill basic groceries; legacy values survive reload',(
   const old=restoreKitchen({schema:1,pantry:{vegetables:1,grains:0,dairy:4},
     prepared:[],dirtyDishes:0,lastPantryDay:0});
   for(let day=1;day<=30;day++)replenishKitchen(old,day*1440);
-  assert.deepEqual(old.pantry,{vegetables:1,grains:0,dairy:4,herbs:0});
+  assert.deepEqual(old.pantry,{vegetables:1,grains:0,dairy:4,herbs:0,meat:0,chicken:0});
   const root=home();root.kitchen=old;
   const restored=loadHousehold(copy(root));
   assert.deepEqual(restored.kitchen.pantry,old.pantry);
