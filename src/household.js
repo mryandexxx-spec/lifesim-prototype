@@ -20,8 +20,9 @@ import {currentSkillLevel} from './skills-engine.js';
 import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
 import {newPhoneCalls,restorePhoneCalls,progressPhoneCalls} from './phone-calls.js';
-import {newSportsWorld,restoreSportsWorld,advanceSportsWorld} from './sports-league.js';
-import {newSportsFan,restoreSportsFan} from './sports-fandom.js';
+import {newSportsWorld,restoreSportsWorld,advanceSportsWorld,sportsFixtures} from './sports-league.js';
+import {newSportsFan,restoreSportsFan,readSportsNews} from './sports-fandom.js';
+import {sportsAutoIntent} from './sports-autonomy.js';
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
@@ -896,6 +897,14 @@ function advancePainting(root,id,minutes){
 export function tickHousehold(root,minutes) {
   // A paused or invalid tick must be completely side-effect free, including Mira's fields.
   if (root.paused || !Number.isFinite(minutes) || minutes<=0) return;
+  // Preserve the actual verified TV-use window BEFORE the simulation action
+  // expires during this tick. A score itself never grants an unobserved reward.
+  const previousSportMinute=root.minutes;
+  const sportsViewing=Object.fromEntries(HOUSEHOLD_IDS.map(id=>{
+    const act=getActor(root,id)?.action;
+    return [id,act?.id==='tv'&&act.phase==='using'&&!act.tvTalk
+      ?Math.max(0,(ACTIONS.tv?.duration||36)-(act.elapsed||0)):0];
+  }));
   const other=root.otherSim;
   if (!other) return tick(root,minutes);
   // Care must run BEFORE settlement if this tick crosses the end of a shift.
@@ -1253,7 +1262,20 @@ export function tickHousehold(root,minutes) {
   tickSocial(root,minutes);
   const phoneEvents=progressPhoneCalls(root,root.minutes);
   // One sports timeline for the whole household; UI and both residents only read it.
-  advanceSportsWorld(root);
+  const sportsCompleted=advanceSportsWorld(root);
+  if(sportsCompleted.length){
+    const fixtureById=new Map(sportsFixtures(root.sportsWorld).map(m=>[m.id,m]));
+    for(const matchId of sportsCompleted){
+      const match=fixtureById.get(matchId);
+      if(!match)continue;
+      for(const id of HOUSEHOLD_IDS){
+        const watching=sportsViewing[id];
+        if(watching>0&&match.end>previousSportMinute&&
+          match.end<=previousSportMinute+Math.min(minutes,watching))
+          readSportsNews(root,id,matchId);
+      }
+    }
+  }
   applyWorkMoodContext(root);
   refreshGardenWishes(root);
   // One family calendar, one weekly bill cycle, never one charge per resident.
@@ -1294,6 +1316,9 @@ export function residentAutonomousChoice(root,id='alex') {
   // No instant count mutation, alternate economy or additional save field.
   if(!urgent&&root.kitchen?.dirtyDishes>=DISH_AUTO_WASH_THRESHOLD&&
     furnitureAvailable(root,'wash',id))return 'wash';
+  // Bounded original-football fandom may suggest a normal real-TV action.
+  // Never preempt work, critical needs, a call or the owner's manual FIFO.
+  if(!urgent&&sportsAutoIntent(root,id)&&furnitureAvailable(root,'tv',id))return 'tv';
   const proposal=autonomousChoice(resident);
   return proposal && furnitureAvailable(root,proposal,id) ? proposal : null;
 }

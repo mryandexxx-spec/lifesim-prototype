@@ -12,7 +12,8 @@ const ids=['alex','mira'];
 const actor=(root,id)=>id==='mira'?root?.otherSim:id==='alex'?root:null;
 const matchId=id=>typeof id==='string'&&/^\d+-\d+-[0-2]$/.test(id);
 export const newSportsFan=()=>({schema:1,favoriteTeamId:null,fanIntensity:0,
-  followSince:null,nextChangeAt:0,lastReactedMatchIds:[],lastDiscussedAt:null});
+  followSince:null,nextChangeAt:0,lastReactedMatchIds:[],lastDiscussedAt:null,
+  lastAutoMatchId:null,lastAutoAt:null,nextAutoAt:0});
 export function restoreSportsFan(raw,now=0){
   const fan=newSportsFan();
   if(!record(raw)||raw.schema!==1||!validTime(now))return fan;
@@ -31,6 +32,9 @@ export function restoreSportsFan(raw,now=0){
   fan.lastReactedMatchIds=[...seen].slice(-LIMIT);
   fan.lastDiscussedAt=validTime(raw.lastDiscussedAt)&&raw.lastDiscussedAt<=now
     ?raw.lastDiscussedAt:null;
+  fan.lastAutoMatchId=matchId(raw.lastAutoMatchId)?raw.lastAutoMatchId:null;
+  fan.lastAutoAt=validTime(raw.lastAutoAt)&&raw.lastAutoAt<=now?raw.lastAutoAt:null;
+  fan.nextAutoAt=validTime(raw.nextAutoAt)&&raw.nextAutoAt<=now+120?raw.nextAutoAt:now;
   return fan;
 }
 export function selectSportsClub(root,id,teamId){
@@ -44,7 +48,8 @@ export function selectSportsClub(root,id,teamId){
   resident.sportsFan={schema:1,favoriteTeamId:teamId,
     fanIntensity:teamId?40:0,followSince:teamId?now:null,
     nextChangeAt:now+CHANGE_COOLDOWN,
-    lastReactedMatchIds:[],lastDiscussedAt:fan.lastDiscussedAt??null};
+    lastReactedMatchIds:[],lastDiscussedAt:fan.lastDiscussedAt??null,
+    lastAutoMatchId:null,lastAutoAt:null,nextAutoAt:now};
   return {ok:true,teamId};
 }
 /** A read is an explicit in-world news interaction, not a passive UI render.
