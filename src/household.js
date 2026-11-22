@@ -20,6 +20,7 @@ import {currentSkillLevel} from './skills-engine.js';
 import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
 import {newPhoneCalls,restorePhoneCalls,progressPhoneCalls} from './phone-calls.js';
+import {newSportsWorld,restoreSportsWorld,advanceSportsWorld} from './sports-league.js';
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
@@ -127,6 +128,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
   state.phoneCalls=newPhoneCalls();
+  state.sportsWorld=newSportsWorld(state);
   applyWorkMoodContext(state);
   return state;
 }
@@ -144,6 +146,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         raw.calendar.holidays.some(saved=>saved?.id===h.id)):[],
     reminderReceipts:restoreReminderReceipts(raw.calendar?.reminderReceipts),
     weekendDays:restoreWeekendDays(raw.calendar?.weekendDays)};
+  root.sportsWorld=restoreSportsWorld(raw.sportsWorld,root);
   const restoredConstruction=restoreConstructionWorld(raw.world?.construction);
   root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
     construction:restoredConstruction,
@@ -1244,6 +1247,8 @@ export function tickHousehold(root,minutes) {
     refreshMind(getActor(root,id),root.world);
   tickSocial(root,minutes);
   const phoneEvents=progressPhoneCalls(root,root.minutes);
+  // One sports timeline for the whole household; UI and both residents only read it.
+  advanceSportsWorld(root);
   applyWorkMoodContext(root);
   refreshGardenWishes(root);
   // One family calendar, one weekly bill cycle, never one charge per resident.
