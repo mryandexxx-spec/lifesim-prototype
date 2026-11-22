@@ -2,6 +2,7 @@
 import {feelMemory} from './emotion-engine.js';
 import {refreshMind} from './psychology.js';
 import {disciplineStatus} from './career-discipline.js';
+import {residentIdsForSimulation,savedAdditionalActor} from './resident-activity-runtime.js';
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
 const scores=Object.freeze({'worklife.success':12,'worklife.exhaustedPride':12,
@@ -72,8 +73,8 @@ export function workMoodContext(contract,now){
 }
 export function applyWorkMoodContext(root){
   if(!root?.careerSystem)return;
-  for(const id of ['alex','mira']){
-    const actor=id==='mira'?root.otherSim:root;
+  for(const id of residentIdsForSimulation(root)){
+    const actor=id==='alex'?root:id==='mira'?root.otherSim:savedAdditionalActor(root,id);
     if(!actor)continue;
     actor.workMoodContext=workMoodContext(root.careerSystem.byResident?.[id],root.minutes);
     const contract=root.careerSystem.byResident?.[id];
@@ -88,7 +89,7 @@ export function applyWorkMoodContext(root){
 /** Impressions use the original emotion engine and whitelist. `at` may
  * be the settlement boundary inside a large tick; actor clock stays intact. */
 export function recordWorkFeeling(root,residentId,source,at=root?.minutes){
-  const actor=residentId==='mira'?root?.otherSim:residentId==='alex'?root:null;
+  const actor=residentId==='alex'?root:residentId==='mira'?root?.otherSim:savedAdditionalActor(root,residentId);
   if(!actor?.mind||!Object.hasOwn(feelings,source)||!validTime(at))return false;
   const memory={id:source,at,fulfilled:false};
   actor.mind.memories=[...(actor.mind.memories||[]),memory].slice(-12);
@@ -141,7 +142,7 @@ export function workLoadLabel(strain){
 export function workLifeConflict(root,id,at=root?.minutes){
   const contract=root?.careerSystem?.byResident?.[id];
   const shift=contract?.currentShift;
-  const person=id==='mira'?root?.otherSim:id==='alex'?root:null;
+  const person=id==='alex'?root:id==='mira'?root?.otherSim:savedAdditionalActor(root,id);
   if(contract?.workLife?.choiceShiftId===shift?.id)return null;
   if(!person||!shift||shift.phase!=='pending'||!validTime(at)||
     at<shift.start-15||at>=shift.end)return null;
