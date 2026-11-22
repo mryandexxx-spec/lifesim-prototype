@@ -20,10 +20,10 @@ export function sportsWatchOpportunity(root){
   home:sportsTeam(match.home)?.name,away:sportsTeam(match.away)?.name,
   remaining:Math.max(0,match.end-root.minutes)};
 }
-export function sportsTvFrame(root,tvId,now=root?.minutes){
- if(!root?.sportsWorld||!Number.isFinite(now)||!homeTv(root,tvId))return null;
- const frame=tvScreenFrame([root,root.otherSim],tvId,0,root.socialAction);
- if(!frame.on)return null;
+/** A read-only procedural feed from the game clock, with no physical-TV or
+ * phone-action prerequisites. Merely looking at it awards NOTHING. */
+export function sportsBroadcastFrame(root,now=root?.minutes){
+ if(!root?.sportsWorld||!Number.isFinite(now))return null;
  const match=liveMatch(root,now);
  if(!match)return null;
  const view=matchAt(root.sportsWorld,match.id,now);
@@ -31,6 +31,12 @@ export function sportsTvFrame(root,tvId,now=root?.minutes){
  return {matchId:match.id,state:'live',minute:view.minute,elapsed:now-match.kickoff,
    home:sportsTeam(match.home),away:sportsTeam(match.away),
    score:view.score,events:view.events};
+}
+/** Physical TV remains gated on a real installed set in a USING session. */
+export function sportsTvFrame(root,tvId,now=root?.minutes){
+ if(!root?.sportsWorld||!Number.isFinite(now)||!homeTv(root,tvId))return null;
+ const frame=tvScreenFrame([root,root.otherSim],tvId,0,root.socialAction);
+ return frame.on?sportsBroadcastFrame(root,now):null;
 }
 const line=(ctx,x,y,X,Y)=>{ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(X,Y);ctx.stroke();};
 /** Uses only standard CanvasRenderingContext2D primitives; all canvas color
