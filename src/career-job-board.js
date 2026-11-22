@@ -1,7 +1,8 @@
 import {recordWorkFeeling,jobSatisfaction} from './career-worklife.js';
 /** W1-B.2a: pure recruitment/read-model adapter. No DOM, PlayCanvas or salary mutations. */
 import {CAREER_CATALOG,careerDefinition} from './career-catalog.js';
-import {hireCareer,separateCareer,CAREER_RESIDENT_IDS} from './career-state.js';
+import {hireCareer,separateCareer,careerResidentIds} from './career-state.js';
+import {residentIdsForSimulation} from './resident-activity-runtime.js';
 import {careerRankForContract} from './career-specializations.js';
 import {DISCIPLINE_REHIRE_MINUTES} from './career-discipline.js';
 import {nextCareerShift,plannedCareerShift} from './career-scheduler.js';
@@ -22,7 +23,8 @@ export function describeCareerShift(shift){
     (Math.floor(shift.end/1440)>Math.floor(shift.start/1440)?' (+1 день)':'');
 }
 function legalRoot(root,id){
-  return root&&CAREER_RESIDENT_IDS.includes(id)&&
+  return root&&careerResidentIds(root.careerSystem).includes(id)&&
+    residentIdsForSimulation(root).includes(id)&&
     Number.isFinite(root.minutes)&&root.minutes>=0&&root.calendar?.startCivilDate&&
     root.careerSystem?.schema===1;
 }
@@ -104,7 +106,7 @@ export function calendarCareerShifts(root,fromIso,toIso){
   }catch{return [];}
   if(last<first||last-first>45)return [];
   const out=[];
-  for(const residentId of CAREER_RESIDENT_IDS){
+  for(const residentId of residentIdsForSimulation(root)){
     const contract=root.careerSystem.byResident?.[residentId];
     if(!contract)continue;
     const career=careerDefinition(contract.careerId);
