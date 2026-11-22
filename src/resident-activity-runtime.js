@@ -18,7 +18,7 @@ export const ADDITIONAL_OBJECT_ACTIONS=Object.freeze([
 // The remaining objects stay manual; career, social, food inventory and hobbies
 // require their own N-resident household settlement stages.
 export const ADDITIONAL_AUTONOMOUS_ACTIONS=Object.freeze([
-  'fridge','bed','shower','toilet','sofa'
+  'fridge','bed','shower','toilet','sofa','tv','mirror'
 ]);
 const owned=(v,k)=>Object.prototype.hasOwnProperty.call(v||{},k);
 const extraPattern=/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/;
@@ -120,7 +120,8 @@ export function validAdditionalAction(action){
   if(action.id==='move')return action.automatic===false&&
     action.phase==='walking'&&
     Number.isFinite(action.goal?.x)&&Number.isFinite(action.goal?.z);
-  if(action.automatic&&!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(action.id))return false;
+  if(action.automatic&&(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(action.id)||
+    (action.id==='mirror'&&action.mirrorPractice!==true)))return false;
   if(!ADDITIONAL_OBJECT_ACTIONS.includes(action.id)||
     typeof action.targetInstanceId!=='string')return false;
   if(action.id==='bed'&&!validBedSlot(action.bedSlot))return false;
@@ -184,7 +185,8 @@ function startPlannedObject(root,id,plan,automatic){
     plan.targetInstanceId,plan.bedSlot||null))return false;
   if(!chooseAction(actor,plan.id,automatic))return false;
   Object.assign(actor.action,{targetInstanceId:plan.targetInstanceId,
-    ...(plan.bedSlot?{bedSlot:plan.bedSlot}:{})});
+    ...(plan.bedSlot?{bedSlot:plan.bedSlot}:{}),
+    ...(automatic&&plan.id==='mirror'?{mirrorPractice:true}:{})});
   return true;
 }
 export function dispatchAdditionalResidentQueues(root){
@@ -306,9 +308,18 @@ export function startAdditionalResidentAutonomy(root,id){
   if(!actor||actor.action)return false;
   actor.autonomy.enabled=root.autonomy.enabled;
   actor.minutes=root.minutes;
-  const wish=autonomousChoice(actor);
+  // Core scoring owns urgent physiological needs, personality, daily rhythm
+  // and repeat-memory cooldown. Mirror speech is a bounded fallback for
+  // unmet Social without inventing friendship, consent or pair receipts.
+  const coreWish=autonomousChoice(actor);
+  const wish=coreWish||
+    (actor.needs.social<35?'mirror':null);
   if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(wish))return false;
-  const plan=prepareCommand(root,id,{type:'object',actionId:wish});
+  let plan=prepareCommand(root,id,{type:'object',actionId:wish});
+  // Leisure can use the actual shared TV if the sofa is reserved. The
+  // physical TV itself is still exclusive; no phantom watch/football credit.
+  if(!plan&&wish==='sofa')
+    plan=prepareCommand(root,id,{type:'object',actionId:'tv'});
   if(plan&&startPlannedObject(root,id,plan,true))return true;
   actor.autonomy.nextAt=Math.max(root.minutes+2,actor.autonomy.nextAt||0);
   return false;
