@@ -137,7 +137,7 @@ export function observePairViews(graph,idA,idB,views){
   pair.views[idB]=safeView(views[idB],pair.views[idB]);
   return true;
 }
-const POSITIVE=new Set(['phone.call','talk','conversation.talk','gift.accepted','leisure.accepted',
+const POSITIVE=new Set(['phone.call','sports.discuss','sports.disagree','talk','conversation.talk','gift.accepted','leisure.accepted',
   'acquaint.chat','friend.tease','friend.confide','rival.truce',
   'romance.flirt','romance.confess','romance.date',
   'romance.tender','romance.propose','romance.marry',
@@ -155,6 +155,8 @@ const TYPES=new Set([...POSITIVE,...NEGATIVE,'introduced']);
 const positive=type=>POSITIVE.has(type);
 const weights={
   'phone.call':{friendship:1,trust:0,tension:0},
+  'sports.discuss':{friendship:1,trust:1,tension:0},
+  'sports.disagree':{friendship:0,trust:0,tension:0},
   talk:{friendship:6,trust:3,tension:-3},
   'conversation.talk':{friendship:5,trust:4,tension:-3},
   'gift.accepted':{friendship:5,trust:4,tension:-3},
