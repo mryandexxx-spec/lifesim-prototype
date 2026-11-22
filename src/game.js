@@ -110,7 +110,8 @@ import {pairDynamic} from './social-dynamics.js';
 import {romanceStatus,romanceLoveDescription,romanceClimate,romanceAvailability,
   setRomancePreference,romancePreferenceSummary} from './romance.js';
 import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX_ACTION_QUEUE,
-  blockedActions,parkQueuedHead,retryBlockedAction,removeBlockedAction} from './action-queue.js';
+  blockedActions,parkQueuedHead,parkInterruptedAction,retryBlockedAction,removeBlockedAction,
+  MAX_BLOCKED_QUEUE} from './action-queue.js';
 import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand} from './queue-rescue.js';
 import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
 import {effectiveSleepSpeed} from './sleep-acceleration.js';
@@ -7876,14 +7877,16 @@ function boot() {
         const stalledSocial=game.socialAction;
         const replay=recoverableSocialCommand(stalledSocial);
         const full=replay&&pendingActions(game.actionQueues,stalledSocial.initiator).length>=MAX_ACTION_QUEUE;
-        if(full){
-          // Never discard an accepted manual request when a full FIFO cannot
-          // store it. Show one actionable warning and let the player free a slot.
+        const overflow=full&&blockedActions(game.actionQueues,stalledSocial.initiator).length>=MAX_BLOCKED_QUEUE;
+        if(overflow){
+          // A truly full active FIFO AND review tray has no safe, lossless
+          // destination for the accepted manual invitation. Surface the
+          // blockage instead of silently erasing the active commitment.
           const seq=game.actionQueues.nextSeq;
           if(lastRescueOverflowSeq!==seq){
             lastRescueOverflowSeq=seq;
-            $('queue-feedback').textContent='Не удалось восстановить встречу: очередь полна. Убери одно из будущих заданий.';
-            toast('Очередь полна · открой план и убери лишнее действие');
+            $('queue-feedback').textContent='Очередь и отложенные задания заполнены. Убери ненужное задание, чтобы освободить встречу.';
+            toast('План заполнен · освободи место в очереди или отложенных');
           }
         }else{
           cancelSocial(game);
@@ -7894,18 +7897,25 @@ function boot() {
           socialWalkGuard=newSocialWalkGuard();
           let restored=false;
           if(replay){
-            const task=enqueueAction(game.actionQueues,stalledSocial.initiator,replay);
+            const task=full
+              ?parkInterruptedAction(game.actionQueues,stalledSocial.initiator,
+                replay,'unreachable-route',game.minutes)
+              :enqueueAction(game.actionQueues,stalledSocial.initiator,replay);
             if(task){
               restored=true;
-              // Give the scene time to settle before retrying the same path.
-              routeRetryAt.set(task.seq,performance.now()+5000);
-              routeFailures.set(task.seq,3);
+              if(!full){
+                // Give the scene time to settle before retrying the same path.
+                routeRetryAt.set(task.seq,performance.now()+5000);
+                routeFailures.set(task.seq,3);
+              }
             }
           }
           restartAutonomyWait();
           const message=replay
             ?restored
-              ?'Встреча зависла при подходе и отложена в конец плана. Остальные действия сохранены.'
+              ?full
+                ?'Встреча зависла и сохранена в «Отложено»: очередь полна. Остальные действия доступны.'
+                :'Встреча зависла при подходе и отложена в конец плана. Остальные действия сохранены.'
               :'Встреча прервана; восстановить задание не удалось. Проверь план.'
             :'Зависшая автоматическая встреча прервана. Персонажи снова могут действовать.';
           $('queue-feedback').textContent=message;
