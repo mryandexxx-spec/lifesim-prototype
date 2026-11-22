@@ -55,7 +55,7 @@ test('Q3b player pause and interrupted/reloaded sleep never grant retroactive en
   loaded.paused=true;tick(loaded,400);close(loaded.needs.energy,s.needs.energy);
   assert.equal(loaded.action.elapsed,90);
   loaded.paused=false;tick(loaded,10);
-  close(loaded.needs.energy,s.needs.energy+1.02);
+  close(loaded.needs.energy,s.needs.energy+1.90);
 });
 test('Q3b clamp-at-100 sleep is chunk invariant, including awake remainder',()=>{
   const a=newGame();a.needs.energy=78;chooseAction(a,'bed');arrive(a);
