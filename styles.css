@@ -2561,3 +2561,33 @@ button.time-card:active {transform:translateY(1px);}
   .career-phone-body .phone-platform-tile{min-height:109px;padding:10px}
   .phone-platform-tile strong{font-size:12px}
 }
+
+/* FANDOM-R1-D: approved fifth phone app, existing safe-area shell and ≥44px taps. */
+.sports-phone-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:9px 0 13px}
+.career-phone-body .sports-phone-tab{min-height:46px;border-radius:11px;font-size:12px;
+  padding:7px 4px;background:#edf5ec;border:1px solid #bad1c2;color:#345c49}
+.career-phone-body .sports-phone-tab-active{background:#347d63;color:white;border-color:#347d63}
+.career-phone-body .sports-phone-summary{margin:6px 0 8px}
+.career-phone-body .sports-phone-live{background:#e9f3e8;border-color:#94baa3;gap:9px}
+.career-phone-body .sports-phone-live>strong{color:#9c433e}
+.sports-phone-score{font-size:17px;font-weight:800;text-align:center;margin:7px 0;color:#244c3d}
+.sports-phone-clubs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px}
+.career-phone-body .sports-phone-team{min-height:48px;padding:8px 6px;
+  background:#f4f7f0;border:1px solid #bbcfc0;border-left:5px solid #7da692;
+  font-size:12px;font-weight:700;text-align:left;white-space:normal}
+.career-phone-body .sports-phone-team:disabled{background:#e7f0e5;opacity:.76}
+.sports-phone-match-list{display:flex;flex-direction:column;gap:8px}
+.sports-phone-match{display:flex;flex-direction:column;gap:3px;padding:10px;
+  background:#f5f8f3;border:1px solid #cfdfd0;border-radius:10px}
+.sports-phone-match strong{font-size:13px;color:#315849}
+.sports-phone-match small{font-size:11px;color:#5d7665}
+.sports-phone-table-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;
+  padding:8px 0;border-bottom:1px solid #d7e6d9;align-items:center}
+.sports-phone-table-row span{font-size:12px;overflow-wrap:anywhere}
+.sports-phone-table-row strong{font-size:11px;text-align:right;white-space:nowrap}
+@media(max-width:360px){
+ .sports-phone-tabs{gap:4px}
+ .career-phone-body .sports-phone-tab{font-size:11px;padding:6px 2px}
+ .sports-phone-clubs{gap:5px}
+ .career-phone-body .sports-phone-team{font-size:11px;padding:6px 4px}
+}
