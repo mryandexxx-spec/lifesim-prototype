@@ -110,6 +110,8 @@ jobs:
           node --check src/meshy-room-v3-data.js
           node --check src/meshy-furniture-visual.js
           node --check src/dining.js
+          node --check src/grill-catalog.js
+          node --check src/grill-r1.js
           node --check src/kitchen.js
           node --check src/dirty-dishes-visual.js
           node --check src/kitchen-market.js
@@ -272,7 +274,7 @@ jobs:
           cp src/object-definition-registry.js src/object-effect-engine.js src/object-legacy-adapter.js src/shop-catalog-selector.js site/src/
           cp src/object-use-runtime.js src/object-quality-presentation.js src/object-quality-comparison.js site/src/
           cp src/object-once-ledger.js site/src/
-          cp src/kitchen.js src/kitchen-market.js src/hobby-content.js site/src/
+          cp src/kitchen.js src/kitchen-market.js src/grill-catalog.js src/grill-r1.js src/hobby-content.js site/src/
           cp src/ready-meal-catalog.js src/ready-food.js site/src/
           cp src/dirty-dishes-visual.js site/src/
           cp src/activity-session.js site/src/
