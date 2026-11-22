@@ -61,7 +61,9 @@ export function addressedSocialPeers(root,initiator){
     return {id,name:legacy(id)?id==='alex'?'Алекс':'Мира':
       root.population.residentsById[id].identity.firstName,
       ready:canMeet(root,initiator,id)&&!root.socialAction&&
-        !root.additionalSocial&&!person.action,
+        !root.additionalSocial&&!person.action&&!actor(root,initiator).action&&
+        !pendingActions(root.actionQueues,id).length&&
+        !pendingActions(root.actionQueues,initiator).length,
       relationship:relationSummary(root.socialGraph,initiator,id)};
   });
 }
@@ -80,9 +82,13 @@ export function queueAddressedSocial(root,initiator,partner,actionId='talk'){
     ?{type:'branch',targetId:partner,actionId}
     :{type:'social',targetId:partner,actionId};
   const receipt=enqueueAction(root.actionQueues,initiator,command);
-  if(receipt&&actor(root,initiator)?.action?.automatic){
-    const person=actor(root,initiator);
-    person.action=null;person.event='Ожидает социального действия';
+  // A new explicit invitation outranks either participant's *automatic*
+  // routine. Never cancel manual action, another session or somebody else's job.
+  if(receipt)for(const id of [initiator,partner]){
+    const person=actor(root,id);
+    if(person?.action?.automatic){
+      person.action=null;person.event='Ожидает социального действия';
+    }
   }
   return receipt;
 }
@@ -153,6 +159,7 @@ export function restoreAddressedSocial(raw,root){
       'phase','elapsed','createdAt'].includes(k))||
     raw.schema!==ADDRESSED_SOCIAL_SCHEMA||
     !Number.isSafeInteger(raw.seq)||raw.seq<1||
+    raw.seq>=root.actionQueues?.nextSeq||
     !['walking','using'].includes(raw.phase)||
     !Number.isFinite(raw.elapsed)||raw.elapsed<0||
     raw.elapsed>=ADDRESSED_SOCIAL_DURATION||
@@ -161,6 +168,11 @@ export function restoreAddressedSocial(raw,root){
     !validAction(raw.actionId)||!canMeet(root,raw.initiator,raw.partner)||
     root.socialAction||actor(root,raw.initiator).action||
     actor(root,raw.partner).action)return null;
+  if(raw.phase==='using'){
+    const a=actor(root,raw.initiator),b=actor(root,raw.partner);
+    if(dist(a.position,b.position)<.76||dist(a.position,b.position)>1.55||
+      !isClearLine(a.position,b.position,root.world))return null;
+  }
   return {...raw};
 }
 function stepTowards(root,id,goal,minutes){
@@ -186,6 +198,8 @@ export function tickAddressedSocial(root,minutes){
   if(!s||root.paused||!Number.isFinite(minutes)||minutes<=0)return false;
   if(!hasTime(root,s)||!canMeet(root,s.initiator,s.partner)||
     root.socialAction||actor(root,s.initiator).action||actor(root,s.partner).action||
+    pendingActions(root.actionQueues,s.initiator).length||
+    pendingActions(root.actionQueues,s.partner).length||
     !actionAllowed(root,s.initiator,s.partner,s.actionId)){
     cancelAddressedSocial(root);return false;
   }
