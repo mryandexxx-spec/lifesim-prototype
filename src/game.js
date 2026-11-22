@@ -175,12 +175,32 @@ const canvas = $('game-canvas');
 // camera pointer events, scrollable panels or editable field gestures.
 installMobileGesturePolicy(document.querySelector('.app-shell'),canvas);
 const intimacyVeil=$('intimacy-veil');
-const loadingProgress=createLoadingProgress(['scene','alex','mira'],({completed,total,failed})=>{
+const loadingProgress=createLoadingProgress([
+  {id:'cache',label:'Подключаем кэш 3D-моделей',optional:true},
+  {id:'engine',label:'Запускаем PlayCanvas',optional:false},
+  {id:'scene',label:'Строим дом и участок',optional:false},
+  {id:'interface',label:'Подключаем управление',optional:false},
+  {id:'frame',label:'Ожидаем первый кадр WebGL',optional:false},
+  {id:'alex',label:'Загружаем модель Алекса',optional:true},
+  {id:'mira',label:'Загружаем модель Миры',optional:true}
+],({completed,total},stages)=>{
   $('loading-count').textContent=completed+' / '+total;
   $('loading-bar').style.width=(completed/total*100)+'%';
-  $('loading-status').textContent=failed
-    ? 'Не все модели доступны — используем резервные облики'
-    : completed===total?'Готово!':'Загружаем сцену и 3D-модели';
+  const pending=stages.find(stage=>stage.status==='pending');
+  $('loading-status').textContent=pending?'Сейчас: '+pending.label:
+    'Игровой мир готов. Дополнительная мебель может догружаться во время игры.';
+  $('loading-stages').replaceChildren(...stages.map(({id,label,status})=>{
+    const li=document.createElement('li');li.dataset.stage=id;li.dataset.status=status;
+    const mark=document.createElement('span');mark.className='loading-stage-mark';
+    mark.setAttribute('aria-hidden','true');
+    mark.textContent=status==='pending'?'○':status==='ready'?'✓':'!';
+    const detail=document.createElement('span');
+    detail.textContent=label+(status==='fallback'
+      ? (id==='cache'?' · обычная сеть':' · резервный облик')
+      : status==='ready'?' · готово':' · ожидаем');
+    li.append(mark,detail);
+    return li;
+  }));
 });
 // Only propose the phone's LOCAL date at first creation/migration. Saved anchors win forever.
 function suggestedGameDate(){
@@ -2233,6 +2253,7 @@ setInterval(() => save(true), 8000);
 function boot() {
   const app = new pc.Application(canvas, { graphicsDeviceOptions: { alpha: false, antialias: true, preserveDrawingBuffer: false } });
   app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+  loadingProgress.finish('engine');
   // LOT-E1: read-only PlayCanvas 2.24 AppStats probe for automated profiling.
   // Never activated for ordinary play, never writes game state/save or GPU flags.
   if(new URLSearchParams(location.search).get('lot-e1')==='qa'){
@@ -9177,18 +9198,38 @@ function boot() {
     }
     if(autosaveTime>8){autosaveTime=0;save(true);}
   });
+  loadingProgress.finish('scene');
+  loadingProgress.finish('interface');
+  // The first actual PlayCanvas postrender event is evidence of a WebGL frame.
+  app.once('postrender',()=>loadingProgress.finish('frame'));
   app.start();
-  // Count the scene after rendering has had a chance to draw its first frame.
-  requestAnimationFrame(()=>requestAnimationFrame(()=>loadingProgress.finish('scene')));
-  // A stalled optional GLB request may not hold the full-screen loader forever.
+  // An 18-second limit applies to optional model requests only. Never
+  // manufacture a successful 3D frame from a wall-clock timer.
   const loadingWatchdog=setTimeout(()=>{
     if(loadingProgress.snapshot().completed<loadingProgress.snapshot().total){
-      console.warn('3D loading timeout; proceeding with fallback');
-      loadingProgress.failUnresolved();
+      if(!loadingProgress.requiredReady()){
+        loadingAborted=true;
+        console.error('WebGL frame startup timed out');
+        const el=$('loading');
+        el.replaceChildren();
+        const heading=document.createElement('strong');
+        heading.textContent='3D не отвечает';
+        const hint=document.createElement('span');
+        hint.textContent='Нет готового кадра WebGL. Сохранение не изменено. Попробуй снова.';
+        const retry=document.createElement('button');
+        retry.type='button';retry.id='startup-retry';retry.className='startup-retry';
+        retry.textContent='Повторить';
+        retry.addEventListener('click',()=>window.location.reload());
+        el.append(heading,hint,retry);
+        return;
+      }
+      console.warn('Optional 3D models timed out; keeping procedural fallbacks');
+      loadingProgress.failUnresolved({onlyOptional:true});
     }
   },18000);
-  void loadingProgress.wait().then(({failed})=>{
+  void loadingProgress.wait().then(()=>{
     clearTimeout(loadingWatchdog);
+    if(loadingAborted||!loadingProgress.requiredReady())return;
     bootReadyToSave=true;
     if(calendarNeedsPersistence||billsNeedsPersistence)save(true);
     $('loading').hidden=true;
@@ -9196,18 +9237,22 @@ function boot() {
     try{seen=localStorage.getItem(UI_TOUR_STORAGE_KEY);}
     catch{seen='done';/* Private mode never blocks loading. */}
     if(shouldShowTour(seen)&&!dialogueNeedsDecision(game))openTour();
-    toast(failed
+    const modelFallback=loadingProgress.stages().some(stage=>
+      (stage.id==='alex'||stage.id==='mira')&&stage.status==='fallback');
+    toast(modelFallback
       ? 'Часть 3D-моделей недоступна — включены старые облики'
       : 'Коснись жителя или мебели · МЕТКИ — названия предметов');
   });
 }
 
+let loadingAborted=false;
 void (async()=>{
-  // Optional Safari model cache must not indefinitely block 3D startup.
-  await Promise.race([
-    registerModelCache(),
-    new Promise(resolve=>setTimeout(resolve,3500))
+  // Cache registration can return false: plain HTTP requests remain valid.
+  const cacheReady=await Promise.race([
+    registerModelCache().then(Boolean).catch(()=>false),
+    new Promise(resolve=>setTimeout(()=>resolve(false),3500))
   ]);
+  loadingProgress.finish('cache',cacheReady);
   boot();
 })().catch(error=>{
   console.error('Блин’С startup failed',error);
