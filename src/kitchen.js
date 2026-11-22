@@ -4,6 +4,7 @@
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {findPath} from './navigation.js';
 import {readyMeal} from './ready-meal-catalog.js';
+import {GRILL_RECIPES,grillRecipe} from './grill-catalog.js';
 
 export const KITCHEN_SCHEMA=1;
 export const KITCHEN_PREPARED_LIMIT=12;
@@ -11,7 +12,7 @@ export const KITCHEN_PREPARED_LIMIT=12;
 export const DISH_AUTO_WASH_THRESHOLD=6;
 export const COOKING_SKILL_ID='cooking';
 export const FRESH_MEAL_HUNGER_THRESHOLD=55;
-export const PANTRY_START=Object.freeze({vegetables:8,grains:8,dairy:8});
+export const PANTRY_START=Object.freeze({vegetables:8,grains:8,dairy:8,meat:0,chicken:0});
 export const KITCHEN_HERB_LIMIT=16;
 export const KITCHEN_HARVEST_UNITS=2;
 const recipe=(id,label,requires,minLevel,cookMinutes,portions,hungerFactor,color)=>
@@ -42,7 +43,7 @@ export function cookingQuality(level=0){
     Number.isFinite(level)&&level>=3?'good':'normal'];
 }
 export function kitchenQualityId(recipeId,quality){
-  return Object.hasOwn(KITCHEN_RECIPES,recipeId)&&
+  return (Object.hasOwn(KITCHEN_RECIPES,recipeId)||Object.hasOwn(GRILL_RECIPES,recipeId))&&
     typeof quality==='string'&&Object.hasOwn(KITCHEN_QUALITIES,quality)
       ?quality:'normal';
 }
@@ -52,7 +53,7 @@ export function kitchenServingMultiplier(recipeId,quality){
 const own=(obj,key)=>Object.hasOwn(obj||{},key);
 const finiteInt=n=>Number.isSafeInteger(n)&&n>=0;
 export const kitchenRecipe=id=>typeof id==='string'
-  ?(own(KITCHEN_RECIPES,id)?KITCHEN_RECIPES[id]:readyMeal(id)):null;
+  ?(own(KITCHEN_RECIPES,id)?KITCHEN_RECIPES[id]:(grillRecipe(id)||readyMeal(id))):null;
 export function newKitchen(){
   return {schema:KITCHEN_SCHEMA,pantry:{...PANTRY_START,herbs:0},prepared:[],
     deliveries:[],dirtyDishes:0,lastPantryDay:0};
@@ -60,9 +61,11 @@ export function newKitchen(){
 export function restoreKitchen(raw){
   const state=newKitchen();
   if(!raw||raw.schema!==KITCHEN_SCHEMA||typeof raw!=='object')return state;
-  if(raw.pantry&&Object.keys(PANTRY_START).every(id=>
+  if(raw.pantry&&['vegetables','grains','dairy'].every(id=>
     finiteInt(raw.pantry[id])&&raw.pantry[id]<=30))
-    state.pantry={...Object.fromEntries(Object.keys(PANTRY_START).map(id=>[id,raw.pantry[id]])),
+    state.pantry={...Object.fromEntries(Object.keys(PANTRY_START).map(id=>
+      [id,finiteInt(raw.pantry[id])&&raw.pantry[id]<=30?raw.pantry[id]:
+        PANTRY_START[id]])),
       herbs:finiteInt(raw.pantry.herbs)&&raw.pantry.herbs<=KITCHEN_HERB_LIMIT?raw.pantry.herbs:0};
   if(Array.isArray(raw.prepared)&&raw.prepared.length<=12){
     const combined=new Map();

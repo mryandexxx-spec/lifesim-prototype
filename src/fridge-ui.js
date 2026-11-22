@@ -5,7 +5,7 @@ import {preparedKitchenMeals,KITCHEN_PREPARED_LIMIT,KITCHEN_HERB_LIMIT,
 import {quoteReadyMeal} from './ready-food.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {KITCHEN_RESTOCK_LABELS,KITCHEN_RESTOCK_PRICE,
-  KITCHEN_RESTOCK_MAX,quoteKitchenRestock} from './kitchen-market.js';
+  KITCHEN_RESTOCK_MAX,quoteKitchenRestock,ingredientPack} from './kitchen-market.js';
 
 export const FRIDGE_TABS=Object.freeze(['eat','stock','buy']);
 export const fridgeTab=value=>FRIDGE_TABS.includes(value)?value:'eat';
@@ -45,8 +45,9 @@ export function fridgeViewModel(root,skillLevel=0){
   });
   const staples=Object.entries(KITCHEN_RESTOCK_LABELS).map(([id,label])=>{
     const quote=quoteKitchenRestock(root,id);
+    const pack=ingredientPack(id);
     return {id,label,current:safe(kitchen?.pantry?.[id]),max:KITCHEN_RESTOCK_MAX,
-      price:KITCHEN_RESTOCK_PRICE,units:5,available:quote.ok,
+      price:pack.price,units:pack.units,available:quote.ok,
       reason:quote.ok?'Доступно':reasons[quote.reason]||'Покупка недоступна'};
   });
   return {
@@ -54,6 +55,7 @@ export function fridgeViewModel(root,skillLevel=0){
     stored,reserved,capacity,remaining:Math.max(0,capacity-stored-reserved),
     pantry:{vegetables:safe(kitchen?.pantry?.vegetables),
       grains:safe(kitchen?.pantry?.grains),dairy:safe(kitchen?.pantry?.dairy),
+      meat:safe(kitchen?.pantry?.meat),chicken:safe(kitchen?.pantry?.chicken),
       herbs:safe(kitchen?.pantry?.herbs),herbsMax:KITCHEN_HERB_LIMIT},
     dirtyDishes:safe(kitchen?.dirtyDishes),
     credits:safe(root?.shop?.credits)

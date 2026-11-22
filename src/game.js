@@ -47,6 +47,8 @@ import {previewPoolTiles,previewPoolFixture,previewRotatedPoolFixture,previewPoo
 import {createPoolVisual,poolFixtureVisualPose} from './pool-visual.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
+import {GRILL_RECIPES,grillRecipe,grillApproach,grillAvailable,
+  canGrillRecipe,chooseOutdoorDining} from './grill-r1.js';
 import {isGardenItem,gardenView,gardenApproach,gardenActionAllowed,
   gardenRequestStillValid} from './gardening.js';
 import {playerMayClaimGarden} from './garden-autonomy.js';
@@ -557,6 +559,7 @@ function taskLabel(task){
   if(!task)return 'Неизвестное действие';
   if(task.type==='move')return 'Идти в указанное место';
   if(task.type==='outdoor')return 'Отдохнуть на садовой скамейке';
+  if(task.type==='grill')return 'Гриль: '+(grillRecipe(task.recipeId)?.label||'готовка');
   if(task.type==='garden')return task.actionId==='water'?'Полить грядку':
     task.actionId==='inspect'?'Осмотреть растение':
     task.actionId==='harvest'?'Собрать садовые травы':
@@ -578,6 +581,16 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
+  if(command.type==='grill'){
+    const actor=getActor(game,residentId);
+    const point=grillApproach(game.world,command.instanceId);
+    const level=currentSkillLevel(actor?.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+    if(residentUnavailableForHome(game,residentId)||!point||
+      !canGrillRecipe(game.kitchen,command.recipeId,level)||
+      !findPath(actor.position,point,game.world)){
+      toast('Гриль недоступен: проверь продукты, навык, место и проход');return false;
+    }
+  }
   if(command.type==='garden'){
     const actor=getActor(game,residentId);
     if(residentUnavailableForHome(game,residentId)||
@@ -1158,7 +1171,7 @@ function renderKitchenRestock(){
     'insufficient-credits':'Недостаточно кредитов',
     'missing-fridge':'Холодильник недоступен'
   };
-  button.textContent=quote.ok?'🛒 Купить +5 · 15 кр.':
+  button.textContent=quote.ok?'🛒 Купить +'+quote.units+' · '+quote.price+' кр.':
     (labels[quote.reason]||'Покупка недоступна');
 }
 $('fridge-staple-select').addEventListener('change',renderKitchenRestock);
@@ -1167,7 +1180,7 @@ $('fridge-buy-button').addEventListener('click',()=>{
   const itemId=$('fridge-staple-select').value;
   const quote=quoteKitchenRestock(game,itemId);
   if(!quote.ok){renderKitchenRestock();toast('Покупка недоступна');return;}
-  if(!window.confirm('Купить «'+quote.label+'» · +5 за 15 кредитов?'))return;
+  if(!window.confirm('Купить «'+quote.label+'» · +'+quote.units+' за '+quote.price+' кредитов?'))return;
   const transaction=proposeKitchenRestock(game,itemId,game.selectedSim);
   if(!transaction.ok){renderKitchenRestock();toast('Баланс или запас изменились');return;}
   const oldKitchen=game.kitchen,oldShop=game.shop,oldHistory=game.financialHistory;
@@ -1180,7 +1193,7 @@ $('fridge-buy-button').addEventListener('click',()=>{
   }
   updateFamilyBalance();select('fridge');
   $('fridge-staple-select').value=itemId;renderKitchenRestock();
-  toast('Куплено: '+quote.label+' +5 · −15 кредитов');
+  toast('Куплено: '+quote.label+' +'+quote.units+' · −'+quote.price+' кредитов');
 });
 // Ready meals use the same fridge inventory and the existing physical dining.
 function renderReadyPurchase(){
@@ -2799,7 +2812,7 @@ function boot() {
   renderOutdoorGround();
   // LOT-B2: original low-poly plants and boundaries, grouped under one node
   // per owned instance. Only the 96-item bounded save controls these meshes.
-  const outdoorFeatureNodes=[],outdoorLightNodes=[];
+  const outdoorFeatureNodes=[],outdoorLightNodes=[],grillAnimated=[];
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
@@ -2818,11 +2831,13 @@ function boot() {
     yellow:mat('#e9c767'),purple:mat('#8f77b6'),
     wood:mat('#af8967'),woodDark:mat('#846e54'),soil:mat('#6e8761'),
     gardenSoil:mat('#6b4e3d'),wetSoil:mat('#544536'),
-    drySoil:mat('#9a7252'),orange:mat('#e5a352'),blue:mat('#7197d8')
+    drySoil:mat('#9a7252'),orange:mat('#e5a352'),blue:mat('#7197d8'),
+    metal:mat('#606975'),metalLight:mat('#aebbc7'),coal:mat('#2b3035'),
+    ember:mat('#d56f40'),meat:mat('#995d43'),chicken:mat('#dbac73')
   };
   const renderOutdoorFeatures=()=>{
     for(const node of outdoorFeatureNodes.splice(0))node.destroy();
-    outdoorLightNodes.length=0;
+    outdoorLightNodes.length=0;grillAnimated.length=0;
     for(const item of game.world?.outdoors?.features||[]){
       const def=OUTDOOR_CATALOG[item.itemId];
       if(!def||!['tree','shrub','flower','fence','furniture','light','garden'].includes(def.category))continue;
@@ -2888,6 +2903,34 @@ function boot() {
         for(const z of [-.23,0,.23])
           part('box','bench slat',0,.59,z,1.50,.10,.17,'wood');
         part('box','bench back',0,.91,.25,1.50,.53,.11,'wood');
+      }else if(item.itemId==='garden.grill'){
+        // Independent lightweight game geometry: iron frame, grate, coals,
+        // handle and three visible skewers. No particle texture or sound.
+        for(const x of [-.48,.48])for(const z of [-.28,.28])
+          part('cylinder','grill leg',x,.36,z,.09,.72,.09,'metal');
+        part('box','firebox',0,.72,0,1.22,.36,.82,'metal');
+        part('box','charcoal bed',0,.91,0,1.08,.07,.68,'coal');
+        for(const x of [-.35,0,.35])for(const z of [-.16,.16])
+          part('sphere','warm ember',x,.965,z,.14,.06,.12,'ember');
+        for(let x=-.48;x<=.49;x+=.12)
+          part('box','grill grate rod',x,1.025,0,.027,.025,.74,'metalLight');
+        for(const z of [-.30,.30])
+          part('box','grill grate rail',0,1.038,z,1.19,.035,.04,'metal');
+        part('cylinder','grill side handle',.71,.84,0,.08,.22,.08,'metalLight');
+        const skewers=[],foodPieces=[];
+        for(const z of [-.18,0,.18]){
+          const pivot=new pc.Entity('GRILL-R1 animated skewer');
+          pivot.setLocalPosition(0,1.115,z);node.addChild(pivot);
+          primitive('box','grill skewer rod',0,0,0,1.20,.035,.035,
+            outdoorFeatureMaterials.metalLight,pivot);
+          for(const x of [-.29,0,.29]){
+            const food=primitive('box','grill food piece',x,.055,0,.20,.14,.17,
+              outdoorFeatureMaterials[z===0?'chicken':'meat'],pivot);
+            food.enabled=false;foodPieces.push(food);
+          }
+          skewers.push(pivot);
+        }
+        grillAnimated.push({instanceId:item.instanceId,skewers,foodPieces});
       }else if(item.itemId==='garden.table'){
         part('cylinder','table stand',0,.43,0,.20,.80,.20,'woodDark');
         part('cylinder','garden tabletop',0,.86,0,1.06,.11,1.06,'wood');
@@ -3844,6 +3887,10 @@ function boot() {
   const diningVisual={alex:null,mira:null};
   let drawnDiningChairs=new Set();
   const diningVisualFor=(id,action)=>{
+    if(action?.targetInstanceId?.startsWith('out-')){
+      diningVisual[id]=null;
+      return null;
+    }
     if(action?.id==='dining'&&action.phase==='using'&&action.diningStage==='eating'){
       const previous=diningVisual[id];
       if(!previous||previous.tableId!==action.targetInstanceId||
@@ -4013,9 +4060,11 @@ function boot() {
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
     alex:game.action?.phase==='using'&&(game.action.id==='fridge'||
-      (game.action.id==='cook'&&['taking','storing'].includes(game.action.cookStage))),
+      (game.action.id==='cook'&&['taking','storing'].includes(game.action.cookStage))||
+      (game.action.id==='grill'&&game.action.grillStage==='storing')),
     mira:game.otherSim.action?.phase==='using'&&(game.otherSim.action.id==='fridge'||
-      (game.otherSim.action.id==='cook'&&['taking','storing'].includes(game.otherSim.action.cookStage)))
+      (game.otherSim.action.id==='cook'&&['taking','storing'].includes(game.otherSim.action.cookStage))||
+      (game.otherSim.action.id==='grill'&&game.otherSim.action.grillStage==='storing'))
   };
   const paths={
     alex:{points:null,index:0,id:null},
@@ -4088,6 +4137,12 @@ function boot() {
       gardenApproach(game.world,targetInstanceId,getActor(game,residentId)?.position)?.goal||null;
     if(id==='move')return getActor(game,residentId)?.action?.goal||null;
     if(id==='bench')return outdoorBenchApproach(game.world,targetInstanceId);
+    if(id==='grill'){
+      const a=getActor(game,residentId)?.action;
+      return ['toFridgeStore','storing'].includes(a?.grillStage)
+        ?furnitureActionApproach(game.world,'fridge')
+        :grillApproach(game.world,targetInstanceId);
+    }
     if(id==='hobby:toSeat'){
       const reader=getActor(game,residentId);
       return reader?.action?.id==='hobby'
@@ -4212,6 +4267,27 @@ function boot() {
     actor.event='Идёт отдыхать на садовой скамейке';
     restartAutonomyWait(actorId);return true;
   };
+  const beginOutdoorGrill=(actorId,instanceId,recipeId,fromQueue=false)=>{
+    const actor=getActor(game,actorId),point=grillApproach(game.world,instanceId);
+    const level=currentSkillLevel(actor?.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+    if(!actor||actor.action||game.socialAction||
+      residentUnavailableForHome(game,actorId)||!point||
+      !grillAvailable(game,actorId,instanceId)||
+      !canGrillRecipe(game.kitchen,recipeId,level)){
+      if(!fromQueue)toast('Гриль занят, нет продуктов или рецепт пока недоступен');
+      return false;
+    }
+    if(!buildRoute('grill',actorId,instanceId)){
+      if(!fromQueue)toast('Нет маршрута к грилю');
+      return false;
+    }
+    if(!chooseAction(actor,'grill',false))return false;
+    actor.action.targetInstanceId=instanceId;
+    actor.action.recipeId=recipeId;
+    actor.action.grillStage='cooking';
+    actor.event='Идёт к грилю: '+grillRecipe(recipeId).label;
+    restartAutonomyWait(actorId);return true;
+  };
   // Meet beside the other resident at a walkable, reachable point.
   beginSocial=(kind,automatic=false,actorId=game.selectedSim,topic=null,shared=null,branchId=null,fromQueue=false)=>{
     if(residentUnavailableForHome(game,actorId)||
@@ -4324,6 +4400,8 @@ function boot() {
       task.targetInstanceId&&!resolveActionFurniture(game.world,
         task.choiceId==='books'?'hobby':task.choiceId,task.targetInstanceId))
       return 'missing-target';
+    if(task.type==='grill'&&!grillApproach(game.world,task.instanceId))
+      return 'missing-target';
     if(task.type==='outdoor'&&!outdoorBenchApproach(game.world,task.instanceId))
       return 'missing-target';
     if(task.type==='move'&&!isWalkable(task.x,task.z,game.world))
@@ -4388,6 +4466,10 @@ function boot() {
               id!==residentId&&showerStates[id].active))&&
             !(command.actionId==='toilet'&&HOUSEHOLD_IDS.some(id=>
               id!==residentId&&toiletStates[id].active));
+        if(command.type==='grill')return grillAvailable(game,residentId,command.instanceId)&&
+          canGrillRecipe(game.kitchen,command.recipeId,
+            currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID))&&
+          Boolean(findPath(actor.position,grillApproach(game.world,command.instanceId),game.world));
         if(command.type==='garden')return gardenActionAllowed(game,residentId,
           command.instanceId,command.actionId,{ignoreReservation:true})&&
           Boolean(gardenApproach(game.world,command.instanceId,actor.position));
@@ -4450,6 +4532,8 @@ function boot() {
         }
         else if(command.type==='outdoor')
           started=beginOutdoorBench(residentId,command.instanceId,true);
+        else if(command.type==='grill')
+          started=beginOutdoorGrill(residentId,command.instanceId,command.recipeId,true);
         else if(command.type==='garden')
           started=beginGardenAction(residentId,command.instanceId,command.actionId,true);
         else if(command.type==='pool'){
@@ -7072,6 +7156,27 @@ function boot() {
       });
       return;
     }
+    if(feature.itemId==='garden.grill'){
+      const level=currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+      const recipes=Object.values(GRILL_RECIPES).map(recipe=>{
+        const available=canGrillRecipe(game.kitchen,recipe.id,level);
+        const reason=level<recipe.minLevel?'Нужна кулинария '+recipe.minLevel:
+          'Нужны продукты или место в холодильнике';
+        return {actionId:recipe.id,label:'🔥 '+recipe.label+' · '+recipe.portions+' порц.',
+          available,reason,command:{type:'grill',instanceId:feature.instanceId,
+            recipeId:recipe.id}};
+      });
+      const first=recipes.find(recipe=>recipe.available)||recipes[0];
+      offerWorldAction(point,def.name,first.label,first.command,feature.instanceId,{
+        info:'Кулинария '+level+' · Мясо '+(game.kitchen?.pantry?.meat||0)+
+          ' · Курица '+(game.kitchen?.pantry?.chicken||0)+
+          ' · Овощи '+(game.kitchen?.pantry?.vegetables||0)+
+          ' · покупай продукты в холодильнике',
+        primaryAvailable:first.available,primaryReason:first.reason,
+        choices:recipes.filter(recipe=>recipe!==first)
+      });
+      return;
+    }
     if(feature.itemId==='garden.bench'){
       // Revalidation of availability and route happens again on confirmation.
       offerWorldAction(point,def.name,'🪑 Отдохнуть',
@@ -7489,7 +7594,8 @@ function boot() {
           def.category==='flower'?.48:
           def.category==='fence'?1.12:
           // Preserve C1's garden hit-volume while polishing its visual stages.
-          item.itemId==='garden.bench'?1.20:1.24;
+          item.itemId==='garden.bench'?1.20:
+          item.itemId==='garden.grill'?1.85:1.24;
         // A tiny flower/path lamp can render smaller than a finger on a
         // zoomed-out iPhone. Expand only its selectable volume, never its
         // saved footprint, route blocker, physics or purchase placement.
@@ -7798,7 +7904,8 @@ function boot() {
       for(const residentId of HOUSEHOLD_IDS){
         const a=getActor(game,residentId);
         const stillUsing=(a.action?.id==='fridge'||
-      (a.action?.id==='dining'&&a.action.diningStage==='taking'))&&
+      (a.action?.id==='dining'&&a.action.diningStage==='taking')||
+      (a.action?.id==='grill'&&a.action.grillStage==='storing'))&&
       a.action.phase==='using';
         if(fridgeWasUsing[residentId]&&!stillUsing&&fridgeOpen>.015)fridgeLeaving[residentId]=true;
         if(fridgeLeaving[residentId]&&fridgeOpen<=.015)fridgeLeaving[residentId]=false;
@@ -7954,6 +8061,10 @@ function boot() {
                 }else if(resident.action.cookStage==='toFridgeStore'){
                   arrive(resident);resident.action.cookStage='storing';
                 }
+              }else if(resident.action?.id==='grill'){
+                arrive(resident);
+                resident.action.grillStage=resident.action.grillStage==='toFridgeStore'
+                  ?'storing':'cooking';
               }else if(resident.action?.id==='dining'){
                 if(resident.action.diningStage==='toFridge'){
                   arrive(resident);resident.action.diningStage='taking';
@@ -8157,11 +8268,12 @@ function boot() {
       useId=using?(game.action.id==='dining'&&game.action.diningStage==='taking'
         ?'fridge':game.action.id==='cook'&&['taking','storing'].includes(game.action.cookStage)
           ?'fridge':game.action.id==='cook'&&game.action.cookStage==='preparing'
-            ?'prep':game.action.id):pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
+            ?'prep':game.action.id==='grill'&&game.action.grillStage==='storing'
+              ?'fridge':game.action.id):pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const alexDining=useId==='dining'&&game.action?.diningStage==='eating';
     const alexDiningVisual=alexDining?diningVisualFor('alex',game.action):diningVisual.alex;
     const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,
-      game.action?.id==='dining'?6:game.action?.id==='cook'&&game.action.cookStage==='storing'
+      game.action?.id==='dining'||game.action?.id==='grill'?6:game.action?.id==='cook'&&game.action.cookStage==='storing'
         ?6:game.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,frameAnimDt,
@@ -8190,6 +8302,8 @@ function boot() {
         (alexWatchSeat||game.action?.targetInstanceId)||null;
     if(useId==='bench'&&game.action?.phase==='using')
       benchVisualTargets.alex=game.action.targetInstanceId;
+    if(alexDining&&game.action?.targetInstanceId?.startsWith('out-'))
+      benchVisualTargets.alex=game.action.diningSeatInstanceId;
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
       (useId==='sofa'||useId==='seat'||useId==='bench'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated||alexDining)&&
         bedStates.alex.progress===0&&!showerStates.alex.active,
@@ -8197,7 +8311,9 @@ function boot() {
     const alexSeatBase=sofaTransitionPose(sofaStates.alex);
     const gardenSeatPose=benchVisualTargets.alex&&sofaStates.alex.progress>0
       ?outdoorBenchPose(game.world,benchVisualTargets.alex,sofaStates.alex.progress):null;
-    if(!gardenSeatPose&&useId!=='bench')benchVisualTargets.alex=null;
+    if(!gardenSeatPose&&useId!=='bench'&&
+      !(alexDining&&game.action?.targetInstanceId?.startsWith('out-')))
+      benchVisualTargets.alex=null;
     const seatPose=gardenSeatPose||(purchasedSeatPrefab(game.world,sofaVisualTargets.alex)
       ?(alexDiningVisual&&alexDiningVisual.chairId===sofaVisualTargets.alex
         ?purchasedDiningSeatPose(game.world,sofaVisualTargets.alex,alexSeatBase,
@@ -8232,12 +8348,18 @@ function boot() {
     const alexSwimFrame=poolSwimVisualFrame(game.world,game.action);
     const alexWater=wateringFrame(game.world,game);
     const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'&&useId!=='swim'
-      ?(useId==='paint'
+      ?(useId==='grill'
+        ?{x:game.position.x,z:game.position.z,
+          y:lotActorHeight(game.world,game.position),pitch:0,
+          yaw:game.world.outdoors.features.find(f=>
+            f.instanceId===game.action?.targetInstanceId)?.yaw||0}
+        :useId==='paint'
         ?easelPaintingPose(game.world,game.action?.targetInstanceId,game.position)
         :furniturePose(game.world,['taking','returning'].includes(alexReadingStage)?'bookcase':useId==='lamp'?'floorlamp':
           useId==='cook'?'stove':useId==='wash'?'sink':useId,
           ACTOR_POSES[useId],game.action?.id==='dining'||
-            (game.action?.id==='cook'&&useId==='fridge')?null:
+            (game.action?.id==='cook'&&useId==='fridge')||
+            (game.action?.id==='grill'&&useId==='fridge')?null:
             (game.action?.id==='cook'&&useId==='prep')
               ?game.action.prepInstanceId:game.action?.targetInstanceId)):null);
     const previousAlexXZ={x:display.x,z:display.z};
@@ -8338,12 +8460,13 @@ function boot() {
       game.otherSim.action.diningStage==='taking'?'fridge':
       game.otherSim.action.id==='cook'&&['taking','storing'].includes(game.otherSim.action.cookStage)?'fridge':
       game.otherSim.action.id==='cook'&&game.otherSim.action.cookStage==='preparing'?'prep':
+      game.otherSim.action.id==='grill'&&game.otherSim.action.grillStage==='storing'?'fridge':
       game.otherSim.action.id):
       pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const miraDining=miraUseId==='dining'&&game.otherSim.action?.diningStage==='eating';
     const miraDiningVisual=miraDining?diningVisualFor('mira',game.otherSim):diningVisual.mira;
     const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,
-      game.otherSim.action?.id==='dining'?6:game.otherSim.action?.id==='cook'&&
+      game.otherSim.action?.id==='dining'||game.otherSim.action?.id==='grill'?6:game.otherSim.action?.id==='cook'&&
         game.otherSim.action.cookStage==='storing'?6:
         game.otherSim.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
@@ -8373,6 +8496,8 @@ function boot() {
         (miraWatchSeat||game.otherSim.action?.targetInstanceId)||null;
     if(miraUseId==='bench'&&game.otherSim.action?.phase==='using')
       benchVisualTargets.mira=game.otherSim.action.targetInstanceId;
+    if(miraDining&&game.otherSim.action?.targetInstanceId?.startsWith('out-'))
+      benchVisualTargets.mira=game.otherSim.action.diningSeatInstanceId;
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
       (miraUseId==='sofa'||miraUseId==='seat'||miraUseId==='bench'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated||miraDining)&&
         bedStates.mira.progress===0&&!showerStates.mira.active,
@@ -8380,7 +8505,9 @@ function boot() {
     const miraSeatBase=sofaTransitionPose(sofaStates.mira);
     const gardenMiraPose=benchVisualTargets.mira&&sofaStates.mira.progress>0
       ?outdoorBenchPose(game.world,benchVisualTargets.mira,sofaStates.mira.progress):null;
-    if(!gardenMiraPose&&miraUseId!=='bench')benchVisualTargets.mira=null;
+    if(!gardenMiraPose&&miraUseId!=='bench'&&
+      !(miraDining&&game.otherSim.action?.targetInstanceId?.startsWith('out-')))
+      benchVisualTargets.mira=null;
     const miraSeatPose=gardenMiraPose||(purchasedSeatPrefab(game.world,sofaVisualTargets.mira)
       ?(miraDiningVisual&&miraDiningVisual.chairId===sofaVisualTargets.mira
         ?purchasedDiningSeatPose(game.world,sofaVisualTargets.mira,miraSeatBase,
@@ -8416,12 +8543,18 @@ function boot() {
       ?{...pairedTv.places.mira,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const miraPose=pairedTvMiraStand||(miraUseId&&!pairedHobby&&!miraSeating&&miraUseId!=='sofa'&&miraUseId!=='bed'&&miraUseId!=='shower'&&miraUseId!=='toilet'&&miraUseId!=='swim'
-      ?(miraUseId==='paint'
+      ?(miraUseId==='grill'
+        ?{x:game.otherSim.position.x,z:game.otherSim.position.z,
+          y:lotActorHeight(game.world,game.otherSim.position),pitch:0,
+          yaw:game.world.outdoors.features.find(f=>
+            f.instanceId===game.otherSim.action?.targetInstanceId)?.yaw||0}
+        :miraUseId==='paint'
         ?easelPaintingPose(game.world,game.otherSim.action?.targetInstanceId,game.otherSim.position)
         :furniturePose(game.world,['taking','returning'].includes(miraReadingStage)?'bookcase':miraUseId==='lamp'?'floorlamp':
           miraUseId==='cook'?'stove':miraUseId==='wash'?'sink':miraUseId,
           ACTOR_POSES[miraUseId],game.otherSim.action?.id==='dining'||
-            (game.otherSim.action?.id==='cook'&&miraUseId==='fridge')?null:
+            (game.otherSim.action?.id==='cook'&&miraUseId==='fridge')||
+            (game.otherSim.action?.id==='grill'&&miraUseId==='fridge')?null:
             (game.otherSim.action?.id==='cook'&&miraUseId==='prep')
               ?game.otherSim.action.prepInstanceId:game.otherSim.action?.targetInstanceId)):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
@@ -8619,8 +8752,10 @@ function boot() {
     // F4G.2: visible cooked tray travels from stove to fridge, stage-only.
     for(const id of HOUSEHOLD_IDS){
       const action=getActor(game,id)?.action;
-      const carrying=action?.id==='cook'&&
-        ['toFridgeStore','storing'].includes(action.cookStage)&&!furnishMode;
+      const carrying=((action?.id==='cook'&&
+        ['toFridgeStore','storing'].includes(action.cookStage))||
+        (action?.id==='grill'&&['toFridgeStore','storing'].includes(action.grillStage)))&&
+        !furnishMode;
       const drawn=cookedCarry[id];
       drawn.tray.enabled=Boolean(carrying);drawn.food.enabled=Boolean(carrying);
       if(carrying){
@@ -8645,6 +8780,16 @@ function boot() {
         const size=Math.max(.07,1-a.elapsed/ACTIONS.dining.duration);
         dish.food.setLocalScale(.23*size,.075,.18*size);
       }
+    }
+    for(const grill of grillAnimated){
+      const actor=HOUSEHOLD_IDS.map(id=>getActor(game,id)).find(a=>
+        a?.action?.id==='grill'&&a.action.phase==='using'&&
+        a.action.grillStage==='cooking'&&
+        a.action.targetInstanceId===grill.instanceId);
+      for(const food of grill.foodPieces)food.enabled=Boolean(actor);
+      for(let i=0;i<grill.skewers.length;i++)
+        grill.skewers[i].setLocalEulerAngles(
+          actor?Math.sin(effectTime*3+i*2)*22:0,0,0);
     }
     // V3 compatibility: action-specific authored parts own visible animation.
     // Keep original procedural geometry for the active music/easel interaction,

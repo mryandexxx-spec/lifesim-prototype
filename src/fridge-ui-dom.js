@@ -43,7 +43,8 @@ export function createFridgeR2UI({document,readModel,readName,onAction}){
       stapleId=model.staples[0]?.id||'vegetables';
     text(get('fridge-r2-summary'),
       'Для: '+readName()+' · Готовых порций '+model.stored+
-      ' · Продукты '+(model.pantry.vegetables+model.pantry.grains+model.pantry.dairy)+
+      ' · Продукты '+(model.pantry.vegetables+model.pantry.grains+model.pantry.dairy+
+        model.pantry.meat+model.pantry.chicken)+
       ' · Семья '+model.credits+' кр.');
     for(const id of ['eat','stock','buy']){
       get('fridge-r2-tab-'+id).setAttribute('aria-selected',String(tab===id));
@@ -96,7 +97,7 @@ export function createFridgeR2UI({document,readModel,readName,onAction}){
       'Купить порцию · '+selectedReady.price+' кр.':selectedReady?.reason||'Недоступно';
     fill('fridge-r2-staple-list',model.staples.map(item=>card({
       id:item.id,label:item.label,action:'select-staple',
-      subtitle:item.available?item.current+'/'+item.max+' · пополнить на +5':
+      subtitle:item.available?item.current+'/'+item.max+' · пополнить на +'+item.units:
         item.current+'/'+item.max+' · '+item.reason,
       mark:item.id===stapleId?'●':'○',active:item.id===stapleId,
       disabled:!item.available
@@ -105,7 +106,7 @@ export function createFridgeR2UI({document,readModel,readName,onAction}){
     const buyStaples=get('fridge-r2-staple-button');
     buyStaples.disabled=!selectedStaple?.available;
     buyStaples.textContent=selectedStaple?.available?
-      'Купить +5 · '+selectedStaple.price+' кр.':selectedStaple?.reason||'Недоступно';
+      'Купить +'+selectedStaple.units+' · '+selectedStaple.price+' кр.':selectedStaple?.reason||'Недоступно';
   }
   const show=(visible,{reset=false}={})=>{
     panel.hidden=!visible;
@@ -113,6 +114,10 @@ export function createFridgeR2UI({document,readModel,readName,onAction}){
     if(visible&&reset){tab='eat';recipeId='';readyId='';stapleId='vegetables';}
   };
   panel.addEventListener('click',event=>{
+    // Selecting a row rebuilds it synchronously. Without stopping the bubble,
+    // the global optional-menu dismiss sees a detached event target and
+    // incorrectly closes the fridge sheet during a real mobile tap.
+    event.stopPropagation();
     const tabButton=event.target.closest('[data-fridge-tab]');
     if(tabButton&&panel.contains(tabButton)){
       tab=fridgeTab(tabButton.dataset.fridgeTab);

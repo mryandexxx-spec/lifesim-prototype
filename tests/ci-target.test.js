@@ -81,6 +81,12 @@ test('LOAD-TRUTH-R1 reserves dedicated two-viewport WebGL only for loader change
     assert.equal(planChanges([name]).load_truth,false,name);
 });
 
+test('GRILL-R1 dual-viewport WebGL is required for grill code, not unrelated releases',()=>{
+  for(const path of ['src/grill-r1.js','src/grill-catalog.js','tests/grill-r1-browser-smoke.mjs'])
+    assert.equal(planChanges([path]).grill_r1,true,path);
+  for(const path of ['src/ready-food.js','src/micro-ux.js','README.md'])
+    assert.equal(Boolean(planChanges([path]).grill_r1),false,path);
+});
 test('FRIDGE-UX-R2 only runs dedicated dual-viewport UI smoke for affected sources',()=>{
   const model=planChanges(['src/fridge-ui.js']);
   const view=planChanges(['src/fridge-ui-dom.js']);

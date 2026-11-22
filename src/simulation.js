@@ -19,6 +19,7 @@ import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
 import {MIRROR_SPEECH_DURATION} from './furniture-interactions.js';
 import {kitchenRecipe,kitchenQualityId,kitchenServingMultiplier} from './kitchen.js';
+import {grillRecipe} from './grill-catalog.js';
 import {validReadingJourneyAction,finishReadingMinutes} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {preferenceAffinity} from './trait-catalog.js';
@@ -43,6 +44,8 @@ export const ACTIONS = Object.freeze({
   // F4G: cooking never directly feeds or rewards skills in the generic tick.
   cook: {label:'Приготовить блюдо',need:'fun',duration:32,
     benefitPerMinute:0,location:[0,-1.08]},
+  grill: {label:'Готовить на гриле',need:'fun',duration:50,
+    benefitPerMinute:0,location:[0,0]},
   prep: {label:'Осмотреть рабочую поверхность',need:'fun',duration:12,
     benefitPerMinute:0,location:[0,-1.04]},
   wash: {label:'Вымыть посуду',need:'fun',duration:14,
@@ -148,6 +151,20 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
         next.action.cookStage=data.action.cookStage;
       }
     }
+    if(next.action&&data.action.id==='grill'){
+      const stage=data.action.grillStage;
+      if(!grillRecipe(data.action.recipeId)||
+         !['cooking','toFridgeStore','storing'].includes(stage)||
+         !((stage==='cooking'&&['walking','using'].includes(next.action.phase))||
+           (stage==='toFridgeStore'&&next.action.phase==='walking')||
+           (stage==='storing'&&next.action.phase==='using'))||
+         !validOutdoorId(data.action.targetInstanceId))
+        next.action=null;
+      else{
+        next.action.recipeId=data.action.recipeId;
+        next.action.grillStage=stage;
+      }
+    }
     if(next.action&&data.action.id==='lamp'&&data.action.lampSwitched===true)
       next.action.lampSwitched=true;
     // Manual speech remains a verified physical mirror action in root v1.
@@ -176,9 +193,9 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     // A rejected action has no target: corrupt v1 mirror practice must not
     // crash household loading or revive its old object reservation.
     if(next.action&&(validFurnitureInstanceId(data.action.targetInstanceId)||
-       (['bench','garden'].includes(data.action.id)&&validOutdoorId(data.action.targetInstanceId))))
+       (['bench','garden','grill'].includes(data.action.id)&&validOutdoorId(data.action.targetInstanceId))))
       next.action.targetInstanceId=data.action.targetInstanceId;
-    if(['bench','garden'].includes(data.action.id)&&!validOutdoorId(data.action.targetInstanceId))
+    if(['bench','garden','grill'].includes(data.action.id)&&!validOutdoorId(data.action.targetInstanceId))
       next.action=null;
     // Optional H1 activity metadata. Unknown activities are not restorable.
     if(['hobby','music','paint'].includes(data.action.id)){
@@ -324,6 +341,26 @@ export function tick(state, minutes,world=state?.world??null) {
           state.action.elapsed=0;
           state.event=stage==='taking'?'Несёт продукты к столешнице':
             stage==='preparing'?'Идёт к плите':'Несёт приготовленное в холодильник';
+        }
+      }
+      return;
+    }
+    if(state.action.id==='grill'){
+      const stage=state.action.grillStage,recipe=grillRecipe(state.action.recipeId);
+      const budget=stage==='cooking'?recipe?.cookMinutes:stage==='storing'?6:0;
+      if(!budget){state.action=null;return;}
+      state.action.elapsed+=Math.min(minutes,Math.max(0,budget-state.action.elapsed));
+      if(state.action.elapsed>=budget){
+        if(stage==='storing'){
+          state.event='Убрал блюдо с гриля в холодильник';
+          rememberAction(state,'grill');
+          state.autonomy.nextAt=state.minutes+7;
+          state.action=null;
+        }else{
+          state.action.phase='walking';
+          state.action.grillStage='toFridgeStore';
+          state.action.elapsed=0;
+          state.event='Несёт готовое с гриля в холодильник';
         }
       }
       return;

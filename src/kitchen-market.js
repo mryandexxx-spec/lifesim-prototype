@@ -6,24 +6,32 @@ export const KITCHEN_RESTOCK_UNITS=5;
 export const KITCHEN_RESTOCK_PRICE=15;
 export const KITCHEN_RESTOCK_MAX=30;
 export const KITCHEN_RESTOCK_LABELS=Object.freeze({
-  vegetables:'Овощи',grains:'Крупы',dairy:'Молочные продукты'
+  vegetables:'Овощи',grains:'Крупы',dairy:'Молочные продукты',
+  meat:'Мясо',chicken:'Курица'
 });
+export const GRILL_INGREDIENT_PACKS=Object.freeze({
+  meat:Object.freeze({units:3,price:36}),
+  chicken:Object.freeze({units:3,price:30})
+});
+export const ingredientPack=id=>GRILL_INGREDIENT_PACKS[id]||
+  {units:KITCHEN_RESTOCK_UNITS,price:KITCHEN_RESTOCK_PRICE};
 const quantity=n=>Number.isSafeInteger(n)&&n>=0&&n<=KITCHEN_RESTOCK_MAX;
 export function quoteKitchenRestock(root,ingredientId){
-  if(!Object.hasOwn(PANTRY_START,ingredientId))
+  if(!Object.hasOwn(KITCHEN_RESTOCK_LABELS,ingredientId))
     return {ok:false,reason:'unsupported-ingredient'};
   if(root?.kitchen?.schema!==KITCHEN_SCHEMA||!quantity(root.kitchen?.pantry?.[ingredientId]))
     return {ok:false,reason:'invalid-pantry'};
   if(!root.world||!furnitureActionApproach(root.world,'fridge'))
     return {ok:false,reason:'missing-fridge'};
   const current=root.kitchen.pantry[ingredientId];
-  if(current+KITCHEN_RESTOCK_UNITS>KITCHEN_RESTOCK_MAX)
+  const pack=ingredientPack(ingredientId);
+  if(current+pack.units>KITCHEN_RESTOCK_MAX)
     return {ok:false,reason:'pantry-full',current};
-  if(!Number.isSafeInteger(root?.shop?.credits)||root.shop.credits<KITCHEN_RESTOCK_PRICE)
+  if(!Number.isSafeInteger(root?.shop?.credits)||root.shop.credits<pack.price)
     return {ok:false,reason:'insufficient-credits',current};
   return {ok:true,ingredientId,label:KITCHEN_RESTOCK_LABELS[ingredientId],
-    current,after:current+KITCHEN_RESTOCK_UNITS,units:KITCHEN_RESTOCK_UNITS,
-    price:KITCHEN_RESTOCK_PRICE,creditsAfter:root.shop.credits-KITCHEN_RESTOCK_PRICE};
+    current,after:current+pack.units,units:pack.units,
+    price:pack.price,creditsAfter:root.shop.credits-pack.price};
 }
 export function proposeKitchenRestock(root,ingredientId,actorId=null){
   const quote=quoteKitchenRestock(root,ingredientId);

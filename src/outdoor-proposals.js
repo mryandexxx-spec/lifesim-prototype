@@ -14,6 +14,7 @@ import {recordFinanceChange} from './finance-ledger.js';
 import {poolWaterNear} from './pool-topology.js';
 import {protectPoolFromWorldEdit} from './pool-cross-editor.js';
 import {outdoorBenchApproach,outdoorBenchBusy} from './outdoor-interactions.js';
+import {grillApproach,grillBusy} from './grill-r1.js';
 import {GARDEN_LIMIT,isGardenItem,newGardenRecord,gardenApproach,gardenBusy} from './gardening.js';
 
 const fail=reason=>({ok:false,reason});
@@ -176,6 +177,12 @@ export function previewOutdoorFeature(root,itemId,{x,z,yaw=0}={}){
     if(!participantPositions(root).every(p=>Boolean(gardenApproach(after,item.instanceId,p))))
       return fail('unreachable-garden');
   }
+  if(itemId==='garden.grill'){
+    const after={...root.world,outdoors:next};
+    const approach=grillApproach(after,item.instanceId);
+    if(!approach||!participantPositions(root).every(p=>Boolean(findPath(p,approach,after))))
+      return fail('unreachable-grill');
+  }
   if(itemId==='garden.bench'){
     const approach=outdoorBenchApproach({...root.world,outdoors:next},item.instanceId);
     if(!approach||!isWalkable(approach.x,approach.z,{...root.world,outdoors:next})||
@@ -232,6 +239,12 @@ export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose
   if(operation!=='move'&&operation!=='sell')return fail('unknown-operation');
   const original=current.features.find(x=>x.instanceId===instanceId);
   if(!original||!b2Category(original.itemId))return fail('missing-instance');
+  if(['garden.table','garden.bench'].includes(original.itemId)&&
+    [root,root?.otherSim].some(a=>a?.action?.id==='dining'&&
+      [a.action.targetInstanceId,a.action.diningSeatInstanceId].includes(instanceId)))
+    return fail('reserved-dining');
+  if(original.itemId==='garden.grill'&&grillBusy(root,instanceId))
+    return fail('reserved-grill');
   if(original.itemId==='garden.bench'&&outdoorBenchBusy(root,instanceId))
     return fail('reserved-bench');
   if(isGardenItem(original.itemId)&&gardenBusy(root,instanceId))return fail('reserved-garden');
@@ -266,6 +279,12 @@ export function previewOutdoorFeatureEdit(root,{operation,itemId,instanceId,pose
     const after={...root.world,outdoors:next};
     if(!participantPositions(root).every(p=>Boolean(gardenApproach(after,instanceId,p))))
       return fail('unreachable-garden');
+  }
+  if(operation==='move'&&original.itemId==='garden.grill'){
+    const after={...root.world,outdoors:next};
+    const approach=grillApproach(after,instanceId);
+    if(!approach||!participantPositions(root).every(p=>Boolean(findPath(p,approach,after))))
+      return fail('unreachable-grill');
   }
   if(operation==='move'&&original.itemId==='garden.bench'){
     const after={...root.world,outdoors:next};

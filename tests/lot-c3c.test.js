@@ -54,7 +54,7 @@ function using(root,id,actionId,residentId='alex',elapsed=0){
 }
 test('C3c: 7 and 30 full game days keep two clocks and finite pantry',()=>{
   let root=household();
-  root.kitchen.pantry={vegetables:1,grains:0,dairy:2,herbs:0};
+  root.kitchen.pantry={vegetables:1,grains:0,dairy:2,herbs:0,meat:0,chicken:0};
   const initial=clone(root.kitchen.pantry);
   const at=root.minutes;
   const start=performance.now();
@@ -180,7 +180,7 @@ test('C3c: finite purchases debit the canonical family ledger and keep legacy me
     root=loadHousehold(clone(root));
   }
   assert.deepEqual(root.kitchen.pantry,
-    {vegetables:7,grains:5,dairy:6,herbs:0});
+    {vegetables:7,grains:5,dairy:6,herbs:0,meat:0,chicken:0});
   assert.equal(root.shop.credits,oldCredits-45);
   assert.equal(root.financialHistory.entries.length,beforeEntries+3);
   assert.equal(root.kitchen.prepared[0].portions,2,'old meals survive');

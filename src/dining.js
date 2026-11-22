@@ -5,6 +5,8 @@
 import {rotateLocal,resolveActionFurniture,furnitureActionApproach,
   FURNITURE_CATALOG,instanceRect,furnitureObstacles} from './furniture-catalog.js';
 import {findPath,nearestWalkable,isWalkable,ROOM} from './navigation.js';
+import {outdoorDiningApproach,outdoorPlatePosition,chooseOutdoorDining}
+  from './grill-r1.js';
 
 const instances=world=>world?.furniture?.instances??world?.instances??[];
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -17,6 +19,8 @@ const worldPoint=(item,x,z)=>{
   return {x:item.x+q.x,z:item.z+q.z};
 };
 export function diningSeatMatches(world,tableId,seatId){
+  if(typeof tableId==='string'&&tableId.startsWith('out-'))
+    return Boolean(outdoorDiningApproach(world,tableId,seatId));
   const table=resolveActionFurniture(world,'dining',tableId);
   const seat=resolveActionFurniture(world,'seat',seatId);
   if(!table||!seat||seat.prefabId!=='chair')return false;
@@ -36,6 +40,10 @@ export function diningSeatMatches(world,tableId,seatId){
  * side is deterministic for an unchanged world and drives the matching pose.
  */
 export function diningSeatApproach(world,tableId,seatId){
+  if(typeof tableId==='string'&&tableId.startsWith('out-')){
+    const point=outdoorDiningApproach(world,tableId,seatId);
+    return point?{...point,side:0}:null;
+  }
   if(!diningSeatMatches(world,tableId,seatId))return null;
   const table=resolveActionFurniture(world,'dining',tableId);
   const seat=resolveActionFurniture(world,'seat',seatId);
@@ -60,6 +68,8 @@ export function diningSeatApproach(world,tableId,seatId){
   return best&&{x:best.x,z:best.z,side:best.side};
 }
 export function chooseDiningSeat(world,from,tableId,excluded=[]){
+  if(typeof tableId==='string'&&tableId.startsWith('out-'))
+    return chooseOutdoorDining(world,from,excluded,tableId);
   const fridge=furnitureActionApproach(world,'fridge');
   const origin=from&&nearestWalkable(from,world);
   if(!fridge||!origin||!findPath(origin,fridge,world))return null;
@@ -76,6 +86,8 @@ export function chooseDiningSeat(world,from,tableId,excluded=[]){
   return best;
 }
 export function diningPlatePosition(world,tableId,seatId){
+  if(typeof tableId==='string'&&tableId.startsWith('out-'))
+    return outdoorPlatePosition(world,tableId,seatId);
   if(!diningSeatMatches(world,tableId,seatId))return null;
   const table=resolveActionFurniture(world,'dining',tableId);
   const chair=resolveActionFurniture(world,'seat',seatId);
@@ -103,6 +115,7 @@ export function isPermittedDiningTuck(world,one,two){
  * Does not change the physical/nav footprint or v1 save coordinates.
  */
 export function diningChairPullLimit(world,tableId,seatId){
+  if(typeof tableId==='string'&&tableId.startsWith('out-'))return 0;
   if(!diningSeatMatches(world,tableId,seatId))return 0;
   const seat=resolveActionFurniture(world,'seat',seatId);
   const others=furnitureObstacles(world).filter(x=>
