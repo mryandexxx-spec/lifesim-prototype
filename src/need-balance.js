@@ -1,3 +1,5 @@
+import {compatibleFurnitureProduct} from './furniture-products.js';
+
 /**
  * Physical + social needs economy: positive 0..100 reserves, per IN-GAME minute.
  * A complete 1x browser second equals 3 in-game minutes (game.js fixed step
@@ -23,10 +25,28 @@ export const NEED_DECAY_PER_MINUTE=Object.freeze({
   social:.016    // R2: 23.04 points / 24 game h before temperament
 });
 export const SOCIAL_DECAY_PERSONALITY_SPREAD=.008;
-// An uninterrupted nightly sleep is not an accelerated one-hour nap.
-export const SLEEP_MIN_MINUTES=420;
+// NEEDS-FIX-R1: default sleep lasts 8–9 game hours; only a verified premium
+// bed reduces the minimum/maximum. No second need clock or persisted multiplier.
+export const SLEEP_MIN_MINUTES=480;
 export const SLEEP_MAX_MINUTES=540;
 export const SLEEP_WAKE_ENERGY=92;
+export const SLEEP_RECOVERY_PER_MINUTE=.19;
+export const SLEEP_PREMIUM_PROFILE=Object.freeze({
+  minMinutes:360,maxMinutes:450,recoveryPerMinute:.24
+});
+export const SLEEP_STANDARD_PROFILE=Object.freeze({
+  minMinutes:SLEEP_MIN_MINUTES,maxMinutes:SLEEP_MAX_MINUTES,
+  recoveryPerMinute:SLEEP_RECOVERY_PER_MINUTE
+});
+export function sleepBedProfile(world,targetInstanceId=null){
+  const items=world?.furniture?.instances;
+  const bed=Array.isArray(items)?items.find(item=>
+    item.instanceId===targetInstanceId&&item.prefabId==='bed'&&
+    item.location==='home'):null;
+  const product=bed?compatibleFurnitureProduct('bed',bed.itemDefinitionId):null;
+  return product?.sleepQuality==='premium'
+    ?SLEEP_PREMIUM_PROFILE:SLEEP_STANDARD_PROFILE;
+}
 export const SELF_CARE_WISH_MAX_NEED=72;
 export const SELF_CARE_REPEAT_COOLDOWN_MINUTES=180;
 export const NEED_COMFORT_START=90;
