@@ -82,7 +82,7 @@ import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_
 import {COOKING_SKILL_ID,kitchenRecipe,KITCHEN_QUALITIES,cookingQuality,canCookRecipe,kitchenSummary,
   preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
 import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock,
-  quoteCookingRecipe} from './kitchen-market.js';
+  quoteCookingRecipe,proposePantryDelivery} from './kitchen-market.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal,proposeReadyMealPurchase} from './ready-food.js';
 import {dirtyDishVisualPlan,DISH_VISUAL_CAP} from './dirty-dishes-visual.js';
@@ -533,6 +533,22 @@ function buyReadyMeal(recipeId,channel,actorId=game.selectedSim){
     updateFamilyBalance();
     return tx;
   }finally{readyFoodPurchaseLocked=false;}
+}
+// Batch2-E1: paid grocery orders use the same atomic snapshot/rollback
+// guarantees as ready meals. No purchase remains without its receipt.
+let pantryPurchaseLocked=false;
+function buyPantryDelivery(ingredientId,actorId=game.selectedSim){
+  if(pantryPurchaseLocked)return {ok:false,reason:'purchase-busy'};
+  pantryPurchaseLocked=true;
+  try{
+    const tx=proposePantryDelivery(game,ingredientId,actorId);
+    if(!tx.ok)return tx;
+    const old={kitchen:game.kitchen,shop:game.shop,financialHistory:game.financialHistory};
+    game.kitchen=tx.kitchen;game.shop=tx.shop;game.financialHistory=tx.financialHistory;
+    if(!save(true)){Object.assign(game,old);return {ok:false,reason:'save-failed'};}
+    updateFamilyBalance();
+    return tx;
+  }finally{pantryPurchaseLocked=false;}
 }
 // Fix the epoch at first migration, not on some later autosave after a phone date change.
 // Save date/bill migrations only after graphics startup succeeds, never on a failed boot.
@@ -2231,6 +2247,7 @@ const careerPhone=createCareerPhoneUI({
   },
   save,notify:toast,onFundsChanged:updateFamilyBalance,
   onBuyReadyMeal:buyReadyMeal,
+  onBuyPantryDelivery:buyPantryDelivery,
   onStartCall:(from,to)=>{
     const previous=structuredClone(game.phoneCalls);
     const result=startPhoneCall(game,from,to);
