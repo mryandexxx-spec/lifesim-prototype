@@ -2812,7 +2812,7 @@ function boot() {
   renderOutdoorGround();
   // LOT-B2: original low-poly plants and boundaries, grouped under one node
   // per owned instance. Only the 96-item bounded save controls these meshes.
-  const outdoorFeatureNodes=[],outdoorLightNodes=[];
+  const outdoorFeatureNodes=[],outdoorLightNodes=[],grillAnimated=[];
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
@@ -2831,11 +2831,13 @@ function boot() {
     yellow:mat('#e9c767'),purple:mat('#8f77b6'),
     wood:mat('#af8967'),woodDark:mat('#846e54'),soil:mat('#6e8761'),
     gardenSoil:mat('#6b4e3d'),wetSoil:mat('#544536'),
-    drySoil:mat('#9a7252'),orange:mat('#e5a352'),blue:mat('#7197d8')
+    drySoil:mat('#9a7252'),orange:mat('#e5a352'),blue:mat('#7197d8'),
+    metal:mat('#606975'),metalLight:mat('#aebbc7'),coal:mat('#2b3035'),
+    ember:mat('#d56f40'),meat:mat('#995d43'),chicken:mat('#dbac73')
   };
   const renderOutdoorFeatures=()=>{
     for(const node of outdoorFeatureNodes.splice(0))node.destroy();
-    outdoorLightNodes.length=0;
+    outdoorLightNodes.length=0;grillAnimated.length=0;
     for(const item of game.world?.outdoors?.features||[]){
       const def=OUTDOOR_CATALOG[item.itemId];
       if(!def||!['tree','shrub','flower','fence','furniture','light','garden'].includes(def.category))continue;
@@ -2901,6 +2903,32 @@ function boot() {
         for(const z of [-.23,0,.23])
           part('box','bench slat',0,.59,z,1.50,.10,.17,'wood');
         part('box','bench back',0,.91,.25,1.50,.53,.11,'wood');
+      }else if(item.itemId==='garden.grill'){
+        // Independent lightweight game geometry: iron frame, grate, coals,
+        // handle and three visible skewers. No particle texture or sound.
+        for(const x of [-.48,.48])for(const z of [-.28,.28])
+          part('cylinder','grill leg',x,.36,z,.09,.72,.09,'metal');
+        part('box','firebox',0,.72,0,1.22,.36,.82,'metal');
+        part('box','charcoal bed',0,.91,0,1.08,.07,.68,'coal');
+        for(const x of [-.35,0,.35])for(const z of [-.16,.16])
+          part('sphere','warm ember',x,.965,z,.14,.06,.12,'ember');
+        for(let x=-.48;x<=.49;x+=.12)
+          part('box','grill grate rod',x,1.025,0,.027,.025,.74,'metalLight');
+        for(const z of [-.30,.30])
+          part('box','grill grate rail',0,1.038,z,1.19,.035,.04,'metal');
+        part('cylinder','grill side handle',.71,.84,0,.08,.22,.08,'metalLight');
+        const skewers=[];
+        for(const z of [-.18,0,.18]){
+          const pivot=new pc.Entity('GRILL-R1 animated skewer');
+          pivot.setLocalPosition(0,1.115,z);node.addChild(pivot);
+          primitive('box','grill skewer rod',0,0,0,1.20,.035,.035,
+            outdoorFeatureMaterials.metalLight,pivot);
+          for(const x of [-.29,0,.29])
+            primitive('box','grill food piece',x,.055,0,.20,.14,.17,
+              outdoorFeatureMaterials[z===0?'chicken':'meat'],pivot);
+          skewers.push(pivot);
+        }
+        grillAnimated.push({instanceId:item.instanceId,skewers});
       }else if(item.itemId==='garden.table'){
         part('cylinder','table stand',0,.43,0,.20,.80,.20,'woodDark');
         part('cylinder','garden tabletop',0,.86,0,1.06,.11,1.06,'wood');
@@ -7120,6 +7148,27 @@ function boot() {
       });
       return;
     }
+    if(feature.itemId==='garden.grill'){
+      const level=currentSkillLevel(actor.skills,HOBBY_SKILLS,COOKING_SKILL_ID);
+      const recipes=Object.values(GRILL_RECIPES).map(recipe=>{
+        const available=canGrillRecipe(game.kitchen,recipe.id,level);
+        const reason=level<recipe.minLevel?'Нужна кулинария '+recipe.minLevel:
+          'Нужны продукты или место в холодильнике';
+        return {actionId:recipe.id,label:'🔥 '+recipe.label+' · '+recipe.portions+' порц.',
+          available,reason,command:{type:'grill',instanceId:feature.instanceId,
+            recipeId:recipe.id}};
+      });
+      const first=recipes.find(recipe=>recipe.available)||recipes[0];
+      offerWorldAction(point,def.name,first.label,first.command,feature.instanceId,{
+        info:'Кулинария '+level+' · Мясо '+(game.kitchen?.pantry?.meat||0)+
+          ' · Курица '+(game.kitchen?.pantry?.chicken||0)+
+          ' · Овощи '+(game.kitchen?.pantry?.vegetables||0)+
+          ' · покупай продукты в холодильнике',
+        primaryAvailable:first.available,primaryReason:first.reason,
+        choices:recipes.filter(recipe=>recipe!==first)
+      });
+      return;
+    }
     if(feature.itemId==='garden.bench'){
       // Revalidation of availability and route happens again on confirmation.
       offerWorldAction(point,def.name,'🪑 Отдохнуть',
@@ -7537,7 +7586,8 @@ function boot() {
           def.category==='flower'?.48:
           def.category==='fence'?1.12:
           // Preserve C1's garden hit-volume while polishing its visual stages.
-          item.itemId==='garden.bench'?1.20:1.24;
+          item.itemId==='garden.bench'?1.20:
+          item.itemId==='garden.grill'?1.85:1.24;
         // A tiny flower/path lamp can render smaller than a finger on a
         // zoomed-out iPhone. Expand only its selectable volume, never its
         // saved footprint, route blocker, physics or purchase placement.
@@ -8697,6 +8747,15 @@ function boot() {
         const size=Math.max(.07,1-a.elapsed/ACTIONS.dining.duration);
         dish.food.setLocalScale(.23*size,.075,.18*size);
       }
+    }
+    for(const grill of grillAnimated){
+      const actor=HOUSEHOLD_IDS.map(id=>getActor(game,id)).find(a=>
+        a?.action?.id==='grill'&&a.action.phase==='using'&&
+        a.action.grillStage==='cooking'&&
+        a.action.targetInstanceId===grill.instanceId);
+      for(let i=0;i<grill.skewers.length;i++)
+        grill.skewers[i].setLocalEulerAngles(
+          actor?Math.sin(effectTime*3+i*2)*22:0,0,0);
     }
     // V3 compatibility: action-specific authored parts own visible animation.
     // Keep original procedural geometry for the active music/easel interaction,
