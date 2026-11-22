@@ -45,6 +45,19 @@ try{
     });
     assert.ok(visibleRatio>=.65,'Central interactive scene must retain at least 65%, got '+visibleRatio);
   }
+  const sceneViewport=await page.evaluate(async()=>{
+    const {Application}=await import('playcanvas');
+    const camera=Application.getApplication().root.findComponent('camera');
+    const {x,y,z,w}=camera.rect;
+    return {x,y,z,w};
+  });
+  if(width>height){
+    assert.ok(sceneViewport.z>=.5&&sceneViewport.z<=.7&&sceneViewport.w===1,
+      'Landscape viewport must exclude side panel: '+JSON.stringify(sceneViewport));
+  }else{
+    assert.ok(sceneViewport.y>0&&sceneViewport.w>=.5&&sceneViewport.w<=.8,
+      'Portrait viewport must exclude tray: '+JSON.stringify(sceneViewport));
+  }
   await page.screenshot({path:'artifacts/parcel-editor/'+width+'x'+height+'-overview.png'});
   await worldTap(8,-7,.35);
   assert.equal(await page.locator('#parcel-editor h2').textContent(),'Садовая скамейка');

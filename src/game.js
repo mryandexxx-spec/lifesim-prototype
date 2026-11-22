@@ -7406,6 +7406,23 @@ function boot() {
   let parcel=null;
   const shell=document.querySelector('.app-shell');
   const tray=installParcelTray(parcelAction);
+  // The 3D camera renders in the actual free editing area, rather than
+  // centering the house behind a bottom/right overlay on small iPhones.
+  function positionParcelViewport(){
+    if(!parcel)return;
+    const surface=canvas.getBoundingClientRect();
+    const panel=$('parcel-editor').getBoundingClientRect();
+    if(surface.width<1||surface.height<1||panel.width<1||panel.height<1)return;
+    const landscape=surface.width>surface.height&&surface.width>=540;
+    if(landscape){
+      const fraction=Math.max(.35,Math.min(1,(panel.left-surface.left-8)/surface.width));
+      camera.camera.rect=new pc.Vec4(0,0,fraction,1);
+    }else{
+      const fraction=Math.max(.45,Math.min(1,(panel.top-surface.top-8)/surface.height));
+      camera.camera.rect=new pc.Vec4(0,1-fraction,1,fraction);
+    }
+  }
+  window.addEventListener('resize',()=>{if(parcel)positionParcelViewport();});
   const command=(id,label,detail)=>({id,label,detail});
   const primary=(id,label,disabled=false)=>({id,label,primary:true,disabled});
   const categoryLabels={ground:'Покрытия',objects:'Мебель и свет',plants:'Растения и ограды',garden:'Грядки'};
@@ -7435,7 +7452,8 @@ function boot() {
       toast('Сначала закончи текущее взаимодействие');return;
     }
     const cameraBefore={...view},fresh=!parcel;
-    if(fresh)parcel={oldView:cameraBefore,oldFinger:oneFingerMode,plan:true,journal:createParcelJournal()};
+    if(fresh)parcel={oldView:cameraBefore,oldFinger:oneFingerMode,
+      oldCameraRect:camera.camera.rect.clone(),plan:true,journal:createParcelJournal()};
     tray.hide();
     if(section==='house'&&!buildMode){closeDomain();enterBuild();}
     if(section==='furniture'&&!furnishMode){closeDomain();enterFurniture();}
@@ -7447,13 +7465,14 @@ function boot() {
     setHomeOpen(false);closeGroundWalkMenu();cameraFocus=null;
     oneFingerMode='pan';showCameraMode();cameraGesture.clear();
     idleParcel();
-    setView(fresh?parcelCamera({...view,centerX:7,centerZ:0,distance:Math.min(95,
-      Math.max(38,36*canvas.clientHeight/Math.max(1,canvas.clientWidth)/.75))},true):cameraBefore);
+    setView(fresh?parcelCamera({...view,centerX:7,centerZ:0,
+      distance:canvas.clientHeight>=canvas.clientWidth?54:42},true):cameraBefore);
     renderParcel();
   }
   function leaveParcel(){
     const previous=parcel;parcelGesture.clear();tray.hide();closeDomain();parcel=null;
     delete shell.dataset.parcel;
+    camera.camera.rect=previous.oldCameraRect;
     oneFingerMode=previous.oldFinger;showCameraMode();setView(previous.oldView);
     $('home-open').focus({preventScroll:true});
   }
@@ -7555,6 +7574,7 @@ function boot() {
       }
     }
     tray.render(m);
+    positionParcelViewport();
   }
   function pickedParcelItem(id){
     const p=parcel;p.tool=id;p.stage='draft';p.first=null;p.options=false;p.message='';
