@@ -26,6 +26,7 @@ import {createCalendarUI} from './calendar-ui.js';
 import {consumeCalendarReminders} from './calendar-reminders.js';
 import {createCareerPhoneUI} from './career-phone-ui.js';
 import {startPhoneCall,cancelPhoneCall} from './phone-calls.js';
+import {selectSportsClub,readSportsNews} from './sports-fandom.js';
 import {pendingWorkIncident} from './career-incidents.js';
 import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
 import {applyWorkMoodContext} from './career-worklife.js';
@@ -158,7 +159,7 @@ import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {TV_WATCH_POSE,tvScreenFrame} from './tv-interaction.js';
-import {sportsTvFrame,paintSportsTv} from './sports-tv.js';
+import {sportsTvFrame,paintSportsTv,sportsWatchOpportunity} from './sports-tv.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {planSharedTv,liveSharedTv} from './tv-together.js';
 import {planPairedHobby,livePairedHobby} from './paired-hobby.js';
@@ -2239,6 +2240,36 @@ const careerPhone=createCareerPhoneUI({
     const result=cancelPhoneCall(game);
     if(result.ok&&!save(true)){game.phoneCalls=previous;return {ok:false,reason:'save-failed'};}
     return result;
+  },
+  onSelectSportsClub:(who,teamId)=>{
+    const actor=getActor(game,who);
+    if(!actor)return {ok:false,reason:'unavailable'};
+    const previous=structuredClone(actor.sportsFan);
+    const result=selectSportsClub(game,who,teamId);
+    if(!result.ok)return result;
+    if(!save(true)){actor.sportsFan=previous;return {ok:false,reason:'save-failed'};}
+    return result;
+  },
+  onReadSportsNews:(who,matchId)=>{
+    const actor=getActor(game,who);
+    if(!actor)return {ok:false,reason:'unavailable'};
+    const previous={fan:structuredClone(actor.sportsFan),
+      mind:structuredClone(actor.mind),event:actor.event};
+    const result=readSportsNews(game,who,matchId);
+    if(!result.ok)return result;
+    if(!save(true)){
+      actor.sportsFan=previous.fan;actor.mind=previous.mind;actor.event=previous.event;
+      return {ok:false,reason:'save-failed'};
+    }
+    return result;
+  },
+  onWatchSportsMatch:(who,tvId)=>{
+    const opportunity=sportsWatchOpportunity(game);
+    if(game.selectedSim!==who||!opportunity||opportunity.tvId!==tvId||
+      residentUnavailableForHome(game,who)||dialogueNeedsDecision(game))
+      return {ok:false,reason:'unavailable'};
+    const queued=scheduleCommand({type:'object',actionId:'tv',targetInstanceId:tvId},who);
+    return {ok:queued,reason:queued?null:'queue-unavailable'};
   },
   onOpenChange:id=>updatePhoneProps(id),
   onIncidentChanged:()=>{updateCareerHud();refreshIncidentNotifications();},

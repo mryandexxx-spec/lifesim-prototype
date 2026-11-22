@@ -23,6 +23,7 @@ jobs:
       career_shifts: ${{ steps.impact.outputs.career_shifts }}
       phone_platform: ${{ steps.impact.outputs.phone_platform }}
       fandom_tv: ${{ steps.impact.outputs.fandom_tv }}
+      fandom_phone: ${{ steps.impact.outputs.fandom_phone }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,6 +111,16 @@ jobs:
         with:
           name: fandom-r1-c-mobile-pr
           path: artifacts/fandom-r1-c/
+          if-no-files-found: ignore
+      - name: FANDOM-R1-D fifth-app real phone, football state and v1 reload
+        if: ${{ needs.targeted.outputs.fandom_phone == 'true' }}
+        run: node tests/fandom-r1-d-browser-smoke.mjs
+      - name: Upload FANDOM-R1-D mobile phone screenshots
+        if: ${{ always() && needs.targeted.outputs.fandom_phone == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fandom-r1-d-mobile-pr
+          path: artifacts/fandom-r1-d/
           if-no-files-found: ignore
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}

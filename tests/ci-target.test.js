@@ -81,6 +81,13 @@ test('LOAD-TRUTH-R1 reserves dedicated two-viewport WebGL only for loader change
     assert.equal(planChanges([name]).load_truth,false,name);
 });
 
+test('FANDOM-R1-D only adds detailed fifth-app mobile QA for sports phone changes',()=>{
+  assert.equal(planChanges(['src/sports-phone-model.js']).fandom_phone,true);
+  assert.equal(planChanges(['src/sports-phone-model.js']).browser,true);
+  assert.equal(planChanges(['tests/fandom-r1-d-browser-smoke.mjs']).fandom_phone,true);
+  assert.equal(planChanges(['src/kitchen.js']).fandom_phone,false);
+  assert.equal(planChanges(['README.md']).fandom_phone,false);
+});
 test('FANDOM-R1-C only reserves detailed mobile TV QA for broadcast changes',()=>{
   assert.equal(planChanges(['src/sports-tv.js']).fandom_tv,true);
   assert.equal(planChanges(['src/sports-tv.js']).browser,true);

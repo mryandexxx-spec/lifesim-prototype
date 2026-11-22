@@ -8,8 +8,8 @@ import {PHONE_APPS,phoneAppRoute} from '../src/phone-app-registry.js';
 
 const idle=()=>{const root=newHousehold('2026-11-22');root.autonomy.enabled=false;
   root.otherSim.autonomy.enabled=false;return root;};
-test('G app registry exposes four actual applications with no duplicate bank',()=>{
-  assert.deepEqual(PHONE_APPS.map(x=>x.id),['work','food','finance','calls']);
+test('G app registry retains four original routes plus approved sports extension',()=>{
+  assert.deepEqual(PHONE_APPS.map(x=>x.id),['work','food','finance','calls','sports']);
   assert.equal(phoneAppRoute('work'),'work');
   assert.equal(phoneAppRoute('invalid'),'home');
   assert.equal(PHONE_APPS.find(x=>x.id==='food').label,'Блин’Ставка');

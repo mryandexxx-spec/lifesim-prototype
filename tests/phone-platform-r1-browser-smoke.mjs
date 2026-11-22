@@ -38,10 +38,10 @@ try{
     const phone=page.locator('#career-phone-panel');
     await phone.waitFor({state:'visible'});
     assert.equal(await phone.getAttribute('aria-label'),'Смартфон: главный экран');
-    assert.equal(await phone.locator('.phone-platform-tile').count(),4);
+    assert.equal(await phone.locator('.phone-platform-tile').count(),5);
     const appIds=await phone.locator('.phone-platform-tile').evaluateAll(els=>
       els.map(el=>el.dataset.phoneApp));
-    assert.deepEqual(appIds,['work','food','finance','calls']);
+    assert.deepEqual(appIds,['work','food','finance','calls','sports']);
     await page.screenshot({path:'artifacts/phone-platform-r1/home-'+width+'.png'});
     await phone.locator('[data-phone-app="work"]').tap();
     assert.equal(await phone.getAttribute('aria-label'),'Смартфон: работа Блин’С');

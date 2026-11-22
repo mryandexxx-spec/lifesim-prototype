@@ -17,7 +17,7 @@ const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
 export function planChanges(files,root=ROOT){
   const changed=[...new Set(files.map(normalize))].sort();
   const relevant=changed.some(f=>isCode(f)||f.startsWith('assets/'));
-  if(!relevant)return {tests:[],browser:false,e5:false,integration_qa:false,fandom_tv:false,changed};
+  if(!relevant)return {tests:[],browser:false,e5:false,integration_qa:false,fandom_tv:false,fandom_phone:false,changed};
   const allTests=readdirSync(path.join(root,'tests')).filter(f=>f.endsWith('.test.js')).map(f=>'tests/'+f);
   const selected=new Set(CORE);
   const changedSrc=changed.filter(f=>f.startsWith('src/')&&/\.(?:js|mjs)$/.test(f));
@@ -79,10 +79,12 @@ export function planChanges(files,root=ROOT){
     /^(?:src\/(?:phone-app-registry|phone-calls|career-phone-ui)\.js|tests\/phone-platform-r1-browser-smoke\.mjs)$/.test(f));
   const fandom_tv=changed.some(f=>
     /^(?:src\/sports-tv\.js|tests\/fandom-r1-c-browser-smoke\.mjs)$/.test(f));
+  const fandom_phone=changed.some(f=>
+    /^(?:src\/sports-phone-model\.js|tests\/fandom-r1-d-browser-smoke\.mjs)$/.test(f));
   const career_shifts=changed.some(f=>
     /^(?:src\/career-rank-schedules\.js|tests\/career-shifts-r1-browser-smoke\.mjs)$/.test(f));
-  return {tests,browser:changed.some(isUI)||career_shifts||phone_platform||fandom_tv,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
-    fandom_tv,
+  return {tests,browser:changed.some(isUI)||career_shifts||phone_platform||fandom_tv||fandom_phone,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
+    fandom_tv,fandom_phone,
     e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),changed};
 }
@@ -115,6 +117,7 @@ function main(){
   console.log('CAREER-SHIFTS-R1 two-viewport phone and calendar:',plan.career_shifts?'required':'not needed');
   console.log('PHONE-PLATFORM-R1 dual-viewport WebGL:',plan.phone_platform?'required':'not needed');
   console.log('FANDOM-R1-C live-TV/calendar real WebGL:',plan.fandom_tv?'required':'not needed');
+  console.log('FANDOM-R1-D fifth-app mobile WebGL:',plan.fandom_phone?'required':'not needed');
   console.log('LOT-E5 four-viewport deep check:',plan.e5?'required':'not needed');
   console.log('P4 Life Systems four-viewport integration:',plan.integration_qa?'required':'not needed');
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
@@ -127,7 +130,8 @@ function main(){
     'grill_r1='+(plan.grill_r1?'true':'false')+'\n'+
     'career_shifts='+(plan.career_shifts?'true':'false')+'\n'+
     'phone_platform='+(plan.phone_platform?'true':'false')+'\n'+
-    'fandom_tv='+(plan.fandom_tv?'true':'false')+'\n');
+    'fandom_tv='+(plan.fandom_tv?'true':'false')+'\n'+
+    'fandom_phone='+(plan.fandom_phone?'true':'false')+'\n');
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main();
