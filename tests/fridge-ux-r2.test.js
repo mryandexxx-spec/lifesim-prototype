@@ -49,7 +49,7 @@ test('FRIDGE-UX-R2: purchase state mirrors the canonical quotes; no new debits',
   for(const staple of projection.staples){
     const quote=quoteKitchenRestock(root,staple.id);
     assert.equal(staple.available,quote.ok);
-    assert.equal(staple.price,15);
+    assert.equal(staple.price,staple.id==='meat'?36:staple.id==='chicken'?30:15);
   }
   assert.equal(JSON.stringify(root),before);
 });
