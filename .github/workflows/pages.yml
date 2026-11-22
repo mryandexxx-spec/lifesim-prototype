@@ -30,6 +30,8 @@ jobs:
           node --check src/game.js
           node --check src/viewport-health.js
           node --check src/loading-progress.js
+          node --check src/fridge-ui.js
+          node --check src/fridge-ui-dom.js
           node --check src/model-cache.js
           node --check sw.js
           node --check src/simulation.js
@@ -289,6 +291,7 @@ jobs:
           cp src/skill-presentation.js site/src/
           cp src/tv-interaction.js site/src/
           cp src/micro-ux.js site/src/
+          cp src/fridge-ui.js src/fridge-ui-dom.js site/src/
           cp src/tv-seating.js site/src/
           cp src/tv-together.js site/src/
           cp src/furniture-placement-preview.js src/furniture-owned-preview.js site/src/
