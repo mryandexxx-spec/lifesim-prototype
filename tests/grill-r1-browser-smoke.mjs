@@ -38,11 +38,18 @@ try{
     page.on('crash',()=>errors.push('renderer crashed'));
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
-    const device=await page.evaluate(async()=>{
+    const actualScene=await page.evaluate(async()=>{
       const {Application}=await import('playcanvas');
-      return Boolean(Application.getApplication()?.graphicsDevice?.canvas);
+      const app=Application.getApplication();
+      const grill=app?.root?.findByName('LOT-B2 out-1 garden.grill');
+      return {webgl:Boolean(app?.graphicsDevice?.canvas),
+        fixture:Boolean(grill),firebox:Boolean(grill?.findByName('firebox')),
+        skewer:Boolean(grill?.findByName('GRILL-R1 animated skewer'))};
     });
-    assert.equal(device,true,'real WebGL PlayCanvas required');
+    assert.equal(actualScene.webgl,true,'real WebGL PlayCanvas required');
+    assert.equal(actualScene.fixture,true,'saved purchased grill must exist in actual scene');
+    assert.equal(actualScene.firebox,true,'grill firebox must render');
+    assert.equal(actualScene.skewer,true,'animated skewer must be in scene');
     assert.ok((await page.locator('#game-canvas').screenshot()).length>1800);
     await page.screenshot({path:'artifacts/grill-r1/game-'+width+'.png'});
     const initial=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
