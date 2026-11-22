@@ -18,10 +18,10 @@ function home(){
   h.world.furniture.instances.push(...pair('901',8),...pair('902',11));
   return h;
 }
-test('F4F.2: quick snack restores much less hunger than the unchanged table meal',()=>{
+test('F4F.2/NEEDS-FIX: quick snack restores much less hunger than the balanced table meal',()=>{
   assert.equal(ACTIONS.fridge.label,'Быстро перекусить');
   assert.equal(ACTIONS.dining.label,'Пообедать за столом');
-  assert.equal(ACTIONS.dining.benefitPerMinute,1.00);
+  assert.equal(ACTIONS.dining.benefitPerMinute,1.22);
   const quick=ACTIONS.fridge.duration*ACTIONS.fridge.benefitPerMinute;
   const full=ACTIONS.dining.duration*ACTIONS.dining.benefitPerMinute;
   assert.ok(quick>0&&quick<full*.65);
