@@ -58,12 +58,12 @@ test('Q4 direct path is persistent and can select the right resident from financ
   const game=read('../src/game.js'),phone=read('../src/career-phone-ui.js'),
     css=read('../styles.css'),html=read('../index.html');
   assert.match(game,/function refreshIncidentNotifications\(\)/);
-  assert.match(game,/HOUSEHOLD_IDS\.filter\(id=>pendingWorkIncident\(game,id\)\)/);
+  assert.match(game,/residentIdsForSimulation\(game\)\.filter\(id=>pendingWorkIncident\(game,id\)\)/);
   assert.match(game,/incidentEvent=careerEvents\.find/);
   assert.match(game,/toast\('💼 '\+incidentEvent\.text,\{incidentResidentId:incidentEvent\.residentId\}\)/);
   assert.match(game,/button\.addEventListener\('click',\(\)=>openWorkIncident\(incidentResidentId\)\)/);
   assert.match(phone,/function openIncident\(residentId\)/);
-  assert.match(phone,/root\.selectedSim!==residentId&&!selectResident\(residentId\)/);
+  assert.match(phone,/getSelectedResident\(root\)!==residentId&&!selectResident\(residentId\)/);
   assert.match(phone,/app='work';section='vacancies';view='list';chosen=null;historyId=null/);
   assert.match(phone,/heading\.scrollIntoView\(\{block:'start'\}\)/);
   assert.match(phone,/heading\.focus\(\{preventScroll:true\}\)/);

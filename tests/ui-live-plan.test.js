@@ -49,7 +49,10 @@ test('live preview re-renders across residents and opens existing queue without 
   const scope={
     $,document:{createElement:create},game,planPeekKey:'',queueVisible:false,
     getActor:(g,id)=>g.actors[id],getActorName:id=>id==='alex'?'Алекс':'Мира',
-    selectedName:()=>game.selectedSim,activeTaskLabel:()=>null,
+    selectedName:()=>game.selectedSim,
+    activeHudResident:()=>game.selectedSim,
+    residentDisplayName:(_,id)=>id==='alex'?'Алекс':id==='mira'?'Мира':'Вера',
+    activeTaskLabel:()=>null,
     pendingActions:(qs,id)=>qs[id],
     taskLabel:task=>task.actionId,
     workPresenceView,residentWorkPhase:()=>null,residentWorkStatus:()=>null,
