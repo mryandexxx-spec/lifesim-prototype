@@ -2,6 +2,7 @@
  * All time values are canonical game minutes; no DOM or PlayCanvas mocks.
  */
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {ACTIONS,SAVE_KEY,newGame,loadGame,chooseAction,arrive,tick} from '../src/simulation.js';
 import {newHousehold,loadHousehold,chooseResidentAction,furnitureAvailable,tickHousehold} from '../src/household.js';
@@ -172,4 +173,13 @@ test('NEEDS-FIX: real kitchen portion remains consumed once after reload and lat
   tickHousehold(save,50);
   assert.equal(save.kitchen.prepared.length,0);
   assert.equal(save.version,1);
+});
+
+test('NEEDS-FIX: production import map invalidates older Safari needs and bed SKU cache keys',()=>{
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  for(const module of ['simulation','need-balance','furniture-products']){
+    const escaped=module.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&');
+    assert.match(html,new RegExp('["]\\./src/'+escaped+'[.]js[?]v=[^"\\n]*-needs-fix-r1["]'),
+      'fresh import-map cache key required: '+module);
+  }
 });
