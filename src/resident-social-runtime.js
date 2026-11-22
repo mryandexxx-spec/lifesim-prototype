@@ -73,7 +73,9 @@ export function additionalSocialEngaged(root,id){
  */
 export function queueAddressedSocial(root,initiator,partner,actionId='talk'){
   if(!canMeet(root,initiator,partner)||!validAction(actionId)||
-    !root.actionQueues||root.paused)return null;
+    !root.actionQueues||root.paused||
+    (ADDRESSED_BRANCHES.includes(actionId)&&
+      !actionAllowed(root,initiator,partner,actionId)))return null;
   const command=ADDRESSED_BRANCHES.includes(actionId)
     ?{type:'branch',targetId:partner,actionId}
     :{type:'social',targetId:partner,actionId};
