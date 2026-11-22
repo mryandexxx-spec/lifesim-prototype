@@ -25,6 +25,7 @@ jobs:
       fandom_tv: ${{ steps.impact.outputs.fandom_tv }}
       fandom_phone: ${{ steps.impact.outputs.fandom_phone }}
       fandom_r2a: ${{ steps.impact.outputs.fandom_r2a }}
+      fandom_r2b: ${{ steps.impact.outputs.fandom_r2b }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -132,6 +133,16 @@ jobs:
         with:
           name: fandom-r2-a-mobile-pr
           path: artifacts/fandom-r2-a/
+          if-no-files-found: ignore
+      - name: FANDOM-R2-B real mobile bought fan decor and crests
+        if: ${{ needs.targeted.outputs.fandom_r2b == 'true' }}
+        run: node tests/fandom-r2-b-browser-smoke.mjs
+      - name: Upload FANDOM-R2-B screenshots
+        if: ${{ always() && needs.targeted.outputs.fandom_r2b == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fandom-r2-b-mobile-pr
+          path: artifacts/fandom-r2-b/
           if-no-files-found: ignore
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}

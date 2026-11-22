@@ -2548,6 +2548,19 @@ function boot() {
       poolSize:dirtyDishNodes.length
     });
   const decorNodes=new Map();
+  if(new URLSearchParams(window.location.search).get('fandom-r2-b')==='qa')
+    window.__LifeSimFanDecorStats=()=>game.world.furniture.instances
+      .filter(i=>['fanflag','fanstand'].includes(i.prefabId)&&i.location==='home')
+      .map(item=>{
+        const node=decorNodes.get(item.instanceId);let meshes=0;
+        const walk=entity=>{if(!entity)return;
+          meshes+=(entity.render?.meshInstances?.length||0);
+          for(const child of entity.children||[])walk(child);
+        };
+        walk(node);
+        return {instanceId:item.instanceId,sku:item.itemDefinitionId,
+          meshes,visible:!!node?.enabled};
+      });
   // H5c: cache the 78 theme stroke entities per easel for Safari performance.
   const easelPaint=new WeakMap();
   const decorTemplates=new Map();
