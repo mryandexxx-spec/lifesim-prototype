@@ -17,7 +17,7 @@ const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
 export function planChanges(files,root=ROOT){
   const changed=[...new Set(files.map(normalize))].sort();
   const relevant=changed.some(f=>isCode(f)||f.startsWith('assets/'));
-  if(!relevant)return {tests:[],browser:false,cas_baseline:false,e5:false,integration_qa:false,fandom_tv:false,fandom_phone:false,fandom_r2a:false,fandom_r2b:false,fandom_r2c:false,changed};
+  if(!relevant)return {tests:[],browser:false,cas_inventory:false,cas_baseline:false,e5:false,integration_qa:false,fandom_tv:false,fandom_phone:false,fandom_r2a:false,fandom_r2b:false,fandom_r2c:false,changed};
   const allTests=readdirSync(path.join(root,'tests')).filter(f=>f.endsWith('.test.js')).map(f=>'tests/'+f);
   const selected=new Set(CORE);
   const changedSrc=changed.filter(f=>f.startsWith('src/')&&/\.(?:js|mjs)$/.test(f));
@@ -87,10 +87,11 @@ export function planChanges(files,root=ROOT){
     /^(?:src\/(?:sports-identity|furniture-catalog|furniture-products|furniture-procedural-library|furniture-editor|career-phone-ui|game)\.js|tests\/fandom-r2-b-browser-smoke\.mjs)$/.test(f));
   const fandom_r2c=changed.some(f=>
     /^(?:src\/(?:sports-shared-watch|action-queue|household|sports-phone-model|career-phone-ui|game)\.js|tests\/fandom-r2-c-browser-smoke\.mjs)$/.test(f));
+  const cas_inventory=changed.some(f=>['scripts/cas-00-dependency-inventory.mjs','tests/cas-00-dependency-inventory.test.js'].includes(f));
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');
   const career_shifts=changed.some(f=>
     /^(?:src\/career-rank-schedules\.js|tests\/career-shifts-r1-browser-smoke\.mjs)$/.test(f));
-  return {tests,cas_baseline,browser:changed.some(isUI)||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
+  return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
     fandom_tv,fandom_phone,fandom_r2a,fandom_r2b,fandom_r2c,
     e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),changed};
@@ -128,13 +129,14 @@ function main(){
   console.log('FANDOM-R2-A live phone and multi-league smoke:',plan.fandom_r2a?'required':'not needed');
   console.log('FANDOM-R2-B live club decor and crests:',plan.fandom_r2b?'required':'not needed');
   console.log('FANDOM-R2-C verified shared TV and mobile memories:',plan.fandom_r2c?'required':'not needed');
+  console.log('CAS-00 full-source static inventory:',plan.cas_inventory?'required':'not needed');
   console.log('CAS-00 four-viewport performance baseline:',plan.cas_baseline?'required':'not needed');
   console.log('LOT-E5 four-viewport deep check:',plan.e5?'required':'not needed');
   console.log('P4 Life Systems four-viewport integration:',plan.integration_qa?'required':'not needed');
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
     'parcel_editor='+changed.some(f=>f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
-    'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
+    'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
     'micro_ux='+(plan.micro_ux?'true':'false')+'\n'+
     'load_truth='+(plan.load_truth?'true':'false')+'\n'+
     'fridge_ux='+(plan.fridge_ux?'true':'false')+'\n'+
