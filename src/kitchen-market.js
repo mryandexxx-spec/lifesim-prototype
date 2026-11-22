@@ -17,7 +17,7 @@ export const ingredientPack=id=>GRILL_INGREDIENT_PACKS[id]||
   {units:KITCHEN_RESTOCK_UNITS,price:KITCHEN_RESTOCK_PRICE};
 const quantity=n=>Number.isSafeInteger(n)&&n>=0&&n<=KITCHEN_RESTOCK_MAX;
 export function quoteKitchenRestock(root,ingredientId){
-  if(!Object.hasOwn(PANTRY_START,ingredientId))
+  if(!Object.hasOwn(KITCHEN_RESTOCK_LABELS,ingredientId))
     return {ok:false,reason:'unsupported-ingredient'};
   if(root?.kitchen?.schema!==KITCHEN_SCHEMA||!quantity(root.kitchen?.pantry?.[ingredientId]))
     return {ok:false,reason:'invalid-pantry'};
