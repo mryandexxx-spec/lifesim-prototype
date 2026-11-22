@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
-import {plannedCareerShift} from '../src/career-scheduler.js';
+import {nextCareerShift} from '../src/career-scheduler.js';
 import {enqueueAction,pendingActions} from '../src/action-queue.js';
 import {careerDepartureLeadMinutes,progressCareerWork,arriveCareerPortal,
   residentAwayAtWork,residentWorkStatus} from '../src/career-work.js';
@@ -11,7 +11,7 @@ function worker(careerId='business-center'){
   const root=newHousehold('2026-11-16');
   root.careerSystem=hireCareer(root.careerSystem,'alex',careerId,root.minutes,{rankSchedules:true});
   const contract=root.careerSystem.byResident.alex;
-  const planned=plannedCareerShift(root.calendar,contract,0);
+  const planned=nextCareerShift(root.calendar,contract,root.minutes-.001);
   assert.ok(planned,careerId+' Monday shift');
   return {root,contract,planned};
 }
@@ -34,13 +34,13 @@ test('automatic worker departs ahead of start, arrives early and waits without w
   assert.equal(residentAwayAtWork(root,'alex'),true);
   assert.equal(contract.currentShift.departedAt,arrival);
   assert.match(residentWorkStatus(root,'alex').label,/Ожидает начала/);
-  assert.equal(contract.lastShift,null);
+  assert.equal(contract.lastShift??null,null);
   assert.equal(arriveCareerPortal(root,'alex',arrival),false);
   root.minutes=planned.start-1;
   progressCareerWork(root,planned.start-1,planned.start);
   assert.equal(contract.currentShift.phase,'working');
   assert.equal(contract.currentShift.departedAt,planned.start);
-  assert.equal(contract.lastShift,null);
+  assert.equal(contract.lastShift??null,null);
 });
 test('manual ordinary work is safely deferred into original FIFO before departure',()=>{
   const {root,contract,planned}=worker();
