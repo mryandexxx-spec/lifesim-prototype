@@ -117,7 +117,12 @@ function approach(root,sourceId,targetId){
   const a=actor(root,sourceId),b=actor(root,targetId);
   if(!a?.position||!b?.position)return null;
   const source={...a.position},target=b.position;
-  if(dist(source,target)>=.76&&dist(source,target)<=1.5&&
+  if(!isWalkable(source.x,source.z,root.world)||
+    !isWalkable(target.x,target.z,root.world))return null;
+  const unobstructed=Object.entries(allActors(root)).every(([id,p])=>
+    id===sourceId||id===targetId||
+      dist(p.position,source)>=.72&&dist(p.position,target)>=.72);
+  if(unobstructed&&dist(source,target)>=.76&&dist(source,target)<=1.5&&
     isClearLine(source,target,root.world))return source;
   const points=[];
   for(let i=0;i<16;i++){
@@ -220,6 +225,8 @@ export function tickAddressedSocial(root,minutes){
     return false;
   }
   if(dist(a.position,b.position)<.76||dist(a.position,b.position)>1.55||
+    !isWalkable(a.position.x,a.position.z,root.world)||
+    !isWalkable(b.position.x,b.position.z,root.world)||
     !isClearLine(a.position,b.position,root.world)){
     cancelAddressedSocial(root);return false;
   }
