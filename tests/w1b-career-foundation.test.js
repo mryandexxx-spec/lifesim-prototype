@@ -51,7 +51,15 @@ test('W1-B.1 contracts independent per resident, old-clock synchronized and vali
   assert.throws(()=>hireCareer(s.careerSystem,'alien','editorial',600),/Invalid/);
   assert.throws(()=>hireCareer(s.careerSystem,'alex','nonexistent',600),/Invalid/);
   const reload=loadHousehold(copy(s));
-  assert.deepEqual(reload.careerSystem,s.careerSystem);
+  // F: old saved contracts retain every legacy field but gain a one-shot safe
+  // future-week rank schedule. None of their past work/salary is rewritten.
+  for(const id of ['alex','mira']){
+    assert.ok(reload.careerSystem.byResident[id].shiftSchedule.effectiveDayIndex>=7);
+    assert.equal(reload.careerSystem.byResident[id].shiftSchedule.schema,1);
+  }
+  const withoutF=copy(reload.careerSystem);
+  for(const id of ['alex','mira'])delete withoutF.byResident[id].shiftSchedule;
+  assert.deepEqual(withoutF,s.careerSystem);
   assert.equal(reload.otherSim.minutes,reload.minutes);
   // In-game simulation ticks in fractional minutes (0.3 at x1).
   const afterFractional=hireCareer(newCareerSystem(),'mira','editorial',480.3);
