@@ -2272,6 +2272,17 @@ const careerPhone=createCareerPhoneUI({
     const queued=scheduleCommand({type:'object',actionId:'tv',targetInstanceId:tvId},who);
     return {ok:queued,reason:queued?null:'queue-unavailable'};
   },
+  onInviteSportsMatch:(who,tvId,matchId)=>{
+    const opportunity=sportsWatchOpportunity(game),other=who==='alex'?'mira':'alex';
+    if(game.selectedSim!==who||game.paused||!opportunity||
+      opportunity.tvId!==tvId||opportunity.matchId!==matchId||
+      residentUnavailableForHome(game,who)||residentUnavailableForHome(game,other)||
+      game.phoneCalls?.active||dialogueNeedsDecision(game))
+      return {ok:false,reason:'unavailable'};
+    const queued=scheduleCommand({type:'shared',targetId:other,mode:'leisure',
+      choiceId:'tv',targetInstanceId:tvId,sportsMatchId:matchId},who);
+    return {ok:queued,reason:queued?null:'queue-unavailable'};
+  },
   onOpenChange:id=>updatePhoneProps(id),
   onIncidentChanged:()=>{updateCareerHud();refreshIncidentNotifications();},
   selectResident:id=>{
@@ -4369,6 +4380,8 @@ function boot() {
     const self=getActor(game,actorId),partnerId=actorId==='alex'?'mira':'alex',
       partner=getActor(game,partnerId);
     if(shared?.mode==='leisure'&&['tv','books','music'].includes(shared.choiceId)){
+      if(shared.sportsMatchId&&
+        sportsWatchOpportunity(game)?.matchId!==shared.sportsMatchId)return false;
       const plan=shared.choiceId==='tv'
         ?planSharedTv(game,actorId,shared.targetInstanceId||'home-tv-1')
         :planPairedHobby(game,actorId,shared.choiceId,shared.targetInstanceId||null);
@@ -4497,6 +4510,11 @@ function boot() {
     let expired=0;
     for(const id of HOUSEHOLD_IDS)for(const task of [...pendingActions(game.actionQueues,id)]){
       if(task.type==='garden'&&!gardenRequestStillValid(game,id,task.instanceId,task.actionId))
+        if(removeQueuedAction(game.actionQueues,id,task.seq))expired++;
+      // Match-linked invitation never silently becomes a generic TV evening
+      // after the actual fixture has ended; explicit FIFO intent expires.
+      if(task.type==='shared'&&task.mode==='leisure'&&task.choiceId==='tv'&&
+        task.sportsMatchId&&sportsWatchOpportunity(game)?.matchId!==task.sportsMatchId)
         if(removeQueuedAction(game.actionQueues,id,task.seq))expired++;
       if(task.type==='pool'&&Number.isFinite(task.queuedAt)&&
         game.minutes-task.queuedAt>=SWIM_MAX_WAIT_MINUTES)
