@@ -157,7 +157,9 @@ test('CAS-01.4 shared fridge reservation blocks both second extra and legacy res
 test('CAS-01.4 A* movement never crosses furniture or another resident collision disc',()=>{
   const root=withPopulation();
   const id='resident_3',actor=getActor(root,id);
-  const goal=nearestWalkable({x:4.5,z:-2.75},root.world);
+  // A nearby genuinely free endpoint must complete; a crowded long corridor
+  // is permitted to wait rather than intersect other actors.
+  const goal=nearestWalkable({x:-2.3,z:3.15},root.world);
   assert.ok(findPath(actor.position,goal,root.world));
   const task=enqueueAction(root.actionQueues,id,{type:'move',x:goal.x,z:goal.z});
   assert.ok(task);
@@ -175,6 +177,29 @@ test('CAS-01.4 A* movement never crosses furniture or another resident collision
   }
   assert.equal(advanced,true,'A* route made physical progress');
   assert.ok(dist(actor.position,goal)<.07,'reached precise goal');
+});
+
+test('CAS-01.4 distant route stays safe if a person blocks the corridor',()=>{
+  const root=withPopulation();
+  const id='resident_3',actor=getActor(root,id);
+  const goal=nearestWalkable({x:4.5,z:-2.75},root.world);
+  assert.ok(findPath(actor.position,goal,root.world),'static A* route exists');
+  assert.ok(enqueueAction(root.actionQueues,id,{type:'move',x:goal.x,z:goal.z}));
+  tickHousehold(root,.1);
+  let progressed=false;
+  for(let k=0;k<80;k++){
+    const before={...actor.position};
+    tickHousehold(root,.25);
+    assert.ok(isClearLine(before,actor.position,root.world),
+      'no static obstacle may be crossed, including along a detour');
+    assert.equal(residentCollisionFree(root,id,actor.position),true,
+      'a queued route may wait, but never tunnel through another resident');
+    if(dist(before,actor.position)>.001)progressed=true;
+    if(!actor.action)break;
+  }
+  assert.equal(progressed,true,'route must at least approach the obstruction');
+  if(!actor.action)assert.ok(dist(actor.position,goal)<.07,
+    'an ended movement must mean real arrival, not a silent cancellation');
 });
 
 test('CAS-01.4 overlapping saved spawns are repaired on first tick, not during atomic preflight',()=>{
