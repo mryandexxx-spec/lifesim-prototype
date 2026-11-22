@@ -591,7 +591,7 @@ function validMusicSource(root,actor){
 }
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
   activityId=null,contentId=null,musicPlan=null,inventoryItemId=null,recipeId=null,
-  mirrorPractice=false) {
+  mirrorPractice=false,tvTalk=false) {
   const item=resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(residentUnavailableForHome(root,residentId))return false;
   if(!item||!HOUSEHOLD_IDS.includes(residentId)||
@@ -650,6 +650,8 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   if(chosen)resident.action.targetInstanceId=item.instanceId;
   if(chosen&&itemId==='mirror'&&mirrorPractice===true&&!automatic)
     resident.action.mirrorPractice=true;
+  if(chosen&&itemId==='tv'&&tvTalk===true&&!automatic)
+    resident.action.tvTalk=true;
   if(chosen&&itemId==='hobby'){
     const session=createActivitySession(HOBBY_ACTIVITIES,{
       sessionId:'reading:'+residentId+':'+root.actionQueues.nextSeq+':'+Math.round(root.minutes*1000),

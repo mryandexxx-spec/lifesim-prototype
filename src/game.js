@@ -540,8 +540,9 @@ function taskLabel(task){
     task.actionId==='harvest'?'Собрать садовые травы':
     task.actionId==='replant'?'Посадить травы заново':'Полюбоваться садом';
   if(task.type==='pool')return task.actionId==='jump'?'Прыгнуть и поплавать':'Плавать';
-  if(task.type==='object')return task.mirrorPractice===true
-    ?'Репетировать речь':ACTIONS[task.actionId]?.label||'Предмет';
+  if(task.type==='object')return task.tvTalk===true?'Поговорить с телевизором':
+    task.mirrorPractice===true?'Репетировать речь':
+      ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
   if(task.type==='social')return SOCIAL_ACTIONS[task.actionId]?.label||'Общение';
@@ -1052,6 +1053,7 @@ function select(id,instanceId=null) {
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
   $('mirror-speech-button').hidden=id!=='mirror';
+  $('tv-talk-button').hidden=id!=='tv';
   $('fridge-lunch-button').hidden=id!=='fridge';
   $('fridge-cook-button').hidden=id!=='fridge';
   const lampLabel=id==='lamp'
@@ -1192,6 +1194,12 @@ $('close-action').addEventListener('click', () => select(null));
 $('mirror-speech-button').addEventListener('click',()=>{
   if(selected!=='mirror')return;
   if(scheduleCommand({type:'object',actionId:'mirror',mirrorPractice:true,
+    ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}))
+    select(null);
+});
+$('tv-talk-button').addEventListener('click',()=>{
+  if(selected!=='tv')return;
+  if(scheduleCommand({type:'object',actionId:'tv',tvTalk:true,
     ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}))
     select(null);
 });
@@ -4070,7 +4078,8 @@ function boot() {
     return true;
   }
   beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null,
-    activityId=null,contentId=null,inventoryItemId=null,recipeId=null,mirrorPractice=false)=>{
+    activityId=null,contentId=null,inventoryItemId=null,recipeId=null,mirrorPractice=false,
+    tvTalk=false)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
@@ -4100,7 +4109,7 @@ function boot() {
       return false;
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
-      activityId,contentId,musicPlan,inventoryItemId,recipeId,mirrorPractice);
+      activityId,contentId,musicPlan,inventoryItemId,recipeId,mirrorPractice,tvTalk);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
@@ -4374,7 +4383,8 @@ function boot() {
             :command.targetInstanceId;
           if(target||command.autoTable!==true)
             started=beginAction(command.actionId,false,residentId,true,target,
-              null,null,null,command.recipeId||null,command.mirrorPractice===true);
+              null,null,null,command.recipeId||null,command.mirrorPractice===true,
+              command.tvTalk===true);
         }
         else if(command.type==='activity'){
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
@@ -8202,6 +8212,8 @@ function boot() {
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
+      tvTalk:game.action?.id==='tv'&&game.action.phase==='using'&&
+        game.action.tvTalk===true,
       watering:alexWater,
       swimStage:alexSwimFrame?.stage||game.action?.stage,
       swimStroke:alexSwimFrame?.stroke||0,
@@ -8382,6 +8394,8 @@ function boot() {
     animationStates.mira=stepAnimation(animationStates.mira,{
       id:'mira',walking:(miraWalking||Boolean(miraShower?.stepWeight>.015))&&!miraSeating&&!miraBedding,
       using:miraToilet?'toilet':miraShower?'shower':miraUseId,
+      tvTalk:game.otherSim.action?.id==='tv'&&game.otherSim.action.phase==='using'&&
+        game.otherSim.action.tvTalk===true,
       watering:miraWater,
       swimStage:miraSwimFrame?.stage||game.otherSim.action?.stage,
       swimStroke:miraSwimFrame?.stroke||0,

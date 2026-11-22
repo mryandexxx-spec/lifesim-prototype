@@ -234,6 +234,13 @@ export function stepAnimation(previous,signals,dt) {
   }else if(action!=='bed'){
     armTarget=[Math.sin(t*1.5)*1.4,Math.sin(t*1.5+1.1)*1.4];
   }
+  // A small, original solo response to the screen; keep the tested seat
+  // pelvis/legs and normal TV gaze. No partner or social gesture session.
+  if(action==='tv'&&signals?.tvTalk===true){
+    const pulse=Math.sin(t*4.2),reply=Math.sin(t*2.7+1);
+    armTarget=[-38+13*pulse,-23+11*reply];
+    elbowTarget=[-39+8*pulse,-18+9*reply];
+  }
   // Only free walking gets exact distance-phase contact poses. The previous
   // angle spring lagged several frames behind the moving root (much worse at
   // 3×), making the stance foot skate; the weight already smooths starts/stops.
