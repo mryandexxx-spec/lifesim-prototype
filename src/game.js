@@ -1,4 +1,5 @@
 import {PARCEL_SECTIONS,areaBuildTool,parcelCamera,balanceQuote,outdoorSectionFor,installParcelTray} from './parcel-editor-ui.js';
+import {createParcelJournal} from './parcel-journal.js';
 import {wateringFrame} from './outdoor-character-motion.js';
 import * as pc from 'playcanvas';
 import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
@@ -7407,7 +7408,6 @@ function boot() {
   const tray=installParcelTray(parcelAction);
   const command=(id,label,detail)=>({id,label,detail});
   const primary=(id,label,disabled=false)=>({id,label,primary:true,disabled});
-  const historyPrefix=()=>buildMode?'build':furnishMode?'furnish':'outdoor';
   const categoryLabels={ground:'Покрытия',objects:'Мебель и свет',plants:'Растения и ограды',garden:'Грядки'};
   const poolLabels={paint:'Добавить воду',erase:'Убрать воду',ladder:'Лестница',steps:'Ступени',board:'Трамплин'};
   const entrySections={'home-build':'house','home-furnish':'furniture','home-outdoors':'yard','home-pool':'pool'};
@@ -7435,7 +7435,7 @@ function boot() {
       toast('Сначала закончи текущее взаимодействие');return;
     }
     const cameraBefore={...view},fresh=!parcel;
-    if(fresh)parcel={oldView:cameraBefore,oldFinger:oneFingerMode,plan:true};
+    if(fresh)parcel={oldView:cameraBefore,oldFinger:oneFingerMode,plan:true,journal:createParcelJournal()};
     tray.hide();
     if(section==='house'&&!buildMode){closeDomain();enterBuild();}
     if(section==='furniture'&&!furnishMode){closeDomain();enterFurniture();}
@@ -7461,13 +7461,14 @@ function boot() {
     const p=parcel;if(!p)return;
     const m={section:p.section,stage:p.stage,plan:p.plan,title:PARCEL_SECTIONS[p.section],hint:p.message,
       wallet:balanceQuote(game.shop.credits),choices:[],actions:[],tabs:p.stage==='browse',nodes:[],
-      undo:p.stage==='browse'&&!$(historyPrefix()+'-undo').disabled,
-      redo:p.stage==='browse'&&!$(historyPrefix()+'-redo').disabled};
+      undo:p.stage==='browse'&&p.journal.canUndo,
+      redo:p.stage==='browse'&&p.journal.canRedo};
     const pick=(id,label,detail)=>command('pick:'+id,label,detail);
     const group=(id,label,detail)=>command('group:'+id,label,detail);
     if(p.stage==='browse'){
       if(buildMode)m.choices=BUILD_TOOL_GROUPS.map(g=>group(g.id,g.label));
-      if(furnishMode)m.choices=[group('shop','Каталог','Мебель и декор'),group('storage','Склад','Свои предметы')];
+      if(furnishMode)m.choices=[group('shop','Каталог','Мебель и декор'),group('storage','Склад','Свои предметы'),
+        group('owned','В комнате','Выбор без поиска на 3D-плане')];
       if(p.section==='yard')m.choices=Object.entries(categoryLabels).map(([id,label])=>group(id,label));
       if(p.section==='pool'){
         m.choices=[group('water','Чаша','Добавить или убрать воду'),group('fixtures','Оснащение','Выходы и трамплины')];
@@ -7479,7 +7480,13 @@ function boot() {
         m.choices.push(group('owned','На участке','Выбрать из списка'));
     }else if(p.stage==='list'){
       m.actions=[command('back','Назад')];
-      if(p.group==='owned'){
+      if(p.group==='owned'&&furnishMode){
+        m.title='Мебель в комнате';m.choices=game.world.furniture.instances
+          .filter(item=>item.location==='home'&&canMoveFurniture(item))
+          .map(item=>command('select:'+item.instanceId,editorLabel(item.instanceId),
+            '№ '+item.instanceId));
+        if(!m.choices.length)m.hint='Подходящей мебели в комнате пока нет.';
+      }else if(p.group==='owned'){
         m.title='На участке';m.choices=(poolMode()?game.world.outdoors.poolFixtures:game.world.outdoors.features)
           .map(f=>command('select:'+(f.fixtureId||f.instanceId),f.fixtureId?poolLabels[f.kind]:OUTDOOR_CATALOG[f.itemId]?.name,
             '№ '+(f.fixtureId||f.instanceId)+' · '+(f.fixtureId?'на борту':f.x+' / '+f.z)));
@@ -7506,6 +7513,9 @@ function boot() {
       if(f.kind==='room'){
         m.actions=[command('back','Назад')];
         m.choices=['room-duplicate','room-relocate','room-join','paint-room'].map(id=>pick(id,titleForBuild(id)));
+      }else if(f.kind==='wall'){
+        m.actions=[command('back','Назад')];
+        m.choices=['move-wall','erase-wall','door','window','arch','paint-wall','paint-facade'].map(id=>pick(id,titleForBuild(id)));
       }else if(f.kind==='furniture'){
         m.actions=m.actions.filter(a=>a.id==='back'||canMoveFurniture(editorItem(f.id)));
         if(!$('furnish-store').disabled)m.choices.push(command('store','На склад'));
@@ -7552,6 +7562,7 @@ function boot() {
       const selection=p.selected;
       setBuildTool(id);
       if(selection?.kind==='room'&&['room-duplicate','room-relocate','paint-room'].includes(id))parcelBuildTap(selection.pos);
+      else if(selection?.kind==='wall'&&!areaBuildTool(id))parcelBuildTap(selection.pos);
       else if(areaBuildTool(id))p.message='Коснись первого угла на плане.';
     }else if(outdoorMode){
       if(poolMode()){selectValue('pool-tool',id);selectValue('pool-fixture-operation','fixture-add');}
@@ -7578,7 +7589,9 @@ function boot() {
     const p=parcel,f=p.selected;p.message='';
     if(f.kind==='furniture'){
       if(action==='store'||action==='sell'){
+        const before=p.journal.snapshot(game);
         $('furnish-'+action).click();
+        p.journal.record(before,game,p.section);
         if(editorItem(f.id)?.location!=='home')idleParcel();
         p.message=$('furnish-feedback').textContent;return;
       }
@@ -7598,10 +7611,82 @@ function boot() {
       else if(action==='move')p.message='Коснись нового места или поверни предмет.';
     }
   }
+  function navigateParcelJournal(direction){
+    const p=parcel,step=p.journal.preview(game,direction);
+    const fail=reason=>{
+      p.message=({
+        'balance-changed':'Семейный баланс изменился. Историю этой сессии больше нельзя применить.',
+        'world-changed':'Другой редактор изменил объект. История заблокирована для защиты сохранения.',
+        'insufficient-credits':'Недостаточно средств для повторения покупки.',
+        'empty-history':'Пока нечего отменять или повторять.',
+        'save-failed':'Не удалось записать сохранение. Изменения не применены.'
+      })[reason]||('Невозможно безопасно применить историю: '+reason);
+      renderParcel();
+    };
+    if(!step.ok){fail(step.reason);return;}
+    if(step.poolChange){
+      // Only the canonical pool editor may change basin/fixture topology.
+      const outdoors=step.world.outdoors;
+      const proposal=previewPoolHistory(game,{
+        pools:outdoors.pools,poolFixtures:outdoors.poolFixtures});
+      if(!proposal.ok||proposal.balance!==step.credits){
+        fail(proposal.reason||'pool-history-price-mismatch');return;
+      }
+      const result=commitPoolPreviewPersisted(game,proposal,next=>{
+        if(!bootReadyToSave)return false;
+        try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));return true;}
+        catch{return false;}
+      });
+      if(!result.ok){fail(result.reason);return;}
+      game.world=result.root.world;game.shop=result.root.shop;
+      game.financialHistory=result.root.financialHistory;
+    }else{
+      const guard=protectPoolFromWorldEdit(game,step.world);
+      if(!guard.ok){fail(guard.reason);return;}
+      const receipt=recordFinanceChange(game,{...game.shop,credits:step.credits},{
+        kind:direction<0?'undo':'redo',
+        sourceId:'parcel-history-'+game.world.outdoors.revision+'-'+
+          (game.financialHistory?.nextId||1),
+        atGameMinute:Math.floor(game.minutes)});
+      if(!receipt.ok){fail(receipt.reason);return;}
+      const next={...game,world:{...game.world,...step.world},
+        shop:receipt.shop,financialHistory:receipt.financialHistory};
+      if(!bootReadyToSave){fail('save-failed');return;}
+      try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));}
+      catch{fail('save-failed');return;}
+      game.world=next.world;game.shop=next.shop;
+      game.financialHistory=next.financialHistory;
+    }
+    p.journal.advance(direction);
+    if(step.changed.includes('outdoors')){
+      poolVisual.sync(game.world.outdoors);renderOutdoorGround();
+      renderOutdoorFeatures();syncOutdoorOwned();syncPoolOwned();
+    }
+    if(step.changed.includes('furniture')){
+      updateDecorNodes();refreshMind(game,game.world);refreshMind(game.otherSim,game.world);
+      renderWarehouse();renderMarket();
+    }
+    if(step.changed.includes('construction'))syncConstructionRender(true);
+    updateFamilyBalance();
+    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    // Reinitialize native domain sessions from authoritative restored data;
+    // their old internal snapshots must not resurrect stale money or objects.
+    const section=p.section;
+    closeDomain();openParcel(section);
+    p.message=direction<0?'Изменение отменено · баланс и предметы сохранены':
+      'Изменение возвращено · баланс и предметы сохранены';
+    renderParcel();
+  }
   function parcelAction(action){
     if(!parcel)return;
     const p=parcel,[verb,value]=action.split(':');
-    if(verb==='section'){if(value!==p.section)openParcel(value);return;}
+    if(verb==='section'){
+      if(value!==p.section){
+        if(p.stage==='draft'&&!window.confirm('Сменить раздел и отменить текущий черновик?'))return;
+        openParcel(value);
+      }
+      return;
+    }
     if(action==='exit'){
       if(p.stage==='draft'&&!window.confirm('Выйти и сбросить текущий черновик?'))return;
       leaveParcel();return;
@@ -7614,7 +7699,16 @@ function boot() {
       if(furnishMode)setEditorView(value==='shop'?'shop':'warehouse');
       if(p.section==='yard'&&value!=='owned')selectValue('outdoor-category',value);
     }else if(verb==='pick')pickedParcelItem(value);
-    else if(verb==='select')selectOutdoorTarget(value);
+    else if(verb==='select'){
+      if(furnishMode){
+        const item=editorItem(value);
+        if(item?.location==='home'&&canMoveFurniture(item)){
+          chooseFurniture(value);
+          p.selected={id:value,kind:'furniture',label:editorLabel(value)};
+          p.stage='selected';p.message='';
+        }else p.message='Предмет недоступен для перестановки.';
+      }else selectOutdoorTarget(value);
+    }
     else if(['move','rotate','sell','store'].includes(action))parcelOwnedAction(action);
     else if(action==='reset'){
       p.first=null;if(buildMode)clearBuildPending();else clearOutdoorPending(true);
@@ -7627,14 +7721,14 @@ function boot() {
     else if(action==='apply'){
       p.message='';
       const id=outdoorMode?'outdoor-apply':buildMode?'build-apply':shopPlacing?'furnish-buy':'furnish-owned-confirm';
-      const before=[game.world.outdoors,game.world.construction,game.world.furniture];
+      const before=p.journal.snapshot(game);
       $(id).click();
-      if(before[0]!==game.world.outdoors||before[1]!==game.world.construction||before[2]!==game.world.furniture){
+      if(p.journal.record(before,game,p.section)){
         const message=$(outdoorMode?'outdoor-preview-text':buildMode?'build-feedback':'furnish-feedback').textContent;
         idleParcel();p.message=message;
       }
     }else if(action==='undo'||action==='redo'){
-      $(historyPrefix()+'-'+action).click();p.message=$(outdoorMode?'outdoor-preview-text':buildMode?'build-feedback':'furnish-feedback').textContent;
+      navigateParcelJournal(action==='undo'?-1:1);return;
     }
     renderParcel();
   }
@@ -7682,8 +7776,12 @@ function boot() {
         if(!outdoorMode)openParcel(target.fixtureId?'pool':'yard');
         selectOutdoorTarget(target.fixtureId||target.instanceId);
       }else if(buildMode){
-        const at=editorFloorAt(pos),room=at&&constructionRoomSelection(game.world.construction,at,{allowStarter:true});
-        if(room?.ok){p.selected={kind:'room',label:'Комната · '+room.room.cells.length*.25+' м²',pos};p.stage='selected';p.message='';}
+        const wall=buildWallAtScreen(pos),at=editorFloorAt(pos),
+          room=at&&constructionRoomSelection(game.world.construction,at,{allowStarter:true});
+        if(wall?.id){
+          selectBuildWall(wall);p.selected={kind:'wall',id:wall.id,label:'Стена · '+wall.id,pos};
+          p.stage='selected';p.message='';
+        }else if(room?.ok){p.selected={kind:'room',label:'Комната · '+room.room.cells.length*.25+' м²',pos};p.stage='selected';p.message='';}
         else idleParcel();
       }else{
         const id=editorFurnitureAt(pos);

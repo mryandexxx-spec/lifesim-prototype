@@ -116,6 +116,8 @@ jobs:
           node --check src/furniture-hold.js
           node --check src/furniture-shop.js
           node --check src/marketplace-home.js
+          node --check src/parcel-editor-ui.js
+          node --check src/parcel-journal.js
           node --check src/furniture-products.js
           node --check src/furniture-procedural-library.js
           node --check src/meshy-furniture-policy.js
@@ -261,6 +263,7 @@ jobs:
           cp src/construction.js site/src/
           cp src/build-tool-palette.js site/src/
           cp src/parcel-editor-ui.js site/src/
+          cp src/parcel-journal.js site/src/
           cp src/lot-surface.js src/outdoor-catalog.js src/outdoor-proposals.js src/outdoor-interactions.js site/src/
           cp src/pool-topology.js site/src/
           cp src/pool-equipment.js src/pool-editor.js site/src/

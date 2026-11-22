@@ -53,7 +53,21 @@ try{
   await worldTap(16,-6);await worldTap(19,-4);
   assert.equal(await action('apply').isEnabled(),true);
   await tap('apply');assert.ok((await root()).world.construction.revision>0);
-  await tap('section:furniture');await tap('group:shop');
+  const built=(await root()).world.construction.floorCells.length;
+  await tap('undo');
+  assert.equal((await root()).world.construction.floorCells.length,
+    seed.world.construction.floorCells.length);
+  await tap('undo');
+  assert.equal((await root()).shop.credits,seed.shop.credits);
+  await tap('redo');
+  assert.equal((await root()).shop.credits,seed.shop.credits-32);
+  await tap('redo');
+  assert.equal((await root()).world.construction.floorCells.length,built);
+  await tap('section:furniture');await tap('group:owned');
+  assert.ok(await page.locator('[data-parcel-action^="select:"]').count()>0);
+  await page.locator('[data-parcel-action^="select:"]').first().tap();
+  assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'selected');
+  await tap('back');await tap('group:shop');
   assert.equal(await page.locator('#furnish-search').isVisible(),true);
   await page.locator('#furnish-stock button:not([hidden])').first().tap();
   assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'draft');
