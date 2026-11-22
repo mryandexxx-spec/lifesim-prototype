@@ -2654,3 +2654,17 @@ button.time-card:active {transform:translateY(1px);}
 
 /* Legacy interaction hint belongs to Life mode, never Build editor. */
 .app-shell[data-parcel] #hint{display:none!important}
+
+/* BUILD-UX phone acceptance: a clean SKU grid and a fixed, non-scrolling action dock.
+   Native legacy filters remain in the DOM for their handlers and old save paths. */
+.app-shell[data-parcel="furniture"] .parcel-native :is(
+  #furnish-type-tabs,#furnish-subtype-tabs,.furnish-search-label,
+  #furnish-catalog-filters,#furnish-filter-count){display:none!important}
+.parcel-editor{overflow:hidden}
+.parcel-editor .parcel-actions{position:relative;z-index:3;flex:none;
+  background:#fbfaf2;padding:7px 0;border-top:1px solid #cbd7c5}
+.parcel-editor .parcel-native{overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;min-height:0;flex:1}
+.parcel-editor .parcel-actions button{min-height:48px}
+.parcel-editor .parcel-actions button[data-parcel-action="turn"],
+.parcel-editor .parcel-actions button[data-parcel-action="rotate"]{grid-column:2}

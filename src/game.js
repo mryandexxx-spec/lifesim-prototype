@@ -5360,8 +5360,9 @@ function boot() {
       :listing?'Выбран: '+listing.name+' · '+listing.price+' кр.':'Выбери мебель для примерки';
     $('furnish-buy').textContent=shopPlacing?'✓ Купить и установить · '+(listing?.price??0)+' кр.':
       'Примерить · '+(listing?.price??0)+' кр.';
-    $('furnish-buy').disabled=shopPlacing?!suitable:
-      !listing||game.shop.credits<listing.price;
+    // Browsing/trying a SKU is free, even when the family cannot afford it.
+    // Only the final purchase requires the authoritative wallet/placement quote.
+    $('furnish-buy').disabled=shopPlacing?!suitable:!listing;
     $('furnish-preview-turn').disabled=!shopPlacing||!shopPose;
     syncShopPreviewEntity();
     if(shopPlacing&&shopPose&&listing){
@@ -5548,12 +5549,9 @@ function boot() {
     button.addEventListener('click',()=>{
       if(!furnishMode||!shopOpen||shopPlacing)return;
       chooseShopProduct(item.itemId);
-      if(game.shop.credits<item.price){
-        editorFeedback('Недостаточно кредитов для «'+item.name+'»',true);return;
-      }
-      // Selecting a card opens the existing non-persistent 3D preview.
-      // The canonical Buy handler still charges only on explicit installation.
-      $('furnish-buy').click();
+      // Selecting a card does NOT start staging. The fixed action bar shows
+      // an explicit «Примерить» button; otherwise the next step is invisible
+      // on iPhone when the catalog occupies the scrollable part of the tray.
     });
     $('furnish-stock').append(button);
   }
@@ -5598,9 +5596,9 @@ function boot() {
     if(!furnishMode||!shopOpen||!shopSelected)return;
     if(!shopPlacing){
       const listing=shopListings.find(i=>i.itemId===shopSelectedItemId);
-      if(!listing||game.shop.credits<listing.price){
-        editorFeedback('Недостаточно пробных кредитов',true);return;
-      }
+      if(!listing)return;
+      // Preview is non-persistent and available at any credit balance;
+      // buyMarketItem checks the real balance again at confirmation.
       // Buy enters a NON-persistent 3D placement session, not an instant sale.
       shopPlacing=true;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
       // Let the edit sheet collapse BEFORE choosing the visible room anchor.
@@ -7463,10 +7461,13 @@ function boot() {
     if(dialogueNeedsDecision(game)||intimacyFrame(game.socialAction).active||careerPhone.interviewNeedsDecision()){
       toast('Сначала закончи текущее взаимодействие');return;
     }
-    const cameraBefore={...view},fresh=!parcel;
+    const cameraBefore={...view},fresh=!parcel,previousSection=parcel?.section;
     if(fresh)parcel={oldView:cameraBefore,oldFinger:oneFingerMode,
       oldCameraRect:camera.camera.rect.clone(),oldCanvasClip:canvas.style.clipPath,
-      plan:true,journal:createParcelJournal()};
+      plan:section!=='furniture',journal:createParcelJournal()};
+    // Furniture starts tilted, both on fresh entry and on tab transition.
+    // Other sections retain their current projection unless opened fresh.
+    if(section==='furniture'&&previousSection!=='furniture')parcel.plan=false;
     tray.hide();
     if(section==='house'&&!buildMode){closeDomain();enterBuild();}
     if(section==='furniture'&&!furnishMode){closeDomain();enterFurniture();}
@@ -7479,7 +7480,9 @@ function boot() {
     oneFingerMode='pan';showCameraMode();cameraGesture.clear();
     idleParcel();
     setView(fresh?parcelCamera({...view,centerX:5,centerZ:0,
-      distance:canvas.clientHeight>=canvas.clientWidth?54:42},true):cameraBefore);
+      distance:canvas.clientHeight>=canvas.clientWidth?54:42},parcel.plan)
+      :section==='furniture'&&previousSection!=='furniture'
+        ?parcelCamera(cameraBefore,false):cameraBefore);
     renderParcel();
   }
   function leaveParcel(){
@@ -7513,6 +7516,14 @@ function boot() {
         m.choices.push(group('owned','На участке','Выбрать из списка'));
     }else if(p.stage==='list'){
       m.actions=[command('back','Назад')];
+      if(p.group==='shop'&&furnishMode){
+        const listing=shopListings.find(x=>x.itemId===shopSelectedItemId);
+        m.hint=listing?'Выбрано: '+listing.name+' · '+listing.price+' кр.'+
+          (game.shop.credits<listing.price?' · можно примерить без покупки':'')
+          :'Выбери предмет в каталоге для примерки.';
+        // This dock is outside the scrolling catalog and stays visible.
+        m.actions.push(primary('try','Примерить',!listing));
+      }
       if(p.group==='owned'&&furnishMode){
         m.title='Мебель в комнате';m.choices=game.world.furniture.instances
           .filter(item=>item.location==='home'&&canMoveFurniture(item))
@@ -7541,7 +7552,8 @@ function boot() {
       }
     }else if(p.stage==='selected'){
       const f=p.selected;m.title=f.label;m.hint=p.message||'Предмет выбран на участке.';
-      m.actions=[command('back','Назад'),command('move','Переставить'),command('rotate','↻ 90°')];
+      // 90° always occupies the middle slot, even after entering a draft.
+      m.actions=[command('back','Назад'),command('rotate','↻ 90°'),command('move','Переставить')];
       if(f.kind==='fixture')m.actions[2].label='Повернуть';
       if(f.kind==='room'){
         m.actions=[command('back','Назад')];
@@ -7733,6 +7745,11 @@ function boot() {
       p.stage='list';p.group=value;p.message='';
       if(furnishMode)setEditorView(value==='shop'?'shop':'warehouse');
       if(p.section==='yard'&&value!=='owned')selectValue('outdoor-category',value);
+    }else if(action==='try'&&furnishMode&&p.stage==='list'&&p.group==='shop'){
+      if(shopSelectedItemId&&!shopPlacing){
+        $('furnish-buy').click();
+        if(shopPlacing){p.stage='draft';p.message='';}
+      }
     }else if(verb==='pick')pickedParcelItem(value);
     else if(verb==='select'){
       if(furnishMode){

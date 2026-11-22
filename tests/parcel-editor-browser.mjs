@@ -97,18 +97,78 @@ try{
   assert.equal((await root()).shop.credits,seed.shop.credits-32);
   await tap('redo');
   assert.equal((await root()).world.construction.floorCells.length,built);
-  await tap('section:furniture');await tap('group:owned');
+  await tap('section:furniture');
+  // Furnishing defaults to a tilted camera, unlike house planning.
+  assert.equal(await action('view').textContent(),'План');
+  const furnishingPitch=await page.evaluate(async()=>{
+    const {Application}=await import('playcanvas');
+    return Application.getApplication().root.findComponent('camera').entity
+      .getEulerAngles().x;
+  });
+  assert.ok(Number.isFinite(furnishingPitch));
+  await tap('group:owned');
   assert.ok(await page.locator('[data-parcel-action^="select:"]').count()>0);
   await page.locator('[data-parcel-action^="select:"]').first().tap();
   assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'selected');
   await tap('back');await tap('group:shop');
-  assert.equal(await page.locator('#furnish-search').isVisible(),true);
+  // The compact editor has no search, category chips, or two select filters.
+  for(const selector of ['#furnish-type-tabs','#furnish-subtype-tabs',
+    '.furnish-search-label','#furnish-catalog-filters',
+    '#furnish-room-filter','#furnish-function-filter']){
+    assert.equal(await page.locator(selector).isVisible(),false,selector);
+  }
   await page.locator('#furnish-stock button:not([hidden])').first().tap();
+  assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'list');
+  assert.equal(await action('try').isVisible(),true);
+  await page.locator('.parcel-native').evaluate(el=>{el.scrollTop=el.scrollHeight});
+  const tryBounds=await action('try').boundingBox(),
+    dockBounds=await page.locator('.parcel-actions').boundingBox(),
+    nativeBounds=await page.locator('.parcel-native').boundingBox();
+  assert.ok(tryBounds&&dockBounds&&nativeBounds);
+  assert.ok(tryBounds.y>=nativeBounds.y+nativeBounds.height,
+    'Preview CTA must remain below and outside catalog scrolling viewport');
+  await tap('try');
   assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'draft');
+  const turnBefore=await action('turn').boundingBox();
+  assert.equal(await action('turn').isEnabled(),true);
+  await tap('turn');
+  const turnAfter=await action('turn').boundingBox();
+  assert.ok(Math.abs(turnBefore.x-turnAfter.x)<1,
+    'The 90° button cannot switch places on the first press');
+  await tap('turn');
+  const turnTwice=await action('turn').boundingBox();
+  assert.ok(Math.abs(turnBefore.x-turnTwice.x)<1,
+    'The 90° button must keep its x coordinate across repeated turns');
   await tap('cancel');await tap('exit');
   assert.equal(await page.locator('#game-canvas').evaluate(el=>el.style.clipPath),'');
   await page.reload();await page.locator('#loading').waitFor({state:'hidden',timeout:75000});
   assert.equal((await root()).world.outdoors.features[0].yaw,90);
+  if(width===390){
+    // Owner reproduction: selected wardrobe costs 320, wallet holds 281.
+    await page.evaluate(key=>{
+      const state=JSON.parse(localStorage.getItem(key));
+      state.shop.credits=281;
+      localStorage.setItem(key,JSON.stringify(state));
+    },SAVE_KEY);
+    await page.reload();
+    await page.locator('#loading').waitFor({state:'hidden',timeout:75000});
+    await page.locator('#home-open').tap();await page.locator('#home-furnish').tap();
+    assert.equal(await action('view').textContent(),'План');
+    await tap('group:shop');
+    const expensive=page.locator('#furnish-stock button').filter({hasText:'Шкаф с историями'});
+    assert.ok(await expensive.count()>0,'Expected canonical wardrobe product');
+    await expensive.first().tap();
+    assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'list');
+    assert.equal(await action('try').isEnabled(),true);
+    await tap('try');
+    assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'draft');
+    assert.equal((await root()).shop.credits,281,'Preview never charges');
+    assert.equal(await action('apply').isEnabled(),false,'Unaffordable purchase cannot commit');
+    assert.equal(await action('turn').isEnabled(),true);
+    await tap('turn');
+    assert.equal((await root()).shop.credits,281);
+    await tap('cancel');await tap('exit');
+  }
   assert.deepEqual(errors,[]);await ctx.close();console.log('Parcel editor passed',width,height);
  }
 }finally{await browser.close();}
