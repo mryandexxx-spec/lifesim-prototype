@@ -4,6 +4,7 @@
  * household v1 saves, A* footprints or action/animation adapters.
  * Every piece is local to its saved object instance. No DOM/PlayCanvas here.
  */
+import {SPORTS_TEAMS} from './sports-catalog.js';
 const piece=(kind,name,x,y,z,sx,sy,sz,color,rotation=null)=>
   ({kind,name,x,y,z,sx,sy,sz,color,rotation});
 const b=(...args)=>piece('box',...args);
@@ -277,6 +278,36 @@ const schemes={
     b('brush handle',-.20,.93,-.38,.40,.023,.025,p.brass,[0,0,16])
   ]}
 };
+/** Original 3D crests and colorways: immutable club IDs, no licensed assets. */
+for(const [index,team] of SPORTS_TEAMS.entries()){
+  const tone=team.color.toLowerCase(),gold='#e0cda1',ink='#263a35';
+  const bars=Array.from({length:index+2},(_,n)=>
+    b('club pennant motif '+n,-.22+n*.085,1.52+(n%2)*.12,-.054,
+      .052,.15,.037,n%2?gold:tone));
+  schemes['fanflag.'+team.id]={parts:[
+    c('weighted flag foot',0,.095,0,.42,.19,.42,ink),
+    c('polished base',0,.19,0,.24,.07,.24,gold),
+    c('flagpole',0,1.00,0,.065,1.67,.065,gold),
+    b('fabric upper field',-.22,1.59,-.032,.54,.37,.045,tone),
+    b('fabric lower field',-.19,1.29,-.031,.43,.28,.042,ink),
+    b('flag trim',-.23,1.79,-.03,.58,.042,.06,gold),
+    ...bars
+  ]};
+  const rosette=Array.from({length:index+2},(_,n)=>{
+    const theta=n*6.283185307179586/(index+2);
+    return s('club fan rosette '+n,.25*Math.sin(theta),1.35+.25*Math.cos(theta),
+      -.11,.12,.12,.08,n%2?tone:gold);
+  });
+  schemes['fanstand.'+team.id]={parts:[
+    b('support plinth',0,.12,0,.91,.24,.57,ink),
+    ...[-.36,.36].map(x=>b('vertical frame '+x,x,.93,.14,.095,1.48,.09,gold)),
+    b('top beam',0,1.66,.14,.84,.08,.12,gold),
+    b('large heraldic panel',0,1.15,-.012,.81,.88,.09,tone),
+    b('dark club shield',0,1.18,-.080,.49,.55,.055,ink),
+    b('fan footboard',0,.25,-.26,.76,.09,.16,gold),
+    ...rosette
+  ]};
+}
 const ALLOWED=new Set(['box','sphere','cylinder']);
 const freeze=Object.fromEntries(Object.entries(schemes).map(([id,entry])=>{
   if(!/^[a-z][a-z0-9.-]+$/.test(id)||!Array.isArray(entry.parts)||entry.parts.length>48)
