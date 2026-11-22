@@ -41,7 +41,7 @@ try{
       const context=await browser.newContext({
         viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
       await context.addInitScript(({key,data,tour})=>{
-        localStorage.setItem(key,JSON.stringify(data));localStorage.setItem(tour,'done');
+        if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(data));localStorage.setItem(tour,'done');
       },{key:SAVE_KEY,data:household,tour:UI_TOUR_STORAGE_KEY});
       const page=await context.newPage(),errors=[];
       page.on('pageerror',e=>errors.push(e.message));
