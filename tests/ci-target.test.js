@@ -149,11 +149,13 @@ test('CAS-01.8 seven-plus-day Node soak and real mobile 2/4 WebGL run on affecte
   const own=planChanges(['tests/cas-01-8-browser-smoke.mjs']);
   assert.equal(own.cas_soak,true);
   assert.equal(own.browser,true);
-  for(const src of ['src/household.js','src/career-work.js','src/resident-social-runtime.js','src/game.js']){
+  for(const src of ['src/household.js','src/career-work.js','src/resident-social-runtime.js']){
     const p=planChanges([src]);
     assert.equal(p.cas_soak,true,src);
     assert.ok(p.tests.includes('tests/cas-01-8-soak.test.js'),src);
   }
+  assert.equal(planChanges(['src/game.js']).cas_soak,true,
+    'live renderer edits need mobile profiling, though pure Node tests do not import game.js');
   for(const src of ['src/kitchen.js','tests/cas-01-8-soak.test.js','README.md'])
     assert.equal(planChanges([src]).cas_soak,false,src);
 });
