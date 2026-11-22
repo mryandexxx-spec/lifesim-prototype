@@ -4,6 +4,7 @@
  */
 import {nextCareerShift} from './career-scheduler.js';
 import {CAREER_RESIDENT_IDS,separateCareer} from './career-state.js';
+import {residentIdsForSimulation,savedAdditionalActor} from './resident-activity-runtime.js';
 import {recordCareerDiscipline,DISCIPLINE_REHIRE_MINUTES} from './career-discipline.js';
 import {recordWorkLifeShift,recordWorkFeeling,applyWorkMoodContext,noteWorkLifeConflict} from './career-worklife.js';
 import {careerRankForContract} from './career-specializations.js';
@@ -21,7 +22,8 @@ const NAMES={alex:'Алекс',mira:'Мира'};
 const ACTIVE=new Set(['departing','waiting','working','returning']);
 const CASH_LIMIT=SHOP_MAX_CREDITS;
 const validMinute=n=>Number.isFinite(n)&&n>=0;
-const actorFor=(root,id)=>id==='mira'?root?.otherSim:root;
+const actorFor=(root,id)=>id==='alex'?root:id==='mira'?root?.otherSim:savedAdditionalActor(root,id);
+const isExtra=id=>!CAREER_RESIDENT_IDS.includes(id);
 
 export function residentWorkPhase(root,id){
   return root?.careerSystem?.byResident?.[id]?.currentShift?.phase||null;
@@ -92,7 +94,7 @@ function shiftSnapshot(shift,mode='normal'){
     workMode:cleanWorkMode(mode)};
 }
 function emit(messages,id,type,text){
-  messages.push({residentId:id,type,text:NAMES[id]+': '+text});
+  messages.push({residentId:id,type,text:(NAMES[id]||id)+': '+text});
 }
 function disciplineNotices(messages,id,outcome){
   if(outcome?.transition==='warning')
@@ -161,7 +163,7 @@ export function progressCareerWork(root,before,after){
   if(!root||root.paused||!validMinute(before)||!validMinute(after)||
      after<=before||!root.calendar||!root.careerSystem||!root.shop)return [];
   const messages=[];
-  for(const id of CAREER_RESIDENT_IDS){
+  for(const id of residentIdsForSimulation(root)){
     const contract=root.careerSystem.byResident?.[id];
     const actor=actorFor(root,id);
     if(!contract||!actor)continue;
@@ -178,7 +180,7 @@ export function progressCareerWork(root,before,after){
         const retryAt=archived.at+DISCIPLINE_REHIRE_MINUTES;
         messages.push({type:'dismissed',residentId:id,
           termination:{...archived,role,retryAt},
-          text:NAMES[id]+': трудовой договор расторгнут из-за повторяющихся нарушений. '+
+          text:(NAMES[id]||id)+': трудовой договор расторгнут из-за повторяющихся нарушений. '+
             'Повторный отклик в эту профессию через 3 игровых дня'});
       }
       continue;
@@ -193,13 +195,36 @@ export function progressCareerWork(root,before,after){
         root.careerSystem.settlementIds.includes(planned.id))continue;
       shift=contract.currentShift=shiftSnapshot(planned,contract.workMode);
     }
+    // Extra adults do not yet have 3D portal animations. Their attendance
+    // uses the SAME contract, shift ID, payroll and root clock. Recheck manual
+    // actions and addressed conversations; neither may be teleported away.
+    if(isExtra(id)&&shift.phase==='pending'&&before<shift.end&&
+       after>=shift.start-careerDepartureLeadMinutes(root,id)){
+      if(actor.action?.automatic){actor.action=null;actor.activitySession=null;}
+      else if(actor.action)deferOrdinaryWorkAction(root,id,actor);
+      const engaged=[root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id);
+      if(!actor.action&&!engaged&&!root.socialAction){
+        shift.phase='departing';
+        actor.event='Отправляется на работу';
+      }
+    }
+    if(isExtra(id)&&shift.phase==='departing'){
+      const arrival=Math.max(before,Math.min(after,shift.start));
+      if(arrival<shift.end)arriveCareerPortal(root,id,arrival);
+    }
     if(shift.phase==='waiting'){
       if(after<shift.start)continue;
       enterWorkingPhase(root,id,shift);
       emit(messages,id,'work-start','начал смену вовремя после раннего прибытия');
     }
-    if(shift.phase==='returning')continue;
+    if(shift.phase==='returning'){
+      // The extra actor has no rendered return path; retain one completed
+      // shift snapshot, then release this person's home/FIFO on the next tick.
+      if(isExtra(id))finishCareerReturn(root,id);
+      continue;
+    }
     if(shift.phase==='working'){
+      if(isExtra(id))progressWorkNeeds(root,before,after);
       if(startWorkIncident(root,id,after)&&after<shift.end)
         emit(messages,id,'incident','новая ситуация на работе · открой смартфон, чтобы выбрать решение');
       if(after>=shift.end){
