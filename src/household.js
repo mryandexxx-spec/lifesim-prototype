@@ -181,7 +181,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.gardenRoutine=restoreGardenRoutine(raw.gardenRoutine,root.minutes);
   root.gardenMilestones=restoreGardenMilestones(raw.gardenMilestones,root.minutes);
   root.householdBills=restoreHouseholdBills(raw.householdBills,root.minutes);
-  root.careerSystem=restoreCareerSystem(raw.careerSystem);
+  root.careerSystem=restoreCareerSystem(raw.careerSystem,Object.keys(population?.residentsById||{}));
   // F: once-only epoch on genuine old saves; never reschedule booked leave or work.
   migrateLegacyCareerSchedules(root);
   root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem,root.minutes);
