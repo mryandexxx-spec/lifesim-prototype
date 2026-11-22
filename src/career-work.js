@@ -37,6 +37,7 @@ export function residentAwayAtWork(root,id){
  * One screen second = three game minutes; keep 15 min of arrival buffer.
  */
 export function careerDepartureLeadMinutes(root,id){
+  if(!CAREER_RESIDENT_IDS.includes(id))return 60;
   const actor=actorFor(root,id);
   if(!actor?.position||!root?.world)return 60;
   const target=nearestWalkable({x:-.65,z:3.45},root.world);
