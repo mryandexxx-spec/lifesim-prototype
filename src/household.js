@@ -7,6 +7,7 @@ import {restoreEventRecords} from './calendar-events.js';
 import {holidayDefinitions,restoreWeekendDays} from './calendar-holidays.js';
 import {restoreReminderReceipts} from './calendar-reminders.js';
 import {newCareerSystem,restoreCareerSystem} from './career-state.js';
+import {migrateLegacyCareerSchedules} from './career-rank-schedules.js';
 import {newRecruitmentSystem,restoreRecruitmentSystem,progressCareerRecruitment} from './career-recruitment.js';
 import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork} from './career-work.js';
 import {progressWorkNeeds} from './career-work-needs.js';
@@ -153,6 +154,8 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.gardenMilestones=restoreGardenMilestones(raw.gardenMilestones,root.minutes);
   root.householdBills=restoreHouseholdBills(raw.householdBills,root.minutes);
   root.careerSystem=restoreCareerSystem(raw.careerSystem);
+  // F: once-only epoch on genuine old saves; never reschedule booked leave or work.
+  migrateLegacyCareerSchedules(root);
   root.recruitmentSystem=restoreRecruitmentSystem(raw.recruitmentSystem,root.careerSystem,root.minutes);
   root.objectOnceLedger=restoreObjectOnceLedger(raw.objectOnceLedger);
   const validMira=raw.otherSim && typeof raw.otherSim==='object' && !Array.isArray(raw.otherSim) &&
