@@ -334,7 +334,7 @@ export function createMiraMeshyVisual({pc,app,rig,fridgeLayout=null,partnerAvata
       state.showerRuntime?.setFrame(shower?showerFrame:null,paused);
       const fridge=actionId==='fridge'||fridgeBusy;
       state.fridgeRuntime?.setFrame(
-        fridge&&actionId==='fridge'?fridgeFrame:null,paused
+        fridgeFrame,paused
       );
       const sofa=actionId==='sofa'||sofaBusy;
       const anim=state.model.anim;

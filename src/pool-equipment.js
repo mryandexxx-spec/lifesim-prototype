@@ -38,7 +38,7 @@ export function poolFixtureSite(pool,edgeCell,side,kind){
            !water.has(zz*POOL_GRID_WIDTH+xx))return null;
       }
   }
-  return {dryApproach,waterCell:edgeCell};
+  return {dryApproach,waterCell:kind==='board'?edgeCell-2*(dz*POOL_GRID_WIDTH+dx):edgeCell};
 }
 export function validPoolFixture(fixture,pools){
   if(!validPoolFixtureId(fixture?.fixtureId)||!validPoolId(fixture?.poolId)||

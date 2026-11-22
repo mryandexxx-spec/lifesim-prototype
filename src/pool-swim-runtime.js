@@ -4,7 +4,7 @@
  * No separate scheduler, renderer, wallet or save schema.
  */
 import {planPoolAdmission,planPoolEntry,planPoolExit,planPoolRecovery,
-  poolAccessPoints,findPoolWaterPath} from './pool-navigation.js';
+  poolAccessPoints,poolLaneCircuit,poolEntryMinutes} from './pool-navigation.js';
 import {validPoolId} from './pool-topology.js';
 import {isWalkable,nearestWalkable,findPath} from './navigation.js';
 
@@ -228,17 +228,15 @@ function travelWet(a,path,minutes,rate=.6){
   return {done,unused:done?Math.max(0,budget):0};
 }
 function laneTravel(root,a,minutes){
-  // Actual path through the dedicated slot, not an arbitrary animation offset.
-  const target=a.slotCells.at(-1);
-  const path=findPoolWaterPath(root.world,a.poolId,a.slotAnchor,target);
-  if(!path||!path.length)return false;
-  const steps=Math.floor(a.wetProgress+minutes);
-  a.wetProgress=(a.wetProgress+minutes)-steps;
-  for(let i=0;i<steps;i++){
-    a.laneIndex+=a.laneDirection;
-    if(a.laneIndex>=path.length-1){a.laneIndex=path.length-1;a.laneDirection=-1;}
-    if(a.laneIndex<=0){a.laneIndex=0;a.laneDirection=1;}
-  }
+  const path=poolLaneCircuit(a.slotCells);
+  const index=path?.indexOf(a.waterCell)??-1;
+  if(index<0)return false;
+  // The saved water cell also locates pre-circuit saves on their new lap.
+  const distance=a.wetProgress+minutes;
+  const steps=Math.floor(distance);
+  a.wetProgress=distance-steps;
+  a.laneIndex=(index+steps)%path.length;
+  a.laneDirection=1;
   a.waterCell=path[a.laneIndex];
   return true;
 }
@@ -293,7 +291,7 @@ export function advancePoolSwim(root,id,minutes){
     if(!entryOpen(root,a)){recover(root,id,'lost-entry');return;}
     const before=a.elapsed;
     a.elapsed+=minutes;
-    const entryDuration=a.entryKind==='steps'?3:2;
+    const entryDuration=poolEntryMinutes(a.entryKind);
     if(a.elapsed<entryDuration)return;
     const wetMinutes=Math.max(0,a.elapsed-entryDuration)-
       Math.max(0,before-entryDuration);

@@ -310,7 +310,7 @@ export function createMeshyVisual({pc,app,rig,footIK=true,footPlant=false,
       state.kissRuntime?.setFrame(kissFrame,paused);
       // Game updates the pose; postUpdate applies joint rotations after Anim.
       const fridge=actionId==='fridge'||fridgeBusy;
-      state.fridgeRuntime?.setFrame(fridge&&actionId==='fridge'?fridgeFrame:null,paused);
+      state.fridgeRuntime?.setFrame(fridgeFrame,paused);
       const bed=actionId==='bed'||bedBusy;
       state.bedRuntime?.setFrame(bed?bedFrame:null,paused);
       const shower=actionId==='shower'||showerBusy;

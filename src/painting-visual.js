@@ -16,11 +16,14 @@ export function easelPaintingPose(world,instanceId,actorPosition=null){
 export function paintingStrokeFrame(frame){
   if(!frame||frame.phase!=='using'||!Number.isFinite(frame.elapsed)||frame.elapsed<0)
     return null;
-  const cycle=frame.elapsed*3.15;
-  return {strokeX:Math.sin(cycle)*.115,
-    strokeY:Math.sin(cycle*1.25)*.085,
-    wrist:Math.sin(cycle*2.2)*12,
-    weight:Math.min(1,Math.max(.18,frame.elapsed/.8))};
+  // Draw on contact, lift the brush, then return above the next starting point.
+  const cycle=frame.elapsed/2.8,phase=cycle%1;
+  const t=phase<.66?phase/.66:1-(phase-.66)/.34;
+  const travel=t*t*(3-2*t);
+  const lift=phase<.66?0:Math.sin(Math.PI*(phase-.66)/.34)**2;
+  return {strokeX:(travel-.5)*.22,strokeY:.052*Math.sin(cycle*Math.PI*.5)+.028*travel,
+    lift,weight:Math.min(1,.22+frame.elapsed/.8)};
+
 }
 /** Independent finished object persists at a saved source pose after the
  * easel is moved, sold or placed in storage. Deterministic slot stacking. */

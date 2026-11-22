@@ -48,8 +48,8 @@ export function createMeshyMusicController({pc,model}={}){
       offset('rightArm',angle(m.arms[1],weight),0,-7*weight);
       offset('leftForeArm',angle(m.elbows[0],weight));
       offset('rightForeArm',angle(m.elbows[1],weight));
-      offset('leftLeg',angle(m.legs[0],.7));
-      offset('rightLeg',angle(m.legs[1],.7));
+      offset('leftLeg',angle(m.legs[0],.7),0,angle(m.stepOut?.[0]));
+      offset('rightLeg',angle(m.legs[1],.7),0,angle(m.stepOut?.[1]));
       offset('leftKnee',angle(m.knees[0],.7));
       offset('rightKnee',angle(m.knees[1],.7));
       offset('hips',0,angle(m.spineTwist,.4),angle(m.pelvisRoll,.6));

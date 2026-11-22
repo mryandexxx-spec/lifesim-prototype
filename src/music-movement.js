@@ -34,16 +34,21 @@ export function musicMovementFrame(frame=null){
   };
   // Distinct full-body loop: contra-lateral steps, elbows/raised hands,
   // weight transfer and visible chest twist. No displacement of A* root.
-  const transfer=Math.tanh(1.2*sin);
-  const rebound=Math.cos(2*phase-.45);
-  const shoulder=Math.sin(phase-.32),swing=Math.sin(phase-.62);
+  // Two beats to a side step and tap. The supporting knee absorbs the
+  // downbeat while the free knee lifts; arms follow the weight shift.
+  const transfer=sin*(1.4-.4*sin*sin);
+  const leftTap=Math.max(0,-sin)**2,rightTap=Math.max(0,sin)**2;
+  const downbeat=.5+.5*Math.cos(2*phase-.4);
+  const swing=Math.sin(phase-.55),phrase=Math.sin(phase*.5);
   return {
-    kind:'dance',arms:[-23-19*swing,-29+16*swing],
-    elbows:[-31-11*shoulder,-25+15*shoulder],
-    legs:[12*transfer,-12*transfer],knees:[6+13*Math.max(0,transfer),6+13*Math.max(0,-transfer)],
-    torsoRoll:-3.7*shoulder,pelvisRoll:5.8*transfer,
-    spineLean:3+2*rebound,spineTwist:14*shoulder,spineRoll:-2.8*shoulder,
-    hipShift:.058*transfer,bodyLift:-.016*(1+rebound),
-    headPitch:3+2*rebound,headRoll:1.8*swing
+    kind:'dance',arms:[-15-12*swing-4*phrase,-18+12*swing],
+    elbows:[-29+8*swing,-36-9*swing],
+    legs:[3-12*leftTap,3-12*rightTap],
+    knees:[4+13*leftTap+4*downbeat,4+13*rightTap+4*downbeat],
+    stepOut:[-5*leftTap,5*rightTap],
+    torsoRoll:-2.8*swing,pelvisRoll:4.2*transfer,
+    spineLean:2+2*downbeat,spineTwist:8*swing,spineRoll:-1.8*swing,
+    hipShift:.037*transfer,bodyLift:-.019*downbeat,
+    headPitch:2+2*downbeat,headRoll:1.4*swing
   };
 }

@@ -25,8 +25,17 @@ export const FRIDGE_FACING_YAW=Math.atan2(
   FRIDGE_LAYOUT.handle.z-FRIDGE_LAYOUT.approach.z)*180/Math.PI;
 
 /** Reconstructable after pause, 3× speed and reload. */
-export function fridgeSequence(elapsed,duration=26){
+export function fridgeSequence(elapsed,duration=26,mode='snack'){
   const p=clamp01(Number.isFinite(duration)&&duration>0?elapsed/duration:0);
+  if(mode==='take'||mode==='store'){
+    const grip=ease(.42,.51,p);
+    const shelf=ease(.2,.42,p)*(1-ease(.5,.69,p));
+    const carry=mode==='take'?ease(.49,.71,p):1-ease(.20,.42,p);
+    return {progress:p,mode,doorOpen:ease(.06,.28,p)*(1-ease(.70,.96,p)),
+      reach:shelf+.34*carry,carry,eat:0,chew:0,
+      placement:mode==='store'?ease(.18,.46,p):0,
+      shelfFood:mode==='take'?1-grip:0,handFood:mode==='take'?grip:0};
+  }
   const doorOpen=ease(.09,.25,p)*(1-ease(.52,.66,p));
   const reach=ease(.27,.36,p)*(1-ease(.44,.54,p));
   const eat=ease(.66,.72,p)*(1-ease(.95,.99,p));
@@ -35,6 +44,21 @@ export function fridgeSequence(elapsed,duration=26){
   const handFood=ease(.42,.49,p)*(1-ease(.74,.97,p));
   const chew=eat*(.5+.5*Math.sin(p*24*Math.PI));
   return {progress:p,doorOpen,reach,eat,chew,shelfFood,handFood};
+}
+
+export function fridgeActionFrame(action,snackDuration){
+  if(action.id==='fridge')return fridgeSequence(action.elapsed,snackDuration);
+  const storing=action.cookStage==='storing'||action.grillStage==='storing';
+  return fridgeSequence(action.elapsed,action.id==='cook'&&!storing?5:6,storing?'store':'take');
+}
+
+// Same final grip as the pickup frame; the walking clip still owns the legs.
+const carriedPortion=Object.freeze(fridgeSequence(1,1,'take'));
+export function carriedFridgePortion(action){
+  const carrying=action?.phase==='walking'&&(
+    action.id==='dining'&&action.diningStage==='toSeat'||
+    action.id==='cook'&&action.cookStage==='toPrep');
+  return carrying?carriedPortion:null;
 }
 
 /** Door segment in room X/Z; hinge is on right and swings away from approach. */

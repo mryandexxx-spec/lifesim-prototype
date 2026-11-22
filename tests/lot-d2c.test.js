@@ -130,3 +130,35 @@ test('D2c procedural swim controls animate opposite limbs without simulation mut
     swimStroke:3,mood:70,energy:70},.04);
   assert.ok(waiting.legs.every(Number.isFinite));
 });
+
+test('one lap visits both lengths of the reserved lane with continuous orientation',()=>{
+  for(const [width,height] of [[4,2],[2,4]]){
+    const root=home({width,height}),a=start(root);
+    const visited=new Set();
+    let previous=poolSwimVisualFrame(root.world,a);
+    for(let i=0;i<160;i++){
+      tickHousehold(root,.05);
+      visited.add(a.waterCell);
+      const frame=poolSwimVisualFrame(root.world,a);
+      const turn=Math.abs((frame.yaw-previous.yaw+540)%360-180);
+      assert.ok(turn<18,'sudden reversal: '+turn);
+      previous=frame;
+    }
+    assert.equal(visited.size,8);
+  }
+});
+
+test('springboard entry rises above deck before feet-first immersion',()=>{
+  const board={...ladder(base+64,'west','fixture-2'),kind:'board',purchasePriceCredits:400};
+  const root=home({width:5,height:5,fixtures:[ladder(),board]});
+  const p=beginPoolSwim(root,'alex',{poolId:'pool-1',actionId:'jump',fixtureId:board.fixtureId});
+  assert.ok(p);
+  const a={...p.action,stage:'entering'};
+  assert.equal(a.entryWetPath[0],board.edgeCell+2);
+  const sample=t=>poolSwimVisualFrame(root.world,{...a,elapsed:t*4.5});
+  assert.ok(sample(.55).y>sample(0).y+.6);
+  assert.ok(sample(.55).pitch<25);
+  assert.equal(sample(.55).immersed,false);
+  assert.ok(sample(.9).immersed);
+  assert.ok(sample(1).pitch>=65);
+});
