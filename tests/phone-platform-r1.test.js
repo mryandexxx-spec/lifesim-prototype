@@ -1,0 +1,97 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {newHousehold,loadHousehold,tickHousehold,residentAutonomousChoice} from '../src/household.js';
+import {newPhoneCalls,restorePhoneCalls,phoneContactStatus,startPhoneCall,
+  progressPhoneCalls,cancelPhoneCall,CALL_DURATION,CALL_COOLDOWN} from '../src/phone-calls.js';
+import {PHONE_APPS,phoneAppRoute} from '../src/phone-app-registry.js';
+import {enqueueAction} from '../src/action-queue.js';
+
+const idle=()=>{const root=newHousehold('2026-11-22');root.autonomy.enabled=false;
+  root.otherSim.autonomy.enabled=false;return root;};
+test('G app registry exposes four actual applications with no duplicate bank',()=>{
+  assert.deepEqual(PHONE_APPS.map(x=>x.id),['work','food','finance','calls']);
+  assert.equal(phoneAppRoute('work'),'work');
+  assert.equal(phoneAppRoute('invalid'),'home');
+  assert.equal(PHONE_APPS.find(x=>x.id==='food').label,'Блин’Ставка');
+});
+test('G old v1 save migration adds only sanitized optional phone calls',()=>{
+  const root=idle(),raw=JSON.parse(JSON.stringify(root));delete raw.phoneCalls;
+  const restored=loadHousehold(raw);
+  assert.equal(restored.version,1);
+  assert.deepEqual(restored.phoneCalls,newPhoneCalls());
+  assert.equal(restored.shop.credits,root.shop.credits);
+  assert.equal(restored.actionQueues.schema,root.actionQueues.schema);
+  assert.deepEqual(restorePhoneCalls({schema:1,nextId:-2,active:{id:-9},lastCompletedAt:Infinity},500),newPhoneCalls());
+});
+test('G calling an idle partner connects remotely; completion gives bounded gain and only one receipt',()=>{
+  const s=idle(),wallet=s.shop.credits,position={...s.otherSim.position};
+  s.needs.social=70;s.otherSim.needs.social=50;
+  const before=s.relationship.affinity;
+  assert.equal(startPhoneCall(s,'alex','mira').ok,true);
+  assert.equal(s.phoneCalls.active.endAt-s.phoneCalls.active.startedAt,CALL_DURATION);
+  assert.equal(residentAutonomousChoice(s,'mira'),null);
+  assert.equal(progressPhoneCalls(s,s.minutes+CALL_DURATION-.01).length,0);
+  s.minutes+=CALL_DURATION;
+  const events=progressPhoneCalls(s,s.minutes);
+  assert.equal(events.length,1);
+  assert.equal(events[0].type,'phone-call');
+  assert.equal(s.needs.social,76);
+  assert.equal(s.otherSim.needs.social,56);
+  assert.equal(s.relationship.affinity,before+1);
+  assert.deepEqual(s.otherSim.position,position);
+  assert.equal(s.shop.credits,wallet);
+  assert.equal(s.phoneCalls.receipts.length,1);
+  assert.equal(progressPhoneCalls(s,s.minutes+5).length,0);
+  assert.equal(s.phoneCalls.receipts.length,1);
+  assert.equal(startPhoneCall(s,'mira','alex').reason,'cooldown');
+  s.minutes+=CALL_COOLDOWN;
+  assert.equal(startPhoneCall(s,'mira','alex').ok,true);
+});
+test('G calls during working shift do not change salary/attendance, while returning and mandatory choices block',()=>{
+  const s=idle();
+  s.careerSystem.byResident.alex={currentShift:{phase:'working'}};
+  assert.equal(phoneContactStatus(s,'alex').ok,true);
+  assert.equal(startPhoneCall(s,'alex','mira').ok,true);
+  s.phoneCalls.active=null;
+  s.careerSystem.byResident.alex.currentShift.phase='returning';
+  assert.equal(phoneContactStatus(s,'alex').reason,'returning');
+  s.careerSystem.byResident.alex.currentShift.phase='working';
+  s.recruitmentSystem.byResident.mira={phase:'interview_active'};
+  assert.equal(phoneContactStatus(s,'mira').reason,'mandatory-choice');
+});
+test('G manual queue and ongoing household action refuse calls without deleting them',()=>{
+  const s=idle();
+  assert.equal(enqueueAction(s.actionQueues,'alex',{type:'object',actionId:'seat',targetInstanceId:'test'}).ok,true);
+  const before=JSON.stringify(s.actionQueues);
+  assert.equal(startPhoneCall(s,'alex','mira').ok,false);
+  assert.equal(JSON.stringify(s.actionQueues),before);
+  s.actionQueues.byResident.alex=[];
+  s.otherSim.action={id:'move',phase:'walking'};
+  assert.equal(startPhoneCall(s,'alex','mira').reason,'busy');
+});
+test('G interrupted, paused and restored calls never grant social rewards',()=>{
+  const s=idle();s.needs.social=40;s.otherSim.needs.social=40;
+  assert.equal(startPhoneCall(s,'alex','mira').ok,true);
+  s.paused=true;
+  assert.deepEqual(progressPhoneCalls(s,s.minutes+CALL_DURATION+1),[]);
+  s.paused=false;
+  const saved=loadHousehold(JSON.parse(JSON.stringify(s)));
+  assert.ok(saved.phoneCalls.active);
+  assert.equal(cancelPhoneCall(saved).ok,true);
+  assert.deepEqual(progressPhoneCalls(saved,s.minutes+CALL_DURATION+1),[]);
+  assert.equal(saved.phoneCalls.receipts.length,0);
+  assert.equal(saved.needs.social,40);
+  assert.equal(saved.otherSim.needs.social,40);
+});
+test('G time-based canonical household tick completes exactly once with pause and 3x independent of frame duration',()=>{
+  const s=idle();s.paused=true;
+  assert.equal(startPhoneCall(s,'alex','mira').ok,true);
+  const before=JSON.stringify(s);
+  tickHousehold(s,10);
+  assert.equal(JSON.stringify(s),before);
+  s.paused=false;s.speed=3;
+  const out=tickHousehold(s,CALL_DURATION);
+  assert.ok(out.some(e=>e.type==='phone-call'));
+  assert.equal(s.phoneCalls.receipts.length,1);
+  assert.equal(tickHousehold(s,1).filter(e=>e.type==='phone-call').length,0);
+});
