@@ -4,15 +4,21 @@
  * Alex/Mira keep their established visual/social pipelines; additional actors
  * use the same root clock, typed persistent FIFO and world A* geometry.
  */
-import {ACTIONS,chooseAction,arrive,tick} from './simulation.js';
+import {ACTIONS,chooseAction,arrive,tick,autonomousChoice} from './simulation.js';
 import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './navigation.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {BED_SLOT_IDS,BED_SLOTS,validBedSlot} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
-import {dispatchActionQueues} from './action-queue.js';
+import {dispatchActionQueues,pendingActions} from './action-queue.js';
 
 export const ADDITIONAL_OBJECT_ACTIONS=Object.freeze([
   'bed','sofa','fridge','shower','toilet','seat','tv','mirror','dresser','wardrobe'
+]);
+// CAS-01.5: only core, physically verified self-care runs autonomously.
+// The remaining objects stay manual; career, social, food inventory and hobbies
+// require their own N-resident household settlement stages.
+export const ADDITIONAL_AUTONOMOUS_ACTIONS=Object.freeze([
+  'fridge','bed','shower','toilet','sofa','tv','mirror'
 ]);
 const owned=(v,k)=>Object.prototype.hasOwnProperty.call(v||{},k);
 const extraPattern=/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/;
@@ -109,10 +115,13 @@ function actionGoal(root,action){
 export function validAdditionalAction(action){
   if(action===null)return true;
   if(!action||typeof action!=='object'||Array.isArray(action)||
-    !['walking','using'].includes(action.phase)||action.automatic!==false||
+    !['walking','using'].includes(action.phase)||typeof action.automatic!=='boolean'||
     !Number.isFinite(action.elapsed)||action.elapsed<0||action.elapsed>1000)return false;
-  if(action.id==='move')return action.phase==='walking'&&
+  if(action.id==='move')return action.automatic===false&&
+    action.phase==='walking'&&
     Number.isFinite(action.goal?.x)&&Number.isFinite(action.goal?.z);
+  if(action.automatic&&(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(action.id)||
+    (action.id==='mirror'&&action.mirrorPractice!==true)))return false;
   if(!ADDITIONAL_OBJECT_ACTIONS.includes(action.id)||
     typeof action.targetInstanceId!=='string')return false;
   if(action.id==='bed'&&!validBedSlot(action.bedSlot))return false;
@@ -167,6 +176,19 @@ function prepareCommand(root,id,command){
   const goal=actionGoal(root,candidate);
   return goal&&findPath(actor.position,goal,root.world)?candidate:null;
 }
+/** Manual FIFO always has priority. An automatic action never consumes a
+ * queue entry or changes another resident's intent.
+ */
+function startPlannedObject(root,id,plan,automatic){
+  const actor=savedAdditionalActor(root,id);
+  if(!actor||actor.action||!furnitureFree(root,id,plan.id,
+    plan.targetInstanceId,plan.bedSlot||null))return false;
+  if(!chooseAction(actor,plan.id,automatic))return false;
+  Object.assign(actor.action,{targetInstanceId:plan.targetInstanceId,
+    ...(plan.bedSlot?{bedSlot:plan.bedSlot}:{}),
+    ...(automatic&&plan.id==='mirror'?{mirrorPractice:true}:{})});
+  return true;
+}
 export function dispatchAdditionalResidentQueues(root){
   if(!root?.population||root.paused||!root.actionQueues)return [];
   const ids=new Set(residentIdsForSimulation(root).slice(2));
@@ -185,9 +207,7 @@ export function dispatchAdditionalResidentQueues(root){
         actor.action={id:'move',phase:'walking',elapsed:0,automatic:false,goal:plan.goal};
         actor.event='Идёт в выбранное место';
       }else{
-        if(!chooseAction(actor,plan.id,false))return false;
-        Object.assign(actor.action,{targetInstanceId:plan.targetInstanceId,
-          ...(plan.bedSlot?{bedSlot:plan.bedSlot}:{})});
+        if(!startPlannedObject(root,id,plan,false))return false;
       }
       return true;
     }
@@ -241,7 +261,13 @@ export function prepareAdditionalResidents(root){
     actor.minutes=root.minutes;
     actor.paused=root.paused;
     actor.speed=root.speed;
-    actor.autonomy.enabled=false; // CAS-01.5 will provide real N-brain autonomy
+    actor.autonomy.enabled=root.autonomy.enabled;
+    if(!Number.isFinite(actor.autonomy.nextAt))
+      actor.autonomy.nextAt=root.minutes;
+    if(!root.autonomy.enabled&&actor.action?.automatic){
+      actor.action=null;
+      actor.event='Ждёт указаний';
+    }
     if(!isWalkable(actor.position.x,actor.position.z,root.world)||
       !residentCollisionFree(root,id,actor.position)){
       const start=nearestWalkable(actor.position,root.world);
@@ -268,8 +294,38 @@ export function prepareAdditionalResidents(root){
     }
   }
 }
-/** Additional people do not run legacy career/social/purchase effects.
- * Only the canonical clock runs once, and each extra actor gets one need tick.
+/** CAS-01.5: use the SAME pure, personality-aware scoring kernel as the
+ * original residents. No free needs, fabricated social rewards or hidden
+ * purchases; each decision must obtain a real reachable resource first.
+ * Failed reservations retry after a small game-time cooldown, so fast frame
+ * loops cannot spin on a missing item.
+ */
+export function startAdditionalResidentAutonomy(root,id){
+  if(!root?.autonomy?.enabled||root.paused||root.socialAction||
+    root.phoneCalls?.active||!residentIdsForSimulation(root).slice(2).includes(id)||
+    pendingActions(root.actionQueues,id).length)return false;
+  const actor=savedAdditionalActor(root,id);
+  if(!actor||actor.action)return false;
+  actor.autonomy.enabled=root.autonomy.enabled;
+  actor.minutes=root.minutes;
+  // Core scoring owns urgent physiological needs, personality, daily rhythm
+  // and repeat-memory cooldown. Mirror speech is a bounded fallback for
+  // unmet Social without inventing friendship, consent or pair receipts.
+  const coreWish=autonomousChoice(actor);
+  const wish=coreWish||
+    (actor.needs.social<35?'mirror':null);
+  if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(wish))return false;
+  let plan=prepareCommand(root,id,{type:'object',actionId:wish});
+  // Leisure can use the actual shared TV if the sofa is reserved. The
+  // physical TV itself is still exclusive; no phantom watch/football credit.
+  if(!plan&&wish==='sofa')
+    plan=prepareCommand(root,id,{type:'object',actionId:'tv'});
+  if(plan&&startPlannedObject(root,id,plan,true))return true;
+  actor.autonomy.nextAt=Math.max(root.minutes+2,actor.autonomy.nextAt||0);
+  return false;
+}
+/** Additional people share the canonical clock and core need tick. They
+ * neither own nor settle household career, social, finance or inventory.
  */
 export function tickAdditionalResidents(root,minutes){
   if(!root?.population||root.paused||!Number.isFinite(minutes)||minutes<=0)return;
@@ -281,20 +337,40 @@ export function tickAdditionalResidents(root,minutes){
     const actor=savedAdditionalActor(root,id);
     actor.minutes=root.minutes-minutes;
     actor.paused=false;actor.speed=root.speed;
-    actor.autonomy.enabled=false;
+    actor.autonomy.enabled=root.autonomy.enabled;
+    // Newly queued manual commands interrupt only this resident's automatic
+    // routine. Blocked FIFO heads still suppress autonomous replacements.
+    if(actor.action?.automatic&&
+      (!root.autonomy.enabled||pendingActions(root.actionQueues,id).length)){
+      actor.action=null;
+      actor.event='Ждёт следующего действия';
+      actor.autonomy.nextAt=Math.max(root.minutes+7,actor.autonomy.nextAt||0);
+    }
     const action=actor.action;
-    if(action?.phase==='walking'){
+    if(action&&action.id!=='move'){
       const goal=actionGoal(root,action);
+      if(!goal||!furnitureFree(root,id,action.id,action.targetInstanceId,
+        action.bedSlot||null)||
+        (action.phase==='using'&&distance(actor.position,goal)>.4)){
+        actor.action=null;actor.event='Предмет или место недоступны';
+      }
+    }
+    if(actor.action?.phase==='walking'){
+      const goal=actionGoal(root,actor.action);
       if(!goal||!advanceExtraPosition(root,id,actor,goal,minutes)){
         actor.action=null;actor.event='Маршрут недоступен';
       }else if(distance(actor.position,goal)<.065){
         actor.position={x:goal.x,z:goal.z};
-        if(action.id==='move'){actor.action=null;actor.event='Пришёл в выбранное место';}
+        if(actor.action.id==='move'){actor.action=null;actor.event='Пришёл в выбранное место';}
         else arrive(actor);
       }
     }
     tick(actor,minutes,root.world);
     actor.minutes=root.minutes;
   }
+  // Dispatch manual heads before considering a new autonomous action.
+  // Both paths recheck reservation/physical A* access at actual start.
   dispatchAdditionalResidentQueues(root);
+  for(const id of residentIdsForSimulation(root).slice(2))
+    startAdditionalResidentAutonomy(root,id);
 }
