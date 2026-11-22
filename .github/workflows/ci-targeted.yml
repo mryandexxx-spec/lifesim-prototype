@@ -55,6 +55,8 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: MICRO-UX-R1 touch/menu and queue smoke at two mobile viewports
+        run: node tests/micro-ux-r1-browser-smoke.mjs
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}
         run: node tests/fixture-motion-browser-smoke.mjs
