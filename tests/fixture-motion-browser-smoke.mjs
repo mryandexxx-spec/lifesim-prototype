@@ -2,12 +2,30 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {newHousehold,chooseResidentAction,tickHousehold} from '../src/household.js';
-import {arrive,SAVE_KEY} from '../src/simulation.js';
+import {ACTIONS,arrive,SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 import {previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from '../src/outdoor-proposals.js';
 import {gardenApproach} from '../src/gardening.js';
 import {poolCellIndex} from '../src/pool-topology.js';
 import {beginPoolSwim,arrivePoolApproach} from '../src/pool-swim-runtime.js';
+
+import {findMarketPlacement,buyMarketItem} from '../src/furniture-shop.js';
+import {furnitureActionApproach} from '../src/furniture-catalog.js';
+import {arriveReadingJourney} from '../src/reading-journey.js';
+import {chooseMusicListeningSpot} from '../src/music-listening.js';
+import {MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,READING_ACTIVITY_ID,
+  READING_CONTENT_ID} from '../src/hobby-reading.js';
+
+function buy(root,sku){
+  const options={residents:[root.position,root.otherSim.position]};
+  const placement=findMarketPlacement(root.world.furniture,root.shop,sku,options);
+  assert.ok(placement,sku);
+  const result=buyMarketItem(root.world.furniture,root.shop,sku,placement,options);
+  assert.ok(result.ok,result.reason);
+  root.world.furniture=result.world;
+  root.shop=result.shop;
+  return result.instanceId;
+}
 
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -44,7 +62,59 @@ try{
       return hinge?.enabled&&Math.abs(hinge.getLocalEulerAngles().y)>1&&panel?.getLocalPosition().x<-.01&&
         sceneRoot.findByName('Meshy furniture fixture.shower').enabled;
     });
-    assert.ok(await page.evaluate(()=>sceneRoot.findByName('flush-lever joint').enabled));
+  });
+
+  const bathroom=home();
+  const stereo=buy(bathroom,'music.starter');
+  const spot=chooseMusicListeningSpot(bathroom.world,bathroom.otherSim.position,stereo);
+  assert.ok(spot);
+  assert.ok(chooseResidentAction(bathroom,'music',false,'mira',stereo,
+    MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS[1],spot));
+  bathroom.otherSim.position={...spot.point};
+  arrive(bathroom.otherSim);
+  assert.ok(chooseResidentAction(bathroom,'toilet',false,'alex'));
+  arrive(bathroom);
+  bathroom.action.elapsed=ACTIONS.toilet.duration*.48;
+  await scene(bathroom,async page=>{
+    const flush=async()=>{
+      await page.waitForFunction(()=>{
+        const fixture=sceneRoot.findByName('Meshy furniture fixture.toilet');
+        return fixture?.enabled&&fixture.findByName('flush-lever joint')?.getLocalPosition().y<-.01;
+      });
+      await page.waitForFunction(()=>sceneRoot.findByName('flush-lever joint').getLocalPosition().y===0);
+    };
+    const dance=async()=>{
+      await page.waitForFunction(()=>sceneRoot.findByName('Meshy Mira visual')?.enabled);
+      const before=await page.evaluate(()=>sceneRoot.findByName('Meshy Mira visual')
+        .children[0].getLocalPosition().x);
+      await page.waitForFunction(x=>{
+        const skin=sceneRoot.findByName('Meshy Mira visual');
+        return skin.enabled&&Math.abs(skin.children[0].getLocalPosition().x-x)>.015;
+      },before);
+    };
+    await Promise.all([flush(),dance()]);
+  });
+
+  const reading=home();
+  const shelf=buy(reading,'bookcase.starter');
+  assert.ok(chooseResidentAction(reading,'hobby',false,'alex',shelf,
+    READING_ACTIVITY_ID,READING_CONTENT_ID));
+  for(const [action,id] of [['hobby',shelf],['sofa',reading.action.readingSeatInstanceId]]){
+    reading.position={...furnitureActionApproach(reading.world,action,id)};
+    assert.ok(arriveReadingJourney(reading.action));
+    tickHousehold(reading,action==='hobby'?2.4:6);
+  }
+  tickHousehold(reading,2.4);
+  assert.equal(reading.action.readingStage,'reading');
+  await scene(reading,async page=>{
+    await page.waitForFunction(()=>{
+      const skin=sceneRoot.findByName('Meshy Alex visual');
+      const book=skin?.findByName('Meshy Alex reading book');
+      const leaf=book?.findByName('turning leaf');
+      return skin?.enabled&&book?.enabled&&leaf?.enabled&&leaf.getLocalPosition().y>.025;
+    });
+    await page.waitForFunction(()=>!sceneRoot.findByName('Meshy Alex reading book')
+      .findByName('turning leaf').enabled);
   });
   let lot=home();
   const p=previewOutdoorFeatureEdit(lot,{operation:'place',itemId:'garden.herb.mint',pose:{x:12,z:-7,yaw:0}});
@@ -76,5 +146,5 @@ try{
       .findByName('mixamorig:LeftArm').getLocalRotation().toString()!==before,before);
   });
   assert.deepEqual(errors,[]);
-  console.log('Animated imported fixtures, swimming and watering passed at 390×844');
+  console.log('Fixture motion, reading, dancing, swimming and watering passed at 390×844');
 }finally{await browser.close();}
