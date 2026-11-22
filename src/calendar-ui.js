@@ -169,7 +169,7 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
     agenda.append(row(w.timeOff==='paid'?'🌴 Оплачиваемый отпуск':
       w.timeOff==='unpaid'?'🏖 Отгул':'▣ Работа: '+w.title,
       'Смена · '+clockLabel(w.start)+'–'+clockLabel(w.end)+
-      (w.overnight?' (+1 день)':'')+' · '
+      (w.overnight?' (+1 день)':'')+' · '+
       (w.residentId==='alex'?'Алекс':'Мира')+' · '+w.rankTitle,null));
   if(!agenda.childNodes.length){const p=document.createElement('p');p.textContent='На эту дату событий нет.';agenda.append(p);}
   const upcoming=el('lc-upcoming');upcoming.replaceChildren();
