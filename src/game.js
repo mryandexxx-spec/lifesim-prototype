@@ -32,6 +32,7 @@ import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
 import {applyWorkMoodContext} from './career-worklife.js';
 import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
   residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
+import {workPresenceView} from './work-presence-ui.js';
 import { findPath, nearestWalkable, isWalkable } from './navigation.js';
 import {lotRaySurface,lotActorHeight,outdoorCellAt,OUTDOOR_GRID_WIDTH} from './lot-surface.js';
 import {previewOutdoorPaint,commitOutdoorPreview,
@@ -1633,6 +1634,7 @@ function renderPlanPeek(){
   const residentId=game.selectedSim;
   const actor=getActor(game,residentId);
   let active=activeTaskLabel(residentId);
+  const workView=workPresenceView(residentWorkPhase(game,residentId),residentWorkStatus(game,residentId)?.label);
   const social=game.socialAction;
   const involved=social&&(social.initiator===residentId||social.partner===residentId);
   const phase=involved?social.phase:actor.action?.phase;
@@ -1644,12 +1646,12 @@ function renderPlanPeek(){
   }
   const plan=planPreview({
     residentName:getActorName(residentId),
-    activeLabel:active,
+    activeLabel:workView.statusOverride||active,
     pending:pendingActions(game.actionQueues,residentId),
     taskName:task=>taskLabel({...task,residentId}),
     paused:game.paused,
     needsReply:dialogueNeedsDecision(game),
-    idleLabel:!game.autonomy.enabled?'Ждёт указаний':actor.event||'Свободное время'
+    idleLabel:workView.idleLabel||(!game.autonomy.enabled?'Ждёт указаний':actor.event||'Свободное время')
   });
   const key=JSON.stringify([residentId,plan.heading,plan.upcoming,plan.more,queueVisible]);
   if(key===planPeekKey)return;
@@ -7539,7 +7541,7 @@ function boot() {
     const residents=[];
     for(const id of HOUSEHOLD_IDS){
       if(id===game.selectedSim||!reactionRigs[id]||showerStates[id]?.active||
-        toiletStates[id]?.active)continue;
+        toiletStates[id]?.active||!workPresenceView(residentWorkPhase(game,id)).hitTestable)continue;
       const p=reactionRigs[id].avatar?.getPosition();
       if(!p)continue;
       const half=.43;
@@ -9236,8 +9238,10 @@ function boot() {
     $('social-result').hidden=!layers.showFeedback;
     reactionBadges.update({dt,paused:game.paused||furnishMode,pc,camera,canvas,
       rigs:reactionRigs,
-      visible:{alex:!showerStates.alex.active&&!toiletStates.alex.active,
-        mira:!showerStates.mira.active&&!toiletStates.mira.active}});
+      visible:{alex:!showerStates.alex.active&&!toiletStates.alex.active&&
+          workPresenceView(residentWorkPhase(game,'alex')).overlayVisible,
+        mira:!showerStates.mira.active&&!toiletStates.mira.active&&
+          workPresenceView(residentWorkPhase(game,'mira')).overlayVisible}});
     // A persistent ORIGINAL orbit belongs only to the selected resident;
     // social response icons take priority, and privacy must not leak position.
     // Two lightweight screen-space glyphs follow the existing animated head.
@@ -9262,6 +9266,7 @@ function boot() {
     const orbitHead=orbitRig?.head||orbitRig?.avatar;
     if(!orbitHead?.getPosition||showerStates[game.selectedSim]?.active||
        toiletStates[game.selectedSim]?.active||
+       !workPresenceView(residentWorkPhase(game,game.selectedSim)).overlayVisible||
        reactionBadges.count()>0){
       moodOrbit.hidden=true;
     }else{
