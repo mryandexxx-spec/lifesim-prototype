@@ -2698,3 +2698,11 @@ button.time-card:active {transform:translateY(1px);}
 .app-shell[data-cas-extra-selected="true"] .social-bar,.app-shell[data-cas-extra-selected="true"] .social-context,.app-shell[data-cas-extra-selected="true"] .social-menu{display:none!important}
 @media(max-width:370px){.cas-resident-details{bottom:calc(203px + env(safe-area-inset-bottom));max-height:32dvh}#dashboard[data-residents="4"] .resident-switch button{font-size:10px}}
 @media(max-height:560px){.cas-resident-details{left:max(8px,env(safe-area-inset-left));right:auto;bottom:calc(108px + env(safe-area-inset-bottom));width:min(315px,50vw);max-height:50dvh}}
+
+/* A third/fourth resident must never silently inherit the old two-rig action panels. */
+.app-shell[data-cas-extra-selected="true"] #action-sheet,
+.app-shell[data-cas-extra-selected="true"] #queue-toggle,
+.app-shell[data-cas-extra-selected="true"] #plan-peek,
+.app-shell[data-cas-extra-selected="true"] .social-bar,
+.app-shell[data-cas-extra-selected="true"] .social-context,
+.app-shell[data-cas-extra-selected="true"] .social-menu{display:none!important}

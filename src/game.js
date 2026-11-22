@@ -1042,6 +1042,9 @@ function closeMindPanel() {
   $('mind-toggle').setAttribute('aria-expanded', 'false');
 }
 $('mind-toggle').addEventListener('click', () => {
+  if(!HOUSEHOLD_IDS.includes(activeHudResident())){
+    focusSelectedCamera(activeHudResident());return;
+  }
   if(dialogueNeedsDecision(game))return;
   const open = $('mind-panel').hidden;
   if(open){mindInspectResident=game.selectedSim;renderMindIdentity();}
@@ -1094,6 +1097,10 @@ const fridgeR2UI=createFridgeR2UI({
 });
 const renderFridgeR2=()=>fridgeR2UI.render();
 function select(id,instanceId=null) {
+  if(id&&!HOUSEHOLD_IDS.includes(activeHudResident())){
+    toast('Для выбранного жителя используй личную панель действий');
+    return;
+  }
   if (id){
     closeInsightPanel();closeMindPanel();closeSocialContext();setViewOpen(false);
     queueVisible=false;renderQueuePanel(true);
