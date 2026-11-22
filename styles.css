@@ -2603,3 +2603,14 @@ button.time-card:active {transform:translateY(1px);}
   .career-phone-body .sports-phone-tab{font-size:10px;padding:6px 1px}
   .sports-phone-stream-status{font-size:11px}
 }
+
+/* FANDOM-R2-B: six distinct original geometric club emblems and avatars. */
+.sports-phone-crest{display:inline-flex;align-items:center;justify-content:center;
+  flex:none;width:30px;height:30px;border-radius:9px;color:#fff;font-size:19px;
+  font-weight:800;box-shadow:inset 0 0 0 1px #ffffff99;text-shadow:0 1px 2px #192b27}
+.sports-phone-team{display:flex!important;align-items:center;gap:6px;text-align:left}
+.sports-phone-personal-crest{display:flex;gap:11px;align-items:center;padding:8px;
+  background:#f1f7eb;border:1px solid;border-radius:11px}
+.sports-phone-personal-crest strong{font-size:12px;line-height:1.2}
+.sports-phone-avatar{width:42px;height:42px;font-size:25px;border-radius:13px}
+@media(max-width:360px){.sports-phone-crest{width:25px;height:25px;font-size:16px}}

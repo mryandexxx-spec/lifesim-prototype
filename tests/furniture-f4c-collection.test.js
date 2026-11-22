@@ -20,12 +20,12 @@ const R=legacyObjectRegistry(),offers=selectShopCatalog();
 const text=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.36}]};
 test('F4C: original shop assortment plus the H5 functional easel',()=>{
-  assert.equal(FURNITURE_PRODUCTS.length,70);
-  assert.equal(offers.length,70);
+  assert.equal(FURNITURE_PRODUCTS.length,82);
+  assert.equal(offers.length,82);
   assert.equal(FURNITURE_LEGACY_OFFERS.length,6);
-  assert.equal(PROCEDURAL_NEW_PREFABS.length,20);
+  assert.equal(PROCEDURAL_NEW_PREFABS.length,22);
   assert.equal(ORIGINAL_FURNITURE.length,10);
-  assert.equal(marketListing().length,70);
+  assert.equal(marketListing().length,82);
   assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,70);
   assert.equal(SHOP_START_CREDITS,5000);
   assert.equal(SHOP_SELL_PERCENT,70);
@@ -62,9 +62,9 @@ test('F4C: each new floor prefab is template-only, safely movable, not gifted in
 });
 test('F4C: all 35 crafted modelKeys are visually different by actual dimensions/shape',()=>{
   const authored=FURNITURE_PRODUCTS.filter(x=>x.modelKey);
-  assert.equal(authored.length,39);
-  assert.equal(Object.keys(PROCEDURAL_FURNITURE_MODELS).length,39);
-  assert.equal(new Set(authored.map(x=>x.modelKey)).size,39);
+  assert.equal(authored.length,51);
+  assert.equal(Object.keys(PROCEDURAL_FURNITURE_MODELS).length,51);
+  assert.equal(new Set(authored.map(x=>x.modelKey)).size,51);
   const geometry=new Map();
   for(const offer of authored){
     const shape=proceduralFurnitureModel(offer.modelKey);
