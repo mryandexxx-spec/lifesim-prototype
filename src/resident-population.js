@@ -4,6 +4,7 @@
  * Invalid/future data fails closed: never substitute an empty population.
  */
 import {createResidentMembership} from './resident-membership.js';
+import {validAdditionalAction} from './resident-activity-runtime.js';
 
 export const POPULATION_SCHEMA=1;
 const isRecord=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -64,7 +65,7 @@ function validateResident(id,entry){
     !Number.isFinite(actor.position.z)||!isRecord(actor.needs)||
     NEEDS.some(k=>!Number.isFinite(actor.needs[k])||actor.needs[k]<0||actor.needs[k]>100)||
     !isRecord(actor.autonomy)||typeof actor.autonomy.enabled!=='boolean'||
-    actor.action!==null)invalid('invalid inert resident actor snapshot');
+    !validAdditionalAction(actor.action))invalid('invalid additional resident actor snapshot');
   if(FORBIDDEN_ACTOR_FIELDS.some(key=>own(actor,key)))
     invalid('additional resident cannot own household state');
 }
@@ -95,7 +96,7 @@ export function restorePopulation(raw){
   return JSON.parse(JSON.stringify(raw));
 }
 
-/** Read-only roster view; no extra actor enters legacy getActor/tick. */
+/** Read-only membership projection, independent of active simulation state. */
 export function savedPopulationMembership(root){
   const pop=own(root??{},'population')?restorePopulation(root.population):null;
   return createResidentMembership(['alex','mira',...Object.keys(pop?.residentsById||{})],

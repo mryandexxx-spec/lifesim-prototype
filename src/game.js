@@ -174,6 +174,7 @@ import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './sh
 import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './toilet-interaction.js';
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
 import {proposeFurnishedRoomMove,createHouseholdConstructionEditor} from './furnished-room.js';
+import {residentSegmentClear} from './resident-activity-runtime.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,residentGardenOpportunity,recordResidentGardenStart,
@@ -8593,6 +8594,10 @@ function boot() {
             const heading=Math.atan2(dx,dz)*180/Math.PI;
             if(residentId==='alex')facing=heading;else miraFacing=heading;
             const step=Math.min(distance,remaining);
+            const candidate={x:resident.position.x+dx/distance*step,
+              z:resident.position.z+dz/distance*step};
+            if(!residentSegmentClear(game,residentId,resident.position,candidate,
+              {additionalOnly:true}))break;
             resident.position.x+=dx/distance*step;
             resident.position.z+=dz/distance*step;
             remaining-=step;
@@ -8652,6 +8657,10 @@ function boot() {
               if(residentId==='alex')facing=Math.atan2(dx,dz)*180/Math.PI;
               else miraFacing=Math.atan2(dx,dz)*180/Math.PI;
               const step=Math.min(dist,remaining);
+              const candidate={x:resident.position.x+dx/dist*step,
+                z:resident.position.z+dz/dist*step};
+              if(!residentSegmentClear(game,residentId,resident.position,candidate,
+                {additionalOnly:true}))break;
               resident.position.x+=dx/dist*step;resident.position.z+=dz/dist*step;
               remaining-=step;
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}

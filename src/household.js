@@ -30,6 +30,8 @@ import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychol
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {strictLegacyActor} from './resident-registry.js';
 import {restorePopulation} from './resident-population.js';
+import {residentIdsForSimulation,savedAdditionalActor,extraReservesFurniture,
+  tickAdditionalResidents} from './resident-activity-runtime.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
@@ -211,7 +213,8 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   mira.objectOnceLedger=restoreObjectOnceLedger(raw.otherSim?.objectOnceLedger);
   root.selectedSim=raw.selectedSim==='mira' ? 'mira' : 'alex';
   root.inventory=restoreInventory(raw.inventory);
-  root.actionQueues=restoreActionQueues(raw.actionQueues,HOUSEHOLD_IDS);
+  root.actionQueues=restoreActionQueues(raw.actionQueues,
+    [...HOUSEHOLD_IDS,...Object.keys(root.population?.residentsById||{})]);
   // Retain the exact object target in persistent commands. Old un-targeted
   // v1 commands migrate to deterministic original instance IDs once.
   for(const id of HOUSEHOLD_IDS){
@@ -479,7 +482,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
 }
 
 export function getActor(root,id='alex') {
-  return strictLegacyActor(root,id);
+  return strictLegacyActor(root,id)??savedAdditionalActor(root,id);
 }
 export function getActorName(id='alex') {
   return RESIDENT_NAMES[id] || RESIDENT_NAMES.alex;
@@ -521,7 +524,7 @@ export function chooseFreeBedSlot(position,occupied=[],world=null,targetInstance
  * Keep the optional target argument last for every existing v1 callsite.
  */
 export function bedSlotFor(root,residentId='alex',targetInstanceId=null) {
-  if(!HOUSEHOLD_IDS.includes(residentId))return null;
+  if(!residentIdsForSimulation(root).includes(residentId))return null;
   const bed=resolveActionFurniture(root.world,'bed',targetInstanceId);
   if(!bed)return null;
   const self=getActor(root,residentId);
@@ -530,11 +533,11 @@ export function bedSlotFor(root,residentId='alex',targetInstanceId=null) {
     ?resolveActionFurniture(root.world,'bed',self.action.targetInstanceId):null;
   if(ownBed?.instanceId===bed.instanceId&&validBedSlot(self.action.bedSlot))
     return self.action.bedSlot;
-  const other=getActor(root,residentId==='alex'?'mira':'alex');
-  const otherBed=other?.action?.id==='bed'
-    ?resolveActionFurniture(root.world,'bed',other.action.targetInstanceId):null;
-  const taken=otherBed?.instanceId===bed.instanceId&&
-      validBedSlot(other.action.bedSlot)?[other.action.bedSlot]:[];
+  const taken=residentIdsForSimulation(root).filter(id=>id!==residentId)
+    .map(id=>getActor(root,id)?.action).filter(action=>{
+      if(action?.id!=='bed'||!validBedSlot(action.bedSlot))return false;
+      return resolveActionFurniture(root.world,'bed',action.targetInstanceId)?.instanceId===bed.instanceId;
+    }).map(action=>action.bedSlot);
   return chooseFreeBedSlot(self.position,taken,root.world,bed.instanceId);
 }
 export function bedDestinationFor(root,residentId='alex',targetInstanceId=null){
@@ -554,6 +557,7 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
     :resolveActionFurniture(root.world,itemId,targetInstanceId);
   if(!item)return false;
   if(itemId==='bed')return bedSlotFor(root,residentId,item.instanceId)!==null;
+  if(extraReservesFurniture(root,itemId,item.instanceId))return false;
   if(itemId==='wash'&&!(root.kitchen?.dirtyDishes>0))return false;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
   if(itemId==='cook'){
@@ -1277,6 +1281,7 @@ export function tickHousehold(root,minutes) {
   }
   // Both clocks remain identical (including when paused).
   other.minutes=root.minutes;
+  tickAdditionalResidents(root,minutes);
   for(const id of HOUSEHOLD_IDS)if(residentAwayAtWork(root,id))
     refreshMind(getActor(root,id),root.world);
   tickSocial(root,minutes);
