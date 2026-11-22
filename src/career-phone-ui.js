@@ -25,6 +25,7 @@ import {phoneContactStatus,CALL_DURATION,CALL_COOLDOWN} from './phone-calls.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal} from './ready-food.js';
 import {KITCHEN_RESTOCK_LABELS,quotePantryDelivery} from './kitchen-market.js';
+import {homeMarketListing,quoteHomeDelivery} from './marketplace-home.js';
 import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff,
   claimPortableCareerLeave} from './career-timeoff.js';
 import {payHouseholdBill} from './household-bills.js';
@@ -52,6 +53,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   save,notify,onFundsChanged=()=>{},onOpenChange=()=>{},onIncidentChanged=()=>{},
    onBuyReadyMeal=()=>({ok:false,reason:'unavailable'}),
   onBuyPantryDelivery=()=>({ok:false,reason:'unavailable'}),
+  onBuyHomeDelivery=()=>({ok:false,reason:'unavailable'}),
   onStartCall=()=>({ok:false,reason:'unavailable'}),
   onCancelCall=()=>({ok:false,reason:'unavailable'}),
   onSelectSportsClub=()=>({ok:false,reason:'unavailable'}),
@@ -80,7 +82,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   const body=element('div','career-phone-body');
   const appTabs=element('nav','career-phone-apps');
   appTabs.setAttribute('aria-label','Приложения смартфона');
-  for(const [id,label] of [['work','Работа'],['finance','Финансы'],['food','Доставка']]){
+  for(const [id,label] of [['work','Работа'],['finance','Финансы'],['food','Маркет']]){
     const tab=action(label,()=>{
       const root=personRoot();if(!root)return;
       if(id==='finance'&&root.recruitmentSystem?.byResident?.[who]?.phase==='interview_active'){
@@ -1100,6 +1102,71 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       item.append(buy);groceries.append(item);
     }
     body.append(groceries);
+    const furnitureOffers=homeMarketListing();
+    const furniture=element('details','career-phone-worklife');
+    const summary=element('summary','career-phone-notice',
+      '🛋 Мебель и декор · '+furnitureOffers.length+' товаров');
+    furniture.append(summary);
+    furniture.append(element('p','career-phone-muted',
+      'Оплата при заказе · доставка через 18 игровых минут на склад мебели. '+
+      'Разместить покупку можно в редакторе дома → Склад. '+
+      'Товары берутся из существующего игрового каталога.'));
+    const transit=root.homeMarket?.orders||[];
+    if(transit.length){
+      const orders=element('section','career-phone-facts');
+      orders.append(element('strong',null,'Мебель в пути · '+transit.length));
+      for(const order of transit){
+        const item=furnitureOffers.find(x=>x.itemId===order.itemId);
+        orders.append(element('span',null,(item?.name||'Мебель')+
+          ' · осталось '+Math.max(0,Math.ceil(order.dueAt-root.minutes))+
+          ' игровых мин.'));
+      }
+      furniture.append(orders);
+    }
+    const search=element('input','career-phone-market-search');
+    search.type='search';search.placeholder='Поиск мебели и декора';
+    search.setAttribute('aria-label','Поиск товаров Блин’Ставки');
+    search.autocomplete='off';
+    const products=element('div','career-phone-list');
+    function paintFurniture(query=''){
+      products.replaceChildren();
+      const needle=query.trim().toLocaleLowerCase('ru');
+      const matches=furnitureOffers.filter(x=>
+        (x.name+' '+(x.category||'')).toLocaleLowerCase('ru').includes(needle));
+      if(!matches.length)products.append(element('p','career-phone-muted','Ничего не найдено'));
+      for(const offer of matches.slice(0,24)){
+        const q=quoteHomeDelivery(root,offer.itemId);
+        const card=element('article','career-phone-card');
+        card.append(element('strong',null,offer.name),
+          element('small',null,offer.price+' кр. · '+(offer.category||'Мебель')));
+        const reasons={'insufficient-credits':'Недостаточно средств',
+          'storage-full':'Склад заполнен','duplicate-instance':'Ошибка склада'};
+        const buy=action(q.ok?'🛒 Заказать · '+offer.price+' кр.':
+          (reasons[q.reason]||'Заказ недоступен'),()=>{
+            const live=personRoot();if(!live)return;
+            const fresh=quoteHomeDelivery(live,offer.itemId);
+            if(!fresh.ok){notify('Условия заказа изменились');render();return;}
+            if(!window.confirm('«'+offer.name+'» за '+fresh.price+
+              ' кр.? Доставка на склад через 18 игровых минут.'))return;
+            const result=onBuyHomeDelivery(offer.itemId,who);
+            if(!result.ok){notify(result.reason==='save-failed'?
+              'Не удалось сохранить заказ · списания нет':'Заказ не оплачен');render();return;}
+            notify('🛋 Мебель заказана · '+result.price+' кр. · 18 игровых минут');
+            render();
+          },'career-phone-primary');
+        buy.disabled=!q.ok;
+        card.append(buy);products.append(card);
+      }
+      if(matches.length>24)products.append(element('p','career-phone-muted',
+        'Показаны первые 24 товара. Уточни поиск.'));
+    }
+    search.addEventListener('input',()=>paintFurniture(search.value));
+    furniture.append(search,products);
+    paintFurniture();
+    body.append(furniture);
+    body.append(element('p','career-phone-muted',
+      'Садовые предметы пока покупаются в режиме строительства: '+
+      'для них нет безопасной доставки на мебельный склад.'));
     body.append(element('h2','career-phone-section-title','Готовые блюда'));
 
     body.append(element('p','career-phone-muted',
