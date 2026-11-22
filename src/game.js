@@ -230,7 +230,10 @@ let billsNeedsPersistence=false;
 // never let the fallback session overwrite the original on-device bytes.
 let saveStorageLocked=false;
 try {
-  const stored=JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+  const rawSave=localStorage.getItem(SAVE_KEY);
+  const stored=rawSave===null?null:JSON.parse(rawSave);
+  if(rawSave!==null&&(!stored||stored.version!==1))
+    throw new Error('Unsupported or damaged saved game');
   billsNeedsPersistence=stored?.householdBills?.schema!==1;
   calendarNeedsPersistence=stored?.calendar?.schema!==1||
     !parseCivilDate(stored.calendar.startCivilDate);
