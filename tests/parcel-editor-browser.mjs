@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {newHousehold} from '../src/household.js';
 import {SAVE_KEY} from '../src/simulation.js';
@@ -10,6 +11,7 @@ base.autonomy.enabled=base.otherSim.autonomy.enabled=false;
 const proposal=previewOutdoorFeatureEdit(base,{operation:'place',itemId:'garden.bench',pose:{x:8,z:-7,yaw:0}});
 assert.ok(proposal.ok,proposal.reason);
 const seed=commitOutdoorFeatureEdit(base,proposal).root;
+await mkdir('artifacts/parcel-editor',{recursive:true});
 const browser=await chromium.launch({args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 try{
  for(const [width,height] of [[390,844],[320,568],[844,390]]){
@@ -35,6 +37,15 @@ try{
     await page.touchscreen.tap(pt.x,pt.y);
   };
   await page.locator('#home-open').tap();await page.locator('#home-outdoors').tap();
+  if(height>width){
+    const visibleRatio=await page.evaluate(()=>{
+      const top=document.querySelector('#parcel-bar').getBoundingClientRect();
+      const panel=document.querySelector('#parcel-editor').getBoundingClientRect();
+      return (panel.top-top.bottom)/(window.innerHeight-top.bottom);
+    });
+    assert.ok(visibleRatio>=.65,'Central interactive scene must retain at least 65%, got '+visibleRatio);
+  }
+  await page.screenshot({path:'artifacts/parcel-editor/'+width+'x'+height+'-overview.png'});
   await worldTap(8,-7,.35);
   assert.equal(await page.locator('#parcel-editor h2').textContent(),'Садовая скамейка');
   await tap('rotate');assert.equal((await root()).world.outdoors.features[0].yaw,0);
@@ -44,6 +55,7 @@ try{
   await tap('group:ground');await tap('pick:stone');
   await worldTap(2.25,-7.75);await worldTap(3.75,-7.75);
   assert.match(await page.locator('.parcel-wallet').textContent(),/32 кр/);
+  await page.screenshot({path:'artifacts/parcel-editor/'+width+'x'+height+'-draft.png'});
   await tap('view');await tap('view');await tap('apply');
   assert.equal((await root()).shop.credits,seed.shop.credits-32);
   await tap('section:pool');await tap('group:water');await tap('pick:paint');

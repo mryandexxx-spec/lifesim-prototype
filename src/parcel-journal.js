@@ -6,11 +6,18 @@
 const DOMAINS=Object.freeze(['construction','furniture','outdoors']);
 const clone=value=>JSON.parse(JSON.stringify(value));
 const allocator=/^next[A-Z]/;
+const poolRows=(value,key)=>Array.isArray(value?.[key])?value[key]:[];
 const canonical=value=>{
   const result=clone(value);
   if(result&&typeof result==='object'){
     delete result.revision;delete result.poolTxnSeq;
     for(const key of Object.keys(result))if(allocator.test(key))delete result[key];
+    // Older v1 outdoors may omit empty pools/fixtures. An editor can normalize
+    // them to [], which must not manufacture a paid pool-history transaction.
+    if(Array.isArray(result.features)&&Array.isArray(result.ground)){
+      result.pools=poolRows(result,'pools');
+      result.poolFixtures=poolRows(result,'poolFixtures');
+    }
   }
   return JSON.stringify(result);
 };
@@ -72,8 +79,16 @@ export function createParcelJournal(limit=40){
       }
       const outside=entry.changed.includes('outdoors');
       const poolChange=outside&&(
-        JSON.stringify(source.world.outdoors.pools)!==JSON.stringify(destination.world.outdoors.pools)||
-        JSON.stringify(source.world.outdoors.poolFixtures)!==JSON.stringify(destination.world.outdoors.poolFixtures));
+        JSON.stringify(poolRows(source.world.outdoors,'pools'))!==
+          JSON.stringify(poolRows(destination.world.outdoors,'pools'))||
+        JSON.stringify(poolRows(source.world.outdoors,'poolFixtures'))!==
+          JSON.stringify(poolRows(destination.world.outdoors,'poolFixtures')));
+      if(outside&&!poolChange){
+        // A ground/furniture edit must preserve the authoritative current
+        // water and fixtures, even when its old snapshot omitted empty arrays.
+        world.outdoors.pools=clone(poolRows(root.world.outdoors,'pools'));
+        world.outdoors.poolFixtures=clone(poolRows(root.world.outdoors,'poolFixtures'));
+      }
       return {ok:true,world,credits,poolChange,section:entry.section,
         changed:[...entry.changed]};
     },

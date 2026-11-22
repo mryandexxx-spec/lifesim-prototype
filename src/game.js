@@ -7628,7 +7628,8 @@ function boot() {
       // Only the canonical pool editor may change basin/fixture topology.
       const outdoors=step.world.outdoors;
       const proposal=previewPoolHistory(game,{
-        pools:outdoors.pools,poolFixtures:outdoors.poolFixtures});
+        pools:Array.isArray(outdoors.pools)?outdoors.pools:[],
+        poolFixtures:Array.isArray(outdoors.poolFixtures)?outdoors.poolFixtures:[]});
       if(!proposal.ok||proposal.balance!==step.credits){
         fail(proposal.reason||'pool-history-price-mismatch');return;
       }

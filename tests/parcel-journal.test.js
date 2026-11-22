@@ -63,3 +63,24 @@ test('pool history is recognized but canonical pool model owns its transaction',
   const back=h.preview(root,-1);assert.equal(back.ok,true,back.reason);
   assert.equal(back.poolChange,true);
 });
+
+test('legacy missing empty pool arrays are not a water edit and never enter pool-history',()=>{
+  const root=newHousehold(),h=createParcelJournal();
+  delete root.world.outdoors.pools;delete root.world.outdoors.poolFixtures;
+  const before=h.snapshot(root);
+  root.world.outdoors.revision++;
+  root.world.outdoors.pools=[];root.world.outdoors.poolFixtures=[];
+  root.world.outdoors.ground=[...root.world.outdoors.ground,{kind:'stone',i:2,j:2}];
+  root.shop.credits-=32;
+  assert.equal(h.record(before,root,'yard'),true);
+  const undo=h.preview(root,-1);
+  assert.equal(undo.ok,true,undo.reason);
+  assert.equal(undo.poolChange,false);
+  assert.deepEqual(undo.world.outdoors.pools,[]);
+  assert.deepEqual(undo.world.outdoors.poolFixtures,[]);
+  root.world={...root.world,...undo.world};
+  root.shop.credits=undo.credits;h.advance(-1);
+  const redo=h.preview(root,1);
+  assert.equal(redo.ok,true,redo.reason);
+  assert.equal(redo.poolChange,false);
+});

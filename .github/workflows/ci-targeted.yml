@@ -70,6 +70,13 @@ jobs:
       - name: Parcel editor real scene and transaction checks
         if: ${{ needs.targeted.outputs.parcel_editor == 'true' }}
         run: node tests/parcel-editor-browser.mjs
+      - name: BUILD-UX real PlayCanvas mobile screenshots
+        if: ${{ always() && needs.targeted.outputs.parcel_editor == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-ux-mobile-pr
+          path: artifacts/parcel-editor/
+          if-no-files-found: ignore
       - name: MICRO-UX-R1 touch/menu and queue smoke at two mobile viewports
         if: ${{ needs.targeted.outputs.micro_ux == 'true' }}
         run: node tests/micro-ux-r1-browser-smoke.mjs
