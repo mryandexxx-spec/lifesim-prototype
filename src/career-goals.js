@@ -5,10 +5,11 @@ import {CAREER_CATALOG} from './career-catalog.js';
 import {workScenario} from './career-incidents.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
+import {savedAdditionalActor} from './resident-activity-runtime.js';
 
 const VALID_TIME=n=>Number.isSafeInteger(n)&&n>=0&&n<=5256000000;
 const MAX_SHIFTS=4;
-const RESIDENTS=Object.freeze(['alex','mira']);
+const residentIds=system=>Object.keys(system?.byResident||{});
 const SKILL_BY_CAREER=Object.freeze({
   'kitchen-studio':'cooking',editorial:'literature','art-studio':'painting'
 });
@@ -54,7 +55,7 @@ const knownGoal=(careerId,goalId)=>
 const blank=()=>({shifts:0,shiftReceipts:[],scenes:{},awarded:{}});
 const properId=id=>typeof id==='string'&&
   /^e[1-9]\d{0,8}@[0-9]+@[0-9]+#work$/.test(id)&&id.length<=102;
-const actorOf=(root,id)=>id==='mira'?root?.otherSim:root;
+const actorOf=(root,id)=>id==='alex'?root:id==='mira'?root?.otherSim:savedAdditionalActor(root,id);
 function cleanCareer(raw,careerId){
   const item=blank();
   if(!raw||typeof raw!=='object'||Array.isArray(raw))return item;
@@ -81,18 +82,18 @@ function cleanCareer(raw,careerId){
   }
   return item;
 }
-export function newProfessionalGoals(){
-  return {schema:1,byResident:{alex:{},mira:{}}};
+export function newProfessionalGoals(ids=['alex','mira']){
+  return {schema:1,byResident:Object.fromEntries(ids.map(id=>[id,{}]))};
 }
 /** Called AFTER canonical contracts and 12-entry work stories are validated.
  * Missing old-v1 field derives only trustworthy existing shift counts and real
  * positive saved scenes. Evicted / unknown events are never fabricated.
  */
 export function restoreProfessionalGoals(raw,system){
-  const out=newProfessionalGoals();
+  const out=newProfessionalGoals(residentIds(system));
   const legacy=!raw||raw.schema!==1||!raw.byResident||
     typeof raw.byResident!=='object';
-  for(const id of RESIDENTS){
+  for(const id of residentIds(system)){
     for(const career of CAREER_CATALOG){
       const old=legacy?null:raw.byResident[id]?.[career.id];
       const contract=system.byResident?.[id];
@@ -115,7 +116,7 @@ export function restoreProfessionalGoals(raw,system){
   return out;
 }
 function ensure(root,id,careerId){
-  if(!RESIDENTS.includes(id)||!PROFESSIONAL_GOALS[careerId])return null;
+  if(!residentIds(root?.careerSystem).includes(id)||!PROFESSIONAL_GOALS[careerId])return null;
   const system=root?.careerSystem;
   if(!system)return null;
   if(!system.professionalGoals)system.professionalGoals=newProfessionalGoals();
@@ -139,7 +140,7 @@ export function professionalGoalsView(root,id){
   const contract=root?.careerSystem?.byResident?.[id];
   const careerId=contract?.careerId;
   const definitions=PROFESSIONAL_GOALS[careerId];
-  if(!RESIDENTS.includes(id)||!definitions)return null;
+  if(!residentIds(root?.careerSystem).includes(id)||!definitions)return null;
   const item=root?.careerSystem?.professionalGoals?.byResident?.[id]?.[careerId]||blank();
   const goals=definitions.map(g=>status(root,id,g,item));
   return {careerId,rank:contract.level,goals,
