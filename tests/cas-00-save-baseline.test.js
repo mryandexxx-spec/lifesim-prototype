@@ -86,3 +86,48 @@ test('CAS-00 queue baseline: four independent generic resident IDs survive v1 qu
   assert.equal(pendingActions(result,'resident_4')[0].actionId,'bed');
   assert.deepEqual(snapshot(result),result);
 });
+
+
+test('CAS-00.3 rich v1 save preserves purchased furniture, ledger, both careers and FIFO',async()=>{
+  const {hireCareer}=await import('../src/career-state.js');
+  const {buyMarketItem,findMarketPlacement}=await import('../src/furniture-shop.js');
+  const {recordFinanceChange}=await import('../src/finance-ledger.js');
+  const s=newHousehold('2026-11-22');
+  const at=s.minutes;
+  s.careerSystem=hireCareer(s.careerSystem,'alex','editorial',at);
+  s.careerSystem=hireCareer(s.careerSystem,'mira','civic-service',at);
+  const people={residents:[{x:-.8,z:2.95},{x:-.25,z:.35}]};
+  const pose=findMarketPlacement(s.world.furniture,s.shop,'plant',people);
+  assert.ok(pose,'owned plant must have a real available placement');
+  const bought=buyMarketItem(s.world.furniture,s.shop,'plant',pose,people);
+  assert.ok(bought.ok,bought.reason);
+  const history=recordFinanceChange(s,bought.shop,{
+    kind:'purchase',sourceId:bought.instanceId,
+    actorId:'mira',atGameMinute:at,receiptId:'cas00-baseline-purchase'
+  });
+  assert.ok(history.ok,history.reason);
+  s.shop=history.shop;s.financialHistory=history.financialHistory;
+  s.world.furniture=bought.world;
+  assert.ok(enqueueAction(s.actionQueues,'alex',{type:'object',actionId:'sofa'}));
+  assert.ok(enqueueAction(s.actionQueues,'mira',{type:'object',actionId:'bed'}));
+  const immutable=snapshot(s);
+  const reloaded=loadHousehold(immutable);
+  assert.equal(reloaded.version,1);
+  assert.equal(reloaded.shop.credits,s.shop.credits);
+  assert.equal(reloaded.financialHistory.entries.length,1);
+  assert.deepEqual(reloaded.financialHistory.entries[0],s.financialHistory.entries[0]);
+  assert.equal(reloaded.careerSystem.byResident.alex.employmentId,'e1');
+  assert.equal(reloaded.careerSystem.byResident.mira.employmentId,'e2');
+  assert.equal(reloaded.careerSystem.byResident.alex.careerId,'editorial');
+  assert.equal(reloaded.careerSystem.byResident.mira.careerId,'civic-service');
+  assert.equal(reloaded.world.furniture.instances.length,s.world.furniture.instances.length);
+  assert.ok(reloaded.world.furniture.instances.some(x=>x.instanceId===bought.instanceId));
+  assert.equal(pendingActions(reloaded.actionQueues,'alex')[0].actionId,'sofa');
+  assert.equal(pendingActions(reloaded.actionQueues,'mira')[0].actionId,'bed');
+  assert.deepEqual(immutable,snapshot(s),'loading must not mutate archived save fixture');
+  const twice=loadHousehold(snapshot(reloaded));
+  assert.equal(twice.shop.credits,reloaded.shop.credits);
+  assert.deepEqual(twice.financialHistory,reloaded.financialHistory);
+  assert.equal(twice.world.furniture.instances.length,reloaded.world.furniture.instances.length);
+  assert.equal(twice.careerSystem.byResident.mira.employmentId,'e2');
+});
