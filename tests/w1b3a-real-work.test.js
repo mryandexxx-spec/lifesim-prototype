@@ -20,7 +20,8 @@ test('W1-B.3a full Monday loop: notice, depart, absent, return, exactly one pay 
   const notice=tickHousehold(root,45);
   assert.ok(notice.some(x=>x.type==='reminder'));
   assert.equal(root.shop.credits,initial);
-  assert.equal(root.careerSystem.byResident.alex.currentShift.phase,'pending');
+  assert.equal(root.careerSystem.byResident.alex.currentShift.phase,'departing',
+    'Approved early exit begins before the original T-15 reminder');
   tickHousehold(root,15);
   assert.equal(root.careerSystem.byResident.alex.currentShift.phase,'departing');
   assert.equal(residentUnavailableForHome(root,'alex'),true);
@@ -106,7 +107,8 @@ test('W1-B.3a late starts earn only minutes worked; missed shifts and manual ski
   const root=fresh();job(root,'alex','editorial');
   root.minutes=540;root.otherSim.minutes=540;
   const actor=root;
-  actor.action={id:'bed',phase:'walking',automatic:false,elapsed:0};
+  actor.action={id:'cook',phase:'using',automatic:false,elapsed:0};
+  // An in-progress atomic recipe is deliberately not interrupted by auto departure.
   const blocked=progressCareerWork(root,539,550);
   assert.ok(blocked.some(x=>x.type==='late'));
   assert.equal(root.careerSystem.byResident.alex.currentShift.phase,'pending');
@@ -131,10 +133,11 @@ test('W1-B.3a late starts earn only minutes worked; missed shifts and manual ski
 });
 test('W1-B.3a early manual exit at -15, pause, corrupted midshift and wallet cap',()=>{
   const root=fresh();job(root,'alex','editorial');
-  progressCareerWork(root,480,525);
+  progressCareerWork(root,480,500);
   assert.equal(requestCareerDeparture(root,'alex',525).ok,true);
   assert.equal(arriveCareerPortal(root,'alex',525),true);
-  assert.equal(root.careerSystem.byResident.alex.currentShift.departedAt,540);
+  assert.equal(root.careerSystem.byResident.alex.currentShift.phase,'waiting');
+  assert.equal(root.careerSystem.byResident.alex.currentShift.departedAt,525);
   const before=JSON.stringify(root);
   root.paused=true;
   tickHousehold(root,500);
