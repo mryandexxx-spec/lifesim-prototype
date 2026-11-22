@@ -2,9 +2,9 @@
  * Real actions go through the original buttons and canonical queue/purchase handlers.
  * Tab/selection state is transient and never written into lifesim.room01.v1.
  */
-import {fridgeTab,fridgeViewModel} from './fridge-ui.js';
+import {fridgeTab} from './fridge-ui.js';
 
-export function createFridgeR2UI({document,readRoot,readSkill,readName,onAction}){
+export function createFridgeR2UI({document,readModel,readName,onAction}){
   const get=id=>document.getElementById(id);
   const sheet=get('action-sheet'),panel=get('fridge-r2');
   let tab='eat',recipeId='',readyId='',stapleId='vegetables';
@@ -34,7 +34,7 @@ export function createFridgeR2UI({document,readRoot,readSkill,readName,onAction}
   }
   function render(){
     if(panel.hidden)return;
-    const model=fridgeViewModel(readRoot(),readSkill());
+    const model=readModel();
     if(!model.recipes.some(item=>item.id===recipeId&&item.available))
       recipeId=model.recipes.find(item=>item.available)?.id||'';
     if(!model.ready.some(item=>item.id===readyId))
