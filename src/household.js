@@ -21,6 +21,7 @@ import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
 import {newPhoneCalls,restorePhoneCalls,progressPhoneCalls} from './phone-calls.js';
 import {newSportsWorld,restoreSportsWorld,advanceSportsWorld} from './sports-league.js';
+import {newSportsFan,restoreSportsFan} from './sports-fandom.js';
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
@@ -129,6 +130,8 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.socialAction=null;
   state.phoneCalls=newPhoneCalls();
   state.sportsWorld=newSportsWorld(state);
+  state.sportsFan=newSportsFan();
+  state.otherSim.sportsFan=newSportsFan();
   applyWorkMoodContext(state);
   return state;
 }
@@ -178,6 +181,8 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   if (!root.autonomy.enabled && mira.action?.automatic &&
       !(mira.action.id==='swim'&&mira.action.exitRequested)) mira.action=null;
   root.otherSim=mira;
+  root.sportsFan=restoreSportsFan(raw.sportsFan,root.minutes);
+  mira.sportsFan=restoreSportsFan(raw.otherSim?.sportsFan,root.minutes);
   root.poolAutoRoutine=restorePoolAutoRoutine(raw.poolAutoRoutine,root.minutes);
   restorePoolFirstSwimAt(raw,root);
   restorePoolFirstSwimAt(raw.otherSim,mira);
