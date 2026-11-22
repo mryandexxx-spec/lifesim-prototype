@@ -81,6 +81,13 @@ test('LOAD-TRUTH-R1 reserves dedicated two-viewport WebGL only for loader change
     assert.equal(planChanges([name]).load_truth,false,name);
 });
 
+test('FANDOM-R1-C only reserves detailed mobile TV QA for broadcast changes',()=>{
+  assert.equal(planChanges(['src/sports-tv.js']).fandom_tv,true);
+  assert.equal(planChanges(['src/sports-tv.js']).browser,true);
+  assert.equal(planChanges(['tests/fandom-r1-c-browser-smoke.mjs']).fandom_tv,true);
+  assert.equal(planChanges(['src/kitchen.js']).fandom_tv,false);
+  assert.equal(planChanges(['README.md']).fandom_tv,false);
+});
 test('GRILL-R1 dual-viewport WebGL is required for grill code, not unrelated releases',()=>{
   for(const path of ['src/grill-r1.js','src/grill-catalog.js','tests/grill-r1-browser-smoke.mjs'])
     assert.equal(planChanges([path]).grill_r1,true,path);
