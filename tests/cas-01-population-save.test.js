@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {SAVE_KEY,newGame} from '../src/simulation.js';
-import {newHousehold,loadHousehold,getActor} from '../src/household.js';
+import {newHousehold,loadHousehold,getActor,tickHousehold} from '../src/household.js';
 import {PopulationSaveError,restorePopulation,savedPopulationMembership,
   proposePopulationSave,commitPopulationSave} from '../src/resident-population.js';
 
@@ -67,6 +67,12 @@ test('CAS-01.3 optional population roundtrip preserves extra actors and independ
   assert.equal(recovered.population.nextResidentSerial,5);
   assert.equal(recovered.shop.credits,189);
   assert.equal(recovered.otherSim.needs.energy,39);
+  const populationBeforeTick=JSON.stringify(recovered.population);
+  const clockBeforeTick=recovered.minutes;
+  tickHousehold(recovered,0.25);
+  assert.equal(recovered.minutes,clockBeforeTick+0.25);
+  assert.equal(JSON.stringify(recovered.population),populationBeforeTick,
+    'regular 2-person tick preserves detached saved records byte-for-byte');
   assert.equal(getActor(recovered,'resident_3'),null,'CAS-01.3 does not spawn gameplay actors');
   const m=savedPopulationMembership(recovered);
   assert.deepEqual(m.getDwellingResidents('dwelling_1'),['alex','mira','resident_3']);
