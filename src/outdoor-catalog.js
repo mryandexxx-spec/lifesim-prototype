@@ -19,6 +19,7 @@ const products=[
   ['garden.herb.melissa','Мелисса · грядка','garden',110,1,1,false],
   ['garden.bench','Садовая скамейка','furniture',240,1.5,.65,false],
   ['garden.table','Садовый стол','furniture',220,1.1,1.1,false],
+  ['garden.grill','Гриль «Уголь»','furniture',560,1.25,.85,false],
   ['light.path','Садовый фонарь','light',120,.25,.25,false],
   ['light.standing','Высокий фонарь','light',180,.35,.35,false],
   ['fence.wood','Деревянная секция','fence',55,.5,.16,false],
