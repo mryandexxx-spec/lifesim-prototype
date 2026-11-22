@@ -22,7 +22,7 @@ test('R1-E opted-in fan may voluntarily prefer LIVE match only when rested and f
  assert.equal(intent?.tvId,'home-tv-1');
  assert.equal(residentAutonomousChoice(root,'alex'),'tv');
  // Rendering a candidate is pure: no bonus, salary, queue or mood receipt.
- assert.equal(JSON.stringify(root.sportsFan),JSON.parse(before).sportsFan&&JSON.stringify(JSON.parse(before).sportsFan));
+ assert.equal(JSON.stringify(root.sportsFan),JSON.stringify(JSON.parse(before).sportsFan));
 });
 test('R1-E critical needs, paused, manual queues, active calls and work block sports autoplay',()=>{
  const {root}=setup();
