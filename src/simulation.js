@@ -155,7 +155,9 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       const stage=data.action.grillStage;
       if(!grillRecipe(data.action.recipeId)||
          !['cooking','toFridgeStore','storing'].includes(stage)||
-         (next.action.phase==='using')!==(stage!=='toFridgeStore')||
+         !((stage==='cooking'&&['walking','using'].includes(next.action.phase))||
+           (stage==='toFridgeStore'&&next.action.phase==='walking')||
+           (stage==='storing'&&next.action.phase==='using'))||
          !validOutdoorId(data.action.targetInstanceId))
         next.action=null;
       else{
