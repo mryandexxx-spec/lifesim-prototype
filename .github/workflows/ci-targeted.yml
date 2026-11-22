@@ -20,6 +20,7 @@ jobs:
       load_truth: ${{ steps.impact.outputs.load_truth }}
       fridge_ux: ${{ steps.impact.outputs.fridge_ux }}
       grill_r1: ${{ steps.impact.outputs.grill_r1 }}
+      career_shifts: ${{ steps.impact.outputs.career_shifts }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,6 +78,16 @@ jobs:
         with:
           name: grill-r1-mobile-pr
           path: artifacts/grill-r1/
+          if-no-files-found: ignore
+      - name: CAREER-SHIFTS-R1 approved rank schedules, overnight calendar and phone in real two-size WebGL
+        if: ${{ needs.targeted.outputs.career_shifts == 'true' }}
+        run: node tests/career-shifts-r1-browser-smoke.mjs
+      - name: Upload CAREER-SHIFTS-R1 mobile evidence
+        if: ${{ always() && needs.targeted.outputs.career_shifts == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: career-shifts-r1-mobile-pr
+          path: artifacts/career-shifts-r1/
           if-no-files-found: ignore
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}
