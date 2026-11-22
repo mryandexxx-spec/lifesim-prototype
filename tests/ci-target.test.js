@@ -124,3 +124,14 @@ test('CAS-00 browser baseline selectively activates four-viewport real PlayCanva
       'unrelated edits must not schedule full profile: '+path);
   }
 });
+
+test('CAS-00 source inventory runs only for the audited script and its own test',()=>{
+  for(const file of ['scripts/cas-00-dependency-inventory.mjs','tests/cas-00-dependency-inventory.test.js']){
+    const plan=planChanges([file]);
+    assert.equal(plan.cas_inventory,true,file);
+    assert.equal(plan.browser,false,'textual source inventory must not waste WebGL runtime');
+  }
+  assert.equal(planChanges(['src/kitchen.js']).cas_inventory,false);
+  assert.equal(planChanges(['tests/cas-00-save-baseline.test.js']).cas_inventory,false);
+  assert.equal(planChanges(['README.md']).cas_inventory,false);
+});
