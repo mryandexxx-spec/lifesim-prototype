@@ -40,7 +40,7 @@ export function careerVacancies(root,residentId){
   if(root.careerSystem.byResident?.[residentId])return [];
   return CAREER_CATALOG.map(career=>{
     // Preview the real scheduler using a TEMPORARY contract; no state is written.
-    const preview=hireCareer(root.careerSystem,residentId,career.id,root.minutes);
+    const preview=hireCareer(root.careerSystem,residentId,career.id,root.minutes,{rankSchedules:true});
     const shift=nextCareerShift(root.calendar,preview.byResident[residentId],root.minutes);
     const rank=careerRankForContract(preview.byResident[residentId])||career.ranks[0];
     const retry=careerRehireRetry(root,residentId,career.id);
@@ -69,7 +69,7 @@ export function acceptCareerOffer(root,residentId,careerId){
   if(retry.blocked)return {ok:false,
     reason:'После увольнения повторный отклик доступен через '+retry.remaining+' игровых мин.'};
   try{
-    const careerSystem=hireCareer(root.careerSystem,residentId,careerId,root.minutes);
+    const careerSystem=hireCareer(root.careerSystem,residentId,careerId,root.minutes,{rankSchedules:true});
     const contract=careerSystem.byResident[residentId];
     return {ok:true,careerSystem,contract,
       shift:nextCareerShift(root.calendar,contract,root.minutes)};
