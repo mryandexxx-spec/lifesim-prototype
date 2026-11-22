@@ -11,7 +11,7 @@ import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getHobbyContent} from './hobby-content.js';
 import {HOBBY_ACTIVITIES,HOBBY_CONTENT} from './hobby-reading.js';
-import {kitchenRecipe} from './kitchen.js';
+import {kitchenRecipe,KITCHEN_RECIPES} from './kitchen.js';
 import {insideLot} from './lot-surface.js';
 import {validPoolId} from './pool-topology.js';
 import {validPoolFixtureId} from './pool-equipment.js';
@@ -65,7 +65,7 @@ export function sanitizeQueueCommand(id,raw,persons){
     if(raw.targetInstanceId!==undefined&&!validFurnitureInstanceId(raw.targetInstanceId))
       return null;
     if(raw.actionId==='cook'){
-      if(!kitchenRecipe(raw.recipeId)||!raw.targetInstanceId)return null;
+      if(!Object.hasOwn(KITCHEN_RECIPES,raw.recipeId)||!raw.targetInstanceId)return null;
       return {type,actionId:'cook',targetInstanceId:raw.targetInstanceId,recipeId:raw.recipeId};
     }
     if(raw.actionId==='dining'&&raw.recipeId!==undefined){
