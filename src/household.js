@@ -31,7 +31,7 @@ import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart}
 import {strictLegacyActor} from './resident-registry.js';
 import {restorePopulation} from './resident-population.js';
 import {residentIdsForSimulation,savedAdditionalActor,extraReservesFurniture,
-  prepareAdditionalResidents,tickAdditionalResidents} from './resident-activity-runtime.js';
+  tickAdditionalResidents} from './resident-activity-runtime.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
@@ -478,7 +478,6 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     }else resident.action=null;
   }
   refreshGardenWishes(root);
-  prepareAdditionalResidents(root);
   return root;
 }
 
