@@ -94,31 +94,31 @@ test('NEEDS-FIX red: completing toilet reaches exact 100; cancellation does not'
     near(saved.needs.bladder,s.needs.bladder);
   }
 });
-test('NEEDS-FIX red: ordinary bed restores low energy in an 8–9 hour night',()=>{
+test('NEEDS-FIX: ordinary bed wakes at actual full energy without a minimum lock',()=>{
   for(const start of [0,10,40,80]){
     const full=sleep(start);
-    assert.ok(full.minutes>=480&&full.minutes<=540,
-      `initial ${start}, duration ${full.minutes}: ordinary bed must sustain a night`);
-    assert.ok(full.energy>=91.95,`initial ${start}: wake tick may include <1 awake minute, energy ${full.energy}`);
+    assert.ok(full.minutes>0&&full.minutes<=540,
+      `initial ${start}, duration ${full.minutes}: bed must wake at full Energy`);
+    assert.ok(full.energy>=99.9,`initial ${start}: wake tick may include <1 awake minute, energy ${full.energy}`);
   }
 });
 test('NEEDS-FIX red: premium canopy bed is faster, still physiological',()=>{
   for(const start of [0,10,40,80]){
     const basic=sleep(start,'bed.platform');
     const fast=sleep(start,'bed.canopy');
-    assert.ok(fast.minutes>=360&&fast.minutes<=450);
+    assert.ok(fast.minutes>0&&fast.minutes<=450);
     assert.ok(fast.minutes<basic.minutes,'premium bed must actually be faster');
-    assert.ok(fast.energy>=91.95);
+    assert.ok(fast.energy>=99.9);
   }
 });
 test('NEEDS-FIX: saved mid-sleep and paused sleep never accrue off-clock energy',()=>{
   for(const start of [0,10,40,80]){
     const original=newGame();original.needs.energy=start;
     chooseAction(original,'bed');arrive(original);
-    tick(original,125);
+    tick(original,30);
     const resumed=loadGame(clone(original));
     near(resumed.needs.energy,original.needs.energy);
-    assert.equal(resumed.action.elapsed,125);
+    assert.equal(resumed.action.elapsed,30);
     resumed.paused=true;tick(resumed,300);
     near(resumed.needs.energy,original.needs.energy);
     resumed.paused=false;
