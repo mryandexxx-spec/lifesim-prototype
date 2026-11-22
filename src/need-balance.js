@@ -29,7 +29,7 @@ export const SOCIAL_DECAY_PERSONALITY_SPREAD=.008;
 // bed reduces the minimum/maximum. No second need clock or persisted multiplier.
 export const SLEEP_MIN_MINUTES=480;
 export const SLEEP_MAX_MINUTES=540;
-export const SLEEP_WAKE_ENERGY=92;
+export const SLEEP_WAKE_ENERGY=100;
 export const SLEEP_RECOVERY_PER_MINUTE=.19;
 export const SLEEP_PREMIUM_PROFILE=Object.freeze({
   minMinutes:360,maxMinutes:450,recoveryPerMinute:.24
