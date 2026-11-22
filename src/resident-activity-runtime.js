@@ -224,6 +224,9 @@ function advanceExtraPosition(root,id,actor,goal,minutes){
     }
     actor.position=point;
     remaining-=step;
+    // Never jump across an unverified A* corner inside one simulation tick.
+    // The next step replans from this precise collision-free location.
+    break;
   }
   return true;
 }
