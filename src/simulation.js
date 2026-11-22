@@ -298,9 +298,10 @@ export function tick(state, minutes,world=state?.world??null) {
   const sleeping=state.action?.id==='bed'&&state.action.phase==='using';
   const profile=sleeping?sleepBedProfile(world,state.action.targetInstanceId):null;
   const sleepElapsed=sleeping?state.action.elapsed:0;
+  // IMPROVEMENTS-BATCH2: a full Energy reserve is a real wake-up trigger,
+  // even when the former minimum bed duration has not elapsed.
   const untilWake=sleeping?Math.max(0,Math.min(profile.maxMinutes-sleepElapsed,
-    Math.max(profile.minMinutes-sleepElapsed,
-      (SLEEP_WAKE_ENERGY-state.needs.energy)/profile.recoveryPerMinute))):0;
+    (SLEEP_WAKE_ENERGY-state.needs.energy)/profile.recoveryPerMinute)):0;
   const sleepMinutes=Math.min(minutes,untilWake);
   for(const need of PHYSICAL_NEEDS){
     const elapsed=need==='energy'?Math.max(0,minutes-sofaRestMinutes-sleepMinutes):minutes;
@@ -455,7 +456,9 @@ export function tick(state, minutes,world=state?.world??null) {
     state.action.elapsed += amount;
     const sleepWoke=sleeping&&sleepMinutes>=untilWake-1e-8;
     if (state.action.elapsed >= duration || sleepWoke ||
-        (!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+        (!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) &&
+          !(state.action.id==='tv'&&state.action.tvTalk===true)&&
+          state.needs[definition.need] >= 99.9)) {
       if(state.action.id==='toilet'&&state.action.elapsed>=duration){
         // The verified completed use, not the relief sub-phase or a reload,
         // is the only step that reaches the exact 100% promise.
