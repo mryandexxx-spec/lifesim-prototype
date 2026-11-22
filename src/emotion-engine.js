@@ -53,7 +53,11 @@ export const EMOTION_SOURCES=Object.freeze({
   'worklife.sharedDisappointed':Object.freeze({kind:'sadness',cause:'Совместный отдых прервался',mood:-4}),
   'garden.firstCare':Object.freeze({kind:'calm',cause:'Первый уход за растением',mood:3}),
   'garden.firstBloomSeen':Object.freeze({kind:'inspiration',cause:'Первое цветение в саду',mood:7}),
-  'pool.firstSwim':Object.freeze({kind:'joy',cause:'Первый полноценный заплыв',mood:6})
+  'pool.firstSwim':Object.freeze({kind:'joy',cause:'Первый полноценный заплыв',mood:6}),
+  'sports.win':Object.freeze({kind:'joy',cause:'Победа любимой команды',mood:7}),
+  'sports.draw':Object.freeze({kind:'calm',cause:'Ничья любимой команды',mood:2}),
+  'sports.loss':Object.freeze({kind:'sadness',cause:'Поражение любимой команды',mood:-5}),
+  'sports.chat':Object.freeze({kind:'enthusiasm',cause:'Обсудили футбол',mood:2})
 });
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const isRecord=v=>Boolean(v)&&typeof v==='object'&&!Array.isArray(v);
