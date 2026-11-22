@@ -226,6 +226,9 @@ const calendarSuggestion=suggestedGameDate();
 let game;
 let calendarNeedsPersistence=false;
 let billsNeedsPersistence=false;
+// If loading any existing save fails (including future/invalid population),
+// never let the fallback session overwrite the original on-device bytes.
+let saveStorageLocked=false;
 try {
   const stored=JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
   billsNeedsPersistence=stored?.householdBills?.schema!==1;
@@ -233,6 +236,7 @@ try {
     !parseCivilDate(stored.calendar.startCivilDate);
   game=loadHousehold(stored,calendarSuggestion);
 } catch {
+  saveStorageLocked=true;
   game=newHousehold(calendarSuggestion);
   calendarNeedsPersistence=true;
   billsNeedsPersistence=true;
@@ -507,8 +511,12 @@ function toast(message,{incidentResidentId=null}={}) {
 // Never serialize a not-yet-rendered fallback household during a failed 3D boot.
 // The last valid on-device save stays byte-for-byte untouched until startup succeeds.
 let bootReadyToSave=false;
+const canWriteGameSave=()=>bootReadyToSave&&!saveStorageLocked;
 function save(silent = false) {
-  if(!bootReadyToSave)return false;
+  if(!canWriteGameSave()){
+    if(saveStorageLocked&&!silent)toast('Сохранение заблокировано: исходный файл не будет перезаписан');
+    return false;
+  }
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(game));
     if (!silent) toast('Игра сохранена на этом устройстве');
@@ -6949,7 +6957,7 @@ function boot() {
     // Commit domain revalidates exact revision, wallet and canonical anchors,
     // THEN attempts ONE localStorage write before any in-memory mutation.
     const result=commitPoolPreviewPersisted(game,draft,next=>{
-      if(!bootReadyToSave)return false;
+      if(!canWriteGameSave())return false;
       try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));return true;}
       catch{return false;}
     });
@@ -7698,7 +7706,7 @@ function boot() {
       if(!receipt.ok){fail(receipt.reason);return;}
       const next={...game,world:{...game.world,...step.world},
         shop:receipt.shop,financialHistory:receipt.financialHistory};
-      if(!bootReadyToSave){fail('save-failed');return;}
+      if(!canWriteGameSave()){fail('save-failed');return;}
       try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));}
       catch{fail('save-failed');return;}
       game.world=next.world;game.shop=next.shop;
@@ -10061,6 +10069,7 @@ function boot() {
     clearTimeout(loadingWatchdog);
     if(loadingAborted||!loadingProgress.requiredReady())return;
     bootReadyToSave=true;
+    if(saveStorageLocked)toast('Сейв не удалось загрузить — запись заблокирована для защиты данных');
     if(calendarNeedsPersistence||billsNeedsPersistence)save(true);
     $('loading').hidden=true;
     let seen='done';
