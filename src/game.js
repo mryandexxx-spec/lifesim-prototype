@@ -160,6 +160,7 @@ import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './s
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {TV_WATCH_POSE,tvScreenFrame} from './tv-interaction.js';
 import {sportsTvFrame,paintSportsTv,sportsWatchOpportunity} from './sports-tv.js';
+import {sportsAutoIntent,recordSportsAutoStart} from './sports-autonomy.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {planSharedTv,liveSharedTv} from './tv-together.js';
 import {planPairedHobby,livePairedHobby} from './paired-hobby.js';
@@ -4255,6 +4256,8 @@ function boot() {
       if(!automatic&&!fromQueue)toast('Предмет сейчас занят другим жителем');
       return false;
     }
+    // Capture an optional fan intent before the ordinary action acquires the TV.
+    const fanIntent=id==='tv'&&automatic?sportsAutoIntent(game,actorId):null;
     const watchSeat=id==='tv'?chooseTvSofa(game,actorId,
       resolveActionFurniture(game.world,'tv',targetInstanceId)?.instanceId||'home-tv-1'):null;
     // Music is not a fixed front-facing appliance. Pick a clear A* approach
@@ -4269,6 +4272,8 @@ function boot() {
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
       activityId,contentId,musicPlan,inventoryItemId,recipeId,mirrorPractice,tvTalk);
+    if(started&&fanIntent)recordSportsAutoStart(game,actorId,fanIntent.matchId,
+      actor.action?.targetInstanceId);
     if(started)restartAutonomyWait(actorId);
     return started;
   };
