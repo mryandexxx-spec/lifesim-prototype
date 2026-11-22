@@ -28,6 +28,7 @@ import {sportsAutoIntent} from './sports-autonomy.js';
 import {newSportsSharedWatch,restoreSportsSharedWatch,observeSharedSportsWatch} from './sports-shared-watch.js';
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
+import {strictLegacyActor} from './resident-registry.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
@@ -472,7 +473,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
 }
 
 export function getActor(root,id='alex') {
-  return id==='mira' ? root.otherSim : root;
+  return strictLegacyActor(root,id);
 }
 export function getActorName(id='alex') {
   return RESIDENT_NAMES[id] || RESIDENT_NAMES.alex;
