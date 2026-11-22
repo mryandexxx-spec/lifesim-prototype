@@ -114,6 +114,10 @@ export function createFridgeR2UI({document,readModel,readName,onAction}){
     if(visible&&reset){tab='eat';recipeId='';readyId='';stapleId='vegetables';}
   };
   panel.addEventListener('click',event=>{
+    // Selecting a row rebuilds it synchronously. Without stopping the bubble,
+    // the global optional-menu dismiss sees a detached event target and
+    // incorrectly closes the fridge sheet during a real mobile tap.
+    event.stopPropagation();
     const tabButton=event.target.closest('[data-fridge-tab]');
     if(tabButton&&panel.contains(tabButton)){
       tab=fridgeTab(tabButton.dataset.fridgeTab);
