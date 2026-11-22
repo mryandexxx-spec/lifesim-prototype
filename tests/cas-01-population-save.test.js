@@ -51,7 +51,7 @@ test('CAS-01.3 old one-person and advanced two-person saves never acquire phanto
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
 });
 
-test('CAS-01.3 optional population roundtrip preserves extra actors and independent membership, not live simulation',()=>{
+test('CAS-01.3 optional population remains v1-safe; CAS-01.4 activates same-dwelling residents on tick',()=>{
   const state=newHousehold();
   state.shop.credits=189;
   state.otherSim.needs.energy=39;
@@ -67,13 +67,15 @@ test('CAS-01.3 optional population roundtrip preserves extra actors and independ
   assert.equal(recovered.population.nextResidentSerial,5);
   assert.equal(recovered.shop.credits,189);
   assert.equal(recovered.otherSim.needs.energy,39);
-  const populationBeforeTick=JSON.stringify(recovered.population);
   const clockBeforeTick=recovered.minutes;
   tickHousehold(recovered,0.25);
   assert.equal(recovered.minutes,clockBeforeTick+0.25);
-  assert.equal(JSON.stringify(recovered.population),populationBeforeTick,
-    'regular 2-person tick preserves detached saved records byte-for-byte');
-  assert.equal(getActor(recovered,'resident_3'),null,'CAS-01.3 does not spawn gameplay actors');
+  assert.ok(recovered.population.residentsById.resident_3.actor.needs.energy<24,
+    'same-dwelling extra adult receives the household need tick');
+  assert.equal(recovered.population.residentsById.resident_4.actor.needs.energy,83,
+    'remote-dwelling record does not consume home resources');
+  assert.equal(getActor(recovered,'resident_3'),
+    recovered.population.residentsById.resident_3.actor,'stable extra actor identity');
   const m=savedPopulationMembership(recovered);
   assert.deepEqual(m.getDwellingResidents('dwelling_1'),['alex','mira','resident_3']);
   assert.deepEqual(m.getFamilyResidents('family_1'),['alex','resident_3','resident_4']);
