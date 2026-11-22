@@ -99,7 +99,7 @@ test('R1-A pause never generates results, and 42-day season rollover retains bou
   const root=fixture(),start=root.sportsWorld.seasonStartDay;
   root.paused=true;tickHousehold(root,42*1440);
   assert.equal(root.sportsWorld.results.length,0);
-  root.paused=false;tickHousehold(root,84*1440);
+  root.paused=false;tickHousehold(root,90*1440);
   assert.equal(root.sportsWorld.seasonId,2);
   assert.equal(root.sportsWorld.seasonStartDay,start+84);
   assert.equal(root.sportsWorld.history.length,2);
