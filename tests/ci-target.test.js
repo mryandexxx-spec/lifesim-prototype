@@ -80,3 +80,16 @@ test('LOAD-TRUTH-R1 reserves dedicated two-viewport WebGL only for loader change
   for(const name of ['index.html','src/kitchen.js','src/career-phone-ui.js'])
     assert.equal(planChanges([name]).load_truth,false,name);
 });
+
+test('FRIDGE-UX-R2 only runs dedicated dual-viewport UI smoke for affected sources',()=>{
+  const model=planChanges(['src/fridge-ui.js']);
+  const view=planChanges(['src/fridge-ui-dom.js']);
+  const smoke=planChanges(['tests/fridge-ux-r2-browser-smoke.mjs']);
+  assert.equal(model.fridge_ux,true);
+  assert.equal(view.fridge_ux,true);
+  assert.equal(smoke.fridge_ux,true);
+  assert.equal(smoke.browser,true);
+  assert.ok(model.tests.includes('tests/fridge-ux-r2.test.js'));
+  for(const source of ['src/ready-food.js','src/kitchen.js','src/career-phone-ui.js'])
+    assert.equal(planChanges([source]).fridge_ux,false,source);
+});
