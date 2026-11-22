@@ -10,6 +10,7 @@ import {newCareerDiscipline,restoreCareerDiscipline,disciplineRisk} from './care
 import {newWorkLife,restoreWorkLife} from './career-worklife.js';
 import {specializationDefinition} from './career-specializations.js';
 import {resetSeniorProof} from './career-seniority.js';
+import {restoreShiftSchedule,newShiftSchedule} from './career-rank-schedules.js';
 export const CAREER_SCHEMA=1;
 export const CAREER_RESIDENT_IDS=Object.freeze(['alex','mira']);
 const validTime=n=>Number.isFinite(n)&&n>=0&&n<=5256000000;
@@ -83,6 +84,8 @@ function cleanContract(raw,id){
       Math.max(0,Math.min(100,Math.round(raw.performance))):50,
     currentShift:null,workMode:cleanWorkMode(raw.workMode)};
   if(specialization)contract.specialization=specialization;
+  const shiftSchedule=restoreShiftSchedule(raw.shiftSchedule);
+  if(shiftSchedule)contract.shiftSchedule=shiftSchedule;
   const seniorProof=restoreSeniorProof(raw.seniorProofs,contract);
   if(seniorProof)contract.seniorProofs=seniorProof;
   contract.timeOff=restoreCareerTimeOff(raw.timeOff,contract.employmentId);
@@ -198,7 +201,8 @@ export function hireCareer(system,residentId,careerId,atMinute){
   const contract={residentId,employmentId:id,careerId,level,
     hiredAt:atMinute,status:'employed',performance:latest?60:50,currentShift:null,
     workedShifts:0,rankShifts:0,missedShifts:0,lateShifts:0,
-    timeOff,workMode:'normal',discipline:newCareerDiscipline(),workLife:newWorkLife()};
+    timeOff,workMode:'normal',discipline:newCareerDiscipline(),workLife:newWorkLife(),
+    shiftSchedule:newShiftSchedule(atMinute)};
   if(latest?.branchId&&specializationDefinition(careerId,latest.branchId)){
     contract.specialization={schema:1,id:latest.branchId,chosenAt:atMinute,
       workedShiftsAtChoice:0,focusReceiptId:null,focusScenarioId:null,focusAt:null};
