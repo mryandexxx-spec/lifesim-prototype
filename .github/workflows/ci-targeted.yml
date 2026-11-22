@@ -93,6 +93,13 @@ jobs:
       - name: PHONE-PLATFORM-R1 real in-game phone home and calls at two mobile WebGL viewports
         if: ${{ needs.targeted.outputs.phone_platform == 'true' }}
         run: node tests/phone-platform-r1-browser-smoke.mjs
+      - name: Upload PHONE-PLATFORM-R1 browser screenshots for visual QA
+        if: ${{ always() && needs.targeted.outputs.phone_platform == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: phone-platform-r1-mobile-pr
+          path: artifacts/phone-platform-r1/
+          if-no-files-found: ignore
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}
         run: node tests/fixture-motion-browser-smoke.mjs

@@ -21,7 +21,7 @@ try{
     const context=await browser.newContext({viewport:{width,height},
       deviceScaleFactor:1,hasTouch:true,isMobile:true,serviceWorkers:'block'});
     await context.addInitScript(({key,record,tour})=>{
-      localStorage.setItem(key,JSON.stringify(record));
+      if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
       localStorage.setItem(tour,'done');
     },{key:SAVE_KEY,record:seed,tour:UI_TOUR_STORAGE_KEY});
     const page=await context.newPage(),errors=[];

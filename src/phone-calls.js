@@ -97,15 +97,22 @@ export function progressPhoneCalls(root,now=root?.minutes){
     !record(root.otherSim?.needs)){
     cancelPhoneCall(root,'invalid-social');return [];
   }
+  // Project the +1 directed friendship into the SAME graph transaction.
+  // The root legacy relationship and canonical graph must not diverge.
+  const views=Object.fromEntries(IDS.map(id=>{
+    const view=root.relationship.views[id];
+    return [id,{...view,friendship:clamp(
+      (Number.isFinite(view.friendship)?view.friendship:50)+1)}];
+  }));
   const receipt=applySocialEvent(root.socialGraph,{
     type:'phone.call',at:now,actorId:a.from,targetId:a.to,token:'phone.call.'+a.id
-  },{observedViews:root.relationship.views});
+  },{observedViews:views});
   if(!receipt){cancelPhoneCall(root,'invalid-receipt');return [];}
   creditCompletedSocialNeed({alex:root,mira:root.otherSim},receipt);
   root.relationship.affinity=clamp(root.relationship.affinity+1);
   for(const id of IDS){
     const view=root.relationship.views[id];
-    view.friendship=clamp((Number.isFinite(view.friendship)?view.friendship:50)+1);
+    view.friendship=views[id].friendship;
     actor(root,id).event='Приятный телефонный разговор';
   }
   root.phoneCalls.receipts.push({id:a.id,at:now,from:a.from,to:a.to});

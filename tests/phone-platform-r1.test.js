@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold,tickHousehold,residentAutonomousChoice} from '../src/household.js';
+import {getPair} from '../src/social-graph.js';
 import {newPhoneCalls,restorePhoneCalls,phoneContactStatus,startPhoneCall,
   progressPhoneCalls,cancelPhoneCall,CALL_DURATION,CALL_COOLDOWN} from '../src/phone-calls.js';
 import {PHONE_APPS,phoneAppRoute} from '../src/phone-app-registry.js';
@@ -26,6 +27,7 @@ test('G calling an idle partner connects remotely; completion gives bounded gain
   const s=idle(),wallet=s.shop.credits,position={...s.otherSim.position};
   s.needs.social=70;s.otherSim.needs.social=50;
   const before=s.relationship.affinity;
+  const beforeGraph=getPair(s.socialGraph,'alex','mira').views.alex.friendship;
   assert.equal(startPhoneCall(s,'alex','mira').ok,true);
   assert.equal(s.phoneCalls.active.endAt-s.phoneCalls.active.startedAt,CALL_DURATION);
   assert.equal(residentAutonomousChoice(s,'mira'),null);
@@ -37,6 +39,7 @@ test('G calling an idle partner connects remotely; completion gives bounded gain
   assert.equal(s.needs.social,76);
   assert.equal(s.otherSim.needs.social,56);
   assert.equal(s.relationship.affinity,before+1);
+  assert.equal(getPair(s.socialGraph,'alex','mira').views.alex.friendship,beforeGraph+1);
   assert.deepEqual(s.otherSim.position,position);
   assert.equal(s.shop.credits,wallet);
   assert.equal(s.phoneCalls.receipts.length,1);
