@@ -11,10 +11,11 @@ test('CAS-01.1 strict legacy actor resolver never aliases an unknown resident to
   assert.deepEqual(HOUSEHOLD_IDS,['alex','mira']);
   assert.equal(strictLegacyActor(root,'alex'),root);
   assert.equal(strictLegacyActor(root,'mira'),root.otherSim);
-  for(const invalid of ['resident_3','unknown','__proto__','',null,undefined]){
+  for(const invalid of ['resident_3','unknown','__proto__','',null]){
     assert.equal(strictLegacyActor(root,invalid),null);
     assert.equal(getActor(root,invalid),null,'no fallback to root for '+String(invalid));
   }
+  assert.equal(strictLegacyActor(root,undefined),null);
   assert.equal(getActor(root),root,'historical omitted id must still mean Alex');
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
 });
