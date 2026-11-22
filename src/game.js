@@ -2443,6 +2443,8 @@ function boot() {
   const variantMaterials=new Map();
   // One reusable 2D canvas/texture per physically installed TV; do not upload per frame.
   const sportsTvTextures=new Map();
+  if(new URLSearchParams(window.location.search).get('fandom-r1-c')==='qa')
+    window.__LifeSimSportsScreenStats=()=>[...sportsTvTextures].map(([tvId,s])=>({tvId,frameKey:s.frameKey}));
   // Meshy is a visual override only: original action, collision, price and saves stay canonical.
   // ?furniture=legacy restores ALL procedural furniture for Safari diagnosis.
   const furnitureVisualMode=new URLSearchParams(window.location.search).get('furniture');
