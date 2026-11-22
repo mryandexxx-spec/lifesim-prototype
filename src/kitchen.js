@@ -8,6 +8,7 @@ import {GRILL_RECIPES,grillRecipe} from './grill-catalog.js';
 
 export const KITCHEN_SCHEMA=1;
 export const KITCHEN_PREPARED_LIMIT=12;
+export const KITCHEN_PANTRY_DELIVERY_LIMIT=12;
 // Domain-side autonomous care threshold; presentation remains dependency-free.
 export const DISH_AUTO_WASH_THRESHOLD=6;
 export const COOKING_SKILL_ID='cooking';
@@ -56,7 +57,7 @@ export const kitchenRecipe=id=>typeof id==='string'
   ?(own(KITCHEN_RECIPES,id)?KITCHEN_RECIPES[id]:(grillRecipe(id)||readyMeal(id))):null;
 export function newKitchen(){
   return {schema:KITCHEN_SCHEMA,pantry:{...PANTRY_START,herbs:0},prepared:[],
-    deliveries:[],dirtyDishes:0,lastPantryDay:0};
+    deliveries:[],pantryDeliveries:[],dirtyDishes:0,lastPantryDay:0};
 }
 export function restoreKitchen(raw){
   const state=newKitchen();
@@ -96,6 +97,26 @@ export function restoreKitchen(raw){
       state.deliveries.push({id:order.id,recipeId:order.recipeId,
         orderedAt:order.orderedAt,dueAt:order.dueAt});
       reserved++;
+    }
+  }
+  // Additive optional v1 grocery deliveries. Keep original ready meal orders
+  // independent and never accept a forged/duplicated warehouse top-up.
+  if(Array.isArray(raw.pantryDeliveries)&&
+      raw.pantryDeliveries.length<=KITCHEN_PANTRY_DELIVERY_LIMIT){
+    const seen=new Set(),reserved=Object.fromEntries(
+      Object.keys(PANTRY_START).filter(k=>k!=='herbs').map(k=>[k,state.pantry[k]]));
+    for(const row of raw.pantryDeliveries){
+      const ingredientId=row?.ingredientId;
+      const units=['meat','chicken'].includes(ingredientId)?3:5;
+      if(!Object.hasOwn(reserved,ingredientId)||
+        !finiteInt(row.units)||row.units!==units||
+        typeof row.id!=='string'||!/^pantry-order-[1-9][0-9]*$/.test(row.id)||
+        seen.has(row.id)||!finiteInt(row.orderedAt)||!finiteInt(row.dueAt)||
+        row.dueAt<row.orderedAt||row.dueAt>2_000_000_000||
+        reserved[ingredientId]+units>30)continue;
+      reserved[ingredientId]+=units;seen.add(row.id);
+      state.pantryDeliveries.push({id:row.id,ingredientId,units,
+        orderedAt:row.orderedAt,dueAt:row.dueAt});
     }
   }
   if(finiteInt(raw.dirtyDishes))state.dirtyDishes=Math.min(32,raw.dirtyDishes);
