@@ -145,6 +145,10 @@ export function stepAnimation(previous,signals,dt) {
     const pulse=Math.sin(stroke),opposite=Math.sin(stroke+Math.PI);
     if(stage==='waiting'){
       armTarget=[4,-4];legTarget=[0,0];
+    }else if(signals.swimJump){
+      const {bend,lift}=signals.swimJump;
+      legTarget=[-38*bend,-38*bend];kneeTarget=[66*bend,66*bend];
+      armTarget=[20*bend-135*lift,20*bend-135*lift];elbowTarget=[-12,-12];
     }else if(stage==='entering'){
       const dip=clamp(safe(signals?.swimStroke,0)/6,0,1);
       legTarget=[-12-25*dip,12+12*dip];

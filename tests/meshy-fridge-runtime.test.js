@@ -106,3 +106,14 @@ test('actual visual bridge applies overlays only after the base Anim evaluation'
   assert.match(pages,/src\/meshy-fridge-runtime\.js/);
   assert.match(pages,/node --check src\/meshy-fridge-runtime\.js/);
 });
+
+test('meal pickup withdraws from the shelf and never lifts food to the mouth',()=>{
+  const take=fridgeSequence(4.5,6,'take');
+  assert.equal(take.eat,0);
+  assert.equal(take.chew,0);
+  assert.equal(meshyFridgePose(take).mouth,0);
+  assert.ok(meshyFridgePose(take).carry>.8);
+  const store=fridgeSequence(6,6,'store');
+  assert.equal(store.handFood,0);
+  assert.equal(store.eat,0);
+});

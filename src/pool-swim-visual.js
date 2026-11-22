@@ -4,7 +4,7 @@
  * origin and the two imported GLBs are individually normalized to it.
  */
 import {poolCellBounds} from './pool-topology.js';
-import {findPoolWaterPath} from './pool-navigation.js';
+import {poolLaneCircuit,poolEntryMinutes} from './pool-navigation.js';
 
 export const POOL_WATER_LEVEL=-.475; // Same constant as D1c pool-visual.js.
 const LAND_LEVEL=-.53;
@@ -16,18 +16,6 @@ const point=cell=>{
 const mix=(a,b,t)=>a+(b-a)*t;
 const toward=(a,b,t)=>({x:mix(a.x,b.x,t),z:mix(a.z,b.z,t)});
 const valid=p=>Number.isFinite(p?.x)&&Number.isFinite(p?.z);
-// Visual cache is per runtime action and invalidated by the outdoors object.
-// A 512-tile pathfinder must not run for two avatars on every WebGL frame.
-const laneCache=new WeakMap();
-function swimmingLane(world,action){
-  const outdoors=world?.outdoors,anchor=action.slotAnchor,target=action.slotCells?.at(-1);
-  const cached=laneCache.get(action);
-  if(cached&&cached.outdoors===outdoors&&cached.revision===outdoors?.revision&&
-    cached.anchor===anchor&&cached.target===target)return cached.path;
-  const path=findPoolWaterPath(world,action.poolId,anchor,target);
-  laneCache.set(action,{outdoors,revision:outdoors?.revision,anchor,target,path});
-  return path;
-}
 function section(path,index,progress=0){
   if(!Array.isArray(path)||!path.length)return null;
   const a=point(path[Math.min(path.length-1,Math.max(0,index))]);
@@ -61,13 +49,25 @@ export function poolSwimVisualFrame(world,action){
   if(!water||!valid(dry))return null;
   const idx=Number.isSafeInteger(action.wetPathIndex)?action.wetPathIndex:0;
   const progress=clamp(Number.isFinite(action.wetProgress)?action.wetProgress:0);
-  const duration=action.entryKind==='steps'?3:2;
+  const duration=poolEntryMinutes(action.entryKind);
   if(action.stage==='entering'){
     // The D2b ladder token is exclusive only during this transition.
     // Before the wet route advances, lower and tip the body into the water.
     const t=clamp((action.elapsed||0)/duration);
     const first=point(action.entryWetPath?.[0])||water;
     const wetRoute=section(action.entryWetPath,idx,progress)||water;
+    if(action.entryKind==='board'&&t<1){
+      const flight=clamp((t-.36)/.43),submerge=clamp((t-.79)/.21);
+      const run=clamp(t/.36);
+      const boardTop=.478;
+      const stand=boardTop*clamp(run*2)-.10*Math.sin(Math.PI*run);
+      const arc=(1-flight)*boardTop+2.25*flight*(1-flight);
+      const frame=output('entering',toward(dry,first,.55*run+.45*flight),
+        heading(dry,first),70*submerge,t*4,submerge);
+      frame.y+=t<.36?stand:arc;
+      frame.jump={bend:Math.sin(Math.PI*run),lift:Math.sin(Math.PI*flight)};
+      return frame;
+    }
     const xy=t<1?toward(dry,first,t):wetRoute;
     const direction=heading(dry,first);
     const bend=clamp((t-.38)/.62);
@@ -77,18 +77,18 @@ export function poolSwimVisualFrame(world,action){
     return frame;
   }
   if(action.stage==='swimming'){
-    const anchor=action.slotAnchor;
-    const target=action.slotCells?.at(-1);
-    const lane=swimmingLane(world,action);
-    if(!lane?.length)return null;
-    const i=Math.max(0,Math.min(lane.length-1,Number.isSafeInteger(action.laneIndex)?action.laneIndex:0));
-    const dir=action.laneDirection===-1?-1:1;
-    const next=Math.max(0,Math.min(lane.length-1,i+dir));
-    const from=point(lane[i]),to=point(lane[next]);
-    if(!from||!to)return null;
-    // Existing D2b wetProgress is fractional movement to the next lane tile.
-    const pos=toward(from,to,progress);
-    const direction=heading(from,to,heading(point(lane[0]),point(lane.at(-1))));
+    const lane=poolLaneCircuit(action.slotCells);
+    const index=lane?.indexOf(action.waterCell)??-1;
+    if(index<0)return null;
+    // A quadratic through the two edge midpoints rounds each tile corner.
+    // Its tangent is shared by the next segment, including the lap seam.
+    const i=index+(progress>=.5?1:0),t=(progress+.5)%1;
+    const cell=offset=>point(lane[(i+offset+lane.length)%lane.length]);
+    const center=cell(0);
+    const incoming=toward(toward(cell(-1),center,.5),center,t);
+    const outgoing=toward(center,toward(center,cell(1),.5),t);
+    const pos=toward(incoming,outgoing,t);
+    const direction=heading(incoming,outgoing);
     return output('swimming',pos,direction,70,
       Number.isFinite(action.waterElapsed)?action.waterElapsed:0,1);
   }

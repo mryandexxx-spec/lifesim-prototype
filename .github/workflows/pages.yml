@@ -275,6 +275,7 @@ jobs:
           cp src/dirty-dishes-visual.js site/src/
           cp src/activity-session.js site/src/
           cp src/activity-registry.js site/src/
+          cp src/painted-canvas.js site/src/
           cp src/painting.js site/src/
           cp src/painting-gallery.js site/src/
           cp src/painting-visual.js src/meshy-painting-runtime.js site/src/

@@ -111,7 +111,7 @@ test('P0 Safari boot: loaded Meshy reading controller accepts idle, reset and re
   for(const resident of ['Alex','Mira']){
     const controller=createMeshyReadingController({pc,model,avatar,resident});
     assert.equal(controller.ready,true);
-    const book=model.children.at(-1);
+    const book=avatar.children.at(-1);
     const closed=book.children.find(e=>e.name==='closed hardcover');
     const openCover=book.children.find(e=>e.name==='open green cover');
     const leftPage=book.children.find(e=>e.name==='left story pages');
@@ -126,6 +126,7 @@ test('P0 Safari boot: loaded Meshy reading controller accepts idle, reset and re
       assert.equal(controller.apply(),false);
     }
     assert.equal(book.enabled,true,'valid zero-minute activity still has a prop');
+    assert.ok(book.position.z>=.45,'open volume clears torso even at elapsed zero');
     controller.setFrame({active:true,elapsed:6});
     assert.equal(book.enabled,true);
     assert.doesNotThrow(()=>controller.apply());

@@ -224,3 +224,24 @@ export function planPoolAdmission(root,residentId,poolId,{jump=false,fixtureId=n
   return planPoolEntry(root.world,actor.position,poolId,{jump,fixtureId,
     blockedFixtureIds,reservedCells});
 }
+
+// Each admitted 2×4 (or 4×2) slot has two lengths joined at both ends.
+// Cache the circuit by the saved slot array; it never extends into a neighbour's slot.
+const circuits=new WeakMap();
+export function poolLaneCircuit(cells){
+  if(!Array.isArray(cells)||cells.length!==8)return null;
+  if(circuits.has(cells))return circuits.get(cells);
+  const sorted=[...cells].sort((a,b)=>a-b);
+  const width=sorted.filter(c=>Math.floor(c/POOL_GRID_WIDTH)===Math.floor(sorted[0]/POOL_GRID_WIDTH)).length;
+  if(width!==2&&width!==4)return null;
+  if(!sorted.every((c,i)=>c===sorted[0]+Math.floor(i/width)*POOL_GRID_WIDTH+i%width))return null;
+  const height=8/width;
+  const loop=sorted.slice(0,width);
+  for(let row=1;row<height;row++)loop.push(sorted[(row+1)*width-1]);
+  for(let col=width-2;col>=0;col--)loop.push(sorted[8-width+col]);
+  for(let row=height-2;row>0;row--)loop.push(sorted[row*width]);
+  circuits.set(cells,loop);
+  return loop;
+}
+
+export const poolEntryMinutes=kind=>kind==='board'?4.5:kind==='steps'?3:2;

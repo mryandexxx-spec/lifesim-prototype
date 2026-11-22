@@ -25,8 +25,16 @@ export const FRIDGE_FACING_YAW=Math.atan2(
   FRIDGE_LAYOUT.handle.z-FRIDGE_LAYOUT.approach.z)*180/Math.PI;
 
 /** Reconstructable after pause, 3× speed and reload. */
-export function fridgeSequence(elapsed,duration=26){
+export function fridgeSequence(elapsed,duration=26,mode='snack'){
   const p=clamp01(Number.isFinite(duration)&&duration>0?elapsed/duration:0);
+  if(mode==='take'||mode==='store'){
+    const grip=ease(.42,.51,p);
+    const shelf=ease(.2,.42,p)*(1-ease(.5,.69,p));
+    const carry=mode==='take'?ease(.49,.71,p):1-ease(.20,.42,p);
+    return {progress:p,mode,doorOpen:ease(.06,.28,p)*(1-ease(.70,.96,p)),
+      reach:shelf+.34*carry,carry,eat:0,chew:0,
+      shelfFood:mode==='take'?1-grip:grip,handFood:mode==='take'?grip:1-grip};
+  }
   const doorOpen=ease(.09,.25,p)*(1-ease(.52,.66,p));
   const reach=ease(.27,.36,p)*(1-ease(.44,.54,p));
   const eat=ease(.66,.72,p)*(1-ease(.95,.99,p));
