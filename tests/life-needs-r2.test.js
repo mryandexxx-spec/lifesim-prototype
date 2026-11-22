@@ -27,7 +27,7 @@ test('R2 six-need moderate balance beats measured R1 without freezing consequenc
     assert.ok(90-1440*rate<75,need+' still calls for attention after 24h no care');
   }
   assert.equal(Math.max(...Object.values(NEED_DECAY_PER_MINUTE)),NEED_DECAY_PER_MINUTE.bladder);
-  assert.equal(SLEEP_MIN_MINUTES,420);
+  assert.equal(SLEEP_MIN_MINUTES,480);
   assert.equal(SLEEP_MAX_MINUTES,540);
   assert.equal(ACTIONS.bed.duration,540);
 });
