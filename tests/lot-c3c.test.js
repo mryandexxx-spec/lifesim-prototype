@@ -54,7 +54,7 @@ function using(root,id,actionId,residentId='alex',elapsed=0){
 }
 test('C3c: 7 and 30 full game days keep two clocks and finite pantry',()=>{
   let root=household();
-  root.kitchen.pantry={vegetables:1,grains:0,dairy:2,herbs:0};
+  root.kitchen.pantry={vegetables:1,grains:0,dairy:2,herbs:0,meat:0,chicken:0};
   const initial=clone(root.kitchen.pantry);
   const at=root.minutes;
   const start=performance.now();
