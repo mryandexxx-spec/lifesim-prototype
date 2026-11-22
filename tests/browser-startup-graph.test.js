@@ -33,8 +33,9 @@ test('Browser module graph is all present in GitHub Pages artifact',()=>{
 });
 test('Safari startup has bounded SW registration and optional model loading',()=>{
  const game=read('src/game.js'),html=read('index.html');
- assert.match(game,/Promise\.race\(\[\s*registerModelCache\(\)/);
- assert.match(game,/loadingProgress\.failUnresolved\(\)/);
+ assert.match(game,/Promise\.race\(\[\s*registerModelCache\(\)\.then\(Boolean\)/);
+ assert.match(game,/loadingProgress\.failUnresolved\(\{onlyOptional:true\}\)/);
+ assert.match(game,/app\.once\('postrender'/);
  assert.match(game,/18000/);
  assert.match(html,/Повторить загрузку/);
  assert.match(html,/game\.js\?v=1\.2u/);
