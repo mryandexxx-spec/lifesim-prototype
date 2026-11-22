@@ -183,3 +183,43 @@ test('CAS-01.5-social old 1- and 2-person saves remain valid after a normal tick
   assert.deepEqual(Object.keys(root.actionQueues.byResident),['alex','mira']);
   assert.equal(root.version,1);
 });
+
+test('CAS-01.5-social a new manual plan for either peer cancels session without reward',()=>{
+  const root=household();placePair(root,'resident_3','resident_4');
+  assert.ok(queueAddressedSocial(root,'resident_3','resident_4','talk'));
+  tickHousehold(root,.1);
+  assert.equal(root.additionalSocial?.phase,'using');
+  const command=enqueueAction(root.actionQueues,'resident_4',
+    {type:'object',actionId:'sofa'});
+  assert.ok(command,'a manual peer request remains a queue head');
+  tickHousehold(root,.1);
+  assert.equal(root.additionalSocial,null);
+  assert.equal(root.socialGraph.nextSeq,1);
+  assert.equal(getPair(root.socialGraph,'resident_3','resident_4'),null);
+});
+test('CAS-01.5-social forged save session age, seq and physical presence are rejected',()=>{
+  const root=household();placePair(root,'resident_3','resident_4');
+  queueAddressedSocial(root,'resident_3','resident_4','talk');
+  tickHousehold(root,.1);
+  tickHousehold(root,3);
+  const session=clone(root.additionalSocial);
+  assert.equal(session.phase,'using');
+  assert.equal(restoreAddressedSocial({...session,seq:root.actionQueues.nextSeq},root),null);
+  assert.equal(restoreAddressedSocial({...session,createdAt:root.minutes+1},root),null);
+  const original={...getActor(root,'resident_4').position};
+  getActor(root,'resident_4').position={x:-4,z:-3};
+  assert.equal(restoreAddressedSocial(session,root),null,'no remote conversation restore');
+  getActor(root,'resident_4').position=original;
+  assert.equal(restoreAddressedSocial(session,root)?.seq,session.seq);
+});
+test('CAS-01.5-social a queued invitation preempts only involved automatic tasks',()=>{
+  const root=household();placePair(root,'resident_3','resident_4');
+  const a=getActor(root,'resident_3'),b=getActor(root,'resident_4');
+  a.action={id:'bed',phase:'walking',elapsed:0,automatic:true};
+  b.action={id:'sofa',phase:'walking',elapsed:0,automatic:true};
+  assert.ok(queueAddressedSocial(root,'resident_3','resident_4','talk'));
+  assert.equal(a.action,null);
+  assert.equal(b.action,null);
+  assert.ok(pendingActions(root.actionQueues,'resident_3').length);
+  assert.equal(root.relationship.affinity,50);
+});
