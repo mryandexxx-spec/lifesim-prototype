@@ -5,10 +5,11 @@ import {careerDefinition} from './career-catalog.js';
 import {currentSkillLevel} from './skills-engine.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {seniorRank,seniorTrack,resetSeniorProof} from './career-seniority.js';
+import {savedAdditionalActor} from './resident-activity-runtime.js';
 
 const validTime=n=>Number.isSafeInteger(n)&&n>=0&&n<=5256000000;
 const validCount=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000;
-const residentActor=(root,id)=>id==='mira'?root?.otherSim:root;
+const residentActor=(root,id)=>id==='alex'?root:id==='mira'?root?.otherSim:savedAdditionalActor(root,id);
 const TRACKS=[
   ['city-services',123,
     ['logistics','Маршрутная логистика','Эксперт маршрутной логистики',5,89,null,0,'city-missing','Сложные доставки и точные маршруты'],
@@ -69,7 +70,7 @@ export function restoreCareerSpecialization(raw,careerId,employmentId,level,work
   return cleaned;
 }
 export function specializationReadiness(root,residentId){
-  if(!['alex','mira'].includes(residentId))return null;
+  if(!Object.hasOwn(root?.careerSystem?.byResident||{},residentId))return null;
   const contract=root?.careerSystem?.byResident?.[residentId];
   const career=careerDefinition(contract?.careerId);
   if(!career)return null;
@@ -99,7 +100,7 @@ export function specializationReadiness(root,residentId){
 export function chooseCareerSpecialization(root,residentId,trackId){
   const contract=root?.careerSystem?.byResident?.[residentId];
   const target=specializationDefinition(contract?.careerId,trackId);
-  if(!['alex','mira'].includes(residentId)||!contract||!target)
+  if(!Object.hasOwn(root?.careerSystem?.byResident||{},residentId)||!contract||!target)
     return {ok:false,reason:'Недоступная специализация'};
   if(contract.level<4||contract.level>7)
     return {ok:false,reason:'Выбор открывается после пятой карьерной ступени'};
