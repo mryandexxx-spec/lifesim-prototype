@@ -5,6 +5,7 @@ import {careerVacancies,leaveCareer,describeCareerShift} from './career-job-boar
 import {disciplineStatus} from './career-discipline.js';
 import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
+import {calendarAt} from './calendar-core.js';
 import {careerScheduleAtDay} from './career-rank-schedules.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {professionalGoalsView} from './career-goals.js';
@@ -220,7 +221,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     const epoch=current.shiftSchedule?.effectiveDayIndex;
     if(Number.isSafeInteger(epoch)&&epoch*1440>root.minutes)
       facts.append(element('span','career-phone-muted',
-        'Новый график начнётся с игровой недели '+(Math.floor(epoch/7)+1)+
+        'Новый график вступит в силу '+calendarAt(root.calendar,epoch*1440).iso+
         ' (после сохранённых отпусков и старых смен).'));
     facts.append(element('span',null,'Статус: '+status.label));
     facts.append(element('span',null,'Баланс семьи: '+root.shop.credits+' кр.'));
