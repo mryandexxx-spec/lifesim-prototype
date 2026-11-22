@@ -66,12 +66,13 @@ test('FRIDGE-UX-R2: recipe locks follow actual skill and pantry without fake acc
 
 test('FRIDGE-UX-R2: existing fridge actions, purchases, save rollback and FIFOs are reused',()=>{
   const game=read('src/game.js'),html=read('index.html'),css=read('styles.css');
+  const presenter=read('src/fridge-ui-dom.js');
   for(const id of ['fridge-r2','fridge-r2-eat','fridge-r2-stock','fridge-r2-buy',
      'fridge-r2-meal-list','fridge-r2-stock-list','fridge-r2-ready-list','fridge-r2-staple-list'])
     assert.match(html,new RegExp('id="'+id+'"'),id+' missing');
   assert.match(game,/fridgeViewModel\(/);
   assert.match(game,/renderFridgeR2\(/);
-  assert.match(game,/fridge-r2-meal-list/);
+  assert.match(presenter,/fridge-r2-meal-list/);
   assert.match(game,/fridge-prepared-select/);
   assert.match(game,/fridge-lunch-button/);
   assert.match(game,/fridge-cook-button/);
