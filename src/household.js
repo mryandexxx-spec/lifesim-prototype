@@ -32,6 +32,9 @@ import {strictLegacyActor} from './resident-registry.js';
 import {restorePopulation} from './resident-population.js';
 import {residentIdsForSimulation,savedAdditionalActor,extraReservesFurniture,
   tickAdditionalResidents} from './resident-activity-runtime.js';
+import {reconcileAdditionalSocialGraph,restoreAddressedSocial,
+  dispatchAddressedSocial,tickAddressedSocial,additionalSocialEngaged,
+  cancelAddressedSocial} from './resident-social-runtime.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
@@ -137,6 +140,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.householdBills=newHouseholdBills(state.minutes);
   refreshMind(state,state.world);refreshMind(state.otherSim,state.world);
   state.socialAction=null;
+  state.additionalSocial=null;
   state.phoneCalls=newPhoneCalls();
   state.sportsWorld=newSportsWorld(state);
   state.sportsSharedWatch=newSportsSharedWatch();
@@ -397,12 +401,14 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   root.socialGraph=restoreSocialGraph(raw.socialGraph,HOUSEHOLD_IDS,{
     ids:HOUSEHOLD_IDS,at:root.minutes,views:root.relationship.views
   });
+  reconcileAdditionalSocialGraph(root);
   // Legacy 1.0j and earlier saves had no life-stage registry at all.
   // Only the two known demo adults receive a migration default; an explicit
   // new registry missing/invalid age does not gain unearned adult eligibility.
   if(!raw.socialGraph||!Object.hasOwn(raw.socialGraph,'lifeStages'))
     for(const id of HOUSEHOLD_IDS)setLifeStage(root.socialGraph,id,'adult');
   root.socialAction=loadSocialAction(raw.socialAction,root);
+  root.additionalSocial=restoreAddressedSocial(raw.additionalSocial,root);
   // R2-C optional saved v1 co-watch receipt: after physical social restoration.
   root.sportsSharedWatch=restoreSportsSharedWatch(raw.sportsSharedWatch,root);
   // F4D: reject ambiguous/corrupt saved double-seat reservations before
@@ -708,6 +714,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   // Explicit actions never supersede an ongoing action or interrupt a social.
   // Future manual commands are stored by action-queue.js and dispatched later.
   if (!resident || resident.action || root.socialAction ||
+    additionalSocialEngaged(root,residentId) ||
     (automatic && (root.paused||pendingActions(root.actionQueues,residentId).length)))return false;
   const slot=itemId==='bed'?bedSlotFor(root,residentId,item.instanceId):null;
   const chosen=chooseAction(resident,itemId,automatic);
@@ -780,6 +787,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
  */
 export function preemptAutomaticForManual(root,residentId){
   if(!HOUSEHOLD_IDS.includes(residentId)||!root?.actionQueues)return null;
+  cancelAddressedSocial(root,residentId);
   const resident=getActor(root,residentId);
   const removed={residentId,objectId:null,objectPhase:null,socialInitiator:null};
   if(resident?.action?.automatic===true){
@@ -1290,6 +1298,8 @@ export function tickHousehold(root,minutes) {
   // Both clocks remain identical (including when paused).
   other.minutes=root.minutes;
   tickAdditionalResidents(root,minutes);
+  dispatchAddressedSocial(root);
+  tickAddressedSocial(root,minutes);
   for(const id of HOUSEHOLD_IDS)if(residentAwayAtWork(root,id))
     refreshMind(getActor(root,id),root.world);
   tickSocial(root,minutes);
@@ -1335,7 +1345,8 @@ export function recordResidentPoolStart(root,id){
 }
 export function residentAutonomousChoice(root,id='alex') {
   if(residentUnavailableForHome(root,id))return null;
-  if(root.socialAction||root.phoneCalls?.active||pendingActions(root.actionQueues,id).length)return null;
+  if(root.socialAction||additionalSocialEngaged(root,id)||
+    root.phoneCalls?.active||pendingActions(root.actionQueues,id).length)return null;
   const resident=getActor(root,id);
   if (!root.autonomy.enabled || !resident || root.paused) return null;
   resident.autonomy.enabled=root.autonomy.enabled;

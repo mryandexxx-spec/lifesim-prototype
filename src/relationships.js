@@ -81,7 +81,8 @@ export function relationshipLabel(value) {
   return value<30?'Напряжённо':value<66?'Нейтрально':'Дружески';
 }
 export function canStartSocial(root,kind,initiator,automatic=false) {
-  if(!Object.hasOwn(SOCIAL_ACTIONS,kind)||!validId(initiator)||!root.otherSim||root.socialAction)return false;
+  if(!Object.hasOwn(SOCIAL_ACTIONS,kind)||!validId(initiator)||!root.otherSim||
+    root.socialAction||root.additionalSocial)return false;
   const self=get(root,initiator),partner=get(root,otherId(initiator));
   if(!self||!partner)return false;
   // No social invitation interrupts furniture work, another talk or sleep.
