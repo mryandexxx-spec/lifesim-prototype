@@ -15,7 +15,8 @@ export const CONVERSATION_TOPICS=Object.freeze({
   humor:row('Юмор','У меня для тебя одна забавная история.','games',['humor.joke','humor.story','humor.tease']),
   support:row('Поддержка','Кажется, у тебя сегодня непростой день.','socializing',['support.listen','support.help','support.dismiss']),
   plans:row('Планы','О чём мечтаешь на ближайшие дни?','drawing',['plans.idea','plans.invite','plans.doubt']),
-  conflict:row('Разобраться','Между нами осталось что-то недосказанное.','socializing',['conflict.apologize','conflict.explain','conflict.blame'])
+  conflict:row('Разобраться','Между нами осталось что-то недосказанное.','socializing',['conflict.apologize','conflict.explain','conflict.blame']),
+  sports:row('Обсудить матч','Как тебе последний матч Лиги Блин’С?','games',['sports.result','sports.cheer','sports.debate'])
 });
 export const CONVERSATION_ACTS=Object.freeze({
   'daily.listen':saying('Спросить о настроении','Мне важно знать, как ты себя чувствуешь.','Спасибо, что интересуешься.','Не хочу об этом говорить.','warm',3),
@@ -35,7 +36,10 @@ export const CONVERSATION_ACTS=Object.freeze({
   'plans.doubt':saying('Усомниться в планах','Не думаю, что у тебя это получится.','Посмотрим, как пойдёт.','Почему ты в меня не веришь?','sharp',-3),
   'conflict.apologize':saying('Извиниться','Прости, если я тебя задел(а).','Спасибо, мне важно это услышать.','Пока мне сложно это принять.','warm',4),
   'conflict.explain':saying('Объяснить свою позицию','Хочу спокойно объяснить, почему так вышло.','Хорошо, попробуем понять друг друга.','Я ещё не готов(а) это обсуждать.','neutral',2),
-  'conflict.blame':saying('Обвинить','Всё случилось из-за тебя!','Давай без обвинений.','Я не собираюсь слушать обвинения.','sharp',-5)
+  'conflict.blame':saying('Обвинить','Всё случилось из-за тебя!','Давай без обвинений.','Я не собираюсь слушать обвинения.','sharp',-5),
+  'sports.result':saying('Обсудить матч','Этот матч получился интересным, правда?','Да, было что обсудить.','Я особо не следил(а), но расскажи.','neutral',2),
+  'sports.cheer':saying('Порадоваться победе','Вот это был красивый момент!','Разделяю твой восторг.','Мне этот футбол не слишком интересен.','warm',3),
+  'sports.debate':saying('Поспорить о счёте','Я бы по-другому оценил(а) этот матч.','Интересная точка зрения!','Давай не превращать это в ссору.','sharp',-1)
 });
 export const CONVERSATION_MAX_TURNS=3;
 const isRecord=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
