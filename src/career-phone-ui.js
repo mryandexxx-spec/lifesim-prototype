@@ -24,6 +24,7 @@ import {sportsCrest} from './sports-identity.js';
 import {phoneContactStatus,CALL_DURATION,CALL_COOLDOWN} from './phone-calls.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal} from './ready-food.js';
+import {KITCHEN_RESTOCK_LABELS,quotePantryDelivery} from './kitchen-market.js';
 import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff,
   claimPortableCareerLeave} from './career-timeoff.js';
 import {payHouseholdBill} from './household-bills.js';
@@ -50,6 +51,7 @@ function action(label,callback,kind=''){
 export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,setCareerSystem,
   save,notify,onFundsChanged=()=>{},onOpenChange=()=>{},onIncidentChanged=()=>{},
    onBuyReadyMeal=()=>({ok:false,reason:'unavailable'}),
+  onBuyPantryDelivery=()=>({ok:false,reason:'unavailable'}),
   onStartCall=()=>({ok:false,reason:'unavailable'}),
   onCancelCall=()=>({ok:false,reason:'unavailable'}),
   onSelectSportsClub=()=>({ok:false,reason:'unavailable'}),
@@ -1053,8 +1055,53 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
    * This view reads only the canonical kitchen and shared wallet.
    */
   function renderReadyFood(root){
-    top('🛵 '+NAMES[who]+' · ДОСТАВКА ГОТОВОЙ ЕДЫ');
-    body.append(element('h2','career-phone-section-title','Заказать обед'));
+    top('🛒 '+NAMES[who]+' · БЛИН’СТАВКА · МАРКЕТПЛЕЙС');
+    body.append(element('h2','career-phone-section-title','Продукты с доставкой'));
+    body.append(element('p','career-phone-muted',
+      'Продукты поступают в общий холодильник через 18 игровых минут. '+
+      'Стоимость списывается только после подтверждения заказа.'));
+    const groceryPending=root.kitchen.pantryDeliveries||[];
+    if(groceryPending.length){
+      const orders=element('section','career-phone-facts');
+      orders.append(element('strong',null,'Продукты в пути · '+groceryPending.length));
+      for(const order of groceryPending){
+        orders.append(element('span',null,
+          (KITCHEN_RESTOCK_LABELS[order.ingredientId]||'Продукты')+
+          ' · '+order.units+' шт. · осталось '+
+          Math.max(0,Math.ceil(order.dueAt-root.minutes))+' игровых мин.'));
+      }
+      body.append(orders);
+    }
+    const groceries=element('div','career-phone-list');
+    for(const id of Object.keys(KITCHEN_RESTOCK_LABELS)){
+      const q=quotePantryDelivery(root,id);
+      const item=element('article','career-phone-card');
+      const pack=q.ok?q:null;
+      item.append(element('strong',null,KITCHEN_RESTOCK_LABELS[id]));
+      item.append(element('small',null,'В наличии: '+root.kitchen.pantry[id]+
+        '/30 · упаковка: '+(pack?.units|| (id==='meat'||id==='chicken'?3:5))+' шт.'));
+      const reason={'insufficient-credits':'Недостаточно средств',
+        'pantry-full':'Холодильник заполнен','missing-fridge':'Нет холодильника',
+        'delivery-limit':'Слишком много заказов'};
+      const buy=action(q.ok?'🛒 Заказать · '+q.price+' кр.':
+        (reason[q.reason]||'Заказ недоступен'),()=>{
+          const live=personRoot();if(!live)return;
+          const fresh=quotePantryDelivery(live,id);
+          if(!fresh.ok){notify('Условия заказа изменились');render();return;}
+          if(!window.confirm('Заказать «'+fresh.label+'» · '+fresh.units+
+            ' шт. за '+fresh.price+' кр.? Доставка через 18 игровых минут.'))return;
+          const result=onBuyPantryDelivery(id,who);
+          if(!result.ok){notify(result.reason==='save-failed'?
+            'Не удалось сохранить заказ · списания нет':'Заказ не оплачен');render();return;}
+          notify('🛒 Заказ оформлен · '+result.price+' кр. · 18 игровых минут');
+          render();
+        },'career-phone-primary');
+      buy.disabled=!q.ok;
+      item.append(buy);groceries.append(item);
+    }
+    body.append(groceries);
+    body.append(element('h2','career-phone-section-title','Готовые блюда'));
+
     body.append(element('p','career-phone-muted',
       'Семья: '+root.shop.credits+' кр. · В холодильнике: '+
       root.kitchen.prepared.reduce((n,x)=>n+x.portions,0)+
