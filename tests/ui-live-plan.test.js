@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {workPresenceView} from '../src/work-presence-ui.js';
 import {planPreview} from '../src/plan-preview.js';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const html=read('../index.html'),css=read('../styles.css'),gameSrc=read('../src/game.js');
@@ -15,7 +16,7 @@ test('1.0t mini-plan is a keyboard-usable, button-based accessible opener',()=>{
 });
 test('1.0t preview does not bypass existing social/physiological FIFO queue contract',()=>{
   assert.match(gameSrc,/pending:pendingActions\(game.actionQueues,residentId\)/);
-  assert.match(gameSrc,/activeLabel:active/);
+  assert.match(gameSrc,/activeLabel:workView\.statusOverride\|\|active/);
   assert.match(gameSrc,/needsReply:dialogueNeedsDecision\(game\)/);
   assert.match(gameSrc,/paused:game.paused/);
   assert.match(gameSrc,/const key=JSON.stringify\(\[residentId,plan.heading,plan.upcoming,plan.more,queueVisible\]\)/);
@@ -51,6 +52,7 @@ test('live preview re-renders across residents and opens existing queue without 
     selectedName:()=>game.selectedSim,activeTaskLabel:()=>null,
     pendingActions:(qs,id)=>qs[id],
     taskLabel:task=>task.actionId,
+    workPresenceView,residentWorkPhase:()=>null,residentWorkStatus:()=>null,
     planPreview,planButtonLabel:count=>'План · '+count,
     planTaskIcon:()=> '•',
     dialogueNeedsDecision:()=>false,
