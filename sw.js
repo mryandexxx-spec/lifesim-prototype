@@ -2,7 +2,7 @@
  * Bump CACHE_VERSION whenever a GLB is replaced at the same URL.
  * This is an optimization, not an offline guarantee for the full game.
  */
-const CACHE_VERSION='blins-models-v4-room-meshy-batch03';
+const CACHE_VERSION='blins-models-v5-articulated-room';
 const CACHE_PREFIX='blins-models-';
 const MODEL_FILES=new Set([
   'assets/characters/meshy-casual-v1.glb',

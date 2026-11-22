@@ -95,48 +95,53 @@ export function createPoolVisual({pc,app,mat,box,lotGround}){
     for(const n of nodes.splice(0))n.destroy();
     for(const mesh of meshes.splice(0))mesh.destroy();
   };
-  const fixtureBox=(name,x,y,z,sx,sy,sz,m)=>{
-    const node=box(name,x,y,z,sx,sy,sz,m);
-    nodes.push(node);
-    return node;
-  };
-  const fixtureVisual=f=>{
+  let previewRoot=null;
+  const fixtureRoots=new Map();
+  function drawFixture(f){
     const p=poolFixtureVisualPose(f);
-    if(!p)return;
-    const at=(along,inward,height)=>({
-      x:p.x+p.tx*along+p.dx*inward,
-      z:p.z+p.tz*along+p.dz*inward,y:GROUND_Y+height});
-    const add=(label,along,inward,height,sx,sy,sz,color)=>{
-      const v=at(along,inward,height);
-      return fixtureBox('LOT-D1c '+f.fixtureId+' '+label,v.x,v.y,v.z,
-        sx,sy,sz,material[color]);
-    };
-    const widthAxisX=Math.abs(p.tx)>.5;
-    const bar=(label,along,inward,height,width,thickness,color)=>
-      add(label,along,inward,height,
-        widthAxisX?width:thickness,thickness,widthAxisX?thickness:width,color);
+    if(!p)return null;
+    const root=new pc.Entity(f.fixtureId+' '+f.kind);
+    app.root.addChild(root);
+    root.setPosition(p.x,GROUND_Y,p.z);
+    root.setEulerAngles(0,Math.atan2(p.dx,p.dz)*180/Math.PI,0);
+    // Local +Z always enters the water, local Z=0 is the actual wall.
+    const part=(name,x,y,z,w,h,d,color)=>box(name,x,y,z,w,h,d,material[color],root);
     if(f.kind==='ladder'){
-      for(const side of [-.18,.18]){
-        add('rail',side,0,.30,.065,.72,.065,'steel');
-        add('handle',side,.12,.68,.075,.14,.075,'steel');
+      for(const x of [-.18,.18]){
+        part('deck socket',x,.015,-.102,.105,.04,.105,'steel');
+        part('deck rail',x,.25,-.102,.055,.50,.055,'steel');
+        part('grip',x,.49,.025,.055,.055,.31,'steel');
+        part('wet rail',x,-.15,.15,.055,1.32,.055,'steel');
       }
-      for(let i=0;i<4;i++)bar('rung',0,.02,-.02+i*.15,.38,.055,'steel');
+      for(let i=0;i<5;i++)part('rung',0,.12-i*.20,.15,.37,.045,.06,'steel');
     }else if(f.kind==='steps'){
-      for(let i=0;i<3;i++)
-        bar('entry step',0,.12+i*.18,-.22+i*.115,.46,.14,'stone');
+      for(let i=0;i<3;i++){
+        const top=-.04-i*.19,height=top+1.2;
+        part('tread',0,-1.2+height/2,.09+i*.20,.47,height,.206,'stone');
+      }
     }else if(f.kind==='board'){
-      add('board pillar',0,-.20,.23,.22,.55,.22,'stone');
-      bar('low launch board',0,.14,.55,.52,.085,'board');
-      bar('board lip',0,.46,.55,.52,.055,'steel');
+      part('anchored base',0,.035,-.18,.40,.07,.43,'stone');
+      part('support',0,.22,-.18,.24,.39,.27,'steel');
+      part('launch board',0,.435,.12,.46,.085,.94,'board');
+      part('board lip',0,.435,.585,.46,.085,.024,'steel');
     }
-  };
+    return root;
+  }
+  function previewFixture(f=null){
+    previewRoot?.destroy();previewRoot=null;
+    for(const node of fixtureRoots.values())node.enabled=true;
+    if(!f)return;
+    const previous=fixtureRoots.get(f.fixtureId);
+    if(previous)previous.enabled=false;
+    previewRoot=drawFixture(f);
+  }
   return {
     sync(outdoors,force=false){
       const key=JSON.stringify({
         pools:outdoors?.pools||[],fixtures:outdoors?.poolFixtures||[]});
       if(!force&&signature===key)return;
       signature=key;
-      clear();
+      previewFixture();fixtureRoots.clear();clear();
       const geometry=buildPoolVisualGeometry(outdoors);
       lotGround.enabled=!geometry.active;
       if(!geometry.active)return;
@@ -150,9 +155,13 @@ export function createPoolVisual({pc,app,mat,box,lotGround}){
           new pc.MeshInstance(mesh,material[kind])]});
         app.root.addChild(node);nodes.push(node);meshes.push(mesh);
       }
-      for(const fixture of outdoors?.poolFixtures||[])fixtureVisual(fixture);
+      for(const fixture of outdoors?.poolFixtures||[]){
+        const node=drawFixture(fixture);
+        if(node){nodes.push(node);fixtureRoots.set(fixture.fixtureId,node);}
+      }
     },
-    dispose(){clear();signature=null;lotGround.enabled=true;},
+    previewFixture,
+    dispose(){previewFixture();fixtureRoots.clear();clear();signature=null;lotGround.enabled=true;},
     stats:()=>({nodeCount:nodes.length,meshCount:meshes.length,
       hasPool:!lotGround.enabled})
   };

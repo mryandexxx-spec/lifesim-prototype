@@ -36,6 +36,7 @@ export function createMeshyMusicController({pc,model}={}){
   }
   return Object.freeze({
     ready:true,
+    get motion(){return current;},
     setFrame(frame,freeze=false){
       current=musicMovementFrame(frame);
       paused=Boolean(freeze);

@@ -49,7 +49,7 @@ export function createMeshyFridgeController({
   const front=new pc.Vec3(0,0,.135),poleDirection=new pc.Vec3(.36,-.12,.32);
   const frontWorld=new pc.Vec3(),poleWorld=new pc.Vec3();
   const xyz=v=>({x:v.x,y:v.y,z:v.z});
-  let frame=null;
+  let frame=null,paused=false;
 
   function rotateToward(bone,oldEnd,newEnd,weight,maxAngle){
     const origin=bone.getPosition();
@@ -68,6 +68,7 @@ export function createMeshyFridgeController({
   }
 
   function apply(){
+    if(paused)return false;
     const pose=meshyFridgePose(frame);
     food.enabled=Boolean(pose?.food>.012);
     if(food.enabled){
@@ -86,6 +87,12 @@ export function createMeshyFridgeController({
     const current=layoutNow();
     if(!current?.handle||!current?.shelfTarget)return false;
     const handle={x:current.handle.x,y:current.handleY,z:current.handle.z};
+    if(current.hinge&&frame.doorOpen){
+      const angle=current.doorAngle*frame.doorOpen*Math.PI/180;
+      const dx=handle.x-current.hinge.x,dz=handle.z-current.hinge.z;
+      handle.x=current.hinge.x+dx*Math.cos(angle)+dz*Math.sin(angle);
+      handle.z=current.hinge.z-dx*Math.sin(angle)+dz*Math.cos(angle);
+    }
     const shelf=current.shelfTarget;
     const total=pose.handle+pose.shelf+pose.mouth;
     const target={x:0,y:0,z:0};
@@ -116,5 +123,5 @@ export function createMeshyFridgeController({
     rotateToward(forearm,xyz(hand.getPosition()),solved.ankle,strength,115);
     return true;
   }
-  return {ready:true,food,setFrame(value){frame=value;},apply};
+  return {ready:true,food,setFrame(value,freeze=false){frame=value;paused=freeze;if(!frame)food.enabled=false;},apply};
 }

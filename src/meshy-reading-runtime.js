@@ -60,6 +60,8 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
   const leftPage=piece('left story pages',-.115,-.010,0,.22,.020,.267,paper);
   const rightPage=piece('right story pages',.115,-.010,0,.22,.020,.267,paper);
   const openSpine=piece('open book spine',0,0,0,.018,.027,.274,ink);
+  const leaf=piece('turning leaf',0,.009,0,.216,.005,.261,paper);
+  const pageTarget=new pc.Vec3(),forward=new pc.Vec3(0,0,1);
   const closedBook=new pc.Entity('closed hardcover');
   book.addChild(closedBook);
   function closedPiece(name,x,y,z,w,h,d,mat){
@@ -105,9 +107,16 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     openSpine.enabled=spreadVisible;
     leftPage.enabled=spreadVisible;
     rightPage.enabled=spreadVisible;
+    const turn=stage==='reading'?clamp01(((current?.elapsed||0)%7-5.4)):0;
+    leaf.enabled=spreadVisible&&turn>0&&turn<1;
+    if(leaf.enabled){
+      const angle=Math.PI*turn;
+      leaf.setLocalPosition(-.108*Math.cos(angle),.009+.108*Math.sin(angle),0);
+      leaf.setLocalEulerAngles(0,0,-turn*180);
+    }
     if(spreadVisible){
-      leftPage.setLocalEulerAngles(0,(1-open)*60,0);
-      rightPage.setLocalEulerAngles(0,(open-1)*60,0);
+      leftPage.setLocalEulerAngles(0,0,-(1-open)*65);
+      rightPage.setLocalEulerAngles(0,0,(1-open)*65);
     }
     if(stage==='taking'||stage==='returning'){
       const progress=Math.min(1,Math.max(0,stepElapsed/2.4));
@@ -139,6 +148,8 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     const stage=current?.stage||'reading';
     if(stage==='reading'&&intent.weight<.005)return false;
     const open=bookPose(stage,current?.stepElapsed||0);
+    avatar.getWorldTransform().transformVector(forward,point);
+    const yaw=Math.atan2(point.x,point.z)*180/Math.PI;
     if(!open){
       // PlayCanvas child book node uses world placement so it follows the
       // animated Mixamo hand without needing a second skeleton attachment.
@@ -147,7 +158,7 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
       book.setPosition(atHand.x,atHand.y,atHand.z);
       // Rotate the compact closed volume like a book held by its spine,
       // rather than the flat double-width spread visible in the screenshot.
-      book.setEulerAngles(67,-12,18);
+      book.setEulerAngles(67,yaw-12,18);
       return true;
     }
     if(hips?.getPosition){
@@ -157,7 +168,7 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
       avatar.getWorldTransform().transformVector(lapLocal,lapOffset);
       book.setPosition(hip.x+lapOffset.x,hip.y+lapOffset.y,
         hip.z+lapOffset.z);
-      book.setEulerAngles(-19,0,0);
+      book.setEulerAngles(-19,yaw,0);
     }else{
       // Rig fallback for future skeletons without an audited hips bone.
       book.setLocalPosition(0,.72,.33);
@@ -167,9 +178,9 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     for(let index=0;index<arms.length;index++){
       const arm=arms[index],shoulder=xyz(arm.upper.getPosition()),
         elbow=xyz(arm.fore.getPosition()),wrist=xyz(arm.hand.getPosition());
-      const x=arm.sign*.17-(index===1?intent.pageTurn*.045:0);
+      const x=arm.sign*.17+(index===1?intent.pageTurn*.22:0);
       book.getWorldTransform().transformPoint(
-        new pc.Vec3(x,.025,.025+(index===1?intent.pageTurn*.035:0)),point);
+        pageTarget.set(x,.025+(index===1?intent.pageTurn*.11:0),.025),point);
       poleDirection.set(arm.sign*.42,-.14,.18);
       avatar.getWorldTransform().transformVector(poleDirection,poleWorld);
       const upperLength=Math.hypot(elbow.x-shoulder.x,elbow.y-shoulder.y,elbow.z-shoulder.z);
@@ -188,7 +199,8 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
         solved.ankle,Math.max(.35,intent.weight)*.88,105)||moved;
     }
     if(neck?.getLocalRotation&&neck?.setLocalRotation){
-      neckTilt.setFromEulerAngles(7*Math.max(.35,intent.weight),0,0);
+      neckTilt.setFromEulerAngles(9*Math.max(.35,intent.weight),
+        3*Math.sin(current.elapsed*1.25),-1.2*intent.pageTurn);
       neckPose.mul2(neck.getLocalRotation(),neckTilt);
       neck.setLocalRotation(neckPose);
       moved=true;

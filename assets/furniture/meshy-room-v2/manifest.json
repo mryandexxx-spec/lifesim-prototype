@@ -320,9 +320,9 @@
       "game_mapping": "fixture.fridge",
       "label": "Холодильник",
       "file": "assets/furniture/meshy-room-v2/cream_fridge.glb",
-      "bytes": 364536,
+      "bytes": 364804,
       "source_bytes": 2409184,
-      "sha256": "fced20e5da46f3a33921f49fce538a3f531fe8432a5436134e78fec828cddc1b",
+      "sha256": "fbf7a6a61a7f052cb6c2f86ef59d33cda64abde668cc05ecf5282826ba96e553",
       "bounds": {
         "min": [
           -0.2443310022354126,
@@ -437,9 +437,9 @@
       "game_mapping": "fixture.shower",
       "label": "Душевая кабина",
       "file": "assets/furniture/meshy-room-v2/glass_shower.glb",
-      "bytes": 338512,
+      "bytes": 338788,
       "source_bytes": 2965384,
-      "sha256": "3a021c5c09d33eea2b9797ddd7598a685b583400219cc7658dad0d1504c37736",
+      "sha256": "24c3194c3591e1716bf6e58942428307b38867c619b4abc1718e03607a624aec",
       "bounds": {
         "min": [
           -0.39469900727272034,
@@ -476,9 +476,9 @@
       "game_mapping": "fixture.toilet",
       "label": "Унитаз",
       "file": "assets/furniture/meshy-room-v2/bathroom_toilet.glb",
-      "bytes": 417580,
+      "bytes": 417856,
       "source_bytes": 2489416,
-      "sha256": "989e9667b05a2d93e8d7a2e488a74cea3eb959d66884a5a565ba0ac2c4a0254d",
+      "sha256": "8576b4beeed6a03f1dde40a100f83d5f377e599a4abc2f03b7a2287e6c1a1b69",
       "bounds": {
         "min": [
           -0.30748099088668823,

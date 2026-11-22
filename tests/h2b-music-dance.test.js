@@ -97,6 +97,22 @@ test('both listen and dance dispatch from typed queue through real A* and keep s
     assert.equal(loaded.activitySession?.activityId,activityId);
   }
 });
+test('Mira resumes a dance saved on arrival before the first activity tick',()=>{
+  const root=newHousehold();
+  const id=station(root);
+  const actor=getUsing(root,id,MUSIC_DANCE_ACTIVITY_ID,'mira');
+  assert.equal(actor.activitySession.phase,'walking');
+  const saved=copy(root);
+  const restored=loadHousehold(saved).otherSim;
+  assert.equal(restored.action.activityId,MUSIC_DANCE_ACTIVITY_ID);
+  assert.equal(restored.activitySession.phase,'using');
+  assert.equal(restored.activitySession.elapsed,0);
+  assert.equal(restored.activitySession.awardedMinutes,0);
+  const away=copy(root);
+  away.otherSim.position={x:-3,z:-3};
+  assert.equal(loadHousehold(away).otherSim.action,null);
+});
+
 test('dancing earns faster fun and expends a small extra energy amount vs listening',()=>{
   const l=newHousehold(),d=newHousehold(),lid=station(l),did=station(d);
   const listener=getUsing(l,lid,MUSIC_ACTIVITY_ID);

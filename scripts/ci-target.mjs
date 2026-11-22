@@ -8,7 +8,7 @@ const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
 const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
 const isUI=f=>/^(?:index\.html|styles\.css|sw\.js|assets\/)/.test(f)||
-  /^src\/(?:game\.js|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
+  /^src\/(?:game\.js|outdoor-character-motion|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
   /^tests\/.*browser.*\.mjs$/.test(f);
 const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
 
@@ -91,8 +91,9 @@ function main(){
   }
   console.log('Browser smoke:',plan.browser?'required':'not needed');
   console.log('LOT-E5 four-viewport deep check:',plan.e5?'required':'not needed');
+  const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
-    'browser='+(plan.browser?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n');
+    'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n');
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main();

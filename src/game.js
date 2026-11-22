@@ -1,3 +1,4 @@
+import {wateringFrame} from './outdoor-character-motion.js';
 import * as pc from 'playcanvas';
 import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
 import {pickWorldRayTarget} from './world-interactions.js';
@@ -38,7 +39,7 @@ import {canBeginPoolSwim,beginPoolSwim,arrivePoolApproach,
 import {poolSwimVisualFrame} from './pool-swim-visual.js';
 import {poolActionStatus,poolActivityLabel,poolWishCommand} from './pool-touch-policy.js';
 import {POOL_FIXTURE_PRICES,poolHasExit} from './pool-equipment.js';
-import {previewPoolTiles,previewPoolFixture,previewPoolHistory,
+import {previewPoolTiles,previewPoolFixture,previewRotatedPoolFixture,previewPoolHistory,
   poolEditorSnapshot,commitPoolPreviewPersisted} from './pool-editor.js';
 import {createPoolVisual,poolFixtureVisualPose} from './pool-visual.js';
 import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
@@ -6288,6 +6289,10 @@ function boot() {
   const poolTool=()=>$('pool-tool').value;
   const poolFixtureOperation=()=>$('pool-fixture-operation').value;
   const poolFixtureOwned=()=>$('pool-fixture-owned').value;
+  const selectedPoolFixture=()=>(game.world.outdoors.poolFixtures||[])
+    .find(f=>f.fixtureId===poolFixtureOwned());
+  const pendingPoolFixture=()=>outdoorPending?.outdoors?.poolFixtures?.find(f=>
+    f.edgeCell===outdoorPending.intent?.edgeCell&&f.side===outdoorPending.intent?.side);
   const syncPoolOwned=()=>{
     const chosen=poolFixtureOwned();
     const options=(game.world.outdoors?.poolFixtures||[]).map(f=>{
@@ -6405,6 +6410,8 @@ function boot() {
     $('pool-controls').hidden=!poolMode();
     $('pool-fixture-controls').hidden=!poolMode()||
       ['paint','erase'].includes(poolTool());
+    $('pool-fixture-rotate').disabled=poolFixtureOperation()==='fixture-remove'||
+      !(pendingPoolFixture()||(poolFixtureOperation()==='fixture-move'&&selectedPoolFixture()));
     $('pool-fixture-owned-label').hidden=!poolMode()||
       poolFixtureOperation()==='fixture-add';
     $('outdoor-feature-controls').hidden=outdoorCategory==='ground'||poolMode();
@@ -6424,6 +6431,7 @@ function boot() {
       :'✓ Купить и применить';
   };
   const clearOutdoorPending=(quiet=false)=>{
+    poolVisual.previewFixture();
     outdoorDrag=null;outdoorPending=null;outdoorPaintGhost.enabled=false;outdoorPose=null;
     if(!quiet)outdoorFeedback(poolMode()
       ?'Вода: коснись и протяни прямоугольник. Оборудование: коснись бортика.'
@@ -6468,6 +6476,7 @@ function boot() {
   };
   const poolPreview=(proposal,description)=>{
     outdoorPending=proposal.ok?{...proposal,pool:true}:null;
+    poolVisual.previewFixture(pendingPoolFixture());
     if(proposal.ok)outdoorFeedback(description+' · площадь '+
       proposal.areaSquareMetres+' м² · чаш '+proposal.basins+
       ' · '+(proposal.cost<0?'возврат '+(-proposal.cost):'стоимость '+proposal.cost)+
@@ -6499,7 +6508,7 @@ function boot() {
     const edge=operation==='fixture-remove'?null:nearestPoolEdge(point);
     const proposal=operation==='fixture-remove'
       ?previewPoolFixture(game,{operation,fixtureId:chosen?.fixtureId})
-      :previewPoolFixture(game,{operation,kind,
+      :previewPoolFixture(game,{operation,kind:operation==='fixture-move'?chosen?.kind:kind,
         edgeCell:edge?.cell,side:edge?.side,fixtureId:chosen?.fixtureId});
     poolPreview(proposal,operation==='fixture-remove'?'Продажа оборудования':
       operation==='fixture-move'?'Перемещение оборудования':
@@ -6614,6 +6623,13 @@ function boot() {
   $('outdoor-ground-kind').addEventListener('change',()=>clearOutdoorPending());
   $('pool-tool').addEventListener('change',()=>{
     $('pool-fixture-operation').value='fixture-add';clearOutdoorPending();
+  });
+  $('pool-fixture-rotate').addEventListener('click',()=>{
+    const fixture=pendingPoolFixture()||selectedPoolFixture();
+    if(!fixture)return;
+    const proposal=previewRotatedPoolFixture(game,fixture,poolFixtureOperation());
+    if(proposal.ok)poolPreview(proposal,'Поворот к соседнему борту');
+    else outdoorFeedback(outdoorReason[proposal.reason]||proposal.reason,true);
   });
   $('pool-fixture-operation').addEventListener('change',()=>{
     clearOutdoorPending();
@@ -7897,6 +7913,7 @@ function boot() {
       ?{...pairedTv.places.alex,y:0,pitch:0,
         yaw:furniturePose(game.world,'tv',TV_WATCH_POSE,pairedTv.tvId)?.yaw||0}:null;
     const alexSwimFrame=poolSwimVisualFrame(game.world,game.action);
+    const alexWater=wateringFrame(game.world,game);
     const pose=pairedTvStand||(useId&&!pairedHobby&&!seating&&useId!=='sofa'&&useId!=='bed'&&useId!=='shower'&&useId!=='toilet'&&useId!=='swim'
       ?(useId==='paint'
         ?easelPaintingPose(game.world,game.action?.targetInstanceId,game.position)
@@ -7912,7 +7929,7 @@ function boot() {
       y:pose?pose.y:animationStates.alex.walkBob+lotActorHeight(game.world,game.position),
       z:pose?pose.z:pairTargets?.a.z??game.position.z,
       pitch:pose?pose.pitch:0,
-      yaw:pose?pose.yaw:socialUsing
+      yaw:alexWater?alexWater.yaw:pose?pose.yaw:socialUsing
         ? Math.atan2(game.otherSim.position.x-game.position.x,
           game.otherSim.position.z-game.position.z)*180/Math.PI:facing
     };
@@ -7944,6 +7961,7 @@ function boot() {
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
+      watering:alexWater,
       swimStage:alexSwimFrame?.stage||game.action?.stage,
       swimStroke:alexSwimFrame?.stroke||0,
       musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
@@ -8089,12 +8107,13 @@ function boot() {
               ?game.otherSim.action.prepInstanceId:game.otherSim.action?.targetInstanceId)):null);
     const previousMiraXZ={x:miraDisplay.x,z:miraDisplay.z};
     const miraSwimFrame=poolSwimVisualFrame(game.world,game.otherSim.action);
+    const miraWater=wateringFrame(game.world,game.otherSim);
     const miraDesired=miraToilet?miraToilet.pose:miraShower?miraShower.pose:miraBedding?miraBedPose:miraSeating?miraSeatPose:miraSwimFrame||{
       x:miraPose?miraPose.x:pairTargets?.b.x??game.otherSim.position.x,
       y:miraPose?miraPose.y:animationStates.mira.walkBob+lotActorHeight(game.world,game.otherSim.position),
       z:miraPose?miraPose.z:pairTargets?.b.z??game.otherSim.position.z,
       pitch:miraPose?miraPose.pitch:0,
-      yaw:miraPose?miraPose.yaw:socialUsing
+      yaw:miraWater?miraWater.yaw:miraPose?miraPose.yaw:socialUsing
         ? Math.atan2(game.position.x-game.otherSim.position.x,
           game.position.z-game.otherSim.position.z)*180/Math.PI:miraFacing
     };
@@ -8122,6 +8141,7 @@ function boot() {
     animationStates.mira=stepAnimation(animationStates.mira,{
       id:'mira',walking:(miraWalking||Boolean(miraShower?.stepWeight>.015))&&!miraSeating&&!miraBedding,
       using:miraToilet?'toilet':miraShower?'shower':miraUseId,
+      watering:miraWater,
       swimStage:miraSwimFrame?.stage||game.otherSim.action?.stage,
       swimStroke:miraSwimFrame?.stroke||0,
       musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
@@ -8183,9 +8203,10 @@ function boot() {
       social:socialUsing&&!pairedTv&&!pairedHobby?game.socialAction.kind:null,
       hugFrame,kissFrame:kissMiraFrame,
       actionId:(miraUseId==='seat'||miraUseId==='bench'||miraDining)?'sofa':miraUseId,
+      outdoorFrame:miraWater||miraSwimFrame,
       readingStage:pairedBooks?'reading':miraReadingStage,
       readingStepElapsed:game.otherSim.action?.readingStepElapsed??0,
-      readingElapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
+      readingElapsed:pairedBooks?game.socialAction.elapsed:game.otherSim.action?.id==='hobby'?game.otherSim.action.elapsed:null,
       musicFrame:game.otherSim.action?.id==='music'?{
         phase:game.otherSim.action.phase,
         activityId:game.otherSim.action.activityId,
@@ -8236,9 +8257,10 @@ function boot() {
       socialElapsed:socialUsing?game.socialAction.elapsed:null,
       hugFrame,kissFrame:kissAlexFrame,
       actionId:(useId==='seat'||useId==='bench'||alexDining)?'sofa':useId,
+      outdoorFrame:alexWater||alexSwimFrame,
       readingStage:pairedBooks?'reading':alexReadingStage,
       readingStepElapsed:game.action?.readingStepElapsed??0,
-      readingElapsed:game.action?.id==='hobby'?game.action.elapsed:null,
+      readingElapsed:pairedBooks?game.socialAction.elapsed:game.action?.id==='hobby'?game.action.elapsed:null,
       musicFrame:game.action?.id==='music'?{
         phase:game.action.phase,activityId:game.action.activityId,
         contentId:game.action.contentId,elapsed:game.action.elapsed
@@ -8579,9 +8601,14 @@ function boot() {
     }
     const activeFridge=alexFridge||miraFridge;
     fridgeOpen=activeFridge?activeFridge.doorOpen:closeFridgeDoor(fridgeOpen,frameAnimDt);
-    meshyFurniture.useProcedural(decorNodes.get('home-fridge-1'),Boolean(activeFridge)||fridgeOpen>.001);
-    meshyFurniture.useProcedural(decorNodes.get('home-shower-1'),Boolean(alexShower||miraShower));
-    meshyFurniture.useProcedural(decorNodes.get('home-toilet-1'),Boolean(alexToilet||miraToilet));
+    meshyFurniture.setFixtureMotion(decorNodes.get('home-fridge-1'),fridgeOpen);
+    const shower=alexShower||miraShower;
+    const leaving=alexShower?useId!=='shower':miraUseId!=='shower';
+    const door=shower?(leaving?Math.sin(Math.PI*shower.progress):
+      Math.min(1,shower.progress/.05,Math.max(0,(.28-shower.progress)/.06))):0;
+    meshyFurniture.setFixtureMotion(decorNodes.get('home-shower-1'),door);
+    meshyFurniture.setFixtureMotion(decorNodes.get('home-toilet-1'),
+      (alexToilet||miraToilet)?.flush?1:0);
     fridgeHinge.setLocalEulerAngles(0,FRIDGE_LAYOUT.doorAngle*fridgeOpen,0);
     const shelfFood=activeFridge?.shelfFood||0;
     fridgeFood.enabled=shelfFood>.012;

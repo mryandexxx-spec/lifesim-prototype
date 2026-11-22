@@ -34,13 +34,16 @@ export function musicMovementFrame(frame=null){
   };
   // Distinct full-body loop: contra-lateral steps, elbows/raised hands,
   // weight transfer and visible chest twist. No displacement of A* root.
+  const transfer=Math.tanh(1.2*sin);
+  const rebound=Math.cos(2*phase-.45);
+  const shoulder=Math.sin(phase-.32),swing=Math.sin(phase-.62);
   return {
-    kind:'dance',arms:[-31-23*sin,-31+23*sin],
-    elbows:[-26-13*cos,-26+13*cos],
-    legs:[16*sin,-16*sin],knees:[7+14*Math.max(0,cos),7+14*Math.max(0,-cos)],
-    torsoRoll:8.5*sin,pelvisRoll:6*sin,
-    spineLean:5+5*cos,spineTwist:13*sin,spineRoll:7.5*sin,
-    hipShift:.038*sin,bodyLift:.018*Math.abs(sin),
-    headPitch:5+7*cos,headRoll:5*sin
+    kind:'dance',arms:[-23-19*swing,-29+16*swing],
+    elbows:[-31-11*shoulder,-25+15*shoulder],
+    legs:[12*transfer,-12*transfer],knees:[6+13*Math.max(0,transfer),6+13*Math.max(0,-transfer)],
+    torsoRoll:-3.7*shoulder,pelvisRoll:5.8*transfer,
+    spineLean:3+2*rebound,spineTwist:14*shoulder,spineRoll:-2.8*shoulder,
+    hipShift:.058*transfer,bodyLift:-.016*(1+rebound),
+    headPitch:3+2*rebound,headRoll:1.8*swing
   };
 }
