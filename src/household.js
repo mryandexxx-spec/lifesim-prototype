@@ -29,6 +29,7 @@ import {newSportsSharedWatch,restoreSportsSharedWatch,observeSharedSportsWatch} 
 import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychology.js';
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {strictLegacyActor} from './resident-registry.js';
+import {restorePopulation} from './resident-population.js';
 import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
@@ -146,7 +147,12 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
 /** Do not change save key or version: parse and sanitize each resident using v1 loader. */
 export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   if (!raw || raw.version!==1) return newHousehold(suggestedDate);
+  // Validate optional population BEFORE any legacy restoration. A damaged
+  // extension is an error, never a silently truncated two-person save.
+  const population=Object.prototype.hasOwnProperty.call(raw,'population')
+    ?restorePopulation(raw.population):null;
   const root=loadGame(raw,DEMO_PROFILES.first);
+  if(population)root.population=population;
   // Missing old v1 calendar: align the SUGGESTED date to the current game day.
   // This adds one optional field without touching minutes, money, people or possessions.
   root.calendar={...restoreCalendar(raw.calendar,root.minutes,suggestedDate),
