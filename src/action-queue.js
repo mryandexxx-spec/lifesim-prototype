@@ -196,6 +196,21 @@ export function parkQueuedHead(queues,residentId,seq,reason,at=0){
     blockedAt:Number.isFinite(at)&&at>=0?Math.min(at,1000000000):0});
   return true;
 }
+/** Rescue of an already accepted active manual invitation when its future
+ * FIFO is full. This keeps the plan in the saved review tray and releases the
+ * shared social lock without erasing or jumping ahead of existing entries.
+ */
+export function parkInterruptedAction(queues,residentId,request,reason,at=0){
+  const parked=blockedActions(queues,residentId),persons=Object.keys(queues?.byResident||{});
+  if(!Array.isArray(parked)||parked.length>=MAX_BLOCKED_QUEUE||
+    !count(queues?.nextSeq)||!BLOCKED_REASONS.includes(reason))return null;
+  const command=sanitizeQueueCommand(residentId,request,persons);
+  if(!command)return null;
+  const task={seq:queues.nextSeq++,...command,blockedReason:reason,
+    blockedAt:Number.isFinite(at)&&at>=0?Math.min(at,1000000000):0};
+  parked.push(task);
+  return task;
+}
 /** Explicit user retry only: re-enter at FIFO tail with a fresh unique seq. */
 export function retryBlockedAction(queues,residentId,seq,at=0){
   const parked=blockedActions(queues,residentId),active=pendingActions(queues,residentId);
