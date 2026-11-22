@@ -27,6 +27,7 @@ test('R2-C only real two-place, consenting and current-match shared TV yields on
  assert.equal(observeSharedSportsWatch(root,8),false);
  root.minutes+=8;root.otherSim.minutes=root.minutes;root.socialAction.elapsed=8;
  assert.equal(observeSharedSportsWatch(root,8),true);
+ root.minutes+=8;root.otherSim.minutes=root.minutes;root.socialAction.elapsed=16;
  assert.equal(root.sportsSharedWatch.memories.length,1);
  assert.equal(root.sportsSharedWatch.memories[0].matchId,m.id);
  assert.equal(root.sportsSharedWatch.memories[0].tvId,plan.tvId);
@@ -58,6 +59,7 @@ test('R2-C queued, refused, paused, removed TV, wrong position and cancelled ses
 });
 test('R2-C anti-replay guards forged future history and stale mid-watch save, preserves old root-v1',()=>{
  const {root,m}=ready();
+ root.minutes+=24;root.otherSim.minutes=root.minutes;
  assert.deepEqual(restoreSportsSharedWatch(undefined,root),newSportsSharedWatch());
  root.sportsSharedWatch={schema:1,active:null,memories:[
     {matchId:m.id,seasonId:0,tvId:'home-tv-1',at:root.minutes+1000,watchedMinutes:20},
