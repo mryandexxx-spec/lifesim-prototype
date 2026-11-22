@@ -280,7 +280,8 @@ jobs:
           cp src/hud-panel.js site/src/
           cp src/need-trends.js site/src/
           cp src/furniture-catalog.js src/furniture-layout.js src/furniture-editor.js src/furniture-transform.js src/furniture-hold.js site/src/
-          cp src/furniture-shop.js src/furniture-value.js src/marketplace-home.js site/src/
+          cp src/furniture-shop.js src/furniture-value.js site/src/
+          cp src/marketplace-home.js site/src/
           cp src/mounted-lighting.js site/src/
           cp src/furniture-products.js src/furniture-procedural-library.js src/furniture-thumbnails.js src/seat-furniture.js src/dining.js src/furniture-interactions.js site/src/
           cp src/meshy-furniture-policy.js src/meshy-furniture-visual.js site/src/
