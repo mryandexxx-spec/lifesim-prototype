@@ -54,6 +54,9 @@ try{
     await page.locator('#calendar-anchor-toggle').tap();
     await page.locator('#life-calendar').waitFor({state:'visible'});
     await page.locator('#lc-jump-date').fill('2026-11-22');
+    // Native date inputs may not dispatch change until blur in mobile Chromium.
+    await page.locator('#lc-jump-date').dispatchEvent('change');
+    await page.waitForFunction(()=>document.querySelector('#lc-selected')?.textContent?.includes('22'));
     const agenda=await page.locator('#lc-agenda').innerText();
     assert.match(agenda,/20:00–05:00 \(\+1 день\)/,
       'Sunday-origin civic overnight ends Monday without a second event');
