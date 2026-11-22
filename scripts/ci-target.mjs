@@ -137,7 +137,7 @@ function main(){
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
     'parcel_editor='+changed.some(f=>f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
-    'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
+    'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'cas_hud='+(plan.cas_hud?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
     'micro_ux='+(plan.micro_ux?'true':'false')+'\n'+
     'load_truth='+(plan.load_truth?'true':'false')+'\n'+
     'fridge_ux='+(plan.fridge_ux?'true':'false')+'\n'+
