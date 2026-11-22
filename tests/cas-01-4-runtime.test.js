@@ -88,12 +88,12 @@ test('CAS-01.4 FIFO dispatches one per resident and does not skip a waiting head
   assert.ok(findPath(getActor(root,'resident_3').position,p,root.world));
   const first=enqueueAction(root.actionQueues,'resident_3',{type:'move',x:p.x,z:p.z});
   const second=enqueueAction(root.actionQueues,'resident_3',{type:'object',actionId:'sofa'});
-  const other=enqueueAction(root.actionQueues,'resident_4',{type:'object',actionId:'mirror'});
+  const other=enqueueAction(root.actionQueues,'resident_4',{type:'object',actionId:'fridge'});
   assert.ok(first&&second&&other);
   assert.deepEqual([first.seq,second.seq,other.seq],[1,2,3]);
   tickHousehold(root,.1);
   assert.equal(action(root,'resident_3')?.id,'move');
-  assert.equal(action(root,'resident_4')?.id,'mirror');
+  assert.equal(action(root,'resident_4')?.id,'fridge');
   assert.deepEqual(pendingActions(root.actionQueues,'resident_3').map(a=>a.seq),[2]);
   assert.equal(pendingActions(root.actionQueues,'resident_4').length,0);
   let observedSecond=false;
