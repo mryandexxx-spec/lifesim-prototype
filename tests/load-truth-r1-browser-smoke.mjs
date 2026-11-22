@@ -44,13 +44,12 @@ try {
       items.map(el=>el.dataset.stage)),stages);
     await page.screenshot({path:'artifacts/load-truth-r1/loading-'+width+'.png'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
-    const final=await page.evaluate(()=>{
+    const final=await page.evaluate(async()=>{
       const list=[...document.querySelectorAll('#loading-stages li')];
       return {
         count:document.getElementById('loading-count').textContent,
         stageStatuses:Object.fromEntries(list.map(el=>[el.dataset.stage,el.dataset.status])),
-        hasWebGL:(()=>{try{return Boolean(document.getElementById('game-canvas')
-          .getContext('webgl2'));}catch{return false;}})()
+        hasWebGL:Boolean((await import('playcanvas')).Application.getApplication()?.graphicsDevice?.canvas)
       };
     });
     assert.equal(final.count,'7 / 7');
