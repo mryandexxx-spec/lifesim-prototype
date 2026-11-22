@@ -158,6 +158,7 @@ import {SOFA_LAYOUT,SOFA_POSE,SOFA_APPROACH} from './pose-config.js';
 import {createSofaTransition,advanceSofaTransition,sofaTransitionPose} from './sofa-transition.js';
 import {BED_SLOTS,BED_LAYOUT} from './bed-layout.js';
 import {TV_WATCH_POSE,tvScreenFrame} from './tv-interaction.js';
+import {sportsTvFrame,paintSportsTv} from './sports-tv.js';
 import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {planSharedTv,liveSharedTv} from './tv-together.js';
 import {planPairedHobby,livePairedHobby} from './paired-hobby.js';
@@ -2440,6 +2441,8 @@ function boot() {
   // Data-only SKU colorways reuse the original prefab, navmesh and animation.
   // Only copied mesh instances are tinted; the authored original is unchanged.
   const variantMaterials=new Map();
+  // One reusable 2D canvas/texture per physically installed TV; do not upload per frame.
+  const sportsTvTextures=new Map();
   // Meshy is a visual override only: original action, collision, price and saves stay canonical.
   // ?furniture=legacy restores ALL procedural furniture for Safari diagnosis.
   const furnitureVisualMode=new URLSearchParams(window.location.search).get('furniture');
@@ -9056,7 +9059,33 @@ function boot() {
         game.socialAction);
       meshyFurniture.useProcedural(decorNodes.get(item.instanceId),frame.on);
       program.enabled=frame.on;
-      if(frame.on)program.render.material=[M.mint,M.blue,M.peach][frame.frame];
+      if(!frame.on)continue;
+      const sport=sportsTvFrame(game,item.instanceId,game.minutes);
+      if(!sport){program.render.material=[M.mint,M.blue,M.peach][frame.frame];continue;}
+      let screen=sportsTvTextures.get(item.instanceId);
+      if(!screen){
+        const canvas=document.createElement('canvas');canvas.width=512;canvas.height=312;
+        const texture=new pc.Texture(app.graphicsDevice,{
+          width:canvas.width,height:canvas.height,mipmaps:false,
+          minFilter:pc.FILTER_LINEAR,magFilter:pc.FILTER_LINEAR
+        });
+        const material=new pc.StandardMaterial();
+        material.diffuse=new pc.Color(1,1,1);material.diffuseMap=texture;
+        material.emissive=new pc.Color(1,1,1);
+        material.emissiveMap=texture;material.emissiveIntensity=.85;
+        material.update();
+        screen={canvas,texture,material,frameKey:''};
+        sportsTvTextures.set(item.instanceId,screen);
+      }
+      const frameKey=sport.matchId+'@'+Math.floor(sport.elapsed);
+      if(screen.frameKey!==frameKey){
+        const context=screen.canvas.getContext('2d');
+        if(context&&paintSportsTv(context,sport,512,312)){
+          screen.texture.setSource(screen.canvas);
+          screen.frameKey=frameKey;
+        }
+      }
+      program.render.material=screen.material;
     }
     // Independently animate blankets on the actual sleeping bed, not the original.
     for(const item of game.world.furniture.instances){
