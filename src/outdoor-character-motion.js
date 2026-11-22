@@ -71,6 +71,14 @@ export function createOutdoorMotion({pc,model,avatar}){
         const sign=i===0?1:-1,p=frame.stroke*2.9+i*Math.PI;
         const reach=Math.cos(p),pull=Math.sin(p);
         const [arm,elbow,hand,thigh,knee,foot]=joints[i];
+        if(frame.jump){
+          const {bend,lift}=frame.jump;
+          aim(arm,elbow,sign*.32,-.9+1.7*lift,-.4*bend+.42*lift);
+          aim(elbow,hand,sign*.12,-.82+1.65*lift,.35);
+          aim(thigh,knee,sign*.12,-1,.9*bend);
+          aim(knee,foot,0,-1,-.95*bend);
+          continue;
+        }
         aim(arm,elbow,sign*(.36+.42*(1-reach*reach)),wet*reach-(1-wet)*.75,
           wet*.60*pull+.32*(1-wet));
         aim(elbow,hand,sign*(.12-.26*pull),wet*Math.cos(p-.45),

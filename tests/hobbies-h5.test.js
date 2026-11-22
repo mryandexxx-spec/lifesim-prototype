@@ -61,7 +61,7 @@ test('H5.1 all authored 3D strokes stay inside the easel canvas at every yaw',()
     }
   }
   const source=file('../src/game.js');
-  assert.match(source,/PAINT_COMPOSITION_SHAPES\[contentId\]\.forEach/);
+  assert.match(source,/primitive\('box','H5 paint surface',0,1.37,-.166,.76,.96/);
   assert.doesNotMatch(source,/const paintingShapes=/,'avoid duplicate untested shapes');
 });
 

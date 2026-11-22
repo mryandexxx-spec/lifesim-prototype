@@ -34,7 +34,7 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
   const neck=model.findByName('mixamorig:Neck');
   const hips=model.findByName('mixamorig:Hips');
   const book=new pc.Entity('Meshy '+resident+' reading book');
-  model.addChild(book);
+  (model.parent||avatar).addChild(book);
   book.setLocalPosition(0,1.12,.36);
   book.setLocalEulerAngles(-14,0,0);
   function material(r,g,b){
@@ -87,7 +87,7 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     'closing','standing','returnShelf','returning']);
   const readingStages=new Set(['opening','reading','closing']);
   const atHand=new pc.Vec3(),lapOffset=new pc.Vec3(),
-    lapLocal=new pc.Vec3(0,.14,.32);
+    lapLocal=new pc.Vec3(0,.28,.49),carryOffset=new pc.Vec3(-.07,-.07,.085);
   // A closed volume stays attached to the REAL animated right wrist while
   // walking; an opened spread rests above the thighs when seated.
   function bookPose(stage,stepElapsed=0){
@@ -146,7 +146,6 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
     // Frozen Anim does not reset bones. Never compound rotation during pause.
     if(paused||!intent||!book.enabled)return false;
     const stage=current?.stage||'reading';
-    if(stage==='reading'&&intent.weight<.005)return false;
     const open=bookPose(stage,current?.stepElapsed||0);
     avatar.getWorldTransform().transformVector(forward,point);
     const yaw=Math.atan2(point.x,point.z)*180/Math.PI;
@@ -154,7 +153,8 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
       // PlayCanvas child book node uses world placement so it follows the
       // animated Mixamo hand without needing a second skeleton attachment.
       const wrist=arms[1].hand.getPosition();
-      atHand.set(wrist.x,wrist.y-.085,wrist.z+.025);
+      avatar.getWorldTransform().transformVector(carryOffset,atHand);
+      atHand.set(wrist.x+atHand.x,wrist.y+atHand.y,wrist.z+atHand.z);
       book.setPosition(atHand.x,atHand.y,atHand.z);
       // Rotate the compact closed volume like a book held by its spine,
       // rather than the flat double-width spread visible in the screenshot.
@@ -171,9 +171,11 @@ export function createMeshyReadingController({pc,model,avatar,resident='Alex'}={
       book.setEulerAngles(-19,yaw,0);
     }else{
       // Rig fallback for future skeletons without an audited hips bone.
-      book.setLocalPosition(0,.72,.33);
+      book.setLocalPosition(0,.96,.49);
       book.setLocalEulerAngles(-19,0,0);
     }
+    // Even the first reading frame must place the prop; limb blending starts afterwards.
+    if(stage==='reading'&&intent.weight<.005)return false;
     let moved=false;
     for(let index=0;index<arms.length;index++){
       const arm=arms[index],shoulder=xyz(arm.upper.getPosition()),

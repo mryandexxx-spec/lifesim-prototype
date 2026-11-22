@@ -18,13 +18,17 @@ export function createMeshyPaintingController({pc,model,avatar}={}){
   const tipMat=new pc.StandardMaterial();
   tipMat.diffuse=new pc.Color(.19,.40,.42);tipMat.update();
   const brush=new pc.Entity('H5a hand-held wooden brush');
-  brush.addComponent('render',{type:'cylinder',material:mat});
-  brush.setLocalPosition(0,.08,.06);brush.setLocalEulerAngles(83,0,0);
-  brush.setLocalScale(.023,.24,.023);hand.addChild(brush);
-  const tip=new pc.Entity('H5a paint tip');
-  tip.addComponent('render',{type:'sphere',material:tipMat});
-  tip.setLocalPosition(0,.11,0);tip.setLocalScale(.037,.05,.037);
-  brush.addChild(tip);brush.enabled=false;
+  (model.parent||avatar).addChild(brush);
+  // The carrier is unscaled. Tip and shaft have independent metre dimensions.
+  for(const [name,z,radius,length,material] of [
+    ['Brush shaft',-.10,.018,.22,mat],['Brush bristles',-.225,.026,.041,tipMat]]){
+    const part=new pc.Entity(name);
+    part.addComponent('render',{type:'cylinder',material});
+    part.setLocalPosition(0,0,z);part.setLocalScale(radius,length,radius);
+    part.setLocalEulerAngles(90,0,0);brush.addChild(part);
+  }
+  brush.enabled=false;
+  const tipTarget=new pc.Vec3(),local=new pc.Vec3();
   const from=new pc.Vec3(),to=new pc.Vec3(),point=new pc.Vec3(),
     pole=new pc.Vec3(),worldPole=new pc.Vec3(),swing=new pc.Quat(),
     next=new pc.Quat(),mix=new pc.Quat(),neckDelta=new pc.Quat();
@@ -54,8 +58,10 @@ export function createMeshyPaintingController({pc,model,avatar}={}){
       if(!healthy||!current||paused)return false;
       try{
       // +Z is the easel-facing direction of the existing character rig.
-      avatar.getWorldTransform().transformPoint(
-        new pc.Vec3(.11+current.strokeX,1.36+current.strokeY,.72),point);
+      const transform=avatar.getWorldTransform();
+      const x=-.07+current.strokeX,y=1.35+current.strokeY;
+      transform.transformPoint(local.set(x,y,.827-.065*current.lift),tipTarget);
+      transform.transformPoint(local.set(x-.035,y-.10,.61-.065*current.lift),point);
       const shoulder=xyz(upper.getPosition()),elbow=xyz(fore.getPosition()),
         wrist=xyz(hand.getPosition());
       if(![shoulder,elbow,wrist,xyz(point)].every(finite))return false;
@@ -72,6 +78,8 @@ export function createMeshyPaintingController({pc,model,avatar}={}){
       if(!solved||![solved.knee,solved.ankle].every(finite))return false;
       swingBone(upper,elbow,solved.knee,current.weight*.93,75);
       swingBone(fore,xyz(hand.getPosition()),solved.ankle,current.weight*.93,105);
+      brush.setPosition(hand.getPosition());
+      brush.lookAt(tipTarget);
       if(neck?.getLocalRotation&&neck.setLocalRotation){
         neckDelta.setFromEulerAngles(7,0,0);
         mix.mul2(neck.getLocalRotation(),neckDelta);neck.setLocalRotation(mix);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {fridgeSequence,FRIDGE_LAYOUT} from '../src/fridge-interaction.js';
+import {fridgeSequence,FRIDGE_LAYOUT,fridgeActionFrame,carriedFridgePortion} from '../src/fridge-interaction.js';
 import {meshyFridgePose,createMeshyFridgeController}
   from '../src/meshy-fridge-runtime.js';
 
@@ -105,4 +105,36 @@ test('actual visual bridge applies overlays only after the base Anim evaluation'
   assert.match(game,/mesh[y]?Shown&&\(useId==='fridge'\|\|alexCarryMeal\)\)snack\.enabled=false/);
   assert.match(pages,/src\/meshy-fridge-runtime\.js/);
   assert.match(pages,/node --check src\/meshy-fridge-runtime\.js/);
+});
+
+test('meal pickup withdraws from the shelf and never lifts food to the mouth',()=>{
+  const take=fridgeSequence(4.5,6,'take');
+  assert.equal(take.eat,0);
+  assert.equal(take.chew,0);
+  assert.equal(meshyFridgePose(take).mouth,0);
+  assert.ok(meshyFridgePose(take).carry>.8);
+  const store=fridgeSequence(6,6,'store');
+  assert.equal(store.handFood,0);
+  assert.equal(store.eat,0);
+});
+
+test('food stays in the carrying grip until reaching the table or worktop',()=>{
+  for(const action of [{id:'dining',diningStage:'toSeat'},{id:'cook',cookStage:'toPrep'}]){
+    const frame=carriedFridgePortion({...action,phase:'walking'});
+    assert.equal(frame.handFood,1);
+    assert.equal(meshyFridgePose(frame).carry,1);
+    assert.equal(frame.doorOpen,0);
+    assert.equal(carriedFridgePortion({...action,phase:'using'}),null);
+  }
+});
+
+test('cooked and grilled dishes travel onto the same shelf with a single visible portion',()=>{
+  for(const action of [{id:'cook',cookStage:'storing'},{id:'grill',grillStage:'storing'}]){
+    const start=fridgeActionFrame({...action,elapsed:0},26);
+    const placed=fridgeActionFrame({...action,elapsed:5},26);
+    assert.equal(start.placement,0);
+    assert.equal(placed.placement,1);
+    assert.equal(placed.handFood+placed.shelfFood,0);
+    assert.equal(meshyFridgePose(placed).mouth,0);
+  }
 });

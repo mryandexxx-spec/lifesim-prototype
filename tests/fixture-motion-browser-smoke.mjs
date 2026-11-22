@@ -84,12 +84,14 @@ try{
       await page.waitForFunction(()=>sceneRoot.findByName('flush-lever joint').getLocalPosition().y===0);
     };
     const dance=async()=>{
+      await page.evaluate(id=>{window.danceStation=id;},stereo);
       await page.waitForFunction(()=>sceneRoot.findByName('Meshy Mira visual')?.enabled);
       const before=await page.evaluate(()=>sceneRoot.findByName('Meshy Mira visual')
         .children[0].getLocalPosition().x);
       await page.waitForFunction(x=>{
         const skin=sceneRoot.findByName('Meshy Mira visual');
-        return skin.enabled&&Math.abs(skin.children[0].getLocalPosition().x-x)>.015;
+        const station=sceneRoot.findByName('F2 purchased / '+window.danceStation);
+        return station?.findByName('Meshy furniture music.starter')?.enabled&&skin.enabled&&Math.abs(skin.children[0].getLocalPosition().x-x)>.015;
       },before);
     };
     await Promise.all([flush(),dance()]);
@@ -115,6 +117,31 @@ try{
     });
     await page.waitForFunction(()=>!sceneRoot.findByName('Meshy Alex reading book')
       .findByName('turning leaf').enabled);
+  });
+  const studio=home(),easel=buy(studio,'easel.starter');
+  assert.ok(chooseResidentAction(studio,'paint',false,'alex',easel,
+    'hobby.paint.picture','painting.hills'));
+  studio.position={...furnitureActionApproach(studio.world,'paint',easel)};
+  arrive(studio);tickHousehold(studio,12);
+  const item=studio.world.furniture.instances.find(i=>i.instanceId===easel);
+  studio.createdWorks.push({id:'work:painting:alex:paint-preview',ownerId:'alex',
+    easelInstanceId:easel,contentId:'painting.garden',seed:12345,quality:65,
+    createdAt:studio.minutes,renderVersion:1,kind:'artwork',location:'studio',
+    origin:{x:item.x,z:item.z,yaw:item.yaw}});
+  await scene(studio,async page=>{
+    await page.waitForFunction(()=>{
+      const brush=sceneRoot.findByName('H5a hand-held wooden brush');
+      const image=node=>{
+        const canvas=node?.render?.material?.diffuseMap?.getSource();
+        if(!node?.enabled||canvas?.width!==256)return false;
+        const pixels=canvas.getContext('2d').getImageData(56,70,128,110).data;
+        const colors=new Set();
+        for(let i=0;i<pixels.length;i+=32)colors.add((pixels[i]<<16)|(pixels[i+1]<<8)|pixels[i+2]);
+        return colors.size>90;
+      };
+      return brush?.enabled&&image(sceneRoot.findByName('H5 paint surface'))&&
+        image(sceneRoot.findByName('Finished painted linen'));
+    });
   });
   let lot=home();
   const p=previewOutdoorFeatureEdit(lot,{operation:'place',itemId:'garden.herb.mint',pose:{x:12,z:-7,yaw:0}});

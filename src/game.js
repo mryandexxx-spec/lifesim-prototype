@@ -73,8 +73,9 @@ import {SHOP_ITEMS,MARKET_OFFERS,findMarketPlacement,findStoredPlacement,buyMark
 import {recordFinanceChange} from './finance-ledger.js';
 import {HOBBY_ACTIVITIES,HOBBY_SKILLS,HOBBY_CONTENT,READING_ACTIVITY_ID,READING_CONTENT_ID,READING_BOOKS,READING_SKILL_ID,MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID,MUSIC_CONTENT_IDS,canReadHobbyContent} from './hobby-reading.js';
 import {skillProfileRows} from './skill-presentation.js';
+import {createPaintSurface} from './painted-canvas.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_SUBJECTS,PAINT_SKILL_ID,PAINT_COMPOSITION_SHAPES,canPaintContent,
-  compositionForArtwork,paintingSeedFromSession} from './painting.js';
+  paintingSeedFromSession} from './painting.js';
 import {COOKING_SKILL_ID,kitchenRecipe,KITCHEN_QUALITIES,cookingQuality,canCookRecipe,kitchenSummary,
   preparedKitchenMeals,hasKitchenServing,chooseKitchenPlan} from './kitchen.js';
 import {KITCHEN_RESTOCK_LABELS,quoteKitchenRestock,proposeKitchenRestock,
@@ -160,7 +161,7 @@ import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {planSharedTv,liveSharedTv} from './tv-together.js';
 import {planPairedHobby,livePairedHobby} from './paired-hobby.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
-import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeSequence,closeFridgeDoor} from './fridge-interaction.js';
+import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeActionFrame,carriedFridgePortion,closeFridgeDoor} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
 import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './toilet-interaction.js';
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
@@ -2497,7 +2498,7 @@ function boot() {
     });
   const decorNodes=new Map();
   // H5c: cache the 78 theme stroke entities per easel for Safari performance.
-  const paintStrokeCache=new WeakMap();
+  const easelPaint=new WeakMap();
   const decorTemplates=new Map();
   const f4eOriginalPositions=new WeakMap();
   // H5: bounded brush compositions come from the testable data-only catalog.
@@ -2542,14 +2543,9 @@ function boot() {
       applySkuModel(node,item.itemDefinitionId||
         PROCEDURAL_DEFAULT_SKU[item.prefabId]);
       if(item.prefabId==='easel'){
-        for(const contentId of PAINT_CONTENT_IDS){
-          PAINT_COMPOSITION_SHAPES[contentId].forEach(([kind,x,y,sx,sy,paletteIndex],i)=>{
-            const color=PAINT_SUBJECTS[contentId].palette[paletteIndex];
-            const stroke=primitive(kind,'H5 paint '+contentId+' '+i,
-              x,y,-.181-i*.0007,sx,sy,.009,mat(color),node);
-            stroke.enabled=false;
-          });
-        }
+        const canvas=primitive('box','H5 paint surface',0,1.37,-.166,.76,.96,.01,M.cream,node);
+        canvas.enabled=false;
+        easelPaint.set(node,createPaintSurface(pc,app.graphicsDevice,canvas));
       }
       // F4E: each bought lamp has a real world-space light source and a
       // tiny emissive bulb. Parent it to the persistent instance node, so
@@ -2691,17 +2687,19 @@ function boot() {
           .70,.86,.062,frame,node);
         primitive('box','H5a finished painting support',0,.79,-.037,
           .61,.76,.018,paper,node);
-        // Old artworks have no renderVersion and retain their original look.
-        const parts=work.renderVersion===1
-          ?compositionForArtwork(work.contentId,work.seed,work.renderVersion)
-          :PAINT_COMPOSITION_SHAPES[work.contentId]||[];
-        parts.forEach(([kind,x,y,sx,sy,colorIndex],i)=>{
-          const palette=PAINT_SUBJECTS[work.contentId]?.palette;
-          if(!palette)return;
-          primitive(kind,'H5a preserved brush stroke '+i,x*.73,
-            .79+(y-1.37)*.73,-.050-i*.0008,
-            sx*.73,sy*.73,.008,mat(palette[colorIndex]),node);
-        });
+        if(work.renderVersion===1){
+          const surface=primitive('box','Finished painted linen',0,.79,-.052,
+            .60,.75,.009,M.cream,node);
+          createPaintSurface(pc,app.graphicsDevice,surface)(work.contentId,work.seed,6);
+        }else{
+          // First-generation saves keep their original, unseeded compositions.
+          const parts=PAINT_COMPOSITION_SHAPES[work.contentId]||[];
+          parts.forEach(([kind,x,y,sx,sy,colorIndex],i)=>{
+            primitive(kind,'H5a preserved brush stroke '+i,x*.73,
+              .79+(y-1.37)*.73,-.050-i*.0008,sx*.73,sy*.73,.008,
+              mat(PAINT_SUBJECTS[work.contentId].palette[colorIndex]),node);
+          });
+        }
         // Frame is a standalone leaning panel, not an easel texture.
         primitive('box','H5a frame foot',0,.31,.10,.63,.10,.12,frame,node);
         artworkNodes.set(work.id,node);
@@ -8287,9 +8285,7 @@ function boot() {
               ?'fridge':game.action.id):pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const alexDining=useId==='dining'&&game.action?.diningStage==='eating';
     const alexDiningVisual=alexDining?diningVisualFor('alex',game.action):diningVisual.alex;
-    const alexFridge=useId==='fridge'?fridgeSequence(game.action.elapsed,
-      game.action?.id==='dining'||game.action?.id==='grill'?6:game.action?.id==='cook'&&game.action.cookStage==='storing'
-        ?6:game.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
+    const alexFridge=useId==='fridge'?fridgeActionFrame(game.action,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
       game.action?.elapsed||0,ACTIONS.shower.duration,frameAnimDt,
       inverseFurniturePose(game.world,'shower',display).yaw);
@@ -8418,6 +8414,7 @@ function boot() {
       tvTalk:game.action?.id==='tv'&&game.action.phase==='using'&&
         game.action.tvTalk===true,
       watering:alexWater,
+      swimJump:alexSwimFrame?.jump,
       swimStage:alexSwimFrame?.stage||game.action?.stage,
       swimStroke:alexSwimFrame?.stroke||0,
       musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
@@ -8480,10 +8477,7 @@ function boot() {
       pairedTv?'tv':pairedBooks?'hobby':pairedMusic?'music':null;
     const miraDining=miraUseId==='dining'&&game.otherSim.action?.diningStage==='eating';
     const miraDiningVisual=miraDining?diningVisualFor('mira',game.otherSim):diningVisual.mira;
-    const miraFridge=miraUseId==='fridge'?fridgeSequence(game.otherSim.action.elapsed,
-      game.otherSim.action?.id==='dining'||game.otherSim.action?.id==='grill'?6:game.otherSim.action?.id==='cook'&&
-        game.otherSim.action.cookStage==='storing'?6:
-        game.otherSim.action?.id==='cook'?5:ACTIONS.fridge.duration):null;
+    const miraFridge=miraUseId==='fridge'?fridgeActionFrame(game.otherSim.action,ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
       game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,frameAnimDt,
       inverseFurniturePose(game.world,'shower',miraDisplay).yaw);
@@ -8611,6 +8605,7 @@ function boot() {
       tvTalk:game.otherSim.action?.id==='tv'&&game.otherSim.action.phase==='using'&&
         game.otherSim.action.tvTalk===true,
       watering:miraWater,
+      swimJump:miraSwimFrame?.jump,
       swimStage:miraSwimFrame?.stage||game.otherSim.action?.stage,
       swimStroke:miraSwimFrame?.stroke||0,
       musicActivityId:pairedMusic?MUSIC_ACTIVITY_ID:
@@ -8697,7 +8692,7 @@ function boot() {
       toiletBusy:toiletStates.mira.active,
       toiletFrame:miraToilet,
       fridgeBusy:fridgeLeaving.mira,
-      fridgeFrame:miraFridge
+      fridgeFrame:miraFridge||carriedFridgePortion(game.otherSim.action)
     });
     // The procedural book belongs to a hidden elbow; never show it floating.
     if(miraMeshShown&&(miraUseId==='sofa'||game.otherSim.action?.id==='hobby'))
@@ -8753,7 +8748,7 @@ function boot() {
       toiletBusy:toiletStates.alex.active,
       toiletFrame:alexToilet,
       fridgeBusy:fridgeLeaving.alex,
-      fridgeFrame:alexFridge
+      fridgeFrame:alexFridge||carriedFridgePortion(game.action)
     });
     // The old snack is attached to the hidden procedural elbow; use the
     // new Meshy hand-bone prop instead, never show both at once.
@@ -8775,8 +8770,16 @@ function boot() {
       drawn.tray.enabled=Boolean(carrying);drawn.food.enabled=Boolean(carrying);
       if(carrying){
         const actor=id==='alex'?display:miraDisplay;
-        const offset=rotateLocal(.26,-.03,actor.yaw);
-        const x=actor.x+offset.x,y=actor.y+1.07,z=actor.z+offset.z;
+        const yaw=actor.yaw*Math.PI/180;
+        let x=actor.x-.20*Math.cos(yaw)+.34*Math.sin(yaw);
+        let y=actor.y+1.16,z=actor.z+.20*Math.sin(yaw)+.34*Math.cos(yaw);
+        const store=id==='alex'?alexFridge:miraFridge;
+        if(store?.mode==='store'){
+          const shelf=liveFridgeLayout().shelfTarget;
+          x+=(shelf.x-x)*store.placement;
+          y+=(shelf.y-y)*store.placement;
+          z+=(shelf.z-z)*store.placement;
+        }
         drawn.tray.setPosition(x,y,z);
         drawn.food.setPosition(x,y+.075,z);
       }
@@ -8807,10 +8810,10 @@ function boot() {
           actor?Math.sin(effectTime*3+i*2)*22:0,0,0);
     }
     // V3 compatibility: action-specific authored parts own visible animation.
-    // Keep original procedural geometry for the active music/easel interaction,
+    // Keep original procedural geometry for the active easel interaction,
     // and for occupied new seats until their individual 3D contact is accepted.
     for(const item of game.world.furniture.instances){
-      if(!['music','easel','sofa','chair'].includes(item.prefabId))continue;
+      if(!['easel','sofa','chair'].includes(item.prefabId))continue;
       if(item.prefabId==='sofa'&&item.itemDefinitionId!=='sofa.classic')continue;
       if(item.prefabId==='chair'&&item.itemDefinitionId!=='chair.cross')continue;
       const node=decorNodes.get(item.instanceId);
@@ -8818,8 +8821,7 @@ function boot() {
       const busy=item.location==='home'&&HOUSEHOLD_IDS.some(id=>{
         const action=getActor(game,id)?.action;
         if(action?.targetInstanceId!==item.instanceId)return false;
-        return item.prefabId==='music'?action.id==='music':
-          item.prefabId==='easel'?action.id==='paint':
+        return item.prefabId==='easel'?action.id==='paint':
           ['seat','sofa','relax'].includes(action.id);
       });
       meshyFurniture.useProcedural(node,busy);
@@ -8967,28 +8969,11 @@ function boot() {
         // Finished paintings live in independent H5a artwork entities.
         const contentId=activeAction?.contentId;
         const stage=activeAction?.phase==='using'
-          ?Math.floor(Math.min(1,activeAction.elapsed/ACTIONS.paint.duration)*6)
+          ?Math.min(6,1+Math.floor(6*activeAction.elapsed/ACTIONS.paint.duration))
           :0;
-        let cached=paintStrokeCache.get(node);
-        if(!cached){
-          cached=new Map(PAINT_CONTENT_IDS.map(theme=>[theme,
-            Array.from({length:6},(_,i)=>node.findByName('H5 paint '+theme+' '+i))]));
-          paintStrokeCache.set(node,cached);
-        }
         const seed=painter?.activitySession?.sessionId
           ?paintingSeedFromSession(painter.activitySession.sessionId):0;
-        const preview=compositionForArtwork(contentId,seed,1);
-        for(const theme of PAINT_CONTENT_IDS)for(let i=0;i<6;i++){
-          const stroke=cached.get(theme)?.[i];
-          if(!stroke)continue;
-          const shown=theme===contentId&&i<stage&&Boolean(preview[i]);
-          if(shown){
-            const [,x,y,sx,sy]=preview[i];
-            stroke.setLocalPosition(x,y,-.181-i*.0007);
-            stroke.setLocalScale(sx,sy,.009);
-          }
-          stroke.enabled=shown;
-        }
+        easelPaint.get(node)?.(contentId,seed,stage);
         continue;
       }
       if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
