@@ -1390,7 +1390,7 @@ button.time-card:active {transform:translateY(1px);}
 .career-phone-kicker{font-size:10px;letter-spacing:1.2px;font-weight:800;color:#d8e9e2;}
 .career-phone-title{font-size:22px;line-height:1.12;font-weight:800;}
 .career-phone-header .career-phone-x{background:#ffffff2e;color:#fff;border:1px solid #ffffff69;
-  border-radius:50%;width:40px;height:40px;min-width:40px;min-height:40px;font-size:28px;line-height:1;padding:0;}
+  border-radius:50%;width:44px;height:44px;min-width:44px;min-height:44px;font-size:28px;line-height:1;padding:0;}
 .career-phone-body{min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;
   padding:14px 16px 24px;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
 .career-phone-person{margin:0 0 10px;color:#5c8779;font-weight:800;font-size:12px;}
@@ -2533,3 +2533,31 @@ button.time-card:active {transform:translateY(1px);}
   .fridge-r2-card{padding:7px}
 }
 @media(prefers-reduced-motion:reduce){.fridge-r2 *{scroll-behavior:auto;transition:none}}
+
+/* PHONE-PLATFORM-R1: existing in-game phone frame + app tiles and persistent back/home. */
+.career-phone-apps[hidden],.phone-platform-bottom[hidden]{display:none!important}
+.phone-platform-welcome{display:flex;flex-direction:column;gap:5px;margin:3px 0 18px}
+.phone-platform-welcome p{margin:0;font-size:11px;font-weight:800;letter-spacing:1px;color:#377e69}
+.phone-platform-welcome strong{font-size:21px;color:#26483c}
+.phone-platform-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.career-phone-body .phone-platform-tile{display:flex;flex-direction:column;align-items:flex-start;
+  gap:7px;min-height:119px;padding:14px 12px;text-align:left;border-radius:18px;
+  background:#fff;border:1px solid #cfdfd4;box-shadow:0 5px 15px #3e6d5112}
+.phone-platform-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:15px;
+  background:#e1f1e7;font-size:25px}
+.phone-platform-tile strong{font-size:13px;line-height:1.12;color:#254639}
+.phone-platform-tile small{font-size:11px;line-height:1.2;color:#648074}
+.phone-platform-contact{display:flex;flex-direction:column;gap:11px;background:#fff;
+  border:1px solid #d1e2d6;padding:16px;border-radius:17px}
+.phone-platform-contact strong{font-size:22px;color:#274b3e}
+.phone-platform-call-status{color:#397e68;font-size:13px;font-weight:700}
+.phone-platform-bottom{display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  padding:8px 12px calc(9px + env(safe-area-inset-bottom));
+  border-top:1px solid #d3e4d6;background:#eef3ea;flex-shrink:0}
+.phone-platform-bottom button{min-height:44px;border-radius:12px;border:1px solid #b4cebf;
+  background:#fff;color:#275b48;font-weight:800;font-size:12px}
+@media(max-width:350px){
+  .phone-platform-grid{gap:8px}
+  .career-phone-body .phone-platform-tile{min-height:109px;padding:10px}
+  .phone-platform-tile strong{font-size:12px}
+}

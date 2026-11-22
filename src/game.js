@@ -25,6 +25,7 @@ import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
 import {consumeCalendarReminders} from './calendar-reminders.js';
 import {createCareerPhoneUI} from './career-phone-ui.js';
+import {startPhoneCall,cancelPhoneCall} from './phone-calls.js';
 import {pendingWorkIncident} from './career-incidents.js';
 import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
 import {applyWorkMoodContext} from './career-worklife.js';
@@ -2225,6 +2226,19 @@ const careerPhone=createCareerPhoneUI({
   },
   save,notify:toast,onFundsChanged:updateFamilyBalance,
   onBuyReadyMeal:buyReadyMeal,
+  onStartCall:(from,to)=>{
+    const previous=structuredClone(game.phoneCalls);
+    const result=startPhoneCall(game,from,to);
+    if(!result.ok)return result;
+    if(!save(true)){game.phoneCalls=previous;return {ok:false,reason:'save-failed'};}
+    return result;
+  },
+  onCancelCall:()=>{
+    const previous=structuredClone(game.phoneCalls);
+    const result=cancelPhoneCall(game);
+    if(result.ok&&!save(true)){game.phoneCalls=previous;return {ok:false,reason:'save-failed'};}
+    return result;
+  },
   onOpenChange:id=>updatePhoneProps(id),
   onIncidentChanged:()=>{updateCareerHud();refreshIncidentNotifications();},
   selectResident:id=>{
@@ -2256,7 +2270,7 @@ const shiftSummary=createCareerShiftSummaryUI({
       updateResidentPicker();
       save(true);
     }
-    careerPhone.open();
+    careerPhone.openWork();
   }
 });
 // Presentation-only HUD preference: never touches simulation or household saves.
