@@ -10,6 +10,7 @@ import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-inte
 import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {validOutdoorId} from './outdoor-catalog.js';
 import {NEED_DECAY_PER_MINUTE,SLEEP_MIN_MINUTES,SLEEP_MAX_MINUTES,SLEEP_WAKE_ENERGY,
+  SLEEP_RECOVERY_PER_MINUTE,sleepBedProfile,
   SELF_CARE_WISH_MAX_NEED,SELF_CARE_REPEAT_COOLDOWN_MINUTES} from './need-balance.js';
 import {insideLot} from './lot-surface.js';
 import {sanitizeSwimAction} from './pool-swim-runtime.js';
@@ -26,7 +27,7 @@ export const NEEDS = Object.freeze([...PHYSICAL_NEEDS,'social']);
 export const ACTIONS = Object.freeze({
   swim: {label:'Плавать в бассейне',need:'fun',duration:45,
     benefitPerMinute:0,location:[0,0]},
-  bed: { label: 'Поспать', need: 'energy', duration: SLEEP_MAX_MINUTES, benefitPerMinute: 0.102, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
+  bed: { label: 'Поспать', need: 'energy', duration: SLEEP_MAX_MINUTES, benefitPerMinute: SLEEP_RECOVERY_PER_MINUTE, location: [BED_SLOTS.right.approach.x,BED_SLOTS.right.approach.z] },
   fridge: { label: 'Быстро перекусить', need: 'hunger', duration: 26, benefitPerMinute: 0.68, location: [FRIDGE_LAYOUT.approach.x, FRIDGE_LAYOUT.approach.z] },
   shower: { label: 'Принять душ', need: 'hygiene', duration: 32, benefitPerMinute: 1.27, location: [SHOWER_LAYOUT.approach.x,SHOWER_LAYOUT.approach.z] },
   sofa: { label: 'Отдохнуть', need: 'fun', duration: 42, benefitPerMinute: 1.16, location: [1.35, 0.52] },
@@ -38,7 +39,7 @@ export const ACTIONS = Object.freeze({
     benefitPerMinute:.74,location:[0,0]},
   // F4F: a real fridge-to-purchased-chair dining journey; hunger only during bites.
   dining: { label:'Пообедать за столом',need:'hunger',duration:31,
-    benefitPerMinute:1.00,location:[0,-1.5] },
+    benefitPerMinute:1.22,location:[0,-1.5] },
   // F4G: cooking never directly feeds or rewards skills in the generic tick.
   cook: {label:'Приготовить блюдо',need:'fun',duration:32,
     benefitPerMinute:0,location:[0,-1.08]},
@@ -54,7 +55,7 @@ export const ACTIONS = Object.freeze({
   tv: { label: 'Смотреть телевизор', need: 'fun', duration: TV_WATCH_DURATION,
     benefitPerMinute: 1.08, location: [TV_APPROACH.x,TV_APPROACH.z] },
   toilet: { label: 'Сходить в туалет', need: 'bladder', duration: 26,
-    benefitPerMinute: 1.2, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] },
+    benefitPerMinute: 3.85, location: [TOILET_LAYOUT.approach.x,TOILET_LAYOUT.approach.z] },
   // One compatibility bridge for every future item-driven hobby: the true
   // activity, timing and effects are authored in the H0 activity registry.
   hobby: { label: 'Читать книгу', need: 'fun', duration: 36, benefitPerMinute: 1.05,
@@ -119,12 +120,17 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     }
     if(next.action&&data.action.id==='dining'&&kitchenRecipe(data.action.selectedRecipeId))
       next.action.selectedRecipeId=data.action.selectedRecipeId;
-    if(next.action&&data.action.id==='dining'&&
-      data.action.portionTaken===true&&kitchenRecipe(data.action.cookedRecipeId)){
+    if(next.action&&data.action.id==='dining'&&data.action.portionTaken===true&&
+      (kitchenRecipe(data.action.cookedRecipeId)||
+        (data.action.cookedRecipeId==null&&!data.action.selectedRecipeId))){
+      // Preserve the single verified serving receipt, including legacy basic
+      // table meals. Reload cannot consume a second portion or award free bites.
       next.action.portionTaken=true;
-      next.action.cookedRecipeId=data.action.cookedRecipeId;
-      const quality=kitchenQualityId(data.action.cookedRecipeId,data.action.cookedQuality);
-      if(quality!=='normal')next.action.cookedQuality=quality;
+      if(kitchenRecipe(data.action.cookedRecipeId)){
+        next.action.cookedRecipeId=data.action.cookedRecipeId;
+        const quality=kitchenQualityId(data.action.cookedRecipeId,data.action.cookedQuality);
+        if(quality!=='normal')next.action.cookedQuality=quality;
+      }
     }
     // Kitchen journey is optional in the v1 save; malformed/stale state never
     // grants a dish, XP or phantom resources when restored.
@@ -266,21 +272,22 @@ export function tick(state, minutes,world=state?.world??null) {
   const sofaRestMinutes=sitting&&state.action?.phase==='using'
     ?Math.min(minutes,Math.max(0,ACTIONS[state.action.id].duration-state.action.elapsed))
     :0;
-  // Q3b: sleep is restorative for 7–9 hours. At or after seven hours,
-  // wake once Energy reaches 92; always wake at nine hours. Account for an
-  // oversized tick without granting sleep beyond the natural wake boundary.
+  // NEEDS-FIX-R1: real installed bed SKU determines a pure, bounded sleep
+  // profile; the core clock, queue and save-v1 schema are unchanged.
+  // Standard 8–9h; premium canopy 6–7.5h; no awake decay during sleep.
   const sleeping=state.action?.id==='bed'&&state.action.phase==='using';
+  const profile=sleeping?sleepBedProfile(world,state.action.targetInstanceId):null;
   const sleepElapsed=sleeping?state.action.elapsed:0;
-  const untilWake=sleeping?Math.max(0,Math.min(SLEEP_MAX_MINUTES-sleepElapsed,
-    Math.max(SLEEP_MIN_MINUTES-sleepElapsed,
-      (SLEEP_WAKE_ENERGY-state.needs.energy)/ACTIONS.bed.benefitPerMinute))):0;
+  const untilWake=sleeping?Math.max(0,Math.min(profile.maxMinutes-sleepElapsed,
+    Math.max(profile.minMinutes-sleepElapsed,
+      (SLEEP_WAKE_ENERGY-state.needs.energy)/profile.recoveryPerMinute))):0;
   const sleepMinutes=Math.min(minutes,untilWake);
   for(const need of PHYSICAL_NEEDS){
     const elapsed=need==='energy'?Math.max(0,minutes-sofaRestMinutes-sleepMinutes):minutes;
     if(need==='energy'&&sleeping){
       // Credit sleep first, then spend ONLY genuinely awake leftover minutes.
       // Capping after the combined amount would create free Energy on big ticks.
-      const restored=clamp(state.needs.energy+ACTIONS.bed.benefitPerMinute*sleepMinutes);
+      const restored=clamp(state.needs.energy+profile.recoveryPerMinute*sleepMinutes);
       state.needs.energy=clamp(restored-NEED_DECAY_PER_MINUTE.energy*elapsed);
     }else state.needs[need]=clamp(state.needs[need]-NEED_DECAY_PER_MINUTE[need]*elapsed);
   }
@@ -341,10 +348,19 @@ export function tick(state, minutes,world=state?.world??null) {
     let gained=(state.action.id==='bed'?0:
       (hobby?.needEffects.find(effect=>effect.statId==='needs.fun')?.perMinute
         ??definition.benefitPerMinute))*amount;
-    if(state.action.id==='dining'&&state.action.portionTaken===true){
-      const cooked=kitchenRecipe(state.action.cookedRecipeId);
-      if(cooked)gained*=cooked.hungerFactor*
-        kitchenServingMultiplier(cooked.id,state.action.cookedQuality);
+    if(state.action.id==='dining'){
+      // No confirmed serving means NO calories: walking, taking and a
+      // malformed/replayed eating state cannot manufacture food benefits.
+      gained=0;
+      if(state.action.portionTaken===true){
+        const food=kitchenRecipe(state.action.cookedRecipeId);
+        const factor=food?food.hungerFactor*
+          kitchenServingMultiplier(food.id,state.action.cookedQuality):1;
+        // A full portion is >2× the ordinary snack even for the lightest
+        // ready meal. Better recipes and real cooking quality remain useful.
+        const fullPortion=Math.min(50,definition.duration*definition.benefitPerMinute*factor);
+        gained=fullPortion*amount/definition.duration;
+      }
     }
     if(state.action.id==='fridge'){
       const eatFrom=definition.duration*FRIDGE_EAT_START;
@@ -365,6 +381,9 @@ export function tick(state, minutes,world=state?.world??null) {
       const overlap=Math.max(0,Math.min(state.action.elapsed+amount,to)
         -Math.max(state.action.elapsed,from));
       gained=definition.benefitPerMinute*overlap/(TOILET_RELIEF_END-TOILET_RELIEF_START);
+      // Relief occurs only behind the privacy mask; any interruption,
+      // including during flush/exit, remains below the completed 100.
+      gained=Math.max(0,Math.min(gained,99-state.needs.bladder));
     }
     // M2 affects enjoyment of optional rest, not animation time, eating,
     // sleep, shower privacy, or promises of physical self-care.
@@ -387,6 +406,12 @@ export function tick(state, minutes,world=state?.world??null) {
     const sleepWoke=sleeping&&sleepMinutes>=untilWake-1e-8;
     if (state.action.elapsed >= duration || sleepWoke ||
         (!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) && state.needs[definition.need] >= 99.9)) {
+      if(state.action.id==='toilet'&&state.action.elapsed>=duration){
+        // The verified completed use, not the relief sub-phase or a reload,
+        // is the only step that reaches the exact 100% promise.
+        state.needs.bladder=100;
+        refreshMind(state,world);
+      }
       // H1n does not complete at the final earned page: the reader still
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
