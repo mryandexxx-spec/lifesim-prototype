@@ -49,34 +49,79 @@ export const CAREER_RANK_SCHEDULES=Object.freeze(Object.fromEntries(
 ));
 export const SHIFT_SCHEDULE_SCHEMA=1;
 const validDay=day=>Number.isSafeInteger(day)&&day>=0&&day<=3650000;
+const validRank=rank=>Number.isInteger(rank)&&rank>=0&&rank<=7;
 export const approvedRankSchedule=(careerId,level)=>
-  Number.isInteger(level)?CAREER_RANK_SCHEDULES[careerId]?.[level]??null:null;
+  validRank(level)?CAREER_RANK_SCHEDULES[careerId]?.[level]??null:null;
 
-/** Legacy contract dates before the epoch keep exactly the former fixed job schedule.
- * Old paid/received employment@day@start IDs cannot change retroactively.
+/** A bounded chronology of promotion schedules. A new rank cannot rewrite the
+ * working hours of a shift already completed on the promotion day.
+ */
+export function restoreShiftSchedule(raw){
+  if(!raw||raw.schema!==SHIFT_SCHEDULE_SCHEMA||!validDay(raw.effectiveDayIndex))return null;
+  const levels=[];
+  if(Array.isArray(raw.levels)&&raw.levels.length<=12){
+    for(const entry of raw.levels){
+      if(!validDay(entry?.dayIndex)||!validRank(entry?.rank)||
+        entry.dayIndex<raw.effectiveDayIndex||
+        levels.length&&entry.dayIndex<=levels.at(-1).dayIndex)return null;
+      levels.push({dayIndex:entry.dayIndex,rank:entry.rank});
+    }
+  }
+  return {schema:SHIFT_SCHEDULE_SCHEMA,effectiveDayIndex:raw.effectiveDayIndex,levels};
+}
+export function newShiftSchedule(atMinute,rank=0){
+  const day=Math.floor(atMinute/DAY);
+  if(!validDay(day)||!validRank(rank))throw new RangeError('Invalid shift calendar epoch');
+  return {schema:SHIFT_SCHEDULE_SCHEMA,effectiveDayIndex:day,
+    levels:[{dayIndex:day,rank}]};
+}
+/** Historical dates from old v1 contracts before the approved transition use
+ * their original catalog mask; rank epochs after the transition are immutable.
  */
 export function careerScheduleAtDay(contract,dayIndex){
   const career=careerDefinition(contract?.careerId);
   if(!career||!validDay(dayIndex))return null;
-  const effective=contract?.shiftSchedule?.schema===SHIFT_SCHEDULE_SCHEMA&&
-    validDay(contract.shiftSchedule.effectiveDayIndex)?
-      contract.shiftSchedule.effectiveDayIndex:null;
-  return effective!==null&&dayIndex>=effective?
-    approvedRankSchedule(career.id,contract.level):career.schedule;
-}
-export function restoreShiftSchedule(raw){
-  return raw&&raw.schema===SHIFT_SCHEDULE_SCHEMA&&validDay(raw.effectiveDayIndex)?
-    {schema:SHIFT_SCHEDULE_SCHEMA,effectiveDayIndex:raw.effectiveDayIndex}:null;
-}
-export function newShiftSchedule(atMinute){
-  const day=Math.floor(atMinute/DAY);
-  if(!validDay(day))throw new RangeError('Invalid shift calendar epoch');
-  return {schema:SHIFT_SCHEDULE_SCHEMA,effectiveDayIndex:day};
+  const policy=restoreShiftSchedule(contract?.shiftSchedule);
+  if(!policy||dayIndex<policy.effectiveDayIndex)return career.schedule;
+  let rank=contract.level;
+  for(const stage of policy.levels){
+    if(stage.dayIndex>dayIndex)break;
+    rank=stage.rank;
+  }
+  return approvedRankSchedule(career.id,rank);
 }
 function nextMondayAfter(day,calendar){
   const serial=civilToSerial(calendar.startCivilDate)+day;
   const weekday=weekdayFromSerial(serial);
   return day+7-weekday; // always NEXT Monday, even when today is Monday
+}
+/** Record a real promotion after the canonical level increment.
+ * Schedule switches on the next game day, never re-offers a second shift on
+ * the already worked day. Existing leave bookings force a later safe Monday.
+ * No changes to the employee's rank, rate, leave, receipts or finished shifts.
+ */
+export function recordRankSchedulePromotion(root,contract){
+  const policy=restoreShiftSchedule(contract?.shiftSchedule);
+  if(!policy||!validRank(contract.level)||
+    !Number.isFinite(root?.minutes)||root.minutes<0)return false;
+  let effective=Math.max(Math.floor(root.minutes/DAY)+1,policy.effectiveDayIndex);
+  const future=(contract.timeOff?.bookings??[]).filter(item=>
+    !item?.settled&&Number.isSafeInteger(item.end)&&item.end>root.minutes);
+  if(future.some(item=>item.end>=effective*DAY)){
+    const lastEnd=Math.max(...future.map(item=>item.end));
+    effective=nextMondayAfter(Math.floor(lastEnd/DAY),root.calendar);
+  }
+  if(!validDay(effective))return false;
+  const levels=policy.levels;
+  // Multiple promotions before the upcoming effective day collapse into one
+  // future rank epoch; no unbounded or conflicting schedule records.
+  while(levels.length&&levels.at(-1).dayIndex>=effective)levels.pop();
+  if(levels.length===0&&effective>policy.effectiveDayIndex)
+    levels.push({dayIndex:policy.effectiveDayIndex,rank:contract.level-1});
+  if(levels.length<12)levels.push({dayIndex:effective,rank:contract.level});
+  else return false;
+  contract.shiftSchedule={...policy,levels};
+  return true;
 }
 /** Applied ONCE on legacy load; save the chosen date so a later reload cannot
  * postpone it again. Already booked leave and an active future shift retain
@@ -103,7 +148,8 @@ export function migrateLegacyCareerSchedules(root){
     if(active&&Number.isFinite(active.end)&&active.end>=root.minutes)
       while(effective*DAY<=active.end)effective+=7;
     if(!validDay(effective))continue;
-    contract.shiftSchedule={schema:SHIFT_SCHEDULE_SCHEMA,effectiveDayIndex:effective};
+    contract.shiftSchedule={schema:SHIFT_SCHEDULE_SCHEMA,effectiveDayIndex:effective,
+      levels:[{dayIndex:effective,rank:contract.level}]};
     changed=true;
   }
   return changed;
