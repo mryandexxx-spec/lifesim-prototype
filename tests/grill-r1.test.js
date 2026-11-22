@@ -142,9 +142,9 @@ test('GRILL-R1: walking, actual cooking, pause, save/reload and one completed st
 });
 test('GRILL-R1: a garden table alone cannot seat, valid front bench is preferred over home',()=>{
   let {h}=fixture();
-  h=buy(h,'garden.table',20,5);
+  h=buy(h,'garden.table',21.5,5);
   assert.equal(chooseOutdoorDining(h.world,h.position),null);
-  h=buy(h,'garden.bench',20,7.25);
+  h=buy(h,'garden.bench',21.5,7.25);
   const table=h.world.outdoors.features.find(f=>f.itemId==='garden.table');
   const bench=h.world.outdoors.features.find(f=>f.itemId==='garden.bench');
   const point=outdoorDiningApproach(h.world,table.instanceId,bench.instanceId);
