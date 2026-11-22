@@ -17,6 +17,8 @@ import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt,select
 import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-work-needs.js';
 
 import {createFinancePhoneUI} from './finance-phone-ui.js';
+import {PHONE_APPS,phoneAppRoute} from './phone-app-registry.js';
+import {phoneContactStatus,CALL_DURATION,CALL_COOLDOWN} from './phone-calls.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal} from './ready-food.js';
 import {upcomingCareerTimeOff,bookCareerTimeOff,cancelCareerTimeOff,
@@ -45,6 +47,8 @@ function action(label,callback,kind=''){
 export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,setCareerSystem,
   save,notify,onFundsChanged=()=>{},onOpenChange=()=>{},onIncidentChanged=()=>{},
    onBuyReadyMeal=()=>({ok:false,reason:'unavailable'}),
+  onStartCall=()=>({ok:false,reason:'unavailable'}),
+  onCancelCall=()=>({ok:false,reason:'unavailable'}),
   selectResident=()=>false,beforeOpen=()=>{},canOpen=()=>true}){
   const overlay=element('section','career-phone-overlay');
   overlay.id='career-phone-panel';overlay.hidden=true;
@@ -78,7 +82,12 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     tab.dataset.app=id;appTabs.append(tab);
   }
   const incidentNotice=element('div','career-phone-incident-banner-slot');
-  frame.append(header,appTabs,incidentNotice,body);
+  const routeBar=element('nav','phone-platform-bottom');
+  routeBar.setAttribute('aria-label','Навигация по телефону');
+  const backButton=action('‹ Назад',()=>{app='home';render();},'phone-platform-back');
+  const homeButton=action('⌂ Главный экран',()=>{app='home';render();},'phone-platform-home');
+  routeBar.append(backButton,homeButton);
+  frame.append(header,appTabs,incidentNotice,body,routeBar);
   overlay.append(shade,frame);host.append(overlay);
   const financeUI=createFinancePhoneUI({body,payBill:root=>{
     const payment=payHouseholdBill(root);
@@ -90,7 +99,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     notify('🧾 Семейный счёт оплачен · −'+payment.amount+' кр.');
     return payment;
   }});
-  let app='work';
+  let app='home';
   let who=null,view='list',chosen=null,lastFocus=null,lastInterviewFeedback='';
   let section='vacancies',historyId=null;
   const contexts={alex:null,mira:null};
@@ -1088,22 +1097,105 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       'Чтобы поесть, выбери «Взять готовое» или обычный обед за столом. '+
       'Приготовленная дома еда дешевле и развивает навык.'));
   }
+  function renderPhoneHome(root){
+    body.replaceChildren();
+    const welcome=element('section','phone-platform-welcome');
+    welcome.append(element('p',null,'ТЕЛЕФОН · '+NAMES[who]),
+      element('strong',null,'Что хочешь сделать?'));
+    body.append(welcome);
+    const grid=element('div','phone-platform-grid');
+    grid.setAttribute('aria-label','Приложения телефона');
+    for(const item of PHONE_APPS){
+      const button=action('',()=>{app=item.id;render();},'phone-platform-tile');
+      button.dataset.phoneApp=item.id;
+      button.setAttribute('aria-label','Открыть '+item.label);
+      button.append(element('span','phone-platform-icon',item.icon),
+        element('strong',null,item.label),
+        element('small',null,item.caption));
+      grid.append(button);
+    }
+    body.append(grid);
+    body.append(element('p','career-phone-muted',
+      'Алекс и Мира пользуются одним игровым временем. Работа, покупки и деньги — настоящие данные семьи.'));
+  }
+  function renderPhoneCalls(root){
+    body.replaceChildren();
+    const recipient=who==='alex'?'mira':'alex';
+    const name=NAMES[recipient],status=phoneContactStatus(root,recipient);
+    const active=root.phoneCalls?.active;
+    body.append(element('p','career-phone-person','☎ '+NAMES[who]+' · ЗВОНКИ'),
+      element('h2','career-phone-section-title','Контакты'));
+    const card=element('section','phone-platform-contact');
+    card.append(element('strong',null,name),
+      element('span','phone-platform-call-status',active?'Идёт разговор':status.label));
+    if(active){
+      card.append(element('p','career-phone-muted',
+        'Разговор идёт · осталось '+Math.max(0,Math.ceil(active.endAt-root.minutes))+
+        ' игровых мин. · кнопка закрытия телефона не прерывает звонок.'));
+      card.append(action('Завершить без бонуса',()=>{
+        const result=onCancelCall();
+        notify(result.ok?'Звонок завершён без награды':'Завершить звонок не удалось');
+        render();
+      },'career-phone-secondary phone-call-cancel'));
+    }else{
+      const own=phoneContactStatus(root,who);
+      const cooldown=root.phoneCalls?.lastCompletedAt===null?0:
+        Math.max(0,Math.ceil(CALL_COOLDOWN-
+          (root.minutes-root.phoneCalls.lastCompletedAt)));
+      const disabled=root.paused||!own.ok||!status.ok||cooldown>0;
+      const label=cooldown>0?'Повторный звонок через '+cooldown+' мин.':
+        root.paused?'Сними паузу для звонка':
+        !own.ok?'Нельзя позвонить: '+own.label:
+        !status.ok?'Контакт недоступен: '+status.label:
+        '☎ Позвонить · '+CALL_DURATION+' игровых мин.';
+      const button=action(label,()=>{
+        const result=onStartCall(who,recipient);
+        const messages={busy:'Собеседник занят',
+          'mandatory-choice':'Сначала реши обязательный вопрос',
+          departing:'Персонаж выходит на работу',returning:'Персонаж возвращается домой',
+          paused:'Сними паузу',cooldown:'Повторный звонок пока недоступен',
+          'save-failed':'Не удалось сохранить звонок'};
+        notify(result.ok?'☎ Разговор начат на '+CALL_DURATION+' игровых минут':
+          messages[result.reason]||'Соединение недоступно');
+        render();
+      },'career-phone-primary phone-call-start');
+      button.disabled=disabled;
+      card.append(button);
+    }
+    body.append(card);
+    body.append(element('p','career-phone-muted',
+      'Звонок работает дистанционно, в том числе во время смены. '+
+      'За завершённый разговор: общение +6 обоим, отношения +1. Перерыв '+CALL_COOLDOWN+
+      ' игровых минут. Рабочая зарплата и очередь действий не меняются.'));
+  }
   function render({preserveScroll=false}={}){
     if(!opened())return;
     const root=personRoot();if(!root)return;
     renderPendingNotice(root);
     const oldScroll=body.scrollTop;
     if(root.recruitmentSystem?.byResident?.[who]?.phase==='interview_active')app='work';
-    title.textContent=app==='finance'?'Финансы · Семья':
+    title.textContent=app==='home'?'Главный экран':
+      app==='calls'?'Звонки · '+NAMES[who]:
+      app==='finance'?'Финансы · Семья':
       app==='food'?'Доставка · Блин’С':'Работа · '+NAMES[who];
-    overlay.setAttribute('aria-label',app==='finance'?'Смартфон: финансы семьи':
+    overlay.setAttribute('aria-label',app==='home'?'Смартфон: главный экран':
+      app==='calls'?'Смартфон: звонки':
+      app==='finance'?'Смартфон: финансы семьи':
       app==='food'?'Смартфон: доставка готовой еды':'Смартфон: работа Блин’С');
+    appTabs.hidden=app==='home'||app==='calls';
+    routeBar.hidden=app==='home';
     for(const b of appTabs.querySelectorAll('button')){
       const selected=b.dataset.app===app;
       b.textContent=b.dataset.app==='finance'?'Финансы · Семья':
         b.dataset.app==='food'?'🛵 Доставка':'Работа · '+NAMES[who];
       b.setAttribute('aria-pressed',String(selected));
       b.classList.toggle('career-phone-app-active',selected);
+    }
+    if(app==='home'){
+      renderPhoneHome(root);body.scrollTop=0;return;
+    }
+    if(app==='calls'){
+      renderPhoneCalls(root);body.scrollTop=preserveScroll?oldScroll:0;return;
     }
     if(app==='finance'){
       financeUI.render(root);
@@ -1144,9 +1236,8 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   }
   function open(target='work'){
     if(opened()){
-      if(target==='finance'&&app!=='finance'){app='finance';render();return;}
-      if(target==='food'&&app!=='food'){app='food';render();return;}
-      if(target==='work'&&app!=='work'){app='work';render();return;}
+      if(target==='home'){app='home';render();return;}
+      if(phoneAppRoute(target)!==app){app=phoneAppRoute(target);render();return;}
       close();return;
     }
     if(!canOpen()){notify('Сначала заверши текущий режим или обязательный диалог');return;}
@@ -1154,7 +1245,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     if(!NAMES[root?.selectedSim])return;
     beforeOpen();
     who=root.selectedSim;
-    app=['finance','food'].includes(target)?target:'work';
+    app=phoneAppRoute(target);
     // Restore the same resident's screen on close/open. A live recruitment
     // interview must still use its canonical application view on first open.
     const remembered=contexts[who];
@@ -1195,9 +1286,10 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     heading.focus({preventScroll:true});
     return true;
   }
-  trigger.addEventListener('click',()=>open('work'));
+  trigger.addEventListener('click',()=>open('home'));
   financeTrigger?.addEventListener('click',()=>open('finance'));
-  return {open:()=>open('work'),openFinance:()=>open('finance'),openIncident,close,
+  return {open:()=>open('home'),openWork:()=>open('work'),
+    openFinance:()=>open('finance'),openIncident,close,
     refresh:()=>render({preserveScroll:true}),isOpen:opened,
     interviewNeedsDecision:()=>opened()&&
       getRoot()?.recruitmentSystem?.byResident?.[who]?.phase==='interview_active'};
