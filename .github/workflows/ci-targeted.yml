@@ -16,6 +16,7 @@ jobs:
       parcel_editor: ${{ steps.impact.outputs.parcel_editor }}
       cas_inventory: ${{ steps.impact.outputs.cas_inventory }}
       cas_baseline: ${{ steps.impact.outputs.cas_baseline }}
+      cas_hud: ${{ steps.impact.outputs.cas_hud }}
       e5: ${{ steps.impact.outputs.e5 }}
       fixture_motion: ${{ steps.impact.outputs.fixture_motion }}
       integration_qa: ${{ steps.impact.outputs.integration_qa }}
@@ -79,6 +80,16 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: CAS-01.7 actual 4-resident iPhone viewport WebGL/HUD/career
+        if: ${{ needs.targeted.outputs.cas_hud == 'true' }}
+        run: node tests/cas-01-7-browser-smoke.mjs
+      - name: Upload CAS-01.7 mobile screenshots
+        if: ${{ always() && needs.targeted.outputs.cas_hud == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-01-7-mobile-pr
+          path: artifacts/cas-01-7/
+          if-no-files-found: ignore
       - name: Parcel editor real scene and transaction checks
         if: ${{ needs.targeted.outputs.parcel_editor == 'true' }}
         run: node tests/parcel-editor-browser.mjs

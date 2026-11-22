@@ -33,11 +33,12 @@ import {workScenario,decideWorkIncident,workIncidentChoiceDescription,pendingWor
 import {jobSatisfaction,workLoadLabel,workLifeConflict} from './career-worklife.js';
 import {resolveWorkLifeConflict} from './career-worklife-conflict.js';
 import {MEMORY_TEXT} from './psychology.js';
+import {residentIdsForSimulation} from './resident-activity-runtime.js';
 import {RECRUITMENT_CAREERS,INTERVIEW_QUESTIONS_BY_CAREER,CAREER_SKILL_LABELS,submitCareerApplication,
   startCareerInterview,answerCareerInterview,markRecruitmentRead,
   finishRecruitmentApplication,interviewScore,recruitmentRetry} from './career-recruitment.js';
 
-const NAMES={alex:'Алекс',mira:'Мира'};
+const LEGACY_NAMES={alex:'Алекс',mira:'Мира'};
 function element(tag,className,text){
   const el=document.createElement(tag);
   if(className)el.className=className;
@@ -60,7 +61,15 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   onReadSportsNews=()=>({ok:false,reason:'unavailable'}),
   onWatchSportsMatch=()=>({ok:false,reason:'unavailable'}),
   onInviteSportsMatch=()=>({ok:false,reason:'unavailable'}),
-  selectResident=()=>false,beforeOpen=()=>{},canOpen=()=>true}){
+  selectResident=()=>false,getSelectedResident=root=>root?.selectedSim,
+  beforeOpen=()=>{},canOpen=()=>true}){
+  const NAMES=new Proxy(LEGACY_NAMES,{get(names,id){
+    if(typeof id!=='string')return undefined;
+    if(Object.hasOwn(names,id))return names[id];
+    const root=getRoot();
+    if(!residentIdsForSimulation(root).includes(id))return undefined;
+    return root.population?.residentsById?.[id]?.identity?.firstName||undefined;
+  }});
   const overlay=element('section','career-phone-overlay');
   overlay.id='career-phone-panel';overlay.hidden=true;
   overlay.setAttribute('aria-label','Смартфон: работа Блин’С');
@@ -140,7 +149,8 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   });
   function personRoot(){
     const root=getRoot();
-    if(!root||root.selectedSim!==who){close({focus:false});return null;}
+    if(!root||getSelectedResident(root)!==who||
+      !residentIdsForSimulation(root).includes(who)){close({focus:false});return null;}
     return root;
   }
   function top(text){
@@ -149,7 +159,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   }
   function renderPendingNotice(root){
     incidentNotice.replaceChildren();
-    const ids=['alex','mira'].filter(id=>pendingWorkIncident(root,id));
+    const ids=residentIdsForSimulation(root).filter(id=>pendingWorkIncident(root,id));
     if(!ids.length)return;
     const id=ids.includes(who)?who:ids[0];
     const contract=root.careerSystem.byResident[id];
@@ -1572,9 +1582,10 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     }
     if(!canOpen()){notify('Сначала заверши текущий режим или обязательный диалог');return;}
     const root=getRoot();
-    if(!NAMES[root?.selectedSim])return;
+    const selected=getSelectedResident(root);
+    if(!NAMES[selected]||!residentIdsForSimulation(root).includes(selected))return;
     beforeOpen();
-    who=root.selectedSim;
+    who=selected;
     app=phoneAppRoute(target);
     // Restore the same resident's screen on close/open. A live recruitment
     // interview must still use its canonical application view on first open.
@@ -1599,7 +1610,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       return false;
     }
     const root=getRoot();
-    if(root.selectedSim!==residentId&&!selectResident(residentId))return false;
+    if(getSelectedResident(root)!==residentId&&!selectResident(residentId))return false;
     if(opened()){
       if(who!==residentId&&who)
         contexts[who]={section,view,chosen,historyId,scrollTop:body.scrollTop};
@@ -1608,7 +1619,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     }else{
       open('work');
     }
-    if(!opened()||getRoot()?.selectedSim!==residentId)return false;
+    if(!opened()||getSelectedResident(getRoot())!==residentId)return false;
     app='work';section='vacancies';view='list';chosen=null;historyId=null;
     render();
     const heading=body.querySelector('#career-pending-incident-title');

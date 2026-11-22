@@ -87,6 +87,7 @@ export function planChanges(files,root=ROOT){
     /^(?:src\/(?:sports-identity|furniture-catalog|furniture-products|furniture-procedural-library|furniture-editor|career-phone-ui|game)\.js|tests\/fandom-r2-b-browser-smoke\.mjs)$/.test(f));
   const fandom_r2c=changed.some(f=>
     /^(?:src\/(?:sports-shared-watch|action-queue|household|sports-phone-model|career-phone-ui|game)\.js|tests\/fandom-r2-c-browser-smoke\.mjs)$/.test(f));
+  const cas_hud=changed.some(f=>/^(?:src\/(?:resident-hud|career-phone-ui|game)\.js|tests\/cas-01-7-browser-smoke\.mjs)$/.test(f));
   const cas_inventory=changed.some(f=>['scripts/cas-00-dependency-inventory.mjs','tests/cas-00-dependency-inventory.test.js'].includes(f));
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');
   const career_shifts=changed.some(f=>
@@ -94,7 +95,7 @@ export function planChanges(files,root=ROOT){
   return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
     fandom_tv,fandom_phone,fandom_r2a,fandom_r2b,fandom_r2c,
     e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
-    integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),changed};
+    integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),cas_hud,changed};
 }
 
 function main(){
@@ -136,7 +137,7 @@ function main(){
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
     'parcel_editor='+changed.some(f=>f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
-    'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
+    'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'cas_hud='+(plan.cas_hud?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
     'micro_ux='+(plan.micro_ux?'true':'false')+'\n'+
     'load_truth='+(plan.load_truth?'true':'false')+'\n'+
     'fridge_ux='+(plan.fridge_ux?'true':'false')+'\n'+

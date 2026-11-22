@@ -2668,3 +2668,41 @@ button.time-card:active {transform:translateY(1px);}
 .parcel-editor .parcel-actions button{min-height:48px}
 .parcel-editor .parcel-actions button[data-parcel-action="turn"],
 .parcel-editor .parcel-actions button[data-parcel-action="rotate"]{grid-column:2}
+
+/* CAS-01.7: 2–4 full-name/unique-ID switches with >=44px finger targets. */
+#dashboard.dashboard[data-residents="3"] .resident-column,#dashboard.dashboard[data-residents="4"] .resident-column{flex-wrap:wrap;gap:4px 7px}
+#dashboard[data-residents="3"] .resident-switch,#dashboard[data-residents="4"] .resident-switch{width:100%;flex:1 0 100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+#dashboard[data-residents="4"] .resident-switch{grid-template-columns:repeat(4,minmax(0,1fr))}
+#dashboard[data-residents="3"] .resident-switch button,#dashboard[data-residents="4"] .resident-switch button{min-width:44px;min-height:44px;width:100%;padding:6px 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+#dashboard .resident-switch button[data-away="true"]{border-style:dashed}
+#dashboard .resident-switch button[data-away="true"]:after{content:" 💼";font-size:9px}
+#dashboard .resident-switch button[data-critical="true"]{box-shadow:inset 0 -3px #cc8551}
+.cas-resident-details{position:absolute;z-index:20;right:max(8px,env(safe-area-inset-right));bottom:calc(176px + env(safe-area-inset-bottom));width:min(340px,calc(100vw - 16px));max-height:min(35dvh,290px);overflow:auto;overscroll-behavior:contain;background:#fffffff9;color:#294d3e;border:1px solid #bdd6c5;border-radius:16px;box-shadow:0 8px 30px #183e313b;padding:9px;display:flex;flex-direction:column;gap:7px}
+.cas-resident-details[hidden]{display:none!important}
+.cas-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
+.cas-detail-heading strong{font-size:16px}
+.cas-detail-heading span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cas-detail-job{font-size:11px;font-weight:700;color:#547563;margin:0}
+.cas-detail-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.cas-detail-actions button,.cas-peer-select,.cas-queue-item button{min-width:0;min-height:44px;border:1px solid #aacdb9;border-radius:9px;background:#e8f3eb;color:#2e604a;font-size:11px;font-weight:750;touch-action:manipulation}
+.cas-detail-actions button:disabled{opacity:.45}
+.cas-detail-actions .cas-peer-select{width:100%;padding:2px}
+.cas-personal-queue{display:flex;flex-wrap:wrap;gap:4px}
+.cas-queue-item{display:flex;align-items:center;gap:5px;font-size:11px}
+.cas-queue-item button{min-height:32px;padding:2px 8px}
+.cas-scene-tags{position:absolute;inset:0;z-index:5;pointer-events:none}
+.cas-scene-tag{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;min-width:48px;min-height:44px;border:1px solid #90b9a0;border-radius:22px;background:#eaf6ebee;color:#26543f;font-size:11px;font-weight:800;padding:4px 7px;box-shadow:0 2px 12px #143f332c;touch-action:manipulation}
+.cas-scene-tag[hidden]{display:none!important}
+.cas-scene-tag:focus-visible,.cas-detail-actions button:focus-visible{outline:3px solid #2b745a;outline-offset:2px}
+.app-shell[data-build-mode="true"] .cas-resident-details,.app-shell[data-furnish-mode="true"] .cas-resident-details{display:none!important}
+.app-shell[data-cas-extra-selected="true"] .social-bar,.app-shell[data-cas-extra-selected="true"] .social-context,.app-shell[data-cas-extra-selected="true"] .social-menu{display:none!important}
+@media(max-width:370px){.cas-resident-details{bottom:calc(203px + env(safe-area-inset-bottom));max-height:32dvh}#dashboard[data-residents="4"] .resident-switch button{font-size:10px}}
+@media(max-height:560px){.cas-resident-details{left:max(8px,env(safe-area-inset-left));right:auto;bottom:calc(108px + env(safe-area-inset-bottom));width:min(315px,50vw);max-height:50dvh}}
+
+/* A third/fourth resident must never silently inherit the old two-rig action panels. */
+.app-shell[data-cas-extra-selected="true"] #action-sheet,
+.app-shell[data-cas-extra-selected="true"] #queue-toggle,
+.app-shell[data-cas-extra-selected="true"] #plan-peek,
+.app-shell[data-cas-extra-selected="true"] .social-bar,
+.app-shell[data-cas-extra-selected="true"] .social-context,
+.app-shell[data-cas-extra-selected="true"] .social-menu{display:none!important}
