@@ -50,6 +50,7 @@ jobs:
           node --check src/sports-calendar.js
           node --check src/sports-league.js
           node --check src/sports-fandom.js
+          node --check src/sports-tv.js
           node --check src/phone-app-registry.js
           node --check src/phone-calls.js
           node --check src/career-phone-ui.js
@@ -246,7 +247,7 @@ jobs:
           cp src/ux01-plan-ui.js site/src/
           cp src/queue-rescue.js site/src/
           cp src/phone-app-registry.js src/phone-calls.js site/src/
-          cp src/sports-catalog.js src/sports-calendar.js src/sports-league.js src/sports-fandom.js site/src/
+          cp src/sports-catalog.js src/sports-calendar.js src/sports-league.js src/sports-fandom.js src/sports-tv.js site/src/
           cp src/insight-presentation.js site/src/
           cp src/ux05-character-ui.js site/src/
           cp src/camera-gestures.js site/src/

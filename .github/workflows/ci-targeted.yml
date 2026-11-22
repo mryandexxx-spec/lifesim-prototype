@@ -22,6 +22,7 @@ jobs:
       grill_r1: ${{ steps.impact.outputs.grill_r1 }}
       career_shifts: ${{ steps.impact.outputs.career_shifts }}
       phone_platform: ${{ steps.impact.outputs.phone_platform }}
+      fandom_tv: ${{ steps.impact.outputs.fandom_tv }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,6 +100,16 @@ jobs:
         with:
           name: phone-platform-r1-mobile-pr
           path: artifacts/phone-platform-r1/
+          if-no-files-found: ignore
+      - name: FANDOM-R1-C real two-viewport football TV and calendar smoke
+        if: ${{ needs.targeted.outputs.fandom_tv == 'true' }}
+        run: node tests/fandom-r1-c-browser-smoke.mjs
+      - name: Upload FANDOM-R1-C screenshots
+        if: ${{ always() && needs.targeted.outputs.fandom_tv == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fandom-r1-c-mobile-pr
+          path: artifacts/fandom-r1-c/
           if-no-files-found: ignore
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}

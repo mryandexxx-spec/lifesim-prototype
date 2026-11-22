@@ -5,6 +5,9 @@ import {addCalendarEvent,editCalendarEvent,removeCalendarEvent,changeEventOccurr
  expandCalendarEvents,findEventConflicts} from './calendar-events.js';
 import {holidayDefinitions,expandHolidays,saveHoliday,removeHoliday,isCalendarDayOff} from './calendar-holidays.js';
 import {calendarCareerShifts,clockLabel} from './career-job-board.js';
+import {sportsCalendarEvents} from './sports-calendar.js';
+import {sportsTeam} from './sports-catalog.js';
+import {matchAt} from './sports-league.js';
 const pad=n=>String(n).padStart(2,'0'),time=n=>pad(Math.floor(n/60))+':'+pad(n%60);
 const fromTime=s=>/^\d{2}:\d{2}$/.test(s)?Number(s.slice(0,2))*60+Number(s.slice(3,5)):NaN;
 const addDays=(iso,n)=>toISODate(serialToCivil(civilToSerial(iso)+n));
@@ -12,11 +15,12 @@ const showDate=iso=>{const d=parseCivilDate(iso);return d?d.day+' '+MONTHS_RU[d.
 const monthNames=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 /** Read-only selection projection. The root calendar and career contracts remain authoritative. */
 export function calendarAgendaSummary(root,iso){
- if(!parseCivilDate(iso))return {events:[],holidays:[],shifts:[]};
+ if(!parseCivilDate(iso))return {events:[],holidays:[],shifts:[],sports:[]};
  return {
   events:expandCalendarEvents(root.calendar,iso,iso),
   holidays:expandHolidays(root.calendar,iso,iso),
-  shifts:calendarCareerShifts(root,iso,iso)
+  shifts:calendarCareerShifts(root,iso,iso),
+  sports:sportsCalendarEvents(root.sportsWorld,root.calendar,iso,iso)
  };
 }
 const markup=`
@@ -118,7 +122,8 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
   const root=getRoot(),now=today(),d=parseCivilDate(selected),c=root.calendar;
   if(!d)return;
   const key=[view,selected,now,JSON.stringify(c.events||[]),JSON.stringify(c.holidays||[]),
-   JSON.stringify(c.occurrenceOverrides||[]),JSON.stringify(root.careerSystem?.byResident||{})].join('|');
+   JSON.stringify(c.occurrenceOverrides||[]),JSON.stringify(root.careerSystem?.byResident||{}),
+   root.sportsWorld?.seasonId,root.sportsWorld?.results?.length].join('|');
   if(cache===key)return;cache=key;
   wrap.querySelectorAll('[data-lc-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lcView===view)));
   el('lc-title').textContent=selected===now?'Сегодня':'Календарь';
@@ -131,6 +136,7 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
     view==='week'?showDate(from)+' — '+showDate(to):showDate(selected);
   const events=expandCalendarEvents(c,from,to),holidays=expandHolidays(c,from,to);
   const work=calendarCareerShifts(root,from,to);
+  const sports=sportsCalendarEvents(root.sportsWorld,root.calendar,from,to);
   const grid=el('lc-days');grid.replaceChildren();grid.className='lc-days lc-'+view;
   if(view!=='day'){
    for(const s of WEEKDAYS_RU){const tag=document.createElement('span');tag.textContent=s;tag.className='lc-week-label';grid.append(tag);}
@@ -143,18 +149,19 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
     if(day.iso===now)b.classList.add('lc-today');
     if(isCalendarDayOff(c,day.iso))b.classList.add('lc-day-off');
     const n=events.filter(e=>e.iso===day.iso).length,h=holidays.filter(x=>x.iso===day.iso).length,
-      w=work.filter(x=>x.iso===day.iso).length;
-    b.setAttribute('aria-label',showDate(day.iso)+(day.iso===now?' сегодня':'')+(n?' событий '+n:'')+(h?' праздников '+h:'')+(w?' рабочих смен '+w:''));
+      w=work.filter(x=>x.iso===day.iso).length,
+      f=sports.filter(x=>x.iso===day.iso).length;
+    b.setAttribute('aria-label',showDate(day.iso)+(day.iso===now?' сегодня':'')+(n?' событий '+n:'')+(h?' праздников '+h:'')+(w?' рабочих смен '+w:'')+(f?' матчей '+f:''));
     b.setAttribute('aria-pressed',String(day.iso===selected));
     const span=document.createElement('span');span.textContent=String(day.day);b.append(span);
-    if(n||h||w){const mark=document.createElement('small');mark.textContent=(n?'●'.repeat(Math.min(3,n)):'')+(h?' ✦':'')+(w?' ▣':'');b.append(mark);}
+    if(n||h||w||f){const mark=document.createElement('small');mark.textContent=(n?'●'.repeat(Math.min(3,n)):'')+(h?' ✦':'')+(w?' ▣':'')+(f?' ⚽':'');b.append(mark);}
     b.addEventListener('click',()=>{selected=day.iso;cache='';render();});grid.append(b);
    }
   }else{const p=document.createElement('p');p.className='lc-day-summary';p.textContent=showDate(selected)+' · '+WEEKDAYS_RU[weekdayFromSerial(civilToSerial(selected))];grid.append(p);}
   el('lc-selected').textContent=showDate(selected)+(selected===now?' · сегодня':'')+(isCalendarDayOff(c,selected)?' · выходной':'');
   const day=calendarAgendaSummary(root,selected);
   el('lc-legend').replaceChildren();
-  for(const [label,count] of [['Событие',day.events.length],['Смена',day.shifts.length],['Праздник',day.holidays.length]]){
+  for(const [label,count] of [['Событие',day.events.length],['Смена',day.shifts.length],['Праздник',day.holidays.length],['Матч',day.sports.length]]){
    const item=document.createElement('span');item.textContent=label+' · '+count;
    el('lc-legend').append(item);
   }
@@ -165,6 +172,13 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
    agenda.append(row(e.title,'Событие · '+(e.allDay?'Весь день':time(e.start)+'–'+time(e.end))+' · '+
     (e.participants.length===2?'Алекс и Мира':e.participants[0]==='alex'?'Алекс':'Мира')+
     (e.repeat!=='none'?' · ↻':''),()=>showEvent(e)));
+  for(const match of day.sports){
+    const data=matchAt(root.sportsWorld,match.matchId,root.minutes);
+    const score=data?.state==='completed'?' · '+data.score.join(':'):
+      data?.state==='live'?' · '+data.score.join(':')+' · идёт':'';
+    agenda.append(row('⚽ '+sportsTeam(match.home)?.short+' — '+sportsTeam(match.away)?.short,
+      'Лига Блин’С · '+time(match.start)+'–'+time(match.end)+score,null));
+  }
   for(const w of day.shifts)
     agenda.append(row(w.timeOff==='paid'?'🌴 Оплачиваемый отпуск':
       w.timeOff==='unpaid'?'🏖 Отгул':'▣ Работа: '+w.title,
@@ -174,7 +188,8 @@ export function createCalendarUI({host,getRoot,setCalendar,notify,onAnchor,onClo
   if(!agenda.childNodes.length){const p=document.createElement('p');p.textContent='На эту дату событий нет.';agenda.append(p);}
   const upcoming=el('lc-upcoming');upcoming.replaceChildren();
   const future=[...expandCalendarEvents(c,now,addDays(now,30)),...expandHolidays(c,now,addDays(now,30)),
-    ...calendarCareerShifts(root,now,addDays(now,30))]
+    ...calendarCareerShifts(root,now,addDays(now,30)),
+    ...sportsCalendarEvents(root.sportsWorld,root.calendar,now,addDays(now,30))]
    .sort((a,b)=>a.iso.localeCompare(b.iso)||a.start-b.start).slice(0,8);
   for(const x of future){const holiday=x.id.startsWith('h-');
     upcoming.append(row((holiday?'✦ ':x.work?'▣ ':'')+x.title,showDate(x.iso)+' · '+
