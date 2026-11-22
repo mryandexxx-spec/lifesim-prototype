@@ -111,12 +111,23 @@ try{
   await page.locator('[data-parcel-action^="select:"]').first().tap();
   assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'selected');
   await tap('back');await tap('group:shop');
-  // The compact editor has no search, category chips, or two select filters.
-  for(const selector of ['#furnish-type-tabs','#furnish-subtype-tabs',
-    '.furnish-search-label','#furnish-catalog-filters',
+  // Owner correction: the category tabs are essential for browsing.
+  // Only the search and the two native room/function dropdowns disappear.
+  assert.equal(await page.locator('#furnish-type-tabs').isVisible(),true);
+  assert.ok(await page.locator('#furnish-type-tabs button').count()>1,
+    'Visible category buttons must remain available');
+  assert.equal(await page.locator('#furnish-filter-count').isVisible(),true);
+  for(const selector of ['.furnish-search-label','#furnish-catalog-filters',
     '#furnish-room-filter','#furnish-function-filter']){
     assert.equal(await page.locator(selector).isVisible(),false,selector);
   }
+  const category=page.locator('#furnish-type-tabs button').nth(1);
+  await category.tap();
+  assert.equal(await category.getAttribute('aria-pressed'),'true',
+    'Selecting a category must continue to filter the catalog');
+  assert.ok(await page.locator('#furnish-stock button:not([hidden])').count()>0);
+  await page.locator('#furnish-type-tabs button').first().tap();
+  assert.equal(await page.locator('#furnish-type-tabs button').first().getAttribute('aria-pressed'),'true');
   await page.locator('#furnish-stock button:not([hidden])').first().tap();
   assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'list');
   assert.equal(await action('try').isVisible(),true);
