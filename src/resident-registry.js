@@ -5,6 +5,7 @@
  * to later CAS-01 stages with explicit migration and resource reservations.
  */
 import {validPersonId} from './social-graph.js';
+import {createResidentMembership} from './resident-membership.js';
 
 export const LEGACY_RESIDENT_IDS=Object.freeze(['alex','mira']);
 export const MAX_HOUSE_RESIDENTS=4;
@@ -42,8 +43,13 @@ export function createResidentDirectory(root,proposed=[]){
     seenActors.add(actor);
   }
   const ids=Object.freeze([...entries.keys()]);
+  const links=Object.fromEntries(proposed.filter(item=>item.familyId!==undefined||
+    item.dwellingId!==undefined).map(item=>[item.id,{
+      familyId:item.familyId, dwellingId:item.dwellingId
+    }]));
+  const membership=createResidentMembership(ids,links);
   return Object.freeze({
-    ids,
+    ids,membership,
     getActor(id){return entries.get(id)??null;}
   });
 }
