@@ -109,7 +109,10 @@ import {latestEpisodes} from './social-episodes.js';
 import {pairDynamic} from './social-dynamics.js';
 import {romanceStatus,romanceLoveDescription,romanceClimate,romanceAvailability,
   setRomancePreference,romancePreferenceSummary} from './romance.js';
-import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues} from './action-queue.js';
+import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX_ACTION_QUEUE,
+  blockedActions,parkQueuedHead,parkInterruptedAction,retryBlockedAction,removeBlockedAction,
+  MAX_BLOCKED_QUEUE} from './action-queue.js';
+import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand} from './queue-rescue.js';
 import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
 import {effectiveSleepSpeed} from './sleep-acceleration.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
@@ -447,6 +450,7 @@ let debugTapAt=0;
 let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let onManualCommandQueued = () => {};
+let inspectQueueWait=()=>null;
 let toastTimeout;
 function toast(message,{incidentResidentId=null}={}) {
   const el=$('toast');
@@ -1603,22 +1607,26 @@ function renderQueuePanel(force=true){
   renderPlanPeek();
   const residentId=queueViewerResident(game.selectedSim,queueInspectResident);
   const pending=pendingActions(game.actionQueues,residentId);
+  const blocked=blockedActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
-  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,active,
+  const headWait=inspectQueueWait(residentId);
+  const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,blocked,active,headWait,
     HOUSEHOLD_IDS.map(id=>pendingActions(game.actionQueues,id).length),
     game.socialAction?.phase,
     getActor(game,residentId).action?.phase,
     (game.socialAction?.eveningStage||game.socialAction?.eveningSofa)&&
       game.socialAction.phase==='using'
       ?Math.floor(game.socialAction.elapsed/3):null]);
-  $('queue-toggle').textContent=planButtonLabel(pendingActions(game.actionQueues,game.selectedSim).length);
+  $('queue-toggle').textContent=planButtonLabel(pendingActions(game.actionQueues,game.selectedSim).length)+
+    (blockedActions(game.actionQueues,game.selectedSim).length?' · ⚠':'');
   if(!force&&key===queueDisplayKey)return;
   queueDisplayKey=key;
   $('queue-panel').hidden=!queueVisible;
   $('queue-toggle').setAttribute('aria-expanded',String(queueVisible));
   $('plan-peek').setAttribute('aria-expanded',String(queueVisible));
   if(!queueVisible)return;
-  $('queue-title').textContent='План · '+getActorName(residentId);
+  $('queue-title').textContent='План · '+getActorName(residentId)+
+    (blocked.length?' · отложено: '+blocked.length:'');
   for(const id of HOUSEHOLD_IDS){
     $('queue-'+id).textContent=getActorName(id)+' · '+pendingActions(game.actionQueues,id).length;
     $('queue-'+id).setAttribute('aria-pressed',String(id===residentId));
@@ -1631,6 +1639,11 @@ function renderQueuePanel(force=true){
   const label=document.createElement('div');
   label.textContent=active?'Сейчас: '+active:'Сейчас: свободен';
   activeEl.append(label);
+  if(pending.length&&headWait){
+    const wait=document.createElement('div');wait.className='shared-progress-text';
+    wait.textContent='Первое задание ожидает: '+headWait+'. Задание сохранено. Можно исправить причину или убрать его кнопкой ниже.';
+    activeEl.append(wait);
+  }
   const evening=game.socialAction?.branchAction?.id==='romance.evening'&&
     (game.socialAction?.eveningStage||game.socialAction?.eveningSofa);
   if(evening&&active){
@@ -1684,7 +1697,39 @@ function renderQueuePanel(force=true){
     });
     li.append(name,remove);list.append(li);
   }
-  $('queue-empty').hidden=pending.length>0;
+  const reasons={
+    'missing-target':'предмет отсутствует или убран',
+    'unreachable-route':'нет маршрута к цели',
+    'invalid-destination':'точка больше не доступна',
+    'unavailable-gift':'подарок или книга отсутствует'
+  };
+  for(const task of blocked){
+    const li=document.createElement('li');
+    const name=document.createElement('span');
+    name.textContent='Отложено · '+taskLabel({...task,residentId})+
+      ' — '+(reasons[task.blockedReason]||'требуется проверка');
+    const retry=document.createElement('button');retry.type='button';
+    retry.textContent='Повторить';
+    retry.setAttribute('aria-label','Вернуть в очередь: '+taskLabel({...task,residentId}));
+    retry.addEventListener('click',()=>{
+      const result=retryBlockedAction(game.actionQueues,residentId,task.seq,game.minutes);
+      if(!result){toast('Очередь заполнена. Убери ненужное задание.');return;}
+      $('queue-feedback').textContent='Задание возвращено в конец плана: '+
+        taskLabel({...result,residentId});
+      renderQueuePanel(true);save(true);
+    });
+    const remove=document.createElement('button');remove.type='button';
+    remove.textContent='Убрать';
+    remove.setAttribute('aria-label','Удалить отложенное: '+taskLabel({...task,residentId}));
+    remove.addEventListener('click',()=>{
+      if(removeBlockedAction(game.actionQueues,residentId,task.seq)){
+        $('queue-feedback').textContent='Отложенное задание удалено по твоей команде';
+        renderQueuePanel(true);save(true);
+      }
+    });
+    li.append(name,retry,remove);list.append(li);
+  }
+  $('queue-empty').hidden=pending.length>0||blocked.length>0;
 }
 $('queue-toggle').addEventListener('click',()=>{
   if(dialogueNeedsDecision(game))return;
@@ -3929,6 +3974,43 @@ function boot() {
   // head, including up to eight A* social approaches. On mobile this can
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
+  let socialWalkGuard=newSocialWalkGuard();
+  let lastRescueOverflowSeq=null;
+  inspectQueueWait=residentId=>{
+    const task=pendingActions(game.actionQueues,residentId)[0];
+    if(!task)return null;
+    if(dialogueNeedsDecision(game))return 'нужно выбрать реплику в незавершённом диалоге';
+    if(game.paused)return 'игра на паузе';
+    if(game.socialAction)return 'выполняется общая встреча (‘'+game.socialAction.phase+'’)';
+    if(residentUnavailableForHome(game,residentId))return 'персонаж на работе или возвращается';
+    const actor=getActor(game,residentId);
+    if(actor?.action)return 'завершается текущее действие';
+    if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0||
+       showerStates[residentId].active||toiletStates[residentId].active||
+       fridgeLeaving[residentId])return 'завершается анимация выхода из предмета';
+    if(task.targetId){
+      if(residentUnavailableForHome(game,task.targetId))
+        return 'собеседник на работе или возвращается';
+      const partner=getActor(game,task.targetId);
+      if(partner?.action)return 'собеседник завершает своё действие';
+      if((pendingActions(game.actionQueues,task.targetId)[0]?.seq??Infinity)<task.seq)
+        return 'у собеседника есть более ранний личный план';
+      if(['alex','mira'].includes(task.targetId)&&
+        (sofaStates[task.targetId].progress>0||bedStates[task.targetId].progress>0||
+         showerStates[task.targetId].active||toiletStates[task.targetId].active||
+         fridgeLeaving[task.targetId]))
+        return 'собеседник завершает анимацию';
+    }
+    if(routeFailures.get(task.seq)>=3)
+      return 'подход не найден; можно изменить расстановку мебели или убрать это задание';
+    if(task.type==='object'&&task.actionId!=='dining'&&
+       !furnitureAvailable(game,task.actionId,residentId,task.targetInstanceId))
+      return 'нужный предмет сейчас занят или отсутствует';
+    if(task.type==='object'&&task.autoTable===true&&
+       !nearestAvailableDiningTable(game,residentId))
+      return 'нет доступного стола со свободным стулом';
+    return null;
+  };
   const destination=(id,residentId='alex',targetInstanceId=null,watchSeatInstanceId=null)=>{
     if(id==='swim')return getActor(game,residentId)?.action?.dryApproach||null;
     if(id==='garden')return getActor(game,residentId)?.action?.gardenGoal||
@@ -4148,8 +4230,51 @@ function boot() {
         (session.branchAction?.id==='romance.evening'&&
           (session.eveningStage||session.eveningSofa)&&session.partner===residentId));
   };
+  const impossibleQueuedHead=(residentId,task)=>{
+    if(!task)return null;
+    if(task.type==='object'&&task.autoTable!==true&&
+      !resolveActionFurniture(game.world,task.actionId,task.targetInstanceId))
+      return 'missing-target';
+    if(task.type==='activity'){
+      const activity=getActivityDefinition(HOBBY_ACTIVITIES,task.activityId);
+      const kind=activity?.requiredCapabilities.includes('music.playback')?'music':
+        activity?.requiredCapabilities.includes('art.paint')?'paint':'hobby';
+      if(!resolveActionFurniture(game.world,kind,task.targetInstanceId))
+        return 'missing-target';
+      if(task.inventoryItemId&&!inventoryFor(game,residentId).some(x=>
+        x.id===task.inventoryItemId&&x.type==='book'))return 'unavailable-gift';
+    }
+    if(task.type==='shared'&&task.mode==='gift'&&
+      !inventoryFor(game,residentId).some(x=>x.id===task.choiceId))
+      return 'unavailable-gift';
+    if(task.type==='shared'&&task.mode==='leisure'&&
+      ['music','books','tv'].includes(task.choiceId)&&
+      task.targetInstanceId&&!resolveActionFurniture(game.world,
+        task.choiceId==='books'?'hobby':task.choiceId,task.targetInstanceId))
+      return 'missing-target';
+    if(task.type==='outdoor'&&!outdoorBenchApproach(game.world,task.instanceId))
+      return 'missing-target';
+    if(task.type==='move'&&!isWalkable(task.x,task.z,game.world))
+      return 'invalid-destination';
+    return null;
+  };
   dispatchPlannedActions=()=>{
     if(game.paused||dialogueNeedsDecision(game))return [];
+    // Only proven-impossible commands move to a visible, saved review tray.
+    // Busy furniture, another person's plan and temporary work never qualify.
+    let parked=0;
+    for(const id of HOUSEHOLD_IDS){
+      const head=pendingActions(game.actionQueues,id)[0];
+      const reason=impossibleQueuedHead(id,head);
+      if(head&&reason&&parkQueuedHead(game.actionQueues,id,head.seq,reason,game.minutes)){
+        routeRetryAt.delete(head.seq);routeFailures.delete(head.seq);parked++;
+      }
+    }
+    if(parked){
+      const message='Недоступные задания сохранены как отложенные в плане. Остальная очередь продолжит работу.';
+      $('queue-feedback').textContent=message;
+      renderQueuePanel(true);save(true);toast(message);
+    }
     // An unfinished plan can mature before its watering command is reached.
     // Drop obsolete garden instructions without blocking subsequent FIFO tasks.
     let expired=0;
@@ -4291,6 +4416,14 @@ function boot() {
           routeRetryAt.set(command.seq,performance.now()+900);
           const count=(routeFailures.get(command.seq)||0)+1;
           routeFailures.set(command.seq,count);
+          if(count>=5&&parkQueuedHead(game.actionQueues,residentId,command.seq,
+            'unreachable-route',game.minutes)){
+            routeRetryAt.delete(command.seq);routeFailures.delete(command.seq);
+            const notice=getActorName(residentId)+
+              ': путь недоступен; задание сохранено в «Отложено». Остальной план может продолжаться.';
+            $('queue-feedback').textContent=notice;
+            renderQueuePanel(true);save(true);toast(notice);
+          }
           if(count===3){
             const musicBlocked=command.type==='activity'&&[MUSIC_ACTIVITY_ID,MUSIC_DANCE_ACTIVITY_ID].includes(command.activityId);
             const message=getActorName(residentId)+
@@ -4329,6 +4462,7 @@ function boot() {
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
     renderSocialMenu();renderQueuePanel();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    socialWalkGuard=newSocialWalkGuard();lastRescueOverflowSeq=null;
     benchVisualTargets.alex=null;benchVisualTargets.mira=null;
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
     for(const id of HOUSEHOLD_IDS){fridgeLeaving[id]=false;fridgeWasUsing[id]=false;}
@@ -7730,6 +7864,64 @@ function boot() {
           sofaStates[id].progress===0&&bedStates[id].progress===0&&
           !showerStates[id].active&&!toiletStates[id].active&&!fridgeLeaving[id];
       }))arriveSocial(game);
+      // QUEUE-RESCUE-R1: a social walk can otherwise retain the shared lock
+      // forever while BOTH manual FIFOs and work departure wait for it.
+      // Only a truly stationary walking phase is rescued, never a dialogue
+      // awaiting a choice or a paused/ongoing physical social activity.
+      const stranded=inspectSocialWalk(socialWalkGuard,game.socialAction,
+        {alex:game.position,mira:game.otherSim.position},.30,{
+          paused:game.paused,
+          partnerAway:HOUSEHOLD_IDS.some(id=>residentUnavailableForHome(game,id))
+        });
+      if(stranded&&game.socialAction){
+        const stalledSocial=game.socialAction;
+        const replay=recoverableSocialCommand(stalledSocial);
+        const full=replay&&pendingActions(game.actionQueues,stalledSocial.initiator).length>=MAX_ACTION_QUEUE;
+        const overflow=full&&blockedActions(game.actionQueues,stalledSocial.initiator).length>=MAX_BLOCKED_QUEUE;
+        if(overflow){
+          // A truly full active FIFO AND review tray has no safe, lossless
+          // destination for the accepted manual invitation. Surface the
+          // blockage instead of silently erasing the active commitment.
+          const seq=game.actionQueues.nextSeq;
+          if(lastRescueOverflowSeq!==seq){
+            lastRescueOverflowSeq=seq;
+            $('queue-feedback').textContent='Очередь и отложенные задания заполнены. Убери ненужное задание, чтобы освободить встречу.';
+            toast('План заполнен · освободи место в очереди или отложенных');
+          }
+        }else{
+          cancelSocial(game);
+          for(const id of HOUSEHOLD_IDS){
+            paths[id]={points:null,index:0,id:null};
+            getActor(game,id).event='Встреча прервана: подход не завершён';
+          }
+          socialWalkGuard=newSocialWalkGuard();
+          let restored=false;
+          if(replay){
+            const task=full
+              ?parkInterruptedAction(game.actionQueues,stalledSocial.initiator,
+                replay,'unreachable-route',game.minutes)
+              :enqueueAction(game.actionQueues,stalledSocial.initiator,replay);
+            if(task){
+              restored=true;
+              if(!full){
+                // Give the scene time to settle before retrying the same path.
+                routeRetryAt.set(task.seq,performance.now()+5000);
+                routeFailures.set(task.seq,3);
+              }
+            }
+          }
+          restartAutonomyWait();
+          const message=replay
+            ?restored
+              ?full
+                ?'Встреча зависла и сохранена в «Отложено»: очередь полна. Остальные действия доступны.'
+                :'Встреча зависла при подходе и отложена в конец плана. Остальные действия сохранены.'
+              :'Встреча прервана; восстановить задание не удалось. Проверь план.'
+            :'Зависшая автоматическая встреча прервана. Персонажи снова могут действовать.';
+          $('queue-feedback').textContent=message;
+          renderQueuePanel(true);save(true);toast(message);
+        }
+      }
       // Real active-time wait is independent for each sim and unaffected by game speed.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);

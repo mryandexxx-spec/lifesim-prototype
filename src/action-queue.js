@@ -19,6 +19,8 @@ import {validOutdoorId} from './outdoor-catalog.js';
 
 export const ACTION_QUEUE_SCHEMA=1;
 export const MAX_ACTION_QUEUE=12;
+export const MAX_BLOCKED_QUEUE=12;
+export const BLOCKED_REASONS=Object.freeze(['missing-target','unreachable-route','invalid-destination','unavailable-gift']);
 export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity','move','outdoor','garden','pool']);
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const count=n=>Number.isSafeInteger(n)&&n>=1&&n<=1000000000;
@@ -125,10 +127,14 @@ export function sanitizeQueueCommand(id,raw,persons){
 export function newActionQueues(personIds=[]){
   if(!Array.isArray(personIds)||personIds.some(id=>!validPersonId(id))||
     new Set(personIds).size!==personIds.length)throw new TypeError('Invalid queue residents');
-  const byResident={};
-  for(const id of personIds)Object.defineProperty(byResident,id,
-    {value:[],writable:true,configurable:true,enumerable:true});
-  return {schema:ACTION_QUEUE_SCHEMA,nextSeq:1,byResident};
+  const byResident={},blockedByResident={};
+  for(const id of personIds){
+    Object.defineProperty(byResident,id,
+      {value:[],writable:true,configurable:true,enumerable:true});
+    Object.defineProperty(blockedByResident,id,
+      {value:[],writable:true,configurable:true,enumerable:true});
+  }
+  return {schema:ACTION_QUEUE_SCHEMA,nextSeq:1,byResident,blockedByResident};
 }
 export function restoreActionQueues(raw,personIds=[]){
   const q=newActionQueues(personIds);
@@ -146,6 +152,24 @@ export function restoreActionQueues(raw,personIds=[]){
     }
     q.byResident[id].sort((a,b)=>a.seq-b.seq);
   }
+  // Optional schema-1 extension: retired-but-recoverable commands remain in
+  // the user's saved plan, outside active FIFO. Legacy saves simply have none.
+  for(const id of personIds){
+    if(!Array.isArray(raw.blockedByResident?.[id]))continue;
+    for(const item of raw.blockedByResident[id]){
+      if(q.blockedByResident[id].length>=MAX_BLOCKED_QUEUE)break;
+      const command=sanitizeQueueCommand(id,item,personIds);
+      if(!count(item?.seq)||seen.has(item.seq)||!command||
+        !BLOCKED_REASONS.includes(item.blockedReason))continue;
+      seen.add(item.seq);largest=Math.max(largest,item.seq);
+      q.blockedByResident[id].push({
+        seq:item.seq,...command,blockedReason:item.blockedReason,
+        blockedAt:Number.isFinite(item.blockedAt)&&item.blockedAt>=0
+          ?Math.min(item.blockedAt,1000000000):0
+      });
+    }
+    q.blockedByResident[id].sort((a,b)=>a.seq-b.seq);
+  }
   if(count(raw.nextSeq)&&raw.nextSeq>largest)q.nextSeq=raw.nextSeq;
   else q.nextSeq=largest+1;
   return q;
@@ -153,6 +177,61 @@ export function restoreActionQueues(raw,personIds=[]){
 export function pendingActions(queues,residentId){
   return Object.hasOwn(queues?.byResident||{},residentId)
     ?queues.byResident[residentId]:[];
+}
+export function blockedActions(queues,residentId){
+  return Object.hasOwn(queues?.blockedByResident||{},residentId)
+    ?queues.blockedByResident[residentId]:[];
+}
+/** A persistently impossible HEAD cannot monopolize subsequent manual plans.
+ * Keep its original command, sequence and human-readable reason in a saved
+ * review tray. Never touch currently running actions or another resident.
+ */
+export function parkQueuedHead(queues,residentId,seq,reason,at=0){
+  const active=pendingActions(queues,residentId),parked=blockedActions(queues,residentId);
+  if(!count(seq)||!BLOCKED_REASONS.includes(reason)||
+    !Array.isArray(active)||!Array.isArray(parked)||
+    !active.length||active[0].seq!==seq||parked.length>=MAX_BLOCKED_QUEUE)return false;
+  const task=active.shift();
+  parked.push({...task,blockedReason:reason,
+    blockedAt:Number.isFinite(at)&&at>=0?Math.min(at,1000000000):0});
+  return true;
+}
+/** Rescue of an already accepted active manual invitation when its future
+ * FIFO is full. This keeps the plan in the saved review tray and releases the
+ * shared social lock without erasing or jumping ahead of existing entries.
+ */
+export function parkInterruptedAction(queues,residentId,request,reason,at=0){
+  const parked=blockedActions(queues,residentId),persons=Object.keys(queues?.byResident||{});
+  if(!Array.isArray(parked)||parked.length>=MAX_BLOCKED_QUEUE||
+    !count(queues?.nextSeq)||!BLOCKED_REASONS.includes(reason))return null;
+  const command=sanitizeQueueCommand(residentId,request,persons);
+  if(!command)return null;
+  const task={seq:queues.nextSeq++,...command,blockedReason:reason,
+    blockedAt:Number.isFinite(at)&&at>=0?Math.min(at,1000000000):0};
+  parked.push(task);
+  return task;
+}
+/** Explicit user retry only: re-enter at FIFO tail with a fresh unique seq. */
+export function retryBlockedAction(queues,residentId,seq,at=0){
+  const parked=blockedActions(queues,residentId),active=pendingActions(queues,residentId);
+  if(!count(seq)||!Array.isArray(parked)||!Array.isArray(active)||
+    active.length>=MAX_ACTION_QUEUE||!count(queues?.nextSeq))return null;
+  const index=parked.findIndex(task=>task.seq===seq);
+  if(index<0)return null;
+  const command=sanitizeQueueCommand(residentId,parked[index],
+    Object.keys(queues.byResident));
+  if(!command)return null;
+  if(command.type==='pool')command.queuedAt=Number.isFinite(at)&&at>=0?at:0;
+  const task={seq:queues.nextSeq++,...command};
+  active.push(task);parked.splice(index,1);
+  return task;
+}
+export function removeBlockedAction(queues,residentId,seq){
+  const items=blockedActions(queues,residentId);
+  if(!count(seq)||!Array.isArray(items))return false;
+  const index=items.findIndex(task=>task.seq===seq);
+  if(index<0)return false;
+  items.splice(index,1);return true;
 }
 export function enqueueAction(queues,residentId,request){
   if(!record(queues)||!count(queues.nextSeq)||
