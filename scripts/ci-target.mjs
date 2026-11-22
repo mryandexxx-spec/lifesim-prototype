@@ -55,6 +55,11 @@ export function planChanges(files,root=ROOT){
     }
   }
   const extra=[
+    // Legacy source-level VM tests extract live UI functions, not ESM imports.
+    // They MUST run whenever the resident HUD or career phone is edited.
+    [/^src\/(?:game|career-phone-ui)\.js$/,[
+      'tests/q1-q4-regression.test.js',
+      'tests/ui-live-plan.test.js','tests/ui-nonblocking.test.js']],
     [/^src\/(?:camera-|mobile-gesture|world-interactions)/,['tests/camera-gestures.test.js','tests/ray-picking.test.js']],
     [/^src\/(?:kitchen|ready-food|dining|household)/,['tests/f4g-kitchen.test.js','tests/life-food-r1.test.js']],
     [/^src\/(?:finance-|household-bills)/,['tests/w4a-finance.test.js','tests/w4c-bills.test.js']],

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {enqueueAction,newActionQueues,pendingActions} from '../src/action-queue.js';
+import {HOUSEHOLD_IDS} from '../src/household.js';
 
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const game=read('../src/game.js');
@@ -38,6 +39,8 @@ test('1.0o: successful enqueue is acknowledged in queue counter and never makes 
   const calls={queue:0,saves:0,toasts:[],priority:0};
   const scope={
     $,ACTIONS:{bed:{label:'Спать'}},getActorName:()=> 'Алекс',
+    HOUSEHOLD_IDS,activeHudResident:()=>scope.game.selectedSim,
+    residentDisplayName:()=> 'Алекс',
     game:{selectedSim:'alex',actionQueues:queues},enqueueAction,pendingActions,
     preemptAutomaticForManual:()=>{calls.priority++;return null;},
     onManualCommandQueued:()=>{},
@@ -55,6 +58,11 @@ test('1.0o: successful enqueue is acknowledged in queue counter and never makes 
   assert.equal(calls.priority,1,'manual priority is triggered after successful enqueue');
   assert.deepEqual(calls.toasts,[],'success does not create a toast over social controls');
   assert.match($('queue-feedback').textContent,/Алекс.*Спать/);
+  // An extra HUD selection never sends the legacy default command to Alex.
+  scope.activeHudResident=()=> 'resident_3';
+  assert.equal(scope.scheduleCommand({type:'object',actionId:'bed'}),false);
+  assert.equal(pendingActions(queues,'alex').length,1);
+  assert.match(calls.toasts.at(-1),/личную панель/);
 });
 test('1.0o: active relationship diagnostics are not displayed without explicit debug action',()=>{
   const $=elements();
