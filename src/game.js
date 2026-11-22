@@ -174,7 +174,9 @@ import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './sh
 import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './toilet-interaction.js';
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
 import {proposeFurnishedRoomMove,createHouseholdConstructionEditor} from './furnished-room.js';
-import {residentSegmentClear} from './resident-activity-runtime.js';
+import {residentSegmentClear,residentIdsForSimulation} from './resident-activity-runtime.js';
+import {residentRoster,residentDisplayName,effectiveHudSelection,residentScenePose,CAS_ACTIONS} from './resident-hud.js';
+import {addressedSocialPeers,queueAddressedSocial} from './resident-social-runtime.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
   residentAutonomousChoice,residentGardenOpportunity,recordResidentGardenStart,
@@ -268,6 +270,11 @@ audioButton.addEventListener('click',async()=>{
 });
 refreshMusicAudioButton();
 const needTrendTracker=createNeedTrendTracker();
+// The old actor selection remains unchanged for two-rig animation/gameplay.
+// Extra selection is a view/explicit-ID queue, never an alias for Alex/Mira.
+let hudResidentId=game.selectedSim;
+const activeHudResident=()=>effectiveHudSelection(game,hudResidentId);
+const hudName=()=>residentDisplayName(game,activeHudResident());
 const selectedActor = () => getActor(game,game.selectedSim);
 const selectedName = () => getActorName(game.selectedSim);
 const visualQuery = new URLSearchParams(window.location.search).get('model') || '';
@@ -636,6 +643,10 @@ function taskLabel(task){
   return 'Действие';
 }
 function scheduleCommand(command,residentId=game.selectedSim){
+  if(!HOUSEHOLD_IDS.includes(activeHudResident())&&residentId!==activeHudResident()){
+    toast('Для выбранного жителя используй личную панель действий');
+    return false;
+  }
   if(command.type==='grill'){
     const actor=getActor(game,residentId);
     const point=grillApproach(game.world,command.instanceId);
@@ -1680,7 +1691,7 @@ function activeTaskLabel(id){
 // A single, read-only status area opens the EXISTING full queue. It never
 // dispatches/removes commands and never mutates serialized simulation state.
 function renderPlanPeek(){
-  const residentId=game.selectedSim;
+  const residentId=activeHudResident();
   const actor=getActor(game,residentId);
   let active=activeTaskLabel(residentId);
   const workView=workPresenceView(residentWorkPhase(game,residentId),residentWorkStatus(game,residentId)?.label);
@@ -1694,7 +1705,7 @@ function renderPlanPeek(){
       active+=' · '+Math.min(100,Math.round(100*(actor.action.elapsed||0)/duration))+'%';
   }
   const plan=planPreview({
-    residentName:getActorName(residentId),
+    residentName:residentDisplayName(game,residentId),
     activeLabel:workView.statusOverride||active,
     pending:pendingActions(game.actionQueues,residentId),
     taskName:task=>taskLabel({...task,residentId}),
@@ -1707,7 +1718,7 @@ function renderPlanPeek(){
   planPeekKey=key;
   $('status-text').textContent=plan.heading;
   $('plan-label').textContent=planButtonLabel(pendingActions(game.actionQueues,residentId).length);
-  $('plan-resident').textContent='Управляешь: '+getActorName(residentId);
+  $('plan-resident').textContent='Выбран: '+residentDisplayName(game,residentId);
   const list=$('plan-upcoming');list.replaceChildren();
   for(const item of plan.upcoming){
     const chip=document.createElement('span');chip.className='plan-chip';
@@ -2231,7 +2242,7 @@ incidentBadge.className='career-incident-badge';
 incidentBadge.hidden=true;
 $('career-phone-toggle').append(incidentBadge);
 function refreshIncidentNotifications(){
-  const ids=HOUSEHOLD_IDS.filter(id=>pendingWorkIncident(game,id));
+  const ids=residentIdsForSimulation(game).filter(id=>pendingWorkIncident(game,id));
   incidentBadge.hidden=ids.length===0;
   incidentBadge.textContent=String(ids.length);
   $('career-phone-toggle').setAttribute('aria-label',
@@ -2239,42 +2250,141 @@ function refreshIncidentNotifications(){
       'Открыть работу и график выбранного жителя');
 }
 function updateCareerHud(){
-  const status=residentWorkStatus(game,game.selectedSim);
+  const id=activeHudResident();
+  const status=residentWorkStatus(game,id);
   workHud.hidden=!status;
-  const pending=game.careerSystem?.byResident?.[game.selectedSim]?.currentShift?.incident;
+  const pending=game.careerSystem?.byResident?.[id]?.currentShift?.incident;
   workHud.textContent=(pending?.choiceId===null?'📩 Рабочая ситуация · ':'')+(status?.label||'');
 }
-function updateResidentPicker() {
-  for (const id of HOUSEHOLD_IDS) {
-    $('pick-'+id).setAttribute('aria-pressed',String(game.selectedSim===id));
-  }
-  $('resident-name').textContent=selectedName();
-  updateCareerHud();updateFamilyBalance();refreshIncidentNotifications();
-  $('avatar-symbol').textContent=game.selectedSim==='alex' ? '☺' : '✿';
-  renderMindIdentity();
+const residentSwitch=$('dashboard').querySelector('.resident-switch');
+const casDetails=document.createElement('section');
+casDetails.id='cas-resident-details';casDetails.className='cas-resident-details';
+casDetails.hidden=true;casDetails.setAttribute('aria-label','Личное управление жителем');
+$('dashboard').insertAdjacentElement('beforebegin',casDetails);
+const casSceneTags=document.createElement('div');
+casSceneTags.className='cas-scene-tags';casSceneTags.id='cas-scene-tags';
+document.querySelector('.app-shell').append(casSceneTags);
+const casTags=new Map(),casButtons=new Map();
+let lastCasDetailsKey='';
+function renderCasDetails(force=false){
+ const id=activeHudResident(),row=residentRoster(game,id).find(x=>x.id===id);
+ casDetails.hidden=!row||row.legacy;
+ if(casDetails.hidden){lastCasDetailsKey='';return;}
+ const pending=pendingActions(game.actionQueues,id);
+ const key=JSON.stringify([row,game.paused,buildMode,furnishMode,outdoorMode,
+   pending.map(x=>[x.seq,x.type,x.actionId]),getActor(game,id)?.event]);
+ if(!force&&key===lastCasDetailsKey)return;
+ // Native iOS select remains mounted while its picker is open.
+ if(!force&&casDetails.contains(document.activeElement)&&
+    document.activeElement?.tagName==='SELECT')return;
+ lastCasDetailsKey=key;
+ const heading=document.createElement('div');heading.className='cas-detail-heading';
+ const name=document.createElement('strong');name.textContent=row.name;
+ const status=document.createElement('span');
+ status.textContent=row.workLabel||(row.away?'На работе':getActor(game,id)?.event||'Дома');
+ heading.append(name,status);
+ const job=document.createElement('p');job.className='cas-detail-job';
+ job.textContent=(row.career?row.career+(row.rank?' · '+row.rank:''):'Без работы')+
+   ' · '+(row.away?'Вне участка':'На участке')+' · в плане '+row.queued;
+ const actions=document.createElement('div');actions.className='cas-detail-actions';
+ const add=(label,handler,disabled=false)=>{
+   const b=document.createElement('button');b.type='button';b.textContent=label;
+   b.disabled=disabled;b.addEventListener('click',handler);actions.append(b);return b;
+ };
+ add('💼 Карьера',()=>careerPhone.openWork());
+ add('◎ Камера',()=>focusSelectedCamera(id),row.away);
+ const blocked=row.away||buildMode||furnishMode||outdoorMode;
+ for(const [actionId,label] of CAS_ACTIONS)
+   add(label,()=>{
+     if(scheduleCommand({type:'object',actionId},id))renderCasDetails(true);
+   },blocked);
+ const peers=addressedSocialPeers(game,id);
+ if(peers.length){
+   const peer=document.createElement('select');peer.className='cas-peer-select';
+   peer.setAttribute('aria-label','Собеседник');
+   for(const item of peers){
+     const opt=document.createElement('option');opt.value=item.id;opt.textContent=item.name;peer.append(opt);
+   }
+   actions.append(peer);
+   add('Поговорить',()=>{
+     const task=queueAddressedSocial(game,id,peer.value,'talk');
+     if(task){save(true);renderCasDetails(true);toast('Беседа поставлена в очередь');}
+     else toast('Собеседник сейчас недоступен');
+   },blocked);
+ }
+ const list=document.createElement('div');list.className='cas-personal-queue';
+ for(const task of pending){
+   const item=document.createElement('div');item.className='cas-queue-item';
+   const label=document.createElement('span');
+   label.textContent=task.type==='object'?
+     (CAS_ACTIONS.find(([k])=>k===task.actionId)?.[1]||'Действие'):
+     task.type==='social'?'Беседа':task.type==='move'?'Маршрут':'Задание';
+   const remove=document.createElement('button');remove.type='button';
+   remove.textContent='Убрать';
+   remove.setAttribute('aria-label','Удалить задание '+label.textContent);
+   remove.addEventListener('click',()=>{
+     if(removeQueuedAction(game.actionQueues,id,task.seq)){
+       save(true);renderCasDetails(true);
+     }
+   });item.append(label,remove);list.append(item);
+ }
+ casDetails.replaceChildren(heading,job,actions,list);
 }
-for (const id of HOUSEHOLD_IDS) {
-  $('pick-'+id).addEventListener('click',()=>{
-    careerPhone.close({focus:false});setHomeOpen(false);setViewOpen(false);
-    selectResident(game,id);mindInspectResident=id;focusSelectedCamera(id);closeInsightPanel();
-    conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
-    socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
-    select(null); closeMindPanel();queueInspectResident=id; updateResidentPicker();renderSocialContext();
-    renderConversationPanel();renderSharedPanel();renderBranchPanel();
-    renderSocialMenu();renderQueuePanel();save(true);
-    toast('Теперь управляешь: '+selectedName());
-  });
+function updateResidentPicker(){
+ const rows=residentRoster(game,hudResidentId);
+ hudResidentId=activeHudResident();
+ $('dashboard').dataset.residents=String(rows.length);
+ document.querySelector('.app-shell').dataset.casExtraSelected=String(!HOUSEHOLD_IDS.includes(hudResidentId));
+ for(const row of rows){
+   let button=$('pick-'+row.id);
+   if(!button){
+     button=document.createElement('button');button.id='pick-'+row.id;button.type='button';
+     button.addEventListener('click',()=>chooseHudResident(row.id));
+     residentSwitch.append(button);casButtons.set(row.id,button);
+   }
+   button.textContent=row.name;
+   button.setAttribute('aria-pressed',String(row.id===hudResidentId));
+   button.setAttribute('aria-label','Выбрать '+row.name+(row.away?' · на работе':''));
+   button.dataset.away=String(row.away);
+   button.dataset.critical=String(row.priorityValue<30);
+ }
+ for(const [id,button] of casButtons)if(!rows.some(row=>row.id===id)){
+   button.remove();casButtons.delete(id);
+ }
+ $('resident-name').textContent=hudName();
+ $('avatar-symbol').textContent=hudResidentId==='alex'?'☺':hudResidentId==='mira'?'✿':'●';
+ updateCareerHud();updateFamilyBalance();refreshIncidentNotifications();
+ if(HOUSEHOLD_IDS.includes(hudResidentId))renderMindIdentity();
+ renderCasDetails(true);
 }
+function chooseHudResident(id){
+ if(!residentIdsForSimulation(game).includes(id)||dialogueNeedsDecision(game))return false;
+ careerPhone.close({focus:false});setHomeOpen(false);setViewOpen(false);
+ if(HOUSEHOLD_IDS.includes(id))selectResident(game,id);
+ hudResidentId=id;
+ mindInspectResident=game.selectedSim;
+ focusSelectedCamera(id);closeInsightPanel();
+ conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
+ socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
+ select(null);closeMindPanel();queueInspectResident=game.selectedSim;
+ updateResidentPicker();
+ renderSocialContext();renderConversationPanel();renderSharedPanel();
+ renderBranchPanel();renderSocialMenu();renderQueuePanel();
+ save(true);toast('Выбран житель: '+hudName());return true;
+}
+for(const id of HOUSEHOLD_IDS)
+ $('pick-'+id).addEventListener('click',()=>chooseHudResident(id));
 updateResidentPicker();
 // Tap the HUD name for focus; the containing mind button keeps its original behavior.
 $('resident-name').addEventListener('click',event=>{
   event.preventDefault();event.stopPropagation();
-  focusSelectedCamera(game.selectedSim);
+  focusSelectedCamera(activeHudResident());
 });
 // W1-B.3a: the existing phone now shows live shift presence, pay and attendance.
 const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
   financeTrigger:$('family-balance-chip'),getRoot:()=>game,
+  getSelectedResident:()=>activeHudResident(),
   setCareerSystem:state=>{
     game.careerSystem=state;applyWorkMoodContext(game);calendarUI.refresh();
   },
@@ -2338,14 +2448,7 @@ const careerPhone=createCareerPhoneUI({
   },
   onOpenChange:id=>updatePhoneProps(id),
   onIncidentChanged:()=>{updateCareerHud();refreshIncidentNotifications();},
-  selectResident:id=>{
-    if(!HOUSEHOLD_IDS.includes(id))return false;
-    if(game.selectedSim!==id){
-      selectResident(game,id);
-      updateResidentPicker();save(true);
-    }
-    return true;
-  },
+  selectResident:id=>chooseHudResident(id),
   canOpen:()=>!furnishMode&&!buildMode&&!outdoorMode&&!dialogueNeedsDecision(game),
   beforeOpen:()=>{
     calendarUI.close();closeCalendarAnchorPanel();setHomeOpen(false);
@@ -2359,14 +2462,10 @@ function openWorkIncident(residentId){
 const shiftSummary=createCareerShiftSummaryUI({
   host:document.querySelector('.app-shell'),getRoot:()=>game,
   shouldDefer:()=>dialogueNeedsDecision(game)||careerPhone.isOpen()||
-    HOUSEHOLD_IDS.some(id=>residentWorkPhase(game,id)==='returning')||
+    residentIdsForSimulation(game).some(id=>residentWorkPhase(game,id)==='returning')||
     document.querySelector('.life-calendar:not([hidden])')!==null,
   onDismissal:residentId=>{
-    if(game.selectedSim!==residentId){
-      selectResident(game,residentId);
-      updateResidentPicker();
-      save(true);
-    }
+    if(activeHudResident()!==residentId)chooseHudResident(residentId);
     careerPhone.openWork();
   }
 });
@@ -2389,7 +2488,7 @@ $('reset-btn').addEventListener('click', () => {
   const previous=game,enabled=game.autonomy.enabled;
   const fresh=newHousehold();
   setHouseholdAutonomy(fresh,enabled);
-  game=fresh;
+  game=fresh;hudResidentId='alex';
   if(!save(true)){
     game=previous;
     toast('Новая игра не начата: сохранение недоступно');
@@ -4084,6 +4183,34 @@ function boot() {
   }));
   const reactionBadges=createReactionBadges($('reaction-layer'));
   const reactionRigs={alex:alexRig,mira:miraRig};
+  // CAS-01.7: two original low-cost scene stand-ins (not new rigs or actors).
+  const casFigures=new Map(),casMaterials=[mat('#608b90'),mat('#ba8a70')];
+  function syncCasFigures(){
+    const ids=residentIdsForSimulation(game).slice(2),present=new Set(ids);
+    for(const [id,node] of casFigures)if(!present.has(id)){
+      node.destroy();casFigures.delete(id);casTags.get(id)?.remove();casTags.delete(id);
+    }
+    ids.forEach((id,index)=>{
+      let node=casFigures.get(id);
+      if(!node){
+        node=new pc.Entity('CAS resident '+id);app.root.addChild(node);
+        cylinder('CAS body '+id,0,1.08,0,.48,.82,.34,casMaterials[index%2],node);
+        ball('CAS head '+id,0,1.67,0,.43,.43,.43,M.skin,node);
+        box('CAS legs '+id,0,.41,0,.34,.72,.30,M.trousers,node);
+        casFigures.set(id,node);
+        const tag=document.createElement('button');tag.type='button';tag.className='cas-scene-tag';
+        tag.textContent=residentDisplayName(game,id);
+        tag.setAttribute('aria-label','Выбрать '+tag.textContent+' в 3D-сцене');
+        tag.addEventListener('click',()=>chooseHudResident(id));
+        casSceneTags.append(tag);casTags.set(id,tag);
+      }
+      const pose=residentScenePose(game,id);
+      node.enabled=Boolean(pose)&&!buildMode&&!furnishMode&&!outdoorMode;
+      if(pose)node.setPosition(pose.x,0,pose.z);
+      const tag=casTags.get(id);
+      tag.hidden=!node.enabled;
+    });
+  }
   const moodOrbit=$('mood-orbit');
   const sleepZzz=Object.fromEntries(HOUSEHOLD_IDS.map(id=>[id,$('sleep-zzz-'+id)]));
   let feedbackRoot=game;
@@ -4817,9 +4944,9 @@ function boot() {
   function setView(next){Object.assign(view,next);cameraUpdate();}
   let cameraFocus=null;
   focusSelectedCamera=id=>{
-    if(!HOUSEHOLD_IDS.includes(id)||buildMode||furnishMode||outdoorMode)return false;
+    if(!residentIdsForSimulation(game).includes(id)||buildMode||furnishMode||outdoorMode)return false;
     if(residentAwayAtWork(game,id)){
-      toast(getActorName(id)+' сейчас на работе — камера осталась на участке');
+      toast((residentDisplayName(game,id)||'Житель')+' сейчас на работе — камера осталась на участке');
       return false;
     }
     const point=getActor(game,id)?.position;
@@ -8395,6 +8522,7 @@ function boot() {
   app.on('update',dt=>{
     viewportHealth.markUpdate(performance.now());
     dt=Math.min(dt,.06);
+    syncCasFigures();
     if(cameraFocus){
       if(buildMode||furnishMode||outdoorMode||cameraGesture.count()||
         residentAwayAtWork(game,cameraFocus.id))cameraFocus=null;
@@ -8405,7 +8533,7 @@ function boot() {
         else{
           // Rendered location differs from the path endpoint while asleep,
           // seated, swimming or in an authored physical action pose.
-          const rig=cameraFocus.id==='alex'?avatar:miraAvatar;
+          const rig=cameraFocus.id==='alex'?avatar:cameraFocus.id==='mira'?miraAvatar:null;
           const rendered=rig?.getPosition?.();
           const target=Number.isFinite(rendered?.x)&&Number.isFinite(rendered?.z)
             ?rendered:actor.position;
@@ -9832,6 +9960,17 @@ function boot() {
       moodOrbit.hidden=!pos;
       if(pos){moodOrbit.style.left=pos.x+'px';moodOrbit.style.top=pos.y+'px';}
     }
+    for(const [id,tag] of casTags){
+      const pose=residentScenePose(game,id);
+      if(!pose||buildMode||furnishMode||outdoorMode){tag.hidden=true;continue;}
+      const point=new pc.Vec3(pose.x,2.15,pose.z);
+      const pos=camera.camera.worldToScreen(point);
+      const behind=camera.camera.viewMatrix.transformPoint(point).z>=0;
+      const visible=!behind&&pos.x>=25&&pos.x<=canvas.clientWidth-25&&
+        pos.y>=70&&pos.y<=canvas.clientHeight-170;
+      tag.hidden=!visible;
+      if(visible){tag.style.left=pos.x+'px';tag.style.top=pos.y+'px';}
+    }
     // Apply scene colors after the authoritative fixed-step clock tick.
     // No visual time advancement while paused, hidden or in Build/Furnish.
     const daylight=dayNightRenderer.update(game.calendar,game.minutes);
@@ -9846,8 +9985,9 @@ function boot() {
       $('calendar-anchor-toggle').title=formatCalendarDay(date,{includeYear:true})+' · День '+date.gameDay+' · открыть календарь и события';
       $('time-label').textContent=t.time;
       $('light-phase-label').textContent=daylight.phaseLabel;
-      const current=selectedActor();
-      $('resident-name').textContent=selectedName();
+      const current=getActor(game,activeHudResident());
+      $('resident-name').textContent=hudName();
+      if(!HOUSEHOLD_IDS.includes(activeHudResident()))renderCasDetails();
       updateFamilyBalance();
       updateCareerHud(); // Live earned wages while shift is progressing.
       const skill=getSkillDefinition(HOBBY_SKILLS,READING_SKILL_ID);
@@ -9914,7 +10054,7 @@ function boot() {
         bar.style.background=band.color;
         const line=bar.closest('.need');
         line.dataset.level=band.id;
-        const trend=needTrends[game.selectedSim][need];
+        const trend=needTrends[activeHudResident()]?.[need]||{symbol:'',direction:'idle',visible:false,label:''};
         const arrow=$('trend-'+need);
         arrow.textContent=trend.symbol;
         arrow.dataset.direction=trend.direction;
