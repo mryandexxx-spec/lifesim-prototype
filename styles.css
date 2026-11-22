@@ -2461,3 +2461,17 @@ button.time-card:active {transform:translateY(1px);}
 .sleep-zzz[hidden]{display:none}
 @keyframes micro-sleep-breathe{0%,100%{opacity:.65}50%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.sleep-zzz{animation:none}}
+
+/* LOAD-TRUTH-R1: observed readiness events, not a simulated loading percentage. */
+.loading .loading-stage-title{font-size:11px;color:#647e6b;font-weight:700}
+.loading-stages{box-sizing:border-box;list-style:none;width:min(320px,88vw);
+  max-height:min(38dvh,238px);overflow-y:auto;overscroll-behavior:contain;
+  margin:0;padding:5px 8px;display:flex;flex-direction:column;gap:4px;
+  border-radius:12px;background:#ffffffa8;text-align:left;}
+.loading-stages li{display:flex;align-items:center;gap:8px;min-height:23px;
+  font-size:11px;line-height:1.3;color:#657a6e;}
+.loading-stages li[data-status="ready"]{color:#2b7356}
+.loading-stages li[data-status="fallback"]{color:#9e663a}
+.loading-stage-mark{display:inline-flex;flex:0 0 16px;justify-content:center;font-size:14px;font-weight:800}
+@media(max-height:590px){.loading{gap:8px}.loading-stages{max-height:33dvh}.loading-mark{font-size:36px}}
+@media(prefers-reduced-motion:reduce){.loading-stages{scroll-behavior:auto}}
