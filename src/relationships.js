@@ -3,6 +3,7 @@ import { refreshMind } from './psychology.js';
 import {charismaSocialBonus} from './hobby-reading.js';
 import {creditCompletedSocialNeed} from './social-need.js';
 import {feelMemory} from './emotion-engine.js';
+import {sportsConversationReady,recordSportsDiscussion} from './sports-fandom.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction} from './social-feedback.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
@@ -108,6 +109,7 @@ export function startSocial(root,kind,initiator,target,automatic=false) {
 }
 /** Multi-turn sessions reuse the existing path reservation and social poses. */
 export function startConversation(root,initiator,target,topic){
+  if(topic==='sports'&&!sportsConversationReady(root))return false;
   const session=createConversation(topic);
   if(!session||!startSocial(root,'talk',initiator,target,false))return false;
   root.socialAction.conversation=session;
@@ -255,10 +257,13 @@ function completeSocial(root,conversationScore=null){
     kind:'direct',actionId:s.kind,recipient:get(root,s.partner),
     view:getPerspective(root,s.partner),minutes:root.minutes
   });
-  const reconciled=s.kind==='talk'&&canReconcile(root);
+  const sportsTalk=s.conversation?.topic==='sports';
+  const reconciled=!sportsTalk&&s.kind==='talk'&&canReconcile(root);
   // Old one-click talk/argue keep exact +8 / -12 / reconciliation +12.
   // A multi-turn talk has a single context-dependent signed result.
-  const gain=(conversationScore===null
+  const gain=sportsTalk
+    ?Math.max(-1,Math.min(2,Math.round((conversationScore||0)/4)))
+    :(conversationScore===null
     ?(reconciled?def.affinity+4:def.affinity)
     :(reconciled?Math.max(4,conversationScore)+4:conversationScore))+
     // Only a completed direct friendly talk (not romance or an argument).
@@ -269,8 +274,8 @@ function completeSocial(root,conversationScore=null){
   root.relationship.nextSocialAt=root.minutes+SOCIAL_COOLDOWN_MINUTES;
   for(const id of ['alex','mira']){
     const resident=get(root,id);
-    resident.needs.fun=clamp(resident.needs.fun+def.fun,0,100);
-    const memoryId=reconciled?'reconcile'
+    resident.needs.fun=clamp(resident.needs.fun+(sportsTalk?(s.kind==='talk'?2:0):def.fun),0,100);
+    const memoryId=sportsTalk?'sports.chat':reconciled?'reconcile'
       :s.kind==='argue'?(id===s.initiator?'regret':'hurt'):'talk';
     const memory={id:memoryId,at:root.minutes,fulfilled:false};
     resident.mind.memories.push(memory);
@@ -280,13 +285,15 @@ function completeSocial(root,conversationScore=null){
     // The old affinity meter remains a backwards-compatible shared record.
     applySocialPerspective(getPerspective(root,id),memory,resident,root.minutes);
     resident.autonomy.nextAt=root.minutes+15;
-    resident.event=reconciled?'Удалось помириться'
+    resident.event=sportsTalk?'Обсудили футбол':reconciled?'Удалось помириться'
       :s.kind==='talk'?'Приятно поговорили'
       :id===s.initiator?'Сожалеет о ссоре':'Обиделся после ссоры';
     refreshMind(resident);
   }
-  const completed=recordPairCompletion(root,s,s.branchAction?.resultType||
-    (s.conversation?'conversation.'+s.kind:s.kind));
+  const completed=recordPairCompletion(root,s,sportsTalk
+    ?(s.kind==='talk'?'sports.discuss':'sports.disagree')
+    :s.branchAction?.resultType||(s.conversation?'conversation.'+s.kind:s.kind));
+  if(completed&&sportsTalk)recordSportsDiscussion(root);
   if(completed&&s.conversation){
     // No premature discovery from a started, abandoned or merely queued talk.
     for(const turn of s.conversation.turns||[]){
