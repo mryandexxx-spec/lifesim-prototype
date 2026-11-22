@@ -18,6 +18,7 @@ import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-w
 
 import {createFinancePhoneUI} from './finance-phone-ui.js';
 import {PHONE_APPS,phoneAppRoute} from './phone-app-registry.js';
+import {sportsPhoneView} from './sports-phone-model.js';
 import {phoneContactStatus,CALL_DURATION,CALL_COOLDOWN} from './phone-calls.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal} from './ready-food.js';
@@ -49,6 +50,9 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
    onBuyReadyMeal=()=>({ok:false,reason:'unavailable'}),
   onStartCall=()=>({ok:false,reason:'unavailable'}),
   onCancelCall=()=>({ok:false,reason:'unavailable'}),
+  onSelectSportsClub=()=>({ok:false,reason:'unavailable'}),
+  onReadSportsNews=()=>({ok:false,reason:'unavailable'}),
+  onWatchSportsMatch=()=>({ok:false,reason:'unavailable'}),
   selectResident=()=>false,beforeOpen=()=>{},canOpen=()=>true}){
   const overlay=element('section','career-phone-overlay');
   overlay.id='career-phone-panel';overlay.hidden=true;
@@ -99,7 +103,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     notify('🧾 Семейный счёт оплачен · −'+payment.amount+' кр.');
     return payment;
   }});
-  let app='home';
+  let app='home',sportsTab='club';
   let who=null,view='list',chosen=null,lastFocus=null,lastInterviewFeedback='';
   let section='vacancies',historyId=null;
   const contexts={alex:null,mira:null};
@@ -1168,6 +1172,134 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       'За завершённый разговор: общение +6 обоим, отношения +1. Перерыв '+CALL_COOLDOWN+
       ' игровых минут. Рабочая зарплата и очередь действий не меняются.'));
   }
+
+  /** Approved fifth application: pure projection backed by one canonical league. */
+  function renderPhoneSports(root){
+    const model=sportsPhoneView(root,who);
+    if(!model){top('⚽ Лига Блин’С пока недоступна');return;}
+    top('⚽ '+NAMES[who]+' · ЛИГА БЛИН’С');
+    body.append(element('h2','career-phone-section-title','Блин’С Спорт'));
+    const header=element('section','career-phone-facts sports-phone-summary');
+    header.append(element('strong',null,'Сезон '+(model.seasonId+1)),
+      element('span',null,'6 клубов · 10 туров · все даты по игровым часам'));
+    body.append(header);
+    const tabs=element('nav','sports-phone-tabs');
+    tabs.setAttribute('aria-label','Разделы Блин’С Спорт');
+    for(const [id,label] of [['club','Мой клуб'],['matches','Матчи'],['table','Таблица']]){
+      const button=action(label,()=>{sportsTab=id;render();},'sports-phone-tab');
+      button.setAttribute('aria-pressed',String(sportsTab===id));
+      button.dataset.sportsTab=id;
+      if(sportsTab===id)button.classList.add('sports-phone-tab-active');
+      tabs.append(button);
+    }
+    body.append(tabs);
+    if(model.live){
+      const card=element('section','career-phone-card sports-phone-live');
+      card.append(element('strong',null,'🔴 ИДЁТ МАТЧ · '+model.live.minute+"′"));
+      card.append(element('p','sports-phone-score',
+        model.live.home+' '+model.live.score.join(' : ')+' '+model.live.away));
+      card.append(element('small',null,'Играется по календарю Блин’С, не в реальном времени'));
+      const watch=action(model.watch?'📺 Смотреть матч':'Матч в эфире · телевизор недоступен',()=>{
+        const live=personRoot();if(!live)return;
+        const current=sportsPhoneView(live,who);
+        if(!current?.watch){notify('Трансляция закончилась или телевизор недоступен');render();return;}
+        const result=onWatchSportsMatch(who,current.watch.tvId);
+        notify(result.ok?'📺 Просмотр матча добавлен в очередь':
+          'Нельзя запланировать просмотр: проверь работу, очередь и телевизор');
+        if(result.ok)close({focus:false});else render();
+      },'career-phone-primary sports-watch-match');
+      watch.disabled=!model.watch;
+      card.append(watch);body.append(card);
+    }
+    if(model.unread.length){
+      const card=element('section','career-phone-card sports-phone-news');
+      card.append(element('strong',null,'⚽ Новости любимого клуба · '+model.unread.length));
+      const recent=model.unread[0];
+      card.append(element('p',null,recent.home+' '+recent.score.join(':')+' '+recent.away));
+      card.append(action('Узнать результат',()=>{
+        const result=onReadSportsNews(who,recent.matchId);
+        const messages={'no-new-match':'Новость уже прочитана',
+          'unavailable':'Нельзя читать новости сейчас','save-failed':'Не удалось сохранить реакцию'};
+        notify(result.ok?'⚽ '+(result.emotion==='sports.win'?'Победа вдохновляет!':
+          result.emotion==='sports.loss'?'Немного досадно проиграть':'Ничья · всё впереди'):
+          messages[result.reason]||'Новость недоступна');
+        render();
+      },'career-phone-primary sports-news-read'));
+      body.append(card);
+    }
+    if(sportsTab==='club'){
+      const card=element('section','career-phone-card sports-phone-club');
+      card.append(element('strong',null,'Мой клуб'));
+      card.append(element('p',null,model.favorite
+        ?'⚑ '+model.favorite.name+' · интерес к футболу '+model.fanIntensity+'/100'
+        :'Клуб не выбран. Алекс и Мира могут поддерживать разные команды.'));
+      if(!model.canChangeClub)card.append(element('small',null,
+        'Изменить команду можно через '+model.changeCooldown+' игровых мин.'));
+      const grid=element('div','sports-phone-clubs');
+      for(const team of model.teams){
+        const chosen=team.id===model.favoriteTeamId;
+        const button=action((chosen?'✓ ':'')+team.name,()=>{
+          if(chosen)return;
+          const result=onSelectSportsClub(who,team.id);
+          notify(result.ok?'⚽ Теперь любимый клуб: '+team.name:
+            result.reason==='cooldown'?'Выбор клуба пока на паузе':
+            'Выбор команды не сохранился');
+          render();
+        },'sports-phone-team');
+        button.dataset.sportsTeam=team.id;
+        button.style.borderLeftColor=team.color;
+        button.disabled=chosen||!model.canChangeClub;
+        grid.append(button);
+      }
+      card.append(grid);
+      if(model.nextFavorite){
+        const m=model.nextFavorite;
+        card.append(element('small',null,
+          'Следующая игра клуба: '+m.iso+' · '+m.time+' · '+m.home+' — '+m.away));
+      }
+      body.append(card);
+      if(model.seasonHistory.length){
+        const last=model.seasonHistory[0];
+        const champion=model.teams.find(t=>t.id===last.championId);
+        body.append(element('p','career-phone-muted',
+          'Чемпион предыдущего сезона: '+(champion?.name||'—')));
+      }
+    }else if(sportsTab==='matches'){
+      const list=element('section','sports-phone-match-list');
+      list.append(element('strong',null,'Ближайшие матчи'));
+      if(!model.upcoming.length)list.append(element('small',null,'Межсезонье · новый сезон скоро'));
+      for(const match of model.upcoming){
+        const card=element('div','sports-phone-match');
+        card.append(element('strong',null,match.home+' — '+match.away),
+          element('small',null,match.iso+' · '+match.time+' · игровое время'));
+        list.append(card);
+      }
+      list.append(element('strong',null,'Результаты'));
+      if(!model.results.length)list.append(element('small',null,'Матчи ещё не завершены'));
+      for(const match of model.results){
+        const card=element('div','sports-phone-match');
+        card.append(element('strong',null,match.home+' '+match.score.join(':')+' '+match.away),
+          element('small',null,match.iso+' · завершён'));
+        list.append(card);
+      }
+      body.append(list);
+    }else{
+      const table=element('section','career-phone-card sports-phone-standings');
+      table.append(element('strong',null,'Турнирная таблица'));
+      table.append(element('small',null,'И · В · Н · П · разница · очки'));
+      for(const team of model.table){
+        const row=element('div','sports-phone-table-row');
+        row.append(element('span',null,team.place+'. '+team.teamName),
+          element('strong',null,team.played+' · '+team.wins+' · '+team.draws+
+            ' · '+team.losses+' · '+(team.for-team.against)+' · '+team.points));
+        table.append(row);
+      }
+      body.append(table);
+    }
+    body.append(element('p','career-phone-muted',
+      'Матчи рассчитываются офлайн. Ставок, внешних трансляций и двойных бонусов досуга нет.'));
+  }
+
   function render({preserveScroll=false}={}){
     if(!opened())return;
     const root=personRoot();if(!root)return;
@@ -1177,12 +1309,14 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     title.textContent=app==='home'?'Главный экран':
       app==='calls'?'Звонки · '+NAMES[who]:
       app==='finance'?'Финансы · Семья':
-      app==='food'?'Доставка · Блин’С':'Работа · '+NAMES[who];
+      app==='food'?'Доставка · Блин’С':
+      app==='sports'?'Блин’С Спорт':'Работа · '+NAMES[who];
     overlay.setAttribute('aria-label',app==='home'?'Смартфон: главный экран':
       app==='calls'?'Смартфон: звонки':
       app==='finance'?'Смартфон: финансы семьи':
-      app==='food'?'Смартфон: доставка готовой еды':'Смартфон: работа Блин’С');
-    appTabs.hidden=app==='home'||app==='calls';
+      app==='food'?'Смартфон: доставка готовой еды':
+      app==='sports'?'Смартфон: Блин’С Спорт':'Смартфон: работа Блин’С');
+    appTabs.hidden=app==='home'||app==='calls'||app==='sports';
     routeBar.hidden=app==='home';
     for(const b of appTabs.querySelectorAll('button')){
       const selected=b.dataset.app===app;
@@ -1196,6 +1330,9 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     }
     if(app==='calls'){
       renderPhoneCalls(root);body.scrollTop=preserveScroll?oldScroll:0;return;
+    }
+    if(app==='sports'){
+      renderPhoneSports(root);body.scrollTop=preserveScroll?oldScroll:0;return;
     }
     if(app==='finance'){
       financeUI.render(root);
