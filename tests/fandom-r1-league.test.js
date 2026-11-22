@@ -35,7 +35,7 @@ test('R1-A staggers fixtures on Wednesday and Saturday by the game calendar, no 
   }
   const example=ms[0],date=calendarAt(root.calendar,example.kickoff).iso;
   assert.equal(sportsCalendarEvents(root.sportsWorld,root.calendar,date,date).length,3);
-  assert.equal(root.calendar.events.length,0); // sports never consumes user-event slots
+  assert.equal((root.calendar.events||[]).length,0); // sports never consumes user-event slots
 });
 test('R1-A never leaks future goals into the live match read model',()=>{
   const root=fixture(),m=sportsFixtures(root.sportsWorld)[0];
