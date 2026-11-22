@@ -65,7 +65,8 @@ test('UI4: visible touch controls have accessible minimum hit areas',()=>{
 test('UI4: save schema untouched and Pages packages both new modules',()=>{
  assert.match(pages,/node --check src\/ui-layout\.js/);
  assert.match(pages,/node --check src\/required-choice-focus\.js/);
- assert.match(pages,/cp src\/plan-preview\.js src\/ui-layout\.js src\/required-choice-focus\.js site\/src\//);
+ const packaged=pages.split('\n').filter(line=>line.trim().startsWith('cp ')&&line.trim().endsWith(' site/src/')).flatMap(line=>line.trim().split(/\s+/).slice(1,-1));
+ for(const file of ['plan-preview','ui-layout','required-choice-focus'])assert.ok(packaged.includes('src/'+file+'.js'),file);
  assert.match(src,/localStorage.getItem\(SAVE_KEY\)/);
  assert.match(html,/сборка \/ 1\.2u/);
  assert.match(html,/styles\.css\?v=1\.2u/);
