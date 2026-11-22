@@ -19,6 +19,7 @@ jobs:
       micro_ux: ${{ steps.impact.outputs.micro_ux }}
       load_truth: ${{ steps.impact.outputs.load_truth }}
       fridge_ux: ${{ steps.impact.outputs.fridge_ux }}
+      grill_r1: ${{ steps.impact.outputs.grill_r1 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,6 +68,16 @@ jobs:
       - name: FRIDGE-UX-R2 approved A actual two-viewport PlayCanvas and HUD smoke
         if: ${{ needs.targeted.outputs.fridge_ux == 'true' }}
         run: node tests/fridge-ux-r2-browser-smoke.mjs
+      - name: GRILL-R1 dual-viewport PlayCanvas, paid meat/chicken and outdoor game smoke
+        if: ${{ needs.targeted.outputs.grill_r1 == 'true' }}
+        run: node tests/grill-r1-browser-smoke.mjs
+      - name: Upload GRILL-R1 mobile gameplay snapshots
+        if: ${{ always() && needs.targeted.outputs.grill_r1 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: grill-r1-mobile-pr
+          path: artifacts/grill-r1/
+          if-no-files-found: ignore
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}
         run: node tests/fixture-motion-browser-smoke.mjs
