@@ -19,6 +19,7 @@ import {DISH_AUTO_WASH_THRESHOLD,COOKING_SKILL_ID,kitchenRecipe,newKitchen,resto
 import {currentSkillLevel} from './skills-engine.js';
 import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
+import {settlePantryDeliveries} from './kitchen-market.js';
 import {newPhoneCalls,restorePhoneCalls,progressPhoneCalls} from './phone-calls.js';
 import {newSportsWorld,restoreSportsWorld,advanceSportsWorld,sportsFixtures} from './sports-league.js';
 import {newSportsFan,restoreSportsFan,readSportsNews} from './sports-fandom.js';
@@ -1175,6 +1176,7 @@ export function tickHousehold(root,minutes) {
   // FOOD-R1: only elapsed game time can fulfill a paid delivery, once.
   // This changes canonical stock, not an actor's A* or manual FIFO action.
   settleReadyMealDeliveries(root);
+  settlePantryDeliveries(root);
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),completed=readyPaint[id];
     if(completed&&!actor.action&&actor.activitySession===completed.session){
