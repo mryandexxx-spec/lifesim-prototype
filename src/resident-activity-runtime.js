@@ -17,6 +17,7 @@ export const ADDITIONAL_OBJECT_ACTIONS=Object.freeze([
 const owned=(v,k)=>Object.prototype.hasOwnProperty.call(v||{},k);
 const extraPattern=/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/;
 const gap=ACTOR_RADIUS*2-.015;
+const preparedRoots=new WeakSet();
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const extraEntries=root=>Object.entries(root?.population?.residentsById||{})
   .filter(([id,entry])=>extraPattern.test(id)&&entry?.id===id&&entry?.actor?.version===1)
@@ -269,6 +270,10 @@ export function prepareAdditionalResidents(root){
  */
 export function tickAdditionalResidents(root,minutes){
   if(!root?.population||root.paused||!Number.isFinite(minutes)||minutes<=0)return;
+  if(!preparedRoots.has(root)){
+    prepareAdditionalResidents(root);
+    preparedRoots.add(root);
+  }
   for(const id of residentIdsForSimulation(root).slice(2)){
     const actor=savedAdditionalActor(root,id);
     actor.minutes=root.minutes-minutes;
