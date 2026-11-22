@@ -5,6 +5,7 @@ import {careerVacancies,leaveCareer,describeCareerShift} from './career-job-boar
 import {disciplineStatus} from './career-discipline.js';
 import {careerDefinition} from './career-catalog.js';
 import {nextCareerShift} from './career-scheduler.js';
+import {careerScheduleAtDay} from './career-rank-schedules.js';
 import {promotionReadiness,promoteCareer} from './career-progression.js';
 import {professionalGoalsView} from './career-goals.js';
 import {careerRankForContract,specializationReadiness,chooseCareerSpecialization} from './career-specializations.js';
@@ -204,6 +205,23 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     facts.id='career-contract-facts';facts.tabIndex=-1;
     facts.append(element('span',null,'Ставка: '+careerRankForContract(current)?.hourlyCredits+' кр./час'));
     facts.append(element('span',null,'Следующая смена: '+describeCareerShift(shift)));
+    const week=careerScheduleAtDay(current,shift?.dayIndex??Math.floor(root.minutes/1440));
+    if(week){
+      const hours=Math.round(week.duration*week.weekdays.length/60);
+      const rate=careerRankForContract(current)?.hourlyCredits||0;
+      const days=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+      facts.append(element('span',null,'График: '+week.weekdays.map(day=>days[day]).join(' · ')+
+        ' · '+clockAt(week.startMinute)+'–'+clockAt(week.startMinute+week.duration)+
+        (week.startMinute+week.duration>=1440?' (+1 день)':'')+
+        ' · '+hours+' ч/нед.'));
+      facts.append(element('span',null,'Ориентир полной недели: '+
+        Math.round(rate*week.duration*week.weekdays.length/60)+' кр.')); 
+    }
+    const epoch=current.shiftSchedule?.effectiveDayIndex;
+    if(Number.isSafeInteger(epoch)&&epoch*1440>root.minutes)
+      facts.append(element('span','career-phone-muted',
+        'Новый график начнётся с игровой недели '+(Math.floor(epoch/7)+1)+
+        ' (после сохранённых отпусков и старых смен).'));
     facts.append(element('span',null,'Статус: '+status.label));
     facts.append(element('span',null,'Баланс семьи: '+root.shop.credits+' кр.'));
     facts.append(element('span',null,'Результативность: '+current.performance+'/100'));
