@@ -45,6 +45,9 @@ try{
     });
     assert.equal(hasGl,true,'real WebGL graphics device');
     await page.locator('#career-phone-toggle').tap();
+    // Phone Platform G opens on its home app launcher: select the actual
+    // career app before checking the approved overnight shift facts.
+    await page.locator('#career-phone-panel [data-phone-app="work"]').tap();
     const body=await page.locator('#career-phone-panel').innerText();
     assert.match(body,/20:00–05:00 \(\+1 день\)/,
       'civic helper shift is displayed as real overnight shift');
