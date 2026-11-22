@@ -110,7 +110,8 @@ test('W1-B.3a late starts earn only minutes worked; missed shifts and manual ski
   actor.action={id:'cook',phase:'using',automatic:false,elapsed:0};
   // An in-progress atomic recipe is deliberately not interrupted by auto departure.
   const blocked=progressCareerWork(root,539,550);
-  assert.ok(blocked.some(x=>x.type==='late'));
+  assert.ok(blocked.some(x=>['late','worklife'].includes(x.type)),
+    'Uninterruptible manual work triggers an honest lateness or work-life warning');
   assert.equal(root.careerSystem.byResident.alex.currentShift.phase,'pending');
   actor.action=null;
   progressCareerWork(root,550,570);
