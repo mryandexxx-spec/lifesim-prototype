@@ -88,6 +88,8 @@ test('W3-C: real explicitly missed shifts cause one discharge, no financial pena
     const shift=nextCareerShift(root.calendar,c,root.minutes);
     assert.ok(shift);
     root.minutes=shift.start-1;root.otherSim.minutes=root.minutes;
+    // Intentional atomic task keeps the contract pending so the user can explicitly miss work.
+    root.action={id:'cook',phase:'using',automatic:false,elapsed:3};
     progressCareerWork(root,shift.start-40,root.minutes);
     assert.equal(c.currentShift?.phase,'pending');
     assert.equal(skipCareerShift(root,'alex'),true);
@@ -195,6 +197,8 @@ test('W3-C: resignation before physical departure does not create a fake missed 
   const root=fresh(),contract=root.careerSystem.byResident.alex;
   const shift=nextCareerShift(root.calendar,contract,root.minutes);
   root.minutes=shift.start-20;
+  // Resignation remains legal before physical departure when an uninterruptible task is active.
+  root.action={id:'cook',phase:'using',automatic:false,elapsed:3};
   progressCareerWork(root,shift.start-59,root.minutes);
   assert.equal(contract.currentShift?.phase,'pending');
   root.minutes+=0.25; // Actual x1/x3 clock is not restricted to whole minutes.
