@@ -25,7 +25,7 @@ test('work-presence: 3D picking and transient HUD both consult the policy',()=>{
   const code=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
   assert.match(code,/workPresenceView\(residentWorkPhase\(game,id\)\)\.hitTestable/);
   assert.match(code,/workPresenceView\(residentWorkPhase\(game,game\.selectedSim\)\)\.overlayVisible/);
-  assert.match(code,/workPresenceView\(residentWorkPhase\(game,id\)\)\.overlayVisible/);
+  assert.match(code,/workPresenceView\(residentWorkPhase\(game,'alex'\)\)\.overlayVisible/);
 });
 test('work-presence: top plan prioritizes career phase over idle and stale actor event',()=>{
   const code=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
