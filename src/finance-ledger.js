@@ -9,6 +9,8 @@ export const FINANCE_HISTORY_LIMIT=120;
 const MAX_SEQUENCE=1_000_000_000;
 const KINDS=new Set(['salary','purchase','sale','art-sale','undo','redo','bill-payment','paid-leave']);
 const safeMoney=n=>Number.isSafeInteger(n)&&n>=0&&n<=SHOP_MAX_CREDITS;
+const extraId=id=>typeof id==='string'&&/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/.test(id);
+const journalActor=id=>['alex','mira'].includes(id)||extraId(id);
 const safeText=(s,max=160)=>typeof s==='string'&&s.length>0&&s.length<=max&&
   !/[\u0000-\u001f]/.test(s);
 const validShop=s=>s?.schema===SHOP_SCHEMA&&safeMoney(s.credits)&&
@@ -23,7 +25,7 @@ function validEntry(e){
     Math.abs(e.delta)<=SHOP_MAX_CREDITS&&safeMoney(e.balanceAfter)&&
     Number.isSafeInteger(e.atGameMinute)&&e.atGameMinute>=0&&
     safeText(e.sourceId)&&
-    (e.actorId===null||['alex','mira'].includes(e.actorId));
+    (e.actorId===null||journalActor(e.actorId));
 }
 /** An old save is a known beginning-of-history boundary, not a zero balance. */
 export function restoreFinancialHistory(raw){
@@ -51,7 +53,8 @@ export function recordFinanceChange(root,nextShop,{
   if(!validShop(root?.shop)||!validShop(nextShop)||
      !Number.isSafeInteger(atGameMinute)||atGameMinute<0||
      !KINDS.has(kind)||!safeText(sourceId)||
-     (actorId!==null&&!['alex','mira'].includes(actorId)))
+     (actorId!==null&&!( ['alex','mira'].includes(actorId)||
+       (extraId(actorId)&&Object.hasOwn(root.population?.residentsById||{},actorId)))))
     return {ok:false,reason:'invalid-finance'};
   const delta=nextShop.credits-root.shop.credits;
   if(!Number.isSafeInteger(delta)||Math.abs(delta)>SHOP_MAX_CREDITS)
