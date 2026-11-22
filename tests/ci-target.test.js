@@ -41,3 +41,13 @@ test('LOT-E5 alone upgrades the same conditional browser job to four-viewport mo
   assert.equal(planChanges(['tests/ci-browser-boot.mjs']).e5,false);
   assert.equal(planChanges(['README.md']).e5,false);
 });
+
+
+test('P4 integration browser triggers only its four-size job, not LOT-E5',()=>{
+  const plan=planChanges(['tests/life-integration-qa-browser.mjs']);
+  assert.equal(plan.browser,true);
+  assert.equal(plan.integration_qa,true);
+  assert.equal(plan.e5,false);
+  assert.equal(planChanges(['tests/life-integration-qa.test.js']).integration_qa,false);
+  assert.equal(planChanges(['README.md']).integration_qa,false);
+});
