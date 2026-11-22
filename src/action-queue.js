@@ -73,10 +73,13 @@ export function sanitizeQueueCommand(id,raw,persons){
     // Whitelist one manual variation; other object tasks reject forged flags.
     if(raw.recipeId!==undefined||
       (raw.mirrorPractice!==undefined&&
-        (raw.actionId!=='mirror'||raw.mirrorPractice!==true)))return null;
+        (raw.actionId!=='mirror'||raw.mirrorPractice!==true))||
+      (raw.tvTalk!==undefined&&
+        (raw.actionId!=='tv'||raw.tvTalk!==true)))return null;
     return {type,actionId:raw.actionId,
       ...(raw.targetInstanceId?{targetInstanceId:raw.targetInstanceId}:{}),
-      ...(raw.mirrorPractice===true?{mirrorPractice:true}:{})};
+      ...(raw.mirrorPractice===true?{mirrorPractice:true}:{}),
+      ...(raw.tvTalk===true?{tvTalk:true}:{})};
   }
   // Solo physical hobby queue commands do not have a social target.
   if(type==='activity'){

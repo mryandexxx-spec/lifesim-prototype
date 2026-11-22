@@ -208,6 +208,9 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     // Optional F3b reservation. Older v1 TV saves remain standing.
     if(data.action.id==='tv'&&validFurnitureInstanceId(data.action.watchSeatInstanceId))
       next.action.watchSeatInstanceId=data.action.watchSeatInstanceId;
+    // Optional schema-v1 flag: continue only the remaining genuine TV response.
+    if(next.action&&data.action.id==='tv'&&data.action.tvTalk===true&&
+      data.action.automatic===false)next.action.tvTalk=true;
   }
   if(data.action?.id==='swim'&&(next.autonomy.enabled||data.action.automatic!==true||
     typeof data.action.exitRequested==='string'))
@@ -348,6 +351,8 @@ export function tick(state, minutes,world=state?.world??null) {
     let gained=(state.action.id==='bed'?0:
       (hobby?.needEffects.find(effect=>effect.statId==='needs.fun')?.perMinute
         ??definition.benefitPerMinute))*amount;
+    if(state.action.id==='tv'&&state.action.tvTalk===true)
+      gained=amount*17/TV_WATCH_DURATION;
     if(state.action.id==='dining'){
       // No confirmed serving means NO calories: walking, taking and a
       // malformed/replayed eating state cannot manufacture food benefits.
@@ -393,6 +398,14 @@ export function tick(state, minutes,world=state?.world??null) {
     if(hobby)gained*=1+preferenceAffinity(state.personality,
       state.action.id==='music'?'music':state.action.id==='paint'?'art':'books')*.12;
     state.needs[definition.need] = clamp(state.needs[definition.need] + gained);
+    // MICRO-UX-R1: only minutes of verified physical speech or solo TV
+    // reaction earn Social; no social event, relationship or bonus at arrival.
+    if(state.action.id==='mirror'&&state.action.mirrorPractice===true){
+      state.needs.social=clamp(state.needs.social+amount*5/MIRROR_SPEECH_DURATION);
+      state.needs.fun=clamp(state.needs.fun+amount*3/MIRROR_SPEECH_DURATION);
+    }
+    if(state.action.id==='tv'&&state.action.tvTalk===true)
+      state.needs.social=clamp(state.needs.social+amount*5/TV_WATCH_DURATION);
     // All registry-defined additional need deltas apply only in the verified
     // using window. Dancing consumes a little extra energy; passive listening
     // has no extra cost. Walking never runs this branch.

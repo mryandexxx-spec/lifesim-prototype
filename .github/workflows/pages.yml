@@ -288,6 +288,7 @@ jobs:
           cp src/skill-registry.js site/src/
           cp src/skill-presentation.js site/src/
           cp src/tv-interaction.js site/src/
+          cp src/micro-ux.js site/src/
           cp src/tv-seating.js site/src/
           cp src/tv-together.js site/src/
           cp src/furniture-placement-preview.js src/furniture-owned-preview.js site/src/

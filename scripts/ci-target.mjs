@@ -66,7 +66,9 @@ export function planChanges(files,root=ROOT){
   for(const [pattern,names] of extra)if(changed.some(f=>pattern.test(f)))
     for(const name of names)if(allTests.includes(name))selected.add(name);
   const tests=[...selected].filter(f=>allTests.includes(f)).sort();
-  return {tests,browser:changed.some(isUI),
+  const micro_ux=changed.some(f=>
+    /^(?:src\/(?:micro-ux|camera-controls)\.js|tests\/micro-ux-r1-browser-smoke\.mjs)$/.test(f));
+  return {tests,browser:changed.some(isUI),micro_ux,
     e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),changed};
 }
@@ -98,7 +100,8 @@ function main(){
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
     'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
-    'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n');
+    'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
+    'micro_ux='+(plan.micro_ux?'true':'false')+'\n');
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main();
