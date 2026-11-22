@@ -64,6 +64,8 @@ try{
     const protein=page.locator('[data-fridge-action="select-staple"][data-id="meat"]');
     await protein.waitFor({state:'visible'});
     await protein.click();
+    assert.equal(await page.locator('#fridge-r2-buy').isVisible(),true,
+      'selecting a dynamic staple must not close the contextual sheet');
     assert.match(await page.locator('#fridge-r2-staple-button').textContent(),/3.*36/);
     if(width===390){
       page.on('dialog',dialog=>dialog.accept());
