@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {CAREER_CATALOG} from '../src/career-catalog.js';
+import {approvedRankSchedule} from '../src/career-rank-schedules.js';
 import {careerVacancies,acceptCareerOffer,leaveCareer,describeCareerShift,clockLabel,calendarCareerShifts}
   from '../src/career-job-board.js';
 import {nextCareerShift} from '../src/career-scheduler.js';
@@ -19,9 +20,12 @@ test('W1-B.2a: phone shows six real professions with actual catalog rate and sch
     const def=CAREER_CATALOG.find(x=>x.id===offer.id);
     assert.equal(offer.rank,def.ranks[0].title);
     assert.equal(offer.hourlyCredits,def.ranks[0].hourlyCredits);
-    assert.equal(offer.shiftCredits,def.ranks[0].hourlyCredits*def.schedule.duration/60);
-    assert.equal(offer.workdays.split(' · ').length,def.schedule.weekdays.length);
-    assert.equal(offer.hours,clockLabel(def.schedule.startMinute)+'–'+clockLabel(def.schedule.startMinute+def.schedule.duration));
+    const schedule=approvedRankSchedule(offer.id,0);
+    assert.equal(offer.shiftCredits,def.ranks[0].hourlyCredits*schedule.duration/60);
+    assert.equal(offer.workdays.split(' · ').length,schedule.weekdays.length);
+    assert.equal(offer.hours,clockLabel(schedule.startMinute)+'–'+
+      clockLabel(schedule.startMinute+schedule.duration)+
+      (schedule.startMinute+schedule.duration>=1440?' (+1 день)':''));
     assert.ok(offer.nextShift);
     assert.equal(offer.firstShiftLabel,describeCareerShift(offer.nextShift));
   }
@@ -97,9 +101,9 @@ test('W1-B.2a: invalid actors/contracts are rejected without altering state',()=
 test('W1-B.2a: cross-midnight work is previewed with the real calendar date',()=>{
   const game=fresh();
   const offer=careerVacancies(game,'mira').find(x=>x.id==='civic-service');
-  assert.equal(offer.hours,'20:00–04:00');
-  assert.equal(offer.nextShift.end-offer.nextShift.start,480);
-  assert.match(offer.firstShiftLabel,/20:00–04:00/);
+  assert.equal(offer.hours,'20:00–05:00 (+1 день)');
+  assert.equal(offer.nextShift.end-offer.nextShift.start,540);
+  assert.match(offer.firstShiftLabel,/20:00–05:00 \(\+1 день\)/);
   assert.equal(clockLabel(1440),'00:00');
 });
 test('W1-B.2a: source and deploy graph include accessible phone, not fake paycheck or second clock',()=>{
