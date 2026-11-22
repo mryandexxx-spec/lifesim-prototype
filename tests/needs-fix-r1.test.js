@@ -178,8 +178,7 @@ test('NEEDS-FIX: real kitchen portion remains consumed once after reload and lat
 test('NEEDS-FIX: production import map invalidates older Safari needs and bed SKU cache keys',()=>{
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   for(const module of ['simulation','need-balance','furniture-products']){
-    const escaped=module.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&');
-    assert.match(html,new RegExp('["]\\./src/'+escaped+'[.]js[?]v=[^"\\n]*-needs-fix-r1["]'),
+    assert.match(html,new RegExp('["]\\./src/'+module+'[.]js[?]v=[^"\\n]*-needs-fix-r1["]'),
       'fresh import-map cache key required: '+module);
   }
 });
