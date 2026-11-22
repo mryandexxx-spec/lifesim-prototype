@@ -58,7 +58,8 @@ try{
   assert.equal((await root()).world.construction.floorCells.length,
     seed.world.construction.floorCells.length);
   await tap('undo');
-  assert.equal((await root()).shop.credits,seed.shop.credits);
+  assert.equal((await root()).shop.credits,seed.shop.credits,
+    'History status: '+await page.locator('#parcel-editor output').textContent());
   await tap('redo');
   assert.equal((await root()).shop.credits,seed.shop.credits-32);
   await tap('redo');
