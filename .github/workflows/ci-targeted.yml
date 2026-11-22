@@ -48,6 +48,13 @@ jobs:
         env:
           CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/ci-target.mjs
+      - name: Archive CAS-01.8 Node eight-day soak report
+        if: ${{ always() && steps.impact.outputs.cas_soak == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-01-8-node-pr
+          path: artifacts/cas-01-8/node.json
+          if-no-files-found: ignore
       - name: CAS-00 full-src resident dependency inventory (not a four-person simulation)
         if: ${{ steps.impact.outputs.cas_inventory == 'true' }}
         run: node scripts/cas-00-dependency-inventory.mjs
