@@ -2273,7 +2273,16 @@ casSceneTags.className='cas-scene-tags';casSceneTags.id='cas-scene-tags';
 document.querySelector('.app-shell').append(casSceneTags);
 const casTags=new Map(),casButtons=new Map();
 let lastCasDetailsKey='';
+// Actual compact HUD grows by one row with 3–4 people. Anchor the extra
+// panel ABOVE its current bounding box, never over another resident's button.
+function alignCasDetails(){
+ const shell=document.querySelector('.app-shell').getBoundingClientRect();
+ const hud=$('dashboard').getBoundingClientRect();
+ casDetails.style.bottom=Math.max(8,Math.ceil(shell.bottom-hud.top+8))+'px';
+}
+window.addEventListener('resize',alignCasDetails);
 function renderCasDetails(force=false){
+ alignCasDetails();
  const id=activeHudResident(),row=residentRoster(game,id).find(x=>x.id===id);
  casDetails.hidden=!row||row.legacy;
  if(casDetails.hidden){lastCasDetailsKey='';return;}
