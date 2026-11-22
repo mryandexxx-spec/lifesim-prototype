@@ -64,6 +64,28 @@ try{
     assert.match(await page.locator('#fridge-r2-ready-list').textContent(),/Солнечная крупяная миска/);
     assert.match(await page.locator('#fridge-r2-ready-list').textContent(),/18 кр/);
     await page.screenshot({path:'artifacts/fridge-ux-r2/buy-'+width+'.png'});
+    if(width===390){
+      // Real user-gesture purchase, via the original hidden handler:
+      // native confirm, canonical ledger, one save and no automatic eating.
+      page.on('dialog',dialog=>dialog.accept());
+      const credits=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).shop.credits,SAVE_KEY);
+      await page.locator('#fridge-r2-ready-button').click();
+      const bought=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+      assert.equal(bought.shop.credits,credits-18,'ready-food purchase must debit exactly once');
+      assert.ok(bought.kitchen.prepared.some(row=>
+        row.recipeId==='ready.sunny-grains'&&row.portions>=1),
+        'paid food stored in shared real fridge');
+      assert.equal(await page.locator('#fridge-r2-tab-buy').getAttribute('aria-selected'),'true',
+        'successful purchase preserves buy tab');
+      const priorVegetables=bought.kitchen.pantry.vegetables;
+      await page.locator('#fridge-r2-staple-button').click();
+      const stocked=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+      assert.equal(stocked.shop.credits,credits-33,'staples cost only the original 15 credits');
+      assert.equal(stocked.kitchen.pantry.vegetables,priorVegetables+5,
+        'staples use original atomic pantry purchase');
+      assert.ok(stocked.financialHistory?.entries?.length>=2,
+        'real finance ledger retains purchase receipts');
+    }
     const bounds=await page.evaluate(()=>{
       const r=document.querySelector('#action-sheet').getBoundingClientRect();
       const h=document.querySelector('#dashboard').getBoundingClientRect();
@@ -79,8 +101,15 @@ try{
     assert.equal(await page.locator('#fridge-r2-tab-eat').getAttribute('aria-selected'),'true');
     const post=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
     assert.equal(post.version,1,'save v1 unchanged');
-    assert.equal(post.kitchen.prepared.length,0,'no free meals');
-    assert.equal(post.shop.credits,seed.shop.credits,'tab clicks do not spend money');
+    if(width===390){
+      assert.ok(post.kitchen.prepared.some(row=>row.recipeId==='ready.sunny-grains'),
+        'purchased meal survives resident switch and v1 save');
+      assert.equal(post.shop.credits,seed.shop.credits-33,
+        'ready meal and pantry purchased only after confirmed clicks');
+    }else{
+      assert.equal(post.kitchen.prepared.length,0,'no free meals');
+      assert.equal(post.shop.credits,seed.shop.credits,'tab clicks do not spend money');
+    }
     assert.deepEqual(errors,[]);
     await context.close();
   }
