@@ -57,9 +57,12 @@ try{
     tv.click();
   });
   assert.equal(await page.locator('#action-sheet').isVisible(),true);
+  const oldTitle=await page.locator('#action-title').textContent();
   await page.touchscreen.tap(12,Math.round(height*.35));
-  assert.equal(await page.locator('#action-sheet').isHidden(),true,
-    'outside empty tap closes optional object context on small viewport');
+  const previousContextClosed=await page.locator('#action-sheet').isHidden()||
+    (await page.locator('#action-title').textContent())!==oldTitle;
+  assert.equal(previousContextClosed,true,
+    'outside tap must close old context or switch to a different scene object');
   assert.deepEqual(errors,[],'no WebGL startup or JavaScript errors');
   await context.close();
  }

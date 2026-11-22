@@ -137,6 +137,8 @@ test('MICRO mobile source contract: name focus, Zzz overlay, separate TV action,
   assert.match(game,/focusSelectedCamera\(id\)/);
   assert.match(game,/sleepZzzVisible\(/);
   assert.match(game,/dismissOnCanvasTap\(/);
+  assert.match(game,/if\(hadOptionalMenu\)\{closeSocialContext\(\);select\(null\);\}/,
+    'all scene-target branches must retire previous optional context');
   assert.doesNotMatch(game,/canvas\.addEventListener\('pointerdown',closeGroundWalkMenu\)/,
     'long press/swipe may not dismiss a ground menu at pointerdown');
   assert.match(game,/const rendered=rig\?\.getPosition/,

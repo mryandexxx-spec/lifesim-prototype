@@ -7515,6 +7515,10 @@ function boot() {
     }
     closeGroundWalkMenu();
     const target=worldTargetAt(pos);
+    // A tap accepted by the gesture classifier retires the previous optional
+    // context before dispatching a new 3D target (resident, object, outdoors).
+    // Never run this on pointerdown/swipe or while a required modal is open.
+    if(hadOptionalMenu){closeSocialContext();select(null);}
     if(target)confirmWorldTap(pos);
     if(target?.kind==='resident')openSocialContext(pos);
     else if(target?.kind==='artwork'){
