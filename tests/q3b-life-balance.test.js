@@ -25,19 +25,19 @@ test('Q3b/R2 effective need rates, fresh household only, personality social spre
   assert.equal(restored.otherSim.needs.hunger,3);
   assert.equal(restored.version,1);
 });
-test('NEEDS-FIX-R1 8-hour minimum sleep, 92-point wake, 9-hour cap and no decay while asleep',()=>{
+test('BATCH2-C full-energy natural wake supersedes minimum duration while keeping upper sleep cap',()=>{
   assert.equal(ACTIONS.bed.duration,SLEEP_MAX_MINUTES);
-  assert.equal(SLEEP_MIN_MINUTES,480);assert.equal(SLEEP_WAKE_ENERGY,92);
+  assert.equal(SLEEP_MIN_MINUTES,480);assert.equal(SLEEP_WAKE_ENERGY,100);
   let s=newGame();s.needs.energy=78;chooseAction(s,'bed');arrive(s);
-  tick(s,400);assert.equal(s.action?.id,'bed');assert.equal(s.action.elapsed,400);
-  assert.equal(s.needs.energy,100,'sleep gains 40.8 without a simultaneous energy drain');
-  tick(s,20);assert.equal(s.action?.id,'bed');
-  tick(s,60);assert.equal(s.action,null);assert.equal(s.needs.energy,100);
+  tick(s,100);assert.equal(s.action?.id,'bed');assert.equal(s.action.elapsed,100);
+  close(s.needs.energy,97,'sleep gains 19 energy without simultaneous awake decay');
+  tick(s,20);assert.equal(s.action,null);
+  assert.ok(s.needs.energy>99.8,'full reserve reached and waking remainder starts awake decay');
   s=newGame();s.needs.energy=0;chooseAction(s,'bed');arrive(s);
   tick(s,420);assert.equal(s.action?.id,'bed');
   close(s.needs.energy,79.8);
   tick(s,120);assert.equal(s.action,null);
-  close(s.needs.energy,92-(540-92/.19)*NEED_DECAY_PER_MINUTE.energy);
+  assert.ok(s.needs.energy>99.5&&s.needs.energy<=100);
 });
 test('Q3b oversized tick and 1-minute chunks agree across natural wake',()=>{
   const a=newGame();a.needs.energy=57;chooseAction(a,'bed');arrive(a);
@@ -61,7 +61,7 @@ test('Q3b clamp-at-100 sleep is chunk invariant, including awake remainder',()=>
   const a=newGame();a.needs.energy=78;chooseAction(a,'bed');arrive(a);
   const b=loadGame(copy(a));
   tick(a,480);for(let i=0;i<480;i++)tick(b,1);
-  close(a.needs.energy,100,1e-4);
+  assert.ok(a.needs.energy<100&&a.needs.energy>89,'oversized tick spends only the awake remainder');
   close(a.needs.energy,b.needs.energy,1e-4);
   assert.equal(a.action,null);assert.equal(b.action,null);
 });
