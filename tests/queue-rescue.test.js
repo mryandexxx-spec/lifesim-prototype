@@ -5,6 +5,8 @@ import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand,
 import {newActionQueues,enqueueAction,restoreActionQueues,pendingActions,
   blockedActions,parkQueuedHead,retryBlockedAction,removeBlockedAction,MAX_ACTION_QUEUE} from '../src/action-queue.js';
 import {readFileSync} from 'node:fs';
+import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
+import {SAVE_KEY} from '../src/simulation.js';
 
 const points=(a=0,b=1)=>({alex:{x:a,z:0},mira:{x:b,z:0}});
 const session=(extra={})=>({initiator:'alex',partner:'mira',kind:'talk',
@@ -119,4 +121,33 @@ test('full active FIFO cannot be overwritten by retry; saved blocked intent rema
   assert.deepEqual(q,before);
   assert.equal(removeBlockedAction(q,'alex',first.seq),true);
   assert.equal(removeBlockedAction(q,'alex',first.seq),false);
+});
+
+test('7/30-day save/reload stress keeps parked manual plans and second resident isolated',()=>{
+  for(const days of [7,30]){
+    let root=newHousehold('2026-11-16');
+    root.autonomy.enabled=false;root.otherSim.autonomy.enabled=false;
+    const archived=enqueueAction(root.actionQueues,'alex',{type:'object',actionId:'fridge'});
+    const next=enqueueAction(root.actionQueues,'alex',{type:'object',actionId:'bed'});
+    const second=enqueueAction(root.actionQueues,'mira',
+      {type:'social',targetId:'alex',actionId:'talk'});
+    assert.ok(parkQueuedHead(root.actionQueues,'alex',archived.seq,
+      'unreachable-route',root.minutes));
+    for(let hour=0;hour<days*24;hour++){
+      root.speed=hour%2?3:1;
+      tickHousehold(root,60);
+      if(hour%11===0)root=loadHousehold(structuredClone(root));
+      assert.equal(root.version,1);
+      assert.equal(root.otherSim.minutes,root.minutes);
+      assert.deepEqual(pendingActions(root.actionQueues,'alex').map(x=>x.seq),[next.seq]);
+      assert.deepEqual(pendingActions(root.actionQueues,'mira').map(x=>x.seq),[second.seq]);
+      assert.deepEqual(blockedActions(root.actionQueues,'alex').map(x=>x.seq),[archived.seq]);
+    }
+    assert.equal(SAVE_KEY,'lifesim.room01.v1');
+    assert.equal(root.actionQueues.schema,1);
+    assert.ok(retryBlockedAction(root.actionQueues,'alex',archived.seq,root.minutes));
+    assert.equal(blockedActions(root.actionQueues,'alex').length,0);
+    assert.equal(pendingActions(root.actionQueues,'alex').length,2);
+    assert.equal(loadHousehold(structuredClone(root)).actionQueues.byResident.alex.length,2);
+  }
 });
