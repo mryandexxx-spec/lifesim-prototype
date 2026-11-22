@@ -16,12 +16,13 @@ import {insideLot} from './lot-surface.js';
 import {validPoolId} from './pool-topology.js';
 import {validPoolFixtureId} from './pool-equipment.js';
 import {validOutdoorId} from './outdoor-catalog.js';
+import {grillRecipe} from './grill-catalog.js';
 
 export const ACTION_QUEUE_SCHEMA=1;
 export const MAX_ACTION_QUEUE=12;
 export const MAX_BLOCKED_QUEUE=12;
 export const BLOCKED_REASONS=Object.freeze(['missing-target','unreachable-route','invalid-destination','unavailable-gift']);
-export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity','move','outdoor','garden','pool']);
+export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity','move','outdoor','garden','pool','grill']);
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const count=n=>Number.isSafeInteger(n)&&n>=1&&n<=1000000000;
 const known=(o,k)=>typeof k==='string'&&Object.hasOwn(o,k);
@@ -30,6 +31,8 @@ export function sanitizeQueueCommand(id,raw,persons){
   if(!record(raw)||!Array.isArray(persons)||!persons.includes(id))return null;
   const type=raw.type;
   if(!ACTION_QUEUE_TYPES.includes(type))return null;
+  if(type==='grill')return validOutdoorId(raw.instanceId)&&grillRecipe(raw.recipeId)
+    ?{type:'grill',instanceId:raw.instanceId,recipeId:raw.recipeId}:null;
   if(type==='outdoor')return validOutdoorId(raw.instanceId)
     ?{type:'outdoor',instanceId:raw.instanceId}:null;
   if(type==='garden')return validOutdoorId(raw.instanceId)&&
