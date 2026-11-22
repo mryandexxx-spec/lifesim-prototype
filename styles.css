@@ -1839,9 +1839,18 @@ button.time-card:active {transform:translateY(1px);}
 .outdoor-feature-controls label{display:flex;flex-direction:column;gap:3px;min-width:0;
   font-size:11px;font-weight:750;color:#396b51}
 .outdoor-feature-controls select{width:100%;min-width:0}
-#outdoor-feature-rotate{grid-column:1/-1}
+.outdoor-rotate-touch-guide{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;
+  gap:5px 10px;align-items:center;min-width:0;border:1px solid #b4cfb9;
+  background:#eaf7e9;padding:7px;border-radius:10px}
+#outdoor-feature-rotate{grid-column:1;min-height:44px;min-width:140px;
+  color:#fff;background:#317f58;border:1px solid #246549;border-radius:9px;
+  font-weight:800;touch-action:manipulation}
+#outdoor-feature-angle{font-size:13px;font-weight:850;color:#205b40;
+  white-space:nowrap;padding:4px}
+#outdoor-rotate-help{grid-column:1/-1;font-size:11px;line-height:1.35;color:#396b51}
 @media (max-width:380px){.outdoor-feature-controls{grid-template-columns:1fr}
-  #outdoor-feature-rotate{grid-column:1}}
+  .outdoor-rotate-touch-guide{grid-template-columns:minmax(0,1fr)}
+  #outdoor-feature-angle{grid-column:1}}
 /* LOT-B1: compact bottom sheet; no new always-visible HUD button. */
 .outdoor-editor[hidden]{display:none!important}
 .outdoor-editor{

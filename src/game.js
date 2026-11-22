@@ -6811,6 +6811,10 @@ function boot() {
       $('outdoor-feature-operation').value==='place';
     $('outdoor-feature-rotate').disabled=outdoorCategory==='ground'||
       $('outdoor-feature-operation').value==='sell';
+    $('outdoor-feature-angle').textContent='Поворот: '+outdoorYaw+'° '+
+      ({0:'↑',90:'→',180:'↓',270:'←'}[outdoorYaw]||'↑');
+    $('outdoor-feature-rotate').setAttribute('aria-label',
+      'Повернуть садовый предмет на 90 градусов · сейчас '+outdoorYaw+' градусов');
     $('outdoor-apply').textContent=poolMode()
       ?!outdoorPending?.ok?'✓ Подтвердить изменение'
         :outdoorPending.cost<0?'✓ Продать · +'+(-outdoorPending.cost)+' кр.'
@@ -6964,9 +6968,9 @@ function boot() {
       ?'Продажа '+OUTDOOR_CATALOG[proposal.itemId].name+
         ' · возврат '+(-proposal.cost)+' кр. (70% от оплаченной цены)'
       :operation==='move'
-        ?'Положение подходит · перенос бесплатный · подтверди'
+        ?'Положение подходит · поворот '+outdoorYaw+'° · перенос бесплатный · подтверди'
         :'Место подходит · '+OUTDOOR_CATALOG[itemId].name+
-          ' · стоимость '+proposal.cost+' кр. · подтверди');
+          ' · поворот '+outdoorYaw+'° · стоимость '+proposal.cost+' кр. · подтверди');
     else outdoorFeedback(outdoorReason[proposal.reason]||'Нельзя разместить здесь объект',true);
     if(operation!=='sell')showOutdoorFeatureGhost(pose,proposal.ok);
     updateOutdoorPanel();return proposal;
@@ -7065,7 +7069,7 @@ function boot() {
       if(item)outdoorPose={x:item.x,z:item.z,yaw:outdoorYaw};
     }else if(outdoorPose)outdoorPose={...outdoorPose,yaw:outdoorYaw};
     if(outdoorPose)previewOutdoorObject(outdoorPose);
-    else outdoorFeedback('Поворот: '+outdoorYaw+'° · выбери землю для размещения');
+    else outdoorFeedback('Поворот: '+outdoorYaw+'° · выбери землю для размещения, затем подтверди');
   });
   $('outdoor-cancel').addEventListener('click',()=>clearOutdoorPending());
   $('outdoor-apply').addEventListener('click',()=>{
