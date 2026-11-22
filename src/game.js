@@ -7308,6 +7308,9 @@ function boot() {
   const confirmWorldOffer=(offer,command)=>{
     closeGroundWalkMenu();
     if(!offer||!command)return;
+    if(offer.residentId!==activeHudResident()){
+      toast('Выбран другой житель — коснись цели ещё раз');return;
+    }
     // A sold/replanted plant cannot acquire a stale queued action.
     if(offer.instanceId&&!game.world.outdoors?.features?.some(
       item=>item.instanceId===offer.instanceId))return;
@@ -7318,11 +7321,11 @@ function boot() {
     scheduleCommand(command,offer.residentId);
   };
   const offerWorldAction=(point,heading,label,command,instanceId=null,options={})=>{
-    groundWalkOffer={residentId:game.selectedSim,command,instanceId,
+    groundWalkOffer={residentId:activeHudResident(),command,instanceId,
       plantedAt:options.plantedAt};
     $('ground-walk-title').textContent=heading;
     $('ground-walk-action-label').textContent=label;
-    $('ground-walk-recipient').textContent=offerForName(getActorName(game.selectedSim));
+    $('ground-walk-recipient').textContent=offerForName(hudName());
     $('ground-walk-info').textContent=options.info||'';
     $('ground-walk-info').hidden=!options.info;
     $('ground-walk-wish').textContent=options.wish||'';
@@ -7378,7 +7381,7 @@ function boot() {
       ?'Недоступно: '+options.primaryReason:'';
   };
   const openPoolActionMenu=(point,poolId,{fixtureId=null,kind=null}={})=>{
-    const residentId=game.selectedSim,actionId=kind==='board'?'jump':'swim';
+    const residentId=activeHudResident(),actionId=kind==='board'?'jump':'swim';
     const status=poolActionStatus(game,residentId,poolId,{actionId,fixtureId});
     const command={type:'pool',poolId,actionId,...(fixtureId?{fixtureId}:{})};
     const a=getActor(game,residentId)?.action;
@@ -7403,7 +7406,7 @@ function boot() {
       openPoolActionMenu(point,poolId);
       return;
     }
-    const id=game.selectedSim,actor=getActor(game,id);
+    const id=activeHudResident(),actor=getActor(game,id);
     if(residentUnavailableForHome(game,id)){
       closeGroundWalkMenu();toast('Персонаж сейчас не на участке');return;
     }
@@ -7423,7 +7426,7 @@ function boot() {
     const feature=game.world.outdoors?.features?.find(
       item=>item.instanceId===target.instanceId);
     const def=feature&&OUTDOOR_CATALOG[feature.itemId];
-    const id=game.selectedSim,actor=getActor(game,id);
+    const id=activeHudResident(),actor=getActor(game,id);
     if(!feature||!def)return;
     if(residentUnavailableForHome(game,id)){
       toast('Персонаж сейчас не на участке');return;
