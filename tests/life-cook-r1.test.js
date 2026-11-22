@@ -239,7 +239,7 @@ test('COOK-R1: Safari source, stable IDs and no duplicate finance plumbing',()=>
   assert.match(ui,/KITCHEN_QUALITIES\[meal.quality\]/);
   assert.match(ui,/renderCookRecipeQuote\(\)/);
   assert.match(ui,/quoteCookingRecipe\(id\)/);
-  assert.match(sim,/kitchenServingMultiplier\(cooked.id,state.action.cookedQuality\)/);
+  assert.match(sim,/kitchenServingMultiplier\(food.id,state.action.cookedQuality\)/);
   assert.match(pages,/cp src\/kitchen\.js src\/kitchen-market\.js/);
   assert.match(pages,/cp src\/ready-meal-catalog\.js src\/ready-food\.js/);
 });
