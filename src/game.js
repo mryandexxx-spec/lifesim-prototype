@@ -2917,18 +2917,20 @@ function boot() {
         for(const z of [-.30,.30])
           part('box','grill grate rail',0,1.038,z,1.19,.035,.04,'metal');
         part('cylinder','grill side handle',.71,.84,0,.08,.22,.08,'metalLight');
-        const skewers=[];
+        const skewers=[],foodPieces=[];
         for(const z of [-.18,0,.18]){
           const pivot=new pc.Entity('GRILL-R1 animated skewer');
           pivot.setLocalPosition(0,1.115,z);node.addChild(pivot);
           primitive('box','grill skewer rod',0,0,0,1.20,.035,.035,
             outdoorFeatureMaterials.metalLight,pivot);
-          for(const x of [-.29,0,.29])
-            primitive('box','grill food piece',x,.055,0,.20,.14,.17,
+          for(const x of [-.29,0,.29]){
+            const food=primitive('box','grill food piece',x,.055,0,.20,.14,.17,
               outdoorFeatureMaterials[z===0?'chicken':'meat'],pivot);
+            food.enabled=false;foodPieces.push(food);
+          }
           skewers.push(pivot);
         }
-        grillAnimated.push({instanceId:item.instanceId,skewers});
+        grillAnimated.push({instanceId:item.instanceId,skewers,foodPieces});
       }else if(item.itemId==='garden.table'){
         part('cylinder','table stand',0,.43,0,.20,.80,.20,'woodDark');
         part('cylinder','garden tabletop',0,.86,0,1.06,.11,1.06,'wood');
@@ -8784,6 +8786,7 @@ function boot() {
         a?.action?.id==='grill'&&a.action.phase==='using'&&
         a.action.grillStage==='cooking'&&
         a.action.targetInstanceId===grill.instanceId);
+      for(const food of grill.foodPieces)food.enabled=Boolean(actor);
       for(let i=0;i<grill.skewers.length;i++)
         grill.skewers[i].setLocalEulerAngles(
           actor?Math.sin(effectTime*3+i*2)*22:0,0,0);
