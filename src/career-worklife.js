@@ -71,9 +71,11 @@ export function workMoodContext(contract,now){
   const satisfaction=jobSatisfaction(contract,now);
   return satisfaction===null?0:clamp(Math.round((satisfaction-55)/4),-5,5);
 }
-export function applyWorkMoodContext(root){
+export function applyWorkMoodContext(root,{additional=false}={}){
   if(!root?.careerSystem)return;
-  for(const id of residentIdsForSimulation(root)){
+  // Restore/preflight must not rewrite population.actor snapshots. Legacy
+  // actors keep historical restoration; extras derive mood only on live ticks.
+  for(const id of additional?residentIdsForSimulation(root):['alex','mira']){
     const actor=id==='alex'?root:id==='mira'?root.otherSim:savedAdditionalActor(root,id);
     if(!actor)continue;
     actor.workMoodContext=workMoodContext(root.careerSystem.byResident?.[id],root.minutes);
