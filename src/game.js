@@ -8064,7 +8064,7 @@ function boot() {
           }
           continue;
         }
-        if(work?.phase==='working')continue;
+        if(work?.phase==='working'||work?.phase==='waiting')continue;
         const socialWalking=Boolean(socialWalkingFor(residentId));
         const pairedPlan=socialWalking
           ?game.socialAction?.shared?.tvPlan||game.socialAction?.shared?.pairPlan:null;
