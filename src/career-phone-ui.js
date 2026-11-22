@@ -20,6 +20,7 @@ import {createFinancePhoneUI} from './finance-phone-ui.js';
 import {PHONE_APPS,phoneAppRoute} from './phone-app-registry.js';
 import {sportsPhoneView} from './sports-phone-model.js';
 import {sportsBroadcastFrame,paintSportsTv} from './sports-tv.js';
+import {sportsCrest} from './sports-identity.js';
 import {phoneContactStatus,CALL_DURATION,CALL_COOLDOWN} from './phone-calls.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {quoteReadyMeal} from './ready-food.js';
@@ -1269,6 +1270,16 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     }else if(sportsTab==='club'){
       const card=element('section','career-phone-card sports-phone-club');
       card.append(element('strong',null,'Мой клуб'));
+      if(model.crest){
+        const badge=element('div','sports-phone-personal-crest');
+        badge.style.borderColor=model.crest.color;
+        const shield=element('span','sports-phone-crest sports-phone-avatar',model.crest.symbol);
+        shield.style.backgroundColor=model.crest.color;
+        shield.setAttribute('role','img');
+        shield.setAttribute('aria-label','Символ клуба '+model.crest.name);
+        badge.append(shield,element('strong',null,NAMES[who]+' · '+model.crest.name));
+        card.append(badge);
+      }
       card.append(element('p',null,model.favorite
         ?'⚑ '+model.favorite.name+' · интерес к футболу '+model.fanIntensity+'/100'
         :'Клуб не выбран. Алекс и Мира могут поддерживать разные команды.'));
@@ -1287,6 +1298,13 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
         },'sports-phone-team');
         button.dataset.sportsTeam=team.id;
         button.style.borderLeftColor=team.color;
+        const crest=sportsCrest(team.id);
+        if(crest){
+          const shield=element('span','sports-phone-crest',crest.symbol);
+          shield.style.backgroundColor=crest.color;
+          shield.setAttribute('aria-hidden','true');
+          button.prepend(shield);
+        }
         button.disabled=chosen||!model.canChangeClub;
         grid.append(button);
       }

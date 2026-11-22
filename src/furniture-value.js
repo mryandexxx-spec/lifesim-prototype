@@ -25,7 +25,8 @@ const passiveLabels=Object.freeze({
   floorlamp:'Декоративное освещение · без изменения потребностей',
   rug:'Ковёр для интерьера · по нему можно ходить',
   dresser:'Декоративный комод',wardrobe:'Декоративный гардероб',
-  mirror:'Зеркало для интерьера',sculpture:'Украшение дома'
+  mirror:'Зеркало для интерьера',sculpture:'Украшение дома',
+  fanflag:'Клубный напольный декор без бонусов',fanstand:'Клубный напольный декор без бонусов'
 });
 
 /** Returns actual action need or an honest non-numeric utility description.

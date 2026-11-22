@@ -2,6 +2,7 @@
  * No browser, DOM, hidden future scores, payment or timeline writes.
  */
 import {SPORTS_TEAMS,sportsTeam} from './sports-catalog.js';
+import {sportsCrest} from './sports-identity.js';
 import {sportsFixtures,matchAt,standings} from './sports-league.js';
 import {sportsWatchOpportunity,sportsBroadcastFrame} from './sports-tv.js';
 import {calendarAt} from './calendar-core.js';
@@ -40,6 +41,8 @@ export function sportsPhoneView(root,id){
   color:sportsTeam(x.teamId)?.color||'#999'}));
  const nextFavorite=club?fixtures.find(m=>m.kickoff>now&&[m.home,m.away].includes(club)):null;
  return {seasonId:root.sportsWorld.seasonId,teams:SPORTS_TEAMS,
+  teamCrests:SPORTS_TEAMS.map(t=>sportsCrest(t.id)),
+  crest:club?sportsCrest(club):null,
   rounds:(SPORTS_TEAMS.length-1)*2,broadcast:sportsBroadcastFrame(root),
   selectedResident:id,residentName:names[id],favoriteTeamId:club,
   favorite:club?sportsTeam(club):null,
