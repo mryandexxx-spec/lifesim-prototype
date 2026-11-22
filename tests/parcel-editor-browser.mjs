@@ -144,30 +144,42 @@ try{
   await page.reload();await page.locator('#loading').waitFor({state:'hidden',timeout:75000});
   assert.equal((await root()).world.outdoors.features[0].yaw,90);
   if(width===390){
-    // Owner reproduction: selected wardrobe costs 320, wallet holds 281.
-    await page.evaluate(key=>{
-      const state=JSON.parse(localStorage.getItem(key));
-      state.shop.credits=281;
-      localStorage.setItem(key,JSON.stringify(state));
-    },SAVE_KEY);
-    await page.reload();
-    await page.locator('#loading').waitFor({state:'hidden',timeout:75000});
-    await page.locator('#home-open').tap();await page.locator('#home-furnish').tap();
-    assert.equal(await action('view').textContent(),'План');
-    await tap('group:shop');
-    const expensive=page.locator('#furnish-stock button').filter({hasText:'Шкаф с историями'});
+    // Owner reproduction: independent fresh save, not an in-place localStorage
+    // mutation wiped by the currently running game's unload persistence.
+    const poorSeed=structuredClone(seed);poorSeed.shop.credits=281;
+    const poorCtx=await browser.newContext({
+      viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true
+    });
+    await poorCtx.addInitScript(({key,seed})=>{
+      if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));
+      localStorage.setItem('lifesim.uiTour.v1','done');
+    },{key:SAVE_KEY,seed:poorSeed});
+    const poorPage=await poorCtx.newPage(),poorErrors=[];
+    poorPage.on('pageerror',error=>poorErrors.push(error.message));
+    await poorPage.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
+    await poorPage.locator('#loading').waitFor({state:'hidden',timeout:75000});
+    const poorAction=id=>poorPage.locator('[data-parcel-action="'+id+'"]');
+    const poorTap=id=>poorAction(id).tap({timeout:8000});
+    const poorRoot=()=>poorPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+    assert.equal((await poorRoot()).shop.credits,281);
+    await poorPage.locator('#home-open').tap();
+    await poorPage.locator('#home-furnish').tap();
+    assert.equal(await poorAction('view').textContent(),'План');
+    await poorTap('group:shop');
+    const expensive=poorPage.locator('#furnish-stock button').filter({hasText:'Шкаф с историями'});
     assert.ok(await expensive.count()>0,'Expected canonical wardrobe product');
     await expensive.first().tap();
-    assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'list');
-    assert.equal(await action('try').isEnabled(),true);
-    await tap('try');
-    assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'draft');
-    assert.equal((await root()).shop.credits,281,'Preview never charges');
-    assert.equal(await action('apply').isEnabled(),false,'Unaffordable purchase cannot commit');
-    assert.equal(await action('turn').isEnabled(),true);
-    await tap('turn');
-    assert.equal((await root()).shop.credits,281);
-    await tap('cancel');await tap('exit');
+    assert.equal(await poorPage.locator('#parcel-editor').getAttribute('data-stage'),'list');
+    assert.equal(await poorAction('try').isEnabled(),true);
+    await poorTap('try');
+    assert.equal(await poorPage.locator('#parcel-editor').getAttribute('data-stage'),'draft');
+    assert.equal((await poorRoot()).shop.credits,281,'Preview never charges');
+    assert.equal(await poorAction('apply').isEnabled(),false,'Unaffordable purchase cannot commit');
+    assert.equal(await poorAction('turn').isEnabled(),true);
+    await poorTap('turn');
+    assert.equal((await poorRoot()).shop.credits,281);
+    await poorTap('cancel');await poorTap('exit');
+    assert.deepEqual(poorErrors,[]);await poorCtx.close();
   }
   assert.deepEqual(errors,[]);await ctx.close();console.log('Parcel editor passed',width,height);
  }
