@@ -83,6 +83,13 @@ const original=[
   {prefabId:'wardrobe',instanceId:'template-wardrobe-1',name:'Гардероб',
     category:'Спальня',actionId:'wardrobe',capabilities:['clothing.organize'],templateOnly:true,
     x:0,z:0,rect:[-.91,.91,-.51,.51],approach:[0,-1.20]},
+  // FANDOM-R2: two purchased floor props with their own original geometry.
+  {prefabId:'fanflag',instanceId:'template-fanflag-1',name:'Клубный вымпел',
+    category:'Декор',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.29,.29,-.29,.29]},
+  {prefabId:'fanstand',instanceId:'template-fanstand-1',name:'Фанатский стенд',
+    category:'Декор',capabilities:['decor'],templateOnly:true,
+    x:0,z:0,rect:[-.50,.50,-.34,.34]},
   // Batch 02 inert decorations: no free instances or invented interactions.
   {prefabId:'meshsmall',instanceId:'template-meshsmall-1',name:'Мелкий декор',
     category:'Декор',capabilities:['decor'],templateOnly:true,x:0,z:0,rect:[-.30,.30,-.30,.30]},

@@ -1,4 +1,5 @@
 import {MESHY_ROOM_V2_PRODUCTS} from './meshy-room-v2-data.js';
+import {SPORTS_TEAMS} from './sports-catalog.js';
 /** F4b2 — canonical, UI/renderer-agnostic purchasable product data.
  * Product/SKU ID remains stable even when several products share one prefab.
  * New content lives here rather than in financial transactions or PlayCanvas.
@@ -153,6 +154,17 @@ const offered=[
     description:'Рисование · личный навык живописи и сохранённые картины'},
 ];
 offered.push(...MESHY_ROOM_V2_PRODUCTS);
+/** R2: stable purchased colorways, independent of a resident's favorite. */
+for(const team of SPORTS_TEAMS){
+  offered.push({itemId:'fanflag.'+team.id,prefabId:'fanflag',price:35,
+    name:'Вымпел · '+team.name,modelKey:'fanflag.'+team.id,
+    typeCategoryId:'type.decor.sports',
+    description:'Напольный клубный вымпел · оригинальный 3D-декор без бонуса'});
+  offered.push({itemId:'fanstand.'+team.id,prefabId:'fanstand',price:55,
+    name:'Фан-стенд · '+team.name,modelKey:'fanstand.'+team.id,
+    typeCategoryId:'type.decor.sports',
+    description:'Напольная фанатская стойка · оригинальный 3D-декор без бонуса'});
+}
 export const FURNITURE_PRODUCTS=Object.freeze(offered.map(x=>Object.freeze({...x,
   ...(x.effects?{effects:Object.freeze(x.effects.map(e=>Object.freeze({...e})))}:{})})));
 export const FURNITURE_PRODUCT_BY_ID=Object.freeze(
@@ -221,6 +233,7 @@ export const FURNITURE_SHOP_TYPES=Object.freeze([
   {id:'type.decor.art',label:'Скульптуры',parentId:'type.decor'},
   {id:'type.decor.wall',label:'Настенный декор',parentId:'type.decor'},
   {id:'type.decor.collections',label:'Композиции и аксессуары',parentId:'type.decor'},
+  {id:'type.decor.sports',label:'Клубная атрибутика',parentId:'type.decor'},
   {id:'type.creative',label:'Творчество',icon:'🎨'},
   {id:'type.creative.painting',label:'Живопись',parentId:'type.creative'},
   {id:'type.electronics',label:'Техника',icon:'▣'},
@@ -234,7 +247,8 @@ export const FURNITURE_TYPE_BY_PREFAB=Object.freeze({
   dresser:'type.storage.dressers',wardrobe:'type.storage.wardrobes',
   bookcase:'type.storage.books',plant:'type.decor.plants',
   rug:'type.decor.rugs',mirror:'type.decor.mirrors',
-  sculpture:'type.decor.art',floorlamp:'type.lighting.floor',
+  sculpture:'type.decor.art',fanflag:'type.decor.sports',fanstand:'type.decor.sports',
+  floorlamp:'type.lighting.floor',
   walllight:'type.lighting.wall',ceilinglight:'type.lighting.ceiling',
   tv:'type.electronics.tv',music:'type.electronics.music',
   easel:'type.creative.painting',
@@ -244,7 +258,7 @@ export const FURNITURE_TYPE_BY_PREFAB=Object.freeze({
 });
 export const PROCEDURAL_NEW_PREFABS=Object.freeze([
   'armchair','chair','diningtable','floorlamp','walllight','ceilinglight','rug',
-  'dresser','mirror','sculpture','wardrobe','easel','stove','prep','sink','meshsmall','meshmedium','meshlarge','meshtall','meshwall'
+  'dresser','mirror','sculpture','fanflag','fanstand','wardrobe','easel','stove','prep','sink','meshsmall','meshmedium','meshlarge','meshtall','meshwall'
 ]);
 export const PROCEDURAL_DEFAULT_SKU=Object.freeze(Object.fromEntries(
   PROCEDURAL_NEW_PREFABS.map(prefabId=>[
