@@ -174,6 +174,12 @@ export function stepAnimation(previous,signals,dt) {
     const stroke=Math.sin(t*5.2),breath=Math.sin(t*2.1);
     armTarget=[-28-5*breath,-67+14*stroke];
     elbowTarget=[-18,-38-7*stroke];
+  }else if(action==='grill'){
+    // Outdoor skewers: a measured forward reach and wrist turn.
+    // Gameplay receives no benefit here; actual GRILL-R1 staged tick owns XP.
+    const turn=Math.sin(t*3.4),reach=Math.sin(t*1.8+.35);
+    armTarget=[-22-10*reach,-59+20*turn];
+    elbowTarget=[-32-8*reach,-37+13*turn];
   }else if(['cook','prep','wash'].includes(action)){
     // F4G: actual repeated chopping/stirring/scrubbing gestures at a verified
     // station. Cosmetic arm motion only; meals and XP come from real use.
