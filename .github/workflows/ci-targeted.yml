@@ -18,6 +18,7 @@ jobs:
       integration_qa: ${{ steps.impact.outputs.integration_qa }}
       micro_ux: ${{ steps.impact.outputs.micro_ux }}
       load_truth: ${{ steps.impact.outputs.load_truth }}
+      fridge_ux: ${{ steps.impact.outputs.fridge_ux }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,6 +64,9 @@ jobs:
       - name: LOAD-TRUTH-R1 factual stages at two mobile WebGL viewports
         if: ${{ needs.targeted.outputs.load_truth == 'true' }}
         run: node tests/load-truth-r1-browser-smoke.mjs
+      - name: FRIDGE-UX-R2 approved A actual two-viewport PlayCanvas and HUD smoke
+        if: ${{ needs.targeted.outputs.fridge_ux == 'true' }}
+        run: node tests/fridge-ux-r2-browser-smoke.mjs
       - name: Imported fixtures and outdoor character motion at mobile viewport
         if: ${{ needs.targeted.outputs.fixture_motion == 'true' }}
         run: node tests/fixture-motion-browser-smoke.mjs
