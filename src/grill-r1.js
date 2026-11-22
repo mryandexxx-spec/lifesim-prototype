@@ -78,14 +78,14 @@ export function outdoorPlatePosition(world,tableId,seatId){
   const dx=seat.x-table.x,dz=seat.z-table.z,d=Math.hypot(dx,dz)||1;
   return {x:table.x+dx/d*.32,y:.34,z:table.z+dz/d*.32};
 }
-export function chooseOutdoorDining(world,from,excluded=[]){
+export function chooseOutdoorDining(world,from,excluded=[],onlyTableId=null){
   const origin=from&&{x:from.x,z:from.z};
   const fridge=furnitureActionApproach(world,'fridge');
   if(!origin||!fridge||!findPath(origin,fridge,world))return null;
   const taken=new Set(excluded);
   let best=null;
   for(const table of world?.outdoors?.features||[]){
-    if(table.itemId!=='garden.table')continue;
+    if(table.itemId!=='garden.table'||(onlyTableId&&table.instanceId!==onlyTableId))continue;
     for(const bench of world?.outdoors?.features||[]){
       if(bench.itemId!=='garden.bench'||taken.has(bench.instanceId))continue;
       const point=outdoorDiningApproach(world,table.instanceId,bench.instanceId);
