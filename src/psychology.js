@@ -59,7 +59,11 @@ export const MEMORY_TEXT = Object.freeze({
   'worklife.sharedDisappointed':'Огорчился из-за прерванного совместного отдыха',
   'garden.firstCare':'Впервые позаботился о растении',
   'garden.firstBloomSeen':'Впервые полюбовался цветением',
-  'pool.firstSwim':'Впервые успешно проплыл в бассейне'
+  'pool.firstSwim':'Впервые успешно проплыл в бассейне',
+  'sports.win':'Порадовался победе любимого клуба',
+  'sports.draw':'Узнал о ничьей любимого клуба',
+  'sports.loss':'Огорчился из-за поражения любимого клуба',
+  'sports.chat':'Поговорили о футбольном матче'
 });
 const IDS = ['bed','fridge','shower','sofa']; // targeted garden wishes require a garden
 const LIMIT = 12;
@@ -103,7 +107,8 @@ export function recentMemoryEffect(mind, minutes, excluded=new Set(),scope='all'
       'worklife.sharedInterrupted':-6,
       'worklife.sharedDisappointed':-4,
       'garden.firstCare':3,'garden.firstBloomSeen':7,
-      'pool.firstSwim':6};
+      'pool.firstSwim':6,
+      'sports.win':7,'sports.draw':2,'sports.loss':-5,'sports.chat':2};
     const effect=Object.hasOwn(socialEffect,memory.id)
       ?socialEffect[memory.id]:memory.fulfilled?12:5;
     return sum+effect*strength;
