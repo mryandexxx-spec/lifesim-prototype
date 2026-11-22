@@ -51,3 +51,13 @@ test('P4 integration browser triggers only its four-size job, not LOT-E5',()=>{
   assert.equal(planChanges(['tests/life-integration-qa.test.js']).integration_qa,false);
   assert.equal(planChanges(['README.md']).integration_qa,false);
 });
+
+test('NEEDS-FIX: changed needs loop or bed SKU routes actual PlayCanvas mobile boot',()=>{
+  for(const source of ['src/simulation.js','src/need-balance.js','src/furniture-products.js']){
+    const plan=planChanges([source]);
+    assert.equal(plan.browser,true,source);
+    assert.ok(plan.tests.includes('tests/needs-fix-r1.test.js'));
+  }
+  assert.equal(planChanges(['src/kitchen.js']).browser,false,
+    'independent pantry changes should not schedule unrelated browser work');
+});
