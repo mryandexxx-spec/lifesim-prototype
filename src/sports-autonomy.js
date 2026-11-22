@@ -31,7 +31,7 @@ export function sportsAutoIntent(root,id){
  if(roll>=fan.fanIntensity)return null;
  return {matchId:match.id,tvId:opportunity.tvId,remaining:opportunity.remaining};
 }
-/** One marker ONLY after the ordinary A*/FIFI physical TV action was accepted.
+/** One marker ONLY after the ordinary A-star/FIFO physical TV action was accepted.
  * No direct Fun/social benefit, no queue insertion, no time advancement here.
  */
 export function recordSportsAutoStart(root,id,matchId,tvId){
