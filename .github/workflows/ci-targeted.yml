@@ -17,6 +17,7 @@ jobs:
       cas_inventory: ${{ steps.impact.outputs.cas_inventory }}
       cas_baseline: ${{ steps.impact.outputs.cas_baseline }}
       cas_hud: ${{ steps.impact.outputs.cas_hud }}
+      cas_soak: ${{ steps.impact.outputs.cas_soak }}
       e5: ${{ steps.impact.outputs.e5 }}
       fixture_motion: ${{ steps.impact.outputs.fixture_motion }}
       integration_qa: ${{ steps.impact.outputs.integration_qa }}
@@ -89,6 +90,16 @@ jobs:
         with:
           name: cas-01-7-mobile-pr
           path: artifacts/cas-01-7/
+          if-no-files-found: ignore
+      - name: CAS-01.8 actual 2/4 resident mobile-size WebGL performance and save soak
+        if: ${{ needs.targeted.outputs.cas_soak == 'true' }}
+        run: node tests/cas-01-8-browser-smoke.mjs
+      - name: Upload CAS-01.8 stress reports and mobile WebGL screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-01-8-soak-pr
+          path: artifacts/cas-01-8/
           if-no-files-found: ignore
       - name: Parcel editor real scene and transaction checks
         if: ${{ needs.targeted.outputs.parcel_editor == 'true' }}
