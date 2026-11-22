@@ -2247,6 +2247,7 @@ function openWorkIncident(residentId){
 const shiftSummary=createCareerShiftSummaryUI({
   host:document.querySelector('.app-shell'),getRoot:()=>game,
   shouldDefer:()=>dialogueNeedsDecision(game)||careerPhone.isOpen()||
+    HOUSEHOLD_IDS.some(id=>residentWorkPhase(game,id)==='returning')||
     document.querySelector('.life-calendar:not([hidden])')!==null,
   onDismissal:residentId=>{
     if(game.selectedSim!==residentId){
@@ -7914,22 +7915,36 @@ function boot() {
       // Run two independent route followers with one shared room and item reservation.
       for(const residentId of HOUSEHOLD_IDS){
         const resident=getActor(game,residentId);
-        // If another command arrives during a sit, stand up completely first.
+        // Career return has priority over stale visual exit gates. A worker
+        // may depart while a non-action seat/shower/door transition still owns
+        // the scene; its old transient controller must not trap the worker in
+        // "returning" and indirectly block the partner's social FIFO/autonomy.
+        // This is the same immediate home reentry as before, with no extra tick,
+        // salary, need reward, or persistent save field.
+        const work=game.careerSystem?.byResident?.[residentId]?.currentShift;
+        if(work?.phase==='returning'){
+          resident.position=nearestWalkable({x:-.65,z:3.45},game.world);
+          if(finishCareerReturn(game,residentId)){
+            sofaStates[residentId]=createSofaTransition();
+            bedStates[residentId]=createBedTransition();
+            showerStates[residentId]=createShowerTransition();
+            toiletStates[residentId]=createToiletTransition();
+            fridgeLeaving[residentId]=false;
+            fridgeWasUsing[residentId]=false;
+            paths[residentId]={points:null,index:0,id:null};
+            restartAutonomyWait(residentId);
+            save(true);updateCareerHud();
+            toast(getActorName(residentId)+' вернулся домой');
+          }
+          continue;
+        }
+        // For ordinary household travel the exit animation remains a hard
+        // gate, including on the other resident's independent route.
         if(sofaStates[residentId].progress>0||bedStates[residentId].progress>0||
           showerStates[residentId].active||toiletStates[residentId].active||
           fridgeLeaving[residentId])continue;
         // Career travel uses the SAME pathfinder and same walking animation
         // as household actions. No imaginary second scene or game timer.
-        const work=game.careerSystem?.byResident?.[residentId]?.currentShift;
-        if(work?.phase==='returning'){
-          resident.position=nearestWalkable({x:-.65,z:3.45},game.world);
-          finishCareerReturn(game,residentId);
-          paths[residentId]={points:null,index:0,id:null};
-          restartAutonomyWait(residentId);
-          save(true);updateCareerHud();
-          toast(getActorName(residentId)+' вернулся домой');
-          continue;
-        }
         if(work?.phase==='departing'){
           const goal=nearestWalkable({x:-.65,z:3.45},game.world);
           const routeId='career-exit:'+work.id;
