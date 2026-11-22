@@ -135,3 +135,12 @@ test('CAS-00 source inventory runs only for the audited script and its own test'
   assert.equal(planChanges(['tests/cas-00-save-baseline.test.js']).cas_inventory,false);
   assert.equal(planChanges(['README.md']).cas_inventory,false);
 });
+
+test('CAS-01.7 source-level VM tests are included for game and phone edits',()=>{
+  for(const source of ['src/game.js','src/career-phone-ui.js']){
+    const selected=planChanges([source]).tests;
+    for(const testFile of ['tests/q1-q4-regression.test.js',
+      'tests/ui-live-plan.test.js','tests/ui-nonblocking.test.js'])
+      assert.ok(selected.includes(testFile),source+' must guard '+testFile);
+  }
+});
