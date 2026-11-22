@@ -68,7 +68,9 @@ export function planChanges(files,root=ROOT){
   const tests=[...selected].filter(f=>allTests.includes(f)).sort();
   const micro_ux=changed.some(f=>
     /^(?:src\/(?:micro-ux|camera-controls)\.js|tests\/micro-ux-r1-browser-smoke\.mjs)$/.test(f));
-  return {tests,browser:changed.some(isUI),micro_ux,
+  const load_truth=changed.some(f=>
+    /^(?:src\/loading-progress\.js|tests\/load-truth-r1-browser-smoke\.mjs)$/.test(f));
+  return {tests,browser:changed.some(isUI),micro_ux,load_truth,
     e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),changed};
 }
@@ -95,13 +97,15 @@ function main(){
     assert.equal(run.status,0,'Targeted Node tests failed');
   }
   console.log('Browser smoke:',plan.browser?'required':'not needed');
+  console.log('LOAD-TRUTH-R1 two-viewport stages:',plan.load_truth?'required':'not needed');
   console.log('LOT-E5 four-viewport deep check:',plan.e5?'required':'not needed');
   console.log('P4 Life Systems four-viewport integration:',plan.integration_qa?'required':'not needed');
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
     'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
     'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
-    'micro_ux='+(plan.micro_ux?'true':'false')+'\n');
+    'micro_ux='+(plan.micro_ux?'true':'false')+'\n'+
+    'load_truth='+(plan.load_truth?'true':'false')+'\n');
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main();
