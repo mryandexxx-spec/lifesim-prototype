@@ -14,6 +14,7 @@ jobs:
     outputs:
       browser: ${{ steps.impact.outputs.browser }}
       parcel_editor: ${{ steps.impact.outputs.parcel_editor }}
+      cas_inventory: ${{ steps.impact.outputs.cas_inventory }}
       cas_baseline: ${{ steps.impact.outputs.cas_baseline }}
       e5: ${{ steps.impact.outputs.e5 }}
       fixture_motion: ${{ steps.impact.outputs.fixture_motion }}
@@ -45,6 +46,16 @@ jobs:
         env:
           CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/ci-target.mjs
+      - name: CAS-00 full-src resident dependency inventory (not a four-person simulation)
+        if: ${{ steps.impact.outputs.cas_inventory == 'true' }}
+        run: node scripts/cas-00-dependency-inventory.mjs
+      - name: Archive CAS-00 complete source lexical inventory
+        if: ${{ always() && steps.impact.outputs.cas_inventory == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-00-source-inventory
+          path: artifacts/cas-00/resident-dependency-inventory.json
+          if-no-files-found: error
   mobile-webgl-smoke:
     needs: targeted
     if: ${{ needs.targeted.outputs.browser == 'true' }}
