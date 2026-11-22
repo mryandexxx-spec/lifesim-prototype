@@ -7417,6 +7417,7 @@ function boot() {
     if(landscape){
       const fraction=Math.max(.35,Math.min(1,(panel.left-surface.left-8)/surface.width));
       camera.camera.rect=new pc.Vec4(0,0,fraction,1);
+      canvas.style.clipPath='inset(0 '+Math.round(surface.width*(1-fraction))+'px 0 0)';
     }else{
       const fraction=Math.max(.45,Math.min(1,(panel.top-surface.top-8)/surface.height));
       // Preserve apparent world scale when bottom tray changes height.
@@ -7430,6 +7431,7 @@ function boot() {
       }
       parcel.lastViewportFraction=fraction;
       camera.camera.rect=new pc.Vec4(0,1-fraction,1,fraction);
+      canvas.style.clipPath='inset(0 0 '+Math.round(surface.height*(1-fraction))+'px 0)';
     }
   }
   window.addEventListener('resize',()=>{if(parcel)positionParcelViewport();});
@@ -7463,7 +7465,8 @@ function boot() {
     }
     const cameraBefore={...view},fresh=!parcel;
     if(fresh)parcel={oldView:cameraBefore,oldFinger:oneFingerMode,
-      oldCameraRect:camera.camera.rect.clone(),plan:true,journal:createParcelJournal()};
+      oldCameraRect:camera.camera.rect.clone(),oldCanvasClip:canvas.style.clipPath,
+      plan:true,journal:createParcelJournal()};
     tray.hide();
     if(section==='house'&&!buildMode){closeDomain();enterBuild();}
     if(section==='furniture'&&!furnishMode){closeDomain();enterFurniture();}
@@ -7483,6 +7486,7 @@ function boot() {
     const previous=parcel;parcelGesture.clear();tray.hide();closeDomain();parcel=null;
     delete shell.dataset.parcel;
     camera.camera.rect=previous.oldCameraRect;
+    canvas.style.clipPath=previous.oldCanvasClip;
     oneFingerMode=previous.oldFinger;showCameraMode();setView(previous.oldView);
     $('home-open').focus({preventScroll:true});
   }

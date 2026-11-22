@@ -2651,3 +2651,6 @@ button.time-card:active {transform:translateY(1px);}
 .parcel-editor[data-stage="list"] .parcel-native{min-height:72px}
 .parcel-editor nav,.parcel-editor .parcel-actions{flex-shrink:0}
 @media(max-height:610px) and (orientation:portrait){.parcel-editor{gap:4px;padding-top:6px}.parcel-editor h2{font-size:16px}.parcel-bar button{padding:4px}}
+
+/* Legacy interaction hint belongs to Life mode, never Build editor. */
+.app-shell[data-parcel] #hint{display:none!important}

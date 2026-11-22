@@ -58,6 +58,10 @@ try{
     assert.ok(sceneViewport.y>0&&sceneViewport.w>=.5&&sceneViewport.w<=.8,
       'Portrait viewport must exclude tray: '+JSON.stringify(sceneViewport));
   }
+  assert.equal(await page.locator('#hint').isVisible(),false,
+    'Legacy Life-mode hint must not block the build lot');
+  const clip=await page.locator('#game-canvas').evaluate(el=>el.style.clipPath);
+  assert.ok(clip.startsWith('inset('),'PlayCanvas residue outside editing viewport must be clipped');
   await page.screenshot({path:'artifacts/parcel-editor/'+width+'x'+height+'-overview.png'});
   await worldTap(8,-7,.35);
   assert.equal(await page.locator('#parcel-editor h2').textContent(),'Садовая скамейка');
@@ -102,6 +106,7 @@ try{
   await page.locator('#furnish-stock button:not([hidden])').first().tap();
   assert.equal(await page.locator('#parcel-editor').getAttribute('data-stage'),'draft');
   await tap('cancel');await tap('exit');
+  assert.equal(await page.locator('#game-canvas').evaluate(el=>el.style.clipPath),'');
   await page.reload();await page.locator('#loading').waitFor({state:'hidden',timeout:75000});
   assert.equal((await root()).world.outdoors.features[0].yaw,90);
   assert.deepEqual(errors,[]);await ctx.close();console.log('Parcel editor passed',width,height);
