@@ -15,8 +15,8 @@ test('Batch02 35 stable visual IDs, 23 opt-in decorative shop SKUs, originals un
   assert.equal(MESHY_ROOM_V2_ENTRIES.length,35);
   assert.equal(MESHY_ROOM_V2_SKUS.length,35);
   assert.equal(MESHY_ROOM_V2_PRODUCTS.length,23);
-  assert.equal(FURNITURE_PRODUCTS.length,70);
-  assert.equal(marketListing().length,70);
+  assert.equal(FURNITURE_PRODUCTS.length,82);
+  assert.equal(marketListing().length,82);
   assert.equal(newFurnitureWorld().instances.length,10);
   for(const product of MESHY_ROOM_V2_PRODUCTS){
     assert.equal(furnitureProduct(product.itemId)?.prefabId,product.prefabId);

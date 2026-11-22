@@ -26,7 +26,7 @@ test('F4C: original shop assortment plus the H5 functional easel',()=>{
   assert.equal(PROCEDURAL_NEW_PREFABS.length,22);
   assert.equal(ORIGINAL_FURNITURE.length,10);
   assert.equal(marketListing().length,82);
-  assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,70);
+  assert.equal(new Set(FURNITURE_PRODUCTS.map(x=>x.itemId)).size,82);
   assert.equal(SHOP_START_CREDITS,5000);
   assert.equal(SHOP_SELL_PERCENT,70);
 });

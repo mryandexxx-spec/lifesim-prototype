@@ -17,7 +17,7 @@ test('13 real V3 GLB are exact, independently-identified SKU/fixture models, no 
   assert.equal(MESHY_ROOM_V3_ENTRIES.length,13);
   assert.equal(MESHY_ROOM_V3_SKUS.length,13);
   assert.equal(new Set(MESHY_ROOM_V3_SKUS).size,13);
-  assert.equal(FURNITURE_PRODUCTS.length,70,'existing catalog prices/stock unchanged');
+  assert.equal(FURNITURE_PRODUCTS.length,82,'existing catalog prices/stock unchanged');
   assert.equal(original.instances.length,10);
   assert.equal(manifest.records.length,13);
   const manifestIds=new Set(manifest.records.map(x=>x.sku));

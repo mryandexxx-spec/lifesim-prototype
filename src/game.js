@@ -2548,7 +2548,7 @@ function boot() {
       poolSize:dirtyDishNodes.length
     });
   const decorNodes=new Map();
-  if(new URLSearchParams(window.location.search).get('fandom-r2-b')==='qa')
+  if(typeof window!=='undefined'&&window.location?.search?.includes('fandom-r2-b=qa'))
     window.__LifeSimFanDecorStats=()=>game.world.furniture.instances
       .filter(i=>['fanflag','fanstand'].includes(i.prefabId)&&i.location==='home')
       .map(item=>{
