@@ -277,6 +277,10 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         ?storedSpot
         :chooseMusicListeningSpot(root.world,actor.position,actor.action.targetInstanceId)?.point;
       if(point)actor.action.musicSpot={x:point.x,z:point.z};
+      // Movement reaches the station between two fixed simulation ticks. A
+      // pagehide save in this interval has a 'using' action and a walking session.
+      const justArrived=listening?.phase==='walking'&&actor.action.phase==='using'&&
+        actor.action.elapsed===0;
       if(!point||!listening||listening.actorId!==id||!MUSIC_ACTIVITY_IDS.includes(listening.activityId)||
         listening.activityId!==actor.action.activityId||
         listening.targetInstanceId!==actor.action.targetInstanceId||
@@ -284,11 +288,13 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         !validMusicSource(root,actor)||
         Math.abs(listening.elapsed-actor.action.elapsed)>.00001||
         !((listening.phase==='walking'&&actor.action.phase==='walking')||
-          (listening.phase==='using'&&actor.action.phase==='using'))||
+          (listening.phase==='using'&&actor.action.phase==='using')||justArrived)||
         (actor.action.phase==='using'&&(!point||
           Math.hypot(actor.position.x-point.x,actor.position.z-point.z)>.35)))
         actor.action=null;
-      else actor.activitySession=listening;
+      else actor.activitySession=justArrived
+        ?arriveActivitySession(listening,{authorized:true,resourceAvailable:true})
+        :listening;
       continue;
     }
     if(actor.action?.id!=='hobby')continue;
