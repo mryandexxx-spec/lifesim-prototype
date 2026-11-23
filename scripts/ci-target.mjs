@@ -17,7 +17,7 @@ const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
 export function planChanges(files,root=ROOT){
   const changed=[...new Set(files.map(normalize))].sort();
   const relevant=changed.some(f=>isCode(f)||f.startsWith('assets/'));
-  if(!relevant)return {tests:[],browser:false,cas_inventory:false,cas_baseline:false,cas_soak:false,e5:false,integration_qa:false,fandom_tv:false,fandom_phone:false,fandom_r2a:false,fandom_r2b:false,fandom_r2c:false,changed};
+  if(!relevant)return {tests:[],browser:false,cas_inventory:false,cas_baseline:false,cas_soak:false,cas_modular:false,e5:false,integration_qa:false,fandom_tv:false,fandom_phone:false,fandom_r2a:false,fandom_r2b:false,fandom_r2c:false,changed};
   const allTests=readdirSync(path.join(root,'tests')).filter(f=>f.endsWith('.test.js')).map(f=>'tests/'+f);
   const selected=new Set(CORE);
   const changedSrc=changed.filter(f=>f.startsWith('src/')&&/\.(?:js|mjs)$/.test(f));
@@ -94,6 +94,8 @@ export function planChanges(files,root=ROOT){
     /^(?:src\/(?:sports-shared-watch|action-queue|household|sports-phone-model|career-phone-ui|game)\.js|tests\/fandom-r2-c-browser-smoke\.mjs)$/.test(f));
   const cas_soak=changed.some(f=>
     /^(?:tests\/cas-01-8-browser-smoke\.mjs|src\/(?:household|resident-activity-runtime|resident-social-runtime|career-work|career-scheduler|finance-ledger|action-queue|game|resident-hud)\.js)$/.test(f));
+  const cas_modular=changed.some(f=>
+    /^(?:scripts\/build-cas-modular-mannequin\.mjs|tests\/cas-02-1-b-browser-smoke\.mjs|src\/character-lab(?:-config)?\.js|cas-modular-lab\.html)$/.test(f));
   const cas_hud=changed.some(f=>/^(?:src\/(?:resident-hud|career-phone-ui|game)\.js|tests\/cas-01-7-browser-smoke\.mjs)$/.test(f));
   const cas_inventory=changed.some(f=>['scripts/cas-00-dependency-inventory.mjs','tests/cas-00-dependency-inventory.test.js'].includes(f));
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');
@@ -101,7 +103,7 @@ export function planChanges(files,root=ROOT){
     /^(?:src\/career-rank-schedules\.js|tests\/career-shifts-r1-browser-smoke\.mjs)$/.test(f));
   return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
     fandom_tv,fandom_phone,fandom_r2a,fandom_r2b,fandom_r2c,
-    e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
+    cas_modular,e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),cas_hud,cas_soak,changed};
 }
 
@@ -138,6 +140,7 @@ function main(){
   console.log('FANDOM-R2-B live club decor and crests:',plan.fandom_r2b?'required':'not needed');
   console.log('FANDOM-R2-C verified shared TV and mobile memories:',plan.fandom_r2c?'required':'not needed');
   console.log('CAS-01.8 multi-actor soak:',plan.cas_soak?'required':'not needed');
+  console.log('CAS-02.1-B real modular WebGL:',plan.cas_modular?'required':'not needed');
   console.log('CAS-00 full-source static inventory:',plan.cas_inventory?'required':'not needed');
   console.log('CAS-00 four-viewport performance baseline:',plan.cas_baseline?'required':'not needed');
   console.log('LOT-E5 four-viewport deep check:',plan.e5?'required':'not needed');
@@ -146,7 +149,7 @@ function main(){
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
     'parcel_editor='+changed.some(f=>f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
     'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'cas_hud='+(plan.cas_hud?'true':'false')+'\n'+
-    'cas_soak='+(plan.cas_soak?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
+    'cas_soak='+(plan.cas_soak?'true':'false')+'\n'+'cas_modular='+(plan.cas_modular?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
     'micro_ux='+(plan.micro_ux?'true':'false')+'\n'+
     'load_truth='+(plan.load_truth?'true':'false')+'\n'+
     'fridge_ux='+(plan.fridge_ux?'true':'false')+'\n'+
