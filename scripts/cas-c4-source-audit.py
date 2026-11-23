@@ -67,6 +67,8 @@ class RangeSource(io.RawIOBase):
         if self.size < 1000:
             raise RuntimeError("Missing source ZIP content length")
         self.offset = 0
+        self.cache_start = -1
+        self.cache = b""
         # Prove byte-range semantics, never mistake HTTP 200 whole-ZIP for a 206 slice.
         self._request(0, 1)
 
@@ -87,7 +89,15 @@ class RangeSource(io.RawIOBase):
         count = max(0, min(count, self.size-self.offset))
         if not count:
             return b""
-        result = self._request(self.offset, count)
+        local = self.offset - self.cache_start
+        if local < 0 or local + count > len(self.cache):
+            # zipfile reads many 30-byte member headers; one 512 KiB fetch
+            # must satisfy nearby reads without dozens of round trips.
+            self.cache_start = self.offset
+            self.cache = self._request(self.offset, min(
+                self.size - self.offset, max(count, 512 * 1024)))
+            local = 0
+        result = self.cache[local:local + count]
         self.offset += count
         return result
 
