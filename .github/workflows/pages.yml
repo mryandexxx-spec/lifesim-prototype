@@ -393,6 +393,7 @@ jobs:
           mkdir -p site/assets/characters/cas-c3
           cp assets/characters/cas-c3/*.glb assets/characters/cas-c3/manifest.json assets/characters/cas-c3/c4-*.json assets/characters/cas-c3/MAKEHUMAN-CC0.txt site/assets/characters/cas-c3/
           cp assets/characters/cas-c3/c4c-*.json assets/characters/cas-c3/c4c-heel-source-LICENSE.txt site/assets/characters/cas-c3/
+          cp assets/characters/cas-c3/mira-c4c-preview.jpg site/assets/characters/cas-c3/
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/

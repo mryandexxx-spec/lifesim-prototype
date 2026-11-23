@@ -1,10 +1,13 @@
-import * as pc from 'playcanvas';
+import * as pc from '../vendor/playcanvas.mjs?v=2.24.1';
 
 const $ = id => document.getElementById(id);
 const base = new URL('../assets/characters/cas-c3/', import.meta.url);
 const canvas = $('canvas');
-const app = new pc.Application(canvas, {graphicsDeviceOptions: {alpha: false, antialias: true}});
-app.graphicsDevice.maxPixelRatio = Math.min(devicePixelRatio || 1, 1.5);
+const startup = window.c4LabStartup;
+startup.stage('Запуск WebGL…');
+const touch = matchMedia('(pointer: coarse)').matches;
+const app = new pc.Application(canvas, {graphicsDeviceOptions: {alpha: false, antialias: !touch}});
+app.graphicsDevice.maxPixelRatio = Math.min(devicePixelRatio || 1, touch ? 1.25 : 1.5);
 app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
 app.setCanvasResolution(pc.RESOLUTION_AUTO);
 app.scene.ambientLight = new pc.Color(.62, .66, .62);
@@ -86,18 +89,37 @@ function asset(file, checksum) {
     if (checksum) url.searchParams.set('v', checksum);
     const item = new pc.Asset(file, 'container', {url: url.href});
     const pending = new Promise((resolve, reject) => {
-      item.once('load', () => resolve(item.resource));
-      item.once('error', () => {
+      function fail(message) {
+        clearTimeout(timer);
+        item.off('load', complete);
+        item.off('error', onError);
         loaded.delete(file);
         app.assets.remove(item);
-        reject(new Error('Не удалось загрузить ' + file));
-      });
+        reject(new Error(message + file));
+      }
+      function complete() {clearTimeout(timer); resolve(item.resource);}
+      function onError() {fail('Не удалось загрузить ');}
+      const timer = setTimeout(() => fail('Истекло время загрузки '), 20000);
+      item.once('load', complete);
+      item.once('error', onError);
       app.assets.add(item);
       app.assets.load(item);
     });
     loaded.set(file, pending);
   }
   return loaded.get(file);
+}
+
+async function loadIndex(file, message) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(new URL(file, base), {cache: 'no-store', signal: controller.signal});
+    if (!response.ok) throw new Error(message);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function assemble(resident, index, count) {
@@ -128,9 +150,7 @@ async function assemble(resident, index, count) {
 
 function heelDefinition() {
   heelManifest ??= (async () => {
-    const response = await fetch(new URL('c4c-manifest.json', base), {cache: 'no-store'});
-    if (!response.ok) throw new Error('Примерка каблуков недоступна');
-    const entry = await response.json();
+    const entry = await loadIndex('c4c-manifest.json', 'Примерка каблуков недоступна');
     const mira = manifest.wearers.mira;
     if (entry.version !== 1 || entry.stage !== 'CAS-02.1-F2-C4C' || entry.resident !== 'mira' ||
         entry.bodySha256 !== mira.bodySha256 || entry.inverseBindSha256 !== mira.inverseBindSha256 ||
@@ -384,29 +404,30 @@ app.start();
 updateCamera();
 (async () => {
   try {
-    const response = await fetch(new URL('c4-manifest.json', base), {cache: 'no-store'});
-    if (!response.ok) throw new Error('Индекс женской обуви C4B отсутствует');
-    manifest = await response.json();
+    startup.stage('Загрузка каталога обуви…');
+    manifest = await loadIndex('c4-manifest.json', 'Индекс женской обуви C4B отсутствует');
     if (manifest.version !== 1 || manifest.stage !== 'CAS-02.1-F2-C4B' || !manifest.wearers?.mira)
       throw new Error('Неподдерживаемый индекс C4B');
     $('motion').value = 'idle';
     $('socks').value = 'off'; // Open female footwear starts without conspicuous socks.
     if (new URLSearchParams(location.search).get('outfit') === 'heels') $('outfit').value = 'heels';
+    const requested = $('outfit').value;
+    $('outfit').value = 'original';
     await equip();
-    if (!active) {
-      $('outfit').value = 'original';
-      await equip();
-    }
     if (!active) throw new Error('Женские модели C4B недоступны');
+    startup.ready();
+    $('outfit').value = requested;
+    await equip();
     for (const id of ['resident', 'outfit', 'motion', 'socks']) $(id).disabled = false;
   } catch (error) {
     try {
       const source = await asset('../meshy-mira-mobile-v1.glb');
       app.root.addChild(source.instantiateRenderEntity());
       originalFallback = true;
+      startup.ready();
       $('status').textContent = 'Примерка недоступна. Показана исходная Мира.';
     } catch {
-      $('status').textContent = error.message;
+      startup.fail(error.message);
     }
   }
 })();
