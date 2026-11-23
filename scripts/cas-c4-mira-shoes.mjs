@@ -3,6 +3,7 @@ import {fileURLToPath} from 'node:url';
 import {digest, editGlb} from './cas-c3-glb.mjs';
 import {buildWearableFromGeometry} from './cas-c3-shoes.mjs';
 import {supportReport} from './cas-c3-contact.mjs';
+import {intoFootFrame} from './cas-c3-foot-frame.mjs';
 
 export const FEMALE_STYLES = Object.freeze(['ballet', 'mary-jane', 'ankle-boots']);
 const folder = new URL('../assets/characters/cas-c3/', import.meta.url);
@@ -37,7 +38,23 @@ function sourcePrimitive(editor) {
     faces:Array.from({length:indices.length/3},(_,i)=>indices.slice(i*3,i*3+3))};
 }
 
-function normalizeHalf(source, faceIds, side) {
+function heelAnkleFraction(target) {
+  if (!target?.ankle || !target?.heel || !target?.toe || !target?.axis)
+    throw new Error('C4 missing true recipient heel/ankle/toe footprint');
+  const origin = [target.ankle[0], 0, target.ankle[2]];
+  const project = point => intoFootFrame([point[0]-origin[0], 0, point[2]-origin[2]], target.axis)[2];
+  // Derive the canonical source-last anchor from the same measured C3 foot
+  // profile and existing C3 .006m heel/.009m toe clearance allowances.
+  // It is one semantic rule applied to every shoe and every source last.
+  const rear = .006 - project(target.heel);
+  const front = .009 + project(target.toe);
+  const fraction = rear / (rear + front);
+  if (!Number.isFinite(fraction) || fraction < .1 || fraction > .3)
+    throw new Error('C4 invalid foot heel-to-ankle proportion');
+  return fraction;
+}
+
+function normalizeHalf(source, faceIds, side, target) {
   const faces = faceIds.map(i=>source.faces[i]);
   const used = [...new Set(faces.flat())];
   const remap = new Map(used.map((v,i)=>[v,i]));
@@ -48,7 +65,10 @@ function normalizeHalf(source, faceIds, side) {
   const xmin = Math.min(...x), xmax = Math.max(...x);
   const zmin = Math.min(...z), zmax = Math.max(...z);
   const ymin = Math.min(...y);
-  const centerX = (xmin+xmax)/2, centerZ = (zmin+zmax)/2;
+  const heelFraction = heelAnkleFraction(target);
+  // Raw OBJ origin follows MakeHuman mannequin. Use the recipient's actual
+  // heel-to-ankle semantic length, NOT source AABB midpoint, for socket zero.
+  const centerX = (xmin+xmax)/2, centerZ = zmin + (zmax-zmin)*heelFraction;
   const width = (xmax-xmin)*MH_UNIT, length = (zmax-zmin)*MH_UNIT;
   if (width < .04 || width > .18 || length < .25 || length > .43)
     throw new Error('C4 '+side+' source last dimensions invalid ('+width+','+length+')');
@@ -64,10 +84,10 @@ function normalizeHalf(source, faceIds, side) {
   const openingRadiiXZ = [Math.max(width*.6,.02),Math.max(length*.36,.055)];
   return {vertices, faces: faces.map(face=>face.map(i=>remap.get(i))),
     originalKeys:new Set(used.map(i=>pointKey(source.vertices[i].position))),
-    collar:roof, openingRadiiXZ, measuredSource:{width,length,roof}};
+    collar:roof, openingRadiiXZ, measuredSource:{width,length,roof,heelFraction}};
 }
 
-export function normalizeFemalePair(bytes, style) {
+export function normalizeFemalePair(bytes, style, profile) {
   if (!FEMALE_STYLES.includes(style)) throw new Error('C4 unknown female shoe style');
   const editor = editGlb(bytes);
   const source = sourcePrimitive(editor);
@@ -79,8 +99,10 @@ export function normalizeFemalePair(bytes, style) {
     sides[coords.reduce((a,b)=>a+b,0)>0?'left':'right'].push(index);
   });
   if (sides.left.length < 25 || sides.right.length < 25) throw new Error('C4 missing one authored shoe');
-  const left = normalizeHalf(source,sides.left,'left');
-  const right = normalizeHalf(source,sides.right,'right');
+  if (profile?.resident !== 'mira' || !profile.sides?.left || !profile.sides?.right)
+    throw new Error('C4 requires original independent Mira rig profile');
+  const left = normalizeHalf(source,sides.left,'left',profile.sides.left);
+  const right = normalizeHalf(source,sides.right,'right',profile.sides.right);
   if (left.faces.length + right.faces.length !== source.faces.length ||
       [...left.originalKeys].some(key=>right.originalKeys.has(key)))
     throw new Error('C4 original authored halves are not independent');
@@ -106,11 +128,11 @@ export function buildMiraFootwear() {
     const sourceFile = sources.styles[style];
     const input = readFileSync(new URL(sourceFile.file,folder));
     if (digest(input) !== sourceFile.sha256) throw new Error('C4 imported source SHA changed');
-    const geometry = normalizeFemalePair(input,style);
+    const geometry = normalizeFemalePair(input,style,profile);
     for (const side of ['left','right']) {
-      const {width,length,roof} = geometry.sides[side].measuredSource;
+      const {width,length,roof,heelFraction} = geometry.sides[side].measuredSource;
       const foot = profile.sides[side];
-      console.log('C4B canonical source-last',style,side,JSON.stringify({width,length,roof,
+      console.log('C4B canonical source-last',style,side,JSON.stringify({width,length,roof,heelFraction,
         targetFootLength:foot.footLength,targetFootWidth:foot.footWidth,
         ankle:foot.ankle,heel:foot.heel,toe:foot.toe}));
     }
