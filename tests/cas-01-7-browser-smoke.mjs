@@ -62,7 +62,7 @@ try{
       await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY)
     ).actionQueues.byResident[partner].length;
 
-    if(initiator==='alex'){
+    if(initiator==='alex'&&width===390){
       // Actual 3D world hit-test, not a synthetic menu event. Allow the
       // animated focus camera to settle before choosing a projected upper body.
       await page.waitForTimeout(850);
@@ -87,9 +87,9 @@ try{
         ' viewport '+width+'x'+height+' last probe '+JSON.stringify(sceneTap));
       await page.locator('#conversation-btn').tap();
     }else{
-      // Alex can be occluded by real room geometry in this fixed camera.
-      // The reverse direction exercises the same UI choice/FIFO separately;
-      // Alex -> Mira above exercises the entire actual 3D touch path.
+      // The compact 320px camera can place a resident under room geometry
+      // or the HUD. Exercise touch confirmation/FIFO for both directions at
+      // 320px; the 390px case also exercises the true scene hit-test.
       await page.evaluate(()=>document.getElementById('conversation-btn').click());
     }
     await page.locator('#social-menu-panel').waitFor({state:'visible'});
