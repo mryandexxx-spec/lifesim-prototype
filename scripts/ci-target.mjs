@@ -6,8 +6,8 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
-const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|cas-f2-footwear-lab\.html|cas-f2-c3-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
-const isUI=f=>f==='src/cas-f2-c3-lab.js'||f==='cas-f2-c3-lab.html'||f==='src/cas-f2-footwear-lab.js'||f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||f==='src/cas-cc0-shoe-fit-policy.js'||/^(?:index\.html|cas-modular-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
+const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-02-2-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|cas-f2-footwear-lab\.html|cas-f2-c3-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
+const isUI=f=>f==='src/cas-f2-c3-lab.js'||f==='cas-f2-c3-lab.html'||f==='src/cas-f2-footwear-lab.js'||f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||f==='src/cas-cc0-shoe-fit-policy.js'||/^(?:index\.html|cas-modular-lab\.html|cas-02-2-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
   // Changes to the live needs loop or SKU sleep quality require a real WebGL boot.
   /^src\/(?:simulation|need-balance|furniture-products)\.js$/.test(f)||
   /^src\/(?:game\.js|outdoor-character-motion|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
@@ -95,7 +95,7 @@ export function planChanges(files,root=ROOT){
   const cas_soak=changed.some(f=>
     /^(?:tests\/cas-01-8-browser-smoke\.mjs|src\/(?:household|resident-activity-runtime|resident-social-runtime|career-work|career-scheduler|finance-ledger|action-queue|game|resident-hud)\.js)$/.test(f));
   const cas_modular=changed.some(f=>
-    /^(?:scripts\/build-cas-modular-mannequin\.mjs|tests\/cas-02-1-b-browser-smoke\.mjs|src\/character-lab(?:-config)?\.js|cas-modular-lab\.html)$/.test(f));
+    /^(?:scripts\/build-cas-modular-mannequin\.mjs|tests\/cas-02-1-b-browser-smoke\.mjs|src\/character-lab(?:-config)?\.js|cas-modular-lab\.html|cas-02-2-lab\.html)$/.test(f));
   const cas_alex=changed.some(f=>
     /^(?:scripts\/(?:cas-source-asset-audit|build-cas-alex-wardrobe)\.mjs|tests\/cas-02-1-d-(?:source-audit|wardrobe)\.test\.js|tests\/cas-02-1-d-browser-smoke\.mjs|src\/character-lab(?:-config)?\.js|cas-alex-wardrobe-lab\.html)$/.test(f));
   const cas_styles=changed.some(f=>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#e2ebe7">
+<title>Блин’С · CAS-02.2-A — реальная геометрия головы и силуэта</title>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#e2ebe7;font:14px system-ui,-apple-system,sans-serif;color:#223b31}
+canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+.topline{position:fixed;top:max(12px,env(safe-area-inset-top));left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.topline strong,.topline span{font-size:12px;border-radius:10px;padding:8px 10px;background:#f7fbf9e8}
+.topline span{background:#223c31d8;color:white}
+.panel{position:fixed;bottom:max(10px,env(safe-area-inset-bottom));left:10px;right:10px;max-width:490px;margin:auto;padding:11px;background:#fafffbea;border:1px solid #b6cbc0;border-radius:17px;box-shadow:0 8px 24px #1b382828;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);max-height:49dvh;overflow-y:auto;overscroll-behavior:contain}
+h1{font-size:15px;margin:0 0 5px}
+.note{font-size:11px;line-height:1.35;color:#466252;margin:0 0 6px}
+.row{display:flex;gap:7px;align-items:center;margin-top:6px}
+.row>*{min-width:0}
+button,select{font:inherit;font-size:13px;min-height:44px;border-radius:10px;border:1px solid #a9c3b5;background:#fff;padding:8px;color:#203b2d;touch-action:manipulation}
+button{cursor:pointer}button:disabled,select:disabled,input:disabled{opacity:.5}
+#cas022-resident,#clip-select{flex:1}
+.morph{display:grid;grid-template-columns:minmax(90px,110px) minmax(0,1fr) 34px;align-items:center;gap:7px;margin-top:8px;min-height:44px;font-size:12px}
+.morph input{width:100%;min-height:44px;accent-color:#326a51;touch-action:pan-x}
+.morph output{font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
+#lab-status{font-size:11px;line-height:1.3;color:#506758;margin-top:7px;min-height:2.4em}
+.metrics{display:flex;align-items:center;gap:7px;justify-content:space-between;font-size:11px;margin-top:6px;color:#536b5e}
+#lab-asset-info{max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lab-fps{white-space:nowrap}
+#show-lab-report{min-height:38px;padding:6px 10px;font-size:12px}
+#lab-report[hidden],#glb-input{display:none}
+#lab-report-text{width:100%;height:100px;font:11px ui-monospace,monospace}
+@media(max-height:630px){.panel{max-height:56dvh;padding:9px}.note{font-size:10px}h1{font-size:13px}.morph{margin-top:2px}.row{margin-top:3px}}
+</style>
+<script type="importmap">{"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}</script>
+</head><body data-character="cas022alex">
+<canvas id="lab-canvas" aria-label="Исходный анимируемый 3D-житель с настоящими геометрическими morph targets"></canvas>
+<header class="topline"><strong>Блин’С · настоящие Алекс / Мира</strong><span>CAS-02.2-A · исследование</span></header>
+<section class="panel" id="cas-lab-panel" aria-label="Проверка геометрических изменений">
+<h1>Голова и силуэт — первый 3D-прототип</h1>
+<p class="note">Настоящие исходные модели, текстуры и анимации. Это ограниченная техническая проба: не готовые черты лица, не обнажённое тело и не игровой редактор.</p>
+<div class="row"><select id="cas022-resident" aria-label="Персонаж"><option value="alex">Алекс</option><option value="mira">Мира</option></select><button id="reset-view" type="button">Камера</button></div>
+<label class="morph" for="cas022-head"><span>Ширина головы</span><input type="range" id="cas022-head" min="0" max="100" value="0" disabled><output id="cas022-head-value">0%</output></label>
+<label class="morph" for="cas022-torso"><span>Силуэт верха</span><input type="range" id="cas022-torso" min="0" max="100" value="0" disabled><output id="cas022-torso-value">0%</output></label>
+<p class="note">Деформация затрагивает и исходную запечённую одежду. Кожа, глаза, нос и губы пока не редактируются — нужны отдельные проверенные 3D-ресурсы.</p>
+<div class="row"><select id="clip-select" disabled aria-label="Анимация"><option>Загрузка…</option></select><button id="pause-animation" type="button" disabled>Пауза</button></div>
+<div id="lab-status" role="status" aria-live="polite">Проверка исходного рига…</div>
+<div class="metrics"><span id="lab-fps">FPS: …</span><span id="lab-asset-info">GLB…</span><button id="show-lab-report" type="button">Отчёт</button></div>
+<div id="lab-report" hidden><textarea id="lab-report-text" readonly aria-label="Технический отчёт"></textarea></div>
+<input id="glb-input" type="file" accept=".glb">
+</section>
+<script>
+const casResident=new URLSearchParams(location.search).get('resident')==='mira'?'mira':'alex';
+document.body.dataset.character=casResident==='mira'?'cas022mira':'cas022alex';
+document.getElementById('cas022-resident').value=casResident;
+</script>
+<script type="module" src="./src/character-lab.js?cas-02-2-a"></script>
+</body></html>

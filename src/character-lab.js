@@ -36,7 +36,8 @@ const camera=new pc.Entity('Lab camera');
 camera.addComponent('camera',{clearColor:new pc.Color(.88,.91,.89),nearClip:.03,farClip:120,fov:42});
 app.root.addChild(camera);
 const isResidentStyleLab=['alexstyles','mirastyles'].includes(document.body.dataset.character);
-const isModularLab=['casproto','alexpilot','alexstyles','mirastyles'].includes(document.body.dataset.character);
+const isCas022Lab=['cas022alex','cas022mira'].includes(document.body.dataset.character);
+const isModularLab=['casproto','alexpilot','alexstyles','mirastyles'].includes(document.body.dataset.character)||isCas022Lab;
 const view={yaw:isModularLab?8:24,pitch:isModularLab?3:12,distance:3.7};
 let casFocusY=.94;
 function fitCasViewport(){
@@ -82,6 +83,7 @@ for(const name of ['pointerup','pointercancel','lostpointercapture'])canvas.addE
 canvas.addEventListener('wheel',event=>{event.preventDefault();view.distance=Math.max(1.7,Math.min(9,view.distance*(1+event.deltaY*.001)));updateView();},{passive:false});
 
 let current=null,currentAsset=null,currentUrl=null;
+let cas022Fallback=false;
 const clipSelect=$('clip-select');
 const pauseButton=$('pause-animation');
 const labModel=characterLabModel(document.body.dataset.character);
@@ -169,6 +171,7 @@ async function loadAsset(url, title, metadata={}){
       if(labModel.key==='casproto')applyCasVariants();
       if(labModel.key==='alexpilot')applyAlexFootwear();
       if(isResidentStyleLab)applyResidentFootwearStyles();
+      if(isCas022Lab&&!cas022Fallback)applyCas022Morphs();
       modelInfo={title,bytes:metadata.bytes||0,triangles:metadata.triangles??null,
         joints:metadata.joints??null,clips:clips.length,morphTargets:metadata.morphTargets??null};
       updateMetrics();
@@ -332,6 +335,52 @@ if(isResidentStyleLab){
   };
  };
 }
+
+function cas022MorphInstances(){
+ if(!current)return [];
+ return current.findComponents('render').flatMap(component=>component.meshInstances||[])
+   .map(instance=>instance.morphInstance).filter(Boolean);
+}
+function applyCas022Morphs(){
+ if(!isCas022Lab||!current)return;
+ const morphs=cas022MorphInstances();
+ if(morphs.length!==1||morphs[0].morph.targets.length!==2)
+   throw new Error('Real original-source head/torso morph targets are absent');
+ const head=$('cas022-head'),torso=$('cas022-torso');
+ const headWeight=Number(head.value)/100,torsoWeight=Number(torso.value)/100;
+ if(!Number.isFinite(headWeight)||!Number.isFinite(torsoWeight))throw Error('Invalid CAS-02.2 weight');
+ morphs[0].setWeight(0,Math.max(0,Math.min(1,headWeight)));
+ morphs[0].setWeight(1,Math.max(0,Math.min(1,torsoWeight)));
+ head.disabled=false;torso.disabled=false;
+ $('cas022-head-value').textContent=Math.round(headWeight*100)+'%';
+ $('cas022-torso-value').textContent=Math.round(torsoWeight*100)+'%';
+}
+if(isCas022Lab){
+ for(const key of ['head','torso'])$('cas022-'+key).addEventListener('input',()=>{
+   applyCas022Morphs();
+   status('Изменена настоящая 3D-геометрия. Это эксперимент, не игровой пресет.');
+ });
+ $('cas022-resident').addEventListener('change',()=>{
+   const resident=$('cas022-resident').value==='mira'?'mira':'alex';
+   location.assign('./cas-02-2-lab.html?resident='+resident);
+ });
+ window.__LifeSimCas022Probe=()=>{
+   const morphs=cas022MorphInstances();
+   const panel=$('cas-lab-panel')?.getBoundingClientRect();
+   const project=y=>current?camera.camera.worldToScreen(
+     current.getWorldTransform().transformPoint(new pc.Vec3(0,y,0))).y:null;
+   return {loaded:!!current,graphics:!!app.graphicsDevice,
+     resident:labModel.key==='cas022mira'?'mira':'alex',
+     morphCount:morphs[0]?.morph.targets.length??0,
+     weights:morphs[0]?[morphs[0].getWeight(0),morphs[0].getWeight(1)]:[],
+     clips:currentAsset?.resource?.animations?.map(x=>x.resource?.name)||[],
+     drawCalls:app.stats?.drawCalls?.total??0,
+     frame:current?{headY:project(1.7),footY:project(0),
+       dockTop:panel?.top??null,topSafe:40,pitch:view.pitch,
+       width:innerWidth,height:innerHeight}:null};
+ };
+}
+
 app.start();
 if(isModularLab)requestAnimationFrame(fitCasViewport);
 // If the model has been committed as a stable asset, it loads without user input.
@@ -339,7 +388,9 @@ if(isModularLab)requestAnimationFrame(fitCasViewport);
 (async()=>{
  const styleResident=labModel.key==='alexstyles'?'alex':
    labModel.key==='mirastyles'?'mira':null;
- const manifestUrl=styleResident
+ const manifestUrl=isCas022Lab
+   ?'./assets/characters/cas-02-2-'+(labModel.key==='cas022mira'?'mira':'alex')+'-morphs.json?cas-02-2-a'
+   :styleResident
    ?'./assets/characters/cas-'+styleResident+'-footwear-v2.json?cas-02-1-e'
    :labModel.key==='alexpilot'
    ?'./assets/characters/cas-alex-footwear-lab-v1.json?cas-02-1-d'
@@ -353,5 +404,20 @@ if(isModularLab)requestAnimationFrame(fitCasViewport);
    triangles:extra?.triangles??extra?.sourceTriangles??labModel.triangles,
    joints:extra?.joints??labModel.joints,morphTargets:labModel.morphTargets
  });
-})().catch(error=>status('Не удалось автоматически загрузить '+labModel.label+
-  ': '+String(error?.message||error)+'. Можно выбрать GLB вручную для диагностики.'));
+})().catch(async error=>{
+ if(isCas022Lab){
+  cas022Fallback=true;
+  const kind=labModel.key==='cas022mira'?'mira':'alex';
+  try{
+   await loadAsset('./assets/characters/'+(kind==='mira'?'meshy-mira-mobile-v1.glb':'meshy-casual-v1.glb'),
+     'Оригинальный '+(kind==='mira'?'Мира':'Алекс'),{joints:66});
+   status('Экспериментальные morph targets недоступны ('+
+     String(error?.message||error)+'). Показана исходная модель; редактор деформаций отключён.');
+  }catch(fallbackError){
+   status('Ошибка 3D-просмотра: '+String(fallbackError?.message||fallbackError));
+  }
+  return;
+ }
+ status('Не удалось автоматически загрузить '+labModel.label+
+   ': '+String(error?.message||error)+'. Можно выбрать GLB вручную для диагностики.');
+});

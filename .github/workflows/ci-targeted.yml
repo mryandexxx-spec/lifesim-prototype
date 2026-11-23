@@ -93,6 +93,18 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: CAS-02.2-A source Alex and Mira real morph targets in four mobile PlayCanvas cases
+        if: ${{ contains(github.event.pull_request.title, 'CAS-02.2') }}
+        run: |
+          node scripts/cas-02-2-morphs.mjs
+          node tests/cas-02-2-browser-smoke.mjs
+      - name: Archive CAS-02.2-A two-resident geometry screenshot evidence
+        if: ${{ always() && contains(github.event.pull_request.title, 'CAS-02.2') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-02-2-a-morphs-mobile-pr
+          path: artifacts/cas-02-2-a/
+          if-no-files-found: ignore
       - name: CAS F2 C3 resident rigs and mobile WebGL
         if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
         run: |
