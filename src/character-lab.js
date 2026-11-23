@@ -35,7 +35,7 @@ fill.setEulerAngles(15,140,0);app.root.addChild(fill);
 const camera=new pc.Entity('Lab camera');
 camera.addComponent('camera',{clearColor:new pc.Color(.88,.91,.89),nearClip:.03,farClip:120,fov:42});
 app.root.addChild(camera);
-const isModularLab=document.body.dataset.character==='casproto';
+const isModularLab=['casproto','alexpilot'].includes(document.body.dataset.character);
 const view={yaw:isModularLab?8:24,pitch:isModularLab?3:12,distance:3.7};
 let casFocusY=.94;
 function fitCasViewport(){
@@ -46,9 +46,10 @@ function fitCasViewport(){
  const upper=55,lower=Math.max(upper+90,rect.top-12);
  const usable=lower-upper,desired=Math.max(130,usable*.80);
  const radians=42*Math.PI/360;
- view.distance=Math.max(3.4,Math.min(9,1.85*h/(2*Math.tan(radians)*desired)));
+ const height=labModel?.targetHeight??1.85;
+ view.distance=Math.max(3.4,Math.min(9,height*h/(2*Math.tan(radians)*desired)));
  const pxPerMeter=h/(2*Math.tan(radians)*view.distance);
- casFocusY=.91-(h/2-(upper+lower)/2)/pxPerMeter;
+ casFocusY=height/2-(h/2-(upper+lower)/2)/pxPerMeter;
  updateView();
 }
 function updateView(){
@@ -165,6 +166,7 @@ async function loadAsset(url, title, metadata={}){
       for(const clip of clips)avatar.anim.assignAnimation(clip.name,clip,undefined,1,!isOneShotClip(clip.name));
       current=avatar;currentAsset=asset;
       if(labModel.key==='casproto')applyCasVariants();
+      if(labModel.key==='alexpilot')applyAlexFootwear();
       modelInfo={title,bytes:metadata.bytes||0,triangles:metadata.triangles??null,
         joints:metadata.joints??null,clips:clips.length,morphTargets:metadata.morphTargets??null};
       updateMetrics();
@@ -244,18 +246,61 @@ if(labModel.key==='casproto'){
     })()
   });
 }
+function applyAlexFootwear(){
+ if(labModel.key!=='alexpilot'||!current)return;
+ const base=current.findByName('CAS Alex shoes original');
+ const alt=current.findByName('CAS Alex shoes alternative');
+ if(!base?.render||!alt?.render)throw new Error('Real Alex footwear skin nodes missing, refusing cosmetic-only demo');
+ const button=$('alex-footwear-swap');
+ const alternate=button.getAttribute('aria-pressed')==='true';
+ base.enabled=!alternate;alt.enabled=alternate;
+ button.disabled=false;
+ button.textContent=alternate?'Исходная обувь · вернуть':'Обувь B · надеть';
+}
+if(labModel.key==='alexpilot'){
+ $('alex-footwear-swap').addEventListener('click',()=>{
+  const button=$('alex-footwear-swap');
+  button.setAttribute('aria-pressed',button.getAttribute('aria-pressed')==='true'?'false':'true');
+  applyAlexFootwear();
+  status(button.getAttribute('aria-pressed')==='true'
+   ?'Надета обувь B — скелет и оригинальные анимации Алекса сохранены.'
+   :'Исходная обувь Алекса восстановлена.');
+ });
+ window.__LifeSimCasAlexProbe=()=>{
+  const base=current?.findByName('CAS Alex shoes original');
+  const alt=current?.findByName('CAS Alex shoes alternative');
+  const panel=document.getElementById('cas-lab-panel')?.getBoundingClientRect();
+  const project=y=>{
+   if(!current)return null;
+   const point=current.getWorldTransform().transformPoint(new pc.Vec3(0,y,0));
+   return camera.camera.worldToScreen(point).y;
+  };
+  return {
+   loaded:!!current,graphics:!!app.graphicsDevice,
+   originalFootwearVisible:base?.enabled??null,alternativeFootwearVisible:alt?.enabled??null,
+   originalSkin:!!base?.render,alternativeSkin:!!alt?.render,
+   clips:currentAsset?.resource?.animations?.map(x=>x.resource?.name)||[],
+   frame:current?{headY:project(1.70),footY:project(0),dockTop:panel?.top??null,
+    topSafe:40,yaw:view.yaw,pitch:view.pitch,width:innerWidth,height:innerHeight}:null,
+   drawCalls:app.stats?.drawCalls?.total??0
+  };
+ };
+}
 app.start();
 if(isModularLab)requestAnimationFrame(fitCasViewport);
 // If the model has been committed as a stable asset, it loads without user input.
 // No temporary signed Meshy URLs or user tokens belong in the public repository.
 (async()=>{
- const extra=isModularLab?await fetch('./assets/characters/cas-modular-mannequin-v1.json?cas-02-1-c',{cache:'no-store'})
+ const manifestUrl=labModel.key==='alexpilot'
+   ?'./assets/characters/cas-alex-footwear-lab-v1.json?cas-02-1-d'
+   :'./assets/characters/cas-modular-mannequin-v1.json?cas-02-1-c';
+ const extra=isModularLab?await fetch(manifestUrl,{cache:'no-store'})
    .then(r=>r.ok?r.json():null).catch(()=>null):null;
  const response=await fetch(preferredAutoUrl,{method:'HEAD'});
  if(!response.ok)throw new Error('not bundled');
  return loadAsset(preferredAutoUrl,labModel.fileName,{
    bytes:extra?.bytes||Number(response.headers.get('content-length'))||labModel.bytes,
-   triangles:extra?.triangles??labModel.triangles,
+   triangles:extra?.triangles??extra?.sourceTriangles??labModel.triangles,
    joints:extra?.joints??labModel.joints,morphTargets:labModel.morphTargets
  });
 })().catch(error=>status('Не удалось автоматически загрузить '+labModel.label+
