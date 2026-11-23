@@ -36,6 +36,20 @@ class C4SourceAuditTests(unittest.TestCase):
             self.assertEqual(asset["geometry"]["triangles"], 1)
             self.assertTrue(asset["files"][0]["sha256"])
 
+    def test_similarly_named_bow_variant_cannot_override_exact_ballet_source(self):
+        data = io.BytesIO()
+        with zipfile.ZipFile(data, "w") as archive:
+            for key in audit.CANDIDATES:
+                archive.writestr(f"clothes/{key}/{key}.mhclo", "# license CC0\n")
+                archive.writestr(f"clothes/{key}/shoe.obj",
+                                 "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
+            archive.writestr("clothes/toigo_ballet_flats_with_bows/other.obj",
+                             "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nf 1 2 3\n")
+        result = audit.inspect_makehuman(data.getvalue())
+        self.assertEqual(result["toigo_ballet_flats"]["geometry"]["triangles"], 1)
+        self.assertTrue(all("/toigo_ballet_flats/" in x["path"]
+                            for x in result["toigo_ballet_flats"]["files"]))
+
     def test_non_cc0_remains_quarantined(self):
         result = audit.inspect_makehuman(self.fake_zip("# license CC-BY\n"))
         self.assertTrue(all(not x["licenseCC0"] for x in result.values()))
