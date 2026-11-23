@@ -110,12 +110,12 @@ function place(activeShoe,mode){
  entity.setLocalScale(scale,scale,scale);
  const showByAlex=mode==='mock';
  entity.setLocalPosition((showByAlex?0:.74)-cx*scale,-raw.min.y*scale,
-  (showByAlex?.055:0)-cz*scale);
+  (showByAlex?0.055:0)-cz*scale);
  setAvatarShoes(!showByAlex);
  if(avatar?.anim)avatar.anim.playing=!showByAlex;
  const tall=(raw.max.y-raw.min.y)*scale;
  $('fit-metrics').textContent=
-   \`\${activeShoe.audit.triangles.toLocaleString('ru-RU')} треуг. · GLB \${(activeShoe.audit.bytes/1e6).toFixed(2)} МБ · высота \${(tall*100).toFixed(0)} см\`;
+   `${activeShoe.audit.triangles.toLocaleString('ru-RU')} треуг. · GLB ${(activeShoe.audit.bytes/1e6).toFixed(2)} МБ · высота ${(tall*100).toFixed(0)} см`;
  $('asset-page').href=CANDIDATES[selected.model].page;
  setStatus(showByAlex?'Условная статичная примерка: пара ещё не разделена и не прикреплена к костям стоп.':
   'Рядом с настоящим Алексом: исходная пара обуви сохранена.');
