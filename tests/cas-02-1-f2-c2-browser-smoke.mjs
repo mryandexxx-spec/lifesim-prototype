@@ -75,15 +75,26 @@ try{
   await page.locator('#sock-choice').selectOption('on');
 
   await page.locator('#animation-clip').selectOption('Walking');
-  await page.waitForTimeout(180);
-  const start=await probe();
-  await page.waitForTimeout(680);
-  const walked=await probe();
-  assert.equal(walked.currentClip,'Walking');
-  const changed=['left','right'].some(side=>
-   ['x','y','z'].some(ax=>Math.abs(start.sockLayers[side].movingToe[ax]-
-    walked.sockLayers[side].movingToe[ax])>.0008));
-  assert.ok(changed,'genuine original Alex foot/toe bones must actually animate socks');
+  const walkSamples=[];
+  for(let i=0;i<8;i++){
+   await page.waitForTimeout(115);
+   const frame=await probe();
+   walkSamples.push({left:frame.sockLayers.left.movingToe,
+    right:frame.sockLayers.right.movingToe,
+    leftBone:frame.attached.dress.sides.left.footWorld,
+    rightBone:frame.attached.dress.sides.right.footWorld});
+  }
+  const axisRange=(key,field,ax)=>{
+   const values=walkSamples.map(x=>x[key]?.[field]?.[ax]??x[key]?.[ax]??0);
+   return Math.max(...values)-Math.min(...values);
+  };
+  const ranges=Object.fromEntries(['left','right','leftBone','rightBone'].map(key=>[
+   key,Math.max(...['x','y','z'].map(ax=>axisRange(key,null,ax)))]));
+  console.log('CAS F2 genuine walk sampled toe/bones '+JSON.stringify({ranges,walkSamples}));
+  assert.ok(Math.max(ranges.leftBone,ranges.rightBone)>.0008,
+   'genuine bone world poses must change in Walking');
+  assert.ok(Math.max(ranges.left,ranges.right)>.0008,
+   'independently bound toe sock vertices must change during Walking');
   await page.screenshot({path:dir+'/'+width+'x'+height+'-walking-with-socks.png'});
   await page.locator('#animation-clip').selectOption('Running');
   await page.waitForTimeout(280);
