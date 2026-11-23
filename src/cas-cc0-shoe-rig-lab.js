@@ -31,7 +31,7 @@ const camera=new pc.Entity('F1 rig camera');
 camera.addComponent('camera',{clearColor:new pc.Color(.88,.92,.89),
  fov:42,nearClip:.03,farClip:100});
 app.root.addChild(camera);
-const view={yaw:18,pitch:4,distance:3.35};
+const view={yaw:18,pitch:20,distance:3.35};
 let focusY=0;
 function moveCamera(){
  const a=view.yaw*Math.PI/180,b=view.pitch*Math.PI/180;
@@ -50,7 +50,8 @@ function frameShoes(){
   const y=camera.camera.worldToScreen(new pc.Vec3(0,.065,0)).y;
   focusY=Math.max(-1.2,Math.min(1.1,focusY-(y-desired)/pixels));
  }
- focusY=Math.max(-1.2,focusY-.29);
+ // The old F0 fixed -0.29m shift forced the low-pitch camera under
+ // the floor on real mobile viewports. Keep the camera safely above it.
  moveCamera();
 }
 moveCamera();
@@ -80,7 +81,7 @@ canvas.addEventListener('wheel',e=>{
  moveCamera();
 },{passive:false});
 $('camera-reset').addEventListener('click',()=>{
- Object.assign(view,{yaw:18,pitch:4,distance:3.35});
+ Object.assign(view,{yaw:18,pitch:20,distance:3.35});
  focusY=0;frameShoes();
 });
 window.addEventListener('resize',()=>{app.resizeCanvas();frameShoes();});
@@ -174,7 +175,12 @@ window.__LifeSimCasF1Probe=()=>({
    worldAnchor:position(a),worldFoot:position(f),
    anchorDistance:round(a.distance(f)),scale:round(p.size)}];
  })):null,
- view:{...view,focusY},panelTop:$('rig-panel').getBoundingClientRect().top,
+ view:{...view,focusY},cameraHeight:round(camera.getPosition().y),
+ footBonesWorld:parts?Object.fromEntries(['left','right'].map(side=>
+  [side,position(parts[side].foot.getPosition())])):null,
+ footBonesPixelY:parts?Object.fromEntries(['left','right'].map(side=>
+  [side,round(camera.camera.worldToScreen(parts[side].foot.getPosition()).y)])):null,
+ panelTop:$('rig-panel').getBoundingClientRect().top,
  footPixelY:avatar?camera.camera.worldToScreen(new pc.Vec3(0,.065,0)).y:null,
  fps,riggingType:'per-foot rigid attachment',skinDeformation:false,
  productionReady:false,physicalIphoneApproved:false
