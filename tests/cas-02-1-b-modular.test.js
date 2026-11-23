@@ -39,7 +39,9 @@ test('CAS-02.1-B five independent skinned meshes share joint order and physicall
  for(let i=0;i<ALL_SLOTS.length;i++){
   const mesh=g.meshes[i],prim=mesh.primitives[0];
   assert.equal(g.nodes.find(n=>n.mesh===i).name,'CAS slot '+ALL_SLOTS[i]);
-  assert.deepEqual(Object.keys(prim.attributes).sort(),['JOINTS_0','NORMAL','POSITION','WEIGHTS_0']);
+  assert.deepEqual(Object.keys(prim.attributes).sort(),i===0?
+   ['COLOR_0','JOINTS_0','NORMAL','POSITION','WEIGHTS_0']:
+   ['JOINTS_0','NORMAL','POSITION','WEIGHTS_0']);
   const js=values(prim.attributes.JOINTS_0,g,bin),ws=values(prim.attributes.WEIGHTS_0,g,bin);
   assert.equal(js.length,ws.length);assert.ok(ws.length>0);
   for(let v=0;v<ws.length;v+=4){assert.ok(js[v]<18&&js[v+1]<18);assert.ok(Math.abs(ws[v]+ws[v+1]-1)<1e-5);}
@@ -61,4 +63,29 @@ test('CAS-02.1-B renders no false production readiness and never accesses save-v
  const {json}=buildCasMannequinGlb();
  assert.equal(json.extras.productionReady,false);assert.ok(!JSON.stringify(json).includes('lifesim.room01.v1'));
  assert.equal(json.nodes.filter(n=>n.name.startsWith('CAS slot ')).length,9);
+});
+
+test('CAS-02.1-C face features, fitted torso and joint geometry are real vertices, not a painted preview',()=>{
+ const {buffer}=buildCasMannequinGlb(),{g,bin}=unpack(buffer);
+ const body=g.meshes[0].primitives[0],top=g.meshes[2].primitives[0];
+ const bodyPos=values(body.attributes.POSITION,g,bin);
+ const bodyColor=values(body.attributes.COLOR_0,g,bin);
+ const upperPos=values(top.attributes.POSITION,g,bin);
+ assert.equal(bodyColor.length,bodyPos.length/3*4,'per-vertex face pigment in actual weighted base');
+ let eyes=0,skin=0;
+ for(let i=0;i<bodyColor.length;i+=4){
+  if(Math.abs(bodyColor[i]-.17)<.001)eyes++;
+  if(Math.abs(bodyColor[i]-.79)<.001)skin++;
+ }
+ assert.ok(eyes>=80&&skin>=100,'pupils/brows and real skin must be authored separately');
+ for(const value of bodyPos)assert.ok(Number.isFinite(value));
+ for(const value of upperPos)assert.ok(Number.isFinite(value));
+ // Shoulder sleeves reach the center chest: no isolated floating sleeves from +/- 0.4m.
+ const shirtXs=[];for(let i=0;i<upperPos.length;i+=3)shirtXs.push(upperPos[i]);
+ assert.ok(Math.min(...shirtXs)<-.32&&Math.max(...shirtXs)>.32);
+ assert.ok(shirtXs.some(x=>Math.abs(x)<.10),'same skinned top mesh spans torso center');
+ // Full-body silhouette is physically plausible in metres and includes actual foot/face vertices.
+ const ys=[];for(let i=1;i<bodyPos.length;i+=3)ys.push(bodyPos[i]);
+ assert.ok(Math.max(...ys)>1.8&&Math.min(...ys)<.2);
+ assert.equal(g.extras.productionReady,false);
 });
