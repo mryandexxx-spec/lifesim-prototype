@@ -70,9 +70,10 @@ test('MICRO-UX-R1 browser smoke is impact-gated, not run for every future UI edi
     assert.equal(planChanges([source]).micro_ux,false,source);
 });
 
-test('LOAD-TRUTH-R1 reserves dedicated two-viewport WebGL only for loader changes',()=>{
+test('LOAD-TRUTH-R1 and QSK-02 jointly cover startup tracking with dedicated real WebGL',()=>{
   const core=planChanges(['src/loading-progress.js']);
-  assert.equal(core.browser,false,'pure tracking logic is independent of renderer');
+  assert.equal(core.browser,true,'QSK-02 upgrades loader tracking changes to real WebGL fault coverage');
+  assert.equal(core.qsk_02,true);
   assert.equal(core.load_truth,true);
   const smoke=planChanges(['tests/load-truth-r1-browser-smoke.mjs']);
   assert.equal(smoke.browser,true);
@@ -245,4 +246,17 @@ test('QSK-01 routes action queues, social handlers and Safari entry changes to r
   const testOnly=planChanges(['tests/qsk-01-social-queue.test.js']);
   assert.equal(testOnly.cas_hud,true);
   assert.equal(testOnly.browser,true);
+});
+
+test('QSK-02 routes SW, startup and recovery risks to real mobile WebGL fault matrix',()=>{
+  for(const path of ['sw.js','src/model-cache.js','src/loading-progress.js',
+    'src/viewport-health.js','src/game.js','index.html']){
+    const p=planChanges([path]);
+    assert.equal(p.qsk_02,true,path+' must have QSK-02 fault coverage');
+    assert.equal(p.browser,true,path+' must boot real PlayCanvas WebGL');
+    assert.ok(p.tests.includes('tests/qsk-02-startup-faults.test.js'),path);
+  }
+  const probe=planChanges(['tests/qsk-02-startup-faults-browser.mjs']);
+  assert.equal(probe.qsk_02,true);
+  assert.equal(probe.browser,true);
 });

@@ -18,6 +18,7 @@ jobs:
       cas_baseline: ${{ steps.impact.outputs.cas_baseline }}
       cas_hud: ${{ steps.impact.outputs.cas_hud }}
       cas_soak: ${{ steps.impact.outputs.cas_soak }}
+      qsk_02: ${{ steps.impact.outputs.qsk_02 }}
       cas_modular: ${{ steps.impact.outputs.cas_modular }}
       cas_alex: ${{ steps.impact.outputs.cas_alex }}
       cas_styles: ${{ steps.impact.outputs.cas_styles }}
@@ -176,6 +177,16 @@ jobs:
           name: cas-f2-c3-visual-evidence
           path: artifacts/cas-02-1-f2-c3/
           if-no-files-found: ignore
+      - name: QSK-02 PlayCanvas startup, dual GLB HTTP 404, WebGL loss and save-lock at two phone viewports
+        if: ${{ needs.targeted.outputs.qsk_02 == 'true' }}
+        run: node tests/qsk-02-startup-faults-browser.mjs
+      - name: Archive QSK-02 measured cold/warm boot and fault-injection screenshots
+        if: ${{ always() && needs.targeted.outputs.qsk_02 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsk-02-startup-faults-pr
+          path: artifacts/qsk-02/
+          if-no-files-found: error
       - name: CAS-01.7 actual 4-resident iPhone viewport WebGL/HUD/career
         if: ${{ needs.targeted.outputs.cas_hud == 'true' }}
         run: node tests/cas-01-7-browser-smoke.mjs
