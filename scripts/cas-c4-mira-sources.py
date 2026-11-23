@@ -207,10 +207,13 @@ def main():
         # Verify the *exact*, SHA-pinned OBJ topology against the current
         # exact-file parser instead of applying an incorrect variant count.
         actual = audit.geometry(obj)["triangles"]
-        if mesh["sourceFaces"] != actual or actual < 100 or actual > 30000:
+        if mesh["sourceFaces"] != actual or actual != {
+                "ballet": 8960, "mary-jane": 1004, "ankle-boots": 4120}[name]:
             raise ValueError(name + " exact source triangulation inconsistent: " +
                              str(mesh["sourceFaces"]) + " vs " + str(actual))
         model = make_glb(mesh, image)
+        if audit.inspect_glb(model)["triangles"] != actual:
+            raise ValueError(name + " exported glTF indices lost source triangles")
         dest = FOLDER / ("c4-" + name + ".source.glb")
         dest.write_bytes(model)
         result["styles"][name] = {
