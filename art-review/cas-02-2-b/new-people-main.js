@@ -194,6 +194,10 @@ $('identity').addEventListener('change',()=>{
 $('next').addEventListener('click',()=>selectPerson(who,selection<0?0:(selection+1)%PEOPLE[who].length));
 TARGETS.forEach((name,i)=>$('morph-'+name).addEventListener('input',()=>{
  const rec=record();if(selection<0||!rec?.morphs[0])return;
+ // Do not let a valid body morph look inert while the camera is on the face,
+ // or hide a small face morph in the full-figure framing.
+ const intendedFocus=name==='body'?'body':'face';
+ if(focus!==intendedFocus)setFocus(intendedFocus);
  const weights=weightsFor(who,selection),value=Number($('morph-'+name).value)/100;
  weights[i]=Math.max(0,Math.min(1,value));
  appearance.set(cacheKey(who,selection),weights);
