@@ -16,7 +16,9 @@ export const CC0_SHOE_CANDIDATES=Object.freeze([
 ]);
 export const ASSET_DIR='assets/characters/cas-cc0-f0';
 export const ASSET_SHA256=Object.freeze({
-  dress:null,sneakers:null,boots:null // pinned before main release after exact real CI audit
+  dress:'b128daa115033cf074c6f5fe1ceba2f38b3f65bfa2a98451f133ead0f98db9ad',
+  sneakers:'64a3cc3d2ff77aa4f77d7bd38d54ac91cb4bed0eae888f7cc253e3fe7545fdb6',
+  boots:'b4bdafe8f7634a2c68aedd09ff5d01b9876856b0e0b6806aa2afe2f943e51fa2'
 });
 const PREFIX='https://grab3d.com/dl/';
 function sha256(bytes){return createHash('sha256').update(bytes).digest('hex');}
