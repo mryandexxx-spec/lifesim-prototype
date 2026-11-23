@@ -69,6 +69,16 @@ export function audit(kind,originalBytes,derivedBytes){
   JSON.stringify(orig.g.skins)!==JSON.stringify(der.g.skins)||
   JSON.stringify(orig.g.animations)!==JSON.stringify(der.g.animations))
   throw Error('Changed original UV, material, skin or animation data');
+ const unchangedAttributes=['POSITION','NORMAL','TEXCOORD_0','JOINTS_0','WEIGHTS_0'];
+ for(const name of unchangedAttributes){
+  const before=accessor(orig,a.attributes[name]),after=accessor(der,b.attributes[name]);
+  if(before.length!==after.length||!before.every((value,i)=>value===after[i]))
+   throw Error('Original attribute bytes differ: '+name);
+ }
+ const beforeIndices=accessor(orig,a.indices),afterIndices=accessor(der,b.indices);
+ if(beforeIndices.length!==afterIndices.length||
+   !beforeIndices.every((value,i)=>value===afterIndices[i]))
+  throw Error('Original face topology indices changed');
  const pos=accessor(orig,a.attributes.POSITION),nor=accessor(orig,a.attributes.NORMAL),
   uv=accessor(orig,a.attributes.TEXCOORD_0),j=accessor(orig,a.attributes.JOINTS_0),
   w=accessor(orig,a.attributes.WEIGHTS_0),indices=accessor(orig,a.indices);
