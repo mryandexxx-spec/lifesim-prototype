@@ -203,3 +203,22 @@ test('CAS-02.1-E source Alex and independently bound Mira both require exact two
  assert.equal(planChanges(['src/finance-ledger.js']).cas_styles,false);
  assert.equal(planChanges(['README.md']).cas_styles,false);
 });
+
+
+test('CAS-02.1-F0 licensed source audit and real visual lab always get targeted CI and PlayCanvas',()=>{
+ const source=planChanges(['scripts/cas-02-1-f0-download-assets.mjs']);
+ assert.equal(source.cas_cc0,true);
+ const html=planChanges(['cas-cc0-shoe-fit-lab.html']);
+ assert.equal(html.cas_cc0,true);
+ assert.equal(html.browser,true,'real shoe 3D lab changes need browser checks');
+ const script=planChanges(['src/cas-cc0-shoe-fit-lab.js']);
+ assert.equal(script.cas_cc0,true);
+ assert.equal(script.browser,true);
+ const browser=planChanges(['tests/cas-02-1-f0-browser-smoke.mjs']);
+ assert.equal(browser.cas_cc0,true);
+ assert.equal(browser.browser,true);
+ const testFile=planChanges(['tests/cas-02-1-f0-sources.test.js']);
+ assert.equal(testFile.cas_cc0,true);
+ assert.equal(planChanges(['src/career-work.js']).cas_cc0,false);
+ assert.equal(planChanges(['README.md']).cas_cc0,false);
+});
