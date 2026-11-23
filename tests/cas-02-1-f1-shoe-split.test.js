@@ -4,6 +4,8 @@ import {readFileSync,existsSync} from 'node:fs';
 import {parseLegacyGlb,sourceAccessor} from '../scripts/cas-source-asset-audit.mjs';
 import {ASSET_SHA256} from '../scripts/cas-02-1-f0-download-assets.mjs';
 import {splitShoeSource,F1_DIR} from '../scripts/cas-02-1-f1-split-dress.mjs';
+import {buildResidentFootwear} from '../scripts/build-cas-resident-footwear-v2.mjs';
+import {buildAlexF1Underfoot,F1_ALEX_SOURCE_SHA256} from '../scripts/cas-02-1-f1-alex-underfoot.mjs';
 import {createHash} from 'node:crypto';
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
@@ -48,4 +50,26 @@ test('CAS F1 source GLB physically splits 19,744 original triangles, keeps all t
    assert.equal(m.parts[side].triangles,outputs[side].triangles);
   }
  }
+});
+
+test('CAS F1 separate original-skin underfoot mask removes lingering white footwear without losing faces or source animation',()=>{
+ const original=buildResidentFootwear('alex').buffer;
+ assert.equal(sha(original),F1_ALEX_SOURCE_SHA256);
+ const {model,metadata}=buildAlexF1Underfoot(original);
+ const a=parseLegacyGlb(original),b=parseLegacyGlb(model);
+ assert.equal(b.gltf.skins.length,1);
+ assert.deepEqual(b.gltf.skins,a.gltf.skins,'exact inverse binds, joint order and source skin retained');
+ assert.deepEqual(b.gltf.animations,a.gltf.animations,'all 10 original source animation tracks retained');
+ assert.ok(metadata.maskedSourceSneakerTriangles>=700);
+ assert.ok(metadata.maskedSourceSneakerTriangles<1700);
+ assert.equal(metadata.sourceBodyTriangles,metadata.unmaskedBodyTriangles+metadata.maskedSourceSneakerTriangles);
+ const node=b.gltf.nodes.find(n=>n.name===metadata.sourceResidualNode);
+ assert.ok(node&&node.skin===0&&node.mesh>=a.gltf.meshes.length);
+ const main=b.gltf.meshes[0].primitives[0],mask=b.gltf.meshes[node.mesh].primitives[0];
+ assert.deepEqual(main.attributes,mask.attributes,'residual must preserve original source weighted vertices');
+ assert.equal(main.material,mask.material,'same unchanged original appearance restored in source mode');
+ const count=p=>sourceAccessor(b,p.indices).values.length/3;
+ assert.equal(count(main)+count(mask),metadata.sourceBodyTriangles);
+ assert.equal(b.gltf.meshes[1].name,a.gltf.meshes[1].name,'reversible original source shoe untouched');
+ assert.equal(b.gltf.extras.casSourceFootwearStyles.sourceSha256,a.gltf.extras.casSourceFootwearStyles.sourceSha256);
 });
