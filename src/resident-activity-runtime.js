@@ -259,6 +259,8 @@ export function dispatchAdditionalResidentQueues(root){
         root.careerSystem?.byResident?.[id]?.currentShift?.phase)||root.socialAction||
         [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))return false;
       const guard=residentGuards(root,id).head;
+      // A* must not execute every render tick during deterministic backoff.
+      if(guard.seq===command.seq&&root.minutes<guard.retryAt)return false;
       const plan=prepareCommand(root,id,command);
       if(!plan){
         const reason=additionalHeadBlockReason(root,id,command);
