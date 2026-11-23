@@ -187,3 +187,19 @@ test('CAS-02.1-D actual Alex source asset builder and wardrobe lab selectively r
  for(const changed of ['src/kitchen.js','README.md','src/career-work.js'])
   assert.equal(Boolean(planChanges([changed]).cas_alex),false,changed);
 });
+
+
+test('CAS-02.1-E source Alex and independently bound Mira both require exact two-size WebGL',()=>{
+ for(const name of ['scripts/build-cas-resident-footwear-v2.mjs',
+  'tests/cas-02-1-e-footwear.test.js','tests/cas-02-1-e-browser-smoke.mjs',
+  'cas-resident-footwear-lab.html','src/character-lab.js','src/character-lab-config.js']){
+  const plan=planChanges([name]);
+  assert.equal(plan.cas_styles,true,name);
+ }
+ const p=planChanges(['cas-resident-footwear-lab.html']);
+ assert.equal(p.browser,true);
+ const src=planChanges(['scripts/build-cas-resident-footwear-v2.mjs']);
+ assert.equal(src.browser,false,'source GLB generator changes do not need unrelated browser work');
+ assert.equal(planChanges(['src/finance-ledger.js']).cas_styles,false);
+ assert.equal(planChanges(['README.md']).cas_styles,false);
+});

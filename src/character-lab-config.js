@@ -29,6 +29,18 @@ export const CHARACTER_LAB_MODELS = Object.freeze({
     fileName:'cas-alex-footwear-lab-v1.glb',bytes:0,triangles:null,joints:66,
     morphTargets:0,targetHeight:2.05
   }),
+  alexstyles:Object.freeze({
+    key:'alexstyles',label:'Алекс — настоящие сменные стили обуви',
+    assetUrl:'./assets/characters/cas-alex-footwear-v2.glb?cas-02-1-e',
+    fileName:'cas-alex-footwear-v2.glb',bytes:0,triangles:null,joints:66,
+    morphTargets:0,targetHeight:2.05
+  }),
+  mirastyles:Object.freeze({
+    key:'mirastyles',label:'Мира — настоящие сменные стили обуви',
+    assetUrl:'./assets/characters/cas-mira-footwear-v2.glb?cas-02-1-e',
+    fileName:'cas-mira-footwear-v2.glb',bytes:0,triangles:null,joints:66,
+    morphTargets:0,targetHeight:2.05
+  }),
   casproto:Object.freeze({
     key:'casproto',label:'CAS-02.1-B original modular prototype',
     assetUrl:'./assets/characters/cas-modular-mannequin-v1.glb?cas-02-1-c',

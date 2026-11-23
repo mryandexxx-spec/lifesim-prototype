@@ -35,7 +35,8 @@ fill.setEulerAngles(15,140,0);app.root.addChild(fill);
 const camera=new pc.Entity('Lab camera');
 camera.addComponent('camera',{clearColor:new pc.Color(.88,.91,.89),nearClip:.03,farClip:120,fov:42});
 app.root.addChild(camera);
-const isModularLab=['casproto','alexpilot'].includes(document.body.dataset.character);
+const isResidentStyleLab=['alexstyles','mirastyles'].includes(document.body.dataset.character);
+const isModularLab=['casproto','alexpilot','alexstyles','mirastyles'].includes(document.body.dataset.character);
 const view={yaw:isModularLab?8:24,pitch:isModularLab?3:12,distance:3.7};
 let casFocusY=.94;
 function fitCasViewport(){
@@ -167,6 +168,7 @@ async function loadAsset(url, title, metadata={}){
       current=avatar;currentAsset=asset;
       if(labModel.key==='casproto')applyCasVariants();
       if(labModel.key==='alexpilot')applyAlexFootwear();
+      if(isResidentStyleLab)applyResidentFootwearStyles();
       modelInfo={title,bytes:metadata.bytes||0,triangles:metadata.triangles??null,
         joints:metadata.joints??null,clips:clips.length,morphTargets:metadata.morphTargets??null};
       updateMetrics();
@@ -286,12 +288,60 @@ if(labModel.key==='alexpilot'){
   };
  };
 }
+const casStyleChoices=['original','graphite','terracotta'];
+function applyResidentFootwearStyles(){
+ if(!isResidentStyleLab||!current)return;
+ const kind=labModel.key==='mirastyles'?'mira':'alex';
+ const selector=$('footwear-style');
+ const active=selector.value||'original';
+ for(const style of casStyleChoices){
+  const node=current.findByName('CAS '+kind+' shoes '+style);
+  if(!node?.render)throw new Error('Missing real '+kind+' independently skinned shoe style '+style);
+  node.enabled=style===active;
+ }
+ selector.disabled=false;
+}
+if(isResidentStyleLab){
+ $('footwear-style').addEventListener('change',()=>{
+  applyResidentFootwearStyles();
+  const name=labModel.key==='mirastyles'?'Миры':'Алекса';
+  status('Выбрана обувь '+$('footwear-style').selectedOptions[0].textContent+
+    ' — исходная модель и анимации '+name+' сохранены.');
+ });
+ window.__LifeSimCasResidentStylesProbe=()=>{
+  const kind=labModel.key==='mirastyles'?'mira':'alex';
+  const dock=$('cas-lab-panel')?.getBoundingClientRect();
+  const project=y=>{
+   if(!current)return null;
+   return camera.camera.worldToScreen(current.getWorldTransform().transformPoint(
+    new pc.Vec3(0,y,0))).y;
+  };
+  return {
+   resident:kind,loaded:!!current,graphics:!!app.graphicsDevice,
+   styles:casStyleChoices.map(style=>{
+    const node=current?.findByName('CAS '+kind+' shoes '+style);
+    return {style,exists:!!node,skinned:!!node?.render,enabled:node?.enabled??null,
+     primitives:node?.render?.meshInstances?.length??0};
+   }),
+   active:$('footwear-style').value,
+   clips:currentAsset?.resource?.animations?.map(x=>x.resource?.name)||[],
+   view:{yaw:view.yaw,pitch:view.pitch,distance:view.distance},
+   frame:current?{headY:project(1.7),footY:project(0),
+    dockTop:dock?.top??null,topSafe:40,width:innerWidth,height:innerHeight}:null,
+   drawCalls:app.stats?.drawCalls?.total??0
+  };
+ };
+}
 app.start();
 if(isModularLab)requestAnimationFrame(fitCasViewport);
 // If the model has been committed as a stable asset, it loads without user input.
 // No temporary signed Meshy URLs or user tokens belong in the public repository.
 (async()=>{
- const manifestUrl=labModel.key==='alexpilot'
+ const styleResident=labModel.key==='alexstyles'?'alex':
+   labModel.key==='mirastyles'?'mira':null;
+ const manifestUrl=styleResident
+   ?'./assets/characters/cas-'+styleResident+'-footwear-v2.json?cas-02-1-e'
+   :labModel.key==='alexpilot'
    ?'./assets/characters/cas-alex-footwear-lab-v1.json?cas-02-1-d'
    :'./assets/characters/cas-modular-mannequin-v1.json?cas-02-1-c';
  const extra=isModularLab?await fetch(manifestUrl,{cache:'no-store'})
