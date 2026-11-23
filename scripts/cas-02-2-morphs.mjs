@@ -77,6 +77,7 @@ export function buildCas022Morphs(kind,source=readSourceAsset(kind)){
   const aWeight=sourceAccessor(original,p.attributes.WEIGHTS_0);
   if(aPos.acc.componentType!==5126||aPos.componentCount!==3||
     aJoint.componentCount!==4||aWeight.componentCount!==4||
+    aWeight.acc.componentType!==5126||
     aPos.acc.count!==aJoint.acc.count||aPos.acc.count!==aWeight.acc.count)
     throw new Error('Unsupported source vertex/skin data');
   const names=g.skins[0].joints.map(i=>g.nodes[i]?.name);
