@@ -14,7 +14,7 @@ const PEOPLE={
   {name:'Майя · новое лицо',weights:[.64,.57,.68,.13,.94,.92]}]
 };
 const original={alex:SOURCE+'meshy-casual-v1.glb',mira:SOURCE+'meshy-mira-mobile-v1.glb'};
-const derived={alex:'./source-variants/alex.glb',mira:'./source-variants/mira.glb'};
+const derived={alex:'./source-variants/alex.glb?casB=r2-b80eeb5b8215',mira:'./source-variants/mira.glb?casB=r2-119ec109f1e9'};
 const canvas=$('scene'),panel=$('panel'),status=$('status');
 const app=new pc.Application(canvas,{graphicsDeviceOptions:{antialias:false,alpha:false}});
 app.graphicsDevice.maxPixelRatio=Math.min(devicePixelRatio||1,1.25);
