@@ -33,6 +33,8 @@ jobs:
           node scripts/build-cas-alex-wardrobe.mjs
           node --check scripts/build-cas-resident-footwear-v2.mjs
           node scripts/build-cas-resident-footwear-v2.mjs
+          node --check scripts/cas-02-1-f0-download-assets.mjs
+          node scripts/cas-02-1-f0-download-assets.mjs
           npm test
           node --check src/game.js
           node --check src/viewport-health.js
@@ -261,7 +263,7 @@ jobs:
           test -s node_modules/playcanvas/build/playcanvas.mjs
           cp node_modules/playcanvas/build/playcanvas.mjs site/vendor/
           mkdir -p site/src
-          cp index.html character-lab.html character-lab-mira.html cas-modular-lab.html cas-alex-wardrobe-lab.html cas-resident-footwear-lab.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
+          cp index.html character-lab.html character-lab-mira.html cas-modular-lab.html cas-alex-wardrobe-lab.html cas-resident-footwear-lab.html cas-cc0-shoe-fit-lab.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
           mkdir -p site/src
           cp src/plan-preview.js src/work-presence-ui.js src/ui-layout.js src/required-choice-focus.js site/src/
           cp src/ux01-plan-ui.js site/src/
@@ -344,7 +346,7 @@ jobs:
           cp src/pool-swim-visual.js src/pool-touch-policy.js site/src/
           cp src/calendar-core.js src/calendar-events.js src/calendar-holidays.js src/calendar-reminders.js src/calendar-ui.js site/src/
           cp src/day-night-cycle.js src/day-night-render.js site/src/
-          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/trait-catalog.js src/sim-events.js src/emotion-engine.js src/mood-presentation.js src/social-perspective.js src/social-graph.js src/action-queue.js src/conversation-engine.js src/dialogue-decision.js src/world-interactions.js src/gifts-leisure.js src/household.js src/relationships.js src/social-reactions.js src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js src/interaction-anchors.js src/meshy-seat-runtime.js src/meshy-fridge-runtime.js src/meshy-bed-runtime.js src/meshy-shower-runtime.js src/loading-progress.js src/model-cache.js src/meshy-mira-visual.js src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js site/src/
+          cp src/game.js src/simulation.js src/navigation.js src/psychology.js src/trait-catalog.js src/sim-events.js src/emotion-engine.js src/mood-presentation.js src/social-perspective.js src/social-graph.js src/action-queue.js src/conversation-engine.js src/dialogue-decision.js src/world-interactions.js src/gifts-leisure.js src/household.js src/relationships.js src/social-reactions.js src/social-feedback.js src/social-episodes.js src/social-compatibility.js src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js src/characters.js src/animations.js src/pose-config.js src/sofa-transition.js src/camera-controls.js src/locomotion.js src/bed-layout.js src/bed-transition.js src/fridge-interaction.js src/shower-interaction.js src/privacy-mosaic.js src/character-lab.js src/character-lab-config.js src/cas-cc0-shoe-fit-lab.js src/meshy-visual.js src/meshy-visual-policy.js src/meshy-sofa-pose.js src/interaction-anchors.js src/meshy-seat-runtime.js src/meshy-fridge-runtime.js src/meshy-bed-runtime.js src/meshy-shower-runtime.js src/loading-progress.js src/model-cache.js src/meshy-mira-visual.js src/meshy-mira-sofa.js src/meshy-mira-bed.js src/meshy-mira-policy.js site/src/
           cp src/mood-action-policy.js site/src/
           cp src/social-need.js site/src/
           cp src/meshy-reading-runtime.js site/src/
@@ -365,6 +367,8 @@ jobs:
           cp assets/characters/cas-modular-mannequin-v1.glb assets/characters/cas-modular-mannequin-v1.json site/assets/characters/
           cp assets/characters/cas-alex-footwear-lab-v1.glb assets/characters/cas-alex-footwear-lab-v1.json site/assets/characters/
           cp assets/characters/cas-alex-footwear-v2.glb assets/characters/cas-alex-footwear-v2.json assets/characters/cas-mira-footwear-v2.glb assets/characters/cas-mira-footwear-v2.json site/assets/characters/
+          mkdir -p site/assets/characters/cas-cc0-f0
+          cp assets/characters/cas-cc0-f0/* site/assets/characters/cas-cc0-f0/
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
