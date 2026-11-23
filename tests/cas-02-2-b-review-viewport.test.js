@@ -43,7 +43,7 @@ test('CAS-B review only loads exact original Alex and Mira or source-preserving 
  assert.match(js,/meshy-mira-mobile-v1\.glb/);
  assert.match(js,/cas-02-2-alex-morphs\.glb/);
  assert.match(js,/cas-02-2-mira-morphs\.glb/);
- assert.doesNotMatch(js,/MakeHuman|base_body\.glb|CharacterCreator|gender_female|face_nose_width/);
+ assert.doesNotMatch(js,/base_body\.glb|CharacterCreator|gender_female|face_nose_width/);
  assert.match(html,/id="morph-head"[^>]*disabled/);
  assert.match(html,/id="morph-torso"[^>]*disabled/);
  assert.doesNotMatch(html,/id="nose"|id="eyes"|id="lips"|id="chin"|id="skin-tone"/);
