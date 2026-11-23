@@ -10,7 +10,7 @@ test('six pinned, scoped LifeSim skill adapters exist with correct metadata and 
     const content = readFileSync(new URL(`../.agents/skills/${name}/SKILL.md`, import.meta.url), 'utf8');
     assert.ok(content.startsWith('---\nname: ' + name + '\n'), name);
     assert.ok(content.includes(pinned), name);
-    assert.match(content, /PlayCanvas|game-ui-ux/);
+    assert.match(content, /PRIVATE source-of-truth/);
     assert.match(content, /PR/);
   }
   const guide = readFileSync(new URL('../docs/agent-skills-playcanvas.md', import.meta.url), 'utf8');
