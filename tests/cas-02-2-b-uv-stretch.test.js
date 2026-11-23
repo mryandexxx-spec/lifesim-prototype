@@ -41,3 +41,15 @@ test('CAS-B UV audit fails closed on unverified source GLB',()=>{
  assert.throws(()=>audit('unknown',source,buffer),/Unknown source/);
 });
 
+
+test('CAS-B audit detects tampering with source UV bytes inside derivative GLB',()=>{
+ const source=readFileSync(new URL(files.alex,base));
+ const {buffer}=deriveSourceGLB('alex',source);
+ const changed=Buffer.from(buffer);
+ const jsonLen=changed.readUInt32LE(12), g=JSON.parse(changed.toString('utf8',20,20+jsonLen));
+ const tex=g.accessors[g.meshes[0].primitives[0].attributes.TEXCOORD_0];
+ const view=g.bufferViews[tex.bufferView];
+ const off=20+jsonLen+8+(view.byteOffset||0)+(tex.byteOffset||0);
+ changed[off]^=1;
+ assert.throws(()=>audit('alex',source,changed),/Original attribute bytes differ: TEXCOORD_0/);
+});
