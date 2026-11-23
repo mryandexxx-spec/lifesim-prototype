@@ -70,9 +70,10 @@ test('MICRO-UX-R1 browser smoke is impact-gated, not run for every future UI edi
     assert.equal(planChanges([source]).micro_ux,false,source);
 });
 
-test('LOAD-TRUTH-R1 reserves dedicated two-viewport WebGL only for loader changes',()=>{
+test('LOAD-TRUTH-R1 and QSK-02 jointly cover startup tracking with dedicated real WebGL',()=>{
   const core=planChanges(['src/loading-progress.js']);
-  assert.equal(core.browser,false,'pure tracking logic is independent of renderer');
+  assert.equal(core.browser,true,'QSK-02 upgrades loader tracking changes to real WebGL fault coverage');
+  assert.equal(core.qsk_02,true);
   assert.equal(core.load_truth,true);
   const smoke=planChanges(['tests/load-truth-r1-browser-smoke.mjs']);
   assert.equal(smoke.browser,true);
