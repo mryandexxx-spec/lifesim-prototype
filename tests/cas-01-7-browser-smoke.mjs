@@ -58,6 +58,9 @@ try{
   // both original residents. The pause keeps commands in persistent FIFO.
   for(const [initiator,partner] of [['alex','mira'],['mira','alex']]){
     await page.locator('#pick-'+initiator).tap();
+    const partnerPendingBefore=JSON.parse(
+      await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY)
+    ).actionQueues.byResident[partner].length;
 
     // Actual 3D world hit-test, not a synthetic menu event. Allow the
     // animated focus camera to settle before choosing a projected upper body.
@@ -106,8 +109,8 @@ try{
     assert.ok(live.actionQueues.byResident[initiator].some(task=>
       task.type==='social'&&task.targetId===partner&&task.actionId==='talk'),
       initiator+' must enqueue social talk for '+partner+' after touch confirmation');
-    assert.ok(live.actionQueues.byResident[partner].every(task=>task.targetId!==initiator),
-      'social invitation cannot silently enqueue a second command for the partner');
+    assert.equal(live.actionQueues.byResident[partner].length,partnerPendingBefore,
+      'social invitation must not add an extra task to the partner queue');
     assert.equal(await page.locator('#social-menu-panel').isHidden(),true,
       'successful confirmation dismisses the optional social panel');
   }
