@@ -35,6 +35,9 @@ jobs:
           node scripts/build-cas-resident-footwear-v2.mjs
           node --check scripts/cas-02-1-f0-download-assets.mjs
           node scripts/cas-02-1-f0-download-assets.mjs
+          node --check scripts/cas-02-1-f1-split-dress.mjs
+          node scripts/cas-02-1-f1-split-dress.mjs
+          node --check src/cas-cc0-shoe-rig-lab.js
           npm test
           node --check src/game.js
           node --check src/viewport-health.js
