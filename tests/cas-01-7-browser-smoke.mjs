@@ -106,9 +106,11 @@ try{
     assert.equal(await page.locator('#social-menu-panel').isHidden(),true,
       'successful confirmation dismisses the optional social panel');
   }
-  await page.reload({waitUntil:'domcontentloaded'});
-  await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
-  const persisted=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
+  // Schema-v1 round-trip. A full page reload deliberately does NOT persist
+  // manual pause (loadGame resumes simulation), so queued talks could start
+  // while WebGL boots; validate persistence before advancing game time.
+  const persisted=loadHousehold(copy(JSON.parse(
+    await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY))));
   assert.ok(persisted.actionQueues.byResident.alex.some(t=>t.type==='social'&&t.targetId==='mira'));
   assert.ok(persisted.actionQueues.byResident.mira.some(t=>t.type==='social'&&t.targetId==='alex'));
   await page.locator('#pick-resident_3').tap();
