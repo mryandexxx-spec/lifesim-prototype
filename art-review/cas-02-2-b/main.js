@@ -27,8 +27,14 @@ app.root.addChild(camera);
 const models={};const sourceColors=new WeakMap();
 let resident='alex',viewMode='original',focus='body',yaw=12,pitch=5;
 let dist=4.0,lastLayout=null,loadError='',isLoading=false,zoomMultiplier=1;
-function say(message,error=false){status.textContent=message;status.classList.toggle('error',error);}
-function adjustStatus(){panel.style.setProperty('--panel-height',panel.getBoundingClientRect().height+'px');}
+let statusTimer=null;
+function say(message,error=false){
+  status.textContent=message;status.classList.toggle('error',error);status.hidden=false;
+  if(statusTimer)clearTimeout(statusTimer);
+  // Hide success messages once read; loading and errors remain visible.
+  if(!error&&!/Загружаю/.test(message))statusTimer=setTimeout(()=>{status.hidden=true;},4200);
+}
+function adjustStatus(){document.documentElement.style.setProperty('--panel-height',panel.getBoundingClientRect().height+'px');}
 function placeCamera(){
   adjustStatus();
   const bounds=panel.getBoundingClientRect();
