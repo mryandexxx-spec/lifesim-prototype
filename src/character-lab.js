@@ -11,7 +11,7 @@ app.graphicsDevice.maxPixelRatio=Math.min(window.devicePixelRatio||1,1.5);
 app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
 app.setCanvasResolution(pc.RESOLUTION_AUTO);
 app.scene.ambientLight = new pc.Color(.65,.69,.67);
-window.addEventListener('resize',()=>app.resizeCanvas());
+window.addEventListener('resize',()=>{app.resizeCanvas();fitCasViewport();});
 
 const createMaterial = hex => {
   const m=new pc.StandardMaterial();
@@ -35,17 +35,32 @@ fill.setEulerAngles(15,140,0);app.root.addChild(fill);
 const camera=new pc.Entity('Lab camera');
 camera.addComponent('camera',{clearColor:new pc.Color(.88,.91,.89),nearClip:.03,farClip:120,fov:42});
 app.root.addChild(camera);
-const view={yaw:24,pitch:12,distance:3.7};
+const isModularLab=document.body.dataset.character==='casproto';
+const view={yaw:isModularLab?8:24,pitch:isModularLab?3:12,distance:3.7};
+let casFocusY=.94;
+function fitCasViewport(){
+ if(!isModularLab)return;
+ const panel=document.getElementById('cas-lab-panel');
+ if(!panel)return;
+ const h=window.innerHeight,rect=panel.getBoundingClientRect();
+ const upper=55,lower=Math.max(upper+90,rect.top-12);
+ const usable=lower-upper,desired=Math.max(130,usable*.80);
+ const radians=42*Math.PI/360;
+ view.distance=Math.max(3.4,Math.min(9,1.85*h/(2*Math.tan(radians)*desired)));
+ const pxPerMeter=h/(2*Math.tan(radians)*view.distance);
+ casFocusY=.91-(h/2-(upper+lower)/2)/pxPerMeter;
+ updateView();
+}
 function updateView(){
   const az=view.yaw*Math.PI/180,el=view.pitch*Math.PI/180;
-  const target=new pc.Vec3(0,.94,0);
+  const target=new pc.Vec3(0,isModularLab?casFocusY:.94,0);
   camera.setPosition(target.x+Math.sin(az)*Math.cos(el)*view.distance,
     target.y+Math.sin(el)*view.distance,
     target.z+Math.cos(az)*Math.cos(el)*view.distance);
   camera.lookAt(target);
 }
 updateView();
-$('reset-view').addEventListener('click',()=>{Object.assign(view,{yaw:24,pitch:12,distance:3.7});updateView();});
+$('reset-view').addEventListener('click',()=>{Object.assign(view,{yaw:isModularLab?8:24,pitch:isModularLab?3:12,distance:3.7});if(isModularLab)fitCasViewport();else updateView();});
 const activePointers=new Map();
 let pinchDistance=0;
 canvas.addEventListener('pointerdown',event=>{canvas.setPointerCapture?.(event.pointerId);activePointers.set(event.pointerId,{x:event.clientX,y:event.clientY});pinchDistance=0;});
@@ -153,6 +168,7 @@ async function loadAsset(url, title, metadata={}){
       modelInfo={title,bytes:metadata.bytes||0,triangles:metadata.triangles??null,
         joints:metadata.joints??null,clips:clips.length,morphTargets:metadata.morphTargets??null};
       updateMetrics();
+      if(isModularLab)fitCasViewport();
       if(previous){previous.destroy();app.assets.remove(previousAsset);previousAsset.unload();}
       clipSelect.replaceChildren();
       const available=summarizeClips(clips.map(c=>c.name));
@@ -214,17 +230,33 @@ if(labModel.key==='casproto'){
       alternate:current?.findByName('CAS slot '+slot+'-alt')?.enabled??null
     })),
     clips:currentAsset?.resource?.animations?.map(x=>x.resource?.name)||[],
-    graphics:!!app.graphicsDevice,draws:app.stats?.drawCalls?.total||0
+    graphics:!!app.graphicsDevice,draws:app.stats?.drawCalls?.total||0,
+    mobileFrame:(()=>{
+      const dock=document.getElementById('cas-lab-panel')?.getBoundingClientRect();
+      if(!current)return null;
+      const toScreen=y=>{
+        const pos=current.getWorldTransform().transformPoint(new pc.Vec3(0,y,0));
+        return camera.camera.worldToScreen(pos).y;
+      };
+      return {headY:toScreen(1.85),footY:toScreen(0),
+        dockTop:dock?.top??0,topSafe:42,width:innerWidth,height:innerHeight,
+        yaw:view.yaw,pitch:view.pitch};
+    })()
   });
 }
 app.start();
+if(isModularLab)requestAnimationFrame(fitCasViewport);
 // If the model has been committed as a stable asset, it loads without user input.
 // No temporary signed Meshy URLs or user tokens belong in the public repository.
-fetch(preferredAutoUrl,{method:'HEAD'}).then(response=>{
-  if(!response.ok)throw new Error('not bundled');
-  return loadAsset(preferredAutoUrl,labModel.fileName,{
-    bytes:Number(response.headers.get('content-length'))||labModel.bytes,
-    triangles:labModel.triangles,joints:labModel.joints,morphTargets:labModel.morphTargets
-  });
-}).catch(error=>status('Не удалось автоматически загрузить '+labModel.label+
+(async()=>{
+ const extra=isModularLab?await fetch('./assets/characters/cas-modular-mannequin-v1.json?cas-02-1-c',{cache:'no-store'})
+   .then(r=>r.ok?r.json():null).catch(()=>null):null;
+ const response=await fetch(preferredAutoUrl,{method:'HEAD'});
+ if(!response.ok)throw new Error('not bundled');
+ return loadAsset(preferredAutoUrl,labModel.fileName,{
+   bytes:extra?.bytes||Number(response.headers.get('content-length'))||labModel.bytes,
+   triangles:extra?.triangles??labModel.triangles,
+   joints:extra?.joints??labModel.joints,morphTargets:labModel.morphTargets
+ });
+})().catch(error=>status('Не удалось автоматически загрузить '+labModel.label+
   ': '+String(error?.message||error)+'. Можно выбрать GLB вручную для диагностики.'));
