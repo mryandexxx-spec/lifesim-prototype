@@ -1,0 +1,87 @@
+{
+  "schema": "lifesim.cas-head-v2.mpfb-donor.v1",
+  "phase": "CAS-HEAD-V2-POC",
+  "ownerApproved": {
+    "newResidentDerivedTopology": true,
+    "referenceOnlyUseOfMakeHuman": true,
+    "paidGeneration": false,
+    "gameIntegration": false
+  },
+  "upstream": {
+    "repo": "https://github.com/makehumancommunity/mpfb2",
+    "tag": "v2.0.18",
+    "commit": "d0a32e57a7f915cb2f2b95410e2117648c7bbb7e",
+    "coreAssetsLicense": "CC0-1.0",
+    "toolCodeLicense": "GPL-3.0",
+    "licenseDeclaration": "https://github.com/makehumancommunity/mpfb2/blob/v2.0.18/LICENSE.md",
+    "toolVendored": false
+  },
+  "donor": {
+    "sourceRelPath": "src/mpfb/data/3dobjs/base.obj",
+    "sha256": "8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c",
+    "vertexCount": 19158,
+    "quadCount": 18486,
+    "uvCoordinateCount": 21334,
+    "faceTopology": "ALL_QUADS",
+    "blenderUpAxis": "Y",
+    "units": "donor-specific; do not assume game metres"
+  },
+  "targets": [
+    {
+      "channel": "eyes",
+      "path": "eyes/l-eye-height1-incr.target.gz",
+      "sha256": "73292502793b0e5b5fd5fd9538dcf6862381a9c9403c549429af5a6fe33c5db5",
+      "changed": 215,
+      "maxDelta": 0.03
+    },
+    {
+      "channel": "nose",
+      "path": "nose/nose-scale-depth-incr.target.gz",
+      "sha256": "49f63b72f04f637ed38061acce579c0948d29175d949bf21e6bfed354c0a10bf",
+      "changed": 366,
+      "maxDelta": 0.086
+    },
+    {
+      "channel": "lips",
+      "path": "mouth/mouth-upperlip-volume-incr.target.gz",
+      "sha256": "e11c109910b3941d5b6c809f6a1c28c12bf08f67f5c126d109002c1aacd43ef6",
+      "changed": 141,
+      "maxDelta": 0.0297
+    },
+    {
+      "channel": "chin",
+      "path": "chin/chin-height-incr.target.gz",
+      "sha256": "4f05b61b39266801b0a333c208d274ff109250fe9e4512c486a455806878e15c",
+      "changed": 555,
+      "maxDelta": 0.205
+    },
+    {
+      "channel": "cheeks",
+      "path": "cheek/l-cheek-bones-incr.target.gz",
+      "sha256": "ea5aa60abcc2926e61cdabf5d40701c2b23b3f8027f949cea0b80bcbc55df301",
+      "changed": 59,
+      "maxDelta": 0.081
+    }
+  ],
+  "originalHeroGLBSha256": {
+    "alex": "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4",
+    "mira": "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a"
+  },
+  "gate": {
+    "donorGeomMeasured": true,
+    "sourceFitted": false,
+    "originalRigTransferVerified": false,
+    "correctiveSkinUV": false,
+    "anatomicalArtValidated": false,
+    "playcanvasPreviewVerified": false,
+    "ownerVisualApproval": false,
+    "productionReady": false
+  },
+  "caveats": [
+    "Donor is a CC0 technical mesh/target reference, not a stylistically accepted Alex/Mira replacement.",
+    "MPFB's own vertex order and UV layout are not the original avatar's order; do not merge into original meshes.",
+    "A donor-only GLB preview or shape key is not a new resident, nor evidence that our source skeleton/animation accepts it.",
+    "Original sources and approved footwear must remain byte-identical.",
+    "Artist must explicitly check eyelid/lip loops, eyes, mouth and neck deformation before source-fit acceptance."
+  ]
+}
