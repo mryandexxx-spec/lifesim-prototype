@@ -2,6 +2,7 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {inflateSync} from 'node:zlib';
 import {ASSET_SHA256} from '../scripts/cas-02-1-f0-download-assets.mjs';
 const dir='artifacts/cas-02-1-f1';
 mkdirSync(dir,{recursive:true});
@@ -9,6 +10,54 @@ const browser=await chromium.launch({headless:true,args:[
  '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
  '--enable-unsafe-swiftshader','--disable-dev-shm-usage'
 ]});
+/** Prevent false-positive WebGL smoke: an all-background canvas is NOT a visible avatar.
+ * Decode actual Playwright PNG pixels with only built-in Node modules.
+ */
+function realRenderedColors(png,panelTop){
+ let offset=8,width=0,height=0,channels=0,depth=0,interlace=0;
+ const compressed=[];
+ if(png.subarray(0,8).toString('hex')!=='89504e470d0a1a0a')throw Error('not a PNG screenshot');
+ while(offset+12<=png.length){
+  const len=png.readUInt32BE(offset),type=png.toString('ascii',offset+4,offset+8);
+  const value=png.subarray(offset+8,offset+8+len);
+  if(type==='IHDR'){
+   width=value.readUInt32BE(0);height=value.readUInt32BE(4);
+   depth=value[8];channels=value[9]===6?4:value[9]===2?3:0;
+   interlace=value[12];
+  }
+  if(type==='IDAT')compressed.push(value);
+  offset+=12+len;
+  if(type==='IEND')break;
+ }
+ if(depth!==8||!channels||interlace!==0)throw Error('Unsupported PNG pixel format');
+ const bytes=inflateSync(Buffer.concat(compressed)),stride=width*channels;
+ const colors=new Set();let prev=Buffer.alloc(stride),cursor=0;
+ for(let y=0;y<height;y++){
+  const filter=bytes[cursor++],row=Buffer.from(bytes.subarray(cursor,cursor+stride));
+  cursor+=stride;
+  for(let i=0;i<stride;i++){
+   const a=i>=channels?row[i-channels]:0,b=prev[i],c=i>=channels?prev[i-channels]:0;
+   let predictor=0;
+   if(filter===1)predictor=a;
+   else if(filter===2)predictor=b;
+   else if(filter===3)predictor=Math.floor((a+b)/2);
+   else if(filter===4){
+    const p=a+b-c,pa=Math.abs(p-a),pb=Math.abs(p-b),pc=Math.abs(p-c);
+    predictor=pa<=pb&&pa<=pc?a:pb<=pc?b:c;
+   }else if(filter!==0)throw Error('Unknown PNG filter '+filter);
+   row[i]=(row[i]+predictor)&255;
+  }
+  // Avoid UI overlay and sample the character's central portion above the dock.
+  if(y>=75&&y<Math.min(height*.72,panelTop-20)&&y%3===0){
+   for(let x=Math.floor(width*.18);x<width*.82;x+=3){
+    const i=x*channels;
+    colors.add((row[i]<<16)|(row[i+1]<<8)|row[i+2]);
+   }
+  }
+  prev=row;
+ }
+ return colors.size;
+}
 const reports=[];
 try{
  for(const [width,height] of [[390,844],[320,568]]){
@@ -31,6 +80,7 @@ try{
   assert.equal(s.skinDeformation,false,'should not falsely claim full skinned shoe');
   assert.equal(s.mode,'dress');
   assert.equal(s.sourceShoesVisible,false);
+  assert.ok(s.cameraHeight>.25,'camera must be above the floor, not beneath it: '+JSON.stringify(s.view));
   assert.ok(s.footPixelY>40&&s.footPixelY<s.panelTop-20,
    'source foot / attached footwear must be visible above mobile panel');
   for(const side of ['left','right']){
@@ -42,10 +92,15 @@ try{
    assert.ok(item.meshTriangles>6000);
    assert.ok(item.scale>.4&&item.scale<4);
    assert.ok(item.anchorDistance<.3,'shoe should be physically close to foot');
+   assert.ok(s.footBonesPixelY[side]>20&&s.footBonesPixelY[side]<s.panelTop-12,
+    'ACTUAL foot bone must be visible above controls: '+JSON.stringify(s.footBonesPixelY));
   }
   const control=await page.locator('#shoe-choice').boundingBox();
   assert.ok(control&&control.height>=43&&control.y+control.height<=height);
   const wearing=await page.locator('#rig-canvas').screenshot();
+  const actualColors=realRenderedColors(wearing,s.panelTop);
+  assert.ok(actualColors>175,
+   'actual textured Alex and BOTH shoe meshes must visibly render, not blank floor/background: '+actualColors);
   await page.screenshot({path:dir+'/'+width+'x'+height+'-leather-worn.png'});
   await page.locator('#shoe-choice').selectOption('source');
   s=await probe();
@@ -81,7 +136,7 @@ try{
   reports.push({width,height,sourceAlexClips:s.sourceClips.length,
    originalRestored:true,perFootAnchors:true,animations:['Walking','Running'],
    cc0SourcePinned:true,noSaveChanges:true,jsErrors:0,
-   physicalIphoneApproved:false});
+   actualRenderedColors:actualColors,physicalIphoneApproved:false});
   await context.close();
  }
 }finally{
