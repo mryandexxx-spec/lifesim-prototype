@@ -14,6 +14,7 @@ import re
 import struct
 import sys
 import urllib.request
+import time
 import zipfile
 
 CANDIDATES = (
@@ -75,13 +76,24 @@ class RangeSource(io.RawIOBase):
     def _request(self, start, count):
         req = urllib.request.Request(self.url, headers={
             "User-Agent": "LifeSim-C4/1", "Range": f"bytes={start}-{start+count-1}"})
-        with urllib.request.urlopen(req, timeout=20) as response:
-            if response.status != 206:
-                raise RuntimeError(f"Source mirror does not support HTTP Range: {response.status}")
-            data = response.read()
-        if len(data) != count:
-            raise RuntimeError(f"Invalid source ZIP range {start}/{count}: got {len(data)} bytes")
-        return data
+        # Real source mirrors sometimes time out mid-range: retry the SAME
+        # exact bytes, not a new model or an unverified cached surrogate.
+        last_error = None
+        for attempt in range(5):
+            try:
+                with urllib.request.urlopen(req, timeout=35) as response:
+                    if response.status != 206:
+                        raise RuntimeError(f"Source mirror does not support HTTP Range: {response.status}")
+                    data = response.read()
+                if len(data) != count:
+                    raise RuntimeError(f"Invalid source ZIP range {start}/{count}: got {len(data)} bytes")
+                return data
+            except (TimeoutError, OSError, urllib.error.URLError) as exc:
+                last_error = exc
+                if attempt < 4:
+                    print(f"C4B retry source byte range {start}/{count} after {type(exc).__name__}", flush=True)
+                    time.sleep(min(2 + attempt * 3, 11))
+        raise RuntimeError(f"Source range permanently unavailable: {start}/{count}: {last_error}")
 
     def read(self, count=-1):
         if count < 0:
