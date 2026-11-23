@@ -67,6 +67,7 @@ try{
       // animated focus camera to settle before choosing a projected upper body.
       await page.waitForTimeout(850);
       let sceneTap=null;
+      const sceneProbes=[];
       for(const heightY of [1.45,1.85,1.0]){
         const tap=await page.evaluate(async ({name,heightY})=>{
           const {Application,Vec3}=await import('playcanvas');
@@ -80,11 +81,25 @@ try{
         if(tap.x<0||tap.x>=width||tap.y<0||tap.y>=height)continue;
         await page.touchscreen.tap(tap.x,tap.y);
         sceneTap={...tap,heightY};
+        const point=await page.evaluate(({x,y})=>{
+          const element=document.elementFromPoint(x,y);
+          const c=document.querySelector('#game-canvas').getBoundingClientRect();
+          return {topTag:element?.tagName,topId:element?.id,
+            topClass:typeof element?.className==='string'?element.className.slice(0,80):'',
+            canvasRect:{x:c.x,y:c.y,width:c.width,height:c.height},
+            socialVisible:!document.getElementById('social-context').hidden,
+            selectedResident:document.querySelector('#dashboard .resident-switch button[aria-pressed="true"]')?.id};
+        },tap);
+        sceneProbes.push({...sceneTap,...point});
         if(await page.locator('#social-context').isVisible())break;
+      }
+      if(!await page.locator('#social-context').isVisible()){
+        await page.screenshot({path:'artifacts/cas-01-7/scene-tap-failure-'+width+'.png'});
+        console.error('QSK-01 real 3D touch diagnostics:',JSON.stringify(sceneProbes));
       }
       assert.equal(await page.locator('#social-context').isVisible(),true,
         '3D touch must open resident context for '+initiator+' -> '+partner+
-        ' viewport '+width+'x'+height+' last probe '+JSON.stringify(sceneTap));
+        ' viewport '+width+'x'+height+' probes '+JSON.stringify(sceneProbes));
       await page.locator('#conversation-btn').tap();
     }else{
       // The compact 320px camera can place a resident under room geometry
