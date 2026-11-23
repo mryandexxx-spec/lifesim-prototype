@@ -27,7 +27,8 @@ try{
  for(const [width,height] of [[390,844],[320,568]]){
   const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
   await context.addInitScript(({key,record,tour})=>{
-   localStorage.setItem(key,JSON.stringify(record));localStorage.setItem(tour,'done');
+   if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
+   localStorage.setItem(tour,'done');
   },{key:SAVE_KEY,record:seed,tour:UI_TOUR_STORAGE_KEY});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
@@ -35,6 +36,11 @@ try{
   await page.goto('http://127.0.0.1:8765/?cas-01-7=qa',{waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
   assert.ok((await page.locator('#game-canvas').screenshot()).length>2000);
+  // loadGame intentionally resumes (paused is not persisted), even if the
+  // serialized seed was paused. Pause the ACTUAL running browser before
+  // enqueueing; otherwise the dispatcher can consume the first invitation.
+  await page.locator('#pause-btn').tap();
+  assert.equal(await page.locator('#pause-btn').getAttribute('aria-label'),'Продолжить');
   assert.equal(await page.locator('#dashboard .resident-switch button').count(),4);
   const figures=await page.evaluate(async()=>{
    const {Application}=await import('playcanvas');
@@ -48,6 +54,82 @@ try{
   }));
   assert.ok(targets.every(x=>x.width>=43.5&&x.height>=43.5&&x.inside),
    '44px iPhone-safe selection without clipped targets: '+JSON.stringify(targets));
+  // SOCIAL-QUEUE-R1: touch the real choice + two-step confirmation for
+  // both original residents. The pause keeps commands in persistent FIFO.
+  for(const [initiator,partner] of [['alex','mira'],['mira','alex']]){
+    await page.locator('#pick-'+initiator).tap();
+    const partnerPendingBefore=JSON.parse(
+      await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY)
+    ).actionQueues.byResident[partner].length;
+
+    if(initiator==='alex'&&width===390){
+      // Actual 3D world hit-test, not a synthetic menu event. Allow the
+      // animated focus camera to settle before choosing a projected upper body.
+      await page.waitForTimeout(850);
+      let sceneTap=null;
+      for(const heightY of [1.45,1.85,1.0]){
+        const tap=await page.evaluate(async ({name,heightY})=>{
+          const {Application,Vec3}=await import('playcanvas');
+          const app=Application.getApplication();
+          const avatar=app.root.findByName(name);
+          const camera=app.root.findComponents('camera').find(c=>c.enabled);
+          if(!avatar||!camera)throw Error('Missing resident mesh/camera: '+name);
+          const p=camera.worldToScreen(avatar.getPosition().clone().add(new Vec3(0,heightY,0)));
+          return {x:Math.round(p.x),y:Math.round(p.y)};
+        },{name:partner==='mira'?'Мира':'Алекс',heightY});
+        if(tap.x<0||tap.x>=width||tap.y<0||tap.y>=height)continue;
+        await page.touchscreen.tap(tap.x,tap.y);
+        sceneTap={...tap,heightY};
+        if(await page.locator('#social-context').isVisible())break;
+      }
+      assert.equal(await page.locator('#social-context').isVisible(),true,
+        '3D touch must open resident context for '+initiator+' -> '+partner+
+        ' viewport '+width+'x'+height+' last probe '+JSON.stringify(sceneTap));
+      await page.locator('#conversation-btn').tap();
+    }else{
+      // The compact 320px camera can place a resident under room geometry
+      // or the HUD. Exercise touch confirmation/FIFO for both directions at
+      // 320px; the 390px case also exercises the true scene hit-test.
+      await page.evaluate(()=>document.getElementById('conversation-btn').click());
+    }
+    await page.locator('#social-menu-panel').waitFor({state:'visible'});
+    await page.locator('#social-menu-options button').filter({hasText:'Поговорить'}).first().tap();
+    const stage=await page.evaluate(()=>{
+      const summary=id=>{
+        const el=document.getElementById(id),r=el.getBoundingClientRect();
+        const css=getComputedStyle(el);
+        return {hidden:el.hidden,display:css.display,visibility:css.visibility,
+          left:r.left,top:r.top,width:r.width,height:r.height,scrollTop:el.scrollTop};
+      };
+      const button=[...document.querySelectorAll('#social-menu-options button')]
+        .find(e=>e.textContent.includes('В очередь · Поговорить'));
+      return {context:summary('social-context'),menu:summary('social-menu-panel'),
+        confirm:button?{parentHidden:button.closest('[hidden]')?.id||null,
+          rect:button.getBoundingClientRect().toJSON()}:null};
+    });
+    assert.equal(stage.menu.hidden,false,
+      initiator+' social options must remain open after choosing Talk: '+JSON.stringify(stage));
+    assert.equal(stage.confirm?.parentHidden??null,null,
+      'two-step confirmation must be reachable after actual 3D+touch navigation');
+    await page.locator('#social-menu-options button').filter({hasText:'В очередь · Поговорить'}).tap();
+    const live=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
+    assert.ok(live.actionQueues.byResident[initiator].some(task=>
+      task.type==='social'&&task.targetId===partner&&task.actionId==='talk'),
+      initiator+' must enqueue social talk for '+partner+' after touch confirmation');
+    assert.equal(live.actionQueues.byResident[partner].length,partnerPendingBefore,
+      'social invitation must not add an extra task to the partner queue');
+    assert.equal(await page.locator('#social-menu-panel').isHidden(),true,
+      'successful confirmation dismisses the optional social panel');
+  }
+  // Schema-v1 round-trip. A full page reload deliberately does NOT persist
+  // manual pause (loadGame resumes simulation), so queued talks could start
+  // while WebGL boots; validate persistence before advancing game time.
+  const persisted=loadHousehold(copy(JSON.parse(
+    await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY))));
+  assert.ok(persisted.actionQueues.byResident.alex.some(t=>t.type==='social'&&t.targetId==='mira'));
+  assert.ok(persisted.actionQueues.byResident.mira.some(t=>t.type==='social'&&t.targetId==='alex'));
+  // Restore the original CAS-01.7 baseline actor for the extra-resident HUD checks.
+  await page.locator('#pick-alex').tap();
   await page.locator('#pick-resident_3').tap();
   assert.equal(await page.locator('#resident-name').innerText(),'Вера');
   await page.locator('#cas-resident-details').waitFor({state:'visible'});

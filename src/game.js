@@ -7493,7 +7493,9 @@ function boot() {
     if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||
       shiftSummary.isOpen()||furnishMode||buildMode||outdoorMode)return;
     if(event.target?.closest?.(
-      '#game-canvas, #action-sheet, #social-context, #ground-walk-menu, #hotspots'))return;
+      '#game-canvas, #action-sheet, #social-context, #social-menu-panel, '+
+      '#shared-panel, #branch-panel, #conversation-panel, '+
+      '#ground-walk-menu, #hotspots'))return;
     if(selected!==null||socialContextVisible||!groundWalkPanel.hidden){
       closeGroundWalkMenu();closeSocialContext();select(null);
     }
