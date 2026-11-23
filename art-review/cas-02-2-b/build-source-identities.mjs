@@ -92,12 +92,21 @@ export function deriveSourceGLB(kind,source){
   const face=h*smooth((z-.018)/.055)*smooth((nz+.05)/.7);
   const a=ball(x,y,z,-.035,1.614,.074,.043,.028,.078);
   const b=ball(x,y,z,.035,1.614,.074,.043,.028,.078);
-  const eyes=face*(a+b);
-  const nose=face*ball(x,y,z,0,1.558,.089,.034,.048,.078);
-  const lips=face*ball(x,y,z,0,1.523,.084,.050,.023,.074);
-  const chin=face*ball(x,y,z,0,1.482,.076,.059,.038,.073);
+  // CAS-02.2-B corrective R2: disjoint facial vertical zones. The earlier
+  // cheek ellipse reached the eye sockets: 116/358 actual eye vertices
+  // were also moved by the "cheeks" target on original Alex.
+  // These are still research morph masks, NOT artist-sculpted anatomy.
+  const eyes=face*(a+b)*smooth((y-1.585)/.008);
+  const nose=face*ball(x,y,z,0,1.558,.089,.034,.048,.078)*
+    smooth((y-1.540)/.012);
+  const lips=face*ball(x,y,z,0,1.523,.084,.050,.023,.074)*
+    (1-smooth((y-1.528)/.012));
+  const chin=face*ball(x,y,z,0,1.482,.076,.059,.038,.073)*
+    (1-smooth((y-1.493)/.011));
   const cheeks=face*(ball(x,y,z,-.061,1.568,.068,.047,.066,.082)+
-                     ball(x,y,z,.061,1.568,.068,.047,.066,.082));
+                     ball(x,y,z,.061,1.568,.068,.047,.066,.082))*
+    (1-smooth((y-1.561)/.022))*smooth((Math.abs(x)-.038)/.014)*
+    smooth((y-1.520)/.018);
   const body=smooth((torsoW[i]-.22)/.72);
   // True per-vertex XYZ deltas (no color-only shape faking).
   const deltas=[
@@ -114,12 +123,31 @@ export function deriveSourceGLB(kind,source){
    if(d>1e-6){metrics[t].vertices++;metrics[t].maxDelta=Math.max(metrics[t].maxDelta,d);}
   });
  }
- // Explicit non-zero local geometry gate: no non-functional cosmetic sliders.
- for(let i=0;i<TARGETS.length;i++){
-  const m=metrics[i];
-  if(m.vertices<(i===5?100:12)||m.maxDelta<.0004||m.maxDelta>.025)
-   throw Error('Unusable '+TARGETS[i]+' localized morph '+JSON.stringify(m));
+ // Explicit semantic audit gate on actual source vertex coordinates:
+ // reject a target that moves vertices in the wrong facial feature zone.
+ const zones={
+  eyes:[1.584,1.65],nose:[1.538,1.60],lips:[1.499,1.542],
+  chin:[1.443,1.508],cheeks:[1.519,1.586]
+ };
+ for(let t=0;t<TARGETS.length;t++){
+  const name=TARGETS[t],m=metrics[t];
+  if(m.vertices<(name==='body'?100:35)||m.maxDelta<.001||m.maxDelta>.025)
+   throw Error('Unusable '+name+' localized morph '+JSON.stringify(m));
+  if(!zones[name])continue;
+  const [bottom,top]=zones[name];
+  for(let i=0;i<count;i++){
+   const delta=Math.hypot(out[t][3*i],out[t][3*i+1],out[t][3*i+2]);
+   if(delta>.0001 && (v[3*i+1]<bottom||v[3*i+1]>top))
+    throw Error(name+' moves vertex outside its anatomical height range');
+  }
  }
+ let eyeCheekOverlap=0;
+ for(let i=0;i<count;i++){
+  const eye=Math.hypot(out[0][3*i],out[0][3*i+1],out[0][3*i+2]);
+  const cheek=Math.hypot(out[4][3*i],out[4][3*i+1],out[4][3*i+2]);
+  if(eye>1e-6 && cheek>1e-6)eyeCheekOverlap++;
+ }
+ if(eyeCheekOverlap)throw Error('Cheek morph touches '+eyeCheekOverlap+' eye vertices');
  const parts=[bin];let offset=bin.length;
  const ids=[];
  for(let t=0;t<out.length;t++){
@@ -139,7 +167,7 @@ export function deriveSourceGLB(kind,source){
  g.meshes[0].extras={...(g.meshes[0].extras||{}),targetNames:TARGETS};
  g.asset.generator='LifeSim CAS-02.2-B source-based prospective identities';
  g.extras={...(g.extras||{}),lifesimB:{kind,sourceSha256:SOURCE[kind].sha,
-  targets:TARGETS,landmarkVersion:'face-geometry-1',productionReady:false,
+  targets:TARGETS,landmarkVersion:'anatomy-isolation-r2',productionReady:false,
   originalsImmutable:true,skinTonesApproved:false,bodyMeshModular:false}};
  const buffer=encodeGLB(g,parts);
  const decoded=parseGLB(buffer);
@@ -150,7 +178,7 @@ export function deriveSourceGLB(kind,source){
    throw Error('Source preservation failed');
  return {buffer,manifest:{kind,sourceSha256:SOURCE[kind].sha,generatedSha256:sha(buffer),bytes:buffer.length,
   sourceBytes:source.length,headVertices:pts.length,totalVertices:count,
-  joints:66,animations:g.animations.length,targets:TARGETS,metrics,
+  joints:66,animations:g.animations.length,targets:TARGETS,metrics,eyeCheekOverlap,
   gameRuntimeChanged:false,originalsImmutable:true,skinTonesApproved:false,ownerArtApproved:false}};
 }
 if(process.argv[1]?.endsWith('/build-source-identities.mjs')){
