@@ -48,6 +48,28 @@ try{
   }));
   assert.ok(targets.every(x=>x.width>=43.5&&x.height>=43.5&&x.inside),
    '44px iPhone-safe selection without clipped targets: '+JSON.stringify(targets));
+  // SOCIAL-QUEUE-R1: touch the real choice + two-step confirmation for
+  // both original residents. The pause keeps commands in persistent FIFO.
+  for(const [initiator,partner] of [['alex','mira'],['mira','alex']]){
+    await page.locator('#pick-'+initiator).tap();
+    await page.evaluate(()=>document.querySelector('#conversation-btn').click());
+    await page.locator('#social-menu-panel').waitFor({state:'visible'});
+    await page.locator('#social-menu-options button').filter({hasText:'Поговорить'}).first().tap();
+    await page.locator('#social-menu-options button').filter({hasText:'В очередь · Поговорить'}).tap();
+    const live=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
+    assert.ok(live.actionQueues.byResident[initiator].some(task=>
+      task.type==='social'&&task.targetId===partner&&task.actionId==='talk'),
+      initiator+' must enqueue social talk for '+partner+' after touch confirmation');
+    assert.ok(live.actionQueues.byResident[partner].every(task=>task.targetId!==initiator),
+      'social invitation cannot silently enqueue a second command for the partner');
+    assert.equal(await page.locator('#social-menu-panel').isHidden(),true,
+      'successful confirmation dismisses the optional social panel');
+  }
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+  const persisted=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
+  assert.ok(persisted.actionQueues.byResident.alex.some(t=>t.type==='social'&&t.targetId==='mira'));
+  assert.ok(persisted.actionQueues.byResident.mira.some(t=>t.type==='social'&&t.targetId==='alex'));
   await page.locator('#pick-resident_3').tap();
   assert.equal(await page.locator('#resident-name').innerText(),'Вера');
   await page.locator('#cas-resident-details').waitFor({state:'visible'});
