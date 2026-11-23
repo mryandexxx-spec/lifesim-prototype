@@ -65,7 +65,7 @@ export function summarizeContactProxy(samples) {
       nearLowAnkleFrames:indices.length,
       maxNearLowAnkleStep:round(Math.max(0,...steps)),
       lateralTravelFromFirst:round(Math.max(...samples.map(s=>
-        Math.hypot(s[foot][0]-samples[0][foot][0],s[foot][2]-samples[0][foot][2])))
+        Math.hypot(s[foot][0]-samples[0][foot][0],s[foot][2]-samples[0][foot][2]))))
     };
   });
   return {
