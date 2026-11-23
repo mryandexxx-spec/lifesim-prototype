@@ -332,3 +332,21 @@ jobs:
           name: ci-boot-390x844
           path: artifacts/ci-boot/
           if-no-files-found: ignore
+
+  cas-c4-female-source-audit:
+    if: ${{ contains(github.event.pull_request.title, 'CAS-02.1-F2-C4') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests for CC0 source import contract
+        run: python3 -m unittest discover -s tests -p 'test_cas_c4_source_audit.py' -v
+      - name: Audit actual MakeHuman CC0 archive and Grab3D heel bytes
+        run: python3 scripts/cas-c4-source-audit.py
+      - name: Archive independent asset license and SHA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-c4-female-source-evidence
+          path: artifacts/cas-02-1-f2-c4/source-audit.json
+          if-no-files-found: warn
