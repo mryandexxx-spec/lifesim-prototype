@@ -222,6 +222,16 @@ window.__LifeSimNewPeopleProbe=()=>{
   error:loadError,localStorageWritten:false,hasMakeHuman:false,gameIntegration:false,
   drawCalls:app.stats?.drawCalls?.total||0};
 };
+// Art-only diagnostic hook: freezes source animations so per-slider WebGL
+// pixel differences can be attributed to geometry rather than Idle motion.
+window.__LifeSimMorphRegionQA={
+ pause(){for(const r of models.values())r.entity.anim?.baseLayer?.pause();},
+ zero(){const r=record();if(!r?.morphs[0])return false;
+   TARGETS.forEach((_,i)=>r.morphs[0].setWeight(i,0));return true;},
+ set(channel,value){const i=TARGETS.indexOf(channel),r=record();
+   if(i<0||!r?.morphs[0])return false;
+   r.morphs[0].setWeight(i,value);return true;}
+};
 app.start();requestAnimationFrame(frame);
 (async()=>{try{
  await createPerson('alex',-1);await selectPerson('alex',0);
