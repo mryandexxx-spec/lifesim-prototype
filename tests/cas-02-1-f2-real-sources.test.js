@@ -41,6 +41,11 @@ test('F2-C inspect REAL three GLBs: exact source triangles, two independent copi
   assert.equal(quality.sourceOrientationVerified,false);
   assert.equal(quality.sourceSha256,ASSET_SHA256[entry.id]);
   assert.ok(['quarantined','geometry-split-review-required'].includes(quality.status));
+  if(entry.id!=='boots'){
+   assert.equal(quality.status,'geometry-split-review-required',
+    'genuine '+entry.id+' must split into two intact source shoe halves');
+   assert.equal(quality.sourceParts.length,2);
+  }
   assert.ok(quality.reason.length>10,'quarantine/review reason must be available');
   assert.equal(quality.sourceParts.length===2||quality.status==='quarantined',true);
   for(const side of quality.sourceParts){
