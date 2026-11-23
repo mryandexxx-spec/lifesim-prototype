@@ -16,3 +16,10 @@
 **Priority:** PRIVATE START-HERE/DECISIONS/WORKFLOW/ROADMAP/ARCHITECTURE/GDD/ENGINEERING-LOG and current PUBLIC code outrank all external skill advice. The adapters are not licenses for changing an owner's product decisions, altering active CAS footwear or the protected #145 asset PR.
 
 **Acceptance:** node:test adapter guard, source/CI diff review, isolated PR CI, then only SHA-guarded merge and full Pages verification if green. A docs-only change should not require PlayCanvas browser job, but main Pages still runs its normal suite. Physical iPhone QA not implied. Future upstream refresh requires a separate reviewed PR, pinned source revision and updated compatibility guard.
+
+## Native project skill: playcanvas-lifesim
+
+The project-specific `.agents/skills/playcanvas-lifesim/SKILL.md` is the primary task router for LifeSim development. It covers PlayCanvas 2.24.1 architecture, independent deterministic simulation, resident rigs and skinning, measured footwear/animation fitting, localStorage migrations, touch Safari, and exact-SHA PR/CI/Pages gates. It composes the six existing adapters **only when relevant**, without copying their upstream engine-specific code. No engine/runtime or dependencies added.
+
+For compatible coding agents with repository skill discovery, the `name: playcanvas-lifesim` frontmatter makes it available as an agent instruction. A GitHub connector and ordinary ChatGPT conversation do not automatically load repository skills; explicitly read the file if discovery is unavailable. The skill does not introduce an executable installer or grant authority to modify active PRs, game saves, characters or releases.
+
