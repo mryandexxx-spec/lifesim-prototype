@@ -10,7 +10,7 @@ import {newGame,SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 import {summarizeFrames,summarizeAssetResources} from '../scripts/qsk-03-metrics.mjs';
 
-const DIR='artifacts/qsk-03',URL='http://127.0.0.1:8765/?lot-e1=qa&qsk-03=baseline';
+const DIR='artifacts/qsk-03',PAGE_URL='http://127.0.0.1:8765/?lot-e1=qa&qsk-03=baseline';
 const SNAPSHOT_FRAMES=150;
 mkdirSync(DIR,{recursive:true});
 
@@ -60,7 +60,7 @@ try{
       try{
         for(const pass of ['cold','warm']){
           const started=Date.now();
-          if(pass==='cold')await page.goto(URL,{waitUntil:'domcontentloaded'});
+          if(pass==='cold')await page.goto(PAGE_URL,{waitUntil:'domcontentloaded'});
           else await page.reload({waitUntil:'domcontentloaded'});
           await page.locator('#loading').waitFor({state:'hidden',timeout:85000});
           await page.locator('#game-canvas').waitFor({state:'visible',timeout:10000});
