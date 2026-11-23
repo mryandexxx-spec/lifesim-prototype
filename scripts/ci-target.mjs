@@ -65,6 +65,8 @@ export function planChanges(files,root=ROOT){
     [/^src\/(?:finance-|household-bills)/,['tests/w4a-finance.test.js','tests/w4c-bills.test.js']],
     [/^src\/(?:phone-|career-phone-ui|household|social-graph|social-need)/,['tests/phone-platform-r1.test.js']],
     [/^src\/(?:action-queue|navigation|simulation)/,['tests/manual-priority-queue-stability.test.js','tests/navigation.test.js']],
+    [/^(?:index\.html|sw\.js|src\/(?:model-cache|loading-progress|viewport-health|game)\.js)$/,
+      ['tests/qsk-02-startup-faults.test.js']],
     [/^(?:index\.html|styles\.css|src\/(?:action-queue|resident-social-runtime|household|social-graph|resident-hud|game)\.js)$/,
       ['tests/qsk-01-social-queue.test.js']],
     [/^src\/(?:pool-|gardening|outdoor-)/,['tests/lot-e2-overlap-recovery.test.js','tests/lot-c3c.test.js']],
@@ -76,6 +78,8 @@ export function planChanges(files,root=ROOT){
   const tests=[...selected].filter(f=>allTests.includes(f)).sort();
   const micro_ux=changed.some(f=>
     /^(?:src\/(?:micro-ux|camera-controls)\.js|tests\/micro-ux-r1-browser-smoke\.mjs)$/.test(f));
+  const qsk_02=changed.some(f=>
+    /^(?:index\.html|sw\.js|src\/(?:model-cache|loading-progress|viewport-health|game)\.js|tests\/qsk-02-startup-faults(?:-browser\.mjs|\.test\.js))$/.test(f));
   const load_truth=changed.some(f=>
     /^(?:src\/loading-progress\.js|tests\/load-truth-r1-browser-smoke\.mjs)$/.test(f));
   const fridge_ux=changed.some(f=>
@@ -110,7 +114,7 @@ export function planChanges(files,root=ROOT){
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');
   const career_shifts=changed.some(f=>
     /^(?:src\/career-rank-schedules\.js|tests\/career-shifts-r1-browser-smoke\.mjs)$/.test(f));
-  return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||cas_hud||cas_c3||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
+  return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||qsk_02||cas_hud||cas_c3||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,qsk_02,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
     fandom_tv,fandom_phone,fandom_r2a,fandom_r2b,fandom_r2c,
     cas_modular,cas_alex,cas_styles,cas_cc0,cas_c3,e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),cas_hud,cas_soak,changed};
@@ -138,6 +142,7 @@ function main(){
     assert.equal(run.status,0,'Targeted Node tests failed');
   }
   console.log('Browser smoke:',plan.browser?'required':'not needed');
+  console.log('QSK-02 mobile startup and failure injection:',plan.qsk_02?'required':'not needed');
   console.log('LOAD-TRUTH-R1 two-viewport stages:',plan.load_truth?'required':'not needed');
   console.log('FRIDGE-UX-R2 two-viewport touch:',plan.fridge_ux?'required':'not needed');
   console.log('GRILL-R1 two-viewport physical cooking/market:',plan.grill_r1?'required':'not needed');
@@ -162,6 +167,7 @@ function main(){
     'parcel_editor='+changed.some(f=>f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
     'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'cas_hud='+(plan.cas_hud?'true':'false')+'\n'+
     'cas_soak='+(plan.cas_soak?'true':'false')+'\n'+'cas_modular='+(plan.cas_modular?'true':'false')+'\n'+'cas_alex='+(plan.cas_alex?'true':'false')+'\n'+'cas_styles='+(plan.cas_styles?'true':'false')+'\n'+'cas_cc0='+(plan.cas_cc0?'true':'false')+'\n'+'cas_c3='+(plan.cas_c3?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
+    'qsk_02='+(plan.qsk_02?'true':'false')+'\n'+
     'micro_ux='+(plan.micro_ux?'true':'false')+'\n'+
     'load_truth='+(plan.load_truth?'true':'false')+'\n'+
     'fridge_ux='+(plan.fridge_ux?'true':'false')+'\n'+
