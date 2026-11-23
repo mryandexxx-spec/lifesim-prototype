@@ -58,7 +58,7 @@ def make_glb(mesh, texture):
         width = len(rows[0])
         at = len(accessors)
         item = {"bufferView": idx, "componentType": 5126 if kind == "f" else 5125,
-                "count": len(rows), "type": "VEC" + str(width)}
+                "count": len(rows), "type": "SCALAR" if width == 1 else "VEC" + str(width)}
         if count:
             item["min"] = [min(row[i] for row in rows) for i in range(width)]
             item["max"] = [max(row[i] for row in rows) for i in range(width)]
