@@ -348,7 +348,7 @@ jobs:
           if-no-files-found: ignore
 
   cas-c4-female-source-audit:
-    if: ${{ contains(github.event.pull_request.title, 'CAS-02.1-F2-C4') }}
+    if: ${{ contains(github.event.pull_request.title, 'CAS-02.1-F2-C4A') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
