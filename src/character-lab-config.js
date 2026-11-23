@@ -23,6 +23,12 @@ export const CHARACTER_LAB_MODELS = Object.freeze({
     fileName:'meshy-casual-v1.glb',bytes:2278456,triangles:25847,joints:66,
     morphTargets:0,targetHeight:1.78
   }),
+  alexpilot:Object.freeze({
+    key:'alexpilot',label:'Алекс — исходный GLB со сменной обувью',
+    assetUrl:'./assets/characters/cas-alex-footwear-lab-v1.glb?cas-02-1-d',
+    fileName:'cas-alex-footwear-lab-v1.glb',bytes:0,triangles:null,joints:66,
+    morphTargets:0,targetHeight:2.05
+  }),
   casproto:Object.freeze({
     key:'casproto',label:'CAS-02.1-B original modular prototype',
     assetUrl:'./assets/characters/cas-modular-mannequin-v1.glb?cas-02-1-c',
