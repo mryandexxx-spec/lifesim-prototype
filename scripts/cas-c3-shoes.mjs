@@ -175,8 +175,8 @@ export function buildWearable(bodyBytes, profile, shoeBytes, style) {
   return buildWearableFromGeometry(bodyBytes, profile, normalizeShoePair(shoeBytes, style));
 }
 
-// C3 and C4 share identical skinning, cuff clipping, bind rig and contact policy.
-// Importers may normalize their own licensed last once without per-resident shims.
+// C3 and C4 share the shoe skinning, bind rig and contact policy.
+// Open uppers may fit the foot and sock to their authored opening.
 export function buildWearableFromGeometry(bodyBytes, profile, geometry) {
   const body = editGlb(bodyBytes);
   const {editor} = geometry;

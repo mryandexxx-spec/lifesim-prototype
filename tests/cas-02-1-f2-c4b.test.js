@@ -118,7 +118,8 @@ test('C4B fitted skin and socks fill both open vamps and stay under the toe boxe
       const toe = frame(styles[style].sides[side].toe)[2];
       const x = frame(ball)[0];
       const cuff = layer => layer.position.flatMap((position, i) =>
-        Math.abs(position[1] - seam.y) < 1e-6 ? [[position, layer.joints[i], layer.weights[i]]] : []);
+        Math.abs(position[1] - seam.y) < 1e-6 ? [[position, layer.joints[i], layer.weights[i]]] : [])
+        .sort(([a], [b]) => a[0] - b[0] || a[2] - b[2]);
       for (const name of ['foot', 'sock']) {
         const fitted = meshLayer(shoe, `C3 opening ${name} ${side}`);
         const positions = fitted.position.map(frame);

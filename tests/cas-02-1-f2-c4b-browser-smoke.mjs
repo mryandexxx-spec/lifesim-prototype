@@ -94,8 +94,12 @@ try {
 
     for (const [motion, clip] of [['walk','Walking'], ['run','Running'], ['sit','Sit_to_Stand_Transition_F']]) {
       await page.locator('#motion').selectOption(motion);
-      assert.equal((await probe()).residents[0].activeClip, clip);
-      await frame('mira-' + motion);
+      for (const style of ['ballet', 'mary-jane']) {
+        await page.locator('#outfit').selectOption(style);
+        await wait('mira', style);
+        assert.equal((await probe()).residents[0].activeClip, clip);
+        await frame(`mira-${style}-${motion}`);
+      }
     }
     await page.locator('#motion').selectOption('walk');
     await page.locator('#pause').click();
