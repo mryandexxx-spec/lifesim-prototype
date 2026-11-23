@@ -165,8 +165,13 @@ function clipForOpening(layer, fit) {
 }
 
 export function buildWearable(bodyBytes, profile, shoeBytes, style) {
+  return buildWearableFromGeometry(bodyBytes, profile, normalizeShoePair(shoeBytes, style));
+}
+
+// C3 and C4 share identical skinning, cuff clipping, bind rig and contact policy.
+// Importers may normalize their own licensed last once without per-resident shims.
+export function buildWearableFromGeometry(bodyBytes, profile, geometry) {
   const body = editGlb(bodyBytes);
-  const geometry = normalizeShoePair(shoeBytes, style);
   const {editor} = geometry;
   const {gltf} = editor;
   const skin = body.gltf.skins[0];
