@@ -7493,7 +7493,9 @@ function boot() {
     if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||
       shiftSummary.isOpen()||furnishMode||buildMode||outdoorMode)return;
     if(event.target?.closest?.(
-      '#game-canvas, #action-sheet, #social-context, #ground-walk-menu, #hotspots'))return;
+      '#game-canvas, #action-sheet, #social-context, #social-menu-panel, '+
+      '#shared-panel, #branch-panel, #conversation-panel, '+
+      '#ground-walk-menu, #hotspots'))return;
     if(selected!==null||socialContextVisible||!groundWalkPanel.hidden){
       closeGroundWalkMenu();closeSocialContext();select(null);
     }
@@ -8021,15 +8023,11 @@ function boot() {
     }
   },true);
 
-  // A scene pointer can finish over HUD/UI after capture, but a UI-originating
-  // touch must NEVER be mistaken for a fresh scene tap and dismiss social menus.
-  const scenePointerIds=new Set();
   canvas.addEventListener('pointerdown',event=>{
     cameraFocus=null;
     viewportHealth.markInput(performance.now());
     if(event.pointerType==='mouse'&&event.button!==0)return;
     if(dialogueNeedsDecision(game))return;
-    scenePointerIds.add(event.pointerId);
     if(event.cancelable)event.preventDefault();
     try{canvas.setPointerCapture?.(event.pointerId);}catch{/* iOS capture may fail */}
     const point=gesturePoint(event),now=performance.now();
@@ -8383,7 +8381,6 @@ function boot() {
     tapCueTimeout=setTimeout(()=>{cue.hidden=true;},450);
   };
   const endPointer=event=>{
-    if(!scenePointerIds.delete(event.pointerId))return;
     viewportHealth.markInput(performance.now());
     if(outdoorMode){
       if(outdoorDrag?.pointerId===event.pointerId){
@@ -8467,7 +8464,6 @@ function boot() {
   };
   window.addEventListener('pointerup',endPointer);
   window.addEventListener('pointercancel',event=>{
-    scenePointerIds.delete(event.pointerId);
     viewportHealth.markInput(performance.now());
     closeGroundWalkMenu();
     if(outdoorDrag?.pointerId===event.pointerId)clearOutdoorPending(true);
@@ -8481,7 +8477,6 @@ function boot() {
     if(!parcel&&ownedPlacement)cancelOwnedPlacement(false);
   });
   window.addEventListener('blur',()=>{
-    scenePointerIds.clear();
     cancelPendingGrab();viewportHealth.markInput(performance.now());closeGroundWalkMenu();
     if(outdoorMode&&!parcel)clearOutdoorPending(true);
     buildDrag=null;buildGhost.enabled=false;cancelEditorDrag();cameraGesture.clear();shopSwipeRawPose=null;
