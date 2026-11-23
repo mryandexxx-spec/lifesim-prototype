@@ -111,8 +111,6 @@ try{
             return {
               canvas:{width:canvas.width,height:canvas.height},
               hasWebGL:Boolean(device.gl),
-              visibleExtra:residents=>residents===2||['resident_3','resident_4']
-                .every(id=>Boolean(app.root.findByName('CAS resident '+id)?.enabled)),
               frames,
               scene:{meshInstances:instances.length,meshes:meshes.size,
                 materials:materials.size,referencedMaterialTextures:textures.size,
