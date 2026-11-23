@@ -39,6 +39,8 @@ jobs:
           node scripts/cas-02-1-f1-split-dress.mjs
           node --check scripts/cas-02-1-f1-alex-underfoot.mjs
           node scripts/cas-02-1-f1-alex-underfoot.mjs
+          node --check scripts/cas-02-1-f2-real-source-audit.mjs
+          node scripts/cas-02-1-f2-real-source-audit.mjs
           node --check src/cas-cc0-shoe-rig-lab.js
           npm test
           node --check src/game.js
@@ -377,6 +379,8 @@ jobs:
           cp assets/characters/cas-cc0-f0/* site/assets/characters/cas-cc0-f0/
           mkdir -p site/assets/characters/cas-cc0-f1
           cp assets/characters/cas-cc0-f1/* site/assets/characters/cas-cc0-f1/
+          mkdir -p site/assets/characters/cas-cc0-f2
+          cp assets/characters/cas-cc0-f2/*.assessment.json site/assets/characters/cas-cc0-f2/
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
