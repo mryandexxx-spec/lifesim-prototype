@@ -1,5 +1,6 @@
 /** CAS-02.2-B independent real PlayCanvas WebGL art-preview smoke, not game integration. */
-import {chromium} from 'playwright';
+import {chromium} from 'playwright-core';
+import chromiumBinary from '@sparticuz/chromium';
 import {createServer} from 'node:http';
 import {readFileSync,statSync,writeFileSync} from 'node:fs';
 import {extname,resolve,normalize} from 'node:path';
@@ -17,10 +18,10 @@ const server=createServer((req,res)=>{
  }catch{res.writeHead(404);res.end();}
 });
 await new Promise(resolve=>server.listen(8765,'127.0.0.1',resolve));
-const browser=await chromium.launch({headless:true,args:[
- '--no-sandbox','--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
- '--enable-unsafe-swiftshader','--disable-dev-shm-usage'
-]});
+const browser=await chromium.launch({headless:true,
+ executablePath:await chromiumBinary.executablePath(),
+ args:[...chromiumBinary.args,'--enable-webgl','--use-angle=swiftshader',
+   '--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const results=[];
 try{
  for(const [width,height] of [[390,844],[320,568]]){
