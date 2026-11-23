@@ -1,0 +1,27 @@
+name: CAS C4 source-rights and topology audit
+on:
+  pull_request:
+    paths:
+      - 'scripts/cas-c4-source-audit.py'
+      - 'tests/cas-c4-source-audit.test.py'
+      - '.github/workflows/cas-c4-source-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Offline fail-closed import and license tests
+        run: python3 -m unittest discover -s tests -p 'cas-c4-source-audit.test.py' -v
+      - name: Inspect actual MakeHuman CC0 ZIP and Grab3D GLB / LICENSE / manifest
+        run: python3 scripts/cas-c4-source-audit.py
+      - name: Publish audit evidence even if source is quarantined
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-c4-female-source-evidence
+          path: artifacts/cas-02-1-f2-c4/source-audit.json
+          if-no-files-found: warn
