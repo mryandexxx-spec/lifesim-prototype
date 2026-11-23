@@ -75,3 +75,7 @@ Read only relevant companion `SKILL.md` files per task, not all six by default. 
 ## Failure checklist
 
 If a 3D resident disappears, check actual Pages auxiliary JSON/GLB packaging, cache URLs and renderer startup before geometry tweaking. If shoes float or clip, audit bind matrices/source last/cut-out and sole contact before offset tweaking. If interactions cannot queue, inspect panel event bubbling and actor selection before rewriting the simulation. If a save breaks, compare legacy payload and pure restore path before changing the storage key. Always verify the **deployed artifact**, not merely local source.
+
+## 2026-11-23 — Specialized PlayCanvas/Blender CAS companions
+
+After this mandatory skill, load `playcanvas-cas-identity-morphs` for new character variants. Select applicable `pc-inspect-glb`, `pc-configure-animation`, `pc-inspect-runtime`, `pc-verify-pixels`, `pc-load-assets`, `blender-core`, `blender-facial-shapekeys`, `blender-character-rigging`, `blender-animation`, `blender-asset-qa`, `blender-export-pipelines`, `scenario-blender-sculpting`. Pinned external references are instruction-only, not installed binaries. Preserve original Alex/Mira and existing accepted garments/shoes, and require real separate geometric identities and owner art approval before production CAS/save integration.
