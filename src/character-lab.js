@@ -149,6 +149,7 @@ async function loadAsset(url, title, metadata={}){
       const clips=asset.resource.animations.map(entry=>entry.resource);
       for(const clip of clips)avatar.anim.assignAnimation(clip.name,clip,undefined,1,!isOneShotClip(clip.name));
       current=avatar;currentAsset=asset;
+      if(labModel.key==='casproto')applyCasVariants();
       modelInfo={title,bytes:metadata.bytes||0,triangles:metadata.triangles??null,
         joints:metadata.joints??null,clips:clips.length,morphTargets:metadata.morphTargets??null};
       updateMetrics();
@@ -187,6 +188,35 @@ $('glb-input').addEventListener('change',async event=>{
 });
 window.addEventListener('pagehide',()=>{if(currentUrl)URL.revokeObjectURL(currentUrl);});
 
+const casSlots=['hair','top','trousers','shoes'];
+function applyCasVariants(){
+  if(labModel.key!=='casproto'||!current)return;
+  for(const slot of casSlots){
+    const base=current.findByName('CAS slot '+slot);
+    const alternate=current.findByName('CAS slot '+slot+'-alt');
+    if(!base||!alternate)throw new Error('Incomplete real skinned CAS mesh pair: '+slot);
+    const button=document.querySelector('[data-cas-slot="'+slot+'"]');
+    const useAlt=button?.getAttribute('aria-pressed')==='true';
+    base.enabled=!useAlt;
+    alternate.enabled=useAlt;
+  }
+}
+if(labModel.key==='casproto'){
+  for(const button of document.querySelectorAll('[data-cas-slot]'))button.addEventListener('click',()=>{
+    button.setAttribute('aria-pressed',button.getAttribute('aria-pressed')==='true'?'false':'true');
+    applyCasVariants();
+  });
+  // Read-only QA probe on this standalone lab; the game runtime has no such global.
+  window.__LifeSimCasModularProbe=()=>({
+    loaded:!!current,
+    slots:casSlots.map(slot=>({
+      slot,base:current?.findByName('CAS slot '+slot)?.enabled??null,
+      alternate:current?.findByName('CAS slot '+slot+'-alt')?.enabled??null
+    })),
+    clips:currentAsset?.resource?.animations?.map(x=>x.resource?.name)||[],
+    graphics:!!app.graphicsDevice,draws:app.stats?.drawCalls?.total||0
+  });
+}
 app.start();
 // If the model has been committed as a stable asset, it loads without user input.
 // No temporary signed Meshy URLs or user tokens belong in the public repository.
