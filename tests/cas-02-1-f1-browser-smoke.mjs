@@ -93,6 +93,13 @@ try{
    assert.ok(item.meshTriangles>6000);
    assert.ok(item.scale>.4&&item.scale<4);
    assert.ok(item.anchorDistance<.3,'shoe should be physically close to foot');
+   assert.ok(item.verticalFactor>=1.3&&item.verticalFactor<=2.2);
+   assert.ok(item.collarAboveAnkle>=.005&&item.collarAboveAnkle<=.045,
+    'shoe throat must reach actual Alex ankle, not leave the white air gap seen in Safari: '+
+    JSON.stringify(item));
+   assert.ok(item.soleWorldY>=-.01&&item.soleWorldY<=.045,
+    'shoe cannot float above the source floor as a shortcut to closing ankle gap: '+
+    JSON.stringify(item));
    assert.ok(s.footBonesPixelY[side]>20&&s.footBonesPixelY[side]<s.panelTop-12,
     'ACTUAL foot bone must be visible above controls: '+JSON.stringify(s.footBonesPixelY));
   }
@@ -103,6 +110,18 @@ try{
   assert.ok(actualColors>175,
    'actual textured Alex and BOTH shoe meshes must visibly render, not blank floor/background: '+actualColors);
   await page.screenshot({path:dir+'/'+width+'x'+height+'-leather-worn.png'});
+  // The reported iPhone visual defect was clear from a SIDE view:
+  // a visible air gap below jeans and above the empty leather shoe collars.
+  // Exercise a genuine canvas drag, then capture that same critical angle.
+  await page.mouse.move(width*.77,height*.24);
+  await page.mouse.down();
+  await page.mouse.move(width*.24,height*.24,{steps:10});
+  await page.mouse.up();
+  s=await probe();
+  assert.ok(s.view.yaw>62&&s.view.yaw<112,
+   'side-view iPhone QA must rotate the actual camera via canvas pointer events');
+  await page.screenshot({path:dir+'/'+width+'x'+height+'-ankle-side-worn.png'});
+  await page.locator('#camera-reset').click();
   await page.locator('#shoe-choice').selectOption('source');
   s=await probe();
   assert.equal(s.sourceShoesVisible,true);
@@ -138,7 +157,8 @@ try{
   reports.push({width,height,sourceAlexClips:s.sourceClips.length,
    originalRestored:true,perFootAnchors:true,animations:['Walking','Running'],
    cc0SourcePinned:true,noSaveChanges:true,jsErrors:0,
-   actualRenderedColors:actualColors,physicalIphoneApproved:false});
+   actualRenderedColors:actualColors,sideAngleQA:true,ankleRimOverlap:true,
+   groundedSoles:true,physicalIphoneApproved:false});
   await context.close();
  }
 }finally{

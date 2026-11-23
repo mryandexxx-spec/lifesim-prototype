@@ -3,6 +3,7 @@
  */
 import * as pc from 'playcanvas';
 import {characterFit} from './character-lab-config.js';
+import {planRigidShoeAnkleFit} from './cas-cc0-shoe-fit-policy.js';
 const $=id=>document.getElementById(id);
 const status=message=>{$('lab-status').textContent=message;};
 const canvas=$('rig-canvas');
@@ -174,12 +175,17 @@ window.__LifeSimCasF1Probe=()=>({
  twoSeparateMeshes:parts?Object.keys(parts).length===2:false,
  binding:parts?Object.fromEntries(['left','right'].map(side=>{
   const p=parts[side],a=p.anchor.getPosition(),f=p.foot.getPosition();
+  const rim=p.shoe.getWorldTransform().transformPoint(new pc.Vec3(p.rawCX,p.rawTopY,p.rawCZ));
+  const sole=p.shoe.getWorldTransform().transformPoint(new pc.Vec3(p.rawCX,p.rawBottomY,p.rawCZ));
   return [side,{meshTriangles:manifest.parts[side].triangles,
    sourceHash:manifest.parts[side].sha256,
    parentFoot:p.anchor.parent===p.foot,visible:p.anchor.enabled,
    boneName:p.foot.name,toeName:p.toe.name,
    worldAnchor:position(a),worldFoot:position(f),
-   anchorDistance:round(a.distance(f)),scale:round(p.size)}];
+   anchorDistance:round(a.distance(f)),scale:round(p.size),
+   verticalFactor:round(p.fit.verticalFactor),
+   collarRimY:round(rim.y),soleWorldY:round(sole.y),
+   collarAboveAnkle:round(rim.y-f.y)}];
  })):null,
  view:{...view,focusY},cameraHeight:round(camera.getPosition().y),
  footBonesWorld:parts?Object.fromEntries(['left','right'].map(side=>
@@ -220,13 +226,19 @@ function attachPart(side,shoeAsset){
  app.root.removeChild(shoe);
  anchor.addChild(shoe);
  const avatarScale=avatar.getLocalScale().x;
- // Keep the source sole at the anchor while extending the rigid instep to
- // cover the visible ankle seam of the baked Alex trouser/foot topology.
- // This is an explicit F1 fit calibration, NOT nonrigid boot deformation.
- shoe.setLocalScale(size/avatarScale,1.45*size/avatarScale,size/avatarScale);
- shoe.setLocalPosition(-cx*size/avatarScale,-raw.min.y*size/avatarScale,
+ // Actual iPhone inspection revealed an air gap: the 1.45x upper stopped
+ // about 2-3 cm BELOW Alex's ankle, despite the sole resting near the ground.
+ // Calibrate to the current source ankle, preserving the existing SOLE height.
+ // This is measured per foot in the source idle bind pose, NOT a floor-lifting hack.
+ const fit=planRigidShoeAnkleFit({
+  ankleY:fp.y,soleY:point.y,sourceHeight:raw.max.y-raw.min.y,
+  sourceScale:size
+ });
+ shoe.setLocalScale(size/avatarScale,fit.verticalFactor*size/avatarScale,size/avatarScale);
+ shoe.setLocalPosition(-cx*size/avatarScale,-raw.min.y*fit.verticalFactor*size/avatarScale,
   -cz*size/avatarScale);
- return {anchor,foot,toe,shoe,size};
+ return {anchor,foot,toe,shoe,size,fit,rawCX:cx,rawCZ:cz,
+  rawTopY:raw.max.y,rawBottomY:raw.min.y};
 }
 app.start();
 (async()=>{
