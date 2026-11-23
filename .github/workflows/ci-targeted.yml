@@ -74,7 +74,7 @@ jobs:
     needs: targeted
     if: ${{ needs.targeted.outputs.browser == 'true' || needs.targeted.outputs.cas_cc0 == 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 38
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -101,6 +101,20 @@ jobs:
           CAS_C3_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c3-*.test.js
           node scripts/cas-c3-probe-fourth.mjs
           node tests/cas-02-1-f2-c3-browser-smoke.mjs
+      - name: CAS C4B exact CC0 female shoe import and real Mira animated WebGL
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
+        run: |
+          python3 scripts/cas-c4-mira-sources.py
+          node scripts/cas-c4-mira-shoes.mjs
+          CAS_C4_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c4b.test.js
+          node tests/cas-02-1-f2-c4b-browser-smoke.mjs
+      - name: Archive C4B Mira female source / animation screenshots
+        if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-f2-c4b-mira-shoes
+          path: artifacts/cas-02-1-f2-c4b/
+          if-no-files-found: ignore
       - name: Archive CAS F2 C3 screenshots and probe
         if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}
         uses: actions/upload-artifact@v4
