@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Блин’С · CAS-02.1-B — прототип модульного 3D-скелета</title>
+<style>
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#e1e9e7;font:14px system-ui,sans-serif;color:#24382e}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.panel{position:absolute;left:10px;right:10px;top:max(10px,env(safe-area-inset-top));max-width:480px;padding:13px;background:#f9fffaee;border:1px solid #b7c9bf;border-radius:14px;box-shadow:0 6px 20px #142a2026}
+h1{font-size:17px;margin:0 0 4px}p{font-size:12px;color:#576d5f;margin:3px 0 10px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;align-items:center}
+button,select,.file-button{font:inherit;border-radius:9px;border:1px solid #b3c6bc;background:white;min-height:44px;padding:8px 10px;color:#24382e;cursor:pointer}
+button[aria-pressed="true"]{background:#386e54;color:white;border-color:#386e54}
+select{flex:1;min-width:125px}
+#lab-status{font-size:12px;margin-top:7px;line-height:1.3}
+#lab-report-text{width:100%;height:110px}
+#lab-fps,#lab-asset-info{font-size:12px;color:#536759}
+#lab-report[hidden]{display:none}
+small{display:block;margin-top:9px;line-height:1.3;color:#607466}
+#glb-input{display:none}
+@media(max-height:640px){.panel{padding:9px}small{display:none}}
+</style>
+<script type="importmap">{"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}</script>
+</head><body data-character="casproto">
+<canvas id="lab-canvas" aria-label="Подлинная WebGL-сцена манекена"></canvas>
+<section class="panel">
+<h1>CAS-02.1-B · проверка модульного скелета</h1>
+<p>Оригинальная инженерная модель, не финальный внешний вид жителей. Переключение заменяет отдельные skinned-меши.</p>
+<div class="row"><button id="reset-view">Камера</button><select id="clip-select" disabled aria-label="Анимация"><option>Загрузка…</option></select><button id="pause-animation" disabled>Пауза</button></div>
+<div class="row">
+<button data-cas-slot="hair" aria-pressed="false">Волосы B</button>
+<button data-cas-slot="top" aria-pressed="false">Верх B</button>
+<button data-cas-slot="trousers" aria-pressed="false">Низ B</button>
+<button data-cas-slot="shoes" aria-pressed="false">Обувь B</button>
+</div>
+<div id="lab-status" role="status">Загрузка PlayCanvas…</div>
+<div class="row"><span id="lab-fps">FPS: …</span><span id="lab-asset-info">GLB…</span><button id="show-lab-report">Отчёт</button></div>
+<div id="lab-report" hidden><textarea id="lab-report-text" readonly></textarea></div>
+<input id="glb-input" type="file" accept=".glb">
+<small>Только изолированная лаборатория; состояние игры и localStorage не изменяются. Safari-приёмка отложена.</small>
+</section>
+<script type="module" src="./src/character-lab.js"></script>
+</body></html>

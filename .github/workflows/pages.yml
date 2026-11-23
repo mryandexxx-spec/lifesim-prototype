@@ -26,6 +26,8 @@ jobs:
       - name: Check game rules and browser source syntax
         run: |
           npm ci
+          node --check scripts/build-cas-modular-mannequin.mjs
+          node scripts/build-cas-modular-mannequin.mjs
           npm test
           node --check src/game.js
           node --check src/viewport-health.js
@@ -254,7 +256,7 @@ jobs:
           test -s node_modules/playcanvas/build/playcanvas.mjs
           cp node_modules/playcanvas/build/playcanvas.mjs site/vendor/
           mkdir -p site/src
-          cp index.html character-lab.html character-lab-mira.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
+          cp index.html character-lab.html character-lab-mira.html cas-modular-lab.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
           mkdir -p site/src
           cp src/plan-preview.js src/work-presence-ui.js src/ui-layout.js src/required-choice-focus.js site/src/
           cp src/ux01-plan-ui.js site/src/
@@ -355,6 +357,7 @@ jobs:
         run: |
           mkdir -p site/assets/characters
           cp assets/characters/meshy-casual-v1.glb assets/characters/meshy-mira-mobile-v1.glb site/assets/characters/
+          cp assets/characters/cas-modular-mannequin-v1.glb assets/characters/cas-modular-mannequin-v1.json site/assets/characters/
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
