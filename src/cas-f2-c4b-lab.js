@@ -10,7 +10,7 @@ app.setCanvasResolution(pc.RESOLUTION_AUTO);
 app.scene.ambientLight = new pc.Color(.62, .66, .62);
 
 const sockMaterial = new pc.StandardMaterial();
-sockMaterial.diffuse = new pc.Color(.38, .39, .37);
+sockMaterial.diffuse = new pc.Color(.84, .85, .83);
 sockMaterial.gloss = .09;
 const knit = new pc.Texture(app.graphicsDevice, {name: 'Sock knit', width: 64, height: 64,
   format: pc.PIXELFORMAT_RGBA8, addressU: pc.ADDRESS_REPEAT, addressV: pc.ADDRESS_REPEAT,
@@ -352,6 +352,7 @@ updateCamera();
     if (manifest.version !== 1 || manifest.stage !== 'CAS-02.1-F2-C4B' || !manifest.wearers?.mira)
       throw new Error('Неподдерживаемый индекс C4B');
     $('motion').value = 'idle';
+    $('socks').value = 'off'; // Open female footwear starts without conspicuous socks.
     await equip();
     if (!active) {
       $('outfit').value = 'original';
