@@ -69,10 +69,27 @@ try{
    stats[name]=diff(baseline,change);
    await page.evaluate(t=>window.__LifeSimMorphRegionQA.set(t,0),name);
   }
-  console.log('CAS_B_EACH_SLIDER '+JSON.stringify({kind,stats,errorCount:errors.length}));
-  if(stats.cheeks.count<15||stats.eyes.count<15)throw Error('No visible eye/cheek morph');
-  if(stats.cheeks.centroid?.[1] <= stats.eyes.centroid?.[1]+10)
+  // A target must do more than change one or two pixels at face zoom.
+  // Thresholds apply ONLY to a steady, same-camera face ROI and do not claim
+  // production-quality sculpting or UV corrections.
+  const pixelMinimum={eyes:300,nose:100,lips:100,chin:200,cheeks:150};
+  for(const [name,minimum] of Object.entries(pixelMinimum))
+   if(stats[name].count<minimum)
+    throw Error('Almost inert '+name+' slider in '+kind+': '+stats[name].count+'/'+minimum+' changed pixels');
+  if(stats.cheeks.centroid?.[1] <= stats.eyes.centroid?.[1]+15)
    throw Error('Cheeks still change upper eye screen region; '+JSON.stringify({kind,eyes:stats.eyes,cheeks:stats.cheeks}));
+  // The body slider only has a meaningful visible test in full-figure focus.
+  await page.locator('#view-body').click();
+  await page.evaluate(()=>{window.__LifeSimMorphRegionQA.pause();window.__LifeSimMorphRegionQA.zero();});
+  await page.waitForTimeout(280);
+  const bodyClip={x:0,y:220,width:390,height:490};
+  const bodyBase=await read(await page.screenshot({clip:bodyClip}));
+  await page.evaluate(()=>window.__LifeSimMorphRegionQA.set('body',1));
+  await page.waitForTimeout(230);
+  const bodyDelta=diff(bodyBase,await read(await page.screenshot({clip:bodyClip})));
+  await page.evaluate(()=>window.__LifeSimMorphRegionQA.zero());
+  console.log('CAS_B_EACH_SLIDER '+JSON.stringify({kind,stats,bodyFullFigure:bodyDelta,errorCount:errors.length}));
+  if(bodyDelta.count<75)throw Error('Nearly inert upper-torso slider at body focus '+JSON.stringify({kind,bodyDelta}));
   if(errors.length)throw Error(JSON.stringify(errors));
  }
 }finally{await browser.close();server.close();}
