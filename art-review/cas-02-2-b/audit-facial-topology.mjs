@@ -98,6 +98,25 @@ export function measureConnectivity(indices, vertexCount, allowed) {
     nonManifoldEdges:[...edges.values()].filter(n=>n>2).length
   };
 }
+/**
+ * Diagnostic geometric-position welding only. Never rewrite an asset with these
+ * indices: coincident eyelids/lips may be separate physical layers in Blender.
+ * This supplies an upper bound on continuity hidden by UV-split vertex indices.
+ */
+export function weldConnectivityProbe(indices, positions, allowed) {
+  if (positions.length !== allowed.length*3) throw Error('Weld position cardinality mismatch');
+  const rep = Int32Array.from({length:allowed.length},(_,i)=>i);
+  const seen = new Map(); let duplicated = 0;
+  for(let i=0;i<allowed.length;i++)if(allowed[i]){
+    const key=[positions[3*i],positions[3*i+1],positions[3*i+2]]
+      .map(x=>Math.round(x*100000)).join(':');
+    if(seen.has(key)){rep[i]=seen.get(key);duplicated++;}
+    else seen.set(key,i);
+  }
+  const mapped=Float64Array.from(indices,i=>rep[i]);
+  return {coincidentIndexDuplicates:duplicated,
+    connectivity:measureConnectivity(mapped,allowed.length,allowed)};
+}
 export function auditFaceTopology(kind, bytes) {
   const source = SOURCES[kind];
   if (!source) throw Error('Unknown original family');
@@ -146,13 +165,19 @@ export function auditFaceTopology(kind, bytes) {
     return [name,{candidateVertices:vertices,...measureConnectivity(indices,vertexCount,allowed)}];
   }));
   const originalGeometry=measureConnectivity(indices,vertexCount,mask);
+  const weldedProbe=weldConnectivityProbe(indices,pos,mask);
   const output={
     kind, sourceSha256:source.sha, vertexCount, triangleCount:indices.length/3,
     joints:g.skins[0].joints.length, animationClips:g.animations.length,
     primitiveCount:primitives.length, materials:g.materials?.length||0,
     atlasImages:g.images.length, sourceMorphTargets:p.targets?.length||0,
     frontFaceCandidateVertices:visibleCount,
-    frontFaceCandidate:originalGeometry, atlasBins16x16:bins.size,
+    frontFaceCandidate:originalGeometry,
+    coincidenceWeldedFaceProbe:weldedProbe.connectivity,
+    coincidenceWeldedDuplicateVertexIndices:weldedProbe.coincidentIndexDuplicates,
+    rawVsCoincidenceWeldedComponentRatio:round(
+      originalGeometry.connectedComponents/Math.max(1,weldedProbe.connectivity.connectedComponents)),
+    atlasBins16x16:bins.size,
     coincidentPositionUvSeams:uvSeamsAtCoincidentPositions.size,
     probeBands,
     anatomyLandmarksValidated:false,
@@ -161,7 +186,7 @@ export function auditFaceTopology(kind, bytes) {
     correctedTexturesAvailable:false,
     artistSculptedNewIdentities:0,
     productionReady:false,
-    conclusion:'Source vertices permit POSITION deformation, but topology/UV data alone do NOT certify controllable facial anatomy or a reusable painted atlas.'
+    conclusion:'Source vertices permit POSITION deformation; UV-split indices and positional coincidence must not be mistaken for validated eyelid/lip topology or a reusable painted atlas.'
   };
   return output;
 }
