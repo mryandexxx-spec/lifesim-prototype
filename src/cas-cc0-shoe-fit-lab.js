@@ -50,6 +50,9 @@ function fitFootwearView(){
   const shoeY=camera.camera.worldToScreen(new pc.Vec3(.23,.06,0)).y;
   focus.y=Math.max(-1.2,Math.min(1.1,focus.y-(shoeY-desired)/px));
  }
+ // Leave an additional optical safety margin: the projected pair's toe is
+ // offset in perspective from the fit reference point at the avatar origin.
+ focus.y=Math.max(-1.2,focus.y-.29);
  cameraMove();
 }
 cameraMove();
