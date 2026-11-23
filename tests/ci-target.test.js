@@ -232,3 +232,17 @@ test('C4B and C4C fit and preview changes run the shared footwear mobile job', (
     assert.equal(plan.browser, true, path);
   }
 });
+
+test('QSK-01 routes action queues, social handlers and Safari entry changes to real 4-resident touch QA',()=>{
+  for(const path of ['src/action-queue.js','src/resident-social-runtime.js',
+    'src/household.js','src/social-graph.js','index.html','styles.css']){
+    const plan=planChanges([path]);
+    assert.equal(plan.browser,true,path+' requires a PlayCanvas boot');
+    assert.equal(plan.cas_hud,true,path+' must execute the 4-resident social smoke');
+    assert.ok(plan.tests.includes('tests/qsk-01-social-queue.test.js'),
+      path+' must run persistent FIFO and import URL guards');
+  }
+  const testOnly=planChanges(['tests/qsk-01-social-queue.test.js']);
+  assert.equal(testOnly.cas_hud,true);
+  assert.equal(testOnly.browser,true);
+});

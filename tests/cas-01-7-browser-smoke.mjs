@@ -67,6 +67,7 @@ try{
       // animated focus camera to settle before choosing a projected upper body.
       await page.waitForTimeout(850);
       let sceneTap=null;
+      const sceneProbes=[];
       for(const heightY of [1.45,1.85,1.0]){
         const tap=await page.evaluate(async ({name,heightY})=>{
           const {Application,Vec3}=await import('playcanvas');
@@ -80,11 +81,25 @@ try{
         if(tap.x<0||tap.x>=width||tap.y<0||tap.y>=height)continue;
         await page.touchscreen.tap(tap.x,tap.y);
         sceneTap={...tap,heightY};
+        const point=await page.evaluate(({x,y})=>{
+          const element=document.elementFromPoint(x,y);
+          const c=document.querySelector('#game-canvas').getBoundingClientRect();
+          return {topTag:element?.tagName,topId:element?.id,
+            topClass:typeof element?.className==='string'?element.className.slice(0,80):'',
+            canvasRect:{x:c.x,y:c.y,width:c.width,height:c.height},
+            socialVisible:!document.getElementById('social-context').hidden,
+            selectedResident:document.querySelector('#dashboard .resident-switch button[aria-pressed="true"]')?.id};
+        },tap);
+        sceneProbes.push({...sceneTap,...point});
         if(await page.locator('#social-context').isVisible())break;
+      }
+      if(!await page.locator('#social-context').isVisible()){
+        await page.screenshot({path:'artifacts/cas-01-7/scene-tap-failure-'+width+'.png'});
+        console.error('QSK-01 real 3D touch diagnostics:',JSON.stringify(sceneProbes));
       }
       assert.equal(await page.locator('#social-context').isVisible(),true,
         '3D touch must open resident context for '+initiator+' -> '+partner+
-        ' viewport '+width+'x'+height+' last probe '+JSON.stringify(sceneTap));
+        ' viewport '+width+'x'+height+' probes '+JSON.stringify(sceneProbes));
       await page.locator('#conversation-btn').tap();
     }else{
       // The compact 320px camera can place a resident under room geometry
@@ -111,11 +126,20 @@ try{
       initiator+' social options must remain open after choosing Talk: '+JSON.stringify(stage));
     assert.equal(stage.confirm?.parentHidden??null,null,
       'two-step confirmation must be reachable after actual 3D+touch navigation');
+    // Touch inside the modal must not be mistaken for a document outside-click.
+    await page.locator('#social-menu-title').tap();
+    assert.equal(await page.locator('#social-menu-panel').isVisible(),true,
+      'touching inside the social modal must not dismiss confirmation');
+    const actorPendingBefore=JSON.parse(
+      await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY)
+    ).actionQueues.byResident[initiator].length;
     await page.locator('#social-menu-options button').filter({hasText:'В очередь · Поговорить'}).tap();
     const live=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
     assert.ok(live.actionQueues.byResident[initiator].some(task=>
       task.type==='social'&&task.targetId===partner&&task.actionId==='talk'),
       initiator+' must enqueue social talk for '+partner+' after touch confirmation');
+    assert.equal(live.actionQueues.byResident[initiator].length,actorPendingBefore+1,
+      'one confirmed tap creates exactly one action, without double enqueue');
     assert.equal(live.actionQueues.byResident[partner].length,partnerPendingBefore,
       'social invitation must not add an extra task to the partner queue');
     assert.equal(await page.locator('#social-menu-panel').isHidden(),true,
@@ -145,6 +169,18 @@ try{
   assert.equal(saved.selectedSim,'alex','extra HUD selection leaves legacy actor untouched');
   assert.equal(saved.population.residentsById.resident_3.identity.firstName,'Вера');
   assert.equal(saved.shop.credits,balance,'no second wallet or phantom salary');
+  // A real browser reload must preserve v1 population and wallet even if
+  // pending social heads begin executing as loadGame resumes the simulation.
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+  assert.equal(await page.locator('#dashboard .resident-switch button').count(),4);
+  const afterReload=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
+  assert.equal(afterReload.version,1);
+  assert.equal(afterReload.shop.credits,balance);
+  assert.equal(afterReload.population.residentsById.resident_3.identity.firstName,'Вера');
+  assert.equal(afterReload.population.residentsById.resident_4.identity.firstName,'Игорь');
+  assert.ok(afterReload.actionQueues.nextSeq>=saved.actionQueues.nextSeq,
+    'reload cannot roll back personal FIFO sequence counter');
   assert.deepEqual(errors,[],width+'x'+height+' JS errors');
   await context.close();
  }
