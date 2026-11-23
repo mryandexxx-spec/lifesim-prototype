@@ -227,7 +227,8 @@ function attachSide(part,socket,fit,side,id){
  socket.foot.addChild(anchor);
  anchor.setPosition(vec(fit.translation));
  anchor.setEulerAngles(0,fit.yawRadians*180/Math.PI,0);
- part.shoe.reparent(anchor);
+ app.root.removeChild(part.shoe);
+ anchor.addChild(part.shoe);
  const avatarScale=avatar.getLocalScale().x;
  part.shoe.setLocalPosition(0,0,0);
  part.shoe.setLocalEulerAngles(0,0,0);
@@ -237,6 +238,7 @@ function attachSide(part,socket,fit,side,id){
 }
 function makeSockLayer(socket){
  const garment=buildFootSurface(socket.profile,{kind:'sock'});
+ const neutral=buildFootSurface(socket.profile,{kind:'neutral'});
  const mesh=new pc.Mesh(app.graphicsDevice);
  const mat=new pc.BasicMaterial();
  mat.color=new pc.Color(.79,.82,.77);
@@ -248,7 +250,7 @@ function makeSockLayer(socket){
  mesh.setIndices([0,1,2]);mesh.update();
  e.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,mat)]});
  app.root.addChild(e);e.enabled=false;
- return {entity:e,mesh,garment,faces:0,vertexCount:0,lastTip:null};
+ return {entity:e,mesh,garment,neutral,mat,faces:0,vertexCount:0,lastTip:null};
 }
 function deltaMatrix(bone,bindWorld){
  const inv=bindWorld.clone().invert();
@@ -261,16 +263,18 @@ function applyGarment(){
  const family=pairs[mode];
  for(const side of ['left','right']){
   const s=sockLayers[side],socket=footSockets[side];
-  const show=mode!=='source'&&socks&&!!family?.fits?.[side];
+  const policy=family?resolveFootwearLayers(socket.profile,family.last,{socks}):null;
+  const show=mode!=='source'&&!!family?.fits?.[side]&&
+   !!(policy?.sockVisible||policy?.neutralFootVisible);
   s.entity.enabled=show;
   if(!show){s.faces=0;s.vertexCount=0;continue;}
   const footDelta=deltaMatrix(socket.foot,socket.bindFoot);
   const toeDelta=deltaMatrix(socket.toe,socket.bindToe);
-  const points=skinFootSurface(s.garment,{footDelta,toeDelta});
+  const points=skinFootSurface(socks?s.garment:s.neutral,{footDelta,toeDelta});
   const item=family.sides[side];
   const src=family.last.parts[side];
   const collar=item.shoe.getWorldTransform().transformPoint(vec(src.collarOpening));
-  const triangles=clipSurfaceAbove(points,s.garment.triangles,collar.y-.004);
+  const triangles=clipSurfaceAbove(points,(socks?s.garment:s.neutral).triangles,collar.y-.004);
   const positions=[],indices=[];
   for(const triangle of triangles)for(const vertex of triangle){
    positions.push(vertex.x,vertex.y,vertex.z);indices.push(indices.length);
@@ -317,7 +321,11 @@ function applyMode(){
  sourceVisible(original);
  for(const [id,pair] of Object.entries(pairs))
   for(const side of ['left','right'])pair.sides[side].anchor.enabled=!original&&id===mode;
- for(const item of Object.values(sockLayers))item.entity.enabled=!original&&socks;
+ for(const item of Object.values(sockLayers))item.entity.enabled=!original;
+ for(const item of Object.values(sockLayers)){
+  item.mat.color=socks?new pc.Color(.79,.82,.77):new pc.Color(.72,.52,.41);
+  item.mat.update();
+ }
  status(original?'Исходные белые кроссовки восстановлены.':
   'Надета экспериментальная пара '+mode+'; стопы и носки анимируются. Посадка носка обуви ещё не утверждена.');
  applyGarment();
@@ -403,7 +411,7 @@ window.__LifeSimCasF2Probe=()=>({
  }])),
  sockLayers:Object.fromEntries(Object.entries(sockLayers).map(([side,s])=>
   [side,{visible:s.entity.enabled,sourceSkin:s.garment.skinId,
-    originalGarment:s.garment.originalGeometry,
+    originalGarment:s.garment.originalGeometry,layer:socks?'sock':'neutral-foot',
     faces:s.faces,vertices:s.vertexCount,
     movingToe:s.lastTip?position(s.lastTip):null}])),
  panelTop:$('rig-panel').getBoundingClientRect().top,
