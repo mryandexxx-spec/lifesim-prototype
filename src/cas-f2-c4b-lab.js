@@ -54,6 +54,7 @@ floor.setLocalPosition(0, -.021, 0);
 app.root.addChild(floor);
 
 let manifest, actors = [], epoch = 0, active = null, originalFallback = false;
+let heelManifest, activeHeel;
 const loaded = new Map();
 const view = {yaw: 24, pitch: 16, zoom: 1, wide: false};
 const soloClips = {idle: /^Idle/, walk: /^Walking$/, run: /^Running$/, sit: /^Sit_to_Stand/};
@@ -122,7 +123,23 @@ async function assemble(resident, index, count) {
     root.anim.assignAnimation(clip.name, clip, undefined, 1, true);
   app.root.addChild(root);
   return {root, original, body, bootBody, layers, clips: part.animations.map(a => a.resource.name),
-    definition, resident, footwear: [], bind};
+    definition, resident, footwear: [], bind, heelClips: false};
+}
+
+function heelDefinition() {
+  heelManifest ??= (async () => {
+    const response = await fetch(new URL('c4c-manifest.json', base), {cache: 'no-store'});
+    if (!response.ok) throw new Error('Примерка каблуков недоступна');
+    const entry = await response.json();
+    const mira = manifest.wearers.mira;
+    if (entry.version !== 1 || entry.stage !== 'CAS-02.1-F2-C4C' || entry.resident !== 'mira' ||
+        entry.bodySha256 !== mira.bodySha256 || entry.inverseBindSha256 !== mira.inverseBindSha256 ||
+        entry.file !== 'mira-c4c-heels.glb' || !/^[a-f0-9]{64}$/.test(entry.sha256) ||
+        ['bind', 'idle', 'walk', 'sit'].some(mode => !entry.clips?.[mode]))
+      throw new Error('Несовместимая примерка каблуков');
+    return entry;
+  })().catch(error => {heelManifest = undefined; throw error;});
+  return heelManifest;
 }
 
 function makeShoeNodes(container, actor) {
@@ -178,6 +195,7 @@ async function equip() {
   const changed = active?.resident !== next.resident;
   const staged = [];
   const nodes = [];
+  let heels, heelAnimations;
   try {
     $('status').textContent = 'Загрузка…';
     if (changed) {
@@ -189,11 +207,17 @@ async function equip() {
     const targets = changed ? staged : actors;
     const wearable = next.outfit !== 'original' && next.outfit !== 'bare';
     if (wearable) {
+      if (next.outfit === 'heels') heels = await heelDefinition();
       const resources = await Promise.all(targets.map(({definition}) => {
-        const {file, sha256} = definition.styles[next.outfit];
+        const {file, sha256} = heels ?? definition.styles[next.outfit];
         return asset(file, sha256);
       }));
       if (nonce !== epoch) return;
+      if (heels) {
+        heelAnimations = resources[0].animations.map(a => a.resource);
+        if (Object.values(heels.clips).some(name => !heelAnimations.some(clip => clip.name === name)))
+          throw new Error('В пакете каблуков отсутствует анимация');
+      }
       targets.forEach((actor, i) => nodes.push(makeShoeNodes(resources[i], actor)));
     }
     if (nonce !== epoch) return;
@@ -205,15 +229,25 @@ async function equip() {
       const actor = actors[i];
       for (const node of actor.footwear) node.destroy();
       actor.footwear = nodes[i] ?? [];
+      if (heelAnimations && !actor.heelClips) {
+        for (const clip of heelAnimations)
+          actor.root.anim.assignAnimation(clip.name, clip, undefined, 1, clip.name !== heels.clips.sit);
+        actor.heelClips = true;
+      }
       actor.root.enabled = true;
     }
     nodes.length = 0;
+    const gaitChanged = Boolean(activeHeel) !== Boolean(heels);
+    activeHeel = heels;
     active = next;
+    const run = $('motion').querySelector('option[value="run"]');
+    run.disabled = Boolean(heels);
+    if (heels && $('motion').value === 'run') $('motion').value = 'walk';
     setLayers();
-    if (changed) setMotion();
+    if (changed || gaitChanged) setMotion();
     else setGround();
     updateCamera();
-    $('status').textContent = 'Женская примерка C4B';
+    $('status').textContent = heels ? 'Каблуки C4C · бег недоступен' : 'Женская примерка C4B';
   } catch (error) {
     if (nonce !== epoch) return;
     $('status').textContent = error.message;
@@ -230,16 +264,20 @@ async function equip() {
 function setGround() {
   for (const actor of actors) {
     const clip = $('motion').value === 'bind' ? 'bind' : actor.root.anim.baseLayer.activeState;
-    const y = actor.definition.contact?.[clip]?.[active.outfit]?.offsetY ?? 0;
+    const y = activeHeel ? 0 : (actor.definition.contact?.[clip]?.[active.outfit]?.offsetY ?? 0);
     actor.root.setLocalPosition(actor.root.getLocalPosition().x, y, 0);
   }
 }
 
 function setMotion() {
+  if (activeHeel && $('motion').value === 'run') $('motion').value = 'walk';
   const motion = $('motion').value;
   for (const actor of actors) {
     const layer = actor.root.anim.baseLayer;
-    if (motion === 'bind') {
+    if (activeHeel) {
+      layer.play(activeHeel.clips[motion]);
+      if (paused && motion !== 'bind') {layer.pause(); layer.activeStateCurrentTime = 0;}
+    } else if (motion === 'bind') {
       layer.reset();
       for (const [node, position, rotation, scale] of actor.bind) {
         node.setLocalPosition(position);
@@ -253,7 +291,7 @@ function setMotion() {
         if (paused) {layer.pause(); layer.activeStateCurrentTime = 0;}
       }
     }
-    actor.root.anim.playing = motion !== 'bind' && !paused;
+    actor.root.anim.playing = motion === 'bind' ? Boolean(activeHeel) : !paused;
   }
   if (active) setGround();
   $('frames').hidden = !paused || motion === 'bind';
@@ -353,6 +391,7 @@ updateCamera();
       throw new Error('Неподдерживаемый индекс C4B');
     $('motion').value = 'idle';
     $('socks').value = 'off'; // Open female footwear starts without conspicuous socks.
+    if (new URLSearchParams(location.search).get('outfit') === 'heels') $('outfit').value = 'heels';
     await equip();
     if (!active) {
       $('outfit').value = 'original';

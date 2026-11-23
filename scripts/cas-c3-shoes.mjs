@@ -16,7 +16,7 @@ const sub = (a, b) => a.map((v, i) => v - b[i]);
 const add = (a, b) => a.map((v, i) => v + b[i]);
 const smooth = t => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
 
-function layers(editor, p) {
+export function layers(editor, p) {
   const attr = Object.fromEntries(Object.entries(p.attributes).map(([key, index]) => [key, editor.read(index)]));
   const indices = editor.read(p.indices).flat();
   return {
@@ -178,28 +178,10 @@ export function buildWearable(bodyBytes, profile, shoeBytes, style) {
 // C3 and C4 share the shoe skinning, bind rig and contact policy.
 // Open uppers may fit the foot and sock to their authored opening.
 export function buildWearableFromGeometry(bodyBytes, profile, geometry) {
-  const body = editGlb(bodyBytes);
   const {editor} = geometry;
+  const {body, attach} = skinnedWearable(bodyBytes, profile, editor);
   const {gltf} = editor;
-  const skin = body.gltf.skins[0];
-  const inverse = body.read(skin.inverseBindMatrices);
-  const count = body.gltf.nodes.findIndex(node => node.name === 'C3 body');
-  const originalRender = body.gltf.nodes.findIndex(node => node.name === profile.originalRender);
-  const inverseBindMatrices = editor.append(inverse, 'MAT4', 5126);
-  gltf.nodes = body.gltf.nodes.slice(0, count).map(({mesh, skin, children, ...node}) =>
-    children ? {...node, children: children.filter(i => i < count)} : node);
-  gltf.meshes = [];
-  gltf.skins = [{...skin, inverseBindMatrices}];
-  gltf.scenes = structuredClone(body.gltf.scenes);
-  gltf.scene = body.gltf.scene ?? 0;
-  const siblings = gltf.nodes.find(n => n.children?.includes(originalRender))?.children ??
-    gltf.scenes[gltf.scene].nodes;
   const stats = {};
-  function attach(name, data, material) {
-    if (!data.faces.length) return;
-    const mesh = gltf.meshes.push({name, primitives: [primitive(editor, data.vertices, data.faces, material)]}) - 1;
-    siblings.push(gltf.nodes.push({name, mesh, skin: 0}) - 1);
-  }
   for (const side of SIDES) {
     const target = profile.sides[side];
     const fit = fitShoe(geometry.sides[side], target, target.joints, geometry);
@@ -219,6 +201,30 @@ export function buildWearableFromGeometry(bodyBytes, profile, geometry) {
   }
   const glb = editor.finish();
   return {glb, stats, inverseBindSha256: profile.inverseBindSha256};
+}
+
+export function skinnedWearable(bodyBytes, profile, editor) {
+  const body = editGlb(bodyBytes);
+  const {gltf} = editor;
+  const skin = body.gltf.skins[0];
+  const inverse = body.read(skin.inverseBindMatrices);
+  const count = body.gltf.nodes.findIndex(node => node.name === 'C3 body');
+  const originalRender = body.gltf.nodes.findIndex(node => node.name === profile.originalRender);
+  const inverseBindMatrices = editor.append(inverse, 'MAT4', 5126);
+  gltf.nodes = body.gltf.nodes.slice(0, count).map(({mesh, skin, children, ...node}) =>
+    children ? {...node, children: children.filter(i => i < count)} : node);
+  gltf.meshes = [];
+  gltf.skins = [{...skin, inverseBindMatrices}];
+  gltf.scenes = structuredClone(body.gltf.scenes);
+  gltf.scene = body.gltf.scene ?? 0;
+  const siblings = gltf.nodes.find(n => n.children?.includes(originalRender))?.children ??
+    gltf.scenes[gltf.scene].nodes;
+  function attach(name, data, material) {
+    if (!data.faces.length) return;
+    const mesh = gltf.meshes.push({name, primitives: [primitive(editor, data.vertices, data.faces, material)]}) - 1;
+    siblings.push(gltf.nodes.push({name, mesh, skin: 0}) - 1);
+  }
+  return {body, attach};
 }
 
 export function bakeFootwear() {

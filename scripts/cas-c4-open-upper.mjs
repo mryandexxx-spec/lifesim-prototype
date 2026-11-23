@@ -5,17 +5,14 @@ const EPSILON = 1e-7;
 const cross = ([ax, ay], [bx, by]) => ax * by - ay * bx;
 const blend = t => t * t * (3 - 2 * t);
 
-function crossSections(fit) {
-  const positions = fit.vertices.map(v => fit.footPoint(v.position));
-  const triangles = fit.faces.map(face => {
+export function meshSections(positions, faces) {
+  const triangles = faces.map(face => {
     const points = face.map(i => positions[i]);
     const z = points.map(p => p[2]);
     return {points, minZ: Math.min(...z), maxZ: Math.max(...z)};
   });
-  const sections = new Map();
   return z => {
-    if (sections.has(z)) return sections.get(z);
-    const edges = [], upper = [];
+    const edges = [];
     for (const {points, minZ, maxZ} of triangles) {
       if (z < minZ || z >= maxZ) continue;
       const intersections = [];
@@ -25,25 +22,36 @@ function crossSections(fit) {
         const t = (z - a[2]) / (b[2] - a[2]);
         intersections.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
       }
-      if (intersections.length !== 2) continue;
-      edges.push(intersections);
-      const [[ax, ay], [bx, by]] = intersections;
-      if (Math.abs(bx - ax) >= Math.abs(by - ay)) upper.push(intersections);
+      if (intersections.length === 2) edges.push(intersections);
     }
+    return edges;
+  };
+}
+
+function crossSections(fit) {
+  const slice = meshSections(fit.vertices.map(v => fit.footPoint(v.position)), fit.faces);
+  const sections = new Map();
+  return z => {
+    if (sections.has(z)) return sections.get(z);
+    const edges = slice(z);
+    const upper = edges.filter(intersections => {
+      const [[ax, ay], [bx, by]] = intersections;
+      return Math.abs(bx - ax) >= Math.abs(by - ay);
+    });
     if (!edges.length) throw new Error('C4 foot extends past the end of the flat shoe last');
     const points = edges.flat();
     const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
     const x = (Math.min(...xs) + Math.max(...xs)) / 2;
     const bottom = Math.min(...ys);
-    const floor = bottom - CLEARANCE + rayDistance(edges, [x, bottom - CLEARANCE], [0, 1]);
-    if (!Number.isFinite(floor)) throw new Error('C4 flat shoe last lacks a continuous sole');
+    const floor = fit.insoleAt?.(z) ?? bottom - CLEARANCE + rayDistance(edges, [x, bottom - CLEARANCE], [0, 1]);
+    if (!Number.isFinite(floor)) throw new Error('C4 shoe last lacks a continuous sole');
     const section = {edges, upper, origin: [x, floor + 2 * CLEARANCE]};
     sections.set(z, section);
     return section;
   };
 }
 
-function rayDistance(edges, origin, ray) {
+export function rayDistance(edges, origin, ray) {
   let distance = Infinity;
   for (const [a, b] of edges) {
     const edge = [b[0] - a[0], b[1] - a[1]];
@@ -59,7 +67,7 @@ function rayDistance(edges, origin, ray) {
 
 // Long triangles near the collar can bridge across a narrow strap or toe cap
 // after the vertices are fitted. Split their shared edges below the cuff.
-function refineFoot(layer, top, seamY) {
+export function refineFoot(layer, top, seamY) {
   const vertices = [...layer.vertices];
   const splits = new Map();
   function midpoint(a, b) {
@@ -95,28 +103,36 @@ function refineFoot(layer, top, seamY) {
 // A spoke from the insole hits the real upper or exits through the cutout.
 // Keep the instep in the latter case and tuck the covered surface inside the
 // former, including under the Mary Jane strap. Both layers use the same last.
-export function fitOpenUpper(fit) {
+export function openUpperSeat(fit) {
   const sectionAt = crossSections(fit);
   const top = Math.min(fit.seamY, Math.max(...fit.vertices.map(v => v.position[1])));
+  function seat([x, y, z], binding) {
+    const {edges, upper, origin} = sectionAt(z);
+    const dx = x - origin[0], dy = y - origin[1];
+    const length = Math.hypot(dx, dy);
+    if (length < EPSILON) return [x, y, z];
+    const distance = rayDistance(edges, origin, [dx / length, dy / length]);
+    const shrink = binding * Math.max(0, 1 - Math.max(0, distance - CLEARANCE) / length);
+    const local = [x - dx * shrink, y - dy * shrink, z];
+    // A curved panel can overhang the spoke underneath it.
+    const aboveUpper = top + CLEARANCE;
+    const roof = aboveUpper - rayDistance(upper, [local[0], aboveUpper], [0, -1]);
+    if (roof > origin[1] + 4 * CLEARANCE)
+      local[1] -= binding * Math.max(0, local[1] - roof + CLEARANCE);
+    return local;
+  }
+  return {top, seat};
+}
+
+export function fitOpenUpper(fit) {
+  const {top, seat} = openUpperSeat(fit);
   return layer => {
     const refined = refineFoot(layer, top, fit.seamY);
     return {...refined, vertices: refined.vertices.map(v => {
       const [x, y, z] = fit.footPoint(v.position);
       if (y >= fit.seamY - EPSILON) return v;
-      const {edges, upper, origin} = sectionAt(z);
-      const dx = x - origin[0], dy = y - origin[1];
-      const length = Math.hypot(dx, dy);
-      if (length < EPSILON) return v;
-      const distance = rayDistance(edges, origin, [dx / length, dy / length]);
       const binding = 1 - blend(Math.max(0, (y - top) / (fit.seamY - top)));
-      const shrink = binding * Math.max(0, 1 - Math.max(0, distance - CLEARANCE) / length);
-      const local = [x - dx * shrink, y - dy * shrink, z];
-      // The side of a curved strap can overhang the spoke underneath it.
-      // Seat the dorsal surface under those projected panels as well.
-      const aboveUpper = top + CLEARANCE;
-      const roof = aboveUpper - rayDistance(upper, [local[0], aboveUpper], [0, -1]);
-      if (roof > origin[1] + 4 * CLEARANCE)
-        local[1] -= binding * Math.max(0, local[1] - roof + CLEARANCE);
+      const local = seat([x, y, z], binding);
       const weights = new Map(fit.influences(local).map(([joint, weight]) => [joint, weight * binding]));
       v.joints.forEach((joint, i) => weights.set(joint, (weights.get(joint) ?? 0) + v.weights[i] * (1 - binding)));
       return {...v, position: fit.modelPoint(local), ...packWeights(weights)};

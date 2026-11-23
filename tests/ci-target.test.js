@@ -223,9 +223,10 @@ test('CAS-02.1-F0 licensed source audit and real visual lab always get targeted 
  assert.equal(planChanges(['README.md']).cas_cc0,false);
 });
 
-test('C4B fit and preview changes run the shared C3/C4B mobile job', () => {
+test('C4B and C4C fit and preview changes run the shared footwear mobile job', () => {
   for (const path of ['scripts/cas-c4-open-upper.mjs', 'src/cas-f2-c4b-lab.js',
-    'tests/cas-02-1-f2-c4b-browser-smoke.mjs']) {
+    'tests/cas-02-1-f2-c4b-browser-smoke.mjs', 'scripts/cas-c4c-heel-motion.mjs',
+    'tests/cas-02-1-f2-c4c-browser-smoke.mjs']) {
     const plan = planChanges([path]);
     assert.equal(plan.cas_c3, true, path);
     assert.equal(plan.browser, true, path);

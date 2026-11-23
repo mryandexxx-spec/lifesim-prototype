@@ -44,6 +44,7 @@ jobs:
           node scripts/cas-c3-shoes.mjs
           python3 scripts/cas-c4-mira-sources.py
           node scripts/cas-c4-mira-shoes.mjs
+          node scripts/cas-c4c-heel-shoes.mjs
           node --check src/cas-f2-c4b-lab.js
           node --check src/cas-f2-c3-lab.js
           node --check src/cas-cc0-shoe-rig-lab.js
@@ -391,6 +392,7 @@ jobs:
           cp assets/characters/cas-cc0-f2/*.glb site/assets/characters/cas-cc0-f2/
           mkdir -p site/assets/characters/cas-c3
           cp assets/characters/cas-c3/*.glb assets/characters/cas-c3/manifest.json assets/characters/cas-c3/c4-*.json assets/characters/cas-c3/MAKEHUMAN-CC0.txt site/assets/characters/cas-c3/
+          cp assets/characters/cas-c3/c4c-*.json assets/characters/cas-c3/c4c-heel-source-LICENSE.txt site/assets/characters/cas-c3/
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
@@ -409,6 +411,7 @@ jobs:
           node scripts/cas-f2-pages-verify.mjs site
           node scripts/cas-c3-pages-verify.mjs site
           node scripts/cas-c4-pages-verify.mjs site
+          node scripts/cas-c4c-pages-verify.mjs site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
