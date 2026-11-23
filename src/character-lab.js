@@ -83,6 +83,7 @@ for(const name of ['pointerup','pointercancel','lostpointercapture'])canvas.addE
 canvas.addEventListener('wheel',event=>{event.preventDefault();view.distance=Math.max(1.7,Math.min(9,view.distance*(1+event.deltaY*.001)));updateView();},{passive:false});
 
 let current=null,currentAsset=null,currentUrl=null;
+let cas022Fallback=false;
 const clipSelect=$('clip-select');
 const pauseButton=$('pause-animation');
 const labModel=characterLabModel(document.body.dataset.character);
@@ -170,7 +171,7 @@ async function loadAsset(url, title, metadata={}){
       if(labModel.key==='casproto')applyCasVariants();
       if(labModel.key==='alexpilot')applyAlexFootwear();
       if(isResidentStyleLab)applyResidentFootwearStyles();
-      if(isCas022Lab)applyCas022Morphs();
+      if(isCas022Lab&&!cas022Fallback)applyCas022Morphs();
       modelInfo={title,bytes:metadata.bytes||0,triangles:metadata.triangles??null,
         joints:metadata.joints??null,clips:clips.length,morphTargets:metadata.morphTargets??null};
       updateMetrics();
@@ -403,5 +404,20 @@ if(isModularLab)requestAnimationFrame(fitCasViewport);
    triangles:extra?.triangles??extra?.sourceTriangles??labModel.triangles,
    joints:extra?.joints??labModel.joints,morphTargets:labModel.morphTargets
  });
-})().catch(error=>status('Не удалось автоматически загрузить '+labModel.label+
-  ': '+String(error?.message||error)+'. Можно выбрать GLB вручную для диагностики.'));
+})().catch(async error=>{
+ if(isCas022Lab){
+  cas022Fallback=true;
+  const kind=labModel.key==='cas022mira'?'mira':'alex';
+  try{
+   await loadAsset('./assets/characters/'+(kind==='mira'?'meshy-mira-mobile-v1.glb':'meshy-casual-v1.glb'),
+     'Оригинальный '+(kind==='mira'?'Мира':'Алекс'),{joints:66});
+   status('Экспериментальные morph targets недоступны ('+
+     String(error?.message||error)+'). Показана исходная модель; редактор деформаций отключён.');
+  }catch(fallbackError){
+   status('Ошибка 3D-просмотра: '+String(fallbackError?.message||fallbackError));
+  }
+  return;
+ }
+ status('Не удалось автоматически загрузить '+labModel.label+
+   ': '+String(error?.message||error)+'. Можно выбрать GLB вручную для диагностики.');
+});
