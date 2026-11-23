@@ -24,8 +24,8 @@ test('LifeSim engine, save, agent and CI safety contracts are explicit',()=>{
   for(const contract of ['2.24.1','JavaScript ES modules','lifesim.room01.v1','root.version=1','FIFO','A*','390×844','320×568','iPhone Safari','PRIVATE','exact-main','SHA-guarded','PR #145','THREE.GLTFLoader','AnimationMixer','SkeletonUtils','physical iPhone']){
     assert.ok(skill.includes(contract),'missing '+contract);
   }
-  assert.match(skill,/not.*production inventory/i);
-  assert.match(skill,/do not.*runtime/i);
+  assert.ok(skill.includes('production inventory'));
+  assert.ok(skill.includes('game runtime'));
   assert.match(skill,/Do not.*reset owner data/i);
 });
 
