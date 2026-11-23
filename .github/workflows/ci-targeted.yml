@@ -20,6 +20,7 @@ jobs:
       cas_soak: ${{ steps.impact.outputs.cas_soak }}
       cas_modular: ${{ steps.impact.outputs.cas_modular }}
       cas_alex: ${{ steps.impact.outputs.cas_alex }}
+      cas_styles: ${{ steps.impact.outputs.cas_styles }}
       e5: ${{ steps.impact.outputs.e5 }}
       fixture_motion: ${{ steps.impact.outputs.fixture_motion }}
       integration_qa: ${{ steps.impact.outputs.integration_qa }}
@@ -123,6 +124,18 @@ jobs:
         with:
           name: cas-02-1-d-real-alex-pr
           path: artifacts/cas-02-1-d/
+          if-no-files-found: error
+      - name: CAS-02.1-E real Alex and Mira independently skinned footwear in four mobile WebGL previews
+        if: ${{ needs.targeted.outputs.cas_styles == 'true' }}
+        run: |
+          node scripts/build-cas-resident-footwear-v2.mjs
+          node tests/cas-02-1-e-browser-smoke.mjs
+      - name: Archive CAS-02.1-E real resident source-shoe screenshots and measured WebGL
+        if: ${{ always() && needs.targeted.outputs.cas_styles == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-02-1-e-real-resident-footwear-pr
+          path: artifacts/cas-02-1-e/
           if-no-files-found: error
       - name: CAS-01.8 actual 2/4 resident mobile-size WebGL performance and save soak
         if: ${{ needs.targeted.outputs.cas_soak == 'true' }}
