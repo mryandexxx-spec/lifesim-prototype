@@ -27,7 +27,8 @@ try{
  for(const [width,height] of [[390,844],[320,568]]){
   const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
   await context.addInitScript(({key,record,tour})=>{
-   localStorage.setItem(key,JSON.stringify(record));localStorage.setItem(tour,'done');
+   if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
+   localStorage.setItem(tour,'done');
   },{key:SAVE_KEY,record:seed,tour:UI_TOUR_STORAGE_KEY});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
@@ -52,7 +53,22 @@ try{
   // both original residents. The pause keeps commands in persistent FIFO.
   for(const [initiator,partner] of [['alex','mira'],['mira','alex']]){
     await page.locator('#pick-'+initiator).tap();
-    await page.evaluate(()=>document.querySelector('#conversation-btn').click());
+
+    // Actual 3D world hit-test, not a synthetic menu event.
+    const tap=await page.evaluate(async name=>{
+      const {Application,Vec3}=await import('playcanvas');
+      const app=Application.getApplication();
+      const avatar=app.root.findByName(name);
+      const camera=app.root.findComponents('camera').find(c=>c.enabled);
+      if(!avatar||!camera)throw Error('Missing real resident mesh or camera: '+name);
+      const p=camera.worldToScreen(avatar.getPosition().clone().add(new Vec3(0,1.45,0)));
+      return {x:Math.round(p.x),y:Math.round(p.y)};
+    },partner==='mira'?'Мира':'Алекс');
+    assert.ok(tap.x>=0&&tap.x<width&&tap.y>=0&&tap.y<height,
+      'resident visible in canvas: '+JSON.stringify(tap));
+    await page.touchscreen.tap(tap.x,tap.y);
+    await page.locator('#social-context').waitFor({state:'visible',timeout:5000});
+    await page.locator('#conversation-btn').tap();
     await page.locator('#social-menu-panel').waitFor({state:'visible'});
     await page.locator('#social-menu-options button').filter({hasText:'Поговорить'}).first().tap();
     await page.locator('#social-menu-options button').filter({hasText:'В очередь · Поговорить'}).tap();
