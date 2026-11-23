@@ -134,7 +134,10 @@ def inspect_makehuman(raw):
     archive = zipfile.ZipFile(io.BytesIO(raw) if isinstance(raw, bytes) else raw)
     result = {}
     for asset in CANDIDATES:
-        entries = [n for n in archive.namelist() if asset in n.lower()
+        # Never let similarly named bow/flower variants override the exact
+        # approved unadorned ballet-flat asset's OBJ and license evidence.
+        prefix = "clothes/" + asset + "/"
+        entries = [n for n in archive.namelist() if n.startswith(prefix)
                    and not n.endswith("/")]
         files = []
         cc0 = False
