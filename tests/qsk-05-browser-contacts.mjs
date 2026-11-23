@@ -52,7 +52,10 @@ try {
         });
         const frames=[];
         for(const [mode,clip] of Object.entries(selected)){
-          await page.locator('#clip-select').selectOption(clip);
+          await page.locator('#clip-select').evaluate((selector,clipName)=>{
+            selector.value=clipName;
+            selector.dispatchEvent(new Event('change',{bubbles:true}));
+          },clip);
           await page.waitForTimeout(120);
           const first=await probe();
           assert.ok(first.webgl && first.meshes>0,resident+' real PlayCanvas WebGL');
