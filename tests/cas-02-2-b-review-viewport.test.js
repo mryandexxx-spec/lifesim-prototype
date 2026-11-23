@@ -32,4 +32,6 @@ test('CAS-B defaults to compact controls, live viewport buttons, accessible togg
   assert.match(js,/computeReviewFraming/);
   assert.doesNotMatch(js,/localStorage/);
   assert.doesNotMatch(js,/THREE\.|GLTFLoader/);
+  assert.match(js,/document\.documentElement\.style\.setProperty\('--panel-height'/);
+  assert.match(js,/status\.hidden=true/);
 });
