@@ -64,13 +64,30 @@ try{
   const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,
     isMobile:true,hasTouch:true,serviceWorkers:'block'});
   const page=await context.newPage(),errors=[];
+  // Force a slow real CC0 shoe transfer to reproduce the owner's iPhone
+  // screenshot: original Meshy sneakers must NEVER flash through meanwhile.
+  await page.route('**/assets/characters/cas-cc0-f1/dress-right.glb',async route=>{
+   await new Promise(resolve=>setTimeout(resolve,1800));
+   await route.continue();
+  });
   page.on('pageerror',error=>errors.push(error.message));
   page.on('crash',()=>errors.push('Chromium renderer crash'));
   await page.goto('http://127.0.0.1:8765/cas-cc0-shoe-rig-lab.html',
    {waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.__LifeSimCasF1Probe?.().loaded===true,{timeout:70000});
+  await page.waitForFunction(()=>{
+   const p=window.__LifeSimCasF1Probe?.();
+   return !!p?.avatarInstantiated&&!p.loaded;
+  },null,{timeout:70000});
   const probe=()=>page.evaluate(()=>window.__LifeSimCasF1Probe());
   let s=await probe();
+  assert.equal(s.previewRevealed,false);
+  assert.equal(s.previewRendersSuppressed,true,
+   'source Meshy white sneakers must NOT flash while true CC0 shoes download');
+  await page.screenshot({path:dir+'/'+width+'x'+height+'-loading-no-meshy-sneaker-flash.png'});
+  await page.waitForFunction(()=>window.__LifeSimCasF1Probe?.().loaded===true,null,{timeout:70000});
+  s=await probe();
+  assert.equal(s.previewRevealed,true);
+  assert.equal(s.previewRendersSuppressed,false);
   assert.equal(s.license,'CC0-1.0');
   assert.equal(s.vendorSourceHash,ASSET_SHA256.dress);
   assert.equal(s.sourceClips.length,10,'the ORIGINAL Alex ten animations, not a mannequin');
@@ -157,7 +174,8 @@ try{
   reports.push({width,height,sourceAlexClips:s.sourceClips.length,
    originalRestored:true,perFootAnchors:true,animations:['Walking','Running'],
    cc0SourcePinned:true,noSaveChanges:true,jsErrors:0,
-   actualRenderedColors:actualColors,sideAngleQA:true,ankleRimOverlap:true,
+   actualRenderedColors:actualColors,sourceShoeFlashSuppressed:true,
+   sideAngleQA:true,ankleRimOverlap:true,
    groundedSoles:true,physicalIphoneApproved:false});
   await context.close();
  }
