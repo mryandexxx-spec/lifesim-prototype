@@ -104,6 +104,7 @@ jobs:
       - name: CAS C4B exact CC0 female shoe import and real Mira animated WebGL
         if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
         run: |
+          python3 -m unittest discover -s tests -p 'test_cas_c4_source_audit.py' -v
           python3 scripts/cas-c4-mira-sources.py
           node scripts/cas-c4-mira-shoes.mjs
           CAS_C4_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c4b.test.js
