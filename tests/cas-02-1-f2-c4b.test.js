@@ -20,6 +20,7 @@ test('C4B true external CC0 geometry, one Mira bind and independent sides', requ
   const audit=JSON.parse(readFileSync(new URL('c4-source-manifest.json',root)));
   const manifest=JSON.parse(readFileSync(new URL('c4-manifest.json',root)));
   const c3=JSON.parse(readFileSync(new URL('manifest.json',root)));
+  const profile=JSON.parse(readFileSync(new URL('mira.profile.json',root)));
   assert.deepEqual(Object.keys(manifest.wearers),['mira']);
   assert.equal(manifest.maleBaselineSha256,c3.wearers.alex.bodySha256);
   assert.equal(manifest.wearers.mira.bodySha256,c3.wearers.mira.bodySha256);
@@ -33,7 +34,7 @@ test('C4B true external CC0 geometry, one Mira bind and independent sides', requ
     assert.equal(base.textures.length,1);
     assert.equal(base.images.length,1);
     assert.equal(base.skins?.length??0,0);
-    const halves=normalizeFemalePair(sourceBytes,style);
+    const halves=normalizeFemalePair(sourceBytes,style,profile);
     assert.equal(halves.sides.left.faces.length+halves.sides.right.faces.length,
       source.triangles);
     for (const side of ['left','right']) {
@@ -42,6 +43,12 @@ test('C4B true external CC0 geometry, one Mira bind and independent sides', requ
       assert.ok(h.vertices.some(v=>v.uv.some(c=>c>0)));
       assert.ok(h.collar.every(Number.isFinite));
       assert.ok(h.measuredSource.width<.18);
+      assert.ok(h.measuredSource.heelFraction>.1 && h.measuredSource.heelFraction<.3);
+      const positions=h.vertices.map(v=>v.position[2]);
+      const shoeHeel=Math.min(...positions), shoeToe=Math.max(...positions);
+      assert.ok(shoeHeel<0 && shoeToe>0);
+      assert.ok(Math.abs(-shoeHeel/(shoeToe-shoeHeel)-h.measuredSource.heelFraction)<1e-5,
+        'C4 canonical shoe socket should align with true recipient heel/toe semantics');
     }
     const entry=manifest.wearers.mira.styles[style];
     assert.equal(entry.sourceSha256,source.sha256);
