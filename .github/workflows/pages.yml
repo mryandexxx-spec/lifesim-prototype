@@ -202,6 +202,7 @@ jobs:
           node --check src/social-graph.js
           node --check src/action-queue.js
           node --check src/queue-rescue.js
+          node --check src/qsk-07-fairness.js
           node --check src/conversation-engine.js
           node --check src/dialogue-decision.js
           node --check src/world-interactions.js
@@ -286,6 +287,7 @@ jobs:
           cp src/cas-f2-c4b-lab.js src/cas-f2-c3-lab.js src/cas-f2-footwear-lab.js src/cas-footwear-standard.js src/cas-footwear-layers.js site/src/
           cp src/ux01-plan-ui.js site/src/
           cp src/queue-rescue.js site/src/
+          cp src/qsk-07-fairness.js site/src/
           cp src/resident-population.js src/resident-membership.js src/resident-registry.js src/resident-activity-runtime.js src/resident-social-runtime.js src/resident-hud.js site/src/
           cp src/phone-app-registry.js src/phone-calls.js site/src/
           cp src/sports-catalog.js src/sports-calendar.js src/sports-league.js src/sports-fandom.js src/sports-tv.js src/sports-phone-model.js src/sports-identity.js src/sports-autonomy.js src/sports-shared-watch.js site/src/

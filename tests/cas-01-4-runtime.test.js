@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {SAVE_KEY,newGame} from '../src/simulation.js';
 import {newHousehold,loadHousehold,tickHousehold,getActor,
   furnitureAvailable,bedSlotFor} from '../src/household.js';
-import {enqueueAction,pendingActions} from '../src/action-queue.js';
+import {enqueueAction,pendingActions,blockedActions} from '../src/action-queue.js';
 import {findPath,isClearLine,isWalkable,ACTOR_RADIUS,nearestWalkable}
   from '../src/navigation.js';
 import {resolveActionFurniture} from '../src/furniture-catalog.js';
@@ -198,8 +198,16 @@ test('CAS-01.4 distant route stays safe if a person blocks the corridor',()=>{
     if(!actor.action)break;
   }
   assert.equal(progressed,true,'route must at least approach the obstruction');
-  if(!actor.action)assert.ok(dist(actor.position,goal)<.07,
-    'an ended movement must mean real arrival, not a silent cancellation');
+  if(!actor.action&&dist(actor.position,goal)>=.07){
+    // QSK-07 deliberately recovers persistent 2–4 person deadlocks without
+    // pretending the character has arrived. The manual intent MUST remain
+    // saved for explicit retry, never disappear or award completion.
+    const preserved=blockedActions(root.actionQueues,id).filter(entry=>
+      entry.type==='move'&&entry.blockedReason==='unreachable-route'&&
+      dist(entry,goal)<.08);
+    assert.equal(preserved.length,1,
+      'a blocked movement may end only by preserving the exact intent for retry');
+  }
 });
 
 test('CAS-01.4 overlapping saved spawns are repaired on first tick, not during atomic preflight',()=>{

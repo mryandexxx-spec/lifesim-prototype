@@ -1852,7 +1852,8 @@ function renderQueuePanel(force=true){
     'missing-target':'предмет отсутствует или убран',
     'unreachable-route':'нет маршрута к цели',
     'invalid-destination':'точка больше не доступна',
-    'unavailable-gift':'подарок или книга отсутствует'
+    'unavailable-gift':'подарок или книга отсутствует',
+    'resource-busy':'предмет или житель занят; повтори позже'
   };
   for(const task of blocked){
     const li=document.createElement('li');
