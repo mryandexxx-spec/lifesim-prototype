@@ -35,3 +35,20 @@ test('CAS-B defaults to compact controls, live viewport buttons, accessible togg
   assert.match(js,/document\.documentElement\.style\.setProperty\('--panel-height'/);
   assert.match(js,/status\.hidden=true/);
 });
+
+test('CAS-B review only loads exact original Alex and Mira or source-preserving approved pilot morphs',()=>{
+ const html=readFileSync(new URL('../art-review/cas-02-2-b/index.html',import.meta.url),'utf8');
+ const js=readFileSync(new URL('../art-review/cas-02-2-b/main.js',import.meta.url),'utf8');
+ assert.match(js,/meshy-casual-v1\.glb/);
+ assert.match(js,/meshy-mira-mobile-v1\.glb/);
+ assert.match(js,/cas-02-2-alex-morphs\.glb/);
+ assert.match(js,/cas-02-2-mira-morphs\.glb/);
+ assert.doesNotMatch(js,/base_body\.glb|CharacterCreator|gender_female|face_nose_width/);
+ assert.match(html,/id="morph-head"[^>]*disabled/);
+ assert.match(html,/id="morph-torso"[^>]*disabled/);
+ assert.doesNotMatch(html,/id="nose"|id="eyes"|id="lips"|id="chin"|id="skin-tone"/);
+ assert.match(js,/morphs\.length!==1\|\|morphs\[0\]\.morph\?\.targets\?\.length!==2/);
+ assert.match(js,/viewMode==='morph'/);
+ assert.match(html,/Никакого MakeHuman/);
+ assert.doesNotMatch(js,/localStorage/);
+});

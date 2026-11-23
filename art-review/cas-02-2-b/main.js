@@ -1,12 +1,10 @@
 import * as pc from 'https://mryandexxx-spec.github.io/lifesim-prototype/vendor/playcanvas.mjs';
 import {computeReviewFraming} from './camera-layout.js';
-
 const $=id=>document.getElementById(id);
-const ASSETS='https://mryandexxx-spec.github.io/lifesim-prototype/assets/characters/';
-const URLs={
-  alex:ASSETS+'meshy-casual-v1.glb',
-  mira:ASSETS+'meshy-mira-mobile-v1.glb',
-  candidate:'https://cdn.jsdelivr.net/gh/kblood/CharacterCreator@852e48f316b90a0937234886630e4fb4cdfd1f78/output/base_body.glb'
+const BASE='https://mryandexxx-spec.github.io/lifesim-prototype/assets/characters/';
+const URLS={
+ alex:{original:BASE+'meshy-casual-v1.glb',morph:BASE+'cas-02-2-alex-morphs.glb'},
+ mira:{original:BASE+'meshy-mira-mobile-v1.glb',morph:BASE+'cas-02-2-mira-morphs.glb'}
 };
 const canvas=$('scene'),panel=$('panel'),status=$('status');
 const app=new pc.Application(canvas,{graphicsDeviceOptions:{antialias:false,alpha:false}});
@@ -18,238 +16,187 @@ const floorMat=new pc.StandardMaterial();floorMat.diffuse=new pc.Color(.82,.87,.
 const floor=new pc.Entity('floor');floor.addComponent('render',{type:'box',material:floorMat});
 floor.setLocalPosition(0,-.055,0);floor.setLocalScale(7,.11,7);app.root.addChild(floor);
 for(const [az,elevation,intensity] of [[-30,55,1.55],[122,23,.72]]){
-  const light=new pc.Entity('review light');light.addComponent('light',{type:'directional',intensity,color:new pc.Color(1,.97,.93)});
-  light.setEulerAngles(elevation,az,0);app.root.addChild(light);
+ const l=new pc.Entity('review light');
+ l.addComponent('light',{type:'directional',intensity,color:new pc.Color(1,.97,.93)});
+ l.setEulerAngles(elevation,az,0);app.root.addChild(l);
 }
 const camera=new pc.Entity('review camera');
-camera.addComponent('camera',{clearColor:new pc.Color(.90,.94,.92),fov:42,nearClip:.015,farClip:100});
-app.root.addChild(camera);
-const models={};const sourceColors=new WeakMap();
-let resident='alex',viewMode='original',focus='body',yaw=12,pitch=5;
-let dist=4.0,lastLayout=null,loadError='',isLoading=false,zoomMultiplier=1;
-let statusTimer=null;
+camera.addComponent('camera',{clearColor:new pc.Color(.90,.94,.92),fov:42,nearClip:.015,farClip:100});app.root.addChild(camera);
+const models={};let resident='alex',viewMode='original',focus='body',yaw=8,pitch=2,dist=4,lastLayout=null,zoomMultiplier=1;
+let busy=false,loadError='',statusTimer=null;
 function say(message,error=false){
-  status.textContent=message;status.classList.toggle('error',error);status.hidden=false;
-  if(statusTimer)clearTimeout(statusTimer);
-  // Hide success messages once read; loading and errors remain visible.
-  if(!error&&!/Загружаю/.test(message))statusTimer=setTimeout(()=>{status.hidden=true;},4200);
+ status.textContent=message;status.classList.toggle('error',error);status.hidden=false;
+ if(statusTimer)clearTimeout(statusTimer);
+ if(!error&&!/Загружаю/.test(message))statusTimer=setTimeout(()=>{status.hidden=true;},4600);
 }
-function adjustStatus(){document.documentElement.style.setProperty('--panel-height',panel.getBoundingClientRect().height+'px');}
-function placeCamera(){
-  adjustStatus();
-  const bounds=panel.getBoundingClientRect();
-  const controlsBottom=$('view-switch').getBoundingClientRect().bottom;
-  const result=computeReviewFraming({
-    viewportHeight:window.innerHeight,panelTop:bounds.top,controlsBottom,focus,fovDegrees:42
-  });
-  lastLayout=result;dist=Math.min(25,Math.max(.65,result.distance*zoomMultiplier));
-  updateCamera();
+function positionCamera(){
+ document.documentElement.style.setProperty('--panel-height',panel.getBoundingClientRect().height+'px');
+ lastLayout=computeReviewFraming({
+   viewportHeight:innerHeight,panelTop:panel.getBoundingClientRect().top,
+   controlsBottom:$('view-switch').getBoundingClientRect().bottom,focus,fovDegrees:42
+ });
+ dist=Math.max(.65,Math.min(25,lastLayout.distance*zoomMultiplier));updateCamera();
 }
 function updateCamera(){
-  if(!lastLayout)return;
-  const y=lastLayout.targetY;
-  const az=yaw*Math.PI/180,el=pitch*Math.PI/180;
-  const centre=new pc.Vec3(0,y,0);
-  camera.setPosition(Math.sin(az)*Math.cos(el)*dist,
-    centre.y+Math.sin(el)*dist,Math.cos(az)*Math.cos(el)*dist);
-  camera.lookAt(centre);
+ if(!lastLayout)return;
+ const az=yaw*Math.PI/180,el=pitch*Math.PI/180,centre=new pc.Vec3(0,lastLayout.targetY,0);
+ camera.setPosition(Math.sin(az)*Math.cos(el)*dist,centre.y+Math.sin(el)*dist,
+   Math.cos(az)*Math.cos(el)*dist);camera.lookAt(centre);
 }
 const pointers=new Map();let pinch=0;
 canvas.addEventListener('pointerdown',event=>{
-  try{canvas.setPointerCapture(event.pointerId);}catch{}
-  pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});pinch=0;
+ try{canvas.setPointerCapture(event.pointerId);}catch{}
+ pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});pinch=0;
 });
 canvas.addEventListener('pointermove',event=>{
-  const previous=pointers.get(event.pointerId);if(!previous)return;
-  const x=event.clientX,y=event.clientY;
-  pointers.set(event.pointerId,{x,y});
-  if(pointers.size===1){
-    yaw-=(x-previous.x)*.32;
-    pitch=Math.max(-30,Math.min(65,pitch+(y-previous.y)*.24));
-  }else if(pointers.size===2){
-    const [a,b]=[...pointers.values()];
-    const length=Math.hypot(a.x-b.x,a.y-b.y);
-    if(pinch>0&&length>0)zoomMultiplier=Math.max(.25,Math.min(4,zoomMultiplier*pinch/length));
-    pinch=length;
-    dist=Math.max(.65,Math.min(25,lastLayout.distance*zoomMultiplier));
-  }
-  updateCamera();
+ const old=pointers.get(event.pointerId);if(!old)return;
+ const x=event.clientX,y=event.clientY;pointers.set(event.pointerId,{x,y});
+ if(pointers.size===1){yaw-=(x-old.x)*.30;pitch=Math.max(-22,Math.min(60,pitch+(y-old.y)*.22));}
+ else if(pointers.size===2){
+   const [a,b]=[...pointers.values()],n=Math.hypot(a.x-b.x,a.y-b.y);
+   if(pinch>0&&n>0)zoomMultiplier=Math.max(.25,Math.min(4,zoomMultiplier*pinch/n));
+   pinch=n;dist=Math.max(.65,Math.min(25,lastLayout.distance*zoomMultiplier));
+ }
+ updateCamera();
 });
-for(const event of ['pointerup','pointercancel','lostpointercapture'])
-  canvas.addEventListener(event,e=>{pointers.delete(e.pointerId);pinch=0;});
+for(const name of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(name,e=>{pointers.delete(e.pointerId);pinch=0;});
 canvas.addEventListener('wheel',e=>{
-  e.preventDefault();
-  zoomMultiplier=Math.max(.25,Math.min(4,zoomMultiplier*(1+e.deltaY*.001)));
-  dist=Math.max(.65,Math.min(25,lastLayout.distance*zoomMultiplier));updateCamera();
+ e.preventDefault();zoomMultiplier=Math.max(.25,Math.min(4,zoomMultiplier*(1+e.deltaY*.001)));
+ dist=Math.max(.65,Math.min(25,lastLayout.distance*zoomMultiplier));updateCamera();
 },{passive:false});
-function setPanel(expanded){
-  panel.classList.toggle('expanded',expanded);
-  $('tools-toggle').textContent=expanded?'×':'⚙';
-  $('tools-toggle').setAttribute('aria-expanded',String(expanded));
-  $('tools-toggle').setAttribute('aria-label',expanded?'Свернуть настройки':'Показать настройки');
-  $('tools-toggle').title=expanded?'Свернуть настройки':'Настройки';
-  requestAnimationFrame(placeCamera);
+function setPanel(open){
+ panel.classList.toggle('expanded',open);$('tools-toggle').textContent=open?'×':'⚙';
+ $('tools-toggle').setAttribute('aria-expanded',String(open));
+ $('tools-toggle').setAttribute('aria-label',open?'Свернуть настройки':'Показать настройки');
+ requestAnimationFrame(positionCamera);
 }
 $('tools-toggle').addEventListener('click',()=>setPanel(!panel.classList.contains('expanded')));
-function setFocus(value){
-  focus=value;zoomMultiplier=1;
-  $('view-face').setAttribute('aria-pressed',String(focus==='face'));
-  $('view-body').setAttribute('aria-pressed',String(focus==='body'));
-  placeCamera();
+function setFocus(v){
+ focus=v;zoomMultiplier=1;
+ $('view-face').setAttribute('aria-pressed',String(v==='face'));
+ $('view-body').setAttribute('aria-pressed',String(v==='body'));
+ positionCamera();
 }
 $('view-face').addEventListener('click',()=>setFocus('face'));
 $('view-body').addEventListener('click',()=>setFocus('body'));
-function renderBounds(entity){
-  let min=null,max=null;
-  for(const node of entity.findComponents('render'))for(const mesh of node.meshInstances){
-    if(!mesh.aabb)continue;
-    const lo=mesh.aabb.getMin(),hi=mesh.aabb.getMax();
-    if(!min){min=lo.clone();max=hi.clone();}
-    else{
-      min.x=Math.min(min.x,lo.x);min.y=Math.min(min.y,lo.y);min.z=Math.min(min.z,lo.z);
-      max.x=Math.max(max.x,hi.x);max.y=Math.max(max.y,hi.y);max.z=Math.max(max.z,hi.z);
-    }
-  }
-  return min?{min,max}:null;
+function getBounds(entity){
+ let min=null,max=null;
+ for(const component of entity.findComponents('render'))for(const mi of component.meshInstances){
+   const b=mi.aabb;if(!b)continue;
+   const a=b.getMin(),c=b.getMax();
+   if(!min){min=a.clone();max=c.clone();}
+   else{min.x=Math.min(min.x,a.x);min.y=Math.min(min.y,a.y);min.z=Math.min(min.z,a.z);
+     max.x=Math.max(max.x,c.x);max.y=Math.max(max.y,c.y);max.z=Math.max(max.z,c.z);}
+ }
+ return min?{min,max}:null;
 }
-async function loadModel(kind){
-  if(models[kind])return models[kind];
-  const asset=new pc.Asset(kind,'container',{url:URLs[kind]});
-  app.assets.add(asset);
-  const promise=new Promise((resolve,reject)=>{
-    asset.ready(resolve);asset.once('error',reject);app.assets.load(asset);
-  });
+function modelKey(who,mode){return who+'-'+mode;}
+async function loadModel(who,mode){
+ const key=modelKey(who,mode);
+ if(models[key])return models[key];
+ const asset=new pc.Asset(key,'container',{url:URLS[who][mode]});app.assets.add(asset);
+ try{
   await Promise.race([
-    promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('Таймаут загрузки GLB (40 с)')),40000))
+   new Promise((resolve,reject)=>{asset.ready(resolve);asset.once('error',reject);app.assets.load(asset);}),
+   new Promise((_,reject)=>setTimeout(()=>reject(Error('GLB не загрузился за 40 с')),40000))
   ]);
   const entity=asset.resource.instantiateRenderEntity();
   app.root.addChild(entity);
-  const bounds=renderBounds(entity);
-  if(!bounds || bounds.max.y-bounds.min.y<.1){
-    entity.destroy();throw new Error('Геометрия GLB не обнаружена');
-  }
-  const scale=1.76/(bounds.max.y-bounds.min.y);
-  entity.setLocalScale(scale,scale,scale);
-  entity.setLocalPosition(-(bounds.max.x+bounds.min.x)*.5*scale,-bounds.min.y*scale,
-    -(bounds.max.z+bounds.min.z)*.5*scale);
-  const animations=asset.resource.animations||[];
-  if(kind!=='candidate'&&animations.length){
-    try{
-      entity.addComponent('anim',{activate:true});
-      for(const item of animations)entity.anim.assignAnimation(item.resource.name,item.resource);
-      const idle=animations.find(a=>/^idle/i.test(a.resource.name))||animations[0];
-      entity.anim.baseLayer.play(idle.resource.name);
-    }catch(error){console.warn('Optional idle animation unavailable',error);}
-  }
-  const morphInstances=entity.findComponents('render')
-    .flatMap(x=>x.meshInstances||[])
-    .map(x=>x.morphInstance).filter(Boolean);
-  const names=[...new Set(morphInstances.flatMap(x=>x.morph?.targets?.map(t=>t.name)||[]))];
-  entity.enabled=false;
-  const model={asset,entity,morphInstances,names,animationCount:animations.length,
-    meshCount:entity.findComponents('render').length};
-  models[kind]=model;return model;
+  try{
+   const bounds=getBounds(entity);if(!bounds)throw Error('Нет геометрии GLB');
+   const height=bounds.max.y-bounds.min.y;if(height<.1)throw Error('Некорректная высота модели');
+   const factor=1.76/height;
+   entity.setLocalScale(factor,factor,factor);
+   entity.setLocalPosition(-(bounds.max.x+bounds.min.x)*.5*factor,-bounds.min.y*factor,
+     -(bounds.max.z+bounds.min.z)*.5*factor);
+   const clips=asset.resource.animations||[];
+   if(clips.length){
+    entity.addComponent('anim',{activate:true});
+    for(const item of clips)entity.anim.assignAnimation(item.resource.name,item.resource);
+    const idle=clips.find(item=>/^idle/i.test(item.resource.name))||clips[0];
+    entity.anim.baseLayer.play(idle.resource.name);
+   }
+   const morphs=entity.findComponents('render').flatMap(component=>component.meshInstances)
+     .map(mi=>mi.morphInstance).filter(Boolean);
+   if(mode==='morph'&&(morphs.length!==1||morphs[0].morph?.targets?.length!==2))
+     throw Error('GLB не содержит двух подтверждённых исходных морфов');
+   entity.enabled=false;
+   const record={asset,entity,morphs,clips:clips.length,sourceResident:who};
+   models[key]=record;return record;
+  }catch(err){entity.destroy();throw err;}
+ }catch(err){app.assets.remove(asset);asset.unload();throw err;}
 }
-function displayed(){return viewMode==='candidate'?'candidate':resident;}
-function displayModels(){for(const [name,model] of Object.entries(models))model.entity.enabled=name===displayed();}
-function setChoice(){for(const [id,mode] of [['original','original'],['candidate','candidate']])
-  $(id).setAttribute('aria-pressed',String(viewMode===mode));}
-const faces={nose:['face_nose_width_decr','face_nose_width_incr'],
-  eyes:['face_eye_size_decr','face_eye_size_incr'],
-  lips:['face_lips_decr','face_lips_incr'],
-  chin:['face_chin_decr','face_chin_incr'],
-  weight:['weight_min','weight_max']
-};
-function setTarget(name,weight){
-  for(const instance of models.candidate?.morphInstances||[]){
-    const i=instance.morph?.targets?.findIndex(t=>t.name===name)??-1;
-    if(i>=0)instance.setWeight(i,weight);
-  }
+function current(){return models[modelKey(resident,viewMode)]||null;}
+function setVisible(){
+ const key=modelKey(resident,viewMode);
+ for(const [name,record] of Object.entries(models))record.entity.enabled=(name===key);
+ $('original').setAttribute('aria-pressed',String(viewMode==='original'));
+ $('candidate').setAttribute('aria-pressed',String(viewMode==='morph'));
 }
-function applyCandidate(){
-  const model=models.candidate;if(!model)return;
-  setTarget('gender_male',resident==='alex'?1:0);
-  setTarget('gender_female',resident==='mira'?1:0);
-  for(const [id,pair] of Object.entries(faces)){
-    const amount=Number($(id).value)/100;
-    setTarget(pair[0],Math.max(0,-amount));
-    setTarget(pair[1],Math.max(0,amount));
-  }
-  const tints={source:'#ffffff',light:'#ffe1d3',warm:'#ddaf93',deep:'#986b51'};
-  const tint=new pc.Color().fromString(tints[$('skin-tone').value]||'#ffffff');
-  for(const component of model.entity.findComponents('render'))
-    for(const instance of component.meshInstances){
-      const material=instance.material;
-      if(!material||!/(skin|body|face)/i.test(material.name||''))continue;
-      if(!sourceColors.has(material))sourceColors.set(material,material.diffuse.clone());
-      const base=sourceColors.get(material);
-      material.diffuse=new pc.Color(base.r*tint.r,base.g*tint.g,base.b*tint.b);
-      material.update();
-    }
+function enableSliders(){
+ const enabled=viewMode==='morph'&&!!current();
+ for(const name of ['head','torso'])$('morph-'+name).disabled=!enabled;
 }
-async function setView(mode){
-  if(isLoading)return;
-  if(mode==='original'){
-    viewMode='original';displayModels();setChoice();
-    say('Оригинальный '+(resident==='alex'?'Алекс':'Мира')+'. Управляйте камерой пальцем.');
-    return;
-  }
-  if(!models.candidate){
-    isLoading=true;$('candidate').disabled=true;
-    say('Загружаю настоящую 3D-модель MakeHuman (7,2 МБ). Оригинал остаётся на экране…');
-    try{await loadModel('candidate');loadError='';}
-    catch(e){
-      loadError=String(e?.message||e);
-      say('Новая 3D-модель не загрузилась: '+loadError+'. Оригинал сохранён.',true);
-      isLoading=false;$('candidate').disabled=false;return;
-    }
-    isLoading=false;$('candidate').disabled=false;
-  }
-  viewMode='candidate';
-  for(const id of Object.keys(faces))$(id).disabled=false;
-  $('skin-tone').disabled=false;
-  applyCandidate();displayModels();setChoice();
-  say('Реальная 3D-анатомия. Нажмите ⚙ для изменения черт лица.');
+function updateMorphs(){
+ const instance=current()?.morphs[0];if(viewMode!=='morph'||!instance)return;
+ const weights=['head','torso'].map(name=>Number($('morph-'+name).value)/100);
+ weights.forEach((weight,index)=>instance.setWeight(index,Math.max(0,Math.min(1,weight))));
+ for(const [index,name] of ['head','torso'].entries())$('morph-'+name+'-val').textContent=Math.round(weights[index]*100)+'%';
 }
-$('original').addEventListener('click',()=>{setView('original');});
-$('candidate').addEventListener('click',()=>{setView('candidate');});
+async function switchMode(next){
+ if(busy)return;
+ const key=modelKey(resident,next);
+ if(!models[key]){
+  busy=true;$('original').disabled=$('candidate').disabled=true;
+  say('Загружаю исходный '+(resident==='alex'?'GLB Алекса':'GLB Миры')+' с настоящими morph targets…');
+  try{await loadModel(resident,next);loadError='';}
+  catch(error){
+    loadError=String(error?.message||error);
+    say('Не удалось загрузить проверенный оригинальный GLB: '+loadError+'. Исходный персонаж остаётся.',true);
+    busy=false;$('original').disabled=$('candidate').disabled=false;return;
+  }
+  busy=false;$('original').disabled=$('candidate').disabled=false;
+ }
+ viewMode=next;setVisible();enableSliders();updateMorphs();
+ say(next==='morph'?'Настоящий '+(resident==='alex'?'Алекс':'Мира')+' · 2 геометрических канала. Откройте ⚙.':
+   'Исходный '+(resident==='alex'?'Алекс':'Мира')+' без изменений.');
+}
+$('original').addEventListener('click',()=>switchMode('original'));
+$('candidate').addEventListener('click',()=>switchMode('morph'));
 $('resident').addEventListener('change',async()=>{
-  if(isLoading)return;
-  resident=$('resident').value==='mira'?'mira':'alex';
-  if(!models[resident]){
-    say('Загружаю оригинальную модель '+(resident==='alex'?'Алекса':'Миры')+'…');
-    try{await loadModel(resident);}catch(e){say('Не удалось загрузить оригинал: '+e.message,true);return;}
-  }
-  applyCandidate();displayModels();
-  say(viewMode==='original'?'Оригинальный '+(resident==='alex'?'Алекс':'Мира')+'.':'3D-кандидат '+(resident==='alex'?'Алекса':'Миры')+'.');
+ if(busy)return;
+ const next=$('resident').value==='mira'?'mira':'alex';
+ busy=true;$('original').disabled=$('candidate').disabled=true;
+ if(!models[modelKey(next,viewMode)]){
+  say('Загружаю исходного '+(next==='alex'?'Алекса':'Миру')+'…');
+  try{await loadModel(next,viewMode);}
+  catch(error){say('Ошибка модели: '+String(error?.message||error),true);
+   $('resident').value=resident;busy=false;$('original').disabled=$('candidate').disabled=false;return;}
+ }
+ resident=next;setVisible();enableSliders();updateMorphs();
+ busy=false;$('original').disabled=$('candidate').disabled=false;
+ say('Оригинальный персонаж '+(resident==='alex'?'Алекс':'Мира')+' загружен.');
 });
-for(const id of Object.keys(faces)){
-  $(id).addEventListener('input',()=>{
-    document.querySelector('output[for="'+id+'"]').textContent=$(id).value;
-    applyCandidate();
-  });
-}
-$('skin-tone').addEventListener('change',applyCandidate);
+for(const name of ['head','torso'])$('morph-'+name).addEventListener('input',updateMorphs);
 $('reset').addEventListener('click',()=>{
-  for(const id of Object.keys(faces)){
-    $(id).value=0;document.querySelector('output[for="'+id+'"]').textContent='0';
-  }
-  $('skin-tone').value='source';yaw=12;pitch=5;zoomMultiplier=1;applyCandidate();placeCamera();
+ for(const name of ['head','torso'])$('morph-'+name).value=0;
+ updateMorphs();zoomMultiplier=1;yaw=8;pitch=2;positionCamera();
 });
-const resize=()=>{app.resizeCanvas();requestAnimationFrame(placeCamera);};
+const resize=()=>{app.resizeCanvas();requestAnimationFrame(positionCamera);};
 window.addEventListener('resize',resize);
 window.visualViewport?.addEventListener('resize',resize);
-new ResizeObserver(()=>requestAnimationFrame(placeCamera)).observe(panel);
+new ResizeObserver(()=>requestAnimationFrame(positionCamera)).observe(panel);
 window.__LifeSimCas022BProbe=()=>({
-  loaded:Object.keys(models),resident,viewMode,focus,panelExpanded:panel.classList.contains('expanded'),
-  panelTop:panel.getBoundingClientRect().top,stage:lastLayout,
-  targetCount:models.candidate?.names.length||0,
-  missingFaceTargets:models.candidate?Object.values(faces).flat().filter(t=>!models.candidate.names.includes(t)):[],
-  loadError,drawCalls:app.stats?.drawCalls?.total||0,
-  originalPreserved:!!models[resident],saveChanged:false
+ resident,viewMode,focus,loaded:Object.keys(models),originalPreserved:!!models[modelKey(resident,'original')],
+ modelVisible:!!current()?.entity.enabled,
+ morphCount:current()?.morphs[0]?.morph?.targets?.length||0,
+ weights:current()?.morphs[0]?['head','torso'].map((_,i)=>current().morphs[0].getWeight(i)):[],
+ clipCount:current()?.clips||0,skinOrFacePresetsAvailable:false,
+ hasMakeHuman:false,panelExpanded:panel.classList.contains('expanded'),
+ stage:lastLayout,loadError,saveChanged:false,drawCalls:app.stats?.drawCalls?.total||0
 });
-app.start();requestAnimationFrame(placeCamera);
+app.start();requestAnimationFrame(positionCamera);
 (async()=>{try{
-  await loadModel('alex');displayModels();
-  say('Алекс на экране. Выберите «Новый 3D» или масштаб сверху.');
-}catch(e){loadError=String(e?.message||e);say('Не удалось загрузить исходную модель: '+loadError,true);}})();
+ await loadModel('alex','original');setVisible();
+ say('Оригинальный Алекс. Кнопка «Морфы» включает только два проверенных канала.');
+}catch(e){loadError=String(e?.message||e);say('Ошибка загрузки оригинального Алекса: '+loadError,true);}})();
