@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
 const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
-const isUI=f=>/^(?:index\.html|cas-modular-lab\.html|cas-resident-footwear-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
+const isUI=f=>/^(?:index\.html|cas-modular-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
   // Changes to the live needs loop or SKU sleep quality require a real WebGL boot.
   /^src\/(?:simulation|need-balance|furniture-products)\.js$/.test(f)||
   /^src\/(?:game\.js|outdoor-character-motion|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
