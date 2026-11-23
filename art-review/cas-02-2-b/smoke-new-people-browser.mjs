@@ -23,17 +23,19 @@ const browser=await chromium.launch({headless:true,
  args:[...chromiumBinary.args,'--enable-webgl','--use-angle=swiftshader',
    '--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const results=[];
+const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,
+ deviceScaleFactor:1,serviceWorkers:'block'});
+const page=await context.newPage();let errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+page.on('crash',()=>errors.push('browser crash'));
 try{
  for(const [width,height] of [[390,844],[320,568]]){
-  const context=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true,
-   deviceScaleFactor:1,serviceWorkers:'block'});
-  const page=await context.newPage(),errors=[];
-  page.on('pageerror',e=>errors.push(e.message));
-  page.on('crash',()=>errors.push('browser crash'));
+  errors=[];
+  await page.setViewportSize({width,height});
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:60000});
   await page.waitForFunction(()=>{
    const p=window.__LifeSimNewPeopleProbe?.();return p?.visible&&p?.identity?.includes('Глеб');
-  },{timeout:90000});
+  },null,{timeout:90000});
   const probe=()=>page.evaluate(()=>window.__LifeSimNewPeopleProbe());
   let state=await probe();
   if(state.morphCount!==6||state.clips!==10||state.weights.length!==6)
@@ -63,7 +65,6 @@ try{
    independentlySkinned:true,originalRestored:true,pixelsDiffer:true,
    panelTop:rect.y,drawCalls:state.drawCalls,physicalSafariAccepted:false});
   console.log('CAS_B_WEBGL '+JSON.stringify(results.at(-1)));
-  await context.close();
  }
 }finally{
  await browser.close();server.close();
