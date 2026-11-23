@@ -1,11 +1,5 @@
 name: QSK-03 — independent PlayCanvas mobile performance baseline
 on:
-  pull_request:
-    paths:
-      - 'scripts/qsk-03-metrics.mjs'
-      - 'tests/qsk-03-*.mjs'
-      - 'tests/qsk-03-*.test.js'
-      - '.github/workflows/qsk-03-baseline.yml'
   workflow_dispatch:
 permissions:
   contents: read
