@@ -114,7 +114,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cas-f2-c4b-mira-shoes
-          path: artifacts/cas-02-1-f2-c4b/
+          path: |
+            artifacts/cas-02-1-f2-c4b/
+            assets/characters/cas-c3/c4-source-manifest.json
+            assets/characters/cas-c3/c4-*.source.glb
           if-no-files-found: ignore
       - name: Archive CAS F2 C3 screenshots and probe
         if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}
