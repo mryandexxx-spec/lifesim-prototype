@@ -104,21 +104,22 @@ function fitFoot(layer, shoe, target, palette) {
     const shape = blendedMatrix(palette, v);
     const neutral = shoe.footPoint(shape.transformPoint(vector(v.position)).toArray());
     const blend = smooth((y - (seam - .065)) / .065);
+    const cuffBlend = smooth((y - (seam - .028)) / .028);
     const lengthwise = clamp(z, shoe.back + .003, shoe.front - .003);
     const innerY = shoe.insoleAt(lengthwise) + .002 + Math.max(0, y - target.soleY);
-    const fitted = y >= seam - 1e-7 ? neutral : fitToShoe(mix([x, innerY, lengthwise], neutral, blend));
+    const fitted = y >= seam - 1e-7 ? neutral : fitToShoe(mix([x, innerY, lengthwise], neutral, cuffBlend));
     return {v, y, shape, blend, fitted};
   });
-  // Soften facets where the ankle blends into the steeper heel shape. Keep
-  // shared cuff vertices fixed and return the smoothed surface to the last.
+  // Soften facets where the ankle blends into the steeper heel shape and
+  // keep shared cuff vertices fixed.
   let positions = prepared.map(v => v.fitted);
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < 3; pass++) {
     positions = positions.map((point, i) => {
       const weight = .35 * smooth((seam - prepared[i].y) / .024);
       if (!weight || !neighbors[i].size) return point;
       const adjacent = [...neighbors[i]].map(j => positions[j]);
       const average = [0, 1, 2].map(axis => adjacent.reduce((sum, p) => sum + p[axis], 0) / adjacent.length);
-      return fitToShoe(mix(point, average, weight));
+      return mix(point, average, weight);
     });
   }
   const posed = positions.map(p => vector(shoe.modelPoint(p)));
