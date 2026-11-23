@@ -3,11 +3,23 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
-  SOURCES, auditFaceTopology, measureConnectivity, readGLB, accessor
+  SOURCES, auditFaceTopology, measureConnectivity, weldConnectivityProbe, readGLB, accessor
 } from '../art-review/cas-02-2-b/audit-facial-topology.mjs';
 
 const dir = new URL('../assets/characters/', import.meta.url);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+
+test('CAS-B G1 UV splits do not falsely prove disjoint facial geometry', () => {
+  const pos=Float64Array.from([0,0,0, 1,0,0, 0,1,0,
+    0,1,0, 1,0,0, 1,1,0]);
+  const idx=[0,1,2,3,4,5],mask=new Uint8Array(6).fill(1);
+  assert.equal(measureConnectivity(idx,6,mask).connectedComponents,2);
+  const welded=weldConnectivityProbe(idx,pos,mask);
+  assert.equal(welded.coincidentIndexDuplicates,2);
+  assert.equal(welded.connectivity.connectedComponents,1);
+  assert.equal(welded.connectivity.triangles,2);
+  assert.throws(()=>weldConnectivityProbe(idx,new Float64Array(0),mask),/cardinality mismatch/);
+});
 
 test('CAS-B G1 actual indexed connectivity is not guessed from region labels', () => {
   const mesh = measureConnectivity([0,1,2,4,5,6],7,new Uint8Array(7).fill(1));
@@ -30,6 +42,10 @@ for (const [kind,source] of Object.entries(SOURCES)) {
     assert.deepEqual(report,auditFaceTopology(kind,bytes),'topology audit must be reproducible');
     console.log('CAS_B_G1_MEASURED '+JSON.stringify(report));
     assert.equal(report.sourceSha256,before);
+    assert.ok(report.coincidenceWeldedFaceProbe.connectedComponents>0);
+    assert.ok(report.coincidenceWeldedFaceProbe.connectedComponents<=report.frontFaceCandidate.connectedComponents);
+    assert.ok(report.coincidenceWeldedDuplicateVertexIndices>0);
+    assert.ok(report.rawVsCoincidenceWeldedComponentRatio>=1);
     assert.equal(report.primitiveCount,1);
     assert.equal(report.joints,66);
     assert.equal(report.animationClips,kind==='alex'?10:13);
