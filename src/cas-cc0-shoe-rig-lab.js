@@ -113,6 +113,25 @@ const round=v=>Math.round(v*10000)/10000;
 const position=v=>({x:round(v.x),y:round(v.y),z:round(v.z)});
 let avatar=null,avatarAsset=null,manifest=null,parts=null,ready=false;
 let mode='source',currentClip=null;
+let previewGate=null,previewRevealed=false;
+/** Render gate is NOT avatar.enabled=false: animations and true bone transforms
+ * must continue ticking while authentic CC0 shoe parts stream in.
+ * Hide every render component BEFORE attaching Alex to the live scene, then
+ * restore exactly the pre-existing enabled states in one frame after dressing.
+ */
+function concealAvatarRenders(model){
+ const snapshots=model.findComponents('render').map(component=>({
+  component,wasEnabled:component.enabled
+ }));
+ if(snapshots.length<4)throw Error('Unexpected Alex render node count');
+ for(const snapshot of snapshots)snapshot.component.enabled=false;
+ return snapshots;
+}
+function revealAvatarRenders(){
+ if(!previewGate)throw Error('No captured Alex render state');
+ for(const snapshot of previewGate)snapshot.component.enabled=snapshot.wasEnabled;
+ previewRevealed=true;
+}
 function originalShoes(on){
  if(!avatar)return;
  for(const variant of ['original','graphite','terracotta']){
@@ -167,6 +186,9 @@ app.on('update',dt=>{
 });
 window.__LifeSimCasF1Probe=()=>({
  loaded:ready,mode,currentClip,sourceResident:'alex',
+ avatarInstantiated:!!avatar,previewRevealed,
+ previewRendersSuppressed:avatar&&!previewRevealed?
+  avatar.findComponents('render').every(component=>!component.enabled):false,
  sourceClips:avatarAsset?.resource?.animations?.map(a=>a.resource.name)||[],
  sourceShoesVisible:avatar?.findByName('CAS alex shoes original')?.enabled??null,
  sourceSneakerResidueVisible:avatar?.findByName('CAS F1 source underfoot residual')?.enabled??null,
@@ -245,6 +267,9 @@ app.start();
  try{
   avatarAsset=await container('./assets/characters/cas-alex-cc0-fitting-base.glb');
   avatar=avatarAsset.resource.instantiateRenderEntity();
+  // Source white Meshy sneakers MUST NOT flash while CC0 dress shoes load.
+  // Retain the original animated rig for fit measurements, conceal visuals only.
+  previewGate=concealAvatarRenders(avatar);
   app.root.addChild(avatar);
   const fit=characterFit(bounds(avatar),2.05);
   avatar.setLocalScale(fit.scale,fit.scale,fit.scale);
@@ -278,6 +303,7 @@ app.start();
   mode='dress';
   $('shoe-choice').value=mode;
   applyMode();
+  revealAvatarRenders();
   $('fit-metrics').textContent='19 744 треуг. · CC0 · 2 независимые стопы';
   $('shoe-choice').disabled=false;
   $('animation-clip').disabled=false;
