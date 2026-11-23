@@ -249,7 +249,7 @@ if(isModularLab)requestAnimationFrame(fitCasViewport);
 // If the model has been committed as a stable asset, it loads without user input.
 // No temporary signed Meshy URLs or user tokens belong in the public repository.
 (async()=>{
- const extra=isModularLab?await fetch('./assets/characters/cas-modular-mannequin-v1.json',{cache:'no-store'})
+ const extra=isModularLab?await fetch('./assets/characters/cas-modular-mannequin-v1.json?cas-02-1-c',{cache:'no-store'})
    .then(r=>r.ok?r.json():null).catch(()=>null):null;
  const response=await fetch(preferredAutoUrl,{method:'HEAD'});
  if(!response.ok)throw new Error('not bundled');
