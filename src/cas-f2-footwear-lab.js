@@ -154,9 +154,12 @@ function feetFromSkeleton(side){
  const horizontal=Math.hypot(dx,dz);
  if(horizontal<.055||horizontal>.32)throw Error('CAS F2 source foot bone distance implausible '+side+' '+horizontal);
  const front={x:dx/horizontal,y:0,z:dz/horizontal};
- // Mixamo ToeBase is not the front tip. Expand the measured foot-bone span by
- // fixed anatomical fractions ONCE per rig, never per shoe or pixel.
- const L=horizontal*1.4;
+ // Mixamo ToeBase is NOT a toe tip and is usually a very short bone span.
+ // Use one resident-level anthropometric foot-length estimate (12.5% of the
+ // existing 2.05m fitted actor stature), bounded by the measured bone span.
+ // This remains a prototype estimate until original full skin-foot measurement;
+ // never tune dress/sneaker/boot separately, and never stretch the upper.
+ const L=clamp(2.05*.125,horizontal*1.3,horizontal*5);
  const heel={x:fp.x-front.x*horizontal*.16,y:0,z:fp.z-front.z*horizontal*.16};
  const tip={x:heel.x+front.x*L,y:0,z:heel.z+front.z*L};
  const soleY=Math.max(-.02,Math.min(fp.y,tp.y)-.038);
@@ -307,7 +310,11 @@ async function loadPair(id){
  const {manifest,rawBounds}=normalizePairLast(id,sourceParts);
  const fits={},sides={};
  for(const side of ['left','right']){
-  const fit=planShoeLastFit(footSockets[side].profile,manifest);
+  let fit;
+  try{fit=planShoeLastFit(footSockets[side].profile,manifest)}
+  catch(error){throw Error(id+' '+side+' last='+round(manifest.parts[side].frame.length)+
+   ' foot='+round(footSockets[side].profile.frame.length)+
+   ' width='+round(footSockets[side].profile.ballWidth)+': '+error.message)}
   const anchor=attachSide(sourceParts[side],footSockets[side],fit,side,id);
   fits[side]=fit;
   sides[side]={...sourceParts[side],anchor,fit};
