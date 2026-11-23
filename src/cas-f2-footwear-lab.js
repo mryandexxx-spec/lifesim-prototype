@@ -119,6 +119,7 @@ const ALEX_F1_SKIN_SHA='b513bf95e9ca0201ae127db3d5ced6e94e4cf0cf92a40ea81d178d17
 const SOURCE_SHOES=['dress','sneakers','boots'];
 let avatar=null,avatarAsset=null,sourceAudit=null,pairs={},ready=false;
 let mode='dress',currentClip=null,socks=true,selectedEpoch=0;
+let fallbackToSource=false,loadError=null;
 let gate=null,revealed=false,footSockets={};
 let sockLayers={},sourceMask=null,sourceShoesNode=null;
 const vec=p=>new pc.Vec3(p.x,p.y,p.z);
@@ -395,7 +396,7 @@ app.on('update',dt=>{
  applyGarment();
 });
 window.__LifeSimCasF2Probe=()=>({
- loaded:ready,avatarInstantiated:!!avatar,previewRevealed:revealed,
+ loaded:ready,fallbackToSource,loadError,avatarInstantiated:!!avatar,previewRevealed:revealed,
  previewRendersSuppressed:avatar&&!revealed?
    avatar.findComponents('render').every(component=>!component.enabled):false,
  mode,currentClip,socks,fps,
@@ -476,7 +477,32 @@ app.start();
   $('fit-metrics').textContent='Реальные CC0 GLB · 2 стопы · независимые анимированные носки';
   frameShoes();
  }catch(error){
-  status('F2 экспериментальная примерка остановлена: '+error.message);
+  loadError=error.message;
+  // A missing/corrupt deployed manifest must NEVER leave the iPhone showing
+  // an empty floor. Expose only the original preserved-source Alex on failure.
+  // This is an explicit terminal fallback, not a white-sneaker loading flash.
+  if(avatar&&gate){
+   try{
+    for(const pair of Object.values(pairs))
+     for(const side of ['left','right'])pair.sides[side].anchor.enabled=false;
+    for(const layer of Object.values(sockLayers))layer.entity.enabled=false;
+    mode='source';
+    if(!revealed)reveal();
+    if(sourceMask)sourceVisible(true);
+    fallbackToSource=true;
+    $('shoe-choice').value='source';
+    $('shoe-choice').disabled=true;
+    $('sock-choice').disabled=true;
+    $('animation-clip').disabled=!avatar.anim;
+    $('pause-resume').disabled=!avatar.anim;
+    frameShoes();
+   }catch(recoveryError){
+    console.error('F2 failed to restore original source avatar',recoveryError);
+   }
+  }
+  status((fallbackToSource?
+   'Алекс показан в исходной обуви; примерка временно недоступна. ':
+   'F2 экспериментальная примерка остановлена. ') +error.message);
   console.error(error);
  }
 })();
