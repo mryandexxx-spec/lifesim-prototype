@@ -363,11 +363,16 @@ export function prepareAdditionalResidents(root){
     }
     if(actor.action){
       const goal=actionGoal(root,actor.action);
-      if(!validAdditionalAction(actor.action)||!goal||
-        !findPath(actor.position,goal,root.world)||
+      if(!validAdditionalAction(actor.action)){
+        actor.action=null;actor.event='Некорректное сохранённое действие';
+      }else if(!goal||!findPath(actor.position,goal,root.world)||
         (actor.action.id!=='move'&&!furnitureFree(root,id,actor.action.id,
-          actor.action.targetInstanceId,actor.action.bedSlot||null)))
-        {actor.action=null;actor.event='Маршрут или предмет недоступен';}
+          actor.action.targetInstanceId,actor.action.bedSlot||null))){
+        // An accepted manual action on a restored v1 snapshot is still
+        // player intent; do not silently lose it before the first route tick.
+        if(!interruptAdditionalAction(root,id,actor,'unreachable-route'))
+          actor.event='Маршрут недоступен: освободи отложенные задания';
+      }
     }
   }
 }
