@@ -47,6 +47,18 @@ export const CHARACTER_LAB_MODELS = Object.freeze({
     fileName:'cas-modular-mannequin-v1.glb',bytes:152564,triangles:3936,joints:18,
     morphTargets:0,targetHeight:1.78
   }),
+  cas022alex:Object.freeze({
+    key:'cas022alex',label:'Алекс — CAS-02.2 геометрический прототип',
+    assetUrl:'./assets/characters/cas-02-2-alex-morphs.glb?cas-02-2-a',
+    fileName:'cas-02-2-alex-morphs.glb',bytes:0,triangles:25847,joints:66,
+    morphTargets:2,targetHeight:2.05
+  }),
+  cas022mira:Object.freeze({
+    key:'cas022mira',label:'Мира — CAS-02.2 геометрический прототип',
+    assetUrl:'./assets/characters/cas-02-2-mira-morphs.glb?cas-02-2-a',
+    fileName:'cas-02-2-mira-morphs.glb',bytes:0,triangles:23245,joints:66,
+    morphTargets:2,targetHeight:2.05
+  }),
   mira:Object.freeze({
     key:'mira',label:'Мира',assetUrl:'./assets/characters/meshy-mira-mobile-v1.glb',
     fileName:'meshy-mira-mobile-v1.glb',bytes:2235708,triangles:23245,joints:66,
