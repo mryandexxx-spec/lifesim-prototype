@@ -2,7 +2,7 @@
 import {chromium as pw} from 'playwright-core';
 import chrome from '@sparticuz/chromium';
 import {createServer} from 'node:http';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {extname,resolve,normalize} from 'node:path';
 const ROOT=process.cwd(),mime={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.glb':'model/gltf-binary'};
 const s=createServer((request,res)=>{
@@ -26,7 +26,12 @@ try{
   await page.waitForTimeout(450);
   const probe=await page.evaluate(()=>window.__LifeSimNewPeopleProbe());
   const bytes=await page.screenshot({type:'jpeg',quality:56,clip:{x:20,y:158,width:350,height:380}});
-  console.log('CAS_B_FACE '+label+' '+bytes.toString('base64'));
+  mkdirSync('screenshots',{recursive:true});
+  writeFileSync('screenshots/'+label+'.jpg',bytes);
+  const b64=bytes.toString('base64');
+  console.log('CAS_B_FACE_BYTES '+label+' '+bytes.length);
+  for(let i=0;i<b64.length;i+=1400)
+   console.log('CAS_B_JPEG_CHUNK '+label+' '+(i/1400)+' '+b64.slice(i,i+1400));
   console.log('CAS_B_FACE_STATE '+label+' '+JSON.stringify({source:probe.sourceFamily,identity:probe.identity,
    morphology:probe.weights,visible:probe.visible,focus:probe.focus}));
  }
