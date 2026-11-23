@@ -35,6 +35,7 @@ try {
       return createHash('sha256').update(data).digest('hex');
     };
     await page.goto(base + '/cas-f2-c4b-lab.html', {waitUntil: 'domcontentloaded'});
+    assert.equal(await page.locator('#socks').inputValue(), 'off', 'female open shoes start without socks');
     const comparisons = [];
     for (const resident of ['mira']) {
       await page.locator('#resident').selectOption(resident);
@@ -64,6 +65,10 @@ try {
     assert.ok((await probe()).residents[0].garment.includes('C3 opening foot left'));
     assert.ok(!(await probe()).residents[0].garment.some(x => x.includes('sock')));
     await frame('mira-without-socks');
+    await page.locator('#socks').selectOption('on');
+    assert.ok((await probe()).residents[0].garment.includes('C3 opening sock left'));
+    await frame('mira-with-optional-cotton-socks');
+    await page.locator('#socks').selectOption('off');
 
     for (const [motion, clip] of [['walk','Walking'], ['run','Running'], ['sit','Sit_to_Stand_Transition_F']]) {
       await page.locator('#motion').selectOption(motion);
