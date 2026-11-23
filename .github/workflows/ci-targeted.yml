@@ -101,11 +101,34 @@ jobs:
           CAS_C3_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c3-*.test.js
           node scripts/cas-c3-probe-fourth.mjs
           node tests/cas-02-1-f2-c3-browser-smoke.mjs
-      - name: CAS C4B exact CC0 female shoe import and real Mira animated WebGL
+      - name: Restore audited female vendor source GLB cache
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
+        id: c4-source-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            assets/characters/cas-c3/c4-*.source.glb
+            assets/characters/cas-c3/c4-source-manifest.json
+          key: cas-c4b-approved-vendor-glbs-v1-6e7d8d-768ce0-c2e390
+      - name: Prepare and SHA-check authentic CC0 female source GLBs
         if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
         run: |
           python3 -m unittest discover -s tests -p 'test_cas_c4_source_audit.py' -v
-          python3 scripts/cas-c4-mira-sources.py
+          if [ "${{ steps.c4-source-cache.outputs.cache-hit }}" != 'true' ]; then
+            python3 scripts/cas-c4-mira-sources.py
+          fi
+          node scripts/cas-c4-source-verify.mjs
+      - name: Save exact SHA-verified female vendor source cache
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' && steps.c4-source-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            assets/characters/cas-c3/c4-*.source.glb
+            assets/characters/cas-c3/c4-source-manifest.json
+          key: cas-c4b-approved-vendor-glbs-v1-6e7d8d-768ce0-c2e390
+      - name: CAS C4B genuine Mira three-style skinned GLB and real mobile WebGL
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
+        run: |
           node scripts/cas-c4-mira-shoes.mjs
           CAS_C4_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c4b.test.js
           node tests/cas-02-1-f2-c4b-browser-smoke.mjs
