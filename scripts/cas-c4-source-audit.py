@@ -57,8 +57,59 @@ def geometry(raw):
     return {"vertices": len(vertices), "triangles": faces, "bounds": bounds}
 
 
+class RangeSource(io.RawIOBase):
+    """Seekable remote ZIP reader: only fetch the three approved source records."""
+    def __init__(self, url):
+        self.url = url
+        request = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "LifeSim-C4/1"})
+        with urllib.request.urlopen(request, timeout=18) as response:
+            self.size = int(response.headers.get("Content-Length", "0"))
+        if self.size < 1000:
+            raise RuntimeError("Missing source ZIP content length")
+        self.offset = 0
+        # Prove byte-range semantics, never mistake HTTP 200 whole-ZIP for a 206 slice.
+        self._request(0, 1)
+
+    def _request(self, start, count):
+        req = urllib.request.Request(self.url, headers={
+            "User-Agent": "LifeSim-C4/1", "Range": f"bytes={start}-{start+count-1}"})
+        with urllib.request.urlopen(req, timeout=20) as response:
+            if response.status != 206:
+                raise RuntimeError(f"Source mirror does not support HTTP Range: {response.status}")
+            data = response.read()
+        if len(data) != count:
+            raise RuntimeError(f"Invalid source ZIP range {start}/{count}: got {len(data)} bytes")
+        return data
+
+    def read(self, count=-1):
+        if count < 0:
+            count = self.size - self.offset
+        count = max(0, min(count, self.size-self.offset))
+        if not count:
+            return b""
+        result = self._request(self.offset, count)
+        self.offset += count
+        return result
+
+    def seek(self, offset, whence=0):
+        self.offset = offset if whence == 0 else (
+            self.offset + offset if whence == 1 else self.size + offset)
+        if self.offset < 0:
+            raise ValueError("Negative archive seek")
+        return self.offset
+
+    def tell(self):
+        return self.offset
+
+    def seekable(self):
+        return True
+
+    def readable(self):
+        return True
+
+
 def inspect_makehuman(raw):
-    archive = zipfile.ZipFile(io.BytesIO(raw))
+    archive = zipfile.ZipFile(io.BytesIO(raw) if isinstance(raw, bytes) else raw)
     result = {}
     for asset in CANDIDATES:
         entries = [n for n in archive.namelist() if asset in n.lower()
@@ -110,21 +161,25 @@ def run():
     source = None
     for url in MIRRORS:
         try:
-            source = download(url)
+            source = RangeSource(url)
             source_url = url
+            candidates = inspect_makehuman(source)
+            print("MakeHuman selected-asset HTTP Range inspection:", source_url, flush=True)
             break
         except Exception as exc:
-            errors.append(str(exc))
+            errors.append(f"{url}: {type(exc).__name__}: {exc}")
+            source = None
     if source is None:
-        raise RuntimeError("All pinned MakeHuman CC0 mirrors failed: " + " / ".join(errors))
-    candidates = inspect_makehuman(source)
+        raise RuntimeError("All MakeHuman source mirrors failed targeted byte-range audit: " +
+                           " / ".join(errors))
+    archive_bytes = source.size
     model, license_bytes, manifest_bytes = (download(HEELS + item) for item in
                                              ("high-heels.glb", "LICENSE.txt", "manifest.json"))
     heel_manifest = json.loads(manifest_bytes)
     report = {
         "version": 1, "stage": "CAS-02.1-F2-C4-source-audit",
-        "makehuman": {"url": source_url, "archiveSha256": sha256(source),
-                      "archiveBytes": len(source), "candidates": candidates},
+        "makehuman": {"url": source_url, "archiveSha256": None, "sourceMode": "HTTP Range (selected asset checksums pinned)",
+                      "archiveBytes": archive_bytes, "candidates": candidates},
         "heels": {"url": HEELS + "high-heels.glb", "sha256": sha256(model),
                   "bytes": len(model), "licenseSha256": sha256(license_bytes),
                   "manifestSha256": sha256(manifest_bytes),
@@ -138,7 +193,7 @@ def run():
     for key, item in candidates.items():
         print(key, "license:", item["licenseCC0"], "geometry:", item["geometry"],
               "files:", [(x["path"], x["sha256"][:12]) for x in item["files"]])
-    print("MakeHuman archive", report["makehuman"]["archiveSha256"], len(source))
+    print("MakeHuman source ranges", source_url, "total archive bytes", archive_bytes)
     print("High heels", report["heels"]["sha256"], report["heels"]["glb"],
           "licenseCC0", report["heels"]["licenseCC0"])
     bad = [key for key, item in candidates.items()
