@@ -123,6 +123,11 @@ function originalShoes(on){
 function applyMode(){
  if(!parts)return;
  const dressed=mode==='dress';
+ // Part of the original white sneaker remains in the 02.1-E body skin.
+ // The independently split, original-skin residual is toggled reversibly.
+ const residue=avatar?.findByName('CAS F1 source underfoot residual');
+ if(!residue?.render)throw Error('F1 masked white sneaker residue not found');
+ residue.enabled=!dressed;
  for(const side of ['left','right'])parts[side].anchor.enabled=dressed;
  originalShoes(!dressed);
  status(dressed?'Надеты кожаные туфли: каждая закреплена на своей анимированной стопе.':
@@ -163,6 +168,7 @@ window.__LifeSimCasF1Probe=()=>({
  loaded:ready,mode,currentClip,sourceResident:'alex',
  sourceClips:avatarAsset?.resource?.animations?.map(a=>a.resource.name)||[],
  sourceShoesVisible:avatar?.findByName('CAS alex shoes original')?.enabled??null,
+ sourceSneakerResidueVisible:avatar?.findByName('CAS F1 source underfoot residual')?.enabled??null,
  vendorSourceHash:manifest?.sourceSha256??null,license:manifest?.license??null,
  sourceTriangles:manifest?.originalTriangles??null,
  twoSeparateMeshes:parts?Object.keys(parts).length===2:false,
@@ -222,7 +228,7 @@ function attachPart(side,shoeAsset){
 app.start();
 (async()=>{
  try{
-  avatarAsset=await container('./assets/characters/cas-alex-footwear-v2.glb');
+  avatarAsset=await container('./assets/characters/cas-alex-cc0-fitting-base.glb');
   avatar=avatarAsset.resource.instantiateRenderEntity();
   app.root.addChild(avatar);
   const fit=characterFit(bounds(avatar),2.05);
