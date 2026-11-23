@@ -54,6 +54,16 @@ jobs:
         env:
           CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/ci-target.mjs
+      - name: QSK-04 audit pinned GLB, textures and provenance (no runtime changes)
+        if: ${{ contains(github.event.pull_request.title, 'QSK-04') }}
+        run: node scripts/qsk-04-asset-qa.mjs
+      - name: Archive QSK-04 GLB source and validation passport
+        if: ${{ always() && contains(github.event.pull_request.title, 'QSK-04') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsk-04-pinned-asset-passport-pr
+          path: artifacts/qsk-04/asset-passport.json
+          if-no-files-found: warn
       - name: Archive CAS-01.8 Node eight-day soak report
         if: ${{ always() && steps.impact.outputs.cas_soak == 'true' }}
         uses: actions/upload-artifact@v4
@@ -94,6 +104,18 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: QSK-04 capture 12 real PlayCanvas Alex/Mira reference frames
+        if: ${{ contains(github.event.pull_request.title, 'QSK-04') }}
+        run: node tests/qsk-04-browser-visual.mjs
+      - name: Archive QSK-04 real mobile WebGL reference screenshots
+        if: ${{ always() && contains(github.event.pull_request.title, 'QSK-04') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsk-04-mobile-playcanvas-reference-pr
+          path: |
+            artifacts/qsk-04/visual-report.json
+            artifacts/qsk-04/*.png
+          if-no-files-found: warn
       - name: CAS-02.2-A source Alex and Mira real morph targets in four mobile PlayCanvas cases
         if: ${{ contains(github.event.pull_request.title, 'CAS-02.2') }}
         run: |
