@@ -23,3 +23,13 @@ The project-specific `.agents/skills/playcanvas-lifesim/SKILL.md` is the primary
 
 For compatible coding agents with repository skill discovery, the `name: playcanvas-lifesim` frontmatter makes it available as an agent instruction. A GitHub connector and ordinary ChatGPT conversation do not automatically load repository skills; explicitly read the file if discovery is unavailable. The skill does not introduce an executable installer or grant authority to modify active PRs, game saves, characters or releases.
 
+
+## 2026-11-23 — Official PlayCanvas, Blender and CAS identity-morph extension
+
+**Source pinned (upstream MIT, links only; no source scripts copied):**
+- `playcanvas/skills` `65f6241bc413c2adb78af5890317a8177dd518f0`: `pc-inspect-glb`, `pc-configure-animation`, `pc-inspect-runtime`, `pc-verify-pixels`, `pc-load-assets`.
+- `EL4CTEO/blender-skills` `1a1cc6c49312f9f370aae86f52b7b907f29c94f6`: `blender-core`, `blender-facial-shapekeys`, `blender-character-rigging`, `blender-animation`, `blender-asset-qa`, `blender-export-pipelines`.
+- `scenario-labs/skills` `3c4d18cd0be2e5280a5accebfeef9ddc98b9a15b`: `scenario-blender-sculpting` (art guidance only; not Scenario remote execution).
+- Original project-specific `playcanvas-cas-identity-morphs`: geometry G0, sculpt G1, morph/rig/garment QA G2, owner art review G3, post-approval editor/integration G4.
+
+**Security and scope:** 12 original LifeSim instruction adapters + one native CAS coordinator; all standalone SKILL.md. Not automatically executed, no imported Python scripts, new licenses on LifeSim code, services, dependency changes, Blender install, runtime/GLB/texture/save edits or protected PR #145 changes. MIT is upstream licensing, not an added project license. Third-party code vendoring needs a separate license/security audit and separate approval. ARKit expressions are not distinct CAS identity facial geometry; actual PlayCanvas preview and owner art acceptance remain required. Existing QSK loader/cache production work stays CAS-blocked.
