@@ -132,6 +132,21 @@ jobs:
           node scripts/cas-c4-mira-shoes.mjs
           CAS_C4_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c4b.test.js
           node tests/cas-02-1-f2-c4b-browser-smoke.mjs
+      - name: CAS C4C Mira heel fit, sampled contact and mobile WebGL
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
+        run: |
+          node scripts/cas-c4c-heel-shoes.mjs
+          CAS_C4C_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c4c.test.js
+          node tests/cas-02-1-f2-c4c-browser-smoke.mjs
+      - name: Archive C4C heel stance, movement and fit evidence
+        if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-f2-c4c-mira-heels
+          path: |
+            artifacts/cas-02-1-f2-c4c/
+            assets/characters/cas-c3/c4c-manifest.json
+          if-no-files-found: ignore
       - name: Archive C4B Mira female source / animation screenshots
         if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}
         uses: actions/upload-artifact@v4

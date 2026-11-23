@@ -20,7 +20,7 @@ function rotation(a, b, t) {
   return q.map(value => value / norm);
 }
 
-function motionTracks(model, clip) {
+export function motionTracks(model, clip) {
   return clip.channels.map(({sampler, target}) => {
     const {input, output, interpolation} = clip.samplers[sampler];
     if (interpolation && interpolation !== 'LINEAR') throw new Error('Unsupported C3 animation interpolation');
@@ -28,7 +28,7 @@ function motionTracks(model, clip) {
   });
 }
 
-function samplePalette(model, tracks, inverse, time) {
+export function samplePose(tracks, time) {
   const pose = new Map();
   for (const {node, path, times, values} of tracks) {
     const at = times.findIndex(t => t >= time);
@@ -42,7 +42,11 @@ function samplePalette(model, tracks, inverse, time) {
     if (!pose.has(node)) pose.set(node, {});
     pose.get(node)[path] = value;
   }
-  const matrix = modelResolver(model.gltf, pose);
+  return pose;
+}
+
+function samplePalette(model, tracks, inverse, time) {
+  const matrix = modelResolver(model.gltf, samplePose(tracks, time));
   return model.gltf.skins[0].joints.map((node, index) => multiply(matrix(node), inverse[index]));
 }
 
