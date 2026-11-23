@@ -144,6 +144,7 @@ jobs:
           node scripts/build-cas-resident-footwear-v2.mjs
           node scripts/cas-02-1-f0-download-assets.mjs
           node scripts/cas-02-1-f1-split-dress.mjs
+          node scripts/cas-02-1-f1-alex-underfoot.mjs
           node tests/cas-02-1-f0-browser-smoke.mjs
           node tests/cas-02-1-f1-browser-smoke.mjs
       - name: Archive CAS-02.1-F0 actual GLB/CC0 license and source verification
@@ -157,6 +158,7 @@ jobs:
             assets/characters/cas-cc0-f0/*.license.txt
             assets/characters/cas-cc0-f0/index.json
             assets/characters/cas-cc0-f1/dress.manifest.json
+            assets/characters/cas-alex-cc0-fitting-base.json
             artifacts/cas-02-1-f0/
             artifacts/cas-02-1-f1/
           if-no-files-found: error
