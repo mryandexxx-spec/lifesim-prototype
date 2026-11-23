@@ -220,7 +220,10 @@ function attachPart(side,shoeAsset){
  app.root.removeChild(shoe);
  anchor.addChild(shoe);
  const avatarScale=avatar.getLocalScale().x;
- shoe.setLocalScale(size/avatarScale,size/avatarScale,size/avatarScale);
+ // Keep the source sole at the anchor while extending the rigid instep to
+ // cover the visible ankle seam of the baked Alex trouser/foot topology.
+ // This is an explicit F1 fit calibration, NOT nonrigid boot deformation.
+ shoe.setLocalScale(size/avatarScale,1.45*size/avatarScale,size/avatarScale);
  shoe.setLocalPosition(-cx*size/avatarScale,-raw.min.y*size/avatarScale,
   -cz*size/avatarScale);
  return {anchor,foot,toe,shoe,size};
