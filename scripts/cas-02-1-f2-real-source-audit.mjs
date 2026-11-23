@@ -65,11 +65,11 @@ export function splitF2ShoePair(source,entry){
   for(const t of triangles)buckets[t[axis]<split?'left':'right'].push(t);
   if(Math.min(buckets.left.length,buckets.right.length)<6000||
      Math.max(buckets.left.length,buckets.right.length)>14000)return null;
-  return {axis,split,buckets};
+  return {axis,split,buckets,centers};
  }
  const chosen=clusterByAxis('x')||clusterByAxis('z');
  if(!chosen)throw Error('No balanced 2-shoe partition on either source X or Z; quarantine');
- const {axis:splitAxis,split:splitX,buckets}=chosen;
+ const {axis:splitAxis,split:splitX,buckets,centers}=chosen;
  const outputs={};
  for(const side of ['left','right']){
   const outG=structuredClone(g),buffers=[Buffer.from(parsed.bin)];
@@ -135,7 +135,7 @@ export function splitF2ShoePair(source,entry){
     n+sourceAccessor(verify,p.indices).acc.count/3,0);
   if(count!==buckets[side].length)throw Error('F2 rebuilt mesh lost source faces');
   outputs[side]={glb:result,triangles:count,sourceBounds:jointBounds,
-    outputSha256:digest(result),sourceCenterX:centers[side==='left'?0:1]};
+    outputSha256:digest(result),sourceCenterOnSplitAxis:centers[side==='left'?0:1]};
  }
  return {outputs,splitX,splitAxis,sourceSha256:digest(source),sourceTriangles:triangles.length};
 }
