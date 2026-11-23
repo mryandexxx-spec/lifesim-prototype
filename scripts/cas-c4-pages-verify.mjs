@@ -20,7 +20,7 @@ for (const name of FEMALE_STYLES) {
   const approved = source.styles[name];
   if (!item || !approved || item.sourceSha256 !== approved.sha256 ||
       !approved.license.includes('CC0') ||
-      !Number.isInteger(approved.triangles) || approved.triangles < 100 || approved.triangles > 30000)
+      approved.triangles !== {'ballet':8960,'mary-jane':1004,'ankle-boots':4120}[name])
     throw new Error('C4 incomplete source identity '+name);
   for (const [file,sha] of [[item.file,item.sha256],[approved.file,approved.sha256]]) {
     const path = resolve(folder,file);
