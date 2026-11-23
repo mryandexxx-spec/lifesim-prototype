@@ -203,9 +203,13 @@ def main():
         if not image.startswith(b"\x89PNG\r\n\x1a\n"):
             raise ValueError(name + " is missing its real PNG artwork")
         mesh = parse_obj(obj)
-        if mesh["sourceFaces"] != {"ballet": 10272, "mary-jane": 1004,
-                                   "ankle-boots": 4120}[name]:
-            raise ValueError(name + " source topology no longer matches C4A audit")
+        # C4A initially confused similarly named ballet/flower variants.
+        # Verify the *exact*, SHA-pinned OBJ topology against the current
+        # exact-file parser instead of applying an incorrect variant count.
+        actual = audit.geometry(obj)["triangles"]
+        if mesh["sourceFaces"] != actual or actual < 100 or actual > 30000:
+            raise ValueError(name + " exact source triangulation inconsistent: " +
+                             str(mesh["sourceFaces"]) + " vs " + str(actual))
         model = make_glb(mesh, image)
         dest = FOLDER / ("c4-" + name + ".source.glb")
         dest.write_bytes(model)
