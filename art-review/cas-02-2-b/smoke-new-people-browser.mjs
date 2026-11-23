@@ -60,6 +60,21 @@ try{
   await page.waitForFunction(()=>window.__LifeSimNewPeopleProbe?.().identity?.includes('Ника'),{timeout:50000});
   state=await probe();
   if(state.morphCount!==6||state.clips!==13)throw Error('Mira derivative failed '+JSON.stringify(state));
+  // Real UI event route, not direct morphInstance API: ensure a user can
+  // actually see their chosen edit on a narrow phone screen.
+  await page.locator('#tools-toggle').click();
+  await page.locator('#morph-body').evaluate(el=>{
+   el.value='100';el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  state=await probe();
+  if(state.focus!=='body'||state.weights[5]<.99)
+   throw Error('Changing upper torso must show BODY, not invisible face zoom');
+  await page.locator('#morph-nose').evaluate(el=>{
+   el.value='100';el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  state=await probe();
+  if(state.focus!=='face'||state.weights[1]<.99)
+   throw Error('Changing nose must show FACE rather than tiny whole-figure');
   if(errors.length)throw Error('Page JS errors: '+JSON.stringify(errors));
   results.push({width,height,realWebGL:true,alexMorphs:6,miraMorphs:6,
    independentlySkinned:true,originalRestored:true,pixelsDiffer:true,
