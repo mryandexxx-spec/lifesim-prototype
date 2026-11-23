@@ -65,6 +65,8 @@ export function planChanges(files,root=ROOT){
     [/^src\/(?:finance-|household-bills)/,['tests/w4a-finance.test.js','tests/w4c-bills.test.js']],
     [/^src\/(?:phone-|career-phone-ui|household|social-graph|social-need)/,['tests/phone-platform-r1.test.js']],
     [/^src\/(?:action-queue|navigation|simulation)/,['tests/manual-priority-queue-stability.test.js','tests/navigation.test.js']],
+    [/^(?:index\.html|styles\.css|src\/(?:action-queue|resident-social-runtime|household|social-graph|resident-hud|game)\.js)$/,
+      ['tests/qsk-01-social-queue.test.js']],
     [/^src\/(?:pool-|gardening|outdoor-)/,['tests/lot-e2-overlap-recovery.test.js','tests/lot-c3c.test.js']],
     [/^(?:\.github\/workflows\/|scripts\/ci-|tests\/ci-)/,['tests/ci-target.test.js']],
     [/^\.github\/workflows\/pages\.yml$/,['tests/m4-release.test.js']]
@@ -103,12 +105,12 @@ export function planChanges(files,root=ROOT){
   const cas_cc0=changed.some(f=>
     /^(?:(?:src\/cas-f2-footwear-lab\.js|cas-f2-footwear-lab\.html|tests\/cas-02-1-f2-c2-browser-smoke\.mjs|tests\/cas-02-1-f2-c2-runtime\.test\.js)|(?:scripts\/cas-02-1-f2-real-source-audit\.mjs|tests\/cas-02-1-f2-real-sources\.test\.js)|scripts\/cas-02-1-f0-download-assets\.mjs|scripts\/cas-02-1-f1-split-dress\.mjs|scripts\/cas-02-1-f1-alex-underfoot\.mjs|src\/cas-cc0-shoe-fit-policy\.js|tests\/cas-02-1-f0-(?:sources\.test\.js|browser-smoke\.mjs)|tests\/cas-02-1-f1-(?:shoe-split\.test\.js|ankle-fit\.test\.js|browser-smoke\.mjs)|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|src\/cas-cc0-shoe-fit-lab\.js|src\/cas-cc0-shoe-rig-lab\.js)$/.test(f));
   const cas_c3=changed.some(f=> /^(?:cas-f2-(?:c3|c4b)-lab\.html|src\/cas-f2-(?:c3|c4b)-lab\.js|tests\/cas-02-1-f2-(?:c3-|c4[bc]).*|scripts\/cas-(?:c3|c4|c4c)-.*|assets\/characters\/cas-c3\/.*)$/.test(f));
-  const cas_hud=changed.some(f=>/^(?:src\/(?:resident-hud|career-phone-ui|game)\.js|tests\/cas-01-7-browser-smoke\.mjs)$/.test(f));
+  const cas_hud=changed.some(f=>/^(?:src\/(?:resident-hud|career-phone-ui|game|action-queue|resident-social-runtime|household|social-graph)\.js|index\.html|styles\.css|tests\/(?:cas-01-7-browser-smoke\.mjs|qsk-01-social-queue\.test\.js))$/.test(f));
   const cas_inventory=changed.some(f=>['scripts/cas-00-dependency-inventory.mjs','tests/cas-00-dependency-inventory.test.js'].includes(f));
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');
   const career_shifts=changed.some(f=>
     /^(?:src\/career-rank-schedules\.js|tests\/career-shifts-r1-browser-smoke\.mjs)$/.test(f));
-  return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||cas_c3||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
+  return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||cas_hud||cas_c3||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
     fandom_tv,fandom_phone,fandom_r2a,fandom_r2b,fandom_r2c,
     cas_modular,cas_alex,cas_styles,cas_cc0,cas_c3,e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),cas_hud,cas_soak,changed};
