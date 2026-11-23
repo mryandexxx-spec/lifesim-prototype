@@ -31,6 +31,8 @@ try{
       const clips=await page.locator('#clip-select option').count();
       assert.equal(clips,expectedClips,kind+' source clip count');
       await page.locator('#pause-animation').click();
+      // Keep the diagnostic HUD out of the camera drag path on 320x568; capture only original 3D.
+      await page.locator('.panel').evaluate(panel=>{panel.style.display='none';});
       const probe=async()=>page.evaluate(async()=>{
         const {Application}=await import('playcanvas'),app=Application.getApplication();
         const camera=app.root.findByName('Lab camera');
