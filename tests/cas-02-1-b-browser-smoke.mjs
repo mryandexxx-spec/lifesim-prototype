@@ -22,6 +22,21 @@ try{
   assert.equal(snapshot.slots.length,4);
   assert.ok(snapshot.slots.every(x=>x.base===true&&x.alternate===false));
   assert.deepEqual(snapshot.clips,['idle','walk','sit','bed']);
+  assert.ok(snapshot.mobileFrame,'mobile projected model frame available');
+  const frame=snapshot.mobileFrame;
+  assert.ok(frame.headY>=frame.topSafe-6,
+    'head must be visible above the mobile bottom dock: '+JSON.stringify(frame));
+  assert.ok(frame.footY<frame.dockTop-8,
+    'shoes must not be hidden by mobile bottom dock: '+JSON.stringify(frame));
+  assert.ok(frame.pitch>=-5&&frame.pitch<=8,
+    'front-facing camera should be near eye level, not overhead');
+  const touch=await page.locator('[data-cas-slot]').evaluateAll(nodes=>
+    nodes.map(x=>{const r=x.getBoundingClientRect();return {label:x.textContent,width:r.width,height:r.height,top:r.top,bottom:r.bottom};}));
+  assert.equal(touch.length,4);
+  assert.ok(touch.every(x=>x.height>=43.5&&x.top>=0&&x.bottom<=height),
+    'every garment toggle must be visible and at least 44px tall');
+  assert.ok(await page.locator('#cas-lab-panel').isVisible());
+
   for(const slot of ['hair','top','trousers','shoes']){
    await page.locator('[data-cas-slot="'+slot+'"]').tap();
    snapshot=await page.evaluate(()=>window.__LifeSimCasModularProbe());
