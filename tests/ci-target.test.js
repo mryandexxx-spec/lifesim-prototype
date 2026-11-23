@@ -246,3 +246,16 @@ test('QSK-01 routes action queues, social handlers and Safari entry changes to r
   assert.equal(testOnly.cas_hud,true);
   assert.equal(testOnly.browser,true);
 });
+
+test('QSK-02 routes SW, startup and recovery risks to real mobile WebGL fault matrix',()=>{
+  for(const path of ['sw.js','src/model-cache.js','src/loading-progress.js',
+    'src/viewport-health.js','src/game.js','index.html']){
+    const p=planChanges([path]);
+    assert.equal(p.qsk_02,true,path+' must have QSK-02 fault coverage');
+    assert.equal(p.browser,true,path+' must boot real PlayCanvas WebGL');
+    assert.ok(p.tests.includes('tests/qsk-02-startup-faults.test.js'),path);
+  }
+  const probe=planChanges(['tests/qsk-02-startup-faults-browser.mjs']);
+  assert.equal(probe.qsk_02,true);
+  assert.equal(probe.browser,true);
+});
