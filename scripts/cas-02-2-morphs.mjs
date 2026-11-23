@@ -152,7 +152,7 @@ if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
   for(const kind of ['alex','mira']){
     const {buffer,metadata}=buildCas022Morphs(kind);
     writeFileSync(metadata.asset,buffer);
-    writeFileSync(metadata.asset.replace(/\\.glb$/,'.json'),JSON.stringify(metadata,null,2)+'\n');
+    writeFileSync(metadata.asset.slice(0,-4)+'.json',JSON.stringify(metadata,null,2)+'\n');
     console.log('CAS-02.2-A SOURCE MORPHS '+JSON.stringify(metadata));
   }
 }
