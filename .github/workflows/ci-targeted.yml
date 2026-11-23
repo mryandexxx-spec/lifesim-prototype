@@ -18,6 +18,7 @@ jobs:
       cas_baseline: ${{ steps.impact.outputs.cas_baseline }}
       cas_hud: ${{ steps.impact.outputs.cas_hud }}
       cas_soak: ${{ steps.impact.outputs.cas_soak }}
+      cas_modular: ${{ steps.impact.outputs.cas_modular }}
       e5: ${{ steps.impact.outputs.e5 }}
       fixture_motion: ${{ steps.impact.outputs.fixture_motion }}
       integration_qa: ${{ steps.impact.outputs.integration_qa }}
@@ -98,6 +99,18 @@ jobs:
           name: cas-01-7-mobile-pr
           path: artifacts/cas-01-7/
           if-no-files-found: ignore
+      - name: CAS-02.1-B original skinned interchangeable GLB and pose real mobile browser
+        if: ${{ needs.targeted.outputs.cas_modular == 'true' }}
+        run: |
+          node scripts/build-cas-modular-mannequin.mjs
+          node tests/cas-02-1-b-browser-smoke.mjs
+      - name: Archive CAS-02.1-B real skinned model visual evidence
+        if: ${{ always() && needs.targeted.outputs.cas_modular == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-02-1-b-mobile-pr
+          path: artifacts/cas-02-1-b/
+          if-no-files-found: error
       - name: CAS-01.8 actual 2/4 resident mobile-size WebGL performance and save soak
         if: ${{ needs.targeted.outputs.cas_soak == 'true' }}
         run: node tests/cas-01-8-browser-smoke.mjs
