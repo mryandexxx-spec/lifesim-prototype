@@ -6,8 +6,8 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
-const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
-const isUI=f=>f==='src/cas-cc0-shoe-fit-lab.js'||/^(?:index\.html|cas-modular-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
+const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
+const isUI=f=>f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||/^(?:index\.html|cas-modular-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
   // Changes to the live needs loop or SKU sleep quality require a real WebGL boot.
   /^src\/(?:simulation|need-balance|furniture-products)\.js$/.test(f)||
   /^src\/(?:game\.js|outdoor-character-motion|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
@@ -101,7 +101,7 @@ export function planChanges(files,root=ROOT){
   const cas_styles=changed.some(f=>
     /^(?:scripts\/build-cas-resident-footwear-v2\.mjs|tests\/cas-02-1-e-(?:footwear\.test\.js|browser-smoke\.mjs)|src\/character-lab(?:-config)?\.js|cas-resident-footwear-lab\.html)$/.test(f));
   const cas_cc0=changed.some(f=>
-    /^(?:scripts\/cas-02-1-f0-download-assets\.mjs|tests\/cas-02-1-f0-(?:sources\.test\.js|browser-smoke\.mjs)|cas-cc0-shoe-fit-lab\.html|src\/cas-cc0-shoe-fit-lab\.js)$/.test(f));
+    /^(?:scripts\/cas-02-1-f0-download-assets\.mjs|scripts\/cas-02-1-f1-split-dress\.mjs|scripts\/cas-02-1-f1-alex-underfoot\.mjs|tests\/cas-02-1-f0-(?:sources\.test\.js|browser-smoke\.mjs)|tests\/cas-02-1-f1-(?:shoe-split\.test\.js|browser-smoke\.mjs)|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|src\/cas-cc0-shoe-fit-lab\.js|src\/cas-cc0-shoe-rig-lab\.js)$/.test(f));
   const cas_hud=changed.some(f=>/^(?:src\/(?:resident-hud|career-phone-ui|game)\.js|tests\/cas-01-7-browser-smoke\.mjs)$/.test(f));
   const cas_inventory=changed.some(f=>['scripts/cas-00-dependency-inventory.mjs','tests/cas-00-dependency-inventory.test.js'].includes(f));
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');

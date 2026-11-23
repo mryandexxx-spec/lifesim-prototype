@@ -21,6 +21,10 @@ export const ASSET_SHA256=Object.freeze({
   boots:'b4bdafe8f7634a2c68aedd09ff5d01b9876856b0e0b6806aa2afe2f943e51fa2'
 });
 const PREFIX='https://grab3d.com/dl/';
+// Mirror is our already-published, SHA-verified F0 Pages release, not a new
+// untrusted model vendor. This is temporary redundancy until raw CC0 bytes
+// are vendored in Git; every retrieved model is checked against its vendor SHA.
+const AUDITED_PAGES='https://mryandexxx-spec.github.io/lifesim-prototype/assets/characters/cas-cc0-f0/';
 function sha256(bytes){return createHash('sha256').update(bytes).digest('hex');}
 export function inspectCandidateGlb(input,entry){
   if(!Buffer.isBuffer(input)||input.length<32||input.length>14_000_000)
@@ -76,6 +80,24 @@ async function getExternal(url,kind,{maxBytes=14_000_000}={}){
    return bytes;
  }finally{clearTimeout(timer)}
 }
+async function getAuditedPublishedFile(file,kind,{maxBytes=14_000_000}={}){
+ const url=AUDITED_PAGES+file;
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),30000);
+ try{
+  const res=await fetch(url,{signal:ctrl.signal,redirect:'follow',
+   headers:{'User-Agent':'LifeSim-CAS-pinned-CC0-mirror/1.0'}});
+  const end=new URL(res.url);
+  if(end.protocol!=='https:'||end.hostname!=='mryandexxx-spec.github.io'||
+   !end.pathname.startsWith('/lifesim-prototype/assets/characters/cas-cc0-f0/'))
+   throw Error('Audited F0 mirror redirect left first-party GitHub Pages');
+  if(!res.ok)throw Error('Audited Pages F0 missing '+file+' HTTP '+res.status);
+  const length=Number(res.headers.get('content-length')||0);
+  if(length>maxBytes)throw Error('Oversize audited mirror GLB');
+  const bytes=Buffer.from(await res.arrayBuffer());
+  if(bytes.length>maxBytes)throw Error('Oversize audited mirror response');
+  return kind==='text'?bytes.toString('utf8'):bytes;
+ }finally{clearTimeout(timer)}
+}
 function licenseChecked(license,manifest,entry){
  if(!/CC0|Creative Commons Zero|Public Domain/i.test(license))
    throw Error('No CC0 proof in '+entry.slug+' package LICENSE');
@@ -91,11 +113,25 @@ export async function downloadAndAuditCandidates(){
  const results=[];
  for(const entry of CC0_SHOE_CANDIDATES){
   const remote=PREFIX+entry.slug+'/';
-  const [bytes,license,licenseManifest]=await Promise.all([
+  let bytes,license,licenseManifest,distribution='publisher';
+  try{
+   [bytes,license,licenseManifest]=await Promise.all([
     getExternal(remote+entry.file,'bin'),
     getExternal(remote+'LICENSE.txt','text',{maxBytes:300000}),
     getExternal(remote+'manifest.json','text',{maxBytes:300000})
-  ]);
+   ]);
+  }catch(error){
+   // The published Pages copies come from our previous successful CI audit;
+   // they are not a license shortcut or weaker hash verification.
+   console.warn('CAS CC0 publisher unavailable, checking pinned Pages mirror:',
+    entry.id,error.message);
+   [bytes,license,licenseManifest]=await Promise.all([
+    getAuditedPublishedFile(entry.id+'.glb','bin'),
+    getAuditedPublishedFile(entry.id+'.license.txt','text',{maxBytes:300000}),
+    getAuditedPublishedFile(entry.id+'.origin.json','text',{maxBytes:300000})
+   ]);
+   distribution='pinned-first-party-pages-mirror';
+  }
   const manifest=JSON.parse(licenseManifest);
   licenseChecked(license,manifest,entry);
   const info=inspectCandidateGlb(bytes,entry);
@@ -107,7 +143,7 @@ export async function downloadAndAuditCandidates(){
   writeFileSync(base+'.origin.json',JSON.stringify(manifest,null,2)+'\n');
   const safeInfo={...info,license:'CC0-1.0',licenseSource:remote+'LICENSE.txt',
     originSource:remote+'manifest.json',modelSource:remote+entry.file,
-    sourcePage:entry.page,originalFile:entry.file,
+    sourcePage:entry.page,originalFile:entry.file,distribution,
     productionReady:false,fitConfirmed:false,rightsOwnerVerified:false,
     requiresOptimization:true,requiresTwoFootRetarget:true};
   writeFileSync(base+'.audit.json',JSON.stringify(safeInfo,null,2)+'\n');
