@@ -47,3 +47,19 @@ test('C3 source pose and complete disjoint shoe parts export on both resident ri
     }
   }
 });
+
+test('C3 shoes have sampled support envelopes against each resident’s original clip', {skip: !built && !strict}, () => {
+  const manifest = JSON.parse(readFileSync(manifestPath));
+  for (const {contact} of Object.values(manifest.wearers)) {
+    assert.equal(Object.keys(contact).length, 5);
+    for (const [clip, outfits] of Object.entries(contact)) {
+      for (const style of C3_STYLES) {
+        const {offsetY, maxLiftOnOriginalSupport, sourceSupportSamples, sampleCount, peakSupportPointDeltaPerSample} = outfits[style];
+        assert.ok(Math.abs(offsetY) < .04);
+        assert.ok(maxLiftOnOriginalSupport < .012, clip + '/' + style);
+        assert.ok(sampleCount >= 1 && sourceSupportSamples >= 1);
+        assert.ok(Number.isFinite(peakSupportPointDeltaPerSample));
+      }
+    }
+  }
+});

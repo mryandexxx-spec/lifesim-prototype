@@ -27,22 +27,28 @@ function localMatrix(node) {
   ];
 }
 
+export function modelResolver(gltf, pose = new Map()) {
+  const children = new Map(gltf.nodes.flatMap((n, i) => (n.children ?? []).map(child => [child, i])));
+  const cache = new Map();
+  function modelMatrix(index) {
+    if (cache.has(index)) return cache.get(index);
+    const local = localMatrix({...gltf.nodes[index], ...pose.get(index)});
+    const ancestor = children.get(index);
+    const matrix = ancestor === undefined ? local : multiply(modelMatrix(ancestor), local);
+    cache.set(index, matrix);
+    return matrix;
+  }
+
+  return modelMatrix;
+}
+
 export function readBindRig(editor, resident) {
   const {gltf, source} = editor;
   if (source.sourceSha256 !== SOURCE_SHA256[resident]) throw new Error('C3 resident source hash mismatch');
   const skin = gltf.skins[0];
   if (gltf.skins.length !== 1 || skin.joints.length !== 66 || !gltf.animations.length)
     throw new Error('C3 resident rig structure changed');
-  const children = new Map(gltf.nodes.flatMap((n, i) => (n.children ?? []).map(child => [child, i])));
-  const cache = new Map();
-  function modelMatrix(index) {
-    if (cache.has(index)) return cache.get(index);
-    const local = localMatrix(gltf.nodes[index]);
-    const ancestor = children.get(index);
-    const matrix = ancestor === undefined ? local : multiply(modelMatrix(ancestor), local);
-    cache.set(index, matrix);
-    return matrix;
-  }
+  const modelMatrix = modelResolver(gltf);
 
   const inverses = editor.read(skin.inverseBindMatrices);
   const maxBindError = Math.max(...skin.joints.map((node, j) =>

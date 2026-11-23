@@ -9,6 +9,31 @@ app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
 app.setCanvasResolution(pc.RESOLUTION_AUTO);
 app.scene.ambientLight = new pc.Color(.62, .66, .62);
 
+const sockMaterial = new pc.StandardMaterial();
+sockMaterial.diffuse = new pc.Color(.38, .39, .37);
+sockMaterial.gloss = .09;
+const knit = new pc.Texture(app.graphicsDevice, {name: 'Sock knit', width: 64, height: 64,
+  format: pc.PIXELFORMAT_RGBA8, addressU: pc.ADDRESS_REPEAT, addressV: pc.ADDRESS_REPEAT,
+  minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR});
+const texels = knit.lock();
+for (let y = 0; y < 64; y++) {
+  for (let x = 0; x < 64; x++) {
+    const rib = Math.cos(x * Math.PI / 4) * 7;
+    const stitch = Math.cos(y * Math.PI / 4 + Math.cos(x * Math.PI / 8)) * 5;
+    const offset = (y * 64 + x) * 4;
+    texels[offset] = texels[offset + 1] = texels[offset + 2] = 218 + rib + stitch;
+    texels[offset + 3] = 255;
+  }
+}
+knit.unlock();
+sockMaterial.diffuseMap = knit;
+sockMaterial.diffuseMapTiling.set(3, 3);
+sockMaterial.update();
+function fabric(entity) {
+  if (entity?.name.includes(' sock ')) {
+    for (const mesh of entity.render.meshInstances) mesh.material = sockMaterial;
+  }
+}
 const camera = new pc.Entity('Camera');
 camera.addComponent('camera', {fov: 42, nearClip: .02, farClip: 30,
   clearColor: new pc.Color(.9, .92, .89)});
@@ -42,10 +67,11 @@ function updateCamera() {
   const height = $('controls').getBoundingClientRect().top;
   const top = Math.max(.45, Math.min(1, (height - 7) / innerHeight));
   camera.camera.rect = new pc.Vec4(0, 1 - top, 1, top);
+  document.body.style.setProperty('--control-top', Math.floor(top*innerHeight) + 'px');
   const isGroup = actors.length > 1;
   const distance = (isGroup ? (view.wide ? 6.8 : 5.0) :
     (view.wide ? 2.9 : 1.14)) * view.zoom;
-  const focus = new pc.Vec3(0, view.wide ? .83 : .15, 0);
+  const focus = new pc.Vec3(0, view.wide ? .83 : (isGroup ? .5 : .15), 0);
   const yaw = view.yaw * Math.PI / 180;
   const pitch = view.pitch * Math.PI / 180;
   camera.setPosition(Math.sin(yaw) * Math.cos(pitch) * distance,
@@ -80,19 +106,21 @@ async function assemble(resident, index, count) {
   root.setPosition((index - (count - 1) / 2) * .64, 0, 0);
   const original = root.findByName(definition.originalRender);
   const body = root.findByName('C3 body');
+  const bootBody = root.findByName('C3 body boot');
   const layers = ['foot', 'sock'].map(layer =>
     ['left', 'right'].map(side => root.findByName('C3 ' + layer + ' ' + side)));
-  if (!original?.render || !body?.render || layers.flat().some(layer => !layer?.render)) {
+  if (!original?.render || !body?.render || !bootBody?.render || layers.flat().some(layer => !layer?.render)) {
     root.destroy();
     throw new Error('Модель персонажа собрана неполностью');
   }
+  layers[1].forEach(fabric);
   const bind = root.find(node => node.name.startsWith('mixamorig:')).map(node =>
     [node, node.getLocalPosition().clone(), node.getLocalRotation().clone(), node.getLocalScale().clone()]);
   root.addComponent('anim', {activate: true});
   for (const {resource: clip} of part.animations)
     root.anim.assignAnimation(clip.name, clip, undefined, 1, true);
   app.root.addChild(root);
-  return {root, original, body, layers, clips: part.animations.map(a => a.resource.name),
+  return {root, original, body, bootBody, layers, clips: part.animations.map(a => a.resource.name),
     definition, resident, footwear: [], bind};
 }
 
@@ -110,6 +138,7 @@ function makeShoeNodes(container, actor) {
       entity.reparent(actor.root);
       moved.push(entity);
       render.rootBone = actor.root;
+      fabric(entity);
       for (const mesh of render.meshInstances) {
         const skin = mesh.skinInstance;
         if (!skin || skin.bones.some((bone, index) => bone === entity ||
@@ -127,8 +156,9 @@ function makeShoeNodes(container, actor) {
 
 function setLayers() {
   const socks = $('socks').value === 'on';
-  for (const {body, original, layers, footwear} of actors) {
-    body.enabled = active.outfit !== 'original';
+  for (const {body, bootBody, original, layers, footwear} of actors) {
+    body.enabled = active.outfit !== 'original' && active.outfit !== 'boots';
+    bootBody.enabled = active.outfit === 'boots';
     original.enabled = active.outfit === 'original';
     const bare = active.outfit === 'bare';
     layers[0].forEach(node => {node.enabled = bare && !socks;});
@@ -142,7 +172,8 @@ function setLayers() {
 async function equip() {
   const nonce = ++epoch;
   const next = {resident: $('resident').value, outfit: $('outfit').value};
-  const ids = next.resident === 'four' ? ['alex', 'mira', 'alex', 'mira'] : [next.resident];
+  const ids = next.resident === 'four' ? ['alex', 'mira', 'alex', 'mira'] :
+    next.resident === 'two' ? ['alex', 'mira'] : [next.resident];
   const changed = active?.resident !== next.resident;
   const staged = [];
   const nodes = [];
@@ -176,6 +207,7 @@ async function equip() {
     active = next;
     setLayers();
     if (changed) setMotion();
+    else setGround();
     updateCamera();
     $('status').textContent = 'Лабораторная примерка';
   } catch (error) {
@@ -188,6 +220,14 @@ async function equip() {
   } finally {
     for (const actor of staged) actor.root.destroy();
     for (const group of nodes) for (const node of group) node.destroy();
+  }
+}
+
+function setGround() {
+  for (const actor of actors) {
+    const clip = $('motion').value === 'bind' ? 'bind' : actor.root.anim.baseLayer.activeState;
+    const y = actor.definition.contact?.[clip]?.[active.outfit]?.offsetY ?? 0;
+    actor.root.setLocalPosition(actor.root.getLocalPosition().x, y, 0);
   }
 }
 
@@ -211,6 +251,7 @@ function setMotion() {
     }
     actor.root.anim.playing = motion !== 'bind' && !paused;
   }
+  if (active) setGround();
   $('frames').hidden = !paused || motion === 'bind';
   $('pause').disabled = motion === 'bind';
   updateCamera();
@@ -290,7 +331,7 @@ app.on('update', dt => {
 });
 window.__LifeSimCasC3 = () => ({
   active, fps, originalFallback, residents: actors.map(actor => ({
-    resident: actor.resident, activeClip: actor.root.anim.baseLayer.activeState, original: actor.original.enabled,
+    resident: actor.resident, groundOffset: actor.root.getLocalPosition().y, activeClip: actor.root.anim.baseLayer.activeState, original: actor.original.enabled,
     lean: actor.root.findByName('mixamorig:LeftToeBase').getPosition().toArray(),
     garment: actor.footwear.filter(node => node.enabled).map(node => node.name),
     skinned: actor.footwear.every(node => node.render.rootBone === actor.root)

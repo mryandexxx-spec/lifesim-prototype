@@ -208,15 +208,19 @@ export function buildBody(bytes, resident, template) {
   const trimmed = clipAnkles(vertices, faces, seamY);
   const parent = gltf.nodes.find(n => n.children?.includes(node));
   const siblings = parent?.children ?? gltf.scenes[gltf.scene ?? 0].nodes;
-  function attach(name, data, material) {
-    const mesh = gltf.meshes.push({name, primitives: [primitive(editor, data.vertices, data.faces, material)]}) - 1;
+  function attachPrimitive(name, part) {
+    const mesh = gltf.meshes.push({name, primitives: [part]}) - 1;
     siblings.push(gltf.nodes.push({...original, name, mesh}) - 1);
+  }
+  function attach(name, data, material) {
+    attachPrimitive(name, primitive(editor, data.vertices, data.faces, material));
   }
   const mat = (name, color, roughness) => gltf.materials.push({name, pbrMetallicRoughness: {
     baseColorFactor: color, roughnessFactor: roughness, metallicFactor: 0}}) - 1;
   const skinMat = mat('Foot skin', skin, .86);
   const sockMat = mat('Cotton sock', [.22, .215, .195, 1], .99);
-  attach('C3 body', trimmed, source.material);
+  const bodyPrimitive = primitive(editor, trimmed.vertices, trimmed.faces, source.material);
+  attachPrimitive('C3 body', bodyPrimitive);
   const sockets = {};
   for (const side of SIDES) {
     const soleShell = vertices.filter(v => v.position[1] < .05 && (v.position[0] > 0) === (side === 'left'));
@@ -227,6 +231,19 @@ export function buildBody(bytes, resident, template) {
     attach('C3 sock ' + side, sock, sockMat);
     sockets[side] = {...rig.sides[side], ...neutral.profile};
   }
+  const tucked = trimmed.vertices.map(v => {
+    const [x, y, z] = v.position;
+    if (y > seamY + .08) return v;
+    const side = x > 0 ? 'left' : 'right';
+    const [cx, cz] = sockets[side].seam.center;
+    const dx = x - cx, dz = z - cz;
+    const radial = Math.hypot(dx / .028, dz / .041);
+    const taper = 1 - smooth((y - seamY - .024) / .056);
+    const scale = 1 - (1 - Math.min(1, .95 / Math.max(radial, 1e-5))) * taper;
+    return {...v, position: [cx + dx*scale, y, cz + dz*scale]};
+  });
+  attachPrimitive('C3 body boot', {...bodyPrimitive, attributes: {...bodyPrimitive.attributes,
+    POSITION: editor.append(tucked.map(v => v.position), 'VEC3', 5126, 34962, true)}});
   const profile = {...rig, templateSha256: digest(Buffer.from(JSON.stringify(template))),
     originalRender: original.name, sides: sockets};
   return {glb: editor.finish(), profile};

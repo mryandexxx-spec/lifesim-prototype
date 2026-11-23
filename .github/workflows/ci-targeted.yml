@@ -99,6 +99,7 @@ jobs:
           node scripts/cas-02-1-f0-download-assets.mjs
           node scripts/cas-c3-shoes.mjs
           CAS_C3_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c3-*.test.js
+          node scripts/cas-c3-probe-fourth.mjs
           node tests/cas-02-1-f2-c3-browser-smoke.mjs
       - name: Archive CAS F2 C3 screenshots and probe
         if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}

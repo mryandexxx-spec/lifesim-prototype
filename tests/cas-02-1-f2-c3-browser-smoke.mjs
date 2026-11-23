@@ -76,6 +76,9 @@ try {
     await wait('mira', 'original');
     assert.equal((await probe()).residents[0].original, true);
     assert.deepEqual((await probe()).residents[0].garment, []);
+    await page.locator('#resident').selectOption('two');
+    await wait('two', 'original');
+    assert.equal((await probe()).residents.length, 2);
     await page.locator('#resident').selectOption('four');
     await wait('four', 'original');
     await page.locator('#outfit').selectOption('sneakers');

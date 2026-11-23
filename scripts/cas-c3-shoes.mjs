@@ -2,6 +2,7 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {ASSET_SHA256} from './cas-02-1-f0-download-assets.mjs';
 import {digest, editGlb, primitive} from './cas-c3-glb.mjs';
+import {supportReport} from './cas-c3-contact.mjs';
 import {bakeBodies, interpolateVertex, packWeights} from './cas-c3-body.mjs';
 
 export const C3_STYLES = ['dress', 'sneakers', 'boots'];
@@ -44,14 +45,14 @@ function selectSide(source, part) {
   return {
     vertices: converted, faces: faces.map(f => f.map(i => indexMap.get(i))),
     originalKeys: new Set(used.map(i => pointKey(source.vertices[i].position))),
-    collar: part.collarRoofY.map(y => y - ground)
+    collar: part.collarRoofY.map(y => y - ground), openingRadiiXZ: part.openingRadiiXZ
   };
 }
 
 export function normalizeShoePair(bytes, style) {
   const entry = settings[style];
   const seam = editGlb(bytes);
-  if (!entry || seam.source.sourceSha256 !== entry.sourceSha256 || entry.sourceSha256 !== ASSET_SHA256[style])
+  if (!entry || seam.source.sourceSha256 !== entry.sourceSha256 || (ASSET_SHA256[style] && entry.sourceSha256 !== ASSET_SHA256[style]))
     throw new Error('Unrecognized C3 shoe source');
   const base = seam.gltf.meshes[0].primitives[0];
   if (seam.gltf.skins?.length || seam.gltf.meshes.length !== 1 || seam.gltf.meshes[0].primitives.length !== 1)
@@ -88,12 +89,14 @@ function fitShoe(source, target, localJoint, style) {
     return {...v, position, ...packWeights([[Leg, calf], [Foot, (1-calf)*(1-bend)], [ToeBase, (1-calf)*bend]])};
   });
   return {vertices, faces: source.faces, scale, collar: [back, mid, front], origin: [ax, ground, az],
+    openingRadiiXZ: source.openingRadiiXZ.map(n => n * scale),
     sole: [ax, ground, az + heel*scale], toe: [ax, ground, az + toe*scale]};
 }
 
 function clipForOpening(layer, fit) {
   const [back, middle, front] = fit.collar;
-  const [, , az] = fit.origin;
+  const [ax, , az] = fit.origin;
+  const [rx, rz] = fit.openingRadiiXZ;
   function visible([, y, z]) {
     const cut = z < az
       ? middle + (back-middle)*Math.min(1, (az-z)/.037)
@@ -105,7 +108,7 @@ function clipForOpening(layer, fit) {
   const retained = new Map(), intersections = new Map();
   const offsets = vertices.map(v => visible(v.position));
   function retain(i) {
-    if (!retained.has(i)) retained.set(i, out.push(vertices[i]) - 1);
+    if (!retained.has(i)) retained.set(i, out.push({...vertices[i]}) - 1);
     return retained.get(i);
   }
   function cut(i, j) {
@@ -122,6 +125,19 @@ function clipForOpening(layer, fit) {
       if ((offsets[i] >= 0) !== (offsets[j] >= 0)) polygon.push(cut(i,j));
     }
     for (let i=1; i+1<polygon.length; i++) kept.push([polygon[0],polygon[i],polygon[i+1]]);
+  }
+  const rimTop = Math.max(back, middle, front);
+  for (const v of out) {
+    const [x, y, z] = v.position;
+    const dx = x - ax;
+    const dz = z - az;
+    const radial = Math.hypot(dx / rx, dz / rz);
+    const inside = Math.min(1, .93 / Math.max(radial, 1e-5));
+    // Conform only the hidden overlap and opening. The ankle seam above
+    // this zone retains precisely the authored positions and skinning.
+    const taper = 1 - smooth((y - rimTop) / .029);
+    const scale = 1 - (1 - inside) * taper;
+    v.position = [ax + dx * scale, y, az + dz * scale];
   }
   return {vertices: out, faces: kept};
 }
@@ -178,13 +194,16 @@ export function bakeFootwear() {
     const profile = JSON.parse(readFileSync(new URL(resident + '.profile.json', folder)));
     const wearer = {body: resident + '.glb', bodySha256: digest(body),
       inverseBindSha256: profile.inverseBindSha256, originalRender: profile.originalRender, styles: {}};
+    const outfits = {};
     for (const style of C3_STYLES) {
       const bytes = readFileSync(new URL('../cas-cc0-f0/' + style + '.glb', folder));
       const {glb, stats} = buildWearable(body, profile, bytes, style);
       const file = resident + '-' + style + '.glb';
       writeFileSync(new URL(file, folder), glb);
       wearer.styles[style] = {file, sha256: digest(glb), sides: stats};
+      outfits[style] = glb;
     }
+    wearer.contact = supportReport(body, profile.originalRender, outfits);
     manifest.wearers[resident] = wearer;
   }
   writeFileSync(new URL('manifest.json', folder), JSON.stringify(manifest, null, 2) + '\n');
