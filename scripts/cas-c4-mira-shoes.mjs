@@ -77,9 +77,14 @@ function normalizeHalf(source, faceIds, side, target) {
       (v.position[1]-ymin)*MH_UNIT,
       (v.position[2]-centerZ)*MH_UNIT]}));
   const localZ = vertices.map(v=>v.position[2]);
-  const back = vertices.filter((v,i)=>localZ[i] < -length*.19).map(v=>v.position[1]);
-  const middle = vertices.filter((v,i)=>Math.abs(localZ[i]) <= length*.19).map(v=>v.position[1]);
-  const front = vertices.filter((v,i)=>localZ[i] > length*.19).map(v=>v.position[1]);
+  const floorZ = Math.min(...localZ);
+  // Collar height bands are measured from the shoe's own heel and toe,
+  // never from the avatar's ankle coordinate or a centred AABB origin.
+  // This remains valid after semantic heel-to-ankle normalization.
+  const longitudinal = localZ.map(z=>(z-floorZ)/length);
+  const back = vertices.filter((v,i)=>longitudinal[i] < 1/3).map(v=>v.position[1]);
+  const middle = vertices.filter((v,i)=>longitudinal[i] >= 1/3 && longitudinal[i] < 2/3).map(v=>v.position[1]);
+  const front = vertices.filter((v,i)=>longitudinal[i] >= 2/3).map(v=>v.position[1]);
   const roof = [back,middle,front].map(a=>percentile(a,.89));
   const openingRadiiXZ = [Math.max(width*.6,.02),Math.max(length*.36,.055)];
   return {vertices, faces: faces.map(face=>face.map(i=>remap.get(i))),
