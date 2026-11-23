@@ -145,6 +145,8 @@ jobs:
           node scripts/cas-02-1-f0-download-assets.mjs
           node scripts/cas-02-1-f1-split-dress.mjs
           node scripts/cas-02-1-f1-alex-underfoot.mjs
+          node scripts/cas-02-1-f2-real-source-audit.mjs
+          node --test tests/cas-02-1-f2-real-sources.test.js
           node tests/cas-02-1-f0-browser-smoke.mjs
           node tests/cas-02-1-f1-browser-smoke.mjs
       - name: Archive CAS-02.1-F0 actual GLB/CC0 license and source verification
@@ -154,6 +156,7 @@ jobs:
           name: cas-02-1-f0-licensed-source-audit
           path: |
             assets/characters/cas-cc0-f0/*.audit.json
+            assets/characters/cas-cc0-f2/*.assessment.json
             assets/characters/cas-cc0-f0/*.origin.json
             assets/characters/cas-cc0-f0/*.license.txt
             assets/characters/cas-cc0-f0/index.json
