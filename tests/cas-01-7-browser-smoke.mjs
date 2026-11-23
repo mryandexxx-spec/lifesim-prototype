@@ -71,6 +71,20 @@ try{
     await page.locator('#conversation-btn').tap();
     await page.locator('#social-menu-panel').waitFor({state:'visible'});
     await page.locator('#social-menu-options button').filter({hasText:'Поговорить'}).first().tap();
+    const stage=await page.evaluate(()=>{
+      const summary=id=>{
+        const el=document.getElementById(id),r=el.getBoundingClientRect();
+        const css=getComputedStyle(el);
+        return {hidden:el.hidden,display:css.display,visibility:css.visibility,
+          left:r.left,top:r.top,width:r.width,height:r.height,scrollTop:el.scrollTop};
+      };
+      const button=[...document.querySelectorAll('#social-menu-options button')]
+        .find(e=>e.textContent.includes('В очередь · Поговорить'));
+      return {context:summary('social-context'),menu:summary('social-menu-panel'),
+        confirm:button?{parentHidden:button.closest('[hidden]')?.id||null,
+          rect:button.getBoundingClientRect().toJSON()}:null};
+    });
+    console.log('SOCIAL-QUEUE-R1 stage '+initiator+' '+JSON.stringify(stage));
     await page.locator('#social-menu-options button').filter({hasText:'В очередь · Поговорить'}).tap();
     const live=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
     assert.ok(live.actionQueues.byResident[initiator].some(task=>
