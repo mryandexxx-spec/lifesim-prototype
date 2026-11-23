@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {buildCasMannequinGlb,SLOTS,RIG_SOURCE} from '../scripts/build-cas-modular-mannequin.mjs';
+import {buildCasMannequinGlb,SLOTS,ALL_SLOTS,RIG_SOURCE} from '../scripts/build-cas-modular-mannequin.mjs';
 const unpack=b=>{
  assert.equal(b.readUInt32LE(0),0x46546c67);assert.equal(b.readUInt32LE(4),2);
  assert.equal(b.readUInt32LE(8),b.length);assert.equal(b.readUInt32LE(16),0x4e4f534a);
@@ -21,11 +21,11 @@ test('CAS-02.1-B deterministically exports a real original GLB with provenance',
  assert.equal(g.asset.generator,RIG_SOURCE);assert.equal(g.extras.productionReady,false);
  assert.equal(g.buffers[0].byteLength,bin.length);assert.equal(createHash('sha256').update(a.buffer).digest('hex').length,64);
  assert.equal(g.skins.length,1);assert.equal(g.skins[0].joints.length,18);
- assert.deepEqual(g.extras.slots,SLOTS);
+ assert.deepEqual(g.extras.slots,ALL_SLOTS);
 });
 test('CAS-02.1-B five independent skinned meshes share joint order and physically verified bind transforms',()=>{
  const {buffer,bindDigest}=buildCasMannequinGlb(),{g,bin}=unpack(buffer);
- assert.equal(g.meshes.length,5);assert.equal(g.nodes.filter(n=>n.skin===0).length,5);
+ assert.equal(g.meshes.length,9);assert.equal(g.nodes.filter(n=>n.skin===0).length,9);
  const skin=g.skins[0],ibm=values(skin.inverseBindMatrices,g,bin);
  assert.equal(createHash('sha256').update(Buffer.from(ibm.buffer,ibm.byteOffset,ibm.byteLength)).digest('hex'),bindDigest);
  const global=skin.joints.map(id=>{
@@ -36,9 +36,9 @@ test('CAS-02.1-B five independent skinned meshes share joint order and physicall
  });
  for(let k=0;k<skin.joints.length;k++)for(let j=0;j<3;j++)
   assert.ok(Math.abs(ibm[16*k+12+j]+global[k][j])<.00001);
- for(let i=0;i<SLOTS.length;i++){
+ for(let i=0;i<ALL_SLOTS.length;i++){
   const mesh=g.meshes[i],prim=mesh.primitives[0];
-  assert.equal(g.nodes.find(n=>n.mesh===i).name,'CAS slot '+SLOTS[i]);
+  assert.equal(g.nodes.find(n=>n.mesh===i).name,'CAS slot '+ALL_SLOTS[i]);
   assert.deepEqual(Object.keys(prim.attributes).sort(),['JOINTS_0','NORMAL','POSITION','WEIGHTS_0']);
   const js=values(prim.attributes.JOINTS_0,g,bin),ws=values(prim.attributes.WEIGHTS_0,g,bin);
   assert.equal(js.length,ws.length);assert.ok(ws.length>0);
@@ -60,5 +60,5 @@ test('CAS-02.1-B source-authored animations target valid bones with real rotatio
 test('CAS-02.1-B renders no false production readiness and never accesses save-v1',()=>{
  const {json}=buildCasMannequinGlb();
  assert.equal(json.extras.productionReady,false);assert.ok(!JSON.stringify(json).includes('lifesim.room01.v1'));
- assert.equal(json.nodes.filter(n=>n.name.startsWith('CAS slot ')).length,5);
+ assert.equal(json.nodes.filter(n=>n.name.startsWith('CAS slot ')).length,9);
 });
