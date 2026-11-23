@@ -240,8 +240,9 @@ function makeSockLayer(socket){
  const garment=buildFootSurface(socket.profile,{kind:'sock'});
  const neutral=buildFootSurface(socket.profile,{kind:'neutral'});
  const mesh=new pc.Mesh(app.graphicsDevice);
- const mat=new pc.BasicMaterial();
- mat.color=new pc.Color(.79,.82,.77);
+ const mat=new pc.StandardMaterial();
+ mat.diffuse=new pc.Color(.79,.82,.77);
+ mat.useLighting=true;
  mat.cull=pc.CULLFACE_NONE;
  mat.update();
  const e=new pc.Entity('F2 anatomical sock '+socket.side);
@@ -323,7 +324,7 @@ function applyMode(){
   for(const side of ['left','right'])pair.sides[side].anchor.enabled=!original&&id===mode;
  for(const item of Object.values(sockLayers))item.entity.enabled=!original;
  for(const item of Object.values(sockLayers)){
-  item.mat.color=socks?new pc.Color(.79,.82,.77):new pc.Color(.72,.52,.41);
+  item.mat.diffuse=socks?new pc.Color(.79,.82,.77):new pc.Color(.72,.52,.41);
   item.mat.update();
  }
  status(original?'Исходные белые кроссовки восстановлены.':
