@@ -347,7 +347,8 @@ export function explainAdditionalResidentAutonomy(root,id){
       plannedAction:plan?.id||null});
     if(plan)return {blocked:null,selected:plan.id,plan,attempts};
   }
-  if(Number.isFinite(actor.needs.social)&&actor.needs.social<35){
+  if(evaluation.selected===null&&Number.isFinite(actor.needs.social)&&
+    actor.needs.social<35){
     const mirror=prepareCommand(root,id,{type:'object',actionId:'mirror'});
     attempts.push({id:'mirror',score:null,reason:'low-social-real-mirror',
       availability:mirror?'free-and-reachable':'unavailable-or-unreachable',
@@ -365,6 +366,9 @@ export function startAdditionalResidentAutonomy(root,id){
   actor.minutes=root.minutes;
   if(explanation.plan&&startPlannedObject(root,id,explanation.plan,true))
     return true;
+  // No eligible need: do not repeatedly postpone a future need merely
+  // because this resident is presently healthy and content.
+  if(explanation.attempts.length===0)return false;
   // A bounded failure cooldown prevents tight frame retries if nothing
   // eligible is physically reachable, with no queue/money/need mutation.
   actor.autonomy.nextAt=Math.max(root.minutes+2,actor.autonomy.nextAt||0);
