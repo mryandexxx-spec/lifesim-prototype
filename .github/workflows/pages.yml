@@ -51,6 +51,8 @@ jobs:
           node --check src/cas-f2-c3-lab.js
           node --check src/cas-cc0-shoe-rig-lab.js
           npm test
+          node --check scripts/qsk-04-asset-qa.mjs
+          node scripts/qsk-04-asset-qa.mjs
           node --check src/game.js
           node --check src/viewport-health.js
           node --check src/loading-progress.js
