@@ -5,6 +5,8 @@ import {fileURLToPath} from 'node:url';
 
 export const RIG_SOURCE='LifeSim original source-authored mannequin generator v1';
 export const SLOTS=['body','hair','top','trousers','shoes'];
+export const VARIANT_SLOTS=['hair-alt','top-alt','trousers-alt','shoes-alt'];
+export const ALL_SLOTS=[...SLOTS,...VARIANT_SLOTS];
 const defs=[
  ['Hips',-1,[0,1.02,0]],['Spine',0,[0,.22,0]],['Neck',1,[0,.40,0]],['Head',2,[0,.20,0]],
  ['LeftShoulder',1,[-.18,.32,0]],['LeftArm',4,[-.22,-.10,0]],['LeftForeArm',5,[-.23,-.25,0]],['LeftHand',6,[-.17,-.23,0]],
@@ -50,7 +52,7 @@ function ellipsoid(center,radius,bone,lat=10,lon=14,start=0,end=Math.PI){
  }
  return out;
 }
-const parts=Object.fromEntries(SLOTS.map(s=>[s,{v:[],idx:[]}]));
+const parts=Object.fromEntries(ALL_SLOTS.map(s=>[s,{v:[],idx:[]}]));
 function add(slot,shape){const p=parts[slot],off=p.v.length;p.v.push(...shape.v);p.idx.push(...shape.idx.map(i=>i+off));}
 // Metres, +Y world, named detachable weighted meshes. Original geometric prototype.
 add('body',segment([0,1.06,0],[0,1.48,0],.16,.13,0,1));
@@ -72,6 +74,15 @@ for(const side of [-1,1]){
 add('top',segment([0,1.12,0],[0,1.48,0],.174,.145,0,1));
 add('trousers',segment([0,.90,0],[0,1.11,0],.185,.185,0,0,4));
 add('hair',ellipsoid([0,1.70,0],[.137,.165,.115],3,7,14,0,Math.PI*.57));
+add('hair-alt',ellipsoid([0,1.735,0],[.156,.19,.14],3,8,16,0,Math.PI*.65));
+for(const side of [-1,1]){
+ const arm=side<0?5:9,thigh=side<0?12:15,knee=side<0?13:16,foot=side<0?14:17;
+ add('top-alt',segment(world[arm],world[arm].map((x,i)=>i===1?x-.14:x),.097,.079,arm,arm,3));
+ add('trousers-alt',segment(world[thigh],world[knee],.11,.097,thigh,knee,3));
+ add('shoes-alt',ellipsoid([world[foot][0],world[foot][1]+.025,world[foot][2]+.035],[.084,.105,.142],foot,9,12));
+}
+add('top-alt',segment([0,1.08,0],[0,1.50,0],.185,.161,0,1));
+add('trousers-alt',segment([0,.91,0],[0,1.10,0],.2,.195,0,0,3));
 
 function binary(){
  const chunks=[],views=[],accessors=[];let offset=0;
@@ -85,7 +96,7 @@ function binary(){
   return accessor;
  }
  const meshDefs=[];
- for(const slot of SLOTS){
+ for(const slot of ALL_SLOTS){
   const {v,idx}=parts[slot];
   const pos=new Float32Array(v.flatMap(x=>x.p));
   const normal=new Float32Array(v.flatMap(x=>{const p=x.p;const c=[0,(slot==='hair'?1.70:1.05),0];const a=p.map((z,k)=>z-c[k]);const l=Math.hypot(...a)||1;return a.map(z=>z/l)}));
@@ -99,7 +110,7 @@ function binary(){
    NORMAL:push(normal,5126,'VEC3',v.length,34962),
    JOINTS_0:push(j,5123,'VEC4',v.length,34962),
    WEIGHTS_0:push(w,5126,'VEC4',v.length,34962)
-  },indices:push(index,5123,'SCALAR',idx.length,34963),material:SLOTS.indexOf(slot)}]});
+  },indices:push(index,5123,'SCALAR',idx.length,34963),material:ALL_SLOTS.indexOf(slot)}]});
  }
  const binds=new Float32Array(world.flatMap(p=>[1,0,0,0,0,1,0,0,0,0,1,0,-p[0],-p[1],-p[2],1]));
  const bindAccess=push(binds,5126,'MAT4',defs.length);
@@ -123,16 +134,16 @@ function binary(){
  for(let i=0;i<defs.length;i++){
   const parent=defs[i][1];nodes[parent<0?0:parent+1].children.push(i+1);
  }
- for(let i=0;i<SLOTS.length;i++){
-  nodes.push({name:'CAS slot '+SLOTS[i],mesh:i,skin:0});
+ for(let i=0;i<ALL_SLOTS.length;i++){
+  nodes.push({name:'CAS slot '+ALL_SLOTS[i],mesh:i,skin:0});
   nodes[0].children.push(nodes.length-1);
  }
- const colors=[[.83,.61,.43,1],[.17,.12,.11,1],[.13,.46,.69,1],[.16,.25,.37,1],[.18,.17,.2,1]];
+ const colors=[[.83,.61,.43,1],[.17,.12,.11,1],[.13,.46,.69,1],[.16,.25,.37,1],[.18,.17,.2,1],[.43,.18,.14,1],[.68,.27,.33,1],[.24,.42,.34,1],[.44,.30,.2,1]];
  const json={asset:{version:'2.0',generator:RIG_SOURCE},scene:0,scenes:[{nodes:[0]}],nodes,
   skins:[{name:'CAS original canonical rig',joints:defs.map((_,i)=>i+1),skeleton:1,inverseBindMatrices:bindAccess}],
-  meshes:meshDefs,materials:colors.map((c,i)=>({name:SLOTS[i],doubleSided:true,pbrMetallicRoughness:{baseColorFactor:c,metallicFactor:0,roughnessFactor:.86}})),
+  meshes:meshDefs,materials:colors.map((c,i)=>({name:ALL_SLOTS[i],doubleSided:true,pbrMetallicRoughness:{baseColorFactor:c,metallicFactor:0,roughnessFactor:.86}})),
   animations,accessors,bufferViews:views,buffers:[{byteLength:offset}],
-  extras:{casProto:1,slots:SLOTS,bindSha256:bindDigest,source:RIG_SOURCE,license:'original authored code; no third-party data',productionReady:false}};
+  extras:{casProto:1,slots:ALL_SLOTS,bindSha256:bindDigest,source:RIG_SOURCE,license:'original authored code; no third-party data',productionReady:false}};
  const blob=Buffer.alloc(offset);let at=0;for(const chunk of chunks){chunk.copy(blob,at);at+=pad(chunk.length)}
  return {json,blob,bindDigest};
 }
@@ -153,7 +164,7 @@ if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
   author:'LifeSim project original code',license:'original project-authored source; no third-party data',
   source:'scripts/build-cas-modular-mannequin.mjs',productionReady:false,
   sha256:createHash('sha256').update(buffer).digest('hex'),bytes:buffer.length,
-  bindSha256:bindDigest,slots:SLOTS,triangles:json.meshes.reduce((sum,m)=>sum+json.accessors[m.primitives[0].indices].count/3,0),
+  bindSha256:bindDigest,slots:ALL_SLOTS,triangles:json.meshes.reduce((sum,m)=>sum+json.accessors[m.primitives[0].indices].count/3,0),
   joints:defs.length,animations:json.animations.map(x=>x.name),rootSaveChanged:false};
  writeFileSync('assets/characters/cas-modular-mannequin-v1.json',JSON.stringify(manifest,null,2)+'\n');
  console.log('CAS-02.1-B generated',JSON.stringify(manifest));
