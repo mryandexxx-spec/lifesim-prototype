@@ -9,7 +9,11 @@ import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './na
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {BED_SLOT_IDS,BED_SLOTS,validBedSlot} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
-import {dispatchActionQueues,pendingActions,queueHeads} from './action-queue.js';
+import {dispatchActionQueues,pendingActions,queueHeads,parkQueuedHead,
+  parkInterruptedAction} from './action-queue.js';
+import {newQueuedHeadGuard,resetQueuedHeadGuard,inspectQueuedHead,
+  newWalkGuard,resetWalkGuard,inspectWalkingAction,walkingRetryAllowed}
+  from './qsk-07-fairness.js';
 
 export const ADDITIONAL_OBJECT_ACTIONS=Object.freeze([
   'bed','sofa','fridge','shower','toilet','seat','tv','mirror','dresser','wardrobe'
@@ -24,6 +28,62 @@ const owned=(v,k)=>Object.prototype.hasOwnProperty.call(v||{},k);
 const extraPattern=/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/;
 const gap=ACTOR_RADIUS*2-.015;
 const preparedRoots=new WeakSet();
+// Retry counters are session-local, not new v1 save fields.
+const fairnessGuards=new WeakMap();
+function residentGuards(root,id){
+  let byResident=fairnessGuards.get(root);
+  if(!byResident){byResident=new Map();fairnessGuards.set(root,byResident);}
+  if(!byResident.has(id))byResident.set(id,{
+    head:newQueuedHeadGuard(),walk:newWalkGuard()
+  });
+  return byResident.get(id);
+}
+function interruptedManualCommand(action){
+  if(!action||action.automatic)return null;
+  if(action.id==='move'&&Number.isFinite(action.goal?.x)&&
+    Number.isFinite(action.goal?.z))
+    return {type:'move',x:action.goal.x,z:action.goal.z};
+  if(ADDITIONAL_OBJECT_ACTIONS.includes(action.id)&&
+    typeof action.targetInstanceId==='string')
+    return {type:'object',actionId:action.id,targetInstanceId:action.targetInstanceId};
+  return null;
+}
+/** Once accepted, player intent is parked in saved explicit-retry tray.
+ * When the tray is full, refuse to erase the active intent.
+ */
+function interruptAdditionalAction(root,id,actor,reason){
+  const action=actor.action;
+  if(!action)return false;
+  if(!action.automatic){
+    const intent=interruptedManualCommand(action);
+    if(!intent||!parkInterruptedAction(root.actionQueues,id,intent,reason,root.minutes))
+      return false;
+  }
+  actor.action=null;
+  actor.event=action.automatic?'Маршрут недоступен':
+    'Маршрут недоступен; задание отложено';
+  if(action.automatic)actor.autonomy.nextAt=Math.max(
+    root.minutes+4,actor.autonomy.nextAt||0);
+  resetWalkGuard(residentGuards(root,id).walk);
+  return true;
+}
+function additionalHeadBlockReason(root,id,command){
+  const actor=savedAdditionalActor(root,id);
+  if(!actor||actor.action)return null;
+  if(command.type==='move')
+    return isWalkable(command.x,command.z,root.world)
+      ?'unreachable-route':'invalid-destination';
+  if(command.type!=='object'||!ADDITIONAL_OBJECT_ACTIONS.includes(command.actionId))
+    return null;
+  const item=resolveActionFurniture(root.world,command.actionId,
+    command.targetInstanceId||null);
+  if(!item)return 'missing-target';
+  const slot=command.actionId==='bed'?chosenAdditionalBedSlot(root,id,item.instanceId):null;
+  if(command.actionId==='bed'&&!slot)return 'resource-busy';
+  if(!furnitureFree(root,id,command.actionId,item.instanceId,slot))
+    return 'resource-busy';
+  return 'unreachable-route';
+}
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const extraEntries=root=>Object.entries(root?.population?.residentsById||{})
   .filter(([id,entry])=>extraPattern.test(id)&&entry?.id===id&&entry?.actor?.version===1)
@@ -198,13 +258,22 @@ export function dispatchAdditionalResidentQueues(root){
       if(!ids.has(id)||['departing','waiting','working','returning'].includes(
         root.careerSystem?.byResident?.[id]?.currentShift?.phase)||root.socialAction||
         [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))return false;
+      const guard=residentGuards(root,id).head;
       const plan=prepareCommand(root,id,command);
-      if(!plan)return false;
+      if(!plan){
+        const reason=additionalHeadBlockReason(root,id,command);
+        if(reason&&inspectQueuedHead(guard,command.seq,reason,root.minutes)==='park'&&
+          parkQueuedHead(root.actionQueues,id,command.seq,reason,root.minutes))
+          resetQueuedHeadGuard(guard);
+        return false;
+      }
+      resetQueuedHeadGuard(guard);
       prepared.set(id,plan);return true;
     },
     start(id,command){
       const actor=savedAdditionalActor(root,id),plan=prepared.get(id);
       if(!actor||!plan||!prepareCommand(root,id,command))return false;
+      resetWalkGuard(residentGuards(root,id).walk);
       if(plan.id==='move'){
         actor.action={id:'move',phase:'walking',elapsed:0,automatic:false,goal:plan.goal};
         actor.event='Идёт в выбранное место';
@@ -405,24 +474,34 @@ export function tickAdditionalResidents(root,minutes){
       actor.autonomy.nextAt=Math.max(root.minutes+7,actor.autonomy.nextAt||0);
     }
     const action=actor.action;
+    const walkGuard=residentGuards(root,id).walk;
     if(action&&action.id!=='move'){
       const goal=actionGoal(root,action);
       if(!goal||!furnitureFree(root,id,action.id,action.targetInstanceId,
         action.bedSlot||null)||
         (action.phase==='using'&&distance(actor.position,goal)>.4)){
-        actor.action=null;actor.event='Предмет или место недоступны';
+        if(!interruptAdditionalAction(root,id,actor,'unreachable-route'))
+          actor.event='Предмет недоступен: освободи отложенные задания';
       }
     }
     if(actor.action?.phase==='walking'){
-      const goal=actionGoal(root,actor.action);
-      if(!goal||!advanceExtraPosition(root,id,actor,goal,minutes)){
-        actor.action=null;actor.event='Маршрут недоступен';
-      }else if(distance(actor.position,goal)<.065){
+      const current=actor.action,goal=actionGoal(root,current);
+      // A* can succeed while another person prevents every collision-safe step.
+      const mayRetry=walkingRetryAllowed(walkGuard,current,root.minutes);
+      const routeValid=Boolean(goal&&(!mayRetry||
+        advanceExtraPosition(root,id,actor,goal,minutes)));
+      const outcome=inspectWalkingAction(walkGuard,current,actor.position,
+        minutes,root.minutes,{routeValid});
+      if(outcome==='exhausted'||outcome==='invalid-position'){
+        if(!interruptAdditionalAction(root,id,actor,'unreachable-route'))
+          actor.event='Маршрут заблокирован: освободи отложенные задания';
+      }else if(routeValid&&goal&&distance(actor.position,goal)<.065){
         actor.position={x:goal.x,z:goal.z};
-        if(actor.action.id==='move'){actor.action=null;actor.event='Пришёл в выбранное место';}
+        if(current.id==='move'){actor.action=null;actor.event='Пришёл в выбранное место';}
         else arrive(actor);
+        resetWalkGuard(walkGuard);
       }
-    }
+    }else resetWalkGuard(walkGuard);
     tick(actor,minutes,root.world);
     actor.minutes=root.minutes;
   }
