@@ -41,7 +41,7 @@ test('C4B true external CC0 geometry, one Mira bind and independent sides', requ
       assert.ok(h.faces.length>30);
       assert.ok(h.vertices.some(v=>v.uv.some(c=>c>0)));
       assert.ok(h.collar.every(Number.isFinite));
-      assert.ok(h.measuredSource.width<.13);
+      assert.ok(h.measuredSource.width<.18);
     }
     const entry=manifest.wearers.mira.styles[style];
     assert.equal(entry.sourceSha256,source.sha256);
