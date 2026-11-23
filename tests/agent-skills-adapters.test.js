@@ -8,7 +8,7 @@ const pinned = 'c6ca6c41c839b68319ffc08430b99ab768debc32';
 test('six pinned, scoped LifeSim skill adapters exist with correct metadata and no runtime installation', () => {
   for (const name of names) {
     const content = readFileSync(new URL(`../.agents/skills/${name}/SKILL.md`, import.meta.url), 'utf8');
-    assert.match(content, new RegExp(`^---\\\\nname: ${name}\\\\n`.replaceAll('\\\\n','\\n')));
+    assert.ok(content.startsWith('---\nname: ' + name + '\n'), name);
     assert.ok(content.includes(pinned), name);
     assert.match(content, /PlayCanvas|game-ui-ux/);
     assert.match(content, /PR/);
