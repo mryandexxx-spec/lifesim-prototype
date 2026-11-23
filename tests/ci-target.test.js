@@ -171,3 +171,19 @@ test('CAS-02.1-B modular asset/lab changes trigger dedicated real WebGL but not 
  for(const name of ['src/kitchen.js','README.md','src/career-work.js'])
   assert.equal(Boolean(planChanges([name]).cas_modular),false,name);
 });
+
+
+test('CAS-02.1-D actual Alex source asset builder and wardrobe lab selectively require real PlayCanvas',()=>{
+ for(const changed of ['scripts/cas-source-asset-audit.mjs','scripts/build-cas-alex-wardrobe.mjs',
+  'tests/cas-02-1-d-browser-smoke.mjs','cas-alex-wardrobe-lab.html']){
+  const p=planChanges([changed]);
+  assert.equal(p.cas_alex,true,changed);
+ }
+ const asset=planChanges(['scripts/build-cas-alex-wardrobe.mjs']);
+ assert.equal(asset.browser,false,'pure asset builder only runs Node and does not need extra global browser smoke');
+ const browser=planChanges(['tests/cas-02-1-d-browser-smoke.mjs']);
+ assert.equal(browser.browser,true);
+ assert.equal(planChanges(['src/character-lab.js']).cas_alex,true);
+ for(const changed of ['src/kitchen.js','README.md','src/career-work.js'])
+  assert.equal(Boolean(planChanges([changed]).cas_alex),false,changed);
+});
