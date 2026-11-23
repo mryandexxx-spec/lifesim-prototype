@@ -28,6 +28,7 @@ for (const [kind,source] of Object.entries(SOURCES)) {
     assert.equal(before,source.sha);
     assert.equal(sha(bytes),before,'must not rewrite the original');
     assert.deepEqual(report,auditFaceTopology(kind,bytes),'topology audit must be reproducible');
+    console.log('CAS_B_G1_MEASURED '+JSON.stringify(report));
     assert.equal(report.sourceSha256,before);
     assert.equal(report.primitiveCount,1);
     assert.equal(report.joints,66);
