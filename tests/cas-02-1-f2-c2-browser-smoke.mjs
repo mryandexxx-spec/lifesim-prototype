@@ -142,6 +142,35 @@ try{
    sourceOrientationApproved:false,contactApproved:false,physicalIphoneApproved:false});
   await context.close();
  }
+ // Deployed missing-asset regression reproduced from physical iPhone Safari:
+ // even a terminal 404 must restore Alex instead of leaving the scene blank.
+ for(const [width,height] of [[390,844],[320,568]]){
+  const context=await browser.newContext({viewport:{width,height},
+   deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
+  const page=await context.newPage(),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/cas-cc0-f2/assessment.json',route=>
+   route.fulfill({status:404,contentType:'text/plain',body:'Not Found'}));
+  await page.goto('http://127.0.0.1:8765/cas-f2-footwear-lab.html',
+   {waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.__LifeSimCasF2Probe?.()?.fallbackToSource===true,
+   null,{timeout:30000});
+  const probe=await page.evaluate(()=>window.__LifeSimCasF2Probe());
+  assert.equal(probe.loaded,false);
+  assert.equal(probe.previewRevealed,true,'missing asset must not leave blank canvas');
+  assert.equal(probe.mode,'source');
+  assert.equal(probe.originalShoesVisible,true);
+  assert.equal(probe.originalResidueVisible,true);
+  assert.match(probe.loadError,/F2 audit report missing from release/);
+  assert.equal(await page.locator('#shoe-choice').isDisabled(),true);
+  assert.match(await page.locator('#lab-status').innerText(),
+   /Алекс показан в исходной обуви/);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('lifesim.room01.v1')),null);
+  assert.deepEqual(errors,[]);
+  await page.screenshot({path:dir+'/'+width+'x'+height+'-missing-audit-restores-original.png'});
+  report.push({width,height,missingAuditFallback:true,originalVisible:true,noSaveChanges:true});
+  await context.close();
+ }
 }finally{
  await browser.close();
  writeFileSync(dir+'/browser.json',JSON.stringify(report,null,2)+'\n');
