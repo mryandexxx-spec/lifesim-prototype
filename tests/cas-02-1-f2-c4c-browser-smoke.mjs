@@ -108,7 +108,18 @@ try {
     assert.deepEqual(errors, []);
     assert.equal(await page.evaluate(() => localStorage.getItem('lifesim.room01.v1')), null);
     await frame('four-rigs');
+    await page.close();
     if (width === 390) {
+      const fallback = await context.newPage();
+      await fallback.route('**/c4c-manifest.json', route => route.fulfill({status: 503}));
+      await fallback.goto(preview);
+      await fallback.waitForFunction(() => window.__LifeSimCasC4B?.().active?.outfit === 'ballet');
+      await fallback.locator('#outfit').selectOption('heels');
+      await fallback.waitForFunction(() => document.getElementById('status').textContent.includes('каблуков недоступна'));
+      assert.equal(await fallback.locator('#outfit').inputValue(), 'ballet');
+      assert.equal(await fallback.evaluate(() => window.__LifeSimCasC4B().active.outfit), 'ballet');
+      await fallback.close();
+
       const blocked = await context.newPage();
       await blocked.route('**/vendor/playcanvas.mjs*', route => route.abort());
       await blocked.goto(preview + '?outfit=heels');
@@ -142,15 +153,6 @@ try {
       assert.equal(await slow.evaluate(() => window.__LifeSimCasC4B().active.outfit), 'original');
       await slow.close();
 
-      const fallback = await context.newPage();
-      await fallback.route('**/c4c-manifest.json', route => route.fulfill({status: 503}));
-      await fallback.goto(preview);
-      await fallback.waitForFunction(() => window.__LifeSimCasC4B?.().active?.outfit === 'ballet');
-      await fallback.locator('#outfit').selectOption('heels');
-      await fallback.waitForFunction(() => document.getElementById('status').textContent.includes('каблуков недоступна'));
-      assert.equal(await fallback.locator('#outfit').inputValue(), 'ballet');
-      assert.equal(await fallback.evaluate(() => window.__LifeSimCasC4B().active.outfit), 'ballet');
-      await fallback.close();
     }
     report.push({width, height, fourMiraFps: group.fps, physicalIphone: false});
     await context.close();
