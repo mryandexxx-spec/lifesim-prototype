@@ -84,7 +84,10 @@ try{
         confirm:button?{parentHidden:button.closest('[hidden]')?.id||null,
           rect:button.getBoundingClientRect().toJSON()}:null};
     });
-    console.log('SOCIAL-QUEUE-R1 stage '+initiator+' '+JSON.stringify(stage));
+    assert.equal(stage.menu.hidden,false,
+      initiator+' social options must remain open after choosing Talk: '+JSON.stringify(stage));
+    assert.equal(stage.confirm?.parentHidden??null,null,
+      'two-step confirmation must be reachable after actual 3D+touch navigation');
     await page.locator('#social-menu-options button').filter({hasText:'В очередь · Поговорить'}).tap();
     const live=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
     assert.ok(live.actionQueues.byResident[initiator].some(task=>
