@@ -174,8 +174,20 @@ def main():
     audit = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(audit)
     print("C4B opening approved CC0 shoe archive", flush=True)
-    archive = zipfile.ZipFile(audit.RangeSource(URL))
-    result = {"version": 1, "sourceURL": URL, "styles": {}}
+    archive = None
+    errors = []
+    source_url = None
+    for url in audit.MIRRORS:
+        try:
+            archive = zipfile.ZipFile(audit.RangeSource(url))
+            source_url = url
+            break
+        except Exception as exc:
+            errors.append(url + ": " + str(exc))
+            print("C4B source mirror fallback: " + str(exc), flush=True)
+    if archive is None:
+        raise RuntimeError("No audited CC0 MakeHuman mirror available: " + "; ".join(errors))
+    result = {"version": 1, "sourceURL": source_url, "styles": {}}
     FOLDER.mkdir(parents=True, exist_ok=True)
     for name, (id, obj_name, image_name, obj_pin, png_pin) in PIN.items():
         folder = "clothes/" + id + "/"
