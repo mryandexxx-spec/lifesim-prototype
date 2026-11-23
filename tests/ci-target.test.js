@@ -159,3 +159,15 @@ test('CAS-01.8 seven-plus-day Node soak and real mobile 2/4 WebGL run on affecte
   for(const src of ['src/kitchen.js','tests/cas-01-8-soak.test.js','README.md'])
     assert.equal(planChanges([src]).cas_soak,false,src);
 });
+
+
+test('CAS-02.1-B modular asset/lab changes trigger dedicated real WebGL but not gameplay-only changes',()=>{
+ for(const name of ['scripts/build-cas-modular-mannequin.mjs','src/character-lab.js',
+    'src/character-lab-config.js','cas-modular-lab.html','tests/cas-02-1-b-browser-smoke.mjs']){
+  const plan=planChanges([name]);assert.equal(plan.cas_modular,true,name);
+ }
+ const plan=planChanges(['tests/cas-02-1-b-browser-smoke.mjs']);
+ assert.equal(plan.browser,true);
+ for(const name of ['src/kitchen.js','README.md','src/career-work.js'])
+  assert.equal(Boolean(planChanges([name]).cas_modular),false,name);
+});
