@@ -25,7 +25,7 @@ export const CHARACTER_LAB_MODELS = Object.freeze({
   }),
   casproto:Object.freeze({
     key:'casproto',label:'CAS-02.1-B original modular prototype',
-    assetUrl:'./assets/characters/cas-modular-mannequin-v1.glb',
+    assetUrl:'./assets/characters/cas-modular-mannequin-v1.glb?cas-02-1-c',
     fileName:'cas-modular-mannequin-v1.glb',bytes:152564,triangles:3936,joints:18,
     morphTargets:0,targetHeight:1.78
   }),
