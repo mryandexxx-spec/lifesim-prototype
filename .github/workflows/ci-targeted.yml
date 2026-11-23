@@ -340,7 +340,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unit tests for CC0 source import contract
-        run: python3 -m unittest discover -s tests -p 'cas-c4-source-audit.test.py' -v
+        run: python3 -m unittest discover -s tests -p 'test_cas_c4_source_audit.py' -v
       - name: Audit actual MakeHuman CC0 archive and Grab3D heel bytes
         run: python3 scripts/cas-c4-source-audit.py
       - name: Archive independent asset license and SHA evidence
