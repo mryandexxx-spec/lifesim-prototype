@@ -382,6 +382,7 @@ jobs:
           cp assets/characters/cas-cc0-f1/* site/assets/characters/cas-cc0-f1/
           mkdir -p site/assets/characters/cas-cc0-f2
           cp assets/characters/cas-cc0-f2/*.assessment.json site/assets/characters/cas-cc0-f2/
+          cp assets/characters/cas-cc0-f2/assessment.json site/assets/characters/cas-cc0-f2/
           cp assets/characters/cas-cc0-f2/*.glb site/assets/characters/cas-cc0-f2/
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
@@ -396,6 +397,8 @@ jobs:
           cp assets/furniture/meshy-room-v3/*.glb site/assets/furniture/meshy-room-v3/
           cp assets/furniture/meshy-room-v3/manifest.json site/assets/furniture/meshy-room-v3/
           cp assets/furniture/meshy-room-v3/thumbnails/*.png site/assets/furniture/meshy-room-v3/thumbnails/
+      - name: Verify published F2 audit manifest and every referenced real GLB
+        run: node scripts/cas-f2-pages-verify.mjs site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
