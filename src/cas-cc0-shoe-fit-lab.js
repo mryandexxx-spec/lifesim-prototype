@@ -27,14 +27,33 @@ for(const [angles,intensity,color] of [[[55,-35,0],1.45,[1,.96,.88]],[[15,140,0]
 const camera=new pc.Entity('Lab camera');
 camera.addComponent('camera',{clearColor:new pc.Color(.88,.92,.89),fov:42,nearClip:.03,farClip:100});
 app.root.addChild(camera);
-const cameraState={yaw:18,pitch:4,distance:4.6},selected={model:'dress',mode:'compare'};
+const cameraState={yaw:18,pitch:4,distance:3.35},focus={x:.24,y:0},selected={model:'dress',mode:'compare'};
 function cameraMove(){
  const a=cameraState.yaw*Math.PI/180,b=cameraState.pitch*Math.PI/180;
- const target=new pc.Vec3(.24,1.0,0);
+ const target=new pc.Vec3(focus.x,focus.y,0);
  camera.setPosition(target.x+Math.sin(a)*Math.cos(b)*cameraState.distance,
   target.y+Math.sin(b)*cameraState.distance,
   target.z+Math.cos(a)*Math.cos(b)*cameraState.distance);
  camera.lookAt(target);
+}
+/** Fit the actual shoe/foot plane above the fixed action dock on small iPhones.
+ * This is a shoe-inspection framing policy for THIS lab only; previous labs'
+ * user zoom and camera framing remain unchanged.
+ */
+function fitFootwearView(){
+ const dock=$('fit-panel')?.getBoundingClientRect();
+ if(!dock)return;
+ const desired=Math.max(95,Math.min(innerHeight*.55,dock.top-64));
+ const px=innerHeight/(2*Math.tan(camera.camera.fov*Math.PI/360)*cameraState.distance);
+ for(let i=0;i<3;i++){
+  cameraMove();
+  const shoeY=camera.camera.worldToScreen(new pc.Vec3(.23,.06,0)).y;
+  focus.y=Math.max(-1.2,Math.min(1.1,focus.y-(shoeY-desired)/px));
+ }
+ // Leave an additional optical safety margin: the projected pair's toe is
+ // offset in perspective from the fit reference point at the avatar origin.
+ focus.y=Math.max(-1.2,focus.y-.29);
+ cameraMove();
 }
 cameraMove();
 const pointers=new Map();let pinch=0;
@@ -62,9 +81,9 @@ canvas.addEventListener('wheel',e=>{
  e.preventDefault();cameraState.distance=Math.min(10,Math.max(1.2,cameraState.distance*(1+e.deltaY*.001)));cameraMove();
 },{passive:false});
 $('camera-reset').addEventListener('click',()=>{
- Object.assign(cameraState,{yaw:18,pitch:4,distance:4.6});cameraMove();
+ Object.assign(cameraState,{yaw:18,pitch:4,distance:3.35});focus.y=0;fitFootwearView();
 });
-window.addEventListener('resize',()=>app.resizeCanvas());
+window.addEventListener('resize',()=>{app.resizeCanvas();fitFootwearView();});
 
 function bounds(entity){
  let min=null,max=null;
@@ -181,7 +200,9 @@ window.__LifeSimCasF0Probe=()=>({
   scale:active.entity.getLocalScale().x,
   visible:active.entity.enabled}:null,
  panelTop:$('fit-panel').getBoundingClientRect().top,
- view:{...cameraState},
+ view:{...cameraState,focusY:focus.y},
+ sourceFootPixelY:avatar?camera.camera.worldToScreen(new pc.Vec3(0,.06,0)).y:null,
+ candidateShoePixelY:active?camera.camera.worldToScreen(new pc.Vec3(selected.mode==='mock'?0:.74,.06,0)).y:null,
  fps:fpsValue,physicalIphoneApproved:false,productionReady:false
 });
 app.start();
@@ -200,6 +221,7 @@ app.start();
   if(idle)avatar.anim.baseLayer.play(idle);
   $('pause-resume').disabled=false;
   await showShoe('dress');
+  fitFootwearView();
   $('source-shoes').disabled=false;
   $('fit-mode').disabled=false;
  }catch(e){setStatus('Не удалось загрузить лабораторию: '+e.message);console.error(e);}
