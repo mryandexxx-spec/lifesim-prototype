@@ -27,7 +27,8 @@ test('CAS F2-C2 real original 66-joint foot skin and dynamic sock are separately
  assert.match(source,/skinFootSurface/);
  assert.match(source,/resolveFootwearLayers/);
  assert.match(source,/clipSurfaceAbove/);
- assert.match(source,/postUpdate/);
+ assert.match(source,/applyGarment\(\);\n\}\);/);
+ assert.doesNotMatch(source,/app\.on\('postUpdate'/);
  assert.match(source,/setPositions\(positions\)/);
  assert.match(source,/entity\.enabled=false/);
  assert.match(source,/fourResidentPerformanceApproved:false/);
