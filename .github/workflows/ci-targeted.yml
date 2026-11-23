@@ -187,6 +187,18 @@ jobs:
           name: qsk-02-startup-faults-pr
           path: artifacts/qsk-02/
           if-no-files-found: error
+      - name: QSK-03 read-only 2/4 resident cold-warm PlayCanvas performance baseline
+        if: ${{ contains(github.event.pull_request.title, 'QSK-03') }}
+        run: |
+          node --test tests/qsk-03-metrics.test.js
+          node tests/qsk-03-browser-baseline.mjs
+      - name: Archive QSK-03 mobile WebGL measured baseline and screenshots
+        if: ${{ always() && contains(github.event.pull_request.title, 'QSK-03') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsk-03-measured-browser-pr
+          path: artifacts/qsk-03/
+          if-no-files-found: warn
       - name: CAS-01.7 actual 4-resident iPhone viewport WebGL/HUD/career
         if: ${{ needs.targeted.outputs.cas_hud == 'true' }}
         run: node tests/cas-01-7-browser-smoke.mjs
