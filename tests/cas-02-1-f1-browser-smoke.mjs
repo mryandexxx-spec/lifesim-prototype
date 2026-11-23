@@ -80,6 +80,7 @@ try{
   assert.equal(s.skinDeformation,false,'should not falsely claim full skinned shoe');
   assert.equal(s.mode,'dress');
   assert.equal(s.sourceShoesVisible,false);
+  assert.equal(s.sourceSneakerResidueVisible,false,'white source sneaker body triangles must be HIDDEN when wearing CC0 shoes');
   assert.ok(s.cameraHeight>.25,'camera must be above the floor, not beneath it: '+JSON.stringify(s.view));
   assert.ok(s.footPixelY>40&&s.footPixelY<s.panelTop-20,
    'source foot / attached footwear must be visible above mobile panel');
@@ -105,6 +106,7 @@ try{
   await page.locator('#shoe-choice').selectOption('source');
   s=await probe();
   assert.equal(s.sourceShoesVisible,true);
+  assert.equal(s.sourceSneakerResidueVisible,true,'masked original source must return with white sneakers');
   for(const p of Object.values(s.binding))assert.equal(p.visible,false);
   const original=await page.locator('#rig-canvas').screenshot();
   assert.notEqual(createHash('sha256').update(wearing).digest('hex'),
