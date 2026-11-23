@@ -18,7 +18,7 @@ const smooth = t => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 -
 const pointKey = p => p.map(x => Math.round(x / EPSILON)).join(',');
 const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
 
-function packWeights(influences) {
+export function packWeights(influences) {
   const ordered = [...influences].filter(([, w]) => w > 1e-8)
     .sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 4);
   const total = ordered.reduce((n, [, w]) => n + w, 0);
@@ -26,8 +26,7 @@ function packWeights(influences) {
   return {joints: ordered.map(([j]) => j), weights: ordered.map(([, w]) => w / total)};
 }
 
-function interpolateVertex(a, b, y) {
-  const t = (y - a.position[1]) / (b.position[1] - a.position[1]);
+export function interpolateVertex(a, b, t) {
   const influences = new Map();
   for (const [v, scale] of [[a, 1 - t], [b, t]]) {
     v.joints.forEach((j, i) => influences.set(j, (influences.get(j) ?? 0) + v.weights[i] * scale));
@@ -49,7 +48,8 @@ function clipAnkles(vertices, faces, height) {
   function cut(a, b) {
     const key = a < b ? a + ':' + b : b + ':' + a;
     if (edges.has(key)) return edges.get(key);
-    const v = interpolateVertex(vertices[a], vertices[b], height);
+    const t = (height - vertices[a].position[1]) / (vertices[b].position[1] - vertices[a].position[1]);
+    const v = interpolateVertex(vertices[a], vertices[b], t);
     v.position[1] = height;
     const ring = rings[v.position[0] > 0 ? 'left' : 'right'];
     const position = pointKey(v.position);
@@ -136,16 +136,20 @@ function fitFoot(template, cuff, soleShell, bones, height, sock) {
   const soleY = Math.min(...soleShell.map(v => v.position[1])) + .006;
   const footLength = shoe.span[1] - .014;
   const footWidth = Math.min(shoe.span[0] - .012, donorWidth * (footLength / (toe[2] - heel[2])));
-  const zScale = footLength / (toe[2] - heel[2]);
   const xScale = footWidth / donorWidth;
-  const zOrigin = shoe.center[1] - (heel[2] + toe[2]) * zScale / 2;
+  const heelZ = shoe.center[1] - footLength / 2;
+  const toeZ = shoe.center[1] + footLength / 2;
+  const ballZ = Math.min(heelZ + footLength * .82, Math.max(heelZ + footLength * .57, bones.anchors.ToeBase[2]));
+  const footZ = z => z < ball[2]
+    ? heelZ + (z - heel[2]) / (ball[2] - heel[2]) * (ballZ - heelZ)
+    : ballZ + (z - ball[2]) / (toe[2] - ball[2]) * (toeZ - ballZ);
   const top = height - .014;
   const yScale = (top - soleY) / template.seamY;
   const output = donor.map(({position}) => {
     const [x, y, z] = position;
     const ankle = smooth((y / template.seamY - .55) / .45);
     const nail = smooth((z - ball[2] + .025) / .065) * (1 - ankle);
-    const flat = [shoe.center[0] + x*xScale, soleY + y*yScale, zOrigin + z*zScale];
+    const flat = [shoe.center[0] + x*xScale, soleY + y*yScale, footZ(z)];
     const topPoint = [collar.center[0] + (x-donorAnkle.center[0])*collar.span[0]/donorAnkle.span[0],
       flat[1], collar.center[1] + (z-donorAnkle.center[1])*collar.span[1]/donorAnkle.span[1]];
     const surface = mix(flat, topPoint, ankle);
@@ -176,9 +180,9 @@ function fitFoot(template, cuff, soleShell, bones, height, sock) {
   }
   return {vertices: output, faces, profile: {
     seam: {y: height, center: collar.center, vertices: cuff.length},
-    heel: [shoe.center[0], soleY, zOrigin + heel[2]*zScale],
-    ball: [shoe.center[0], soleY, zOrigin + ball[2]*zScale],
-    toe: [shoe.center[0], soleY, zOrigin + toe[2]*zScale],
+    heel: [shoe.center[0], soleY, heelZ],
+    ball: [shoe.center[0], soleY, ballZ],
+    toe: [shoe.center[0], soleY, toeZ],
     ankle: [collar.center[0], top, collar.center[1]], footWidth,
     soleY, sourceSoleY: soleY - .006, footLength
   }};

@@ -22,6 +22,7 @@ jobs:
       cas_alex: ${{ steps.impact.outputs.cas_alex }}
       cas_styles: ${{ steps.impact.outputs.cas_styles }}
       cas_cc0: ${{ steps.impact.outputs.cas_cc0 }}
+      cas_c3: ${{ steps.impact.outputs.cas_c3 }}
       e5: ${{ steps.impact.outputs.e5 }}
       fixture_motion: ${{ steps.impact.outputs.fixture_motion }}
       integration_qa: ${{ steps.impact.outputs.integration_qa }}
@@ -92,6 +93,20 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: CAS F2 C3 resident rigs and mobile WebGL
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
+        run: |
+          node scripts/cas-02-1-f0-download-assets.mjs
+          node scripts/cas-c3-shoes.mjs
+          CAS_C3_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c3-*.test.js
+          node tests/cas-02-1-f2-c3-browser-smoke.mjs
+      - name: Archive CAS F2 C3 screenshots and probe
+        if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-f2-c3-visual-evidence
+          path: artifacts/cas-02-1-f2-c3/
+          if-no-files-found: ignore
       - name: CAS-01.7 actual 4-resident iPhone viewport WebGL/HUD/career
         if: ${{ needs.targeted.outputs.cas_hud == 'true' }}
         run: node tests/cas-01-7-browser-smoke.mjs

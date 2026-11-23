@@ -6,8 +6,8 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
-const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|cas-f2-footwear-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
-const isUI=f=>f==='src/cas-f2-footwear-lab.js'||f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||f==='src/cas-cc0-shoe-fit-policy.js'||/^(?:index\.html|cas-modular-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
+const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|cas-f2-footwear-lab\.html|cas-f2-c3-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
+const isUI=f=>f==='src/cas-f2-c3-lab.js'||f==='cas-f2-c3-lab.html'||f==='src/cas-f2-footwear-lab.js'||f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||f==='src/cas-cc0-shoe-fit-policy.js'||/^(?:index\.html|cas-modular-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
   // Changes to the live needs loop or SKU sleep quality require a real WebGL boot.
   /^src\/(?:simulation|need-balance|furniture-products)\.js$/.test(f)||
   /^src\/(?:game\.js|outdoor-character-motion|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
@@ -102,14 +102,15 @@ export function planChanges(files,root=ROOT){
     /^(?:scripts\/build-cas-resident-footwear-v2\.mjs|tests\/cas-02-1-e-(?:footwear\.test\.js|browser-smoke\.mjs)|src\/character-lab(?:-config)?\.js|cas-resident-footwear-lab\.html)$/.test(f));
   const cas_cc0=changed.some(f=>
     /^(?:(?:src\/cas-f2-footwear-lab\.js|cas-f2-footwear-lab\.html|tests\/cas-02-1-f2-c2-browser-smoke\.mjs|tests\/cas-02-1-f2-c2-runtime\.test\.js)|(?:scripts\/cas-02-1-f2-real-source-audit\.mjs|tests\/cas-02-1-f2-real-sources\.test\.js)|scripts\/cas-02-1-f0-download-assets\.mjs|scripts\/cas-02-1-f1-split-dress\.mjs|scripts\/cas-02-1-f1-alex-underfoot\.mjs|src\/cas-cc0-shoe-fit-policy\.js|tests\/cas-02-1-f0-(?:sources\.test\.js|browser-smoke\.mjs)|tests\/cas-02-1-f1-(?:shoe-split\.test\.js|ankle-fit\.test\.js|browser-smoke\.mjs)|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|src\/cas-cc0-shoe-fit-lab\.js|src\/cas-cc0-shoe-rig-lab\.js)$/.test(f));
+  const cas_c3=changed.some(f=> /^(?:cas-f2-c3-lab\.html|src\/cas-f2-c3-lab\.js|tests\/cas-02-1-f2-c3-.*|scripts\/cas-c3-.*|assets\/characters\/cas-c3\/.*)$/.test(f));
   const cas_hud=changed.some(f=>/^(?:src\/(?:resident-hud|career-phone-ui|game)\.js|tests\/cas-01-7-browser-smoke\.mjs)$/.test(f));
   const cas_inventory=changed.some(f=>['scripts/cas-00-dependency-inventory.mjs','tests/cas-00-dependency-inventory.test.js'].includes(f));
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');
   const career_shifts=changed.some(f=>
     /^(?:src\/career-rank-schedules\.js|tests\/career-shifts-r1-browser-smoke\.mjs)$/.test(f));
-  return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
+  return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||cas_c3||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
     fandom_tv,fandom_phone,fandom_r2a,fandom_r2b,fandom_r2c,
-    cas_modular,cas_alex,cas_styles,cas_cc0,e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
+    cas_modular,cas_alex,cas_styles,cas_cc0,cas_c3,e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),cas_hud,cas_soak,changed};
 }
 
@@ -158,7 +159,7 @@ function main(){
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
     'parcel_editor='+changed.some(f=>f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
     'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'cas_hud='+(plan.cas_hud?'true':'false')+'\n'+
-    'cas_soak='+(plan.cas_soak?'true':'false')+'\n'+'cas_modular='+(plan.cas_modular?'true':'false')+'\n'+'cas_alex='+(plan.cas_alex?'true':'false')+'\n'+'cas_styles='+(plan.cas_styles?'true':'false')+'\n'+'cas_cc0='+(plan.cas_cc0?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
+    'cas_soak='+(plan.cas_soak?'true':'false')+'\n'+'cas_modular='+(plan.cas_modular?'true':'false')+'\n'+'cas_alex='+(plan.cas_alex?'true':'false')+'\n'+'cas_styles='+(plan.cas_styles?'true':'false')+'\n'+'cas_cc0='+(plan.cas_cc0?'true':'false')+'\n'+'cas_c3='+(plan.cas_c3?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
     'micro_ux='+(plan.micro_ux?'true':'false')+'\n'+
     'load_truth='+(plan.load_truth?'true':'false')+'\n'+
     'fridge_ux='+(plan.fridge_ux?'true':'false')+'\n'+

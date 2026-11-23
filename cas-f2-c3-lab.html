@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#e5eae3">
+<title>Блин’С · Примерка обуви C3</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#e5eae3;color:#233b30;font:14px system-ui,-apple-system,sans-serif}
+canvas{position:fixed;width:100%;height:100%;inset:0;touch-action:none}
+header{position:fixed;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));background:#fbfff8ef;border-radius:12px;padding:9px 12px;font-weight:650;pointer-events:none}
+section{position:fixed;bottom:max(8px,env(safe-area-inset-bottom));left:8px;right:8px;margin:auto;max-width:470px;padding:10px;border:1px solid #c7d2c7;border-radius:16px;background:#fafff9;box-shadow:0 8px 28px #243a2822}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+label{display:grid;gap:2px;font-size:11px;min-width:0}
+select,button{border:1px solid #a9bbae;border-radius:8px;background:white;color:inherit;font:inherit;min-width:0;min-height:40px;padding:3px 7px}
+button{min-height:44px;touch-action:manipulation}
+select:focus-visible,button:focus-visible{outline:2px solid #21644b;outline-offset:1px}
+.actions{display:flex;gap:6px;margin-top:7px}
+.actions button{flex:1}
+.status{font-size:11px;min-height:15px;margin:5px 0 0;color:#456253}
+.frames{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:11px;min-height:24px}
+.frames input{flex:1;min-width:0}
+.frames[hidden]{display:none}
+</style>
+<script type="importmap">{"imports":{"playcanvas":"./vendor/playcanvas.mjs"}}</script>
+</head>
+<body>
+<canvas id="canvas" aria-label="Анимированная трёхмерная примерка обуви"></canvas>
+<header>Блин’С · Примерка C3</header>
+<section id="controls" aria-label="Настройки примерки">
+<div class="grid">
+<label>Персонаж<select id="resident" disabled><option value="alex">Алекс</option><option value="mira">Мира</option><option value="four">4 жителя</option></select></label>
+<label>Обувь<select id="outfit" disabled><option value="dress">Туфли</option><option value="sneakers">Кеды</option><option value="boots">Ботинки</option><option value="original">Исходная</option><option value="bare">Без обуви</option></select></label>
+<label>Движение<select id="motion" disabled><option value="bind">Исходная поза</option><option value="idle">Стойка</option><option value="walk">Ходьба</option><option value="run">Бег</option><option value="sit">Встать со стула</option></select></label>
+<label>Носки<select id="socks" disabled><option value="on">Надеты</option><option value="off">Сняты</option></select></label>
+</div>
+<div class="actions"><button id="camera" type="button">Весь персонаж</button><button id="pause" type="button" disabled>Пауза</button></div>
+<label class="frames" id="frames" hidden>Фаза<input id="phase" type="range" min="0" max="100" value="0"><output id="phase-value">0%</output></label>
+<p class="status"><span id="status" role="status">Загрузка моделей…</span> <span id="fps"></span></p>
+</section>
+<script type="module" src="./src/cas-f2-c3-lab.js?v=c3b"></script>
+</body>
+</html>
