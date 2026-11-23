@@ -1,5 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {readSourceAsset,parseLegacyGlb,sourceAccessor,auditSourceGlb} from '../scripts/cas-source-asset-audit.mjs';
 import {CAS_022_SOURCE_SHA256,CAS_022_MORPHS,buildCas022Morphs}
   from '../scripts/cas-02-2-morphs.mjs';
@@ -56,4 +61,21 @@ test('CAS-02.2-A fails closed on unapproved source or unknown resident',()=>{
 test('CAS-02.2-A makes no browser save or game imports and stays lab-only',()=>{
  const source=buildCas022Morphs.toString();
  assert.doesNotMatch(source,/localStorage|lifesim\.room01\.v1|game\.js/);
+});
+
+test('CAS-02.2-A CLI emits separately named GLB binaries and JSON manifests for Pages',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'cas-022-'));
+ try{
+  const builder=fileURLToPath(new URL('../scripts/cas-02-2-morphs.mjs',import.meta.url));
+  execFileSync(process.execPath,[builder],{cwd:dir,stdio:'pipe'});
+  for(const kind of ['alex','mira']){
+   const name='cas-02-2-'+kind+'-morphs';
+   const glb=readFileSync(join(dir,'assets/characters',name+'.glb'));
+   const json=JSON.parse(readFileSync(join(dir,'assets/characters',name+'.json'),'utf8'));
+   assert.equal(glb.readUInt32LE(0),0x46546c67,'GLB must not be overwritten by JSON');
+   assert.equal(parseLegacyGlb(glb).gltf.meshes[0].primitives[0].targets.length,2);
+   assert.equal(json.asset,'assets/characters/'+name+'.glb');
+   assert.equal(json.morphTargets,2);
+  }
+ }finally{rmSync(dir,{recursive:true,force:true});}
 });
