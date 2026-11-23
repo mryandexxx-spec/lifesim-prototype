@@ -53,12 +53,19 @@ try{
   if(probe.morphCount!==6)throw Error('Missing morphs '+kind);
   await page.evaluate(()=>{window.__LifeSimMorphRegionQA.pause();window.__LifeSimMorphRegionQA.zero();});
   await page.waitForTimeout(350);
-  const baseline=await read(await page.locator('#scene').screenshot());
-  const stats={};
+  // Only the visible face raster. Full-canvas screenshots included UI overlays,
+  // especially the changing status/dock area, creating false pixel positives.
+  const faceClip={x:20,y:280,width:350,height:335};
+  const snapshot=()=>page.screenshot({clip:faceClip});
+  const baseline=await read(await snapshot());
+  await page.waitForTimeout(250);
+  const negative=diff(baseline,await read(await snapshot()));
+  const stats={unchanged:negative};
+  if(negative.count>600)throw Error('Unstable baseline/no paused animation: '+JSON.stringify({kind,negative}));
   for(const name of targets){
    await page.evaluate(t=>window.__LifeSimMorphRegionQA.set(t,1),name);
    await page.waitForTimeout(220);
-   const change=await read(await page.locator('#scene').screenshot());
+   const change=await read(await snapshot());
    stats[name]=diff(baseline,change);
    await page.evaluate(t=>window.__LifeSimMorphRegionQA.set(t,0),name);
   }
