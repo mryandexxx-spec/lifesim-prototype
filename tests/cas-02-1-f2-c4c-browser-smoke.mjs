@@ -42,6 +42,7 @@ try {
     const run = () => page.locator('#motion option[value="run"]').evaluate(option => option.disabled);
     await page.goto(preview + '?outfit=heels', {waitUntil: 'domcontentloaded'});
     await wait('heels');
+    assert.equal(await page.locator('#preview-still').isVisible(), false);
     const first = (await probe()).residents[0];
     assert.equal(first.activeClip, 'C4C heel idle');
     assert.equal(first.groundOffset, 0);
@@ -108,6 +109,39 @@ try {
     assert.equal(await page.evaluate(() => localStorage.getItem('lifesim.room01.v1')), null);
     await frame('four-rigs');
     if (width === 390) {
+      const blocked = await context.newPage();
+      await blocked.route('**/vendor/playcanvas.mjs*', route => route.abort());
+      await blocked.goto(preview + '?outfit=heels');
+      await blocked.locator('#retry').waitFor({state: 'visible'});
+      assert.match(await blocked.locator('#status').innerText(), /Не удалось запустить 3D/);
+      assert.ok(await blocked.locator('#preview-still img').evaluate(img => img.complete && img.naturalWidth > 0));
+      await blocked.close();
+
+      const noGpu = await context.newPage();
+      await noGpu.addInitScript(() => {
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+          return type.startsWith('webgl') ? null : getContext.call(this, type, ...args);
+        };
+      });
+      await noGpu.goto(preview + '?outfit=heels');
+      await noGpu.locator('#retry').waitFor({state: 'visible'});
+      assert.match(await noGpu.locator('#status').innerText(), /Не удалось запустить 3D/);
+      assert.equal(await noGpu.locator('#preview-still').isVisible(), true);
+      await noGpu.close();
+
+      const slow = await context.newPage();
+      await slow.route('**/mira-c4c-heels.glb*', async route => {
+        await slow.clock.fastForward(21000);
+        await route.abort();
+      });
+      await slow.clock.install();
+      await slow.goto(preview + '?outfit=heels');
+      await slow.waitForFunction(() => document.getElementById('status').textContent.includes('Истекло время загрузки'));
+      assert.equal(await slow.locator('#outfit').inputValue(), 'original');
+      assert.equal(await slow.evaluate(() => window.__LifeSimCasC4B().active.outfit), 'original');
+      await slow.close();
+
       const fallback = await context.newPage();
       await fallback.route('**/c4c-manifest.json', route => route.fulfill({status: 503}));
       await fallback.goto(preview);

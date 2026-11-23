@@ -15,6 +15,9 @@ if (manifest.version !== 1 || manifest.stage !== 'CAS-02.1-F2-C4C' || manifest.r
   throw new Error('C4C Pages index or Mira binding does not match');
 const bytes = read(manifest.file);
 if (digest(bytes) !== manifest.sha256) throw new Error('C4C Pages fitted GLB checksum differs');
+const still = read('mira-c4c-preview.jpg');
+if (still.length < 100 || still.readUInt16BE(0) !== 0xffd8)
+  throw new Error('C4C Pages startup preview is missing or invalid');
 for (const [file, hash] of Object.entries(HEEL_PINS)) {
   if (manifest.source.pins[file] !== hash || digest(read(heelSourceFile(file))) !== hash)
     throw new Error('C4C Pages original publisher bytes differ: ' + file);
