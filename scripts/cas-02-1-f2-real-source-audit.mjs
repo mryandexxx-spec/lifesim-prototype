@@ -2,7 +2,7 @@
  * Uses the downloaded source geometry and original materials/textures.
  * Never builds or changes a human body, skeleton, or game save.
  */
-import {readFileSync,writeFileSync,mkdirSync,copyFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {parseLegacyGlb,sourceAccessor} from './cas-source-asset-audit.mjs';
@@ -149,7 +149,7 @@ export function buildF2Candidates(){
   const audit={id:entry.id,cut:entry.id==='boots'?'boot':'low-top',
    sourceSha256:ASSET_SHA256[entry.id],sourceTriangles:entry.expectedTriangles,
    sourceUrl:entry.page,license:'CC0-1.0',sourceParts:[],
-   sourceOrientationVerified:false,contactApproved:false,
+   sourceOrientationVerified:false,handednessVerified:false,contactApproved:false,
    normalisedFitApproved:false,status:'quarantined'};
   try{
    const raw=readFileSync(FROM+'/'+entry.id+'.glb');
