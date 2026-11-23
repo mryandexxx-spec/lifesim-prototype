@@ -70,10 +70,36 @@ try {
     await frame('mira-with-optional-cotton-socks');
     await page.locator('#socks').selectOption('off');
 
+    await page.locator('#motion').selectOption('bind');
+    const screen = {x: width / 2, y: 70};
+    async function tilt(dy) {
+      await page.mouse.move(screen.x, screen.y);
+      await page.mouse.down();
+      await page.mouse.move(screen.x, screen.y + dy);
+      await page.mouse.up();
+    }
+    await tilt(100);
+    for (const style of ['ballet', 'mary-jane']) {
+      await page.locator('#outfit').selectOption(style);
+      await wait('mira', style);
+      const bare = await frame(`mira-${style}-opening-skin`);
+      await page.locator('#socks').selectOption('on');
+      assert.deepEqual((await probe()).residents[0].garment.filter(name => name.includes('opening')),
+        ['C3 opening sock left', 'C3 opening sock right']);
+      const socks = await frame(`mira-${style}-opening-socks`);
+      assert.notEqual(bare, socks);
+      await page.locator('#socks').selectOption('off');
+    }
+    await tilt(-100);
+
     for (const [motion, clip] of [['walk','Walking'], ['run','Running'], ['sit','Sit_to_Stand_Transition_F']]) {
       await page.locator('#motion').selectOption(motion);
-      assert.equal((await probe()).residents[0].activeClip, clip);
-      await frame('mira-' + motion);
+      for (const style of ['ballet', 'mary-jane']) {
+        await page.locator('#outfit').selectOption(style);
+        await wait('mira', style);
+        assert.equal((await probe()).residents[0].activeClip, clip);
+        await frame(`mira-${style}-${motion}`);
+      }
     }
     await page.locator('#motion').selectOption('walk');
     await page.locator('#pause').click();
