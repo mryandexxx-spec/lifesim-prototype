@@ -24,7 +24,8 @@ try{
   let state=await probe();
   assert.equal(state.graphics,true);
   assert.equal(state.resident,resident,'each original has its own source skin');
-  assert.equal(state.morphCount,2,'two live PlayCanvas MorphTargets');
+  assert.equal(state.morphCount,2,'two live PlayCanvas MorphTargets; status='+
+    await page.locator('#lab-status').innerText()+'; probe='+JSON.stringify(state));
   assert.ok(state.weights.every(x=>x===0),'original geometry is always the default');
   assert.equal(state.clips.length,resident==='alex'?10:13,'all original animation clips preserved');
   assert.ok(state.frame.headY>=state.frame.topSafe-15,'head not cropped by top overlay');
