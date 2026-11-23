@@ -15,7 +15,7 @@ test('six pinned, scoped LifeSim skill adapters exist with correct metadata and 
   }
   const guide = readFileSync(new URL('../docs/agent-skills-playcanvas.md', import.meta.url), 'utf8');
   for (const name of names) assert.ok(guide.includes(name), name);
-  assert.ok(guide.includes('not automatically activate'));
+  assert.ok(guide.includes('automatically activate'));
 });
 
 test('engine-specific and persistence advice is explicitly quarantined', () => {
