@@ -3,6 +3,7 @@ import test from 'node:test';
 import {existsSync, readFileSync} from 'node:fs';
 import {parseLegacyGlb, sourceAccessor} from '../scripts/cas-source-asset-audit.mjs';
 import {C3_STYLES, normalizeShoePair} from '../scripts/cas-c3-shoes.mjs';
+import {plantarFrame} from '../scripts/cas-c3-foot-frame.mjs';
 import {digest} from '../scripts/cas-c3-glb.mjs';
 
 const root = new URL('../assets/characters/', import.meta.url);
@@ -40,9 +41,20 @@ test('C3 source pose and complete disjoint shoe parts export on both resident ri
         const p = pair.gltf.meshes[node.mesh].primitives[0];
         assert.equal(node.skin, 0);
         const weights = sourceAccessor(pair, p.attributes.WEIGHTS_0).values;
+        const {values: positions} = sourceAccessor(pair, p.attributes.POSITION);
+        const rows = Array.from({length: positions.length / 3}, (_, i) => positions.slice(i*3, i*3+3));
+        const actualAxis = plantarFrame(rows);
+        const {axis} = wearer.styles[style].sides[side];
+        assert.ok(actualAxis.sin*axis.sin + actualAxis.cos*axis.cos > .9998,
+          'the wearable follows the same plantar axis as the recipient');
         assert.ok(weights.some(w => w > .1 && w < .9));
         for (let i = 0; i < weights.length; i += 4)
           assert.ok(Math.abs(weights[i]+weights[i+1]+weights[i+2]+weights[i+3]-1) < 1e-6);
+        if (style === 'dress') {
+          const skin = pair.gltf.nodes.find(n => n.name === 'C3 opening foot ' + side);
+          const part = pair.gltf.meshes[skin.mesh].primitives[0];
+          assert.ok(Number.isInteger(part.attributes.COLOR_0));
+        }
       }
     }
   }

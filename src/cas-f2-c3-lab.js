@@ -79,10 +79,11 @@ function updateCamera() {
   camera.lookAt(focus);
 }
 
-function asset(file) {
+function asset(file, checksum) {
   if (!loaded.has(file)) {
-    const url = new URL(file, base).href;
-    const item = new pc.Asset(file, 'container', {url});
+    const url = new URL(file, base);
+    if (checksum) url.searchParams.set('v', checksum);
+    const item = new pc.Asset(file, 'container', {url: url.href});
     const pending = new Promise((resolve, reject) => {
       item.once('load', () => resolve(item.resource));
       item.once('error', () => {
@@ -100,7 +101,7 @@ function asset(file) {
 
 async function assemble(resident, index, count) {
   const definition = manifest.wearers[resident];
-  const part = await asset(definition.body);
+  const part = await asset(definition.body, definition.bodySha256);
   const root = part.instantiateRenderEntity();
   root.enabled = false;
   root.setPosition((index - (count - 1) / 2) * .64, 0, 0);
@@ -188,7 +189,10 @@ async function equip() {
     const targets = changed ? staged : actors;
     const wearable = next.outfit !== 'original' && next.outfit !== 'bare';
     if (wearable) {
-      const resources = await Promise.all(targets.map(actor => asset(actor.definition.styles[next.outfit].file)));
+      const resources = await Promise.all(targets.map(({definition}) => {
+        const {file, sha256} = definition.styles[next.outfit];
+        return asset(file, sha256);
+      }));
       if (nonce !== epoch) return;
       targets.forEach((actor, i) => nodes.push(makeShoeNodes(resources[i], actor)));
     }
@@ -342,7 +346,7 @@ app.start();
 updateCamera();
 (async () => {
   try {
-    const response = await fetch(new URL('manifest.json', base));
+    const response = await fetch(new URL('manifest.json', base), {cache: 'no-store'});
     if (!response.ok) throw new Error('Индекс ассетов C3 отсутствует');
     manifest = await response.json();
     if (manifest.version !== 1 || !manifest.wearers?.alex || !manifest.wearers?.mira)

@@ -45,10 +45,27 @@ test('C3 builds exact bind seams and keeps original weighted clips for both resi
     assert.deepEqual(preserved, original.gltf.nodes);
     assert.deepEqual(model.bin.subarray(0, original.bin.length), original.bin);
     for (const side of ['left', 'right']) {
-      const {seam: {y, vertices}, joints, footLength} = profile.sides[side];
+      const {seam: {y, vertices}, joints, footLength, soleY, axis} = profile.sides[side];
       const body = [...new Set(seam(model, 'C3 body', y, side))].sort();
       assert.equal(body.length, vertices);
       assert.ok(footLength > .16 && footLength < .28);
+      assert.ok(Math.abs(Math.hypot(axis.sin, axis.cos)-1) < 1e-10);
+      assert.ok(axis.sin * (side === 'left' ? 1 : -1) > 0);
+      const donor = template.sides[side];
+      const {heel, toe, ball} = donor.landmarks;
+      const lengthScale = footLength / (toe[2] - heel[2]);
+      const barefoot = semantic(model, 'C3 foot ' + side, 'POSITION');
+      let measured = 0;
+      for (const [i, vertex] of donor.vertices.entries()) {
+        if (vertex[2] < ball[2]) continue;
+        assert.ok(Math.abs(barefoot[i][1] - soleY - vertex[1]*lengthScale) < 1e-7,
+          'instep and toes keep the template proportions');
+        measured++;
+      }
+      assert.ok(measured > 20);
+      const tone = semantic(model, 'C3 foot ' + side, 'COLOR_0');
+      assert.equal(tone.length, barefoot.length);
+      assert.ok(new Set(tone.map(v => v.join(','))).size > 8, 'native seams retain the sampled skin tones');
       for (const layer of ['foot', 'sock']) {
         const name = 'C3 ' + layer + ' ' + side;
         assert.deepEqual(seam(model, name, y, side).sort(), body);

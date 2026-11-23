@@ -17,6 +17,12 @@ try {
       deviceScaleFactor: 1, isMobile: true, hasTouch: true, serviceWorkers: 'block'});
     const page = await context.newPage();
     const errors = [];
+    const modelRequests = new Set();
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (url.pathname.includes('/cas-c3/') && url.pathname.endsWith('.glb'))
+        modelRequests.add(url.searchParams.get('v'));
+    });
     page.on('pageerror', e => errors.push(e.message));
     page.on('crash', () => errors.push('crash'));
     const probe = () => page.evaluate(() => window.__LifeSimCasC3?.());
@@ -44,8 +50,14 @@ try {
         assert.ok(s.residents[0].garment.includes('C3 shoe right'));
         comparisons.push({resident, style, sha: await frame(resident + '-' + style)});
       }
+      await page.locator('#socks').selectOption('off');
+      await page.locator('#outfit').selectOption('bare');
+      await wait(resident, 'bare');
+      await frame(resident + '-barefoot');
       await page.locator('#outfit').selectOption('dress');
       await wait(resident, 'dress');
+      await frame(resident + '-dress-bare-ankle');
+      await page.locator('#socks').selectOption('on');
     }
     assert.equal(new Set(comparisons.map(x => x.sha)).size, comparisons.length);
     await page.locator('#socks').selectOption('off');
@@ -90,6 +102,8 @@ try {
     await frame('four-sneakers');
     assert.equal(await page.evaluate(() => localStorage.getItem('lifesim.room01.v1')), null);
     assert.deepEqual(errors, []);
+    assert.equal(modelRequests.size, 8);
+    assert.ok([...modelRequests].every(hash => /^[a-f0-9]{64}$/.test(hash)));
     const fallback = await context.newPage();
     await fallback.route('**/cas-c3/manifest.json', route => route.fulfill({status: 404}));
     await fallback.goto(base + '/cas-f2-c3-lab.html');

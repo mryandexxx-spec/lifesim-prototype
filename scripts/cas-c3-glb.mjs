@@ -75,7 +75,8 @@ export function primitive(editor, vertices, faces, material) {
       NORMAL: editor.append(vertices.map(v => v.normal), 'VEC3', 5126, 34962),
       TEXCOORD_0: editor.append(vertices.map(v => v.uv), 'VEC2', 5126, 34962),
       JOINTS_0: editor.append(vertices.map(v => v.joints), 'VEC4', 5121, 34962),
-      WEIGHTS_0: editor.append(vertices.map(v => v.weights), 'VEC4', 5126, 34962)
+      WEIGHTS_0: editor.append(vertices.map(v => v.weights), 'VEC4', 5126, 34962),
+      ...(vertices[0]?.color && {COLOR_0: editor.append(vertices.map(v => v.color), 'VEC3', 5126, 34962)})
     },
     indices: editor.append(faces.flat(), 'SCALAR', vertices.length > 65535 ? 5125 : 5123, 34963, true),
     material

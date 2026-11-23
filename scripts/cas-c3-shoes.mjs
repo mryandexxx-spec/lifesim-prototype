@@ -3,6 +3,7 @@ import {fileURLToPath} from 'node:url';
 import {ASSET_SHA256} from './cas-02-1-f0-download-assets.mjs';
 import {digest, editGlb, primitive} from './cas-c3-glb.mjs';
 import {supportReport} from './cas-c3-contact.mjs';
+import {plantarFrame, intoFootFrame, fromFootFrame} from './cas-c3-foot-frame.mjs';
 import {bakeBodies, interpolateVertex, packWeights} from './cas-c3-body.mjs';
 
 export const C3_STYLES = ['dress', 'sneakers', 'boots'];
@@ -11,6 +12,8 @@ const folder = new URL('../assets/characters/cas-c3/', import.meta.url);
 const settings = JSON.parse(readFileSync(new URL('source-collars.json', folder))).styles;
 const pointKey = p => p.map(x => Math.round(x * 1e5)).join(',');
 const dot = (a, b) => a.reduce((sum, v, i) => sum + v * b[i], 0);
+const sub = (a, b) => a.map((v, i) => v - b[i]);
+const add = (a, b) => a.map((v, i) => v + b[i]);
 const smooth = t => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
 
 function layers(editor, p) {
@@ -18,7 +21,8 @@ function layers(editor, p) {
   const indices = editor.read(p.indices).flat();
   return {
     vertices: attr.POSITION.map((position, i) => ({position, uv: attr.TEXCOORD_0[i],
-      normal: attr.NORMAL[i], joints: attr.JOINTS_0?.[i], weights: attr.WEIGHTS_0?.[i]})),
+      normal: attr.NORMAL[i], joints: attr.JOINTS_0?.[i], weights: attr.WEIGHTS_0?.[i],
+      ...(attr.COLOR_0 && {color: attr.COLOR_0[i]})})),
     faces: Array.from({length: indices.length / 3}, (_, i) => indices.slice(i*3, i*3+3))
   };
 }
@@ -41,7 +45,12 @@ function selectSide(source, part) {
       position: [p[0] - cx, p[1], p[2] - cz]};
   });
   const ground = Math.min(...converted.map(v => v.position[1]));
-  for (const v of converted) v.position[1] -= ground;
+  const axis = plantarFrame(converted.map(v => v.position));
+  for (const v of converted) {
+    v.position = intoFootFrame(v.position, axis);
+    v.position[1] -= ground;
+    v.normal = intoFootFrame(v.normal, axis);
+  }
   return {
     vertices: converted, faces: faces.map(f => f.map(i => indexMap.get(i))),
     originalKeys: new Set(used.map(i => pointKey(source.vertices[i].position))),
@@ -73,34 +82,44 @@ function fitShoe(source, target, localJoint, style) {
   const heel = Math.min(...z);
   const toe = Math.max(...z);
   const [ax, , az] = target.ankle;
+  const ground = target.sourceSoleY;
+  const origin = [ax, 0, az];
+  const modelPoint = point => add(fromFootFrame(point, target.axis), origin);
+  const footPoint = point => intoFootFrame(sub(point, origin), target.axis);
+  const heelZ = footPoint(target.heel)[2];
+  const toeZ = footPoint(target.toe)[2];
+  const ballZ = footPoint(target.ball)[2];
   // Clearance for lining, heel counter and toe box. The same rule applies
   // to each style, with the authored collar fixed under the reconstructed ankle.
   const scale = Math.max((target.footLength + .018) / (toe - heel),
-    (target.heel[2] - az - .006) / heel, (target.toe[2] - az + .009) / toe);
+    (heelZ - .006) / heel, (toeZ + .009) / toe);
   if (scale < .55 || scale > 1.3) throw new Error('C3 source does not fit ankle/length envelope');
-  const ground = target.sourceSoleY;
-  const [back, mid, front] = source.collar.map(y => ground + y * scale);
+  const collar = source.collar.map(y => ground + y * scale);
   const {Leg, Foot, ToeBase} = localJoint;
+  function influences([, y, z]) {
+    const bend = smooth((z - ballZ + .025) / .075) * style.flex;
+    const calf = (style.shell === 'high' ? .68 : 0) * smooth((y - target.ankle[1] * .68) / .07);
+    return [[Leg, calf], [Foot, (1-calf)*(1-bend)], [ToeBase, (1-calf)*bend]];
+  }
   const vertices = source.vertices.map(v => {
     const [x, y, z] = v.position;
-    const position = [ax + x * scale, ground + y * scale, az + z * scale];
-    const bend = smooth((position[2] - target.ball[2] + .025) / .075) * style.flex;
-    const calf = (style.shell === 'high' ? .68 : 0) * smooth((position[1] - target.ankle[1] * .68) / .07);
-    return {...v, position, ...packWeights([[Leg, calf], [Foot, (1-calf)*(1-bend)], [ToeBase, (1-calf)*bend]])};
+    const local = [x * scale, ground + y * scale, z * scale];
+    return {...v, position: modelPoint(local), normal: fromFootFrame(v.normal, target.axis),
+      ...packWeights(influences(local))};
   });
-  return {vertices, faces: source.faces, scale, collar: [back, mid, front], origin: [ax, ground, az],
+  return {vertices, faces: source.faces, scale, collar, axis: target.axis,
+    footPoint, modelPoint, influences, seamY: target.seam.y,
     openingRadiiXZ: source.openingRadiiXZ.map(n => n * scale),
-    sole: [ax, ground, az + heel*scale], toe: [ax, ground, az + toe*scale]};
+    sole: modelPoint([0, ground, heel*scale]), toe: modelPoint([0, ground, toe*scale])};
 }
 
 function clipForOpening(layer, fit) {
   const [back, middle, front] = fit.collar;
-  const [ax, , az] = fit.origin;
   const [rx, rz] = fit.openingRadiiXZ;
-  function visible([, y, z]) {
-    const cut = z < az
-      ? middle + (back-middle)*Math.min(1, (az-z)/.037)
-      : middle + (front-middle)*Math.min(1, (z-az)/.043);
+  function visible(position) {
+    const [, y, z] = fit.footPoint(position);
+    const end = z < 0 ? back : front;
+    const cut = middle + (end-middle)*Math.min(1, Math.abs(z)/rz);
     return y - cut + .006;
   }
   const {vertices, faces} = layer;
@@ -127,17 +146,20 @@ function clipForOpening(layer, fit) {
     for (let i=1; i+1<polygon.length; i++) kept.push([polygon[0],polygon[i],polygon[i+1]]);
   }
   const rimTop = Math.max(back, middle, front);
+  const startBlend = Math.min(rimTop, fit.seamY - .017);
   for (const v of out) {
-    const [x, y, z] = v.position;
-    const dx = x - ax;
-    const dz = z - az;
-    const radial = Math.hypot(dx / rx, dz / rz);
-    const inside = Math.min(1, .93 / Math.max(radial, 1e-5));
-    // Conform only the hidden overlap and opening. The ankle seam above
-    // this zone retains precisely the authored positions and skinning.
-    const taper = 1 - smooth((y - rimTop) / .029);
-    const scale = 1 - (1 - inside) * taper;
-    v.position = [ax + dx * scale, y, az + dz * scale];
+    const [x, y, z] = fit.footPoint(v.position);
+    const radial = Math.hypot(x / rx, z / rz);
+    const inside = Math.min(1, .90 / Math.max(radial, 1e-5));
+    // At the rim the skin follows the lining's deformation. Its original
+    // cuff positions and weights are recovered continuously above the rim.
+    const lining = 1 - smooth((y - startBlend) / (fit.seamY - startBlend));
+    const scale = 1 - (1 - inside) * lining;
+    const local = [x * scale, y, z * scale];
+    v.position = fit.modelPoint(local);
+    const mixed = new Map(fit.influences(local).map(([j, w]) => [j, w * lining]));
+    v.joints.forEach((j, i) => mixed.set(j, (mixed.get(j) ?? 0) + v.weights[i]*(1-lining)));
+    Object.assign(v, packWeights(mixed));
   }
   return {vertices: out, faces: kept};
 }
@@ -180,7 +202,7 @@ export function buildWearable(bodyBytes, profile, shoeBytes, style) {
       attach('C3 opening ' + garment + ' ' + side, layer, material);
     }
     stats[side] = {scale: fit.scale, triangles: fit.faces.length, sole: fit.sole, toe: fit.toe,
-      openingHeight: fit.collar};
+      openingHeight: fit.collar, axis: fit.axis};
   }
   const glb = editor.finish();
   return {glb, stats, inverseBindSha256: profile.inverseBindSha256};
