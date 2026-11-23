@@ -47,8 +47,13 @@ for(const people of [2,4])test('QSK-01 '+people+' residents: directional social 
   const expected=['alex','mira',...(people===4?['resident_3','resident_4']:[])];
   assert.deepEqual(Object.keys(restored.actionQueues.byResident).sort(),expected.sort());
   for(const id of expected){
-    assert.deepEqual(pendingActions(restored.actionQueues,id),
-      pendingActions(q,id),'exact order, seq and target survive save-v1 for '+id);
+    // Restore may resolve a generic bed/fridge request to its canonical
+    // instance ID. Intent, personal ordering, identity and seq must survive.
+    const intent=task=>({seq:task.seq,type:task.type,
+      actionId:task.actionId,targetId:task.targetId});
+    assert.deepEqual(pendingActions(restored.actionQueues,id).map(intent),
+      pendingActions(q,id).map(intent),
+      'personal order, seq and social target survive save-v1 for '+id);
   }
   assert.deepEqual(queueHeads(restored.actionQueues).map(x=>x.residentId),
     expected,'only the head of each personal FIFO may dispatch');
