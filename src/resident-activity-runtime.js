@@ -4,7 +4,7 @@
  * Alex/Mira keep their established visual/social pipelines; additional actors
  * use the same root clock, typed persistent FIFO and world A* geometry.
  */
-import {ACTIONS,chooseAction,arrive,tick,autonomousChoice} from './simulation.js';
+import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy} from './simulation.js';
 import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './navigation.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {BED_SLOT_IDS,BED_SLOTS,validBedSlot} from './bed-layout.js';
@@ -302,33 +302,75 @@ export function prepareAdditionalResidents(root){
  * Failed reservations retry after a small game-time cooldown, so fast frame
  * loops cannot spin on a missing item.
  */
-export function startAdditionalResidentAutonomy(root,id){
-  if(!root?.autonomy?.enabled||root.paused||root.socialAction||
-    root.phoneCalls?.active||
-    [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id)||
-    queueHeads(root.actionQueues).some(({command})=>
-      ['social','branch'].includes(command.type)&&command.targetId===id)||
-    !residentIdsForSimulation(root).slice(2).includes(id)||
-    ['departing','waiting','working','returning'].includes(
-      root.careerSystem?.byResident?.[id]?.currentShift?.phase)||
-    pendingActions(root.actionQueues,id).length)return false;
+function additionalAutonomyBlock(root,id){
+  if(!root?.autonomy?.enabled)return 'disabled';
+  if(root.paused)return 'paused';
+  if(!root.actionQueues||!root.population)return 'missing-household';
+  if(root.socialAction||root.phoneCalls?.active||
+    [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))
+    return 'social-or-phone-busy';
+  if(queueHeads(root.actionQueues).some(({command})=>
+    ['social','branch'].includes(command.type)&&command.targetId===id))
+    return 'incoming-social-command';
+  if(!residentIdsForSimulation(root).slice(2).includes(id))return 'outside-household';
+  if(['departing','waiting','working','returning'].includes(
+    root.careerSystem?.byResident?.[id]?.currentShift?.phase))return 'working';
+  if(pendingActions(root.actionQueues,id).length)return 'manual-fifo';
+  if(savedAdditionalActor(root,id)?.action)return 'action-running';
+  return null;
+}
+
+/** Read-only resource-aware explanation of a resident's *actual* feasible
+ * next action. This is not serialized or shown as a reward. It uses precisely
+ * the same exclusive furniture reservations and A* tests as action dispatch.
+ */
+export function explainAdditionalResidentAutonomy(root,id){
+  const blocked=additionalAutonomyBlock(root,id);
+  if(blocked)return {blocked,selected:null,plan:null,attempts:[]};
   const actor=savedAdditionalActor(root,id);
-  if(!actor||actor.action)return false;
+  const projected={...actor,minutes:root.minutes,paused:root.paused,
+    autonomy:{...actor.autonomy,enabled:root.autonomy.enabled}};
+  const evaluation=evaluateAutonomy(projected);
+  if(evaluation.blocked)return {
+    blocked:evaluation.blocked,selected:null,plan:null,attempts:[]};
+  const attempts=[];
+  for(const candidate of evaluation.candidates){
+    if(candidate.score<=0)continue;
+    if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(candidate.id))continue;
+    let plan=prepareCommand(root,id,{type:'object',actionId:candidate.id});
+    // Real TV is only an alternate reachable device for leisure.
+    if(!plan&&candidate.id==='sofa')
+      plan=prepareCommand(root,id,{type:'object',actionId:'tv'});
+    attempts.push({id:candidate.id,score:candidate.score,
+      reason:candidate.reason,factors:candidate.factors,
+      availability:plan?'free-and-reachable':'unavailable-or-unreachable',
+      plannedAction:plan?.id||null});
+    if(plan)return {blocked:null,selected:plan.id,plan,attempts};
+  }
+  if(evaluation.selected===null&&Number.isFinite(actor.needs.social)&&
+    actor.needs.social<35){
+    const mirror=prepareCommand(root,id,{type:'object',actionId:'mirror'});
+    attempts.push({id:'mirror',score:null,reason:'low-social-real-mirror',
+      availability:mirror?'free-and-reachable':'unavailable-or-unreachable',
+      plannedAction:mirror?.id||null});
+    if(mirror)return {blocked:null,selected:'mirror',plan:mirror,attempts};
+  }
+  return {blocked:null,selected:null,plan:null,attempts};
+}
+
+export function startAdditionalResidentAutonomy(root,id){
+  const explanation=explainAdditionalResidentAutonomy(root,id);
+  if(explanation.blocked)return false;
+  const actor=savedAdditionalActor(root,id);
   actor.autonomy.enabled=root.autonomy.enabled;
   actor.minutes=root.minutes;
-  // Core scoring owns urgent physiological needs, personality, daily rhythm
-  // and repeat-memory cooldown. Mirror speech is a bounded fallback for
-  // unmet Social without inventing friendship, consent or pair receipts.
-  const coreWish=autonomousChoice(actor);
-  const wish=coreWish||
-    (actor.needs.social<35?'mirror':null);
-  if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(wish))return false;
-  let plan=prepareCommand(root,id,{type:'object',actionId:wish});
-  // Leisure can use the actual shared TV if the sofa is reserved. The
-  // physical TV itself is still exclusive; no phantom watch/football credit.
-  if(!plan&&wish==='sofa')
-    plan=prepareCommand(root,id,{type:'object',actionId:'tv'});
-  if(plan&&startPlannedObject(root,id,plan,true))return true;
+  if(explanation.plan&&startPlannedObject(root,id,explanation.plan,true))
+    return true;
+  // No eligible need: do not repeatedly postpone a future need merely
+  // because this resident is presently healthy and content.
+  if(explanation.attempts.length===0)return false;
+  // A bounded failure cooldown prevents tight frame retries if nothing
+  // eligible is physically reachable, with no queue/money/need mutation.
   actor.autonomy.nextAt=Math.max(root.minutes+2,actor.autonomy.nextAt||0);
   return false;
 }

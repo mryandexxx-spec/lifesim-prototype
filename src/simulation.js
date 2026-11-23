@@ -477,34 +477,39 @@ export function tick(state, minutes,world=state?.world??null) {
   }
 }
 
-export function autonomousChoice(state) {
-  if (state.paused || state.action || !state.autonomy.enabled || state.minutes < state.autonomy.nextAt) return null;
-  const hour = Math.floor(state.minutes % 1440 / 60);
-  const night = hour >= 21 || hour < 6;
-  const critical = Math.min(...PHYSICAL_NEEDS.map(id => state.needs[id])) < 24;
-  // A lonely resident may still take care of basic needs or seek a real
-  // social interaction; there is deliberately no imaginary 'social sofa'.
-  const wishReady = !critical && state.minutes >= 540;
-  const options = [
-    { id: 'fridge', need: 'hunger', threshold: 55, weight: 1.25 },
-    { id: 'bed', need: 'energy', threshold: 42, weight: 1.12 },
-    { id: 'shower', need: 'hygiene', threshold: 58, weight: 0.95 },
-    { id: 'toilet', need: 'bladder', threshold: 50, weight: 1.67 },
-    { id: 'sofa', need: 'fun', threshold: 55, weight: 0.90 }
+/** QSK-06: explainable, pure utility scoring. Decisions contain no RNG,
+ * wall clock, I/O or mutations; tie order follows the established action list.
+ * Only an actual adapter can decide whether a ranked physical resource is free.
+ */
+export function evaluateAutonomy(state) {
+  const blocked=!state?'missing-state':
+    state.paused?'paused':
+    state.action?'action-running':
+    !state.autonomy?.enabled?'disabled':
+    !Number.isFinite(state.minutes)||state.minutes<state.autonomy.nextAt?'cooldown':null;
+  if(blocked)return {blocked,selected:null,candidates:[]};
+  const hour=Math.floor(state.minutes%1440/60);
+  const night=hour>=21||hour<6;
+  const critical=Math.min(...PHYSICAL_NEEDS.map(id=>
+    Number.isFinite(state.needs?.[id])?state.needs[id]:100))<24;
+  const wishReady=!critical&&state.minutes>=540;
+  const options=[
+    {id:'fridge',need:'hunger',threshold:55,weight:1.25},
+    {id:'bed',need:'energy',threshold:42,weight:1.12},
+    {id:'shower',need:'hygiene',threshold:58,weight:.95},
+    {id:'toilet',need:'bladder',threshold:50,weight:1.67},
+    {id:'sofa',need:'fun',threshold:55,weight:.90}
   ];
-  const scored = options.map(option => {
-    const value = state.needs[option.need];
-    const urgency = Math.max(0, option.threshold - value) * option.weight;
-    // Sleep is a physiological priority at night, even if a leisure wish
-    // happens to be active. Temperament never overrides basic rest.
-    const bedtime = night && option.id === 'bed' && value < 70 ? 10+(70-value)*1.60 : 0;
+  const candidates=options.map((option,order)=>{
+    const value=Number.isFinite(state.needs?.[option.need])
+      ?clamp(state.needs[option.need]):100;
+    const deficit=Math.max(0,option.threshold-value)*option.weight;
+    const nightRest=night&&option.id==='bed'&&value<70
+      ?10+(70-value)*1.60:0;
     const exhaustion=option.id==='bed'&&value<16?12:0;
-    const base = urgency + bedtime + exhaustion;
-    // No voluntary action at game start: let the player explore for the first hour.
-    const recovery=state.workRecovery?.until>state.minutes&&
-      ((option.id==='bed'&&value<45)||(option.id==='sofa'&&value<40));
-    // Wishes never force repetitive green-zone self-care. Memories are
-    // canonical save-v1 receipts, so cooldown survives reload without a new field.
+    const base=deficit+nightRest+exhaustion;
+    const recovery=Boolean(state.workRecovery?.until>state.minutes&&
+      ((option.id==='bed'&&value<45)||(option.id==='sofa'&&value<40)));
     const urgent=value<24||(option.id==='bed'&&night&&value<42);
     const recent=(state.mind?.memories||[]).some(memory=>
       memory.id===option.id&&state.minutes-memory.at>=0&&
@@ -512,10 +517,23 @@ export function autonomousChoice(state) {
     const wish=wishReady&&value<SELF_CARE_WISH_MAX_NEED&&
       state.mind?.wish?.id===option.id;
     const eligible=(base>0||recovery||wish)&&(!recent||urgent);
-    const score=eligible ? base + psychologyScore(state,option.id,wishReady) : 0;
-    return { id: option.id, score };
-  }).sort((a, b) => b.score - a.score);
-  return scored[0].score > 0 ? scored[0].id : null;
+    const personality=eligible?psychologyScore(state,option.id,wishReady):0;
+    const score=eligible?base+personality:0;
+    const reason=!eligible?(recent&&!urgent?'recent-action-cooldown':'need-satisfied'):
+      urgent?'urgent-need':nightRest>0?'night-rest':
+      deficit>0?'need-deficit':recovery?'work-recovery':'personal-wish';
+    return {id:option.id,need:option.need,value,score,eligible,reason,
+      factors:{deficit,nightRest,exhaustion,personality,recovery,wish,
+        recent,urgent},order};
+  }).sort((a,b)=>b.score-a.score||a.order-b.order)
+    .map(({order,...candidate})=>candidate);
+  return {blocked:null,
+    selected:candidates[0]?.score>0?candidates[0].id:null,candidates};
+}
+
+/** Compatibility API for the existing Alex/Mira game decision callers. */
+export function autonomousChoice(state) {
+  return evaluateAutonomy(state).selected;
 }
 
 export function readableTime(minutes) {
