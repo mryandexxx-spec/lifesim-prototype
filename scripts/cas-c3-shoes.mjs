@@ -93,7 +93,9 @@ function fitShoe(source, target, localJoint, style) {
   // to each style, with the authored collar fixed under the reconstructed ankle.
   const scale = Math.max((target.footLength + .018) / (toe - heel),
     (heelZ - .006) / heel, (toeZ + .009) / toe);
-  if (scale < .55 || scale > 1.3) throw new Error('C3 source does not fit ankle/length envelope');
+  if (scale < .55 || scale > 1.3) throw new Error('C3 source does not fit ankle/length envelope: ' +
+    JSON.stringify({scale, sourceLength: toe-heel, targetLength: target.footLength,
+      sourceHeel: heel, sourceToe: toe, targetHeel: heelZ, targetToe: toeZ}));
   const collar = source.collar.map(y => ground + y * scale);
   const {Leg, Foot, ToeBase} = localJoint;
   function influences([, y, z]) {
@@ -165,8 +167,13 @@ function clipForOpening(layer, fit) {
 }
 
 export function buildWearable(bodyBytes, profile, shoeBytes, style) {
+  return buildWearableFromGeometry(bodyBytes, profile, normalizeShoePair(shoeBytes, style));
+}
+
+// C3 and C4 share identical skinning, cuff clipping, bind rig and contact policy.
+// Importers may normalize their own licensed last once without per-resident shims.
+export function buildWearableFromGeometry(bodyBytes, profile, geometry) {
   const body = editGlb(bodyBytes);
-  const geometry = normalizeShoePair(shoeBytes, style);
   const {editor} = geometry;
   const {gltf} = editor;
   const skin = body.gltf.skins[0];

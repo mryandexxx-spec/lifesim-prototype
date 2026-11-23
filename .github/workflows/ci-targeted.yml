@@ -74,7 +74,7 @@ jobs:
     needs: targeted
     if: ${{ needs.targeted.outputs.browser == 'true' || needs.targeted.outputs.cas_cc0 == 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 38
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -101,6 +101,47 @@ jobs:
           CAS_C3_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c3-*.test.js
           node scripts/cas-c3-probe-fourth.mjs
           node tests/cas-02-1-f2-c3-browser-smoke.mjs
+      - name: Restore audited female vendor source GLB cache
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
+        id: c4-source-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            assets/characters/cas-c3/c4-*.source.glb
+            assets/characters/cas-c3/c4-source-manifest.json
+          key: cas-c4b-approved-vendor-glbs-v1-6e7d8d-768ce0-c2e390
+      - name: Prepare and SHA-check authentic CC0 female source GLBs
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
+        run: |
+          python3 -m unittest discover -s tests -p 'test_cas_c4_source_audit.py' -v
+          if [ "${{ steps.c4-source-cache.outputs.cache-hit }}" != 'true' ]; then
+            python3 scripts/cas-c4-mira-sources.py
+          fi
+          node scripts/cas-c4-source-verify.mjs
+      - name: Save exact SHA-verified female vendor source cache
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' && steps.c4-source-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            assets/characters/cas-c3/c4-*.source.glb
+            assets/characters/cas-c3/c4-source-manifest.json
+          key: cas-c4b-approved-vendor-glbs-v1-6e7d8d-768ce0-c2e390
+      - name: CAS C4B genuine Mira three-style skinned GLB and real mobile WebGL
+        if: ${{ needs.targeted.outputs.cas_c3 == 'true' }}
+        run: |
+          node scripts/cas-c4-mira-shoes.mjs
+          CAS_C4_REQUIRE_ASSETS=1 node --test tests/cas-02-1-f2-c4b.test.js
+          node tests/cas-02-1-f2-c4b-browser-smoke.mjs
+      - name: Archive C4B Mira female source / animation screenshots
+        if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-f2-c4b-mira-shoes
+          path: |
+            artifacts/cas-02-1-f2-c4b/
+            assets/characters/cas-c3/c4-source-manifest.json
+            assets/characters/cas-c3/c4-*.source.glb
+          if-no-files-found: ignore
       - name: Archive CAS F2 C3 screenshots and probe
         if: ${{ always() && needs.targeted.outputs.cas_c3 == 'true' }}
         uses: actions/upload-artifact@v4
@@ -334,7 +375,7 @@ jobs:
           if-no-files-found: ignore
 
   cas-c4-female-source-audit:
-    if: ${{ contains(github.event.pull_request.title, 'CAS-02.1-F2-C4') }}
+    if: ${{ contains(github.event.pull_request.title, 'CAS-02.1-F2-C4A') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
