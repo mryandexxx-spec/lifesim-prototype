@@ -125,6 +125,7 @@ import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX
   blockedActions,parkQueuedHead,parkInterruptedAction,retryBlockedAction,removeBlockedAction,
   MAX_BLOCKED_QUEUE} from './action-queue.js';
 import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand} from './queue-rescue.js';
+import {newQueuedHeadGuard,inspectQueuedHead} from './qsk-07-fairness.js';
 import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
 import {effectiveSleepSpeed} from './sleep-acceleration.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
@@ -4365,6 +4366,10 @@ function boot() {
   // head, including up to eight A* social approaches. On mobile this can
   // monopolize the main thread and look like a frozen game.
   const routeRetryAt=new Map(),routeFailures=new Map();
+  // QSK-07-B: legacy Alex/Mira canStart(move) can fail before start() and
+  // therefore never increment routeFailures. Bound that static A* failure
+  // per resident/head in game minutes, using the existing saved review tray.
+  const legacyMoveHeadGuards=new Map();
   let socialWalkGuard=newSocialWalkGuard();
   let lastRescueOverflowSeq=null;
   inspectQueueWait=residentId=>{
@@ -4757,8 +4762,30 @@ function boot() {
           Boolean(gardenApproach(game.world,command.instanceId,actor.position));
         if(command.type==='outdoor')return outdoorBenchAvailable(game,residentId,command.instanceId)&&
           Boolean(findPath(actor.position,outdoorBenchApproach(game.world,command.instanceId),game.world));
-        if(command.type==='move')return isWalkable(command.x,command.z,game.world)&&
-          Boolean(findPath(actor.position,{x:command.x,z:command.z},game.world));
+        if(command.type==='move'){
+          if(!isWalkable(command.x,command.z,game.world))return false;
+          let guard=legacyMoveHeadGuards.get(residentId);
+          if(!guard){guard=newQueuedHeadGuard();legacyMoveHeadGuards.set(residentId,guard);}
+          // Backoff has to occur BEFORE A*, not merely after failed start.
+          if(guard.seq===command.seq&&game.minutes<guard.retryAt)return false;
+          if(findPath(actor.position,{x:command.x,z:command.z},game.world)){
+            legacyMoveHeadGuards.delete(residentId);
+            return true;
+          }
+          if(inspectQueuedHead(guard,command.seq,'unreachable-route',
+            game.minutes)==='park'&&
+            parkQueuedHead(game.actionQueues,residentId,command.seq,
+              'unreachable-route',game.minutes)){
+            legacyMoveHeadGuards.delete(residentId);
+            routeRetryAt.delete(command.seq);
+            routeFailures.delete(command.seq);
+            const notice=getActorName(residentId)+
+              ': недостижимый маршрут сохранён в «Отложено». Остальной план продолжит работу.';
+            $('queue-feedback').textContent=notice;
+            renderQueuePanel(true);save(true);toast(notice);
+          }
+          return false;
+        }
         const partnerId=command.targetId;
         // Current 3D scene is a two-person adapter; the queue core is N-person.
         if(!HOUSEHOLD_IDS.includes(partnerId)||partnerId===residentId||
