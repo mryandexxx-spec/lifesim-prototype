@@ -29,6 +29,10 @@ try{
   assert.equal(state.skinCount,0,'vendor model is not pre-rigged');
   assert.equal(state.sourceShoeVisible,true,'source Alex shoes remain in compare mode');
   assert.equal(state.mode,'compare');
+  assert.ok(state.candidateShoePixelY>40&&state.candidateShoePixelY<state.panelTop-20,
+   'actual vendor shoe must be visible above the iPhone dock, not occluded: '+JSON.stringify(state));
+  assert.ok(state.sourceFootPixelY>40&&state.sourceFootPixelY<state.panelTop-20,
+   'Alex source footwear must be visible above the iPhone dock');
   const shoebox=await page.locator('#source-shoes').boundingBox();
   assert.ok(shoebox&&shoebox.height>=43&&shoebox.y+shoebox.height<=height);
   const modebox=await page.locator('#fit-mode').boundingBox();
@@ -51,6 +55,8 @@ try{
   await page.locator('#fit-mode').selectOption('mock');
   state=await probe();
   assert.equal(state.mode,'mock');
+  assert.ok(state.candidateShoePixelY<state.panelTop-20,
+   'static trial pair must remain above the panel in the shoe-focused preview');
   assert.equal(state.sourceShoeVisible,false,'original shoe hidden ONLY during explicitly static fit test');
   assert.ok(state.geometryBounds.scale>0.2&&state.geometryBounds.scale<5);
   await page.screenshot({path:dir+'/'+width+'x'+height+'-boots-static-fit.png'});
