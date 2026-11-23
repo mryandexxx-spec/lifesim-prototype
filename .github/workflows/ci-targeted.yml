@@ -54,6 +54,18 @@ jobs:
         env:
           CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/ci-target.mjs
+      - name: QSK-05 audit actual pinned original rig clip joint matrix
+        if: ${{ contains(github.event.pull_request.title, 'QSK-05') }}
+        run: |
+          node --test tests/qsk-05-contact-matrix.test.js
+          node scripts/qsk-05-contact-matrix.mjs
+      - name: Archive QSK-05 read-only source joint matrix and blocked CAS gaps
+        if: ${{ always() && contains(github.event.pull_request.title, 'QSK-05') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsk-05-original-joint-matrix-pr
+          path: artifacts/qsk-05/original-rig-matrix.json
+          if-no-files-found: error
       - name: QSK-04 audit pinned GLB, textures and provenance (no runtime changes)
         if: ${{ contains(github.event.pull_request.title, 'QSK-04') }}
         run: node scripts/qsk-04-asset-qa.mjs
@@ -104,6 +116,18 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: QSK-05 real original rig movement in 390x844 and 320x568 PlayCanvas
+        if: ${{ contains(github.event.pull_request.title, 'QSK-05') }}
+        run: node tests/qsk-05-browser-contacts.mjs
+      - name: Archive QSK-05 PlayCanvas clip frames (non-contact-certified)
+        if: ${{ always() && contains(github.event.pull_request.title, 'QSK-05') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsk-05-original-mobile-webgl-pr
+          path: |
+            artifacts/qsk-05/browser-contact-report.json
+            artifacts/qsk-05/*.png
+          if-no-files-found: warn
       - name: QSK-04 capture 12 real PlayCanvas Alex/Mira reference frames
         if: ${{ contains(github.event.pull_request.title, 'QSK-04') }}
         run: node tests/qsk-04-browser-visual.mjs
