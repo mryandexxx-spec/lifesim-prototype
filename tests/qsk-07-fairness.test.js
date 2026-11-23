@@ -144,6 +144,31 @@ test('QSK-07: unreachable FIFO head is quarantined; later manual command remains
   assert.equal(pendingActions(root.actionQueues,'resident_3').length,0);
 });
 
+test('QSK-07: restored accepted manual walk is saved, not erased by route preflight',()=>{
+  let root=household();
+  const actor=getActor(root,'resident_3');
+  // Find a genuine unwalkable point in the lot; do not depend on one
+  // decorative furniture layout or an arbitrary outside-lot coordinate.
+  let goal=null;
+  for(let x=-4;x<=5&&!goal;x+=.5)
+    for(let z=-4;z<=4;z+=.5)
+      if(!isWalkable(x,z,root.world)){goal={x,z};break;}
+  assert.ok(goal,'starter lot must have an impassable furniture footprint');
+  actor.action={id:'move',phase:'walking',elapsed:0,automatic:false,goal};
+  root=loadHousehold(copy(root));
+  assert.equal(getActor(root,'resident_3').action?.id,'move');
+  tickHousehold(root,.1);
+  assert.equal(getActor(root,'resident_3').action,null);
+  const parked=blockedActions(root.actionQueues,'resident_3');
+  assert.equal(parked.length,1);
+  assert.equal(parked[0].type,'move');
+  assert.equal(parked[0].x,goal.x);
+  assert.equal(parked[0].z,goal.z);
+  assert.equal(parked[0].blockedReason,'unreachable-route');
+  assert.deepEqual(loadHousehold(copy(root)).actionQueues.blockedByResident.resident_3,
+    parked,'explicit saved retry survives a second v1 reload unchanged');
+});
+
 test('QSK-07: eight-day 4-resident soak, deterministic v1 reload without duplicate receipts',()=>{
   let root=household();
   const initialMoney=root.money,initialHistory=copy(root.financialHistory);
