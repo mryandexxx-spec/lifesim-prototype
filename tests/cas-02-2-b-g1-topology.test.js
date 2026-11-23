@@ -65,7 +65,7 @@ for (const [kind,source] of Object.entries(SOURCES)) {
     assert.equal(report.correctedTexturesAvailable,false);
     assert.equal(report.artistSculptedNewIdentities,0);
     assert.equal(report.productionReady,false);
-    assert.match(report.conclusion,/do NOT certify/i);
+    assert.match(report.conclusion,/must not be mistaken for validated/i);
   });
 }
 
