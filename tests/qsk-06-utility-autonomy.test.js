@@ -5,6 +5,7 @@ import {createProfile} from '../src/trait-catalog.js';
 import {newHousehold,loadHousehold,tickHousehold,getActor} from '../src/household.js';
 import {resolveActionFurniture,furnitureActionApproach} from '../src/furniture-catalog.js';
 import {pendingActions,enqueueAction} from '../src/action-queue.js';
+import {explainAdditionalResidentAutonomy} from '../src/resident-activity-runtime.js';
 
 const copy=value=>JSON.parse(JSON.stringify(value));
 const healthy=state=>{
@@ -89,6 +90,14 @@ test('QSK-06 occupied preferred fridge falls back to reachable urgent toilet, no
     targetInstanceId:fridge.instanceId};
   const before=copy(a.needs);
   assert.equal(evaluateAutonomy(a).selected,'fridge');
+  const beforeTrace=copy(root);
+  const decision=explainAdditionalResidentAutonomy(root,'resident_3');
+  assert.deepEqual(root,beforeTrace,'explanation must not mutate the household');
+  assert.equal(decision.selected,'toilet');
+  assert.deepEqual(decision.attempts.slice(0,2).map(x=>[x.id,x.availability]),[
+    ['fridge','unavailable-or-unreachable'],
+    ['toilet','free-and-reachable']
+  ]);
   tickHousehold(root,.1);
   assert.equal(a.action?.id,'toilet');
   assert.equal(a.action?.automatic,true);
@@ -108,6 +117,8 @@ test('QSK-06 blocked manual queue still outranks ranked fallback after save/relo
   enqueueAction(root.actionQueues,'resident_3',
     {type:'object',actionId:'fridge',targetInstanceId:fridge.instanceId});
   const restored=loadHousehold(copy(root));
+  assert.equal(explainAdditionalResidentAutonomy(restored,'resident_3').blocked,
+    'manual-fifo');
   tickHousehold(restored,.1);
   const b=getActor(restored,'resident_3');
   assert.equal(b.action,null,'AI cannot skip a blocked user command');
