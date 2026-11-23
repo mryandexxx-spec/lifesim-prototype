@@ -78,14 +78,16 @@ test('QSK-02: SW only caches same-origin successful immutable GLBs, never JS/JSO
   assert.equal((await sw.request(model+'?v=first')).status,200);
   assert.equal((await sw.request(model+'?v=second')).status,200);
   assert.equal(sw.downloads.length,1,'different query on immutable URL reuses model bytes');
+  // A failed network response is never pinned in the immutable model cache.
+  assert.equal((await sw.request('assets/characters/meshy-mira-mobile-v1.glb?broken-asset=1')).status,404);
   assert.equal((await sw.request('assets/characters/meshy-mira-mobile-v1.glb')).status,200);
-  assert.equal(sw.downloads.length,2);
+  assert.equal(sw.downloads.length,3,'the post-404 retry must issue another network request');
   assert.equal(await sw.request('src/game.js'),null,'JS modules cannot receive stale GLB cache');
   assert.equal(await sw.request('assets/characters/cas-cc0-f2/assessment.json'),null,
     'asset audit JSON must never be cached by the GLB-only worker');
   assert.equal(await sw.dispatch('fetch',new Request('https://other.invalid/x')),null);
   assert.equal(await sw.request(model,'POST'),null);
-  assert.equal(sw.downloads.length,2);
+  assert.equal(sw.downloads.length,3);
   assert.ok(sw.stores.size>=1);
 });
 
