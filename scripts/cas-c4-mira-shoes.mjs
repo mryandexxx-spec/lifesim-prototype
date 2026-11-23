@@ -8,7 +8,7 @@ export const FEMALE_STYLES = Object.freeze(['ballet', 'mary-jane', 'ankle-boots'
 const folder = new URL('../assets/characters/cas-c3/', import.meta.url);
 // One source-wide MakeHuman body-to-meter conversion. The C3 fit resolver
 // performs uniform scaling to Mira's existing foot; no per-shoe CSS/px shims.
-const MH_UNIT = 0.11;
+const MH_UNIT = 0.145;
 const stiffness = Object.freeze({
   ballet: {flex: .65, shell: 'low'},
   'mary-jane': {flex: .52, shell: 'low'},
@@ -50,7 +50,7 @@ function normalizeHalf(source, faceIds, side) {
   const ymin = Math.min(...y);
   const centerX = (xmin+xmax)/2, centerZ = (zmin+zmax)/2;
   const width = (xmax-xmin)*MH_UNIT, length = (zmax-zmin)*MH_UNIT;
-  if (width < .04 || width > .13 || length < .18 || length > .32)
+  if (width < .04 || width > .18 || length < .25 || length > .43)
     throw new Error('C4 '+side+' source last dimensions invalid ('+width+','+length+')');
   const vertices = raw.map(v=>({...v,
     position:[(v.position[0]-centerX)*MH_UNIT,
@@ -107,6 +107,13 @@ export function buildMiraFootwear() {
     const input = readFileSync(new URL(sourceFile.file,folder));
     if (digest(input) !== sourceFile.sha256) throw new Error('C4 imported source SHA changed');
     const geometry = normalizeFemalePair(input,style);
+    for (const side of ['left','right']) {
+      const {width,length,roof} = geometry.sides[side].measuredSource;
+      const foot = profile.sides[side];
+      console.log('C4B canonical source-last',style,side,JSON.stringify({width,length,roof,
+        targetFootLength:foot.footLength,targetFootWidth:foot.footWidth,
+        ankle:foot.ankle,heel:foot.heel,toe:foot.toe}));
+    }
     const result = buildWearableFromGeometry(base,profile,geometry);
     const name = 'mira-c4-'+style+'.glb';
     writeFileSync(new URL(name,folder),result.glb);
