@@ -71,7 +71,7 @@ jobs:
           if-no-files-found: error
   mobile-webgl-smoke:
     needs: targeted
-    if: ${{ needs.targeted.outputs.browser == 'true' }}
+    if: ${{ needs.targeted.outputs.browser == 'true' || needs.targeted.outputs.cas_cc0 == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
