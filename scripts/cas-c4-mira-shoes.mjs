@@ -4,6 +4,7 @@ import {digest, editGlb} from './cas-c3-glb.mjs';
 import {buildWearableFromGeometry} from './cas-c3-shoes.mjs';
 import {supportReport} from './cas-c3-contact.mjs';
 import {intoFootFrame} from './cas-c3-foot-frame.mjs';
+import {fitOpenUpper} from './cas-c4-open-upper.mjs';
 
 export const FEMALE_STYLES = Object.freeze(['ballet', 'mary-jane', 'ankle-boots']);
 const folder = new URL('../assets/characters/cas-c3/', import.meta.url);
@@ -11,8 +12,8 @@ const folder = new URL('../assets/characters/cas-c3/', import.meta.url);
 // performs uniform scaling to Mira's existing foot; no per-shoe CSS/px shims.
 const MH_UNIT = 0.145;
 const stiffness = Object.freeze({
-  ballet: {flex: .65, shell: 'low'},
-  'mary-jane': {flex: .52, shell: 'low'},
+  ballet: {flex: .65, shell: 'low', fitOpenUpper},
+  'mary-jane': {flex: .52, shell: 'low', fitOpenUpper},
   'ankle-boots': {flex: .32, shell: 'high'}
 });
 

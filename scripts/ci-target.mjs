@@ -102,7 +102,7 @@ export function planChanges(files,root=ROOT){
     /^(?:scripts\/build-cas-resident-footwear-v2\.mjs|tests\/cas-02-1-e-(?:footwear\.test\.js|browser-smoke\.mjs)|src\/character-lab(?:-config)?\.js|cas-resident-footwear-lab\.html)$/.test(f));
   const cas_cc0=changed.some(f=>
     /^(?:(?:src\/cas-f2-footwear-lab\.js|cas-f2-footwear-lab\.html|tests\/cas-02-1-f2-c2-browser-smoke\.mjs|tests\/cas-02-1-f2-c2-runtime\.test\.js)|(?:scripts\/cas-02-1-f2-real-source-audit\.mjs|tests\/cas-02-1-f2-real-sources\.test\.js)|scripts\/cas-02-1-f0-download-assets\.mjs|scripts\/cas-02-1-f1-split-dress\.mjs|scripts\/cas-02-1-f1-alex-underfoot\.mjs|src\/cas-cc0-shoe-fit-policy\.js|tests\/cas-02-1-f0-(?:sources\.test\.js|browser-smoke\.mjs)|tests\/cas-02-1-f1-(?:shoe-split\.test\.js|ankle-fit\.test\.js|browser-smoke\.mjs)|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|src\/cas-cc0-shoe-fit-lab\.js|src\/cas-cc0-shoe-rig-lab\.js)$/.test(f));
-  const cas_c3=changed.some(f=> /^(?:cas-f2-c3-lab\.html|src\/cas-f2-c3-lab\.js|tests\/cas-02-1-f2-c3-.*|scripts\/cas-c3-.*|assets\/characters\/cas-c3\/.*)$/.test(f));
+  const cas_c3=changed.some(f=> /^(?:cas-f2-(?:c3|c4b)-lab\.html|src\/cas-f2-(?:c3|c4b)-lab\.js|tests\/cas-02-1-f2-(?:c3-|c4b).*|scripts\/cas-c[34]-.*|assets\/characters\/cas-c3\/.*)$/.test(f));
   const cas_hud=changed.some(f=>/^(?:src\/(?:resident-hud|career-phone-ui|game)\.js|tests\/cas-01-7-browser-smoke\.mjs)$/.test(f));
   const cas_inventory=changed.some(f=>['scripts/cas-00-dependency-inventory.mjs','tests/cas-00-dependency-inventory.test.js'].includes(f));
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');

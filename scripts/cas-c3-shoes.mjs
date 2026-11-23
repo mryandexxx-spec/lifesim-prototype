@@ -97,6 +97,8 @@ function fitShoe(source, target, localJoint, style) {
     JSON.stringify({scale, sourceLength: toe-heel, targetLength: target.footLength,
       sourceHeel: heel, sourceToe: toe, targetHeel: heelZ, targetToe: toeZ}));
   const collar = source.collar.map(y => ground + y * scale);
+  const widthScale = style.fitOpenUpper ? (target.footWidth + .012) / source.measuredSource.width : scale;
+  const centerX = style.fitOpenUpper ? footPoint(target.ball)[0] : 0;
   const {Leg, Foot, ToeBase} = localJoint;
   function influences([, y, z]) {
     const bend = smooth((z - ballZ + .025) / .075) * style.flex;
@@ -105,8 +107,11 @@ function fitShoe(source, target, localJoint, style) {
   }
   const vertices = source.vertices.map(v => {
     const [x, y, z] = v.position;
-    const local = [x * scale, ground + y * scale, z * scale];
-    return {...v, position: modelPoint(local), normal: fromFootFrame(v.normal, target.axis),
+    const local = [centerX + x * widthScale, ground + y * scale, z * scale];
+    const [nx, ny, nz] = v.normal;
+    const normal = style.fitOpenUpper ? [nx * scale / widthScale, ny, nz] : v.normal;
+    const length = style.fitOpenUpper ? Math.hypot(...normal) : 1;
+    return {...v, position: modelPoint(local), normal: fromFootFrame(normal.map(n => n / length), target.axis),
       ...packWeights(influences(local))};
   });
   return {vertices, faces: source.faces, scale, collar, axis: target.axis,
@@ -198,12 +203,13 @@ export function buildWearableFromGeometry(bodyBytes, profile, geometry) {
   for (const side of SIDES) {
     const target = profile.sides[side];
     const fit = fitShoe(geometry.sides[side], target, target.joints, geometry);
+    const fitLayer = geometry.fitOpenUpper?.(fit) ?? (layer => clipForOpening(layer, fit));
     attach('C3 shoe ' + side, fit, geometry.material);
     for (const garment of ['foot', 'sock']) {
       const name = 'C3 ' + garment + ' ' + side;
       const bodyNode = body.gltf.nodes.find(n => n.name === name);
       const bodyPrimitive = body.gltf.meshes[bodyNode.mesh].primitives[0];
-      const layer = clipForOpening(layers(body, bodyPrimitive), fit);
+      const layer = fitLayer(layers(body, bodyPrimitive));
       if (!layer.faces.length) continue;
       const material = gltf.materials.push(body.gltf.materials[bodyPrimitive.material]) - 1;
       attach('C3 opening ' + garment + ' ' + side, layer, material);
