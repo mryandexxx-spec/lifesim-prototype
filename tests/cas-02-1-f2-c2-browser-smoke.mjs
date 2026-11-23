@@ -29,8 +29,16 @@ try{
   assert.equal(loading.previewRendersSuppressed,true,
    'original white shoes must not appear during real CC0 source load');
   await page.screenshot({path:dir+'/'+width+'x'+height+'-no-white-sneaker-flash.png'});
-  await page.waitForFunction(()=>window.__LifeSimCasF2Probe?.()?.loaded===true,null,{timeout:80000});
+  await page.waitForFunction(()=>{
+   const s=window.__LifeSimCasF2Probe?.();
+   const t=document.querySelector('#lab-status')?.textContent||'';
+   return s?.loaded===true||t.includes('примерка остановлена');
+  },null,{timeout:25000});
   let s=await probe();
+  if(!s?.loaded){
+   const status=await page.locator('#lab-status').innerText();
+   throw Error('F2 authentic PlayCanvas lab fail-closed: '+status+'; page errors: '+JSON.stringify(errors));
+  }
   assert.equal(s.mode,'dress');
   assert.equal(s.previewRevealed,true);
   assert.equal(s.originalShoesVisible,false);
