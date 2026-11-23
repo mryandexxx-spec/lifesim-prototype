@@ -1,0 +1,210 @@
+{
+  "schema": "lifesim.cas-b.g1-source-landmark-candidates.v1",
+  "status": "VISUAL_CANDIDATES_ONLY_NOT_VALIDATED_SCULPT",
+  "method": "Blender 4.5.0 source GLB import, fixed 420px orthographic face render, per-pixel evaluated mesh raycast, matched primitive vertex ID; NOT head-weight/ellipse-generated anatomical regions",
+  "render": {
+    "pixels": [
+      420,
+      420
+    ],
+    "cameraBlender": [
+      0,
+      -1.2,
+      1.55
+    ],
+    "lookAtBlender": [
+      0,
+      0,
+      1.55
+    ],
+    "orthographicScale": 0.42
+  },
+  "productionReady": false,
+  "ownerArtApproved": false,
+  "families": {
+    "alex": {
+      "source": "assets/characters/meshy-casual-v1.glb",
+      "sha256": "7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4",
+      "jointCount": 66,
+      "animationClips": 10,
+      "expectedVertices": 18137,
+      "points": {
+        "eyeLO": [
+          7237,
+          143,
+          192
+        ],
+        "eyeLI": [
+          4426,
+          185,
+          192
+        ],
+        "eyeRI": [
+          4441,
+          225,
+          192
+        ],
+        "eyeRO": [
+          787,
+          264,
+          192
+        ],
+        "bridge": [
+          4543,
+          207,
+          207
+        ],
+        "noseTip": [
+          4599,
+          207,
+          223
+        ],
+        "nostrilL": [
+          4923,
+          194,
+          233
+        ],
+        "nostrilR": [
+          4606,
+          223,
+          233
+        ],
+        "lipL": [
+          6526,
+          182,
+          248
+        ],
+        "lipR": [
+          6033,
+          234,
+          248
+        ],
+        "upperLip": [
+          6333,
+          208,
+          246
+        ],
+        "lowerLip": [
+          6421,
+          207,
+          254
+        ],
+        "chin": [
+          6081,
+          207,
+          286
+        ],
+        "cheekL": [
+          7771,
+          146,
+          237
+        ],
+        "cheekR": [
+          5284,
+          262,
+          237
+        ],
+        "jawL": [
+          7626,
+          162,
+          281
+        ],
+        "jawR": [
+          6943,
+          253,
+          281
+        ]
+      }
+    },
+    "mira": {
+      "source": "assets/characters/meshy-mira-mobile-v1.glb",
+      "sha256": "40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a",
+      "jointCount": 66,
+      "animationClips": 13,
+      "expectedVertices": 18120,
+      "points": {
+        "eyeLO": [
+          8940,
+          145,
+          267
+        ],
+        "eyeLI": [
+          8892,
+          185,
+          269
+        ],
+        "eyeRI": [
+          8303,
+          227,
+          268
+        ],
+        "eyeRO": [
+          2551,
+          267,
+          266
+        ],
+        "bridge": [
+          8480,
+          208,
+          290
+        ],
+        "noseTip": [
+          8560,
+          208,
+          302
+        ],
+        "nostrilL": [
+          9113,
+          196,
+          308
+        ],
+        "nostrilR": [
+          8603,
+          221,
+          308
+        ],
+        "lipL": [
+          9170,
+          184,
+          328
+        ],
+        "lipR": [
+          8738,
+          232,
+          329
+        ],
+        "upperLip": [
+          8522,
+          207,
+          326
+        ],
+        "lowerLip": [
+          8808,
+          208,
+          338
+        ],
+        "chin": [
+          8641,
+          209,
+          355
+        ],
+        "cheekL": [
+          9143,
+          165,
+          315
+        ],
+        "cheekR": [
+          8682,
+          254,
+          315
+        ]
+      }
+    }
+  },
+  "caveats": [
+    "A pixel-hit labels a candidate surface point; it does not certify the surrounding edge loops or face part topology.",
+    "Several eyelid anchors are back-facing in source normals. Never use the points directly as automatic deformation regions.",
+    "The source texture combines eyes, hair, skin and clothing in one baked JPEG atlas.",
+    "An offline geodesic landmark-brush experiment without corrected UV still exceeded 1.20x P95 stretch for every face control. It is explicitly rejected, not production sculpt."
+  ]
+}
