@@ -21,7 +21,7 @@ import {grillRecipe} from './grill-catalog.js';
 export const ACTION_QUEUE_SCHEMA=1;
 export const MAX_ACTION_QUEUE=12;
 export const MAX_BLOCKED_QUEUE=12;
-export const BLOCKED_REASONS=Object.freeze(['missing-target','unreachable-route','invalid-destination','unavailable-gift']);
+export const BLOCKED_REASONS=Object.freeze(['missing-target','unreachable-route','invalid-destination','unavailable-gift','resource-busy']);
 export const ACTION_QUEUE_TYPES=Object.freeze(['object','social','conversation','branch','shared','activity','move','outdoor','garden','pool','grill']);
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const count=n=>Number.isSafeInteger(n)&&n>=1&&n<=1000000000;
