@@ -54,20 +54,28 @@ try{
   for(const [initiator,partner] of [['alex','mira'],['mira','alex']]){
     await page.locator('#pick-'+initiator).tap();
 
-    // Actual 3D world hit-test, not a synthetic menu event.
-    const tap=await page.evaluate(async name=>{
-      const {Application,Vec3}=await import('playcanvas');
-      const app=Application.getApplication();
-      const avatar=app.root.findByName(name);
-      const camera=app.root.findComponents('camera').find(c=>c.enabled);
-      if(!avatar||!camera)throw Error('Missing real resident mesh or camera: '+name);
-      const p=camera.worldToScreen(avatar.getPosition().clone().add(new Vec3(0,1.45,0)));
-      return {x:Math.round(p.x),y:Math.round(p.y)};
-    },partner==='mira'?'Мира':'Алекс');
-    assert.ok(tap.x>=0&&tap.x<width&&tap.y>=0&&tap.y<height,
-      'resident visible in canvas: '+JSON.stringify(tap));
-    await page.touchscreen.tap(tap.x,tap.y);
-    await page.locator('#social-context').waitFor({state:'visible',timeout:5000});
+    // Actual 3D world hit-test, not a synthetic menu event. Allow the
+    // animated focus camera to settle before choosing a projected upper body.
+    await page.waitForTimeout(850);
+    let sceneTap=null;
+    for(const heightY of [1.45,1.85,1.0]){
+      const tap=await page.evaluate(async ({name,heightY})=>{
+        const {Application,Vec3}=await import('playcanvas');
+        const app=Application.getApplication();
+        const avatar=app.root.findByName(name);
+        const camera=app.root.findComponents('camera').find(c=>c.enabled);
+        if(!avatar||!camera)throw Error('Missing resident mesh/camera: '+name);
+        const p=camera.worldToScreen(avatar.getPosition().clone().add(new Vec3(0,heightY,0)));
+        return {x:Math.round(p.x),y:Math.round(p.y)};
+      },{name:partner==='mira'?'Мира':'Алекс',heightY});
+      if(tap.x<0||tap.x>=width||tap.y<0||tap.y>=height)continue;
+      await page.touchscreen.tap(tap.x,tap.y);
+      sceneTap={...tap,heightY};
+      if(await page.locator('#social-context').isVisible())break;
+    }
+    assert.equal(await page.locator('#social-context').isVisible(),true,
+      '3D touch must open resident context for '+initiator+' -> '+partner+
+      ' viewport '+width+'x'+height+' last probe '+JSON.stringify(sceneTap));
     await page.locator('#conversation-btn').tap();
     await page.locator('#social-menu-panel').waitFor({state:'visible'});
     await page.locator('#social-menu-options button').filter({hasText:'Поговорить'}).first().tap();
