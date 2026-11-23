@@ -98,7 +98,7 @@ export function deriveSourceGLB(kind,source){
   // These are still research morph masks, NOT artist-sculpted anatomy.
   const eyes=face*(a+b)*smooth((y-1.585)/.008);
   const nose=face*ball(x,y,z,0,1.558,.086,
-    kind==='mira'?.058:.044,kind==='mira'?.072:.063,kind==='mira'?.098:.088)*
+    kind==='mira' ? .058 : .044,kind==='mira' ? .072 : .063,kind==='mira' ? .098 : .088)*
     smooth((y-1.540)/.012)*(1-smooth((y-1.575)/.012));
   const lips=face*ball(x,y,z,0,1.523,.084,.050,.023,.074)*
     (1-smooth((y-1.528)/.012));
