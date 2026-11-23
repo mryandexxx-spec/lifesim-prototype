@@ -121,6 +121,8 @@ try{
     await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY))));
   assert.ok(persisted.actionQueues.byResident.alex.some(t=>t.type==='social'&&t.targetId==='mira'));
   assert.ok(persisted.actionQueues.byResident.mira.some(t=>t.type==='social'&&t.targetId==='alex'));
+  // Restore the original CAS-01.7 baseline actor for the extra-resident HUD checks.
+  await page.locator('#pick-alex').tap();
   await page.locator('#pick-resident_3').tap();
   assert.equal(await page.locator('#resident-name').innerText(),'Вера');
   await page.locator('#cas-resident-details').waitFor({state:'visible'});
