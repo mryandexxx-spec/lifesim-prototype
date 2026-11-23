@@ -371,7 +371,9 @@ jobs:
           cp assets/characters/cas-alex-footwear-lab-v1.glb assets/characters/cas-alex-footwear-lab-v1.json site/assets/characters/
           cp assets/characters/cas-alex-footwear-v2.glb assets/characters/cas-alex-footwear-v2.json assets/characters/cas-mira-footwear-v2.glb assets/characters/cas-mira-footwear-v2.json site/assets/characters/
           mkdir -p site/assets/characters/cas-cc0-f0
-          cp assets/characters/cas-cc0-f0/* site/assets/characters/cas-cc0-f0/\n          mkdir -p site/assets/characters/cas-cc0-f1\n          cp assets/characters/cas-cc0-f1/* site/assets/characters/cas-cc0-f1/
+          cp assets/characters/cas-cc0-f0/* site/assets/characters/cas-cc0-f0/
+          mkdir -p site/assets/characters/cas-cc0-f1
+          cp assets/characters/cas-cc0-f1/* site/assets/characters/cas-cc0-f1/
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
