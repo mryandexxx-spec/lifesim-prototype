@@ -42,6 +42,9 @@ jobs:
           node --check scripts/cas-02-1-f2-real-source-audit.mjs
           node scripts/cas-02-1-f2-real-source-audit.mjs
           node scripts/cas-c3-shoes.mjs
+          python3 scripts/cas-c4-mira-sources.py
+          node scripts/cas-c4-mira-shoes.mjs
+          node --check src/cas-f2-c4b-lab.js
           node --check src/cas-f2-c3-lab.js
           node --check src/cas-cc0-shoe-rig-lab.js
           npm test
@@ -272,10 +275,10 @@ jobs:
           test -s node_modules/playcanvas/build/playcanvas.mjs
           cp node_modules/playcanvas/build/playcanvas.mjs site/vendor/
           mkdir -p site/src
-          cp index.html character-lab.html character-lab-mira.html cas-modular-lab.html cas-alex-wardrobe-lab.html cas-resident-footwear-lab.html cas-cc0-shoe-fit-lab.html cas-cc0-shoe-rig-lab.html cas-f2-footwear-lab.html cas-f2-c3-lab.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
+          cp index.html character-lab.html character-lab-mira.html cas-modular-lab.html cas-alex-wardrobe-lab.html cas-resident-footwear-lab.html cas-cc0-shoe-fit-lab.html cas-cc0-shoe-rig-lab.html cas-f2-footwear-lab.html cas-f2-c3-lab.html cas-f2-c4b-lab.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
           mkdir -p site/src
           cp src/plan-preview.js src/work-presence-ui.js src/ui-layout.js src/required-choice-focus.js site/src/
-          cp src/cas-f2-c3-lab.js src/cas-f2-footwear-lab.js src/cas-footwear-standard.js src/cas-footwear-layers.js site/src/
+          cp src/cas-f2-c4b-lab.js src/cas-f2-c3-lab.js src/cas-f2-footwear-lab.js src/cas-footwear-standard.js src/cas-footwear-layers.js site/src/
           cp src/ux01-plan-ui.js site/src/
           cp src/queue-rescue.js site/src/
           cp src/resident-population.js src/resident-membership.js src/resident-registry.js src/resident-activity-runtime.js src/resident-social-runtime.js src/resident-hud.js site/src/
@@ -387,7 +390,7 @@ jobs:
           cp assets/characters/cas-cc0-f2/assessment.json site/assets/characters/cas-cc0-f2/
           cp assets/characters/cas-cc0-f2/*.glb site/assets/characters/cas-cc0-f2/
           mkdir -p site/assets/characters/cas-c3
-          cp assets/characters/cas-c3/*.glb assets/characters/cas-c3/manifest.json assets/characters/cas-c3/MAKEHUMAN-CC0.txt site/assets/characters/cas-c3/
+          cp assets/characters/cas-c3/*.glb assets/characters/cas-c3/manifest.json assets/characters/cas-c3/c4-*.json assets/characters/cas-c3/MAKEHUMAN-CC0.txt site/assets/characters/cas-c3/
           mkdir -p site/assets/furniture/meshy-room-v1
           cp assets/furniture/meshy-room-v1/*.glb site/assets/furniture/meshy-room-v1/
           cp assets/furniture/meshy-room-v1/manifest.json site/assets/furniture/meshy-room-v1/
@@ -405,6 +408,7 @@ jobs:
         run: |
           node scripts/cas-f2-pages-verify.mjs site
           node scripts/cas-c3-pages-verify.mjs site
+          node scripts/cas-c4-pages-verify.mjs site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
