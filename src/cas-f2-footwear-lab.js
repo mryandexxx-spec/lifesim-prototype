@@ -390,8 +390,10 @@ app.on('update',dt=>{
    frameCount=0;frameSeconds=0;
   }
  }
+ // The supported PlayCanvas app tick emits update; postUpdate is not
+ // guaranteed by this engine build. Advance the skinned sock on every tick.
+ applyGarment();
 });
-app.on('postUpdate',()=>{applyGarment()});
 window.__LifeSimCasF2Probe=()=>({
  loaded:ready,avatarInstantiated:!!avatar,previewRevealed:revealed,
  previewRendersSuppressed:avatar&&!revealed?
