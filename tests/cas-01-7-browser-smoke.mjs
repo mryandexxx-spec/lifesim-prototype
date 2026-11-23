@@ -36,6 +36,11 @@ try{
   await page.goto('http://127.0.0.1:8765/?cas-01-7=qa',{waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
   assert.ok((await page.locator('#game-canvas').screenshot()).length>2000);
+  // loadGame intentionally resumes (paused is not persisted), even if the
+  // serialized seed was paused. Pause the ACTUAL running browser before
+  // enqueueing; otherwise the dispatcher can consume the first invitation.
+  await page.locator('#pause-btn').tap();
+  assert.equal(await page.locator('#pause-btn').getAttribute('aria-label'),'Продолжить');
   assert.equal(await page.locator('#dashboard .resident-switch button').count(),4);
   const figures=await page.evaluate(async()=>{
    const {Application}=await import('playcanvas');
