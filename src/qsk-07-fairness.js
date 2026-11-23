@@ -26,11 +26,16 @@ export function inspectQueuedHead(guard,seq,reason,now){
   const at=safeTime(now);
   if(guard.seq!==seq||guard.reason!==reason)
     Object.assign(guard,{seq,reason,firstAt:at,attempts:0,retryAt:at});
-  if(reason==='resource-busy')
-    return at-guard.firstAt>=RESOURCE_WAIT_MINUTES?'park':'waiting-for-resource';
   if(at<guard.retryAt)return 'backoff';
-  guard.attempts++;
-  if(guard.attempts>=QUEUE_ROUTE_MAX_FAILURES)return 'park';
+  if(reason==='resource-busy'){
+    guard.retryAt=at+1;
+    return at-guard.firstAt>=RESOURCE_WAIT_MINUTES?'park':'waiting-for-resource';
+  }
+  guard.attempts=Math.min(QUEUE_ROUTE_MAX_FAILURES,guard.attempts+1);
+  if(guard.attempts>=QUEUE_ROUTE_MAX_FAILURES){
+    guard.retryAt=at+8; // parked-tray overflow must not spin on A*
+    return 'park';
+  }
   guard.retryAt=at+Math.pow(2,guard.attempts-1);
   return 'backoff';
 }
@@ -64,8 +69,11 @@ export function inspectWalkingAction(guard,action,location,minutes,now,{routeVal
     :WALK_STALL_MINUTES;
   if(guard.still<WALK_STALL_MINUTES)return 'tracking';
   guard.still=0;
-  guard.stalls++;
-  if(guard.stalls>=WALK_MAX_STALLS)return 'exhausted';
+  guard.stalls=Math.min(WALK_MAX_STALLS,guard.stalls+1);
+  if(guard.stalls>=WALK_MAX_STALLS){
+    guard.retryAt=at+8; // defer recovery if saved review tray is full
+    return 'exhausted';
+  }
   guard.retryAt=at+Math.pow(2,guard.stalls-1);
   return 'backoff';
 }
