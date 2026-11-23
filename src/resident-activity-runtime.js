@@ -4,7 +4,7 @@
  * Alex/Mira keep their established visual/social pipelines; additional actors
  * use the same root clock, typed persistent FIFO and world A* geometry.
  */
-import {ACTIONS,chooseAction,arrive,tick,autonomousChoice} from './simulation.js';
+import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy} from './simulation.js';
 import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './navigation.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {BED_SLOT_IDS,BED_SLOTS,validBedSlot} from './bed-layout.js';
@@ -316,19 +316,27 @@ export function startAdditionalResidentAutonomy(root,id){
   if(!actor||actor.action)return false;
   actor.autonomy.enabled=root.autonomy.enabled;
   actor.minutes=root.minutes;
-  // Core scoring owns urgent physiological needs, personality, daily rhythm
-  // and repeat-memory cooldown. Mirror speech is a bounded fallback for
-  // unmet Social without inventing friendship, consent or pair receipts.
-  const coreWish=autonomousChoice(actor);
-  const wish=coreWish||
-    (actor.needs.social<35?'mirror':null);
-  if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(wish))return false;
-  let plan=prepareCommand(root,id,{type:'object',actionId:wish});
-  // Leisure can use the actual shared TV if the sofa is reserved. The
-  // physical TV itself is still exclusive; no phantom watch/football credit.
-  if(!plan&&wish==='sofa')
-    plan=prepareCommand(root,id,{type:'object',actionId:'tv'});
-  if(plan&&startPlannedObject(root,id,plan,true))return true;
+  // Deterministic reason-coded utility order is shared with Alex/Mira.
+  // Inspect actual reservations AND A* reachability for every candidate:
+  // an occupied fridge cannot suppress a different urgent reachable need.
+  // Manual FIFO, work and social gates above always preempt this loop.
+  const evaluation=evaluateAutonomy(actor);
+  if(evaluation.blocked)return false;
+  for(const candidate of evaluation.candidates){
+    if(candidate.score<=0||!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(candidate.id))
+      continue;
+    let plan=prepareCommand(root,id,{type:'object',actionId:candidate.id});
+    // The physical TV is an alternative ONLY to a valid leisure wish.
+    if(!plan&&candidate.id==='sofa')
+      plan=prepareCommand(root,id,{type:'object',actionId:'tv'});
+    if(plan&&startPlannedObject(root,id,plan,true))return true;
+  }
+  // Mirror practice needs a real installed, free and reachable fixture;
+  // it never simulates a conversation, relationship or free reward.
+  if(Number.isFinite(actor.needs.social)&&actor.needs.social<35){
+    const mirror=prepareCommand(root,id,{type:'object',actionId:'mirror'});
+    if(mirror&&startPlannedObject(root,id,mirror,true))return true;
+  }
   actor.autonomy.nextAt=Math.max(root.minutes+2,actor.autonomy.nextAt||0);
   return false;
 }
