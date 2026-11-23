@@ -37,28 +37,39 @@ export function splitF2ShoePair(source,entry){
    if(tri.some(v=>!Number.isInteger(v)||v<0||v*3+2>=pos.length))
     throw Error('Out of range source shoe vertex');
    const x=tri.reduce((sum,v)=>sum+pos[v*3],0)/3;
-   triangles.push({pIndex,tri,x});
+   const z=tri.reduce((sum,v)=>sum+pos[v*3+2],0)/3;
+   triangles.push({pIndex,tri,x,z});
   }
  }
  if(triangles.length!==entry.expectedTriangles)throw Error('CC0 source triangle count drift: '+triangles.length);
- const sorted=triangles.map(t=>t.x).sort((a,b)=>a-b);
- let centers=[sorted[Math.floor(sorted.length*.17)],sorted[Math.floor(sorted.length*.83)]];
- for(let iteration=0;iteration<50;iteration++){
-  const clusters=[[],[]];
-  for(const t of triangles)clusters[Math.abs(t.x-centers[0])<=Math.abs(t.x-centers[1])?0:1].push(t.x);
-  if(clusters.some(c=>c.length<3000))throw Error('Cannot identify two separate physical shoes');
-  const next=clusters.map(c=>c.reduce((a,b)=>a+b,0)/c.length);
-  if(next.some(v=>!Number.isFinite(v)))throw Error('Bad shoe cluster');
-  if(Math.max(...next.map((n,i)=>Math.abs(n-centers[i])))<1e-9){centers=next;break;}
-  centers=next;
+
+ // Try source-X first (the dress and sneaker sources), then source-Z for
+ // unusual publisher layouts such as one hiking boot lying on its side.
+ // Never infer true physical LEFT/RIGHT handedness from the split axis.
+ function clusterByAxis(axis){
+  const sorted=triangles.map(t=>t[axis]).sort((a,b)=>a-b);
+  let centers=[sorted[Math.floor(sorted.length*.17)],sorted[Math.floor(sorted.length*.83)]];
+  for(let iteration=0;iteration<50;iteration++){
+   const groups=[[],[]];
+   for(const t of triangles)
+    groups[Math.abs(t[axis]-centers[0])<=Math.abs(t[axis]-centers[1])?0:1].push(t[axis]);
+   if(groups.some(g=>g.length<3000))return null;
+   const next=groups.map(g=>g.reduce((a,b)=>a+b,0)/g.length);
+   if(next.some(v=>!Number.isFinite(v)))return null;
+   if(Math.max(...next.map((v,i)=>Math.abs(v-centers[i])))<1e-9){centers=next;break;}
+   centers=next;
+  }
+  if(centers[1]-centers[0]<.045)return null;
+  const split=(centers[0]+centers[1])/2;
+  const buckets={left:[],right:[]};
+  for(const t of triangles)buckets[t[axis]<split?'left':'right'].push(t);
+  if(Math.min(buckets.left.length,buckets.right.length)<6000||
+     Math.max(buckets.left.length,buckets.right.length)>14000)return null;
+  return {axis,split,buckets};
  }
- if(centers[1]-centers[0]<.045)throw Error('Source shoes have no safe left/right X separation');
- const splitX=(centers[0]+centers[1])/2;
- const buckets={left:[],right:[]};
- for(const t of triangles)buckets[t.x<splitX?'left':'right'].push(t);
- if(Math.min(buckets.left.length,buckets.right.length)<6000||
-   Math.max(buckets.left.length,buckets.right.length)>14000)
-   throw Error('Separated CC0 shoes have implausible face balance');
+ const chosen=clusterByAxis('x')||clusterByAxis('z');
+ if(!chosen)throw Error('No balanced 2-shoe partition on either source X or Z; quarantine');
+ const {axis:splitAxis,split:splitX,buckets}=chosen;
  const outputs={};
  for(const side of ['left','right']){
   const outG=structuredClone(g),buffers=[Buffer.from(parsed.bin)];
@@ -126,7 +137,7 @@ export function splitF2ShoePair(source,entry){
   outputs[side]={glb:result,triangles:count,sourceBounds:jointBounds,
     outputSha256:digest(result),sourceCenterX:centers[side==='left'?0:1]};
  }
- return {outputs,splitX,sourceSha256:digest(source),sourceTriangles:triangles.length};
+ return {outputs,splitX,splitAxis,sourceSha256:digest(source),sourceTriangles:triangles.length};
 }
 
 /** QA does not mistake a side-lying, reversed or unidentified source for a
@@ -158,7 +169,7 @@ export function buildF2Candidates(){
    if(!/CC0|public domain/i.test(license)||
       !/CC0|public.domain/i.test(origin))throw Error('Missing vendor-declared CC0 chain');
    const split=splitF2ShoePair(raw,entry);
-   audit.splitAxis='source-X';audit.sourceSplitAt=split.splitX;
+   audit.splitAxis='source-'+split.splitAxis.toUpperCase();audit.sourceSplitAt=split.splitX;
    for(const side of ['left','right']){
     const part=split.outputs[side],filename=entry.id+'-'+side+'.glb';
     writeFileSync(F2_DIR+'/'+filename,part.glb);
