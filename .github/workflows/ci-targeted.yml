@@ -143,7 +143,9 @@ jobs:
         run: |
           node scripts/build-cas-resident-footwear-v2.mjs
           node scripts/cas-02-1-f0-download-assets.mjs
+          node scripts/cas-02-1-f1-split-dress.mjs
           node tests/cas-02-1-f0-browser-smoke.mjs
+          node tests/cas-02-1-f1-browser-smoke.mjs
       - name: Archive CAS-02.1-F0 actual GLB/CC0 license and source verification
         if: ${{ always() && needs.targeted.outputs.cas_cc0 == 'true' }}
         uses: actions/upload-artifact@v4
@@ -154,7 +156,9 @@ jobs:
             assets/characters/cas-cc0-f0/*.origin.json
             assets/characters/cas-cc0-f0/*.license.txt
             assets/characters/cas-cc0-f0/index.json
+            assets/characters/cas-cc0-f1/dress.manifest.json
             artifacts/cas-02-1-f0/
+            artifacts/cas-02-1-f1/
           if-no-files-found: error
       - name: CAS-01.8 actual 2/4 resident mobile-size WebGL performance and save soak
         if: ${{ needs.targeted.outputs.cas_soak == 'true' }}
