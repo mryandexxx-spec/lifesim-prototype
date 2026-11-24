@@ -74,7 +74,13 @@ export const ACTIONS = Object.freeze({
 // The saved flags are optional v1 data; old in-progress actions retain timing.
 export const MANUAL_CARE_THRESHOLD=95;
 export const MANUAL_SLEEP_MIN_MINUTES=30;
+// PF-05: the mirror is one physical resource, with two distinct intents in v1.
+export function mirrorActionLabel(action){
+  return action?.id==='mirror'
+    ?(action.mirrorPractice===true?'Репетировать речь':ACTIONS.mirror.label):null;
+}
 export function actionDuration(action){
+  if(action?.id==='mirror'&&action.mirrorPractice===true)return MIRROR_SPEECH_DURATION;
   const definition=ACTIONS[action?.id];
   if(action?.automatic===false&&action.phase==='using'&&action.shortSelfCare===true){
     if(action.id==='shower')return 16;
@@ -252,6 +258,7 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
   if(data.action?.id==='swim'&&(next.autonomy.enabled||data.action.automatic!==true||
     typeof data.action.exitRequested==='string'))
     next.action=sanitizeSwimAction(data.action);
+  if(mirrorActionLabel(next.action))next.event=mirrorActionLabel(next.action);
   return next;
 }
 
@@ -500,7 +507,7 @@ export function tick(state, minutes,world=state?.world??null) {
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
         validReadingJourneyAction(state.action)&&finishReadingMinutes(state.action);
-      state.event=returning?'Закрывает книгу':(hobby?.label||definition.label)+' — готово';
+      state.event=returning?'Закрывает книгу':(hobby?.label||mirrorActionLabel(state.action)||definition.label)+' — готово';
       rememberAction(state, state.action.id);
       state.autonomy.nextAt = state.minutes + 7;
       if(!returning)state.action=null;

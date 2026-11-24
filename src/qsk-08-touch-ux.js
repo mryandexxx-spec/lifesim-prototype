@@ -37,7 +37,8 @@ export function verifiedLastEvent(event){
   if(typeof event!=='string'||!event.trim())return null;
   if(/прерван|отменено|недоступ|не удалось|заблокирован/i.test(event))
     return {code:'interrupted',text:'Прервано · '+event};
-  if(/заверш|выполнено|пришёл|закончено/i.test(event))
+  if(event==='Причесаться у зеркала — готово'||/^Речь отрепетирована · харизма \+\d+ XP$/.test(event)||
+    /заверш|выполнено|пришёл|закончено/i.test(event))
     return {code:'completed',text:'Завершено · '+event};
   return null; // Never invent completion from an arbitrary idle event.
 }

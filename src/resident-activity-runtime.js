@@ -4,9 +4,12 @@
  * Alex/Mira keep their established visual/social pipelines; additional actors
  * use the same root clock, typed persistent FIFO and world A* geometry.
  */
-import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy} from './simulation.js';
+import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy,mirrorActionLabel} from './simulation.js';
 import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './navigation.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
+import {MIRROR_SPEECH_DURATION,MIRROR_SPEECH_XP} from './furniture-interactions.js';
+import {HOBBY_SKILLS} from './hobby-reading.js';
+import {restoreSkillProgress} from './skills-engine.js';
 import {BED_SLOT_IDS,BED_SLOTS,validBedSlot} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
 import {dispatchActionQueues,pendingActions,queueHeads,parkQueuedHead,
@@ -45,7 +48,8 @@ function interruptedManualCommand(action){
     return {type:'move',x:action.goal.x,z:action.goal.z};
   if(ADDITIONAL_OBJECT_ACTIONS.includes(action.id)&&
     typeof action.targetInstanceId==='string')
-    return {type:'object',actionId:action.id,targetInstanceId:action.targetInstanceId};
+    return {type:'object',actionId:action.id,targetInstanceId:action.targetInstanceId,
+      ...(action.id==='mirror'&&action.mirrorPractice===true?{mirrorPractice:true}:{})};
   return null;
 }
 /** Once accepted, player intent is parked in saved explicit-retry tray.
@@ -245,7 +249,8 @@ function prepareCommand(root,id,command){
   if(command.actionId==='bed'&&!slot)return null;
   if(!furnitureFree(root,id,command.actionId,item.instanceId,slot))return null;
   const candidate={id:command.actionId,targetInstanceId:item.instanceId,
-    ...(slot?{bedSlot:slot}:{})};
+    ...(slot?{bedSlot:slot}:{}),
+    ...(command.actionId==='mirror'&&command.mirrorPractice===true?{mirrorPractice:true}:{})};
   const goal=actionGoal(root,candidate);
   return goal&&findPath(actor.position,goal,root.world)?candidate:null;
 }
@@ -259,7 +264,8 @@ function startPlannedObject(root,id,plan,automatic){
   if(!chooseAction(actor,plan.id,automatic))return false;
   Object.assign(actor.action,{targetInstanceId:plan.targetInstanceId,
     ...(plan.bedSlot?{bedSlot:plan.bedSlot}:{}),
-    ...(automatic&&plan.id==='mirror'?{mirrorPractice:true}:{})});
+    ...(plan.id==='mirror'&&(automatic||plan.mirrorPractice===true)?{mirrorPractice:true}:{})});
+  if(mirrorActionLabel(actor.action))actor.event=mirrorActionLabel(actor.action);
   return true;
 }
 export function dispatchAdditionalResidentQueues(root){
@@ -373,6 +379,10 @@ export function prepareAdditionalResidents(root){
         residentCollisionFree(root,id,p)&&findPath(start,p,root.world));
       if(safe)actor.position=safe;
       else {actor.action=null;actor.event='Нет безопасного места для жителя';}
+    }
+    if(actor.action?.id==='mirror'&&actor.action.mirrorPractice===true&&
+      actor.action.automatic===false&&actor.action.elapsed>=MIRROR_SPEECH_DURATION){
+      actor.action=null;actor.event='Действие у зеркала прервано';
     }
     if(actor.action){
       const goal=actionGoal(root,actor.action);
@@ -526,7 +536,20 @@ export function tickAdditionalResidents(root,minutes){
         resetWalkGuard(walkGuard);
       }
     }else resetWalkGuard(walkGuard);
+    const practice=actor.action;
+    const manualSpeech=practice?.id==='mirror'&&practice.mirrorPractice===true&&
+      practice.automatic===false&&practice.phase==='using'&&practice.elapsed<MIRROR_SPEECH_DURATION;
     tick(actor,minutes,root.world);
+    if(manualSpeech&&!actor.action&&practice.elapsed>=MIRROR_SPEECH_DURATION&&
+      actor.event===mirrorActionLabel(practice)+' — готово'){
+      // The exact reserved mirror and physical position were checked above.
+      actor.skills=restoreSkillProgress(actor.skills,HOBBY_SKILLS);
+      const cap=HOBBY_SKILLS.skills.charisma.xpThresholds.at(-1);
+      const previous=actor.skills.xpById.charisma||0;
+      const next=Math.min(cap,previous+MIRROR_SPEECH_XP);
+      actor.skills.xpById.charisma=next;
+      actor.event='Речь отрепетирована · харизма +'+(next-previous)+' XP';
+    }
     actor.minutes=root.minutes;
   }
   // Dispatch manual heads before considering a new autonomous action.

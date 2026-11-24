@@ -28,7 +28,7 @@ import {readV1Save,writeV1Save} from './qsk-09-save-safety.js';
 import {validateV1BackupText,exportV1BackupText,commitV1Backup,backupSummary,MAX_V1_BACKUP_BYTES} from './qsk-09-backup.js';
 import {createNeedTrendTracker} from './need-trends.js';
 import {createToastUI} from './qsk-11-toast-ui.js';
-import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, actionDuration, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
+import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, actionDuration, mirrorActionLabel, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
 import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
@@ -387,7 +387,7 @@ const META = {
   prep: {title:'Рабочая поверхность',category:'Кухня',description:'Подготовка ингредиентов происходит здесь во время готовки.',icon:'▤',anchor:[0,1.05,0]},
   wash: {title:'Кухонная мойка',category:'Кухня',description:'Вымыть накопившуюся после обедов посуду.',icon:'◉',anchor:[0,1.12,0]},
   lamp: { title:'Торшер',category:'Освещение',description:'Переключить настоящий свет после подхода к выбранному торшеру',icon:'☀',anchor:[0,1.3,0] },
-  mirror: { title:'Зеркало',category:'Уход за собой',description:'Причесаться или репетировать речь перед настоящим зеркалом. Харизма растёт после 24 минут практики.',icon:'◇',anchor:[0,1.4,0] },
+  mirror: { title:'Зеркало',category:'Уход за собой',description:'Причёсывание: 17 мин, без прироста навыка. Репетиция речи: 24 мин, +18 XP харизмы после завершения; немного общения и досуга.',icon:'◇',anchor:[0,1.4,0] },
   dresser: { title:'Комод',category:'Хранение',description:'Подойти и открыть ящики или дверцы комода',icon:'▤',anchor:[0,.75,0] },
   wardrobe: { title:'Гардероб',category:'Хранение',description:'Подойти к шкафу и осмотреть одежду и полки',icon:'▥',anchor:[0,1.6,0] },
   tv: { title: 'Телевизор', category: 'Гостиная', description: 'Сядет на свободный диван с видом на экран или посмотрит стоя, если мест нет', icon: '▣', anchor: [3.5, 1.42, .36] },
@@ -1603,7 +1603,7 @@ function renderPlanPeek(){
   const phase=involved?social.phase:actor.action?.phase;
   if(active&&phase==='walking')active='Идёт · '+active;
   else if(active&&phase==='using'&&!involved&&actor.action){
-    const duration=getActivityDefinition(HOBBY_ACTIVITIES,actor.action.activityId)?.timeBudget.targetMinutes??ACTIONS[actor.action.id]?.duration;
+    const duration=getActivityDefinition(HOBBY_ACTIVITIES,actor.action.activityId)?.timeBudget.targetMinutes??actionDuration(actor.action);
     if(Number.isFinite(duration)&&duration>0)
       active+=' · '+Math.min(100,Math.round(100*(actor.action.elapsed||0)/duration))+'%';
   }
@@ -2197,7 +2197,7 @@ function renderCasDetails(force=false){
  const currentActor=getActor(game,id);
  const key=JSON.stringify([row,game.paused,buildMode,furnishMode,outdoorMode,
    pending,blockedTasks,currentActor?.event,currentActor?.action?.id,
-   currentActor?.action?.phase]);
+   currentActor?.action?.phase,currentActor?.action?.mirrorPractice]);
  if(!force&&key===lastCasDetailsKey)return;
  // Native iOS select remains mounted while its picker is open.
  if(!force&&casDetails.contains(document.activeElement)&&
@@ -2208,7 +2208,7 @@ function renderCasDetails(force=false){
  const status=document.createElement('span');
  const activeExtra=currentActor?.action;
  const extraLabel=activeExtra
-   ?(CAS_ACTIONS.find(([actionId])=>actionId===activeExtra.id)?.[1]||
+   ?(mirrorActionLabel(activeExtra)||CAS_ACTIONS.find(([actionId])=>actionId===activeExtra.id)?.[1]||
      (activeExtra.id==='move'?'Идти':'Занятие')):null;
  const currentStatus=visibleActionPhase(extraLabel,activeExtra?.phase,{paused:game.paused});
  status.textContent=row.workLabel||(row.away?'На работе':
@@ -2235,6 +2235,11 @@ function renderCasDetails(force=false){
  for(const [actionId,label] of CAS_ACTIONS)
    add(label,()=>{
      if(scheduleCommand({type:'object',actionId},id))renderCasDetails(true);
+   },blocked,unavailableReason);
+ for(const [label,speech] of [['Причесаться у зеркала',false],['Репетировать речь',true]])
+   add(label,()=>{
+     if(scheduleCommand({type:'object',actionId:'mirror',...(speech?{mirrorPractice:true}:{})},id))
+       renderCasDetails(true);
    },blocked,unavailableReason);
  const peers=addressedSocialPeers(game,id);
  if(peers.length){
@@ -2269,7 +2274,7 @@ function renderCasDetails(force=false){
    const label=document.createElement('span');label.className='queue-item-text';
    const title=document.createElement('strong');
    title.textContent=task.type==='object'?
-     (CAS_ACTIONS.find(([k])=>k===task.actionId)?.[1]||'Действие'):
+     (task.actionId==='mirror'?taskLabel(task):CAS_ACTIONS.find(([k])=>k===task.actionId)?.[1]||'Действие'):
      task.type==='social'?'Беседа':task.type==='move'?'Маршрут':'Задание';
    const state=document.createElement('small');state.className='queue-item-status';
    state.textContent=queuedActionStatus(index+1);
@@ -2289,7 +2294,7 @@ function renderCasDetails(force=false){
    const label=document.createElement('span');label.className='queue-item-text';
    const title=document.createElement('strong');
    title.textContent=task.type==='object'
-     ?CAS_ACTIONS.find(([k])=>k===task.actionId)?.[1]||'Задание'
+     ?(task.actionId==='mirror'?taskLabel(task):CAS_ACTIONS.find(([k])=>k===task.actionId)?.[1]||'Задание')
      :task.type==='move'?'Маршрут':'Задание';
    const state=document.createElement('small');state.className='queue-item-status';
    state.dataset.state='blocked';
@@ -4400,6 +4405,20 @@ function boot() {
         duration:actionDuration(a),needs:{...actor.needs},
         shower:shower?{privacy:shower.privacy,water:shower.water,bathing:shower.bathing}:null,
         toilet:toilet?{privacy:toilet.privacy,relief:toilet.relief,flush:toilet.flush,seated:toilet.seated}:null};
+    };
+  }
+  // PF-05/A read-only browser diagnostics, not part of the ordinary game API.
+  if(new URLSearchParams(location.search).get('pf-05')==='qa'){
+    window.__LifeSimMirrorQA=(id,instanceId)=>{
+      const actor=getActor(game,id),a=actor?.action;
+      const glint=decorNodes.get(instanceId)?.findByName('F4E mirror highlight');
+      const scale=glint?.getLocalScale();
+      return {minutes:game.minutes,paused:game.paused,speed:game.speed,
+        id:a?.id??null,phase:a?.phase??null,elapsed:a?.elapsed??0,
+        speech:a?.mirrorPractice===true,target:a?.targetInstanceId??null,
+        duration:actionDuration(a),label:mirrorActionLabel(a),event:actor.event,
+        social:actor.needs.social,fun:actor.needs.fun,xp:actor.skills?.xpById?.charisma||0,
+        glint:glint?{enabled:glint.enabled,x:scale.x,y:scale.y}:null};
     };
   }
   const fridgeLeaving={alex:false,mira:false};
@@ -8723,6 +8742,8 @@ function boot() {
       while(accumulator>=.10){
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
         const prevAlexGardenEvent=game.event,prevMiraGardenEvent=game.otherSim.event;
+        const mirrorCompletion=['alex','mira'].map(id=>[id,getActor(game,id).action])
+          .filter(([,action])=>action?.id==='mirror'&&action.phase==='using');
         const prevAlexLabel=game.action?.activityId
           ?getActivityDefinition(HOBBY_ACTIVITIES,game.action.activityId)?.label:null;
         const prevMiraLabel=game.otherSim.action?.activityId
@@ -8793,9 +8814,16 @@ function boot() {
         }
         // A completed job frees its own resident; planned commands start only
         // after both participant states and render transition guards allow it.
+        for(const [id,action] of mirrorCompletion){
+          const actor=getActor(game,id);
+          if(!actor.action&&action.elapsed>=actionDuration(action)&&
+            (actor.event===mirrorActionLabel(action)+' — готово'||
+             (action.mirrorPractice===true&&actor.event.startsWith('Речь отрепетирована · харизма +'))))
+            toast(getActorName(id)+': '+actor.event);
+        }
         dispatchPlannedActions();
-        if(prevAlex && prevAlex!=='garden' && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex]?.label||'прогулку').toLowerCase());
-        if(prevMira && prevMira!=='garden' && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira]?.label||'прогулку').toLowerCase());
+        if(prevAlex && !['garden','mirror'].includes(prevAlex) && !game.action) toast('Алекс закончил: '+(prevAlexLabel||ACTIONS[prevAlex]?.label||'прогулку').toLowerCase());
+        if(prevMira && !['garden','mirror'].includes(prevMira) && !game.otherSim.action) toast('Мира закончила: '+(prevMiraLabel||ACTIONS[prevMira]?.label||'прогулку').toLowerCase());
         if(socialBefore && !game.socialAction)toast(socialBefore==='talk'?'Жители поговорили ♡':'Жители поспорили ⚡');
       if(sharedBefore&&!game.socialAction)
         toast(getActor(game,sharedBefore).event);
@@ -9890,7 +9918,8 @@ function boot() {
         continue;
       }
       if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
-      const weight=Math.max(0,...HOUSEHOLD_IDS.map(id=>
+      const utilityUsers=residentIdsForSimulation(game).map(id=>getActor(game,id)?.action);
+      const weight=Math.max(0,...residentIdsForSimulation(game).map(id=>
         furnitureUseWeight(getActor(game,id)?.action,item.instanceId)));
       if(['dresser','wardrobe'].includes(item.prefabId))
         meshyFurniture.useProcedural(node,weight>.005);
@@ -9938,9 +9967,13 @@ function boot() {
         const glint=node.findByName('F4E mirror highlight');
         if(glint){glint.enabled=weight>.008;
           if(glint.enabled){
-            glint.setLocalPosition(Math.sin(effectTime*1.7)*.13*weight,
-              1.36,-.16);
-            glint.setLocalScale(.12+.09*weight,.28+.13*weight,.026);
+            const speech=utilityUsers.some(action=>action?.id==='mirror'&&
+              action.mirrorPractice===true&&action.phase==='using'&&action.targetInstanceId===item.instanceId);
+            // Object-only feedback, not a new character animation or rig.
+            glint.setLocalPosition(speech?Math.sin(effectTime*2.5)*.18*weight:0,
+              speech?1.36:1.36+Math.sin(effectTime*1.7)*.16*weight,-.16);
+            glint.setLocalScale(speech?.28+.13*weight:.12+.09*weight,
+              speech?.12+.09*weight:.28+.13*weight,.026);
           }
         }
       }
