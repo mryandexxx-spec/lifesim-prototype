@@ -527,7 +527,9 @@ function toast(message,{incidentResidentId=null}={}) {
 // Never serialize a not-yet-rendered fallback household during a failed 3D boot.
 // The last valid on-device save stays byte-for-byte untouched until startup succeeds.
 let bootReadyToSave=false;
-const canWriteGameSave=()=>bootReadyToSave&&!saveStorageLocked;
+// After confirmed backup import, pagehide/visibility/timer must NEVER write the old live family.
+let restoreReloadPending=false;
+const canWriteGameSave=()=>bootReadyToSave&&!saveStorageLocked&&!restoreReloadPending;
 let saveFailureNotified=false;
 function save(silent = false) {
   if(!canWriteGameSave()){
@@ -2658,6 +2660,7 @@ $('backup-apply').addEventListener('click',()=>{
       'Восстановление не удалось — прогресс не изменён');
     return;
   }
+  restoreReloadPending=true;
   backupDialog.close();
   window.location.reload();
 });

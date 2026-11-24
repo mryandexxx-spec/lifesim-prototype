@@ -90,3 +90,16 @@ test('QSK-09 backup preview: current root v1 population residentsById counts 3â€
   delete household.population.residentsById.resident_4;
   assert.equal(backupSummary(household).residents,3);
 });
+
+test('QSK-09 import: confirmed restore suppresses old in-memory pagehide and autosave writes',async()=>{
+  const game=await readFile(new URL('../src/game.js',import.meta.url),'utf8');
+  assert.ok(game.includes('let restoreReloadPending=false;'));
+  assert.ok(game.includes('const canWriteGameSave=()=>bootReadyToSave&&!saveStorageLocked&&!restoreReloadPending;'));
+  assert.ok(game.includes('window.addEventListener(\'pagehide\', () => save(true))'));
+  assert.ok(game.includes('if (document.hidden) save(true)'));
+  const commit=game.indexOf('commitV1Backup(localStorage,SAVE_KEY,pendingBackup)');
+  const lock=game.indexOf('restoreReloadPending=true;',commit);
+  const reload=game.indexOf('window.location.reload();',lock);
+  assert.ok(commit>=0&&lock>commit&&reload>lock,
+    'after a successful import suppress every old-family write before reload');
+});
