@@ -98,7 +98,7 @@ try{
     await context.addInitScript(({key,record,tour})=>{
       if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
       localStorage.setItem(tour,'done');
-    },{key:SAVE_KEY,record:seed,tour:UI_TOUR_STORAGE_KEY});
+    },{key:SAVE_KEY,record:{...seed,minutes:width===320||width===844?60:720},tour:UI_TOUR_STORAGE_KEY});
     const page=await context.newPage();
     page.on('pageerror',e=>errors.push('JavaScript: '+e.message));
     page.on('crash',()=>errors.push('WebGL renderer crash'));
@@ -141,6 +141,35 @@ try{
       assert.equal(await page.locator('#outdoor-apply').isDisabled(),true);
       assert.equal((await page.evaluate(()=>
         window.__LifeSimPoolVisualStats?.()))?.hasPool,true);
+      // PF-01: choose a real visible yard cell through the active camera.
+      const point=await page.evaluate(async()=>{
+        const {Application,Vec3}=await import('playcanvas');
+        const app=Application.getApplication(),cam=app.root.findByName('Camera').camera;
+        const canvas=document.querySelector('#game-canvas'),rect=canvas.getBoundingClientRect();
+        for(const z of [4.25,2.25,-4.25,-6.25,6.25,0.25])
+          for(const x of [12.25,14.25,16.25,18.25,10.25,8.25]){
+            const p=cam.worldToScreen(new Vec3(x,-.53,z));
+            const sx=p.x+rect.left,sy=p.y+rect.top;
+            if(document.elementFromPoint(sx,sy)===canvas)return {x:sx,y:sy};
+          }
+        return null;
+      });
+      assert.ok(point,'visible yard cell required');
+      const outline=()=>page.evaluate(async()=>{
+        const {Application}=await import('playcanvas');
+        const root=Application.getApplication().root;
+        const border=root.findByName('PF-01 pool preview outline');
+        const fill=root.findByName('LOT-B1 paint preview');
+        return {enabled:border.enabled,edges:border.children.length,lit:border.children.some(n=>n.render.material.useLighting),
+          fill:fill.enabled,opacity:fill.render.material.opacity};
+      });
+      await page.locator('#pool-tool').selectOption('paint');
+      await page.touchscreen.tap(point.x,point.y);
+      assert.deepEqual(await outline(),{enabled:true,edges:4,lit:false,fill:true,opacity:.62});
+      await page.screenshot({path:'artifacts/lot-e5/pf-01-'+name+'.png'});
+      await page.locator('#outdoor-tool-camera').tap();
+      assert.equal((await outline()).enabled,false);
+      assert.equal((await outline()).fill,false);
       await page.locator('#outdoor-exit').tap();
       await assertMode(page,null);
       await assertStable(page,baseline,name+' Lot exit');
