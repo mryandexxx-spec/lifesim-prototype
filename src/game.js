@@ -2147,7 +2147,8 @@ function updateFamilyBalance(){
 const workHud=document.createElement('small');
 workHud.id='career-work-hud';
 workHud.className='career-work-hud';
-$('resident-name').insertAdjacentElement('afterend',workHud);
+workHud.hidden=true;
+$('dashboard').append(workHud);
 const incidentBadge=document.createElement('b');
 incidentBadge.id='career-incident-badge';
 incidentBadge.className='career-incident-badge';
@@ -3241,9 +3242,29 @@ function boot() {
     gardenStageSignature=currentGardenStageSignature();
   };
   renderOutdoorFeatures();
+  const outdoorPaintMaterial=mat('#62b889',{opacity:.30});
   const outdoorPaintGhost=box('LOT-B1 paint preview',0,-.509,0,.5,.025,.5,
-    mat('#62b889',{opacity:.30}));
+    outdoorPaintMaterial);
   outdoorPaintGhost.enabled=false;
+  // PF-01: lighting-independent pool fill and opaque perimeter.
+  // Reuse four strips; no per-cell entities or additional light sources.
+  const poolMarkMaterial=(color,opacity)=>{
+    const material=mat(color,opacity===undefined?{emissive:1}:{emissive:1,opacity});
+    material.useLighting=false;
+    material.update();
+    return material;
+  };
+  const poolMarks={
+    paint:{fill:poolMarkMaterial('#00a9ed',.62),edge:poolMarkMaterial('#baf8ff')},
+    erase:{fill:poolMarkMaterial('#e26a10',.62),edge:poolMarkMaterial('#ffe5a0')}
+  };
+  const poolOutline=new pc.Entity('PF-01 pool preview outline');
+  app.root.addChild(poolOutline);
+  poolOutline.enabled=false;
+  const poolEdges=Array.from({length:4},(_,i)=>
+    box('PF-01 pool preview edge '+i,0,0,0,1,.025,1,poolMarks.paint.edge,poolOutline));
+  for(const edge of poolEdges){edge.render.castShadows=false;edge.render.receiveShadows=false;}
+  outdoorPaintGhost.render.castShadows=false;
   const buildGhost=box('F5 preview',0,.05,0,.2,.06,.2,mat('#438ac4',{opacity:.25}));
   buildGhost.enabled=false;
   const buildWallMarker=box('F5 selected wall',0,.32,0,.3,.62,.3,mat('#24c8bc',{opacity:.72}));
@@ -7074,7 +7095,7 @@ function boot() {
   };
   const clearOutdoorPending=(quiet=false)=>{
     poolVisual.previewFixture();
-    outdoorDrag=null;outdoorPending=null;outdoorPaintGhost.enabled=false;outdoorPose=null;
+    outdoorDrag=null;outdoorPending=null;outdoorPaintGhost.enabled=false;poolOutline.enabled=false;outdoorPose=null;
     if(!quiet)outdoorFeedback(poolMode()
       ?'Вода: коснись и протяни прямоугольник. Оборудование: коснись бортика.'
       :outdoorCategory==='ground'
@@ -7088,14 +7109,34 @@ function boot() {
   };
   const paintGhostFrom=(from,to)=>{
     const a=outdoorCellAt(from?.x,from?.z),b=outdoorCellAt(to?.x,to?.z);
+    poolOutline.enabled=false;
     if(a===null||b===null){outdoorPaintGhost.enabled=false;return;}
     const i0=Math.min(a%OUTDOOR_GRID_WIDTH,b%OUTDOOR_GRID_WIDTH);
     const i1=Math.max(a%OUTDOOR_GRID_WIDTH,b%OUTDOOR_GRID_WIDTH);
     const j0=Math.min(Math.floor(a/OUTDOOR_GRID_WIDTH),Math.floor(b/OUTDOOR_GRID_WIDTH));
     const j1=Math.max(Math.floor(a/OUTDOOR_GRID_WIDTH),Math.floor(b/OUTDOOR_GRID_WIDTH));
-    outdoorPaintGhost.setPosition(-9+(i0+i1+1)*.25,-.506,-12+(j0+j1+1)*.25);
-    outdoorPaintGhost.setLocalScale((i1-i0+1)*.5,.025,(j1-j0+1)*.5);
+    const x=-9+(i0+i1+1)*.25,z=-12+(j0+j1+1)*.25;
+    const w=(i1-i0+1)*.5,d=(j1-j0+1)*.5;
+    const marks=poolMode()?poolMarks[poolTool()]:null;
+    outdoorPaintGhost.render.material=marks?.fill||outdoorPaintMaterial;
+    outdoorPaintGhost.setPosition(x,marks?-.465:-.506,z);
+    outdoorPaintGhost.setLocalScale(w,.025,d);
     outdoorPaintGhost.enabled=true;
+    if(marks){
+      const t=.12;
+      const strips=[
+        [x,-.425,z-d/2+t/2,w,.025,t],
+        [x,-.425,z+d/2-t/2,w,.025,t],
+        [x-w/2+t/2,-.425,z,t,.025,d-2*t],
+        [x+w/2-t/2,-.425,z,t,.025,d-2*t]
+      ];
+      poolEdges.forEach((edge,i)=>{
+        const [ex,ey,ez,sx,sy,sz]=strips[i];
+        edge.setPosition(ex,ey,ez);edge.setLocalScale(sx,sy,sz);
+        edge.render.material=marks.edge;
+      });
+      poolOutline.enabled=true;
+    }
   };
   const previewOutdoorSelection=(from,to,kind)=>{
     const p=previewOutdoorPaint(game,{from,to,kind});
@@ -7188,6 +7229,7 @@ function boot() {
   };
   const outdoorSnap=n=>Math.round(n*4)/4;
   const showOutdoorFeatureGhost=(pose,valid=true)=>{
+    poolOutline.enabled=false;
     if(!pose){outdoorPaintGhost.enabled=false;return;}
     const operation=$('outdoor-feature-operation').value;
     const chosen=operation==='place'

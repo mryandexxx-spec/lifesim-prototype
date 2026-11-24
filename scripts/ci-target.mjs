@@ -84,7 +84,7 @@ export function planChanges(files,root=ROOT){
     for(const name of names)if(allTests.includes(name))selected.add(name);
   // Structural game.js extraction can invalidate any legacy source contract.
   // Run every Node suite before merging this boundary, not only imported modules.
-  if(changed.some(f=>f==='src/qsk-11-home-menu.js'||f==='src/qsk-11-tour-ui.js'||f==='src/qsk-11-time-ui.js'))for(const file of allTests)selected.add(file);
+  if(changed.some(f=>f==='src/qsk-11-home-menu.js'||f==='src/qsk-11-tour-ui.js'||f==='src/qsk-11-time-ui.js'||f==='tests/pf-01.test.js'))for(const file of allTests)selected.add(file);
   const tests=[...selected].filter(f=>allTests.includes(f)).sort();
   const micro_ux=changed.some(f=>
     /^(?:src\/(?:micro-ux|camera-controls)\.js|tests\/micro-ux-r1-browser-smoke\.mjs)$/.test(f));

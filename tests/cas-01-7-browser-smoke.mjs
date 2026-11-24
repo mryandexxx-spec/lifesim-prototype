@@ -157,12 +157,30 @@ try{
   await page.locator('#pick-resident_3').tap();
   assert.equal(await page.locator('#resident-name').innerText(),'Вера');
   await page.locator('#cas-resident-details').waitFor({state:'visible'});
+  // PF-01: actual four-person HUD at 320/390, selected resident's full schedule.
+  const careerLine=page.locator('#career-work-hud');
+  await careerLine.waitFor({state:'visible'});
+  assert.match(await careerLine.innerText(),/\d{2}:\d{2}–\d{2}:\d{2}/);
+  const assertCareerFits=async()=>{
+    const fit=await careerLine.evaluate(el=>{
+      const r=el.getBoundingClientRect(),hud=el.parentElement.getBoundingClientRect();
+      return {direct:el.parentElement.id==='dashboard',fits:r.left>=hud.left&&r.right<=hud.right&&r.top>=hud.top&&r.bottom<=hud.bottom,
+        width:r.width,scroll:el.scrollWidth,client:el.clientWidth,scrollH:el.scrollHeight,clientH:el.clientHeight};
+    });
+    assert.ok(fit.direct&&fit.fits&&fit.width>width*.8&&fit.scroll<=fit.client+1&&fit.scrollH<=fit.clientH+1,JSON.stringify(fit));
+  };
+  await assertCareerFits();
+  const priorCollapsed=await page.locator('#dashboard').getAttribute('data-collapsed');
+  await page.locator('#hud-toggle').tap();await assertCareerFits();
+  await page.locator('#hud-toggle').tap();
+  assert.equal(await page.locator('#dashboard').getAttribute('data-collapsed'),priorCollapsed);
   await page.locator('#career-phone-toggle').tap();
   await page.locator('#career-phone-panel [data-phone-app="work"]').tap();
   assert.match(await page.locator('#career-phone-panel').innerText(),/Вера/);
   await page.locator('.career-phone-x').tap();
   await page.locator('#pick-resident_4').tap();
   assert.equal(await page.locator('#resident-name').innerText(),'Игорь');
+  assert.equal(await page.locator('#career-work-hud').isVisible(),false,'no schedule from previous selected resident');
   await page.screenshot({path:'artifacts/cas-01-7/four-'+width+'.png'});
   const saved=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
   assert.equal(saved.version,1);

@@ -50,9 +50,10 @@ const modes=page=>page.evaluate(()=>{
   const id=['build-editor','furniture-editor','outdoor-editor'];
   const shell=document.querySelector('.app-shell');
   return {editors:Object.fromEntries(id.map(k=>[k,!document.getElementById(k).hidden])),
-    flags:['buildMode','furnishMode','outdoorMode'].map(k=>shell.dataset[k])};
+    flags:['buildMode','furnishMode','outdoorMode'].map(k=>shell.dataset[k]),
+    parcel:shell.dataset.parcel||null};
 });
-async function assertMode(page,expected){
+async function assertMode(page,expected,section=null){
   const value=await modes(page);
   for(const [id,open] of Object.entries(value.editors))
     assert.equal(open,id===expected,'unexpected editor '+id+' for '+expected);
@@ -60,7 +61,13 @@ async function assertMode(page,expected){
     (v==='true'&&expected!==null)),'mode flags cannot leak into Life mode');
   assert.ok(Object.values(value.editors).filter(Boolean).length<=1,
     'only one editor can be active');
+  assert.equal(value.parcel,section,'active public parcel section');
+  assert.equal(await page.locator('#parcel-editor').isVisible(),section!==null);
+  assert.equal(await page.locator('#parcel-bar').isVisible(),section!==null);
+  if(expected)assert.equal(await page.locator('#'+expected).isVisible(),false,
+    'native editor must be hidden behind parcel UI');
 }
+const parcelAction=(page,id)=>page.locator('[data-parcel-action="'+id+'"]');
 async function assertStable(page,base,label){
   const current=await snapshot(page);
   assert.ok(current,label+' saved root must exist');
@@ -98,7 +105,7 @@ try{
     await context.addInitScript(({key,record,tour})=>{
       if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
       localStorage.setItem(tour,'done');
-    },{key:SAVE_KEY,record:seed,tour:UI_TOUR_STORAGE_KEY});
+    },{key:SAVE_KEY,record:{...seed,minutes:width===320||width===844?60:720},tour:UI_TOUR_STORAGE_KEY});
     const page=await context.newPage();
     page.on('pageerror',e=>errors.push('JavaScript: '+e.message));
     page.on('crash',()=>errors.push('WebGL renderer crash'));
@@ -127,43 +134,116 @@ try{
 
       await page.locator('#home-open').tap();
       await page.locator('#home-build').tap();
-      await assertMode(page,'build-editor');
-      await page.locator('#build-exit').tap();
+      await assertMode(page,'build-editor','house');
+      await parcelAction(page,'exit').tap();
       await assertMode(page,null);
       await assertStable(page,baseline,name+' Build exit');
       steps.push('Build-to-Life-no-transaction');
 
       await page.locator('#home-open').tap();
-      await page.locator('#home-outdoors').tap();
-      await assertMode(page,'outdoor-editor');
-      await page.locator('#outdoor-category').selectOption('pool');
-      assert.equal(await page.locator('#pool-controls').isVisible(),true);
-      assert.equal(await page.locator('#outdoor-apply').isDisabled(),true);
+      await page.locator('#home-pool').tap();
+      await assertMode(page,'outdoor-editor','pool');
       assert.equal((await page.evaluate(()=>
         window.__LifeSimPoolVisualStats?.()))?.hasPool,true);
-      await page.locator('#outdoor-exit').tap();
+      // PF-01: target canonical cell CENTERS inside the yard/pool, not the
+      // first available pixel on the clipped scene's edge. The latter was
+      // unreliable on landscape Chromium and only showed a tiny single cell.
+      // Verify projection and inverse ray before each real touch.
+      const point=async(x,z,kind)=>page.evaluate(async({x,z,kind,world})=>{
+        const {Application,Vec3}=await import('playcanvas');
+        const {lotRaySurface,outdoorCellAt}=await import('/src/lot-surface.js');
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const cam=Application.getApplication().root.findByName('Camera').camera;
+        const canvas=document.querySelector('#game-canvas'),rect=canvas.getBoundingClientRect();
+        const p=cam.worldToScreen(new Vec3(x,-.53,z));
+        const sx=Math.round(p.x+rect.left),sy=Math.round(p.y+rect.top);
+        const margin=5;
+        const clear=[[0,0],[-margin,0],[margin,0],[0,-margin],[0,margin]].every(([dx,dy])=>
+          document.elementFromPoint(sx+dx,sy+dy)===canvas);
+        const near=cam.screenToWorld(sx-rect.left,sy-rect.top,cam.nearClip);
+        const far=cam.screenToWorld(sx-rect.left,sy-rect.top,cam.farClip);
+        const hit=lotRaySurface(near,far,world);
+        return {x:sx,y:sy,clear,hit,expectedCell:outdoorCellAt(x,z),
+          actualCell:hit?outdoorCellAt(hit.x,hit.z):null,kind};
+      },{x,z,kind,world:initial.world});
+      // Passive evidence for distinguishing a missed touch, a cancelled
+      // gesture, and a renderer failure; do not inject gameplay events.
+      await page.evaluate(()=>{
+        window.__pf01TouchTrace=[];
+        for(const type of ['pointerdown','pointerup','pointercancel','lostpointercapture'])
+          document.addEventListener(type,e=>{
+            const trace=window.__pf01TouchTrace;
+            trace.push({type,target:e.target.id,x:e.clientX,y:e.clientY,time:e.timeStamp});
+            if(trace.length>16)trace.shift();
+          },{capture:true,passive:true});
+      });
+      const outline=()=>page.evaluate(async()=>{
+        const {Application}=await import('playcanvas');
+        const root=Application.getApplication().root;
+        const border=root.findByName('PF-01 pool preview outline');
+        const fill=root.findByName('LOT-B1 paint preview');
+        const scale=fill.getLocalScale();
+        return {enabled:border.enabled,edges:border.children.length,lit:border.children.some(n=>n.render.material.useLighting),
+          fill:fill.enabled,opacity:fill.render.material.opacity,size:[scale.x,scale.z]};
+      });
+      for(const tool of ['paint','erase']){
+        await parcelAction(page,'group:water').tap();
+        await parcelAction(page,'pick:'+tool).tap();
+        assert.equal(await parcelAction(page,'apply').isDisabled(),true);
+        const corners=tool==='paint'?[[1.25,-8.75],[3.75,-7.25]]:[[18.75,8.75],[19.75,9.75]];
+        const kind=tool==='paint'?'yard':'pool-water';
+        for(const [i,[x,z]] of corners.entries()){
+          // Just as a player would, expose an off-screen target using the
+          // visible zoom control BEFORE tapping. Do not retry failed touches
+          // or bypass the actual pointer path. Reproject after each zoom.
+          let at=await point(x,z,kind);
+          const projections=[at];
+          for(let zoom=0;!at.clear&&zoom<3;zoom++){
+            await parcelAction(page,'zoom-out').tap();
+            at=await point(x,z,kind);
+            projections.push(at);
+          }
+          assert.ok(at.clear&&at.hit?.kind===kind&&at.actualCell===at.expectedCell,
+            name+' '+tool+' corner '+i+' projection '+JSON.stringify(projections));
+          await page.touchscreen.tap(at.x,at.y);
+          const expected=i===0?[.5,.5]:
+            [Math.abs(corners[1][0]-corners[0][0])+.5,Math.abs(corners[1][1]-corners[0][1])+.5];
+          const actual=await outline();
+          const trace=await page.evaluate(()=>window.__pf01TouchTrace);
+          assert.deepEqual(actual,{enabled:true,edges:4,lit:false,fill:true,opacity:.62,size:expected},
+            name+' '+tool+' corner '+i+' '+JSON.stringify({at,trace,
+              hint:await page.locator('#parcel-editor output').textContent()}));
+          if(i===0)assert.match(await page.locator('#parcel-editor output').textContent(),/противоположной клетки/);
+        }
+        await page.screenshot({path:'artifacts/lot-e5/pf-01-'+tool+'-'+name+'.png'});
+        await parcelAction(page,'cancel').tap();
+        assert.equal((await outline()).enabled,false);
+        assert.equal((await outline()).fill,false);
+      }
+      await parcelAction(page,'exit').tap();
       await assertMode(page,null);
       await assertStable(page,baseline,name+' Lot exit');
       steps.push('Lot-pool-to-Life-no-transaction');
 
       await page.locator('#home-open').tap();
       await page.locator('#home-furnish').tap();
-      await assertMode(page,'furniture-editor');
-      await page.locator('#furnish-shop-toggle').tap();
-      await page.locator('#furnish-stock button[data-item-id="chair.loft"]').tap();
+      await assertMode(page,'furniture-editor','furniture');
+      await parcelAction(page,'group:shop').tap();
+      await page.locator('#parcel-editor #furnish-stock button[data-item-id="chair.loft"]').tap();
+      await parcelAction(page,'try').tap();
       assert.equal(await page.locator('#furniture-editor')
         .getAttribute('data-shop-placing'),'true');
-      await page.locator('#furnish-place-cancel').tap();
+      await parcelAction(page,'cancel').tap();
       assert.equal(await page.locator('#furniture-editor')
         .getAttribute('data-shop-placing'),'false');
-      await page.locator('#furnish-exit').tap();
+      await parcelAction(page,'exit').tap();
       await assertMode(page,null);
       await assertStable(page,baseline,name+' Furnish preview cancelled');
       steps.push('Furnish-cancel-to-Life-no-charge');
 
       await page.locator('#career-phone-toggle').tap();
-      assert.match(await page.locator('#career-phone-title').innerText(),/Мира/);
-      await page.locator('.career-phone-app-tab[data-app="finance"]').tap();
+      assert.match(await page.locator('.phone-platform-welcome').innerText(),/Мира/);
+      await page.locator('#career-phone-panel [data-phone-app="finance"]').tap();
       assert.match(await page.locator('#career-phone-title').innerText(),/Финансы/);
       await page.locator('#career-phone-panel .career-phone-header .career-phone-x').tap();
       await page.locator('#calendar-anchor-toggle').tap();
@@ -182,8 +262,8 @@ try{
       const rotated=await assertCanvas(page,name+' rotated Life');
       await page.locator('#home-open').tap();
       await page.locator('#home-outdoors').tap();
-      await assertMode(page,'outdoor-editor');
-      await page.locator('#outdoor-exit').tap();
+      await assertMode(page,'outdoor-editor','yard');
+      await parcelAction(page,'exit').tap();
       await assertMode(page,null);
       await assertStable(page,baseline,name+' rotated Lot exit');
       await page.screenshot({path:'artifacts/lot-e5/rotated-'+name+'.png'});
@@ -217,6 +297,7 @@ try{
         credits:reloaded.shop.credits,receiptCount:reloaded.financialHistory.entries.length,
         jsErrors:errors.length});
     }catch(e){
+      await page.screenshot({path:'artifacts/lot-e5/failure-'+name+'.png'}).catch(()=>{});
       failures.push({viewport:name,step:steps.at(-1)||'startup',error:e.stack||String(e),
         browserErrors:errors});
     }finally{await context.close();}

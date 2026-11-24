@@ -7,10 +7,21 @@ test('LOT-E5 is a four-viewport cross-mode release gate, not another gameplay sy
   const browser=source('tests/lot-e5-browser-smoke.mjs');
   for(const size of ['390,844','375,667','320,568','844,390'])
     assert.ok(browser.includes('['+size+']'),size);
-  for(const mode of ['#home-build','#build-exit','#home-outdoors','#outdoor-exit',
-    '#home-furnish','#furnish-place-cancel','#furnish-exit',
-    '#career-phone-toggle','#menu-rotate-btn','#save-btn'])
+  // The native editor DOM is intentionally hidden by the unified parcel tray.
+  // Require actual user-facing entry points, touch commands and mode checks.
+  for(const mode of ['#home-build','#home-pool','#home-outdoors','#home-furnish',
+    '#career-phone-toggle','[data-phone-app="finance"]','#menu-rotate-btn','#save-btn'])
     assert.ok(browser.includes(mode),mode);
+  for(const section of ["'build-editor','house'","'outdoor-editor','pool'",
+    "'outdoor-editor','yard'","'furniture-editor','furniture'"])
+    assert.ok(browser.includes(section),section);
+  for(const action of ['exit','group:water','group:shop','try','cancel'])
+    assert.ok(browser.includes("parcelAction(page,'"+action+"').tap()"),action);
+  for(const guard of ["['paint','erase']","parcelAction(page,'pick:'+tool).tap()",
+    "parcelAction(page,'apply').isDisabled()",'page.touchscreen.tap','lotRaySurface',
+    'PF-01 pool preview outline','native editor must be hidden behind parcel UI'])
+    assert.ok(browser.includes(guard),guard);
+  assert.doesNotMatch(browser, /#(?:build-exit|outdoor-exit|furnish-exit|furnish-place-cancel)/);
   for(const guard of ['financialHistory','world.construction','world.furniture',
     'world.outdoors','actionQueues','shop.credits','page.reload',
     'page.setViewportSize','getContext','pageerror','report.json'])
