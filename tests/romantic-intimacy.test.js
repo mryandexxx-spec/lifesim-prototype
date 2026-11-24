@@ -153,8 +153,11 @@ test('R2 UI fades only on consent, keeps ordinary save and game controls intact'
   const css=read('../styles.css');
   const pages=read('../.github/workflows/pages.yml');
   assert.doesNotMatch(game,/intimacyQAMode|createIntimacyQAHousehold|INTIMACY_QA_DEBUG_QUERY|intimacy-qa-controls/);
-  assert.ok(game.includes('localStorage.getItem(SAVE_KEY)'));
-  assert.ok(game.includes('localStorage.setItem(SAVE_KEY,'));
+  assert.ok(game.includes('readV1Save(localStorage,SAVE_KEY)'));
+  assert.ok(game.includes('writeV1Save(localStorage,SAVE_KEY,'));
+  const save=read('../src/qsk-09-save-safety.js');
+  assert.ok(save.includes('storage.getItem(key)'));
+  assert.ok(save.includes('storage.setItem(key,bytes)'));
   assert.ok(game.includes("beginSocial('talk',false"));
   assert.ok(game.includes("intimacyVeil.classList.toggle('visible',privateFrame.active)"));
   assert.ok(game.includes("if(intimacyFrame(game.socialAction).active)"));
