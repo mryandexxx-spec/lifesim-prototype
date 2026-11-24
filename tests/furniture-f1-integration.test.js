@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const game=read('../src/game.js');
+const homeMenu=read('../src/qsk-11-home-menu.js');
 const html=read('../index.html');
 const css=read('../styles.css');
 const workflow=read('../.github/workflows/pages.yml');
@@ -14,7 +15,8 @@ test('F1/F2 mobile UI has real mode enter/exit, 3D picking and accessible shop c
   assert.match(html,/id="furnish-toggle"[^>]+aria-pressed="false"/);
   assert.match(html,/id="home-open"[^>]*aria-controls="home-panel"/);
   assert.match(html,/id="home-furnish"[^>]*aria-controls="furniture-editor"/);
-  assert.match(game,/\$\('home-furnish'\).addEventListener\('click'/);
+  assert.match(game,/const homeMenu=createHomeMenu\(\{/);
+  assert.match(homeMenu,/\$\('home-furnish'\)\.addEventListener\('click',\(\)=>\{setOpen\(false\);\$\('furnish-toggle'\)\.click\(\);\}\)/);
   assert.match(css,/\.life-nav button\{min-height:50px;/);
   assert.match(html,/id="furniture-editor"[^>]+hidden/);
   assert.match(css,/\.furniture-editor\[hidden\]\{display:none!important;/);
