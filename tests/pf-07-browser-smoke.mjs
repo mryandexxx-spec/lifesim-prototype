@@ -18,7 +18,7 @@ const scene=(page,name)=>page.evaluate(async name=>{
  return {enabled:node.enabled,x:p.x,y:p.y,z:p.z,yaw:e.y,webgl:!!app.graphicsDevice.canvas};
 },name);
 try{
- for(const [width,height,sku,price,query] of [[390,844,'mesh.green_curtains',190,'Оконная панель со шторами'],[320,568,'mesh.wooden_blinds',180,'Оконная панель с жалюзи']]){
+ for(const [width,height,sku,price] of [[390,844,'mesh.green_curtains',190],[320,568,'mesh.wooden_blinds',180]]){
   const seed=newHousehold();seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
   const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,hasTouch:true,isMobile:true});
   await context.addInitScript(({key,record,tour})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));localStorage.setItem(tour,'done');},{key:SAVE_KEY,record:seed,tour:UI_TOUR_STORAGE_KEY});
@@ -28,7 +28,9 @@ try{
   const baseline=await snap(page);
   await page.locator('#home-open').tap();await page.locator('#home-furnish').tap();
   await parcel(page,'group:shop').tap();
-  await page.locator('#parcel-editor #furnish-search').fill(query);
+  // Parcel intentionally hides the legacy search input. Use the real visible category rail.
+  await page.locator('#parcel-editor #furnish-type-tabs button[data-category-id="type.decor"]').tap();
+  await page.locator('#parcel-editor #furnish-subtype-tabs button[data-category-id="type.decor.wall"]').tap();
   await page.locator('#parcel-editor #furnish-stock button[data-item-id="'+sku+'"]').tap();
   await parcel(page,'try').tap();await parcel(page,'auto').tap();
   assert.equal(await parcel(page,'apply').isDisabled(),false,'valid wall preview '+sku);
