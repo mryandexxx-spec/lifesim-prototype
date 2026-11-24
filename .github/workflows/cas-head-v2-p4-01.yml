@@ -1,15 +1,11 @@
 name: CAS P4-01 isolated
 on:
-  pull_request:
-    paths:
-      - 'art-review/cas-head-v2/p4-01/**'
-      - '.github/workflows/cas-head-v2-p4-01.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   asya:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
