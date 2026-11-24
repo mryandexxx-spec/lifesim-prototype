@@ -103,6 +103,8 @@ try {
     assert.ok(Math.abs(canvasBounds.width - viewport.width) < 1);
     assert.ok(Math.abs(canvasBounds.height - viewport.height) < 1);
     assert.ok(viewport.height >= 205 && viewport.y + viewport.height <= panel.y + 1);
+    assert.equal(await page.locator('#viewport button, #viewport #scene-label').count(), 0, 'review controls must not overlay character');
+    assert.ok((await page.locator('#scene-toolbar, .scene-toolbar').boundingBox()).y >= viewport.y + viewport.height - 1);
     const minimumSliderHeight = await page.locator('[data-morph]').evaluateAll((sliders) => Math.min(...sliders.map((el) => el.getBoundingClientRect().height)));
     assert.ok(minimumSliderHeight >= 44);
     for (const family of ['alex', 'mira']) {
@@ -146,6 +148,9 @@ try {
       await page.locator('#frame').tap();
       await page.locator('#panel').evaluate((panel) => { panel.scrollTop = 0; });
       await shot('full-body-neutral');
+      for (let i=0;i<6;i++) await page.locator('#rotate').tap();
+      await shot('full-body-front');
+      for (let i=0;i<2;i++) await page.locator('#rotate').tap();
       for (const cue of ['idle', 'walk', 'sit']) {
         await page.locator('#pose').selectOption(cue);
         const first = await canvasShot();
