@@ -6,6 +6,12 @@ import {proposeFurnitureMove} from '../src/furniture-layout.js';
 import {buyMarketItem,newFurnitureShop,storeMarketItem,restoreMarketItem} from '../src/furniture-shop.js';
 import {isWalkable,findPath} from '../src/navigation.js';
 
+import {newHousehold,chooseResidentAction,tickHousehold} from '../src/household.js';
+import {ACTIONS,arrive} from '../src/simulation.js';
+import {furnitureActionApproach} from '../src/furniture-catalog.js';
+import {READY_MEAL_IDS} from '../src/ready-meal-catalog.js';
+import {proposeReadyMealPurchase} from '../src/ready-food.js';
+
 const table={instanceId:'shop-diningtable-90',prefabId:'diningtable',x:9,z:0,yaw:0,location:'home'};
 const chair={instanceId:'shop-chair-91',prefabId:'chair',x:9,z:2.5,yaw:0,location:'home'};
 const residents=[{x:6,z:-2},{x:6,z:2},{x:12,z:-2},{x:12,z:2}];
@@ -50,4 +56,34 @@ test('PF-03 a table may not trap an overlapping chair between other furniture',(
   const world=fixture({...table,z:-.5},seat,blocker('shop-armchair-92',7.9),blocker('shop-armchair-93',10.1));
   const result=proposeFurnitureMove(world,table.instanceId,{x:9,z:0,yaw:0});
   assert.equal(result.ok,false);
+});
+
+test('PF-03 two original residents can take and eat one portion at a tucked chair',()=>{
+  for(const person of ['alex','mira']){
+    const h=newHousehold(),id=READY_MEAL_IDS[2],actor=person==='alex'?h:h.otherSim;
+    h.autonomy.enabled=false;h.otherSim.autonomy.enabled=false;
+    h.world.furniture.instances.push({...table,x:6.75,z:-1.5},{...chair,x:6.75,z:-.5});
+    const tx=proposeReadyMealPurchase(h,id,'fridge',person);
+    assert.equal(tx.ok,true,tx.reason);
+    h.kitchen=tx.kitchen;h.shop=tx.shop;h.financialHistory=tx.financialHistory;
+    actor.needs.hunger=18;
+    assert.equal(chooseResidentAction(h,'dining',false,person,table.instanceId,
+      null,null,null,null,id),true);
+    assert.equal(actor.action.diningSeatInstanceId,chair.instanceId);
+    actor.position={...furnitureActionApproach(h.world,'fridge')};
+    arrive(actor);actor.action.diningStage='taking';tickHousehold(h,6);
+    assert.equal(h.kitchen.prepared[0].portions,1);
+    const approach=diningSeatApproach(h.world,table.instanceId,chair.instanceId);
+    assert.ok(approach?.side);
+    actor.position={...approach};arrive(actor);actor.action.diningStage='eating';
+    const hunger=actor.needs.hunger,balance=h.shop.credits;
+    tickHousehold(h,6);
+    assert.equal(actor.action.cookedRecipeId,id);
+    assert.ok(actor.needs.hunger>hunger);
+    assert.equal(h.shop.credits,balance);
+    tickHousehold(h,ACTIONS.dining.duration-6);
+    assert.equal(actor.action,null);
+    assert.equal(h.kitchen.dirtyDishes,1);
+    assert.equal(h.financialHistory.entries.length,1);
+  }
 });
