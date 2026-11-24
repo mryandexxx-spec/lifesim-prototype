@@ -13,8 +13,8 @@ from pathlib import Path
 import statistics
 import sys
 
-import bmesh
 import bpy
+import bmesh
 import numpy as np
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
