@@ -4407,6 +4407,20 @@ function boot() {
         toilet:toilet?{privacy:toilet.privacy,relief:toilet.relief,flush:toilet.flush,seated:toilet.seated}:null};
     };
   }
+  // PF-05/A read-only browser diagnostics, not part of the ordinary game API.
+  if(new URLSearchParams(location.search).get('pf-05')==='qa'){
+    window.__LifeSimMirrorQA=(id,instanceId)=>{
+      const actor=getActor(game,id),a=actor?.action;
+      const glint=decorNodes.get(instanceId)?.findByName('F4E mirror highlight');
+      const scale=glint?.getLocalScale();
+      return {minutes:game.minutes,paused:game.paused,speed:game.speed,
+        id:a?.id??null,phase:a?.phase??null,elapsed:a?.elapsed??0,
+        speech:a?.mirrorPractice===true,target:a?.targetInstanceId??null,
+        duration:actionDuration(a),label:mirrorActionLabel(a),event:actor.event,
+        social:actor.needs.social,fun:actor.needs.fun,xp:actor.skills?.xpById?.charisma||0,
+        glint:glint?{enabled:glint.enabled,x:scale.x,y:scale.y}:null};
+    };
+  }
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
     alex:game.action?.phase==='using'&&(game.action.id==='fridge'||

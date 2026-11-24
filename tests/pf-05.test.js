@@ -7,6 +7,7 @@ import {labelActiveTask,labelQueuedTask} from '../src/qsk-11-task-labels.js';
 import {findMarketPlacement,buyMarketItem} from '../src/furniture-shop.js';
 import {furnitureActionApproach} from '../src/furniture-catalog.js';
 import {enqueueAction} from '../src/action-queue.js';
+import {verifiedLastEvent} from '../src/qsk-08-touch-ux.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 function fixture(extra=false){
   const root=newHousehold();root.autonomy.enabled=false;
@@ -62,4 +63,11 @@ test('PF-05 browser uses variant-aware progress and confirmed mirror completion 
   assert.match(game,/actionDuration\(actor\.action\)/);
   assert.match(game,/mirrorCompletion/);
   assert.match(game,/mirror-speech-button/);
+});
+
+test('PF-05 last event is a verified completion and not an active intent',()=>{
+  assert.equal(verifiedLastEvent('Причесаться у зеркала — готово')?.code,'completed');
+  assert.equal(verifiedLastEvent('Речь отрепетирована · харизма +18 XP')?.code,'completed');
+  assert.equal(verifiedLastEvent('Репетировать речь'),null);
+  assert.equal(verifiedLastEvent('Практика речи прервана: зеркало недоступно')?.code,'interrupted');
 });

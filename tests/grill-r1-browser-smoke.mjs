@@ -108,3 +108,5 @@ try{
 await import('./pf-04a-meal-timing-browser-smoke.mjs');
 
 await import('./pf-04b-browser-smoke.mjs');
+
+await import('./pf-05-browser-smoke.mjs');
