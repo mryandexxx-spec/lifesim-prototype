@@ -4390,6 +4390,18 @@ function boot() {
         receipts:game.financialHistory.entries.length};
     };
   }
+  // PF-04/B read-only QA, available solely in the explicit test URL.
+  if(new URLSearchParams(location.search).get('pf-04b')==='qa'){
+    window.__LifeSimManualCareQA=id=>{
+      const actor=getActor(game,id),a=actor?.action;
+      const shower=showerStates[id]?.frame,toilet=toiletStates[id]?.frame;
+      return {minutes:game.minutes,speed:game.speed,paused:game.paused,
+        id:a?.id??null,phase:a?.phase??null,elapsed:a?.elapsed??0,
+        duration:actionDuration(a),needs:{...actor.needs},
+        shower:shower?{privacy:shower.privacy,water:shower.water,bathing:shower.bathing}:null,
+        toilet:toilet?{privacy:toilet.privacy,relief:toilet.relief,flush:toilet.flush,seated:toilet.seated}:null};
+    };
+  }
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
     alex:game.action?.phase==='using'&&(game.action.id==='fridge'||
