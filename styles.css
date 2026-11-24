@@ -2669,6 +2669,13 @@ button.time-card:active {transform:translateY(1px);}
 .parcel-editor .parcel-native{overflow-y:auto;overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;min-height:0;flex:1}
 .parcel-editor .parcel-actions button{min-height:48px}
+/* PF-07: furniture placement must keep the auto-place touch target reachable.
+   The draft has a status, choices and fixed footer; 30dvh clips the choices on small phones. */
+.app-shell[data-parcel="furniture"] .parcel-editor[data-stage="draft"]{max-height:46dvh;overflow-y:auto}
+.app-shell[data-parcel="furniture"] .parcel-editor[data-stage="draft"] :is(header,output){flex-shrink:0}
+.app-shell[data-parcel="furniture"] .parcel-editor[data-stage="draft"] .parcel-choices{flex:0 0 auto;min-height:48px;overflow:visible}
+.app-shell[data-parcel="furniture"] .parcel-editor[data-stage="draft"] .parcel-choices button{min-height:44px}
+@media(orientation:landscape) and (min-width:540px){.app-shell[data-parcel="furniture"] .parcel-editor[data-stage="draft"]{max-height:calc(100% - max(62px,env(safe-area-inset-top)))}}
 .parcel-editor .parcel-actions button[data-parcel-action="turn"],
 .parcel-editor .parcel-actions button[data-parcel-action="rotate"]{grid-column:2}
 
