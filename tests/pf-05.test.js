@@ -71,3 +71,15 @@ test('PF-05 last event is a verified completion and not an active intent',()=>{
   assert.equal(verifiedLastEvent('Репетировать речь'),null);
   assert.equal(verifiedLastEvent('Практика речи прервана: зеркало недоступно')?.code,'interrupted');
 });
+
+test('PF-05 rejected restored mirror never retains misleading active label or pays XP',()=>{
+  for(const person of ['alex','mira']){
+    const {root,id,point}=fixture(),actor=getActor(root,person);
+    assert.ok(chooseResidentAction(root,'mirror',false,person,id,null,null,null,null,null,true));
+    actor.position={...point};arrive(actor);tickHousehold(root,8);
+    actor.position={x:point.x+3,z:point.z};
+    const loaded=loadHousehold(copy(root)),after=getActor(loaded,person);
+    assert.equal(after.action,null);assert.equal(labelActiveTask(loaded,person),null);
+    assert.match(after.event,/прервано/);assert.equal(after.skills.xpById.charisma||0,0);
+  }
+});

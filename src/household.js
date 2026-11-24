@@ -268,6 +268,9 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         (sim.action.phase==='walking'&&!findPath(sim.position,point,root.world)))
         sim.action=null;
     }
+    // An invalid restored mirror must never leave a stale active-intent status.
+    if(!sim.action&&(id==='alex'?raw.action:raw.otherSim?.action)?.id==='mirror')
+      sim.event='Действие у зеркала прервано';
     root.actionQueues.byResident[id]=root.actionQueues.byResident[id].filter(task=>
       (task.type!=='outdoor'||Boolean(outdoorBench(root.world,task.instanceId)))&&
       (task.type!=='grill'||Boolean(outdoorGrill(root.world,task.instanceId)))&&

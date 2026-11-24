@@ -380,6 +380,10 @@ export function prepareAdditionalResidents(root){
       if(safe)actor.position=safe;
       else {actor.action=null;actor.event='Нет безопасного места для жителя';}
     }
+    if(actor.action?.id==='mirror'&&actor.action.mirrorPractice===true&&
+      actor.action.automatic===false&&actor.action.elapsed>=MIRROR_SPEECH_DURATION){
+      actor.action=null;actor.event='Действие у зеркала прервано';
+    }
     if(actor.action){
       const goal=actionGoal(root,actor.action);
       if(!validAdditionalAction(actor.action)){
