@@ -145,6 +145,7 @@ jobs:
           node --check src/roof-construction.js
           node --check src/exterior-construction.js
           node --check src/mounted-lighting.js
+          node --check src/window-mount.js
           node --check src/furniture-catalog.js
           node --check src/furniture-layout.js
           node --check src/furniture-editor.js
@@ -334,6 +335,7 @@ jobs:
           cp src/furniture-shop.js src/furniture-value.js site/src/
           cp src/marketplace-home.js site/src/
           cp src/mounted-lighting.js site/src/
+          cp src/window-mount.js site/src/
           cp src/furniture-products.js src/furniture-procedural-library.js src/furniture-thumbnails.js src/seat-furniture.js src/dining.js src/furniture-interactions.js site/src/
           cp src/meshy-furniture-policy.js src/meshy-furniture-visual.js site/src/
           cp src/meshy-room-v2-data.js site/src/

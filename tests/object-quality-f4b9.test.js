@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {isWindowPanel} from '../src/window-mount.js';
 import {createObjectRegistry} from '../src/object-definition-registry.js';
 import {compareShopVariants,chooseComparableVariant,formatShopVariantComparison}
   from '../src/object-quality-comparison.js';
@@ -130,6 +131,7 @@ test('F4b9: actual browser renderMarket button selects real visible SKU without 
   });
   elements.get('furnish-stock').querySelectorAll=()=>buttons;
   const state={
+    isWindowPanel,syncWindowPlacementWalls(){},
     $:id=>elements.get(id),document:{createElement:()=>makeEl()},
     shopOpen:true,warehouseOpen:false,shopPlacing:false,furnishMode:true,
     shopSelected:'sofa',shopSelectedItemId:'legacy.sofa',

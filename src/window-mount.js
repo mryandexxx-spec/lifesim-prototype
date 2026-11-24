@@ -2,7 +2,7 @@
  * No money, renderer or save dependency. Anchor is a half-meter wall segment
  * center and room-facing side; its three consecutive sections cover 1.5 m.
  */
-import {BUILD_STEP,constructionWallSegments,constructionOpeningEdgeIds,constructionContains} from './construction.js';
+import {BUILD_STEP,constructionWallSegments,constructionOpeningEdgeIds} from './construction.js';
 import {BUILD_WALL_HEIGHTS} from './exterior-construction.js';
 const ids=new Set(['mesh.green_curtains','mesh.wooden_blinds']);
 export const isWindowPanel=id=>ids.has(id);
@@ -23,7 +23,7 @@ function wallIndex(world){
     const k=physical(w);
     if(!byCell.has(k)||w.starterSide)byCell.set(k,w);
   }
-  return {byId,byCell};
+  return {byId,byCell,floors:new Set(world.floorCells||[])};
 }
 const cache=new WeakMap();
 function index(world){
@@ -32,7 +32,7 @@ function index(world){
 }
 function mountPose(world,id,mount){
   if(!isWindowPanel(id)||!world||!mount||mount.t!==.5||![-1,1].includes(mount.side))return null;
-  const {byId,byCell}=index(world),w=byId.get(mount.edgeId);
+  const {byId,byCell,floors}=index(world),w=byId.get(mount.edgeId);
   if(!w)return null;
   // Reject gaps, wall ends, corners and every structural opening, including
   // a door/window on an adjacent section of the panel's full width.
@@ -40,8 +40,10 @@ function mountPose(world,id,mount){
     const k=key(w.axis,w.i+(w.axis==='h'?d:0),w.j+(w.axis==='v'?d:0));
     const part=byCell.get(k);
     if(!part||part.starterSide!==w.starterSide)return null;
-    const a=(along(w)+d+.5)*BUILD_STEP,normal=line(w)*BUILD_STEP+mount.side*.26;
-    if(!constructionContains(world,w.axis==='h'?a:normal,w.axis==='h'?normal:a))return null;
+    // Floor-cell adjacency, not legacy A* inset or a porch, determines a real room face.
+    const i=w.i+(w.axis==='h'?d:(mount.side<0?-1:0));
+    const j=w.j+(w.axis==='v'?d:(mount.side<0?-1:0));
+    if(!floors.has(i+','+j))return null;
   }
   // Legacy north wall has an authored, non-opening window. Do not cover it.
   if(w.starterSide==='north'&&center(w)+.75>-3.22&&center(w)-.75<-1.14)return null;
