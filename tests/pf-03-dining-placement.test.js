@@ -34,7 +34,7 @@ for(const yaw of [0,90,180,270]){
   });
   test('PF-03 buy and restore use the same side access at yaw '+yaw,()=>{
     const world=fixture(table),shop=newFurnitureShop(),pose=poseAt(yaw,depth);
-    const purchase=buyMarketItem(world,shop,'chair',pose,{residents});
+    const purchase=buyMarketItem(world,shop,'chair.loft',pose,{residents});
     assert.equal(purchase.ok,true,purchase.reason);
     assert.ok(purchase.shop.credits<shop.credits);
     const stored=storeMarketItem(purchase.world,purchase.shop,purchase.instanceId);
