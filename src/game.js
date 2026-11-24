@@ -1838,7 +1838,8 @@ function renderQueuePanel(force=true){
       const social=game.socialAction;
       const shared=Boolean(social&&(social.initiator===residentId||social.partner===residentId));
       if(!window.confirm(interruptionQuestion(getActorName(residentId),active,{shared})))return;
-      if(shared)cancelSocial(game);
+      if(social&&(social.initiator===residentId||social.partner===residentId))
+        cancelSocial(game);
       else if(getActor(game,residentId).action?.id==='swim'){
         requestPoolExit(game,residentId,'cancelled');
         renderQueuePanel(true);save(true);
