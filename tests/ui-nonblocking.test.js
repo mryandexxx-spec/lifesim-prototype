@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {enqueueAction,newActionQueues,pendingActions} from '../src/action-queue.js';
 import {HOUSEHOLD_IDS} from '../src/household.js';
+import {labelQueuedTask} from '../src/qsk-11-task-labels.js';
 
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const game=read('../src/game.js');
@@ -38,7 +39,7 @@ test('1.0o: successful enqueue is acknowledged in queue counter and never makes 
   const $=elements(),queues=newActionQueues(['alex','mira']);
   const calls={queue:0,saves:0,toasts:[],priority:0};
   const scope={
-    $,ACTIONS:{bed:{label:'Спать'}},getActorName:()=> 'Алекс',
+    $,ACTIONS:{bed:{label:'Спать'}},labelQueuedTask,getActorName:()=> 'Алекс',
     HOUSEHOLD_IDS,activeHudResident:()=>scope.game.selectedSim,
     residentDisplayName:()=> 'Алекс',
     game:{selectedSim:'alex',actionQueues:queues},enqueueAction,pendingActions,
@@ -50,14 +51,14 @@ test('1.0o: successful enqueue is acknowledged in queue counter and never makes 
     queueReceiptTimer:null,setTimeout:()=>1,clearTimeout:()=>{},
     save:()=>calls.saves++,toast:msg=>calls.toasts.push(msg)
   };
-  runInNewContext(extract('function taskLabel(task){','function queuedSocial('),scope);
+  runInNewContext(extract('const taskLabel=task=>labelQueuedTask(game,task);','function queuedSocial('),scope);
   assert.equal(scope.scheduleCommand({type:'object',actionId:'bed'}),true);
   assert.equal(pendingActions(queues,'alex').length,1);
   assert.equal(calls.queue,1);
   assert.equal(calls.saves,1);
   assert.equal(calls.priority,1,'manual priority is triggered after successful enqueue');
   assert.deepEqual(calls.toasts,[],'success does not create a toast over social controls');
-  assert.match($('queue-feedback').textContent,/Алекс.*Спать/);
+  assert.match($('queue-feedback').textContent,/Алекс.*Поспать/);
   // An extra HUD selection never sends the legacy default command to Alex.
   scope.activeHudResident=()=> 'resident_3';
   assert.equal(scope.scheduleCommand({type:'object',actionId:'bed'}),false);
