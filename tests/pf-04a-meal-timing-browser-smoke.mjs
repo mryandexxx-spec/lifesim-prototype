@@ -25,6 +25,10 @@ try{
     const fridge=furnitureActionApproach(seed.world,'fridge');
     const seat=diningSeatApproach(seed.world,actor.action.targetInstanceId,actor.action.diningSeatInstanceId);
     const legs=[length(actor.position,findPath(actor.position,fridge,seed.world)),length(fridge,findPath(fridge,seat,seed.world))];
+    // The v1 loader intentionally resets runtime pause/speed. Seed an idle
+    // household, then use the actual HUD and fridge command after boot.
+    actor.action=null;
+    seed.selectedSim=id;
     const context=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true,deviceScaleFactor:1,serviceWorkers:'block'});
     try{
       await context.addInitScript(({key,record,tour})=>{
@@ -36,24 +40,44 @@ try{
       await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
       assert.equal(await page.evaluate(()=>Boolean(document.querySelector('#game-canvas')?.getContext('webgl2')||document.querySelector('#game-canvas')?.getContext('webgl'))),true);
       const snapshot=()=>page.evaluate(id=>window.__LifeSimMealTimingQA(id),id);
+      assert.equal((await snapshot()).stage,null,'idle fixture after load');
+      if(!(await snapshot()).paused)await page.locator('#pause-btn').tap();
+      assert.equal((await snapshot()).paused,true,'pause via actual HUD');
+      if((await snapshot()).speed!==speed)await page.locator('#speed-btn').tap();
+      assert.equal((await snapshot()).speed,speed,'speed via actual HUD');
+      await page.evaluate(id=>{
+        document.getElementById('pick-'+id).click();
+        const layer=document.getElementById('hotspots');
+        layer.hidden=false;
+        const fridge=[...layer.querySelectorAll('button')].find(b=>b.textContent.includes('Холодильник'));
+        if(!fridge)throw Error('missing fridge hotspot');
+        fridge.click();
+      },id);
+      await page.locator('#fridge-r2').waitFor({state:'visible'});
+      await page.locator('[data-fridge-action="eat"][data-id="ready.sunny-grains"]').tap();
       const initial=await snapshot();
-      assert.equal(initial.stage,'toFridge');assert.equal(initial.speed,speed);assert.equal(initial.paused,true);
+      assert.equal(initial.paused,true,'meal command does not unpause');
+      assert.equal(initial.speed,speed);
+      assert.ok(initial.stage===null||initial.stage==='toFridge','queued or dispatched while paused');
       await page.waitForTimeout(350);
       assert.deepEqual(await snapshot(),initial,'paused journey must not change state');
       await page.evaluate(id=>{
         const trace=[];let last;window.__pf04aTrace=trace;
         const frame=()=>{
           const s=window.__LifeSimMealTimingQA(id);
-          if(s.stage!==last){last=s.stage;trace.push(s);}
-          if(s.stage!==null)requestAnimationFrame(frame);
+          if(s.stage!==null||trace.length){
+            if(s.stage!==last){last=s.stage;trace.push(s);}
+          }
+          if(!trace.length||s.stage!==null)requestAnimationFrame(frame);
         };
         frame();
       },id);
       await page.locator('#pause-btn').tap();
-      await page.waitForFunction(()=>window.__pf04aTrace.at(-1)?.stage===null,null,{timeout:120000});
+      await page.waitForFunction(()=>window.__pf04aTrace.length>=2&&window.__pf04aTrace.at(-1)?.stage===null,null,{timeout:120000});
       const trace=await page.evaluate(()=>window.__pf04aTrace);
       assert.deepEqual(trace.map(s=>s.stage),['toFridge','taking','toSeat','eating',null]);
       const times=trace.slice(1).map((s,i)=>s.minutes-trace[i].minutes);
+      console.log('PF-04/A phase trace',JSON.stringify({width,height,speed,id,legs,times,trace}));
       const baseline=legs.map(n=>n*3/1.65),target=legs.map(n=>n*3/2.2);
       assert.ok(times[0]<=target[0]+2.7,'fridge leg '+times[0]+' target '+target[0]);
       assert.ok(times[2]<=target[1]+3.6,'chair leg '+times[2]+' target '+target[1]);
