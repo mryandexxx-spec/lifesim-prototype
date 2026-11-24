@@ -129,6 +129,8 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
         next.action.elapsed<(next.action.id==='shower'?16:18))next.action.shortSelfCare=true;
       if(next.action.id==='bed'&&data.action.manualSleepMinimum===true)
         next.action.manualSleepMinimum=true;
+      if(['sofa','tv'].includes(next.action.id)&&data.action.manualFullLeisure===true)
+        next.action.manualFullLeisure=true;
     }
     if(data.action.id==='dining'){
       if(validFurnitureInstanceId(data.action.diningSeatInstanceId)&&
@@ -300,6 +302,7 @@ export function arrive(state) {
       state.needs[ACTIONS[action.id].need]>=MANUAL_CARE_THRESHOLD)
       action.shortSelfCare=true;
     if(action.id==='bed')action.manualSleepMinimum=true;
+    if(['sofa','tv'].includes(action.id))action.manualFullLeisure=true;
   }
 }
 
@@ -483,7 +486,8 @@ export function tick(state, minutes,world=state?.world??null) {
     state.action.elapsed += amount;
     const sleepWoke=sleeping&&sleepMinutes>=untilWake-1e-8;
     if (state.action.elapsed >= duration || sleepWoke ||
-        (state.action.automatic!==false&&!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) &&
+        (!(state.action.automatic===false&&state.action.manualFullLeisure===true&&
+          ['sofa','tv'].includes(state.action.id))&&!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) &&
           !(state.action.id==='tv'&&state.action.tvTalk===true)&&
           state.needs[definition.need] >= 99.9)) {
       if(state.action.id==='toilet'&&state.action.elapsed>=duration){
