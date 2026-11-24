@@ -56,12 +56,14 @@ test('Q4 pending state belongs to working resident, survives reload and never pa
 });
 test('Q4 direct path is persistent and can select the right resident from finance without changing saves',()=>{
   const game=read('../src/game.js'),phone=read('../src/career-phone-ui.js'),
+    toastUI=read('../src/qsk-11-toast-ui.js'),
     css=read('../styles.css'),html=read('../index.html');
   assert.match(game,/function refreshIncidentNotifications\(\)/);
   assert.match(game,/residentIdsForSimulation\(game\)\.filter\(id=>pendingWorkIncident\(game,id\)\)/);
   assert.match(game,/incidentEvent=careerEvents\.find/);
   assert.match(game,/toast\('💼 '\+incidentEvent\.text,\{incidentResidentId:incidentEvent\.residentId\}\)/);
-  assert.match(game,/button\.addEventListener\('click',\(\)=>openWorkIncident\(incidentResidentId\)\)/);
+  assert.match(game,/openIncident:id=>openWorkIncident\(id\)/);
+  assert.match(toastUI,/button\.addEventListener\('click',\(\)=>openIncident\(incidentResidentId\)\)/);
   assert.match(phone,/function openIncident\(residentId\)/);
   assert.match(phone,/getSelectedResident\(root\)!==residentId&&!selectResident\(residentId\)/);
   assert.match(phone,/app='work';section='vacancies';view='list';chosen=null;historyId=null/);

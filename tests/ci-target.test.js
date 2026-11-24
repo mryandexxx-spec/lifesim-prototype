@@ -274,7 +274,8 @@ test('QSK-11/B toast UI must route mobile WebGL, accessibility and social regres
   const plan=planChanges(['src/qsk-11-toast-ui.js']);
   assert.equal(plan.browser,true);
   for(const file of ['tests/qsk-11-toast-ui.test.js','tests/ui-nonblocking.test.js',
-    'tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js'])
+    'tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js',
+    'tests/q1-q4-regression.test.js'])
     assert.ok(plan.tests.includes(file),file);
   assert.equal(planChanges(['README.md']).browser,false);
 });
