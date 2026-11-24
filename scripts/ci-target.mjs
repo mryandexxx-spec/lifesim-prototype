@@ -55,6 +55,8 @@ export function planChanges(files,root=ROOT){
     }
   }
   const extra=[
+    // F1 source-text contracts do not import the live modules they inspect.
+    [/^(?:index\.html|styles\.css|\.github\/workflows\/pages\.yml|src\/(?:household|game|window-mount|qsk-11-home-menu|toilet-interaction)\.js)$/,['tests/furniture-f1-integration.test.js']],
     // Extracted live queue labels need UI/touch regression even when game.js itself is unchanged.
     [/^src\/qsk-11-task-labels\.js$/,['tests/qsk-01-social-queue.test.js','tests/qsk-08-touch-ux.test.js','tests/ui-nonblocking.test.js','tests/qsk-11-task-labels.test.js']],
     [/^src\/qsk-11-toast-ui\.js$/,['tests/qsk-11-toast-ui.test.js','tests/ui-nonblocking.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js','tests/q1-q4-regression.test.js']],
