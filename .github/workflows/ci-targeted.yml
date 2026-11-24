@@ -429,3 +429,147 @@ jobs:
           name: cas-c4-female-source-evidence
           path: artifacts/cas-02-1-f2-c4/source-audit.json
           if-no-files-found: warn
+
+  # Experimental P2 art job exists ONLY in isolated draft branch, never production main.
+  cas-head-v2-p2-asset-lab:
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'art/cas-head-v2-p2-derivative-blender-20261124' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.11'
+      - name: Verify originals and touch lab
+        run: node --test tests/cas-head-v2-p2-lab.test.js
+      - name: Are both head GLBs already committed?
+        id: asset_check
+        run: |
+          if test -s art-review/cas-head-v2/p2-lab/assets/alex-derivative-dense.glb && test -s art-review/cas-head-v2/p2-lab/assets/mira-derivative-dense.glb; then
+            echo "exists=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=no" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Prepare legal donor and headless Blender dependencies
+        if: steps.asset_check.outputs.exists == 'no'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libx11-6 libxi6 libxxf86vm1 libxrender1 libxfixes3 libxkbcommon0 libgl1 libegl1 libsm6 libxext6 libxcb1 libxrandr2 libxinerama1 libxcursor1 libfontconfig1 libfreetype6 libopenal1
+          git clone --depth=1 --branch v2.0.18 https://github.com/makehumancommunity/mpfb2.git "$RUNNER_TEMP/mpfb2"
+          test "$(git -C "$RUNNER_TEMP/mpfb2" rev-parse HEAD)" = "d0a32e57a7f915cb2f2b95410e2117648c7bbb7e"
+          test "$(sha256sum "$RUNNER_TEMP/mpfb2/src/mpfb/data/3dobjs/base.obj" | cut -d' ' -f1)" = "8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c"
+          sudo mkdir -p /vercel
+          sudo ln -s "$GITHUB_WORKSPACE" /vercel/sandbox
+          sudo ln -s "$RUNNER_TEMP/mpfb2" /vercel/mpfb2
+          sudo install -d -o "$(id -un)" -g "$(id -gn)" /vercel/p2-output
+      - name: Blender bpy 4.5 source-fitted face WIP and real dense morph GLBs
+        if: steps.asset_check.outputs.exists == 'no'
+        run: |
+          uv run --python 3.11 --with bpy==4.5.0 --with pillow python art-review/cas-head-v2/blender-p2-derivative-wip.py
+          python3 art-review/cas-head-v2/expand-sparse-p2.py /vercel/p2-output/alex-derivative-wip.glb /vercel/p2-output/mira-derivative-wip.glb
+          mkdir -p art-review/cas-head-v2/p2-lab/assets
+          cp /vercel/p2-output/alex-derivative-dense.glb art-review/cas-head-v2/p2-lab/assets/
+          cp /vercel/p2-output/mira-derivative-dense.glb art-review/cas-head-v2/p2-lab/assets/
+          node art-review/cas-head-v2/verify-derived-heads.mjs art-review/cas-head-v2/p2-lab/assets/alex-derivative-dense.glb art-review/cas-head-v2/p2-lab/assets/mira-derivative-dense.glb > /vercel/p2-output/p2-structural-receipt.json
+      - name: Verify actual branch WIP binaries without self-certifying art
+        run: |
+          node art-review/cas-head-v2/verify-derived-heads.mjs art-review/cas-head-v2/p2-lab/assets/alex-derivative-dense.glb art-review/cas-head-v2/p2-lab/assets/mira-derivative-dense.glb > /tmp/p2-branch-structural-receipt.json
+          node -e "const a=require('/tmp/p2-branch-structural-receipt.json');if(a.length!==2||a.some(x=>x.geometryAndRigInspection!=='PASS'||x.productionReady||x.ownerArtApproved))process.exit(1)"
+      - name: Archive actual Blender workspaces, renders and exported morph assets
+        if: steps.asset_check.outputs.exists == 'no'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-head-v2-p2-unapproved-blender-lab
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            /vercel/p2-output/*.blend
+            /vercel/p2-output/*.png
+            /vercel/p2-output/*-derivative-dense.glb
+            /vercel/p2-output/p2-structural-receipt.json
+      - name: Commit WIP GLBs to THIS art branch only (never production assets)
+        if: steps.asset_check.outputs.exists == 'no'
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add art-review/cas-head-v2/p2-lab/assets/*.glb
+          git commit -m "art(CAS-HEAD-V2-P2): unapproved Blender WIP GLBs for independent preview"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
+      - name: Install Chromium only for isolated P2 browser art review
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium
+      - name: Run real staged WebGL lab at both iPhone-size viewports
+        run: node art-review/cas-head-v2/p2-lab/smoke-p2-browser.mjs
+      - name: Archive proof of independent PlayCanvas WebGL and mobile UI
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-head-v2-p2-mobile-playcanvas-WIP-not-approved
+          if-no-files-found: warn
+          retention-days: 14
+          path: artifacts/cas-head-v2-p2-browser/
+
+  cas-head-v2-p3-lab:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 269 && github.head_ref == 'art/cas-head-v2-p2-derivative-blender-20261124' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.11'
+      - name: Build Blender P3 models from the pinned CC0 donor
+        env:
+          OMP_NUM_THREADS: '4'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libx11-6 libxi6 libxxf86vm1 libxrender1 libxfixes3 libxkbcommon0 libgl1 libegl1 libsm6 libxext6 libxcb1 libxrandr2 libxinerama1 libxcursor1 libfontconfig1 libfreetype6 libopenal1
+          git clone --depth=1 --branch v2.0.18 https://github.com/makehumancommunity/mpfb2.git "$RUNNER_TEMP/mpfb2"
+          test "$(git -C "$RUNNER_TEMP/mpfb2" rev-parse HEAD)" = "d0a32e57a7f915cb2f2b95410e2117648c7bbb7e"
+          uv run --python 3.11 --with bpy==4.5.0 python art-review/cas-head-v2/p3/build-heads.py -- \
+            --donor "$RUNNER_TEMP/mpfb2/src/mpfb/data" --output "$RUNNER_TEMP/p3" --assets-only
+          python3 art-review/cas-head-v2/p3/assemble-glb.py "$RUNNER_TEMP/p3" art-review/cas-head-v2/p3-lab/assets
+          node art-review/cas-head-v2/p3/verify-p3.mjs > "$RUNNER_TEMP/p3/geometry-report.json"
+      - name: Check each morph and animation in PlayCanvas WebGL
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install chromium --only-shell
+          CAS_P3_ARTIFACTS=artifacts/cas-head-v2-p3-browser node art-review/cas-head-v2/p3-lab/smoke.mjs
+      - name: Archive Blender and mobile lab evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-head-v2-p3-review
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/p3/*-p3.blend
+            ${{ runner.temp }}/p3/geometry-report.json
+            art-review/cas-head-v2/p3-lab/assets/*-p3.glb
+            artifacts/cas-head-v2-p3-browser/
+      - name: Stage the checked GLBs on this draft branch for art review
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add art-review/cas-head-v2/p3-lab/assets/*-p3.glb
+          if ! git diff --cached --quiet; then
+            git commit -m 'art(CAS-HEAD-V2-P3): stage verified Blender lab assets'
+            git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
+          fi
