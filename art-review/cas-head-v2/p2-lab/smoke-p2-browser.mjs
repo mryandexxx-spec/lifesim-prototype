@@ -34,8 +34,9 @@ try {
   await checkStatus('5 геометрических морфов','Alex derivative');
   const vp=await page.locator('#viewport').boundingBox();
   const panel=await page.locator('#panel').boundingBox();
-  if(!vp||!panel||vp.height<190||vp.y+vp.height>panel.y+2)
-   throw Error('Face viewport obscured on '+width+'×'+height+': '+JSON.stringify({vp,panel}));
+  const canvasBox=await page.locator('#review-canvas').boundingBox();
+  if(!vp||!panel||!canvasBox||vp.height<190||vp.y+vp.height>panel.y+2||Math.abs(canvasBox.height-vp.height)>2||Math.abs(canvasBox.width-vp.width)>2)
+   throw Error('Face viewport obscured or WebGL canvas letterboxed on '+width+'×'+height+': '+JSON.stringify({vp,panel,canvasBox}));
   const imgBefore=await page.locator('#review-canvas').screenshot();
   await page.screenshot({path:resolve(OUT,htName(width,height,'alex-derived-0'))});
   await page.locator('#max').click();
@@ -66,7 +67,7 @@ try {
   if(!status.includes('художественный контроль НЕ пройден'))throw Error('WIP art rejection missing from status');
   if(errors.length)throw Error('Real WebGL page JS or browser errors '+JSON.stringify(errors));
   results.push({width,height,playCanvasWebGL:true,derivedMorphs:5,sourceUnchanged:true,
-   bothFamilies:true,morphPixelsDiffer:true,viewportHeight:vp.height,
+   bothFamilies:true,morphPixelsDiffer:true,viewportHeight:vp.height,canvasHeight:canvasBox.height,
    panelY:panel.y,mobileChrome:true,physicalIphoneSafariAccepted:false,ownerArtApproved:false});
   console.log('CAS_HEAD_V2_P2_MOBILE_WEBGL '+JSON.stringify(results.at(-1)));
  }
