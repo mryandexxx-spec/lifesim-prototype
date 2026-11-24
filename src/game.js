@@ -4378,6 +4378,18 @@ function boot() {
     });
   }
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
+  // Read-only PF-04/A browser timing probe, never active in normal play.
+  if(new URLSearchParams(location.search).get('pf-04a')==='qa'){
+    window.__LifeSimMealTimingQA=id=>{
+      const actor=getActor(game,id),a=actor?.action;
+      return {minutes:game.minutes,speed:game.speed,paused:game.paused,
+        stage:a?.id==='dining'?a.diningStage:null,elapsed:a?.elapsed??0,
+        position:{...actor.position},hunger:actor.needs.hunger,doorOpen:fridgeOpen,
+        portions:game.kitchen.prepared.reduce((n,row)=>n+row.portions,0),
+        dishes:game.kitchen.dirtyDishes,credits:game.shop.credits,
+        receipts:game.financialHistory.entries.length};
+    };
+  }
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
     alex:game.action?.phase==='using'&&(game.action.id==='fridge'||
