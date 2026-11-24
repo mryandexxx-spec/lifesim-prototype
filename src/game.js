@@ -5914,6 +5914,9 @@ function boot() {
       shopPlacing=true;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
       // Let the edit sheet collapse BEFORE choosing the visible room anchor.
       renderMarket();moveShopPreviewToCamera(true);
+      if(isWindowPanel(shopSelectedItemId)&&!quoteWindowMount(game.world.construction,game.world.furniture,shopSelectedItemId,shopPose).ok){
+        shopPose=findMarketPlacement(game.world.furniture,game.shop,shopSelectedItemId,editorContext());renderMarket();
+      }
       editorFeedback('Размещение: веди предмет по полу одним пальцем, двумя поворачивай камеру, затем «Установить».');
       return;
     }
@@ -5993,7 +5996,7 @@ function boot() {
       if(source.x===stage.pose.x&&source.z===stage.pose.z&&source.yaw===stage.pose.yaw)return;
       // The editor is the existing source of truth for reversible movement.
       if(!commitFurniture(stage.instanceId,stage.pose))return;
-      ownedPlacement=null;ownedSwipeRawPose=null;renderFurnitureSelection();
+      ownedPlacement=null;ownedSwipeRawPose=null;syncWindowPlacementWalls();renderFurnitureSelection();
     }else{
       if(!applyMarketTransaction(restoreMarketItem(game.world.furniture,game.shop,
         stage.instanceId,stage.pose,editorContext()),'Со склада · бесплатно'))return;
@@ -7908,6 +7911,7 @@ function boot() {
         m.choices=['move-wall','erase-wall','door','window','arch','paint-wall','paint-facade'].map(id=>pick(id,titleForBuild(id)));
       }else if(f.kind==='furniture'){
         m.actions=m.actions.filter(a=>a.id==='back'||canMoveFurniture(editorItem(f.id)));
+        if(isWindowPanel(editorItem(f.id)?.itemDefinitionId))m.actions=m.actions.map(a=>a.id==='rotate'?{...a,disabled:true,label:'↻ Авто'}:a);
         if(!$('furnish-store').disabled)m.choices.push(command('store','На склад'));
         if(!$('furnish-sell').disabled)m.choices.push(command('sell','Продать…'));
       }else m.choices=[command('sell','Продать…')];
@@ -7938,7 +7942,9 @@ function boot() {
         const status=$(buying?'furnish-preview':'furnish-owned-status');
         m.hint=p.message||status.textContent;m.invalid=status.dataset.invalid==='true';
         m.wallet=balanceQuote(game.shop.credits,buying?listing?.price:0);
-        m.actions.push({...command('turn','↻ 90°'),disabled:buying&&$('furnish-preview-turn').disabled});
+        const autoWindow=isWindowPanel(buying?shopSelectedItemId:editorItem(ownedPlacement?.instanceId)?.itemDefinitionId);
+        if(autoWindow)m.hint+=' · поворот по стене автоматически';
+        m.actions.push({...command('turn',autoWindow?'↻ Авто':'↻ 90°'),disabled:autoWindow||(buying&&$('furnish-preview-turn').disabled)});
         m.actions.push(primary('apply',buying?'Купить':ownedPlacement?.kind==='restore'?'Поставить':'Сохранить',
           $(buying?'furnish-buy':'furnish-owned-confirm').disabled));
         m.choices=[command('auto','Найти место')];
@@ -8015,6 +8021,8 @@ function boot() {
       renderParcel();
     };
     if(!step.ok){fail(step.reason);return;}
+    const windowGuard=validateWindowMounts(step.world.construction||game.world.construction,step.world.furniture||game.world.furniture);
+    if(!windowGuard.ok){fail(windowGuard.reason);return;}
     if(step.poolChange){
       // Only the canonical pool editor may change basin/fixture topology.
       const outdoors=step.world.outdoors;
@@ -8058,7 +8066,7 @@ function boot() {
       updateDecorNodes();refreshMind(game,game.world);refreshMind(game.otherSim,game.world);
       renderWarehouse();renderMarket();
     }
-    if(step.changed.includes('construction'))syncConstructionRender(true);
+    if(step.changed.includes('construction')){syncConstructionRender(true);updateDecorNodes();}
     updateFamilyBalance();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     // Reinitialize native domain sessions from authoritative restored data;
