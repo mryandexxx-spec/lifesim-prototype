@@ -95,5 +95,5 @@ test('QSK-11/B live adapter is DOM-only and is explicitly packaged for Safari Pa
   assert.doesNotMatch(adapter,/\b(?:localStorage|sessionStorage|writeV1Save|save\(|tickHousehold|enqueueAction|import\s)/);
   assert.match(pages,/node --check src\/qsk-11-toast-ui\.js/);
   assert.match(pages,/cp src\/qsk-11-toast-ui\.js site\/src\//);
-  assert.match(html,/src\/game\.js\?v=[^"]+-qsk-11b"/);
+  assert.match(html,/src\/game\.js\?v=[^\"]+-qsk-11b(?:-[^\"]+)?\"/);
 });

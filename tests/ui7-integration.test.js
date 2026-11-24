@@ -20,7 +20,7 @@ test('UI7 reads only separate UI preference, does not alter household save',()=>
  assert.match(game,/shouldShowTour\(seen\)&&!dialogueNeedsDecision\(game\)/);
  assert.match(game,/if\(enteringRequired\)\{\s*closeTour\(\);/);
  const begin=game.indexOf('const uiTour=createUITour();');
- const end=game.indexOf('// View is a presentation-only popover',begin);
+ const end=game.indexOf('// View remains a presentation-only popover',begin);
  const section=game.slice(begin,end);
  assert.ok(begin>=0&&end>begin);
  assert.doesNotMatch(section,/save\(|tick\(|cancelSocial\(|enqueueAction\(|game\.needs\s*=/);
