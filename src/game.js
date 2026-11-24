@@ -20,6 +20,7 @@ import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './viewport-health.js';
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
+import {readV1Save,writeV1Save} from './qsk-09-save-safety.js';
 import {createNeedTrendTracker} from './need-trends.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
@@ -236,10 +237,10 @@ let billsNeedsPersistence=false;
 // never let the fallback session overwrite the original on-device bytes.
 let saveStorageLocked=false;
 try {
-  const rawSave=localStorage.getItem(SAVE_KEY);
-  const stored=rawSave===null?null:JSON.parse(rawSave);
-  if(rawSave!==null&&(!stored||stored.version!==1))
+  const storedSnapshot=readV1Save(localStorage,SAVE_KEY);
+  if(storedSnapshot.status==='locked')
     throw new Error('Unsupported or damaged saved game');
+  const stored=storedSnapshot.value;
   billsNeedsPersistence=stored?.householdBills?.schema!==1;
   calendarNeedsPersistence=stored?.calendar?.schema!==1||
     !parseCivilDate(stored.calendar.startCivilDate);
@@ -526,19 +527,28 @@ function toast(message,{incidentResidentId=null}={}) {
 // The last valid on-device save stays byte-for-byte untouched until startup succeeds.
 let bootReadyToSave=false;
 const canWriteGameSave=()=>bootReadyToSave&&!saveStorageLocked;
+let saveFailureNotified=false;
 function save(silent = false) {
   if(!canWriteGameSave()){
     if(saveStorageLocked&&!silent)toast('Сохранение заблокировано: исходный файл не будет перезаписан');
     return false;
   }
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(game));
-    if (!silent) toast('Игра сохранена на этом устройстве');
+  let result;
+  try {result=writeV1Save(localStorage,SAVE_KEY,game);}
+  catch {result={ok:false,reason:'unavailable'};}
+  if(result.ok){
+    saveFailureNotified=false;
+    if(!silent)toast('Игра сохранена на этом устройстве');
     return true;
-  } catch {
-    if (!silent) toast('Не удалось сохранить: браузер запретил хранилище');
-    return false;
   }
+  // A failed autosave is not a success. Warn once without flooding the HUD.
+  if(!silent||!saveFailureNotified){
+    toast(result.reason==='quota'
+      ?'Недостаточно места для сохранения — прежний сейв сохранён'
+      :'Не удалось сохранить — прежний сейв не заменён');
+  }
+  saveFailureNotified=true;
+  return false;
 }
 // FOOD-R1: both checkout channels share one snapshot commit. Failed storage
 // restores all three parts, so no meal or debit can survive alone.
@@ -7221,7 +7231,7 @@ function boot() {
     // THEN attempts ONE localStorage write before any in-memory mutation.
     const result=commitPoolPreviewPersisted(game,draft,next=>{
       if(!canWriteGameSave())return false;
-      try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));return true;}
+      try{return writeV1Save(localStorage,SAVE_KEY,next).ok;}
       catch{return false;}
     });
     if(!result.ok){
@@ -7957,7 +7967,7 @@ function boot() {
       }
       const result=commitPoolPreviewPersisted(game,proposal,next=>{
         if(!canWriteGameSave())return false;
-        try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));return true;}
+        try{return writeV1Save(localStorage,SAVE_KEY,next).ok;}
         catch{return false;}
       });
       if(!result.ok){fail(result.reason);return;}
@@ -7975,7 +7985,7 @@ function boot() {
       const next={...game,world:{...game.world,...step.world},
         shop:receipt.shop,financialHistory:receipt.financialHistory};
       if(!canWriteGameSave()){fail('save-failed');return;}
-      try{localStorage.setItem(SAVE_KEY,JSON.stringify(next));}
+      try{if(!writeV1Save(localStorage,SAVE_KEY,next).ok){fail('save-failed');return;}}
       catch{fail('save-failed');return;}
       game.world=next.world;game.shop=next.shop;
       game.financialHistory=next.financialHistory;
