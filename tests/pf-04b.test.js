@@ -49,3 +49,16 @@ test('full needs do not create autonomous care loops',()=>{
   const s=newGame();s.minutes=720;for(const key of Object.keys(s.needs))s.needs[key]=100;
   assert.equal(evaluateAutonomy(s).selected,null);
 });
+
+test('manual leisure policy survives reload and preserves legacy/automatic early exit',()=>{
+  for(const id of ['tv','sofa']){
+    const fresh=begin(id,'fun',100);tick(fresh,1);
+    const restored=loadGame(JSON.parse(JSON.stringify(fresh)));
+    finishAt(restored,ACTIONS[id].duration-1);
+    for(const automatic of [false,true]){
+      const legacy=newGame();legacy.needs.fun=100;
+      legacy.action={id,phase:'using',elapsed:1,automatic};
+      tick(legacy,1);assert.equal(legacy.action,null);
+    }
+  }
+});
