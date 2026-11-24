@@ -242,11 +242,39 @@ def trim_body(body, spec):
         if all((points[key] - center).xy.length > .04 for key in other):
             tips = {v for v in bm.verts if tuple(round(x, 6) for x in v.co) in set(other)}
             bmesh.ops.delete(bm, geom=list(tips), context='VERTS')
+    if spec['name'] == 'Ася':
+        close_source_collar_hole(bm, uv_layer)
     bm.to_mesh(body.data)
     bm.free()
     body.data.update()
     body.name = 'Original body below the fitted neckline'
     return [points[k] for k in loop], [weights[k] for k in loop], [uv_colors[k] for k in loop]
+
+
+def close_source_collar_hole(mesh, uv_layer):
+    """Repair the exposed open skin patch inherited from the Mira body copy."""
+    def in_patch(vertex):
+        x, y, z = vertex.co
+        return -.034 < x < -.014 and -.010 < y < .010 and 1.373 < z < 1.395
+    bmesh.ops.remove_doubles(mesh, verts=[v for v in mesh.verts if in_patch(v)], dist=8e-6)
+    mesh.verts.index_update()
+    mesh.verts.ensure_lookup_table()
+    border = [edge for edge in mesh.edges if edge.is_boundary and all(in_patch(v) for v in edge.verts)]
+    loops = closed_rings([tuple(v.index for v in edge.verts) for edge in border])
+    if len(loops) != 1 or len(loops[0]) != 5:
+        raise ValueError('Unexpected topology at the source Mira collar hole')
+    vertices = [mesh.verts[i] for i in loops[0]]
+    sample_vertex = min(vertices, key=lambda vert: vert.co.x)
+    source_loop = next(loop for loop in sample_vertex.link_loops if loop.face.normal.y < -.1)
+    pigment_uv = source_loop[uv_layer].uv.copy()
+    patch = mesh.faces.new(vertices)
+    patch.normal_update()
+    if patch.normal.y > 0:
+        patch.normal_flip()
+    patch.smooth = True
+    for loop in patch.loops:
+        loop[uv_layer].uv = pigment_uv
+    bmesh.ops.triangulate(mesh, faces=[patch])
 
 
 def ring_order(ids, coords, center):
@@ -578,20 +606,29 @@ def fix_normals(obj):
     bm.free()
 
 
-def build_hair(rig, family, spec):
+def build_hair(rig, family, spec, face):
     """Sculpt a close scalp base and continuous, individually swept locks."""
     hair_vertices, hair_faces, colors = [], [], []
     alex = family == 'alex'
     center = Vector((spec['x'], .002 if alex else .000, 1.566 if alex else 1.536))
     pigment = np.array((58, 30, 21) if alex else (48, 24, 20))
+    skin = BVHTree.FromPolygons([v.co for v in face.data.vertices], [tuple(p.vertices) for p in face.data.polygons])
+
     def surface(theta, phi, lift=0.):
         front = math.cos(theta)
         side = math.sin(theta)
         wave = .00037 * math.sin(theta * 23 + phi * 10) + .00024 * math.sin(theta * 39 - phi * 7)
         style = (.010 if alex else .003) * soft_peak(theta, -.55, .8) * soft_peak(phi, .52, .6)
-        return center + Vector((side * math.sin(phi) * (.084 + wave + lift),
-                                -front * math.sin(phi) * ((.082 if front > 0 else .088) + wave + lift),
-                                math.cos(phi) * ((.099 if alex else .112) + lift + style + wave)))
+        local = Vector((side * math.sin(phi) * (.084 + wave + lift),
+                        -front * math.sin(phi) * ((.082 if front > 0 else .088) + wave + lift),
+                        math.cos(phi) * ((.099 if alex else .112) + lift + style + wave)))
+        axis = local.normalized()
+        if phi < 1.46:
+            contact, *_ = skin.ray_cast(center + axis * .21, -axis, .20)
+            if contact is not None:
+                clearance = (contact - center).dot(axis) + .002 - local.length
+                local += axis * max(0., min(.010, clearance))
+        return center + local
     angular, vertical = 96, 28
     for k in range(vertical + 1):
         t = k / vertical
@@ -726,7 +763,7 @@ def main():
         scene, cam, center = studio(family, spec, 10 if args.quick else 100)
         face = build_face(data, family, spec, rig, body, out)
         eyewear = build_eyes(face, rig, family, spec)
-        hair = build_hair(rig, family, spec)
+        hair = build_hair(rig, family, spec, face)
         scene.cycles.samples = 16 if args.quick else 112
         select_only(face)
         if not args.assets_only:
