@@ -1,7 +1,7 @@
 /** Two-person household without importing PlayCanvas, DOM or browser APIs.
  * Legacy root fields remain Alex's exact v1 state; otherSim is an optional extension.
  */
-import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS } from './simulation.js';
+import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS,mirrorActionLabel } from './simulation.js';
 import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar} from './calendar-core.js';
 import {restoreEventRecords} from './calendar-events.js';
 import {holidayDefinitions,restoreWeekendDays} from './calendar-holidays.js';
@@ -721,8 +721,10 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   const slot=itemId==='bed'?bedSlotFor(root,residentId,item.instanceId):null;
   const chosen=chooseAction(resident,itemId,automatic);
   if(chosen)resident.action.targetInstanceId=item.instanceId;
-  if(chosen&&itemId==='mirror'&&mirrorPractice===true&&!automatic)
+  if(chosen&&itemId==='mirror'&&mirrorPractice===true&&!automatic){
     resident.action.mirrorPractice=true;
+    resident.event=mirrorActionLabel(resident.action);
+  }
   if(chosen&&itemId==='tv'&&tvTalk===true&&!automatic)
     resident.action.tvTalk=true;
   if(chosen&&itemId==='hobby'){
@@ -1182,7 +1184,7 @@ export function tickHousehold(root,minutes) {
     if(before.id==='mirror'&&before.phase==='using'&&
       before.action.mirrorPractice===true&&!actor.action&&
       before.action.elapsed>=MIRROR_SPEECH_DURATION&&
-      actor.event===ACTIONS.mirror.label+' — готово'){
+      actor.event===mirrorActionLabel(before.action)+' — готово'){
       const point=furnitureActionApproach(root.world,'mirror',before.action.targetInstanceId);
       if(point&&Math.hypot(actor.position.x-point.x,actor.position.z-point.z)<=.45){
         const cap=HOBBY_SKILLS.skills.charisma.xpThresholds.at(-1);

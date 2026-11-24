@@ -1,6 +1,6 @@
 // QSK-11 stage A: read-only labels for the existing 2–4-resident plan UI.
 // No DOM, localStorage, queue writes, or separate game truth.
-import {ACTIONS} from './simulation.js';
+import {ACTIONS,mirrorActionLabel} from './simulation.js';
 import {grillRecipe} from './grill-r1.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
@@ -48,6 +48,7 @@ export function labelActiveTask(game,id){
   }
   const actor=getActor(game,id);
   if(actor.action?.id==='swim')return poolActivityLabel(actor.action);
+  if(mirrorActionLabel(actor.action))return mirrorActionLabel(actor.action);
   return actor.action
     ?(actor.action.id==='music'
       ?getActivityDefinition(HOBBY_ACTIVITIES,actor.action.activityId)?.label
