@@ -66,10 +66,18 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
       table.location==='home'&&diningSeatMatches(candidate,table.instanceId,instanceId))
     :[];
   const diningPoint=diningTables.length
-    ?diningTables.map(t=>diningSeatApproach(candidate,t.instanceId,instanceId))
+    ?diningTables.map(t=>diningSeatApproach(nav,t.instanceId,instanceId))
       .find(Boolean)||null:null;
   const targetApproach=diningTables.length?diningPoint:
     furnitureActionApproach(candidate,FURNITURE_CATALOG[target.prefabId].actionId,instanceId);
+  // Moving a table must not create an overlapping dining pair with no side access.
+  // Standalone tables and non-overlapping chairs retain their existing placement rules.
+  const tuckedSeats=target.prefabId==='diningtable'
+    ?candidate.instances.filter(chair=>chair.location==='home'&&chair.prefabId==='chair'&&
+      isPermittedDiningTuck(candidate,instanceId,chair.instanceId))
+      .map(chair=>diningSeatApproach(nav,instanceId,chair.instanceId))
+    :[];
+  if(tuckedSeats.some(point=>!point))return {ok:false,reason:'unreachable-seat'};
   // Sitting needs a real clear interaction slot, not just a renderable mesh.
   if(['chair','armchair','floorlamp','mirror','dresser','wardrobe'].includes(target.prefabId)){
     const approach=targetApproach;
@@ -92,6 +100,8 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
       if(!sitting||!findPath(person,sitting,nav))
         return {ok:false,reason:'unreachable-seat'};
     }
+    if(tuckedSeats.some(point=>!findPath(person,point,nav)))
+      return {ok:false,reason:'unreachable-seat'};
     // A moved television must retain a real approach to its own screen.
     if(target.prefabId==='tv'){
       const watching=furnitureActionApproach(candidate,'tv',instanceId);
