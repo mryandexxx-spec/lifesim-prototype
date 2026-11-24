@@ -52,6 +52,9 @@ test('F1 static deploy includes module and retains critical needs/assets',()=>{
   assert.match(workflow,/node --check src\/furniture-editor\.js/);
   assert.match(workflow,/cp src\/furniture-catalog\.js src\/furniture-layout\.js src\/furniture-editor\.js src\/furniture-transform\.js src\/furniture-hold\.js site\/src\//);
   assert.match(workflow,/cp src\/need-balance\.js site\/src\//);
-  assert.ok(read('../src/household.js').includes('root.world={furniture:restoreFurnitureWorld'));
+  const household=read('../src/household.js');
+  assert.match(household,/const restoredConstruction=restoreConstructionWorld\(raw\.world\?\.construction\)/);
+  assert.match(household,/root\.world=\{furniture:migrateWindowMounts\(restoredConstruction,restoreFurnitureWorld\(raw\.world\?\.furniture\)\)/);
+  assert.match(household,/construction:restoredConstruction/);
   assert.ok(read('../src/toilet-interaction.js').includes('TOILET_LAYOUT'));
 });
