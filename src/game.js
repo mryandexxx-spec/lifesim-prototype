@@ -22,6 +22,7 @@ import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './viewport-health.js';
 import {UI_TOUR_STORAGE_KEY,shouldShowTour} from './ui-onboarding.js';
 import {createTourUI} from './qsk-11-tour-ui.js';
+import {createTimeUI} from './qsk-11-time-ui.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import {readV1Save,writeV1Save} from './qsk-09-save-safety.js';
 import {validateV1BackupText,exportV1BackupText,commitV1Backup,backupSummary,MAX_V1_BACKUP_BYTES} from './qsk-09-backup.js';
@@ -2098,39 +2099,28 @@ renderBranchPanel();
 renderSocialMenu();
 renderQueuePanel();
 renderSocialContext();
+const timeUI=createTimeUI({element:$,onPause:togglePause,onSpeed:toggleSpeed,onAutonomy:toggleAutonomy});
 function renderPauseButton(){
   const blocked=dialogueNeedsDecision(game);
-  const paused=game.paused||blocked||furnishMode||buildMode||outdoorMode;
-  $('pause-icon').textContent=paused?'▶':'Ⅱ';
-  $('pause-btn').setAttribute('aria-label',blocked
-    ?'Выбери реплику: игровое время остановлено'
-    :outdoorMode?'Участок: игровое время остановлено'
-    :buildMode?'Строительство: игровое время остановлено'
-    :furnishMode?'Обстановка: игровое время остановлено'
-      :paused?'Продолжить':'Пауза');
+  timeUI.renderPause({blocked,paused:game.paused,furnishMode,buildMode,outdoorMode});
 }
-$('pause-btn').addEventListener('click', () => {
+function togglePause(){
   if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||furnishMode)return;
   if(buildMode||outdoorMode)return;
   game.paused = !game.paused;
   renderPauseButton();
   toast(game.paused ? 'Симуляция на паузе' : 'Время снова идёт');
-});
-$('speed-btn').addEventListener('click', () => {
+}
+function toggleSpeed(){
   if(furnishMode||buildMode||outdoorMode)return;
   game.speed = game.speed === 1 ? 3 : 1;
-  $('speed-btn').textContent = `${game.speed}×`;
+  timeUI.renderSpeed(game.speed);
   toast(game.speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
-});
-function updateAutoButton() {
-  const enabled = game.autonomy.enabled;
-  $('auto-btn').setAttribute('aria-pressed', String(enabled));
-  $('auto-btn').setAttribute('aria-label', enabled
-    ? 'Автономность включена. Нажмите, чтобы отключить'
-    : 'Автономность выключена. Нажмите, чтобы включить');
-  $('auto-state').textContent = enabled ? 'ВКЛ' : 'ВЫКЛ';
 }
-$('auto-btn').addEventListener('click', () => {
+function updateAutoButton() {
+  timeUI.renderAutonomy(game.autonomy.enabled);
+}
+function toggleAutonomy(){
   if(furnishMode||buildMode||outdoorMode)return;
   const enabled = setHouseholdAutonomy(game, !game.autonomy.enabled);
   restartAutonomyWait();
@@ -2139,7 +2129,7 @@ $('auto-btn').addEventListener('click', () => {
   save(true);
   toast(enabled ? 'Автономность включена. Жители скоро решат, чем заняться.'
     : 'Автономность выключена. Оба жителя ждут твоих команд.');
-});
+}
 updateAutoButton();
 // W4-B: no second wallet, only a presentation of the single family credits balance.
 const familyFunds=$('family-balance-chip');
@@ -10254,7 +10244,7 @@ function boot() {
         }
       }
       renderPauseButton(); // Includes the mandatory dialogue hold, not just manual pause.
-      $('speed-btn').textContent=game.speed+'×';
+      timeUI.renderSpeed(game.speed);
       // Live plan is now the single source of HUD status, not a second stale label.
       renderPlanPeek();
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.

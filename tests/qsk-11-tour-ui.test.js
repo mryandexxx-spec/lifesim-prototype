@@ -91,5 +91,5 @@ test('QSK-11/E Pages includes adapter and game retains UI preference and boot ga
   assert.doesNotMatch(adapter,/localStorage|sessionStorage|playcanvas|simulation\.js|household\.js/);
   assert.ok(pages.includes('node --check src/qsk-11-tour-ui.js'));
   assert.ok(pages.includes('cp src/qsk-11-tour-ui.js site/src/'));
-  assert.match(read('../index.html'),/src\/game\.js\?v=[^"]+-qsk-11e"/);
+  assert.match(read('../index.html'),/src\/game\.js\?v=[^"]+-qsk-11e(?:-[^"]+)?"/);
 });
