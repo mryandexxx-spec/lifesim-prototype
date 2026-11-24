@@ -67,6 +67,19 @@ function interruptAdditionalAction(root,id,actor,reason){
   resetWalkGuard(residentGuards(root,id).walk);
   return true;
 }
+/** Explicit player cancellation for one present additional resident only.
+ * Live actor activity and its walk guard are cleared together; queued intent
+ * and other residents, the single wallet and save-v1 remain untouched.
+ */
+export function cancelAdditionalResidentAction(root,id){
+  if(!residentIdsForSimulation(root).slice(2).includes(id))return false;
+  const actor=savedAdditionalActor(root,id);
+  if(!actor?.action)return false;
+  actor.action=null;actor.activitySession=null;
+  actor.event='Действие прервано по команде игрока';
+  resetWalkGuard(residentGuards(root,id).walk);
+  return true;
+}
 function additionalHeadBlockReason(root,id,command){
   const actor=savedAdditionalActor(root,id);
   if(!actor||actor.action)return null;

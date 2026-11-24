@@ -2706,3 +2706,40 @@ button.time-card:active {transform:translateY(1px);}
 .app-shell[data-cas-extra-selected="true"] .social-bar,
 .app-shell[data-cas-extra-selected="true"] .social-context,
 .app-shell[data-cas-extra-selected="true"] .social-menu{display:none!important}
+
+/* QSK-08: fingertip-friendly, compact queue feedback above the real HUD.
+ * The world stays visible; only the inside of this opt-in panel scrolls. */
+.queue-panel{top:auto;bottom:calc(env(safe-area-inset-bottom) + 186px);
+  max-height:min(44dvh,360px);overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;}
+.queue-panel .queue-head button,.queue-panel .queue-active button,
+.queue-panel .queue-items li button,.queue-panel .queue-resident-tabs button,
+.cas-personal-queue .cas-queue-item button{min-width:44px;min-height:44px;
+  touch-action:manipulation;flex-shrink:0;}
+.queue-panel .queue-head button{font-size:23px;}
+.queue-panel .queue-active{font-size:13px;line-height:1.4;}
+.queue-panel .queue-items li{align-items:center;gap:6px;padding:7px;
+  font-size:12px;}
+.queue-item-text{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px;
+  line-height:1.35;overflow-wrap:anywhere;}
+.queue-item-status{font-size:11px;color:#53735f;font-weight:700;}
+.queue-item-status[data-state="blocked"]{color:#974e3d;}
+.queue-panel button:focus-visible,.cas-personal-queue button:focus-visible{
+  outline:3px solid #217052;outline-offset:2px;}
+.cas-personal-queue{flex-direction:column;flex-wrap:nowrap;}
+.cas-personal-queue .cas-queue-item{justify-content:space-between;width:100%;
+  background:#f2f7f0;border-radius:9px;padding:5px;min-width:0;}
+.cas-personal-queue .queue-item-text{font-size:12px;}
+.cas-personal-queue .cas-queue-item button{padding:5px 8px;}
+.cas-personal-queue .cas-queue-item[data-state="blocked"]{background:#fff2ed;}
+@media(max-width:370px){
+  .queue-panel{right:max(8px,env(safe-area-inset-right));
+    width:calc(100vw - max(8px,env(safe-area-inset-right)) - max(8px,env(safe-area-inset-left)));
+    bottom:calc(env(safe-area-inset-bottom) + 202px);max-height:38dvh;padding:10px;}
+  .queue-panel .queue-items li{gap:4px;}
+  .queue-panel .queue-items li button{font-size:12px;padding:6px;}
+}
+@media(max-height:560px){
+  .queue-panel{bottom:calc(env(safe-area-inset-bottom) + 110px);
+    max-height:52dvh;}
+}
