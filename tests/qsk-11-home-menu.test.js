@@ -75,5 +75,5 @@ test('adapter remains UI-only; game owns guards, parcel capture and release pack
   assert.doesNotMatch(adapter,/\b(?:localStorage|sessionStorage|writeV1Save|tickHousehold|openParcel|playcanvas)\b/);
   assert.ok(pages.includes('node --check src/qsk-11-home-menu.js'));
   assert.ok(pages.includes('cp src/qsk-11-home-menu.js site/src/'));
-  assert.match(read('../index.html'),/src\/game\.js\?v=[^"]+-qsk-11d"/);
+  assert.match(read('../index.html'),/src\/game\.js\?v=[^"]+-qsk-11d(?:-qsk-11e)?"/);
 });
