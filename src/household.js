@@ -21,6 +21,7 @@ import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
 import {settlePantryDeliveries} from './kitchen-market.js';
 import {newHomeMarket,restoreHomeMarket,settleHomeDeliveries} from './marketplace-home.js';
+import {newNotificationHistory,restoreNotificationHistory} from './notification-history.js';
 import {newPhoneCalls,restorePhoneCalls,progressPhoneCalls} from './phone-calls.js';
 import {newSportsWorld,restoreSportsWorld,advanceSportsWorld,sportsFixtures} from './sports-league.js';
 import {newSportsFan,restoreSportsFan,readSportsNews} from './sports-fandom.js';
@@ -142,6 +143,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.socialAction=null;
   state.additionalSocial=null;
   state.phoneCalls=newPhoneCalls();
+  state.notificationHistory=newNotificationHistory();
   state.sportsWorld=newSportsWorld(state);
   state.sportsSharedWatch=newSportsSharedWatch();
   state.sportsFan=newSportsFan();
@@ -397,6 +399,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     });
   }
   root.phoneCalls=restorePhoneCalls(raw.phoneCalls,root.minutes);
+  root.notificationHistory=restoreNotificationHistory(raw.notificationHistory,root.minutes);
   root.relationship=loadRelationship(raw.relationship,root.minutes,{
     alex:root.mind.memories,mira:mira.mind.memories
   });

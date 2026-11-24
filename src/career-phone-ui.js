@@ -17,6 +17,7 @@ import {residentWorkStatus,requestCareerDeparture,skipCareerShift,clockAt,select
 import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-work-needs.js';
 
 import {createFinancePhoneUI} from './finance-phone-ui.js';
+import {markNotificationsRead,unreadNotifications,notificationIncidentCurrent} from './notification-history.js';
 import {PHONE_APPS,phoneAppRoute} from './phone-app-registry.js';
 import {sportsPhoneView} from './sports-phone-model.js';
 import {paintSportsTv} from './sports-tv.js';
@@ -1245,11 +1246,47 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       button.append(element('span','phone-platform-icon',item.icon),
         element('strong',null,item.label),
         element('small',null,item.caption));
+      if(item.id==='notifications'){
+        const count=unreadNotifications(root.notificationHistory);
+        if(count)button.append(element('small','pf-notice-count','Новых: '+count));
+      }
       grid.append(button);
     }
     body.append(grid);
     body.append(element('p','career-phone-muted',
       'Алекс и Мира пользуются одним игровым временем. Работа, покупки и деньги — настоящие данные семьи.'));
+  }
+  function renderNotifications(root){
+    body.replaceChildren();
+    const history=root.notificationHistory;
+    const count=unreadNotifications(history);
+    const header=element('section','career-phone-card');
+    header.append(element('strong',null,'Журнал семьи · '+count+' новых'),
+      element('small',null,'Последние 100 уведомлений · игровое время'));
+    const mark=id=>{
+      if(markNotificationsRead(history,id))save(true);
+      render({preserveScroll:true});
+    };
+    const all=action('Прочитать все',()=>mark(null));
+    all.disabled=count===0;header.append(all);body.append(header);
+    const labels={general:'Игра',work:'Работа',calendar:'Календарь',finance:'Финансы',delivery:'Доставка'};
+    for(const entry of (history?.entries??[]).slice().reverse()){
+      const card=element('section','career-phone-card pf-notice-card'+(entry.read?'':' pf-notice-unread'));
+      const date=calendarAt(root.calendar,entry.at);
+      card.append(element('small',null,labels[entry.category]+' · '+date.iso+
+        ' · '+date.time+(entry.read?'':' · Новое')),
+        element('p','pf-notice-message',entry.message+(entry.repeat>1?' (×'+entry.repeat+')':'')));
+      if(!entry.read)card.append(action('Отметить прочитанным',()=>mark(entry.id)));
+      if(notificationIncidentCurrent(entry,pendingWorkIncident(root,entry.incidentResidentId))){
+        card.append(action('Решить',()=>{
+          if(notificationIncidentCurrent(entry,pendingWorkIncident(getRoot(),entry.incidentResidentId))){
+            if(openIncident(entry.incidentResidentId)&&markNotificationsRead(history,entry.id))save(true);
+          }else render({preserveScroll:true});
+        },'career-phone-primary'));
+      }
+      body.append(card);
+    }
+    if(!history?.entries?.length)body.append(element('p','career-phone-muted','Уведомлений пока нет.'));
   }
   function renderPhoneCalls(root){
     body.replaceChildren();
@@ -1546,16 +1583,18 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     const oldScroll=body.scrollTop;
     if(root.recruitmentSystem?.byResident?.[who]?.phase==='interview_active')app='work';
     title.textContent=app==='home'?'Главный экран':
+      app==='notifications'?'Уведомления':
       app==='calls'?'Звонки · '+NAMES[who]:
       app==='finance'?'Финансы · Семья':
       app==='food'?'Доставка · Блин’С':
       app==='sports'?'Блин’С Спорт':'Работа · '+NAMES[who];
     overlay.setAttribute('aria-label',app==='home'?'Смартфон: главный экран':
+      app==='notifications'?'Смартфон: уведомления':
       app==='calls'?'Смартфон: звонки':
       app==='finance'?'Смартфон: финансы семьи':
       app==='food'?'Смартфон: доставка готовой еды':
       app==='sports'?'Смартфон: Блин’С Спорт':'Смартфон: работа Блин’С');
-    appTabs.hidden=app==='home'||app==='calls'||app==='sports';
+    appTabs.hidden=app==='home'||app==='calls'||app==='sports'||app==='notifications';
     routeBar.hidden=app==='home';
     for(const b of appTabs.querySelectorAll('button')){
       const selected=b.dataset.app===app;
@@ -1566,6 +1605,9 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     }
     if(app==='home'){
       renderPhoneHome(root);body.scrollTop=0;return;
+    }
+    if(app==='notifications'){
+      renderNotifications(root);body.scrollTop=preserveScroll?oldScroll:0;return;
     }
     if(app==='calls'){
       renderPhoneCalls(root);body.scrollTop=preserveScroll?oldScroll:0;return;
@@ -1669,6 +1711,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   financeTrigger?.addEventListener('click',()=>open('finance'));
   return {open:()=>open('home'),openWork:()=>open('work'),
     openFinance:()=>open('finance'),openIncident,close,
+    refreshNotifications:()=>{if(opened()&&(app==='home'||app==='notifications'))render({preserveScroll:true});},
     refresh:()=>render({preserveScroll:true}),isOpen:opened,
     interviewNeedsDecision:()=>opened()&&
       getRoot()?.recruitmentSystem?.byResident?.[who]?.phase==='interview_active'};

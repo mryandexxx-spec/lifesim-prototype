@@ -2767,3 +2767,6 @@ button.time-card:active {transform:translateY(1px);}
 /* PF-01: retain compact two-row HUD for residents without a career. */
 #dashboard.dashboard[data-collapsed="false"]:has(.career-work-hud:not([hidden])) .needs{grid-row:4}
 #dashboard.dashboard[data-collapsed="false"]:has(.career-work-hud:not([hidden])) .mood-overview{grid-row:5}
+
+/* PF-06: touch-safe notification history. */
+.pf-notice-card{overflow-wrap:anywhere}.pf-notice-unread{border-left:4px solid #367d66}.pf-notice-message{margin:5px 0;white-space:pre-wrap}.pf-notice-card button{min-height:44px}.phone-platform-tile .pf-notice-count{font-weight:700;color:#205844}

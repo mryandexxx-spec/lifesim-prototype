@@ -27,6 +27,7 @@ import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import {readV1Save,writeV1Save} from './qsk-09-save-safety.js';
 import {validateV1BackupText,exportV1BackupText,commitV1Backup,backupSummary,MAX_V1_BACKUP_BYTES} from './qsk-09-backup.js';
 import {createNeedTrendTracker} from './need-trends.js';
+import {appendNotification} from './notification-history.js';
 import {createToastUI} from './qsk-11-toast-ui.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, actionDuration, mirrorActionLabel, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
@@ -434,10 +435,15 @@ let restartAutonomyWait = () => {};
 let onManualCommandQueued = () => {};
 let inspectQueueWait=()=>null;
 // The legacy toast(message, options) interface is preserved at every call site.
+let refreshNotificationPhone=()=>{};
 const toast=createToastUI({
   element:$('toast'),document,
   incidentPending:id=>pendingWorkIncident(game,id),
-  openIncident:id=>openWorkIncident(id)
+  openIncident:id=>openWorkIncident(id),
+  onNotice:(message,{incidentResidentId})=>{
+    const incidentId=incidentResidentId?pendingWorkIncident(game,incidentResidentId)?.id:null;
+    if(appendNotification(game,message,{incidentResidentId,incidentId}))refreshNotificationPhone();
+  }
 });
 // Never serialize a not-yet-rendered fallback household during a failed 3D boot.
 // The last valid on-device save stays byte-for-byte untouched until startup succeeds.
@@ -2444,6 +2450,7 @@ const careerPhone=createCareerPhoneUI({
     closeMindPanel();closeInsightPanel();setViewOpen(false);closeSocialContext();select(null);
   }
 });
+refreshNotificationPhone=()=>careerPhone.refreshNotifications();
 function openWorkIncident(residentId){
   if(!pendingWorkIncident(game,residentId))return false;
   return careerPhone.openIncident(residentId);
@@ -10408,7 +10415,7 @@ function boot() {
       (stage.id==='alex'||stage.id==='mira')&&stage.status==='fallback');
     toast(modelFallback
       ? 'Часть 3D-моделей недоступна — включены старые облики'
-      : 'Коснись жителя или мебели · МЕТКИ — названия предметов');
+      : 'Коснись жителя или мебели · МЕТКИ — названия предметов',{record:modelFallback});
   });
 }
 
