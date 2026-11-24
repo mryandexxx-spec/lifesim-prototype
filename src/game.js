@@ -180,7 +180,7 @@ import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {planSharedTv,liveSharedTv} from './tv-together.js';
 import {planPairedHobby,livePairedHobby} from './paired-hobby.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
-import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeActionFrame,carriedFridgePortion,closeFridgeDoor} from './fridge-interaction.js';
+import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeActionFrame,carriedFridgePortion,closeFridgeDoor,mealRouteMetersPerSecond} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
 import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './toilet-interaction.js';
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
@@ -4378,6 +4378,18 @@ function boot() {
     });
   }
   let facing=0,gait=0,miraFacing=0,miraGait=0,effectTime=0,fridgeOpen=0;
+  // Read-only PF-04/A browser timing probe, never active in normal play.
+  if(new URLSearchParams(location.search).get('pf-04a')==='qa'){
+    window.__LifeSimMealTimingQA=id=>{
+      const actor=getActor(game,id),a=actor?.action;
+      return {minutes:game.minutes,speed:game.speed,paused:game.paused,
+        stage:a?.id==='dining'?a.diningStage:null,elapsed:a?.elapsed??0,
+        position:{...actor.position},hunger:actor.needs.hunger,doorOpen:fridgeOpen,
+        portions:game.kitchen.prepared.reduce((n,row)=>n+row.portions,0),
+        dishes:game.kitchen.dirtyDishes,credits:game.shop.credits,
+        receipts:game.financialHistory.entries.length};
+    };
+  }
   const fridgeLeaving={alex:false,mira:false};
   const fridgeWasUsing={
     alex:game.action?.phase==='using'&&(game.action.id==='fridge'||
@@ -8895,7 +8907,7 @@ function boot() {
             p=paths[residentId];
           }
           if(p.points && (socialWalking?game.socialAction?.phase==='walking':resident.action?.phase==='walking')){
-            let remaining=dt*1.65*game.speed,hops=0;
+            let remaining=dt*(socialWalking?1.65:mealRouteMetersPerSecond(resident.action))*game.speed,hops=0;
             while(remaining>0 && p.index<p.points.length && hops++<12){
               const next=p.points[p.index];
               const dx=next.x-resident.position.x,dz=next.z-resident.position.z;

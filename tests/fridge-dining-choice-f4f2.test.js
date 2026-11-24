@@ -31,9 +31,9 @@ test('F4F.2/NEEDS-FIX: quick snack restores much less hunger than the balanced t
   tickHousehold(h,ACTIONS.fridge.duration);
   assert.ok(h.needs.hunger>before&&h.needs.hunger<before+quick+1);
 });
-test('F4F.2: refrigerator meal selects nearest valid table, skipping missing chairs',()=>{
+test('F4F.2/PF-04/A: refrigerator meal selects shortest fridge-to-seat route, skipping missing chairs',()=>{
   const h=home();h.position={x:10.8,z:2.6};
-  assert.equal(nearestAvailableDiningTable(h,'alex')?.instanceId,'shop-diningtable-902');
+  assert.equal(nearestAvailableDiningTable(h,'alex')?.instanceId,'shop-diningtable-901');
   h.position={x:7.8,z:2.6};
   assert.equal(nearestAvailableDiningTable(h,'alex')?.instanceId,'shop-diningtable-901');
   h.world.furniture.instances.find(x=>x.instanceId==='shop-chair-901').location='storage';
@@ -52,7 +52,7 @@ test('F4F.2: queue persists auto-table intent and begins standard saved dining a
   assert.equal(pendingActions(restored,'alex')[0].autoTable,true);
   const h=home();h.actionQueues=restored;h.position={x:11,z:2.7};
   const chosen=nearestAvailableDiningTable(h,'alex');
-  assert.equal(chosen.instanceId,'shop-diningtable-902');
+  assert.equal(chosen.instanceId,'shop-diningtable-901');
   assert.ok(chooseResidentAction(h,'dining',false,'alex',chosen.instanceId));
   assert.equal(h.action.diningStage,'toFridge');
   h.position={...furnitureActionApproach(h.world,'fridge')};

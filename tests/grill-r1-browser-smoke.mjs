@@ -103,3 +103,6 @@ try{
   }
   console.log('GRILL-R1 PlayCanvas 390x844 / 320x568, saved grill, real protein purchase and HUD PASS');
 }finally{await browser.close();}
+
+// GRILL and ready food share the real dining journey.
+await import('./pf-04a-meal-timing-browser-smoke.mjs');

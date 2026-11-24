@@ -5,7 +5,7 @@
 import {GRILL_RECIPES,grillRecipe} from './grill-catalog.js';
 import {KITCHEN_PREPARED_LIMIT,cookingQuality,kitchenQualityId} from './kitchen.js';
 import {OUTDOOR_CATALOG} from './outdoor-catalog.js';
-import {findPath,isWalkable} from './navigation.js';
+import {findPath,isWalkable,nearestWalkable} from './navigation.js';
 import {furnitureActionApproach} from './furniture-catalog.js';
 export {GRILL_RECIPES,grillRecipe};
 export const GRILL_ITEM_ID='garden.grill';
@@ -79,9 +79,13 @@ export function outdoorPlatePosition(world,tableId,seatId){
   return {x:table.x+dx/d*.32,y:.34,z:table.z+dz/d*.32};
 }
 export function chooseOutdoorDining(world,from,excluded=[],onlyTableId=null){
-  const origin=from&&{x:from.x,z:from.z};
+  const origin=from&&nearestWalkable(from,world);
   const fridge=furnitureActionApproach(world,'fridge');
-  if(!origin||!fridge||!findPath(origin,fridge,world))return null;
+  if(!origin||!fridge)return null;
+  const first=findPath(origin,fridge,world);
+  if(!first)return null;
+  const length=(start,route)=>route.reduce((sum,p,i)=>sum+distance(i?route[i-1]:start,p),0);
+  const firstCost=length(origin,first);
   const taken=new Set(excluded);
   let best=null;
   for(const table of world?.outdoors?.features||[]){
@@ -89,8 +93,9 @@ export function chooseOutdoorDining(world,from,excluded=[],onlyTableId=null){
     for(const bench of world?.outdoors?.features||[]){
       if(bench.itemId!=='garden.bench'||taken.has(bench.instanceId))continue;
       const point=outdoorDiningApproach(world,table.instanceId,bench.instanceId);
-      if(!point||!findPath(fridge,point,world))continue;
-      const cost=distance(fridge,point)+distance(origin,fridge);
+      const second=point&&findPath(fridge,point,world);
+      if(!second)continue;
+      const cost=firstCost+length(fridge,second);
       if(!best||cost<best.cost-1e-6)
         best={tableId:table.instanceId,instanceId:bench.instanceId,point,cost};
     }

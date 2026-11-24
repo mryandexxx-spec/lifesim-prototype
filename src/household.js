@@ -84,7 +84,7 @@ import {switchLampAtArrival,MIRROR_SPEECH_DURATION,MIRROR_SPEECH_XP} from './fur
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_WORKS_LIMIT,canPaintContent,restoreCreatedWorks,finishPainting} from './painting.js';
 import {chooseDiningSeat,diningSeatApproach} from './dining.js';
 import {grillApproach,grillAvailable,canGrillRecipe,finishGrillRecipe,
-  outdoorGrill,chooseOutdoorDining} from './grill-r1.js';
+  outdoorGrill} from './grill-r1.js';
 import {grillRecipe} from './grill-catalog.js';
 
 export const HOUSEHOLD_IDS = Object.freeze(['alex', 'mira']);
@@ -602,26 +602,28 @@ export function furnitureAvailable(root,itemId,residentId='alex',targetInstanceI
   return other?.action?.targetInstanceId!==item.instanceId &&
     !(other?.action?.id===itemId&&!other.action.targetInstanceId);
 }
-/** F4F.2: nearest reachable dining table at dispatch, using this resident's position.
- * The actual meal remains the existing table-specific dining action.
+/** PF-04/A: shortest reachable fridge-to-seat journey at dispatch.
+ * Explicit table commands still keep their exact target ID.
  */
 export function nearestAvailableDiningTable(root,residentId='alex'){
   const actor=getActor(root,residentId);
   if(!actor||!resolveActionFurniture(root?.world,'fridge'))return null;
   const other=getActor(root,residentId==='alex'?'mira':'alex');
   const taken=[other?.action?.id==='dining'?other.action.diningSeatInstanceId:null,
-    other?.action?.id==='bench'?other.action.targetInstanceId:null].filter(Boolean);
-  const outdoor=chooseOutdoorDining(root.world,actor.position,taken);
-  if(outdoor&&furnitureAvailable(root,'dining',residentId,outdoor.tableId))
-    return {instanceId:outdoor.tableId,distance:outdoor.cost,outdoor:true};
+    ['seat','bench'].includes(other?.action?.id)?other.action.targetInstanceId:null].filter(Boolean);
+  const candidates=[
+    ...(root.world?.furniture?.instances??[]).filter(t=>t.prefabId==='diningtable'&&t.location==='home'),
+    ...(root.world?.outdoors?.features??[]).filter(t=>t.itemId==='garden.table')
+  ];
   let best=null;
-  for(const table of root.world?.furniture?.instances??[]){
-    if(table.prefabId!=='diningtable'||table.location!=='home'||
-      !furnitureAvailable(root,'dining',residentId,table.instanceId))continue;
-    const distance=Math.hypot(actor.position.x-table.x,actor.position.z-table.z);
+  for(const table of candidates){
+    if(!furnitureAvailable(root,'dining',residentId,table.instanceId))continue;
+    const seat=chooseDiningSeat(root.world,actor.position,table.instanceId,taken);
+    if(!seat)continue;
+    const distance=seat.cost;
     if(!best||distance<best.distance-1e-6||
       (Math.abs(distance-best.distance)<=1e-6&&table.instanceId<best.instanceId))
-      best={instanceId:table.instanceId,distance};
+      best={instanceId:table.instanceId,distance,...(table.itemId==='garden.table'?{outdoor:true}:{})};
   }
   return best;
 }

@@ -4,7 +4,7 @@ import {DEMO_PROFILES,restoreProfile} from './trait-catalog.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {SOCIAL_NEED_INITIAL,SOCIAL_NEED_LEGACY_DEFAULT,socialNeedDecayRate} from './social-need.js';
 import {validBedSlot,BED_SLOTS} from './bed-layout.js';
-import {FRIDGE_EAT_START,FRIDGE_LAYOUT} from './fridge-interaction.js';
+import {FRIDGE_EAT_START,FRIDGE_LAYOUT,DINING_TAKE_MINUTES} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
 import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-interaction.js';
 import {validFurnitureInstanceId} from './furniture-catalog.js';
@@ -369,8 +369,8 @@ export function tick(state, minutes,world=state?.world??null) {
     // F4F: collect a real portion at the fridge before walking to the chair.
     // No hunger reward during collection or transit.
     if(state.action.id==='dining'&&state.action.diningStage==='taking'){
-      state.action.elapsed+=Math.min(minutes,Math.max(0,6-state.action.elapsed));
-      if(state.action.elapsed>=6){
+      state.action.elapsed+=Math.min(minutes,Math.max(0,DINING_TAKE_MINUTES-state.action.elapsed));
+      if(state.action.elapsed>=DINING_TAKE_MINUTES){
         state.action.phase='walking';state.action.diningStage='toSeat';
         state.action.elapsed=0;state.event='Несёт еду к обеденному столу';
       }

@@ -10,6 +10,7 @@ import {outdoorDiningApproach,outdoorPlatePosition,chooseOutdoorDining}
 
 const instances=world=>world?.furniture?.instances??world?.instances??[];
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+const routeLength=(from,route)=>route.reduce((sum,p,i)=>sum+distance(i?route[i-1]:from,p),0);
 const clamp01=n=>Math.max(0,Math.min(1,Number.isFinite(n)?n:0));
 const ease=t=>{const u=clamp01(t);return u*u*(3-2*u);};
 const overlap=(a,b)=>Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*
@@ -84,7 +85,10 @@ export function chooseDiningSeat(world,from,tableId,excluded=[]){
     return chooseOutdoorDining(world,from,excluded,tableId);
   const fridge=furnitureActionApproach(world,'fridge');
   const origin=from&&nearestWalkable(from,world);
-  if(!fridge||!origin||!findPath(origin,fridge,world))return null;
+  if(!fridge||!origin)return null;
+  const firstLeg=findPath(origin,fridge,world);
+  if(!firstLeg)return null;
+  const firstCost=routeLength(origin,firstLeg);
   const taken=new Set(excluded);
   let best=null;
   for(const seat of instances(world)){
@@ -92,7 +96,9 @@ export function chooseDiningSeat(world,from,tableId,excluded=[]){
        !diningSeatMatches(world,tableId,seat.instanceId))continue;
     const point=diningSeatApproach(world,tableId,seat.instanceId);
     if(!point)continue;
-    const cost=distance(fridge,point)+distance(origin,fridge);
+    const secondLeg=findPath(fridge,point,world);
+    if(!secondLeg)continue;
+    const cost=firstCost+routeLength(fridge,secondLeg);
     if(!best||cost<best.cost)best={instanceId:seat.instanceId,point,cost};
   }
   return best;
@@ -150,5 +156,5 @@ export function diningChairPullOffset(progress,maxPull=.30){
   return p<=.45?max*ease(p/.45):
     max*(1-.72*ease((p-.45)/.55));
 }
-export const DINING_TAKE_MINUTES=6;
+export {DINING_TAKE_MINUTES} from './fridge-interaction.js';
 export const DINING_EAT_MINUTES=31;
