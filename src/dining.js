@@ -18,6 +18,17 @@ const worldPoint=(item,x,z)=>{
   const q=rotateLocal(x,z,item.yaw);
   return {x:item.x+q.x,z:item.z+q.z};
 };
+// 25 cm build grid: a 1.00 m centre gap on the short table side
+// overlaps the conservative footprints by 20 cm, without burying the backrest.
+const MAX_DINING_TUCK=.20;
+function diningFrontOverlap(table,seat){
+  const front=rotateLocal(0,-1,seat.yaw);
+  const bounds=instanceRect(table,FURNITURE_CATALOG.diningtable.footprint);
+  const tableHalf=Math.abs(front.x)*(bounds.maxX-bounds.minX)/2+
+    Math.abs(front.z)*(bounds.maxZ-bounds.minZ)/2;
+  const ahead=(table.x-seat.x)*front.x+(table.z-seat.z)*front.z;
+  return tableHalf-FURNITURE_CATALOG.chair.footprint.minZ-ahead;
+}
 export function diningSeatMatches(world,tableId,seatId){
   if(typeof tableId==='string'&&tableId.startsWith('out-'))
     return Boolean(outdoorDiningApproach(world,tableId,seatId));
@@ -31,7 +42,8 @@ export function diningSeatMatches(world,tableId,seatId){
   const to={x:table.x-center.x,z:table.z-center.z};
   const depth=Math.hypot(to.x,to.z);
   const facing=(to.x*(front.x-center.x)+to.z*(front.z-center.z))/Math.max(.01,depth);
-  if(depth<1.05||depth>2.65||facing<.78)return false;
+  if(depth<1-1e-6||depth>2.65||facing<.78||
+    diningFrontOverlap(table,seat)>MAX_DINING_TUCK+1e-6)return false;
   const side=Math.abs(to.x*(front.z-center.z)-to.z*(front.x-center.x));
   return side<1.15;
 }
@@ -96,7 +108,7 @@ export function diningPlatePosition(world,tableId,seatId){
   const d=Math.hypot(dir.x,dir.z)||1;
   return {x:table.x+dir.x/d*.49,y:.79,z:table.z+dir.z/d*.49};
 }
-/** Allow <=18cm of tabletop/chair edging only for front-facing pairs.
+/** Allow <=20cm along the chair FRONT axis only for front-facing pairs.
  * All unrelated furniture collisions remain under the old strict rule.
  */
 export function isPermittedDiningTuck(world,one,two){
@@ -109,7 +121,7 @@ export function isPermittedDiningTuck(world,one,two){
   const z=instanceRect(table,FURNITURE_CATALOG.diningtable.footprint);
   const dx=Math.max(0,Math.min(x.maxX,z.maxX)-Math.max(x.minX,z.minX));
   const dz=Math.max(0,Math.min(x.maxZ,z.maxZ)-Math.max(x.minZ,z.minZ));
-  return dx>0&&dz>0&&Math.min(dx,dz)<=.18+1e-6;
+  return dx>0&&dz>0&&diningFrontOverlap(table,chair)<=MAX_DINING_TUCK+1e-6;
 }
 /** Per-session visual displacement can never slide through other objects.
  * Does not change the physical/nav footprint or v1 save coordinates.
