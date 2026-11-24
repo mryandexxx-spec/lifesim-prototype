@@ -126,6 +126,8 @@ import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX
   MAX_BLOCKED_QUEUE} from './action-queue.js';
 import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand} from './queue-rescue.js';
 import {newQueuedHeadGuard,inspectQueuedHead} from './qsk-07-fairness.js';
+import {visibleActionPhase,queuedActionStatus,blockedActionMessage,
+  interruptionQuestion,verifiedLastEvent} from './qsk-08-touch-ux.js';
 import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
 import {effectiveSleepSpeed} from './sleep-acceleration.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
@@ -175,7 +177,7 @@ import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './sh
 import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './toilet-interaction.js';
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
 import {proposeFurnishedRoomMove,createHouseholdConstructionEditor} from './furnished-room.js';
-import {residentSegmentClear,residentIdsForSimulation} from './resident-activity-runtime.js';
+import {residentSegmentClear,residentIdsForSimulation,cancelAdditionalResidentAction} from './resident-activity-runtime.js';
 import {residentRoster,residentDisplayName,effectiveHudSelection,residentScenePose,CAS_ACTIONS} from './resident-hud.js';
 import {addressedSocialPeers,queueAddressedSocial} from './resident-social-runtime.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
@@ -753,7 +755,12 @@ function scheduleCommand(command,residentId=game.selectedSim){
   }
   const queued=command.type==='pool'?{...command,queuedAt:game.minutes}:command;
   const task=enqueueAction(game.actionQueues,residentId,queued);
-  if(!task){toast('Не удалось добавить: очередь заполнена или действие недоступно');return false;}
+  if(!task){
+    toast(pendingActions(game.actionQueues,residentId).length>=MAX_ACTION_QUEUE
+      ?'План заполнен: убери ненужное задание в «Плане»'
+      :'Действие недоступно: проверь предмет, цель или условия');
+    return false;
+  }
   // A manual task has authority over the addressed person's spontaneous
   // action, including being the partner of an autonomous conversation.
   // Don't cancel anything if enqueue failed; keep older MANUAL plans intact.
@@ -1762,8 +1769,12 @@ function renderQueuePanel(force=true){
   const blocked=blockedActions(game.actionQueues,residentId);
   const active=activeTaskLabel(residentId);
   const headWait=inspectQueueWait(residentId);
+  const actor=getActor(game,residentId);
+  const social=game.socialAction;
+  const socialInvolved=social&&(social.initiator===residentId||social.partner===residentId);
+  const phase=socialInvolved?social.phase:actor.action?.phase;
   const key=JSON.stringify([queueVisible,residentId,game.selectedSim,pending,blocked,active,headWait,
-    HOUSEHOLD_IDS.map(id=>pendingActions(game.actionQueues,id).length),
+    actor.event,game.paused,HOUSEHOLD_IDS.map(id=>pendingActions(game.actionQueues,id).length),
     game.socialAction?.phase,
     getActor(game,residentId).action?.phase,
     (game.socialAction?.eveningStage||game.socialAction?.eveningSofa)&&
@@ -1788,9 +1799,19 @@ function renderQueuePanel(force=true){
     :'Просмотр плана '+getActorName(residentId)+'. Сейчас управляешь: '+
        getActorName(game.selectedSim)+'. Просмотр не переключает управление.';
   const activeEl=$('queue-active');activeEl.replaceChildren();
+  const actionState=visibleActionPhase(active,phase,{paused:game.paused});
+  activeEl.dataset.state=actionState.code;
   const label=document.createElement('div');
-  label.textContent=active?'Сейчас: '+active:'Сейчас: свободен';
+  label.textContent='Сейчас: '+actionState.text;
   activeEl.append(label);
+  if(!active){
+    const last=verifiedLastEvent(actor.event);
+    if(last){
+      const event=document.createElement('small');
+      event.className='queue-item-status';event.dataset.state=last.code;
+      event.textContent=last.text;activeEl.append(event);
+    }
+  }
   if(pending.length&&headWait){
     const wait=document.createElement('div');wait.className='shared-progress-text';
     wait.textContent='Первое задание ожидает: '+headWait+'. Задание сохранено. Можно исправить причину или убрать его кнопкой ниже.';
@@ -1812,8 +1833,11 @@ function renderQueuePanel(force=true){
   if(active){
     const stop=document.createElement('button');stop.type='button';
     stop.textContent='Прервать текущее действие';
+    stop.setAttribute('aria-label','Прервать текущее действие: '+active);
     stop.addEventListener('click',()=>{
       const social=game.socialAction;
+      const shared=Boolean(social&&(social.initiator===residentId||social.partner===residentId));
+      if(!window.confirm(interruptionQuestion(getActorName(residentId),active,{shared})))return;
       if(social&&(social.initiator===residentId||social.partner===residentId))
         cancelSocial(game);
       else if(getActor(game,residentId).action?.id==='swim'){
@@ -1834,8 +1858,13 @@ function renderQueuePanel(force=true){
   const list=$('queue-items');list.replaceChildren();
   for(const [index,task] of pending.entries()){
     const li=document.createElement('li');
-    const name=document.createElement('span');
-    name.textContent=(index+1)+'. '+taskLabel({...task,residentId});
+    const name=document.createElement('span');name.className='queue-item-text';
+    const title=document.createElement('strong');
+    title.textContent=taskLabel({...task,residentId});
+    const state=document.createElement('small');state.className='queue-item-status';
+    state.dataset.state=headWait&&index===0?'waiting':'queued';
+    state.textContent=queuedActionStatus(index+1,index===0?headWait:null);
+    name.append(title,state);li.dataset.state=state.dataset.state;
     const remove=document.createElement('button');
     remove.type='button';remove.textContent='Убрать';
     remove.setAttribute('aria-label','Удалить из очереди: '+taskLabel({...task,residentId}));
@@ -1849,18 +1878,15 @@ function renderQueuePanel(force=true){
     });
     li.append(name,remove);list.append(li);
   }
-  const reasons={
-    'missing-target':'предмет отсутствует или убран',
-    'unreachable-route':'нет маршрута к цели',
-    'invalid-destination':'точка больше не доступна',
-    'unavailable-gift':'подарок или книга отсутствует',
-    'resource-busy':'предмет или житель занят; повтори позже'
-  };
   for(const task of blocked){
-    const li=document.createElement('li');
-    const name=document.createElement('span');
-    name.textContent='Отложено · '+taskLabel({...task,residentId})+
-      ' — '+(reasons[task.blockedReason]||'требуется проверка');
+    const li=document.createElement('li');li.dataset.state='blocked';
+    const name=document.createElement('span');name.className='queue-item-text';
+    const title=document.createElement('strong');
+    title.textContent=taskLabel({...task,residentId});
+    const state=document.createElement('small');
+    state.className='queue-item-status';state.dataset.state='blocked';
+    state.textContent='Отложено · '+blockedActionMessage(task.blockedReason);
+    name.append(title,state);
     const retry=document.createElement('button');retry.type='button';
     retry.textContent='Повторить';
     retry.setAttribute('aria-label','Вернуть в очередь: '+taskLabel({...task,residentId}));
@@ -2289,8 +2315,11 @@ function renderCasDetails(force=false){
  casDetails.hidden=!row||row.legacy;
  if(casDetails.hidden){lastCasDetailsKey='';return;}
  const pending=pendingActions(game.actionQueues,id);
+ const blockedTasks=blockedActions(game.actionQueues,id);
+ const currentActor=getActor(game,id);
  const key=JSON.stringify([row,game.paused,buildMode,furnishMode,outdoorMode,
-   pending.map(x=>[x.seq,x.type,x.actionId]),getActor(game,id)?.event]);
+   pending,blockedTasks,currentActor?.event,currentActor?.action?.id,
+   currentActor?.action?.phase]);
  if(!force&&key===lastCasDetailsKey)return;
  // Native iOS select remains mounted while its picker is open.
  if(!force&&casDetails.contains(document.activeElement)&&
@@ -2299,23 +2328,36 @@ function renderCasDetails(force=false){
  const heading=document.createElement('div');heading.className='cas-detail-heading';
  const name=document.createElement('strong');name.textContent=row.name;
  const status=document.createElement('span');
- status.textContent=row.workLabel||(row.away?'На работе':getActor(game,id)?.event||'Дома');
+ const activeExtra=currentActor?.action;
+ const extraLabel=activeExtra
+   ?(CAS_ACTIONS.find(([actionId])=>actionId===activeExtra.id)?.[1]||
+     (activeExtra.id==='move'?'Идти':'Занятие')):null;
+ const currentStatus=visibleActionPhase(extraLabel,activeExtra?.phase,{paused:game.paused});
+ status.textContent=row.workLabel||(row.away?'На работе':
+   activeExtra?currentStatus.text:currentActor?.event||'Дома');
  heading.append(name,status);
  const job=document.createElement('p');job.className='cas-detail-job';
  job.textContent=(row.career?row.career+(row.rank?' · '+row.rank:''):'Без работы')+
    ' · '+(row.away?'Вне участка':'На участке')+' · в плане '+row.queued;
  const actions=document.createElement('div');actions.className='cas-detail-actions';
- const add=(label,handler,disabled=false)=>{
+ const add=(label,handler,disabled=false,reason='')=>{
    const b=document.createElement('button');b.type='button';b.textContent=label;
-   b.disabled=disabled;b.addEventListener('click',handler);actions.append(b);return b;
+   b.disabled=disabled;
+   if(disabled){
+     b.title=reason||'Действие сейчас недоступно';
+     b.setAttribute('aria-label',label+' · недоступно: '+b.title);
+   }else b.setAttribute('aria-label',label+' · доступно');
+   b.addEventListener('click',handler);actions.append(b);return b;
  };
  add('💼 Карьера',()=>careerPhone.openWork());
  add('◎ Камера',()=>focusSelectedCamera(id),row.away);
  const blocked=row.away||buildMode||furnishMode||outdoorMode;
+ const unavailableReason=row.away?'Житель сейчас на работе':
+   'Закрой режим редактирования участка';
  for(const [actionId,label] of CAS_ACTIONS)
    add(label,()=>{
      if(scheduleCommand({type:'object',actionId},id))renderCasDetails(true);
-   },blocked);
+   },blocked,unavailableReason);
  const peers=addressedSocialPeers(game,id);
  if(peers.length){
    const peer=document.createElement('select');peer.className='cas-peer-select';
@@ -2326,25 +2368,71 @@ function renderCasDetails(force=false){
    actions.append(peer);
    add('Поговорить',()=>{
      const task=queueAddressedSocial(game,id,peer.value,'talk');
-     if(task){save(true);renderCasDetails(true);toast('Беседа поставлена в очередь');}
-     else toast('Собеседник сейчас недоступен');
-   },blocked);
+     if(task){
+       save(true);renderCasDetails(true);
+       const position=pendingActions(game.actionQueues,id).findIndex(x=>x.seq===task.seq)+1;
+       toast(row.name+': беседа добавлена в очередь №'+position);
+     }else toast('Беседа недоступна: собеседник занят или отсутствует');
+   },blocked,unavailableReason);
+ }
+ if(activeExtra&&!row.away){
+   add('Прервать',()=>{
+     if(!window.confirm(interruptionQuestion(row.name,extraLabel)))return;
+     if(cancelAdditionalResidentAction(game,id)){
+       save(true);renderCasDetails(true);
+       toast(row.name+': действие прервано по твоей команде');
+     }
+   });
  }
  const list=document.createElement('div');list.className='cas-personal-queue';
- for(const task of pending){
+ for(const [index,task] of pending.entries()){
    const item=document.createElement('div');item.className='cas-queue-item';
-   const label=document.createElement('span');
-   label.textContent=task.type==='object'?
+   item.dataset.state='queued';
+   const label=document.createElement('span');label.className='queue-item-text';
+   const title=document.createElement('strong');
+   title.textContent=task.type==='object'?
      (CAS_ACTIONS.find(([k])=>k===task.actionId)?.[1]||'Действие'):
      task.type==='social'?'Беседа':task.type==='move'?'Маршрут':'Задание';
+   const state=document.createElement('small');state.className='queue-item-status';
+   state.textContent=queuedActionStatus(index+1);
+   label.append(title,state);
    const remove=document.createElement('button');remove.type='button';
    remove.textContent='Убрать';
-   remove.setAttribute('aria-label','Удалить задание '+label.textContent);
+   remove.setAttribute('aria-label','Удалить из очереди: '+title.textContent);
    remove.addEventListener('click',()=>{
      if(removeQueuedAction(game.actionQueues,id,task.seq)){
        save(true);renderCasDetails(true);
      }
    });item.append(label,remove);list.append(item);
+ }
+ for(const task of blockedTasks){
+   const item=document.createElement('div');item.className='cas-queue-item';
+   item.dataset.state='blocked';
+   const label=document.createElement('span');label.className='queue-item-text';
+   const title=document.createElement('strong');
+   title.textContent=task.type==='object'
+     ?CAS_ACTIONS.find(([k])=>k===task.actionId)?.[1]||'Задание'
+     :task.type==='move'?'Маршрут':'Задание';
+   const state=document.createElement('small');state.className='queue-item-status';
+   state.dataset.state='blocked';
+   state.textContent='Отложено · '+blockedActionMessage(task.blockedReason);
+   label.append(title,state);
+   const retry=document.createElement('button');retry.type='button';retry.textContent='Повторить';
+   retry.setAttribute('aria-label','Повторить отложенное: '+title.textContent);
+   retry.addEventListener('click',()=>{
+     const result=retryBlockedAction(game.actionQueues,id,task.seq,game.minutes);
+     if(!result){toast('Очередь заполнена; убери ненужное задание');return;}
+     save(true);renderCasDetails(true);toast(row.name+': задание снова в очереди');
+   });
+   const remove=document.createElement('button');remove.type='button';
+   remove.textContent='Убрать';
+   remove.setAttribute('aria-label','Убрать отложенное: '+title.textContent);
+   remove.addEventListener('click',()=>{
+     if(removeBlockedAction(game.actionQueues,id,task.seq)){
+       save(true);renderCasDetails(true);
+     }
+   });
+   item.append(label,retry,remove);list.append(item);
  }
  casDetails.replaceChildren(heading,job,actions,list);
 }
