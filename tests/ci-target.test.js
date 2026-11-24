@@ -304,3 +304,10 @@ test('QSK-11/D home extraction routes full Node regression and mobile browser',(
     'tests/qsk-11-view-popover.test.js','tests/ui4-integration.test.js','tests/ui7-integration.test.js'])
     assert.ok(plan.tests.includes(file),file);
 });
+
+test('QSK-11/E onboarding extraction routes full Node regression and mobile browser',()=>{
+  const plan=planChanges(['src/qsk-11-tour-ui.js']);
+  assert.equal(plan.browser,true);
+  for(const file of ['tests/qsk-11-tour-ui.test.js','tests/ui-onboarding.test.js','tests/ui7-integration.test.js','tests/qsk-11-home-menu.test.js','tests/parcel-editor.test.js'])
+    assert.ok(plan.tests.includes(file),file);
+});

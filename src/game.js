@@ -20,7 +20,8 @@ import {createCameraGestureSession} from './camera-gestures.js';
 import {sleepZzzVisible,dismissOnCanvasTap} from './micro-ux.js';
 import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './viewport-health.js';
-import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
+import {UI_TOUR_STORAGE_KEY,shouldShowTour} from './ui-onboarding.js';
+import {createTourUI} from './qsk-11-tour-ui.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import {readV1Save,writeV1Save} from './qsk-09-save-safety.js';
 import {validateV1BackupText,exportV1BackupText,commitV1Backup,backupSummary,MAX_V1_BACKUP_BYTES} from './qsk-09-backup.js';
@@ -320,55 +321,18 @@ updateMeshModelButton();
 
 // Optional first-use explanation does not pause, enqueue or persist gameplay.
 // Only an independent localStorage *UI preference* tracks whether it was read.
-const uiTour=createUITour();
-let tourOpen=false;
-function closeTour({remember=true,restoreFocus=false}={}){
-  if(!tourOpen)return;
-  tourOpen=false;
-  $('tour-panel').hidden=true;
-  if(remember){
+const {openTour,closeTour}=createTourUI({
+  element:$,document,requiredDialogue:()=>dialogueNeedsDecision(game),
+  rememberDismissal:()=>{
     try{localStorage.setItem(UI_TOUR_STORAGE_KEY,'done');}
     catch{/* Safari private browsing: play without persistent UI hints. */}
+  },
+  onReplay:()=>{
+    setViewOpen(false);
+    closeInsightPanel();closeMindPanel();closeSocialContext();select(null);
+    queueVisible=false;renderQueuePanel(true);
   }
-  if(restoreFocus)$('view-toggle').focus({preventScroll:true});
-}
-function renderTour(){
-  const step=uiTour.current();
-  $('tour-progress').textContent=uiTour.progress();
-  $('tour-title').textContent=step.title;
-  $('tour-body').textContent=step.body;
-  $('tour-tip').textContent=step.hint;
-  $('tour-next').textContent=uiTour.index()===uiTour.length-1?'Играть':'Дальше';
-}
-function openTour(){
-  if(dialogueNeedsDecision(game))return false;
-  uiTour.reset();renderTour();
-  tourOpen=true;$('tour-panel').hidden=false;
-  $('tour-panel').focus({preventScroll:true});
-  return true;
-}
-$('tour-close').addEventListener('click',()=>closeTour({restoreFocus:true}));
-$('tour-skip').addEventListener('click',()=>closeTour({restoreFocus:true}));
-$('tour-next').addEventListener('click',()=>{
-  if(uiTour.next())renderTour();
-  else closeTour({restoreFocus:true});
 });
-$('tour-replay').addEventListener('click',()=>{
-  setViewOpen(false);
-  closeInsightPanel();closeMindPanel();closeSocialContext();select(null);
-  queueVisible=false;renderQueuePanel(true);
-  openTour();
-});
-document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'&&tourOpen&&!dialogueNeedsDecision(game)){
-    event.preventDefault();closeTour({restoreFocus:true});
-  }
-},true);
-document.addEventListener('pointerdown',event=>{
-  if(!tourOpen)return;
-  if($('tour-panel').contains(event.target)||$('tour-replay').contains(event.target))return;
-  closeTour({remember:true});
-},true);
 
 // Comfort C2: UI-only house tool picker. All editor mutations stay in
 // the existing, tested Build/Furnish handlers.
