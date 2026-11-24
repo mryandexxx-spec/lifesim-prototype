@@ -13,6 +13,9 @@ let shown=null,serial=0;
 const status=(message,error=false)=>{const el=$('status');el.textContent=message;el.style.color=error?'#ffd29c':'#e3f7f5';};
 const canvas=$('review-canvas'),viewport=$('viewport');
 const app=new pc.Application(canvas,{graphicsDeviceOptions:{antialias:true,alpha:false}});
+app.graphicsDevice.maxPixelRatio=Math.min(window.devicePixelRatio||1,1.25);
+app.setCanvasFillMode(pc.FILLMODE_NONE);
+app.setCanvasResolution(pc.RESOLUTION_AUTO);
 app.start();
 app.scene.ambientLight=new pc.Color(.7,.76,.75);
 app.scene.gammaCorrection=pc.GAMMA_SRGB;
@@ -34,7 +37,10 @@ function frame(){
 }
 function resize(){
  const width=viewport.clientWidth,height=viewport.clientHeight;
- if(width>0&&height>0)app.resizeCanvas(width,height);
+ if(width>0&&height>0){
+  canvas.style.width=width+'px';canvas.style.height=height+'px';
+  app.resizeCanvas(width,height);
+ }
  frame();
 }
 new ResizeObserver(resize).observe(viewport);
