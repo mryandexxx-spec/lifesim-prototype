@@ -58,7 +58,9 @@ export function planChanges(files,root=ROOT){
     // Extracted live queue labels need UI/touch regression even when game.js itself is unchanged.
     [/^src\/qsk-11-task-labels\.js$/,['tests/qsk-01-social-queue.test.js','tests/qsk-08-touch-ux.test.js','tests/ui-nonblocking.test.js','tests/qsk-11-task-labels.test.js']],
     [/^src\/qsk-11-toast-ui\.js$/,['tests/qsk-11-toast-ui.test.js','tests/ui-nonblocking.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js','tests/q1-q4-regression.test.js']],
-    [/^src\/qsk-11-view-popover\.js$/,['tests/qsk-11-view-popover.test.js','tests/ui-nonblocking.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js','tests/q1-q4-regression.test.js']],
+    [/^src\/qsk-11-view-popover\.js$/,['tests/qsk-11-view-popover.test.js','tests/ui-nonblocking.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js','tests/q1-q4-regression.test.js','tests/ui4-integration.test.js','tests/ui7-integration.test.js']],
+    // Legacy source-text UI assertions span menu entry, bootstrap and Safari cache.
+    [/^(?:index\.html|src\/game\.js)$/,['tests/ui4-integration.test.js','tests/ui7-integration.test.js','tests/qsk-11-toast-ui.test.js','tests/qsk-11-view-popover.test.js']],
     // Legacy source-level VM tests extract live UI functions, not ESM imports.
     // They MUST run whenever the resident HUD or career phone is edited.
     [/^src\/(?:game|career-phone-ui)\.js$/,[

@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const html=read('../index.html'),css=read('../styles.css'),src=read('../src/game.js');
+const viewPopover=read('../src/qsk-11-view-popover.js');
 const pages=read('../.github/workflows/pages.yml');
 test('UI4: View exposes old controls in a single optional popover, not permanently on the tray',()=>{
  const nav=html.slice(html.indexOf('<nav class="life-nav"'),html.indexOf('</nav>')+6);
@@ -14,9 +15,12 @@ test('UI4: View exposes old controls in a single optional popover, not permanent
  assert.match(html,/<section id="view-panel" class="view-panel" hidden /);
  assert.match(html,/id="item-labels-btn"[^>]*aria-pressed="false"/);
  assert.match(html,/id="mesh-model-btn"[^>]*aria-pressed="true"/);
- assert.match(src,/\$\('view-toggle'\).addEventListener\('click',\(\)=>setViewOpen\(!viewOpen\)\)/);
+ assert.match(src,/const viewPopover=createViewPopover\(\{/);
+ assert.match(src,/const setViewOpen=viewPopover\.setOpen/);
+ assert.match(viewPopover,/toggle\.addEventListener\('click',\(\)=>setOpen\(!open\)\)/);
+ assert.match(viewPopover,/close\.addEventListener\('click',\(\)=>setOpen\(false,\{restoreFocus:true\}\)\)/);
+ assert.match(src,/canOpen:\(\)=>!\(dialogueNeedsDecision\(game\)\|\|furnishMode\|\|buildMode\|\|outdoorMode\)/);
  assert.match(src,/setViewOpen\(false,\{restoreFocus:true\}\)/);
- assert.match(src,/dialogueNeedsDecision\(game\)\)return;/);
 });
 test('UI4: social categories anchor to clicked world resident and reuse placement for submenu',()=>{
  assert.match(src,/function openSocialContext\(pos\)/);

@@ -286,6 +286,13 @@ test('QSK-11/C view popover changes require mobile WebGL and input regression',(
   for(const file of [
     'tests/qsk-11-view-popover.test.js','tests/ui-nonblocking.test.js',
     'tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js',
-    'tests/q1-q4-regression.test.js'
+    'tests/q1-q4-regression.test.js','tests/ui4-integration.test.js',
+    'tests/ui7-integration.test.js'
   ])assert.ok(plan.tests.includes(file),file);
+  for(const path of ['src/game.js','index.html']){
+    const selected=planChanges([path]).tests;
+    for(const file of ['tests/ui4-integration.test.js','tests/ui7-integration.test.js',
+      'tests/qsk-11-toast-ui.test.js','tests/qsk-11-view-popover.test.js'])
+      assert.ok(selected.includes(file),path+' must run '+file);
+  }
 });
