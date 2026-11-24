@@ -11,12 +11,15 @@ const needs=value=>record(value)&&
 const actor=value=>record(value)&&value.version===1&&
   Number.isFinite(value.minutes)&&value.minutes>=0&&
   needs(value.needs)&&coords(value.position);
+// Older Mira v1 payloads can omit a separate clock; loadHousehold uses root minutes.
+const secondary=value=>record(value)&&value.version===1&&
+  needs(value.needs)&&coords(value.position);
 
 /** Missing optional fields are valid for old v1 saves; malformed core data is not. */
 export function inspectV1Save(root){
   if(!actor(root))return {ok:false,reason:'invalid-root'};
   if(Object.hasOwn(root,'otherSim')&&root.otherSim!==undefined&&
-    !actor(root.otherSim))return {ok:false,reason:'invalid-second-resident'};
+    !secondary(root.otherSim))return {ok:false,reason:'invalid-second-resident'};
   // A damaged shop would otherwise silently restore starter credits.
   if(Object.hasOwn(root,'shop')&&root.shop!==undefined){
     const shop=root.shop;
