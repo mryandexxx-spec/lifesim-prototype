@@ -8,6 +8,7 @@ import {planPreview,planTaskIcon} from './plan-preview.js';
 import {residentMoodInsight,socialReactionInsight,insightLayerPolicy} from './insight-presentation.js';
 import {contextualPlacement} from './ui-layout.js';
 import {createViewPopover} from './qsk-11-view-popover.js';
+import {createHomeMenu} from './qsk-11-home-menu.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {characterCardSnapshot,oncePerButton} from './ux05-character-ui.js';
 import {createLoadingProgress} from './loading-progress.js';
@@ -371,24 +372,18 @@ document.addEventListener('pointerdown',event=>{
 
 // Comfort C2: UI-only house tool picker. All editor mutations stay in
 // the existing, tested Build/Furnish handlers.
-let homeOpen=false;
-function setHomeOpen(open,{restoreFocus=false}={}){
-  if(open&&(dialogueNeedsDecision(game)||furnishMode||buildMode||outdoorMode))return;
-  homeOpen=Boolean(open);
-  $('home-panel').hidden=!homeOpen;
-  $('home-open').setAttribute('aria-expanded',String(homeOpen));
-  if(homeOpen){
+const homeMenu=createHomeMenu({
+  element:$,document,requestFrame:requestAnimationFrame,
+  canOpen:()=>!(dialogueNeedsDecision(game)||furnishMode||buildMode||outdoorMode),
+  requiredDialogue:()=>dialogueNeedsDecision(game),
+  onOpen:()=>{
     setViewOpen(false);
     calendarUI.close();closeCalendarAnchorPanel();
     closeTour();closeInsightPanel();closeMindPanel();closeSocialContext();select(null);
     queueVisible=false;renderQueuePanel(true);
-    requestAnimationFrame(()=>$('home-furnish').focus({preventScroll:true}));
-  }else if(restoreFocus)$('home-open').focus({preventScroll:true});
-}
-$('home-open').addEventListener('click',()=>setHomeOpen(!homeOpen));
-$('home-close').addEventListener('click',()=>setHomeOpen(false,{restoreFocus:true}));
-$('home-furnish').addEventListener('click',()=>{setHomeOpen(false);$('furnish-toggle').click();});
-$('home-build').addEventListener('click',()=>{setHomeOpen(false);$('build-toggle').click();});
+  }
+});
+const setHomeOpen=homeMenu.setOpen;
 $('menu-rotate-btn').addEventListener('click',()=>$('rotate-camera-btn').click());
 $('menu-reset-camera-btn').addEventListener('click',()=>$('reset-camera-btn').click());
 const syncCameraMenu=()=>{
@@ -400,11 +395,6 @@ new MutationObserver(syncCameraMenu).observe($('rotate-camera-btn'),{
   attributes:true,attributeFilter:['aria-pressed']
 });
 syncCameraMenu();
-document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'&&homeOpen&&!dialogueNeedsDecision(game)){
-    event.preventDefault();setHomeOpen(false,{restoreFocus:true});
-  }
-},true);
 
 // View remains a presentation-only popover: all commands and mode guards
 // stay in game, while the DOM/pointer/focus wiring belongs to the adapter.

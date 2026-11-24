@@ -122,5 +122,5 @@ test('QSK-11/C adapter is UI-only, wired to original game callbacks and shipped 
   assert.doesNotMatch(adapter,/\b(?:localStorage|sessionStorage|writeV1Save|save\(|tickHousehold|enqueueAction|playcanvas)/);
   assert.match(pages,/node --check src\/qsk-11-view-popover\.js/);
   assert.match(pages,/cp src\/qsk-11-view-popover\.js site\/src\//);
-  assert.match(html,/src\/game\.js\?v=[^"]+-qsk-11c"/);
+  assert.match(html,/src\/game\.js\?v=[^"]+-qsk-11c(?:-[^"]+)?"/);
 });

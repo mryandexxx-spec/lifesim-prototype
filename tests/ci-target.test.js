@@ -296,3 +296,11 @@ test('QSK-11/C view popover changes require mobile WebGL and input regression',(
       assert.ok(selected.includes(file),path+' must run '+file);
   }
 });
+
+test('QSK-11/D home extraction routes full Node regression and mobile browser',()=>{
+  const plan=planChanges(['src/qsk-11-home-menu.js']);
+  assert.equal(plan.browser,true);
+  for(const file of ['tests/qsk-11-home-menu.test.js','tests/parcel-editor.test.js',
+    'tests/qsk-11-view-popover.test.js','tests/ui4-integration.test.js','tests/ui7-integration.test.js'])
+    assert.ok(plan.tests.includes(file),file);
+});
