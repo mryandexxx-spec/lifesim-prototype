@@ -11,6 +11,8 @@ import {MOUNTED_LIGHTS,mountedAnchorAt,lightingMountPose} from './mounted-lighti
 import {FURNITURE_PRODUCTS,FURNITURE_LEGACY_OFFERS,
   compatibleFurnitureProduct,legacyProductId} from './furniture-products.js';
 
+import {isWindowPanel,windowPlacementCandidates} from './window-mount.js';
+
 export const SHOP_SCHEMA=1;
 export const SHOP_START_CREDITS=5000; // Provisional, NOT a signed-off economy.
 export const SHOP_SELL_PERCENT=70;
@@ -248,14 +250,16 @@ export function findStoredPlacement(world,shop,instanceId,opts={}){
   const stored=world?.instances?.find(x=>x.instanceId===instanceId&&x.location==='storage');
   if(!stored)return null;
   const poses=[{x:stored.x,z:stored.z,yaw:stored.yaw},
-    ...CANDIDATES.map(([x,z])=>({x,z,yaw:stored.yaw}))];
+    ...(isWindowPanel(stored.itemDefinitionId)?windowPlacementCandidates(opts.construction,stored.itemDefinitionId):
+      CANDIDATES.map(([x,z])=>({x,z,yaw:stored.yaw})))];
   for(const pose of poses)if(restoreMarketItem(world,shop,instanceId,pose,opts).ok)
     return pose;
   return null;
 }
 export function findMarketPlacement(world,shop,prefabId,opts={}){
-  for(const [x,z] of CANDIDATES){
-    const pose={x,z,yaw:0};
+  const poses=isWindowPanel(prefabId)?windowPlacementCandidates(opts.construction,prefabId):
+    CANDIDATES.map(([x,z])=>({x,z,yaw:0}));
+  for(const pose of poses){
     const result=buyMarketItem(world,shop,prefabId,pose,opts);
     if(result.ok)return pose;
   }

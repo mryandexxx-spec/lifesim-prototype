@@ -218,6 +218,9 @@ export function restoreFurnitureWorld(raw){
       }
       restored.lightMode=['auto','on','off'].includes(item.lightMode)?item.lightMode:'auto';
     }
+    if(item.prefabId==='meshwall'&&item.mount&&typeof item.mount.edgeId==='string'&&
+      /^[a-z0-9:,.-]{1,80}$/.test(item.mount.edgeId)&&[-1,1].includes(item.mount.side)&&item.mount.t===.5)
+      restored.mount={edgeId:item.mount.edgeId,side:item.mount.side,t:.5};
     instances.push(restored);
   }
   return {schema:FURNITURE_SCHEMA,

@@ -55,6 +55,7 @@ import {newSocialGraph,restoreSocialGraph,markAcquainted,observePairViews,setLif
 import {BED_SLOTS,BED_SLOT_IDS,availableBedSlot,validBedSlot} from './bed-layout.js';
 import {findPath,nearestWalkable} from './navigation.js';
 import {newConstructionWorld,restoreConstructionWorld} from './construction.js';
+import {migrateWindowMounts} from './window-mount.js';
 import {newFurnitureWorld,restoreFurnitureWorld,resolveActionFurniture} from './furniture-catalog.js';
 import {newFurnitureShop,restoreFurnitureShop} from './furniture-shop.js';
 import {newFinancialHistory,restoreFinancialHistory} from './finance-ledger.js';
@@ -172,7 +173,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     weekendDays:restoreWeekendDays(raw.calendar?.weekendDays)};
   root.sportsWorld=restoreSportsWorld(raw.sportsWorld,root);
   const restoredConstruction=restoreConstructionWorld(raw.world?.construction);
-  root.world={furniture:restoreFurnitureWorld(raw.world?.furniture),
+  root.world={furniture:migrateWindowMounts(restoredConstruction,restoreFurnitureWorld(raw.world?.furniture)),
     construction:restoredConstruction,
     outdoors:restoreOutdoorsWorld(raw.world?.outdoors,restoredConstruction,root.minutes)};
   root.kitchen=restoreKitchen(raw.kitchen);
