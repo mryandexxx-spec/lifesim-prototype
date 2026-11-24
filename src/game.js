@@ -9919,8 +9919,8 @@ function boot() {
       }
       if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
       const utilityUsers=residentIdsForSimulation(game).map(id=>getActor(game,id)?.action);
-      const weight=Math.max(0,...utilityUsers.map(action=>
-        furnitureUseWeight(action,item.instanceId)));
+      const weight=Math.max(0,...residentIdsForSimulation(game).map(id=>
+        furnitureUseWeight(getActor(game,id)?.action,item.instanceId)));
       if(['dresser','wardrobe'].includes(item.prefabId))
         meshyFurniture.useProcedural(node,weight>.005);
       const reposition=(part,dx=0,dz=0)=>{
