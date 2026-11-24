@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createReadStream, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -34,6 +35,8 @@ const browser = await chromium.launch({
 mkdirSync(out, { recursive: true });
 const channels = ['eyes', 'nose', 'lips', 'chin', 'cheeks'];
 const results = [];
+const pins = { 'alex-p3.glb': 'ab9595c5fa4e8f962aaf3697311fa47e175ed3754d9f585207bd79523f2bce5a', 'mira-p3.glb': '26a65437db84024a6bc0a2cb33fddd9935c60f1f88a3a55c76a53c63b3e0de71', 'meshy-casual-v1.glb': '7014401e6819b8b047fe384cfce4a62549711aa711d26a6894571800a40eb5f4', 'meshy-mira-mobile-v1.glb': '40a2d1e0dcde53f7c2f53c6bd220f39ba440bbf4d42dfbad949ca82146594d0a' };
+const verifiedBrowserAssets = [];
 
 function pixelDifference(page, a, b) {
   return page.evaluate(async ([a, b]) => {
@@ -63,6 +66,12 @@ try {
   for (const [width, height] of [[390, 844], [320, 568]]) {
     const context = await browser.newContext({ viewport: { width, height }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
     const page = await context.newPage();
+    const received = new Map();
+    page.on('response', response => {
+      const name = new URL(response.url()).pathname.split('/').at(-1);
+      if (!Object.hasOwn(pins, name)) return;
+      received.set(name, response.body().then(body => ({name, status: response.status(), sha256: createHash('sha256').update(body).digest('hex')})));
+    });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const canvas = page.locator('#review-canvas');
@@ -75,6 +84,8 @@ try {
     } catch (error) {
       throw new Error(`PlayCanvas start: ${await page.locator('#status').innerText()}. ${errors.join(', ')}`, { cause: error });
     }
+    const webgl = await canvas.evaluate(el => { const gl = el.getContext('webgl2'); return gl && { version: gl.getParameter(gl.VERSION), width: gl.drawingBufferWidth, height: gl.drawingBufferHeight }; });
+    assert.ok(webgl && webgl.width > 0 && webgl.height > 0, 'Expected active WebGL 2');
     const viewport = await page.locator('#viewport').boundingBox();
     const canvasBounds = await canvas.boundingBox();
     const panel = await page.locator('#panel').boundingBox();
@@ -93,6 +104,9 @@ try {
       await page.locator('#panel').evaluate((panel) => { panel.scrollTop = 0; });
       const before = await canvas.screenshot();
       await shot('neutral');
+      await page.locator('#rotate').tap(); await shot('neutral-45');
+      await page.locator('#rotate').tap(); await shot('neutral-90');
+      for (let i=0;i<6;i++) await page.locator('#rotate').tap();
       for (const channel of channels) {
         const slider = page.locator(`[data-morph="${channel}"]`);
         await slider.fill('100');
@@ -120,6 +134,7 @@ try {
       await page.locator('#min').tap();
       await page.locator('#frame').tap();
       await page.locator('#panel').evaluate((panel) => { panel.scrollTop = 0; });
+      await shot('full-body-neutral');
       for (const cue of ['idle', 'walk', 'sit']) {
         await page.locator('#pose').selectOption(cue);
         const first = await canvas.screenshot();
@@ -137,10 +152,16 @@ try {
       results.push(familyResult);
       console.log(`${width}×${height} ${family}: 5 individual morphs, combined morph, original comparison and 3 live clips`);
     }
+    for (const [name, expected] of Object.entries(pins)) {
+      assert.ok(received.has(name), `Asset not received: ${name}`);
+      const actual = await received.get(name);
+      assert.equal(actual.status, 200, name); assert.equal(actual.sha256, expected, name);
+      verifiedBrowserAssets.push({ width, height, ...actual });
+    }
     await context.close();
   }
 } finally {
   await browser.close();
   server.close();
-  writeFileSync(join(out, 'report.json'), JSON.stringify({ results, physicalIphoneVerified: false, ownerArtApproved: false }, null, 2));
+  writeFileSync(join(out, 'report.json'), JSON.stringify({ version: 'P3-09', browser: browser.version(), results, verifiedBrowserAssets, physicalIphoneVerified: false, ownerArtApproved: false }, null, 2));
 }
