@@ -6,6 +6,12 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const location=path.join(root,'.github/workflows');
 const active=new Set(['ci-targeted.yml','pages.yml','ci-full-manual.yml']);
 for(const file of readdirSync(location).filter(f=>/\.ya?ml$/.test(f))){
+  if(file==='qsk-12-release-evidence.yml'){
+    const yaml=readFileSync(path.join(location,file),'utf8');
+    assert.match(yaml,/^on:\n  workflow_run:\n    workflows:\n      - CI — change-aware Node and one-screen WebGL\n      - Test and deploy Блин’С to GitHub Pages\n    types: \[completed\]\npermissions:\n  actions: read\n  contents: read\n/m);
+    assert.doesNotMatch(yaml,/^  (?:pull_request|push|schedule|pull_request_target|merge_group):/m);
+    continue;
+  }
   if(active.has(file))continue;
   const yaml=readFileSync(path.join(location,file),'utf8');
   const match=yaml.match(/^on:[ \t]*\r?\n((?:^[ \t].*(?:\r?\n|$)|^\r?\n)*)/m);

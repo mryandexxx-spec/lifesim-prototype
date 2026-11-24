@@ -1,0 +1,33 @@
+name: QSK-12 release evidence
+on:
+  workflow_run:
+    workflows:
+      - CI — change-aware Node and one-screen WebGL
+      - Test and deploy Блин’С to GitHub Pages
+    types: [completed]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # workflow_run uses the trusted default-branch revision, never PR code.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Collect read-only evidence for completed source run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/qsk-12-release-evidence.mjs
+      - name: Upload machine-readable release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsk-12-release-evidence
+          path: artifacts/qsk-12/report.json
+          if-no-files-found: error
