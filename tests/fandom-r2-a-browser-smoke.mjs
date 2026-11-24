@@ -36,7 +36,7 @@ try{
     await page.locator('#career-phone-toggle').tap();
     const panel=page.locator('#career-phone-panel');
     await panel.waitFor({state:'visible'});
-    assert.equal(await panel.locator('.phone-platform-tile').count(),5);
+    assert.equal(await panel.locator('.phone-platform-tile').count(),6);
     await panel.locator('[data-phone-app="sports"]').tap();
     const before=JSON.parse(await page.evaluate(k=>localStorage.getItem(k),SAVE_KEY));
     assert.equal(before.world.furniture.instances.some(x=>x.prefabId==='tv'),false);

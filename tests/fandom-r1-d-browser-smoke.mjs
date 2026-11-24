@@ -42,9 +42,9 @@ try{
   await page.locator('#career-phone-toggle').tap();
   const phone=page.locator('#career-phone-panel');
   await phone.waitFor({state:'visible'});
-  assert.equal(await phone.locator('.phone-platform-tile').count(),5);
+  assert.equal(await phone.locator('.phone-platform-tile').count(),6);
   const ids=await phone.locator('.phone-platform-tile').evaluateAll(nodes=>nodes.map(x=>x.dataset.phoneApp));
-  assert.deepEqual(ids,['work','food','finance','calls','sports']);
+  assert.deepEqual(ids,['work','food','finance','calls','sports','notifications']);
   await page.screenshot({path:'artifacts/fandom-r1-d/home-'+width+'.png'});
   await phone.locator('[data-phone-app="sports"]').tap();
   assert.equal(await phone.getAttribute('aria-label'),'Смартфон: Блин’С Спорт');
