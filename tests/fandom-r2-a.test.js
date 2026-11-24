@@ -6,6 +6,7 @@ import {sportsSchedule,sportsScheduleForLeague} from '../src/sports-calendar.js'
 import {sportsFixtures,matchAt} from '../src/sports-league.js';
 import {sportsTvFrame,sportsBroadcastFrame,paintSportsTv} from '../src/sports-tv.js';
 import {sportsPhoneView} from '../src/sports-phone-model.js';
+import {newGame} from '../src/simulation.js';
 
 test('R2-A retains historical six-team fixture identity while exposing extensible league registry',()=>{
   assert.equal(SPORTS_LEAGUES.length,1,'do not invent unapproved active leagues');
@@ -69,4 +70,31 @@ test('R2-A mobile feed renders current offline match without a TV, a fake action
   tickHousehold(root,m.end-root.minutes+1);
   assert.equal(sportsBroadcastFrame(root),null,'no fabricated future broadcasts');
   assert.equal(sportsPhoneView(root,'alex')?.broadcast,null);
+});
+
+test('PF-02 current household residents can read the same feed without expanding personal fan or paired TV contracts',()=>{
+  const root=newHousehold('2026-11-22'),m=sportsFixtures(root.sportsWorld)[0];
+  const make=(id,firstName)=>({id,identity:{firstName,lastName:'Тест',lifeStage:'adult'},actor:newGame()});
+  root.population={schema:1,nextResidentSerial:5,
+    residentsById:{resident_3:make('resident_3','Вера'),resident_4:make('resident_4','Игорь')},
+    linksByResident:{alex:{familyId:'family_1',dwellingId:'dwelling_1'},
+      mira:{familyId:'family_1',dwellingId:'dwelling_1'},
+      resident_3:{familyId:'family_2',dwellingId:'dwelling_1'},
+      resident_4:{familyId:'family_3',dwellingId:'dwelling_2'}},kinship:[]};
+  root.minutes=m.kickoff+8;root.otherSim.minutes=root.minutes;
+  const before=JSON.stringify(root),legacy=sportsPhoneView(root,'alex');
+  const extra=sportsPhoneView(root,'resident_3');
+  assert.equal(extra?.residentName,'Вера');
+  assert.deepEqual(extra.broadcast,legacy.broadcast);
+  assert.equal(extra.personalSupported,false);
+  assert.equal(extra.canChangeClub,false);
+  assert.equal(extra.watch,null);
+  assert.equal(extra.favoriteTeamId,null);
+  assert.deepEqual(extra.unread,[]);
+  assert.equal(sportsPhoneView(root,'resident_4'),null,'non-household resident is not a live actor');
+  assert.equal(sportsPhoneView(root,'__proto__'),null);
+  assert.equal(legacy.personalSupported,true);
+  assert.equal(JSON.stringify(root),before);
+  root.population.linksByResident.resident_4.dwellingId='dwelling_1';
+  assert.equal(sportsPhoneView(root,'resident_4')?.broadcast?.matchId,m.id);
 });
