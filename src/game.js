@@ -21,6 +21,7 @@ import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './v
 import {UI_TOUR_STORAGE_KEY,createUITour,shouldShowTour} from './ui-onboarding.js';
 import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import {readV1Save,writeV1Save} from './qsk-09-save-safety.js';
+import {validateV1BackupText,exportV1BackupText,commitV1Backup,backupSummary,MAX_V1_BACKUP_BYTES} from './qsk-09-backup.js';
 import {createNeedTrendTracker} from './need-trends.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
@@ -2597,6 +2598,68 @@ createHudPanel({
 });
 $('save-btn').addEventListener('click', () => {
   if(save())setViewOpen(false,{restoreFocus:true});
+});
+// QSK-09: manual file backup with explicit read-only preview and atomic restore.
+let pendingBackup=null;
+const backupDialog=$('backup-review');
+function backupText(summary){
+  return 'Жителей: '+summary.residents+' · день '+(Math.floor(summary.minutes/1440)+1)+
+    ' · деньги: '+(summary.credits===null?'нет данных':summary.credits)+
+    ' · мебель: '+(summary.items===null?'не указана':summary.items)+
+    ' · очередь: '+summary.queued;
+}
+const closeBackup=()=>{
+  pendingBackup=null;
+  if(backupDialog.open)backupDialog.close();
+};
+$('backup-export-btn').addEventListener('click',()=>{
+  if(!save(true)){toast('Копия не создана: сначала требуется успешное сохранение');return;}
+  const backup=exportV1BackupText(localStorage,SAVE_KEY);
+  if(!backup.ok){toast('Невозможно создать копию: сейв недоступен');return;}
+  const blob=new Blob([backup.text],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download='blins-lifesim-v1-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.append(link);
+  link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  toast('Копия подготовлена · сохрани файл в «Файлы»');
+});
+$('backup-import-btn').addEventListener('click',()=>{
+  $('backup-file').value='';
+  $('backup-file').click();
+});
+$('backup-file').addEventListener('change',async event=>{
+  closeBackup();
+  const file=event.target.files?.[0];
+  if(!file)return;
+  if(file.size>MAX_V1_BACKUP_BYTES){toast('Файл слишком большой');return;}
+  let text;
+  try{text=await file.text();}catch{toast('Не удалось прочитать файл');return;}
+  const checked=validateV1BackupText(text);
+  if(!checked.ok){toast('Файл повреждён или несовместим с текущей версией');return;}
+  pendingBackup=checked;
+  $('backup-current').textContent=backupText(backupSummary(game));
+  $('backup-incoming').textContent=backupText(checked.summary);
+  $('backup-filename').textContent=file.name;
+  setViewOpen(false);
+  backupDialog.showModal();
+  $('backup-apply').focus({preventScroll:true});
+});
+$('backup-cancel').addEventListener('click',closeBackup);
+backupDialog.addEventListener('close',()=>{pendingBackup=null;});
+$('backup-apply').addEventListener('click',()=>{
+  if(!pendingBackup)return;
+  if(!bootReadyToSave){toast('Дождись готовности игры');return;}
+  const result=commitV1Backup(localStorage,SAVE_KEY,pendingBackup);
+  if(!result.ok){
+    toast(result.reason==='quota'?'Недостаточно места — прежний прогресс сохранён':
+      'Восстановление не удалось — прогресс не изменён');
+    return;
+  }
+  backupDialog.close();
+  window.location.reload();
 });
 $('reset-btn').addEventListener('click', () => {
   if (!window.confirm('Начать новую жизнь? Текущее сохранение будет заменено.')) return;
