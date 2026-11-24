@@ -240,6 +240,9 @@
         <button id="auto-btn" class="auto-control" type="button" aria-pressed="true" aria-label="Автономность включена. Нажмите, чтобы отключить"><span>Автономность</span><small id="auto-state">ВКЛ</small></button>
         <button id="music-audio-toggle" class="music-audio-toggle" type="button" aria-pressed="false">🔇 Включить звук</button>
         <button id="save-btn" type="button">Сохранить игру</button>
+        <button id="backup-export-btn" type="button">↓ Скачать резервную копию</button>
+        <button id="backup-import-btn" type="button">↑ Восстановить из копии…</button>
+        <input id="backup-file" type="file" accept=".json,application/json" hidden aria-label="Выбрать файл резервной копии JSON" />
       </div>
       <div class="menu-group" role="group" aria-labelledby="menu-help-heading">
         <h3 id="menu-help-heading">Помощь</h3>
@@ -255,6 +258,16 @@
       <p class="menu-about">Блин’С · LifeSim · сборка 1.2u.17 · Comfort C2</p>
     </section>
 
+    <dialog id="backup-review" class="backup-review" aria-labelledby="backup-title">
+      <h2 id="backup-title">Восстановить сохранение</h2>
+      <p>Файл: <strong id="backup-filename"></strong></p>
+      <div class="backup-compare">
+        <div><strong>Сейчас</strong><p id="backup-current"></p></div>
+        <div><strong>Из копии</strong><p id="backup-incoming"></p></div>
+      </div>
+      <p class="backup-warning">Сохранение на этом устройстве будет заменено. Рекомендуем сначала скачать копию текущего прогресса. Отменить замену после подтверждения нельзя.</p>
+      <div class="backup-actions"><button id="backup-cancel" type="button">Отмена</button><button id="backup-apply" type="button">Заменить сохранение</button></div>
+    </dialog>
     <section id="home-panel" class="home-panel" role="dialog" aria-modal="false" aria-label="Дом: выбор редактора" hidden tabindex="-1">
       <div class="view-panel-head"><strong>Дом</strong><button id="home-close" type="button" aria-label="Закрыть выбор редактора">×</button></div>
       <button id="home-furnish" type="button" aria-controls="furniture-editor">▦ Обстановка <small>Мебель, магазин и склад</small></button>
@@ -890,7 +903,7 @@
       <ol id="loading-stages" class="loading-stages" aria-label="Этапы готовности" aria-live="off"></ol>
     </div>
   </div>
-  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b-w4c-shift-summary-lotb1-q0-outdoor-context-q0-q1q4-q2-20261119-lotc1-q3b-20261120-q5-20261120-lot-c2a-20261120-ux00-20261120-lot-c2b-20261120-ux01-20261120-lot-c2c-20261120-ux02a-20261120-meshy-room-20261120-meshystarterthumb-20261120-ux02b-20261120-lot-c3a-20261120-lot-c3b-20261120-meshy-batch02-ux03-20261120-ux04-20261120-roomcontact1-ux05-20261120-meshyv3-20261120-ux06-20261120-lotd2b-20261120-lotd2c-20261121-romance-touchfix-20261121-ux08-20261121-hud-r1-v2-20261121-book-r1-20261121-dish-r1-20261121-food-r1-lot-e3-20261121-cook-r1-charisma-r1-garden-r1-action-motion-micro-ux-r1-gesture3-load-truth-r1-fridge-ux-r2-postwork-r1-grill-r1-career-shifts-r1-fandom-r1-a-phone-platform-r1-fandom-r1-c-fandom-r1-d-fandom-r1-e-fandom-r2-a-fandom-r2-b-fandom-r2-c-improvements-batch2-a-improvements-batch2-b-batch2-rotate-ux-improvements-batch2-c-batch2-e1-batch2-e2-parcel-editor-1-parcel-journal-1-build-ux-uxfix1-cas-01-3-cas-01-4-cas-01-5-cas-01-5-social-cas-01-7-social-queue-r1-qsk-06-qsk-07-qsk-07-b-qsk-08-qsk-09"></script>
+  <script type="module" src="./src/game.js?v=1.2u-h2-music-fix1-cache-f4c-h5b-20261117-f4g2-h5c-f5b3-f5b4-f5c1-f5c2-f5d1-f5d2-f5d3a-starter-join-w1a1-safari-gesture1-w1a2-w1a3-w1a4-w1b2a-phone-w1b3a-work-w1b3b1-growth-w1b2b1-recruitment-w1b3b2-w2a1-w2a4-comfort-c1-comfort-c2-comfort-c3-w4a-w4b-w4c-shift-summary-lotb1-q0-outdoor-context-q0-q1q4-q2-20261119-lotc1-q3b-20261120-q5-20261120-lot-c2a-20261120-ux00-20261120-lot-c2b-20261120-ux01-20261120-lot-c2c-20261120-ux02a-20261120-meshy-room-20261120-meshystarterthumb-20261120-ux02b-20261120-lot-c3a-20261120-lot-c3b-20261120-meshy-batch02-ux03-20261120-ux04-20261120-roomcontact1-ux05-20261120-meshyv3-20261120-ux06-20261120-lotd2b-20261120-lotd2c-20261121-romance-touchfix-20261121-ux08-20261121-hud-r1-v2-20261121-book-r1-20261121-dish-r1-20261121-food-r1-lot-e3-20261121-cook-r1-charisma-r1-garden-r1-action-motion-micro-ux-r1-gesture3-load-truth-r1-fridge-ux-r2-postwork-r1-grill-r1-career-shifts-r1-fandom-r1-a-phone-platform-r1-fandom-r1-c-fandom-r1-d-fandom-r1-e-fandom-r2-a-fandom-r2-b-fandom-r2-c-improvements-batch2-a-improvements-batch2-b-batch2-rotate-ux-improvements-batch2-c-batch2-e1-batch2-e2-parcel-editor-1-parcel-journal-1-build-ux-uxfix1-cas-01-3-cas-01-4-cas-01-5-cas-01-5-social-cas-01-7-social-queue-r1-qsk-06-qsk-07-qsk-07-b-qsk-08-qsk-09-qsk-09-backup"></script>
   <script>
     window.addEventListener('error', function (event) {
       const el = document.getElementById('loading');
