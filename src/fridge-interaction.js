@@ -20,6 +20,12 @@ export const FRIDGE_LAYOUT=Object.freeze({
   sweep:Object.freeze({minX:2.89,maxX:4.04,minZ:-2.26,maxZ:-1.20})
 });
 export const FRIDGE_EAT_START=.66;
+// PF-04/A: a shared pickup budget and dining-only brisk walk.
+export const DINING_TAKE_MINUTES=4.5;
+export function mealRouteMetersPerSecond(action){
+  return action?.id==='dining'&&action.phase==='walking'&&
+    ['toFridge','toSeat'].includes(action.diningStage)?2.2:1.65;
+}
 export const FRIDGE_FACING_YAW=Math.atan2(
   FRIDGE_LAYOUT.handle.x-FRIDGE_LAYOUT.approach.x,
   FRIDGE_LAYOUT.handle.z-FRIDGE_LAYOUT.approach.z)*180/Math.PI;
@@ -49,7 +55,7 @@ export function fridgeSequence(elapsed,duration=26,mode='snack'){
 export function fridgeActionFrame(action,snackDuration){
   if(action.id==='fridge')return fridgeSequence(action.elapsed,snackDuration);
   const storing=action.cookStage==='storing'||action.grillStage==='storing';
-  return fridgeSequence(action.elapsed,action.id==='cook'&&!storing?5:6,storing?'store':'take');
+  return fridgeSequence(action.elapsed,action.id==='dining'?DINING_TAKE_MINUTES:action.id==='cook'&&!storing?5:6,storing?'store':'take');
 }
 
 // Same final grip as the pickup frame; the walking clip still owns the legs.

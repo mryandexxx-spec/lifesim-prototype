@@ -180,7 +180,7 @@ import {chooseTvSofa,tvSofaView} from './tv-seating.js';
 import {planSharedTv,liveSharedTv} from './tv-together.js';
 import {planPairedHobby,livePairedHobby} from './paired-hobby.js';
 import {createBedTransition,advanceBedTransition,bedTransitionPose,bedBeddingPose} from './bed-transition.js';
-import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeActionFrame,carriedFridgePortion,closeFridgeDoor} from './fridge-interaction.js';
+import {FRIDGE_LAYOUT,FRIDGE_FACING_YAW,fridgeActionFrame,carriedFridgePortion,closeFridgeDoor,mealRouteMetersPerSecond} from './fridge-interaction.js';
 import {SHOWER_LAYOUT,createShowerTransition,advanceShowerTransition} from './shower-interaction.js';
 import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './toilet-interaction.js';
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
@@ -8895,7 +8895,7 @@ function boot() {
             p=paths[residentId];
           }
           if(p.points && (socialWalking?game.socialAction?.phase==='walking':resident.action?.phase==='walking')){
-            let remaining=dt*1.65*game.speed,hops=0;
+            let remaining=dt*(socialWalking?1.65:mealRouteMetersPerSecond(resident.action))*game.speed,hops=0;
             while(remaining>0 && p.index<p.points.length && hops++<12){
               const next=p.points[p.index];
               const dx=next.x-resident.position.x,dz=next.z-resident.position.z;
