@@ -1,0 +1,13 @@
+{
+  "version": "P3-09",
+  "leon": {
+    "source": "P3-07",
+    "sha256": "ab9595c5fa4e8f962aaf3697311fa47e175ed3754d9f585207bd79523f2bce5a",
+    "path": "assets/alex-p3.glb"
+  },
+  "asya": {
+    "source": "P3-08",
+    "sha256": "26a65437db84024a6bc0a2cb33fddd9935c60f1f88a3a55c76a53c63b3e0de71",
+    "path": "assets/mira-p3.glb"
+  }
+}
