@@ -106,3 +106,5 @@ try{
 
 // GRILL and ready food share the real dining journey.
 await import('./pf-04a-meal-timing-browser-smoke.mjs');
+
+await import('./pf-04b-browser-smoke.mjs');

@@ -28,7 +28,7 @@ import {readV1Save,writeV1Save} from './qsk-09-save-safety.js';
 import {validateV1BackupText,exportV1BackupText,commitV1Backup,backupSummary,MAX_V1_BACKUP_BYTES} from './qsk-09-backup.js';
 import {createNeedTrendTracker} from './need-trends.js';
 import {createToastUI} from './qsk-11-toast-ui.js';
-import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
+import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, actionDuration, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
 import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
@@ -4388,6 +4388,18 @@ function boot() {
         portions:game.kitchen.prepared.reduce((n,row)=>n+row.portions,0),
         dishes:game.kitchen.dirtyDishes,credits:game.shop.credits,
         receipts:game.financialHistory.entries.length};
+    };
+  }
+  // PF-04/B read-only QA, available solely in the explicit test URL.
+  if(new URLSearchParams(location.search).get('pf-04b')==='qa'){
+    window.__LifeSimManualCareQA=id=>{
+      const actor=getActor(game,id),a=actor?.action;
+      const shower=showerStates[id]?.frame,toilet=toiletStates[id]?.frame;
+      return {minutes:game.minutes,speed:game.speed,paused:game.paused,
+        id:a?.id??null,phase:a?.phase??null,elapsed:a?.elapsed??0,
+        duration:actionDuration(a),needs:{...actor.needs},
+        shower:shower?{privacy:shower.privacy,water:shower.water,bathing:shower.bathing}:null,
+        toilet:toilet?{privacy:toilet.privacy,relief:toilet.relief,flush:toilet.flush,seated:toilet.seated}:null};
     };
   }
   const fridgeLeaving={alex:false,mira:false};
@@ -9188,12 +9200,12 @@ function boot() {
     const alexDiningVisual=alexDining?diningVisualFor('alex',game.action):diningVisual.alex;
     const alexFridge=useId==='fridge'?fridgeActionFrame(game.action,ACTIONS.fridge.duration):null;
     showerStates.alex=advanceShowerTransition(showerStates.alex,useId==='shower',
-      game.action?.elapsed||0,ACTIONS.shower.duration,frameAnimDt,
+      game.action?.elapsed||0,actionDuration(game.action)||ACTIONS.shower.duration,frameAnimDt,
       inverseFurniturePose(game.world,'shower',display).yaw);
     const alexShower=showerStates.alex.frame?{...showerStates.alex.frame,
       pose:furniturePose(game.world,'shower',showerStates.alex.frame.pose)}:null;
     toiletStates.alex=advanceToiletTransition(toiletStates.alex,useId==='toilet',
-      game.action?.elapsed||0,ACTIONS.toilet.duration,frameAnimDt,
+      game.action?.elapsed||0,actionDuration(game.action)||ACTIONS.toilet.duration,frameAnimDt,
       inverseFurniturePose(game.world,'toilet',display).yaw);
     const alexToilet=toiletStates.alex.frame?{...toiletStates.alex.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.alex.frame.pose)}:null;
@@ -9380,12 +9392,12 @@ function boot() {
     const miraDiningVisual=miraDining?diningVisualFor('mira',game.otherSim):diningVisual.mira;
     const miraFridge=miraUseId==='fridge'?fridgeActionFrame(game.otherSim.action,ACTIONS.fridge.duration):null;
     showerStates.mira=advanceShowerTransition(showerStates.mira,miraUseId==='shower',
-      game.otherSim.action?.elapsed||0,ACTIONS.shower.duration,frameAnimDt,
+      game.otherSim.action?.elapsed||0,actionDuration(game.otherSim.action)||ACTIONS.shower.duration,frameAnimDt,
       inverseFurniturePose(game.world,'shower',miraDisplay).yaw);
     const miraShower=showerStates.mira.frame?{...showerStates.mira.frame,
       pose:furniturePose(game.world,'shower',showerStates.mira.frame.pose)}:null;
     toiletStates.mira=advanceToiletTransition(toiletStates.mira,miraUseId==='toilet',
-      game.otherSim.action?.elapsed||0,ACTIONS.toilet.duration,frameAnimDt,
+      game.otherSim.action?.elapsed||0,actionDuration(game.otherSim.action)||ACTIONS.toilet.duration,frameAnimDt,
       inverseFurniturePose(game.world,'toilet',miraDisplay).yaw);
     const miraToilet=toiletStates.mira.frame?{...toiletStates.mira.frame,
       pose:furniturePose(game.world,'toilet',toiletStates.mira.frame.pose)}:null;
