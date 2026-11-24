@@ -19,7 +19,7 @@ import {WORK_MODES,WORK_MODE_IDS,cleanWorkMode,workNeedsReport} from './career-w
 import {createFinancePhoneUI} from './finance-phone-ui.js';
 import {PHONE_APPS,phoneAppRoute} from './phone-app-registry.js';
 import {sportsPhoneView} from './sports-phone-model.js';
-import {sportsBroadcastFrame,paintSportsTv} from './sports-tv.js';
+import {paintSportsTv} from './sports-tv.js';
 import {sportsCrest} from './sports-identity.js';
 import {phoneContactStatus,CALL_DURATION,CALL_COOLDOWN} from './phone-calls.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
@@ -119,7 +119,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     notify('🧾 Семейный счёт оплачен · −'+payment.amount+' кр.');
     return payment;
   }});
-  let app='home',sportsTab='club',streamInterval=null;
+  let app='home',sportsTab='club',streamInterval=null,sportsSignature=null;
   let who=null,view='list',chosen=null,lastFocus=null,lastInterviewFeedback='';
   let section='vacancies',historyId=null;
   const contexts={alex:null,mira:null};
@@ -127,6 +127,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
   function close({focus=true}={}){
     if(!opened())return;
     if(streamInterval!==null){clearInterval(streamInterval);streamInterval=null;}
+    sportsSignature=null;
     overlay.hidden=true;trigger.setAttribute('aria-expanded','false');
     financeTrigger?.setAttribute('aria-expanded','false');
     if(who)contexts[who]={section,view,chosen,historyId,scrollTop:body.scrollTop};
@@ -1301,33 +1302,56 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       ' игровых минут. Рабочая зарплата и очередь действий не меняются.'));
   }
 
-  /** Screen-only broadcast. The shared procedural renderer cannot advance the
-   * simulation, charge the household or count as physically watched TV.
-   * A small visible-only timer keeps the in-app image current without touching
-   * the global PlayCanvas render loop or requiring a second clock.
+  /** Refresh the visible sports app from the canonical game clock. Rebuild
+   * only at fixture/TV availability boundaries; otherwise preserve focus,
+   * scroll and the same Canvas2D element. No game-state writes or second clock.
    */
-  function refreshMobileBroadcast(){
-    if(!opened()||app!=='sports'||sportsTab!=='stream')return;
+  const sportsKey=model=>model?JSON.stringify([model.seasonId,model.live?.matchId??null,
+    model.watch?.tvId??null,model.upcoming[0]?.matchId??null]):null;
+  function refreshSportsPhone(){
+    if(!opened()||app!=='sports'||document.hidden)return;
+    const root=personRoot();if(!root)return;
+    const model=sportsPhoneView(root,who);
+    if(sportsKey(model)!==sportsSignature){render({preserveScroll:true});return;}
+    if(!model)return;
+    if(model.live){
+      const label=body.querySelector('.sports-phone-live>strong');
+      const score=body.querySelector('.sports-phone-score');
+      if(label)label.textContent='🔴 ИДЁТ МАТЧ · '+Math.floor(model.live.minute)+"′";
+      if(score)score.textContent=model.live.home+' '+model.live.score.join(' : ')+' '+model.live.away;
+    }
+    refreshMobileBroadcast(model);
+  }
+  function refreshMobileBroadcast(model){
+    if(!opened()||app!=='sports'||sportsTab!=='stream'||!model)return;
     const canvas=body.querySelector('.sports-phone-stream-canvas');
     if(!canvas)return;
     const status=body.querySelector('.sports-phone-stream-status');
-    const ctx=canvas.getContext('2d'),frame=sportsBroadcastFrame(getRoot());
-    if(!ctx)return;
+    const ctx=canvas.getContext('2d'),frame=model.broadcast;
+    if(!ctx){
+      if(status)status.textContent='Не удалось открыть изображение эфира';
+      return;
+    }
     if(!frame){
       ctx.fillStyle='#102923';ctx.fillRect(0,0,canvas.width,canvas.height);
       ctx.fillStyle='#f2f5e8';ctx.font='22px sans-serif';ctx.textAlign='center';
       ctx.fillText('Нет матча в эфире',canvas.width/2,canvas.height/2);
-      if(status)status.textContent='Следующий эфир — по игровому календарю';
+      const next=model.upcoming[0];
+      if(status)status.textContent=next?'Следующий эфир — '+next.iso+' · '+next.time+
+        ' · '+next.home+' — '+next.away+' · игровое время':'Нет матчей в расписании · межсезонье';
       return;
     }
-    paintSportsTv(ctx,frame,canvas.width,canvas.height);
-    if(status)status.textContent='🔴 Прямой игровой эфир · '+frame.minute+"′"+
-      ' · '+frame.home.short+' '+frame.score.join(':')+' '+frame.away.short;
+    const minute=Math.floor(frame.minute);
+    paintSportsTv(ctx,{...frame,minute},canvas.width,canvas.height);
+    if(status)status.textContent='🔴 Прямой игровой эфир · '+minute+"′"+
+      ' · '+frame.home.short+' '+frame.score.join(':')+' '+frame.away.short+
+      (model.paused?' · игра на паузе':'');
   }
   /** Approved fifth application: pure projection backed by one canonical league. */
   function renderPhoneSports(root){
     const model=sportsPhoneView(root,who);
-    if(!model){top('⚽ Лига Блин’С пока недоступна');return;}
+    sportsSignature=sportsKey(model);
+    if(!model){top('⚽ Лига Блин’С пока недоступна');return null;}
     top('⚽ '+NAMES[who]+' · ЛИГА БЛИН’С');
     body.append(element('h2','career-phone-section-title','Блин’С Спорт'));
     const header=element('section','career-phone-facts sports-phone-summary');
@@ -1344,14 +1368,30 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       tabs.append(button);
     }
     body.append(tabs);
+    // The broadcast is the primary content, not buried below TV/club actions.
+    if(sportsTab==='stream'){
+      const card=element('section','career-phone-card sports-phone-stream');
+      card.append(element('strong',null,'📱 Оригинальная трансляция'));
+      const canvas=element('canvas','sports-phone-stream-canvas');
+      canvas.width=512;canvas.height=312;
+      canvas.setAttribute('role','img');
+      canvas.setAttribute('aria-label','Поле и текущий счёт игрового матча');
+      card.append(canvas,element('p','sports-phone-stream-status','Ожидание игрового эфира'));
+      card.append(element('small',null,
+        'События и счёт из Лиги Блин’С. Смотреть можно без телевизора; '+
+        'просмотр на телефоне не даёт дополнительных бонусов.'));
+      body.append(card);
+    }
     if(model.live){
       const card=element('section','career-phone-card sports-phone-live');
-      card.append(element('strong',null,'🔴 ИДЁТ МАТЧ · '+model.live.minute+"′"));
+      card.append(element('strong',null,'🔴 ИДЁТ МАТЧ · '+Math.floor(model.live.minute)+"′"));
       card.append(element('p','sports-phone-score',
         model.live.home+' '+model.live.score.join(' : ')+' '+model.live.away));
       card.append(element('small',null,'Играется по календарю Блин’С, не в реальном времени'));
-      card.append(action('📱 Смотреть на телефоне',()=>{sportsTab='stream';render();},
-        'career-phone-secondary sports-watch-mobile'));
+      if(sportsTab!=='stream')card.append(action('📱 Смотреть на телефоне',()=>{
+        sportsTab='stream';render();
+      },'career-phone-secondary sports-watch-mobile'));
+      if(model.personalSupported){
       const watch=action(model.watch?'📺 Смотреть матч':'Матч в эфире · телевизор недоступен',()=>{
         const live=personRoot();if(!live)return;
         const current=sportsPhoneView(live,who);
@@ -1374,6 +1414,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       },'career-phone-secondary sports-watch-together');
       invite.disabled=!model.watch;
       card.append(invite);
+      }else card.append(element('small',null,'Доступен просмотр общего игрового эфира.'));
       body.append(card);
     }
     if(model.unread.length){
@@ -1393,16 +1434,11 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       body.append(card);
     }
     if(sportsTab==='stream'){
-      const card=element('section','career-phone-card sports-phone-stream');
-      card.append(element('strong',null,'📱 Оригинальная трансляция'));
-      const canvas=element('canvas','sports-phone-stream-canvas');
-      canvas.width=512;canvas.height=312;
-      canvas.setAttribute('role','img');
-      canvas.setAttribute('aria-label','Поле и текущий счёт игрового матча');
-      card.append(canvas,element('p','sports-phone-stream-status','Ожидание игрового эфира'));
-      card.append(element('small',null,
-        'События и счёт из Лиги Блин’С. Смотреть можно без телевизора; '+
-        'просмотр на телефоне не даёт дополнительных бонусов.'));
+      // Broadcast already inserted above the live-match controls.
+    }else if(sportsTab==='club'&&!model.personalSupported){
+      const card=element('section','career-phone-card sports-phone-club');
+      card.append(element('strong',null,'Мой клуб'),
+        element('p',null,'Для этого жителя пока доступны эфир, календарь и таблица. Личное фанатство ещё недоступно.'));
       body.append(card);
     }else if(sportsTab==='club'){
       const card=element('section','career-phone-card sports-phone-club');
@@ -1500,6 +1536,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     }
     body.append(element('p','career-phone-muted',
       'Матчи рассчитываются офлайн. Ставок, внешних трансляций и двойных бонусов досуга нет.'));
+    return model;
   }
 
   function render({preserveScroll=false}={}){
@@ -1534,8 +1571,8 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       renderPhoneCalls(root);body.scrollTop=preserveScroll?oldScroll:0;return;
     }
     if(app==='sports'){
-      renderPhoneSports(root);body.scrollTop=preserveScroll?oldScroll:0;
-      refreshMobileBroadcast();return;
+      const model=renderPhoneSports(root);body.scrollTop=preserveScroll?oldScroll:0;
+      refreshMobileBroadcast(model);return;
     }
     if(app==='finance'){
       financeUI.render(root);
@@ -1599,7 +1636,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
     overlay.hidden=false;trigger.setAttribute('aria-expanded','true');
     financeTrigger?.setAttribute('aria-expanded','true');
     render();
-    if(streamInterval===null)streamInterval=setInterval(refreshMobileBroadcast,400);
+    if(streamInterval===null)streamInterval=setInterval(refreshSportsPhone,400);
     if(remembered)body.scrollTop=remembered.scrollTop??0;
     onOpenChange(who);closeButton.focus({preventScroll:true});
   }

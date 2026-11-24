@@ -6,12 +6,19 @@ import {sportsCrest} from './sports-identity.js';
 import {sportsFixtures,matchAt,standings} from './sports-league.js';
 import {sportsWatchOpportunity,sportsBroadcastFrame} from './sports-tv.js';
 import {calendarAt} from './calendar-core.js';
+import {residentIdsForSimulation} from './resident-activity-runtime.js';
 const names={alex:'Алекс',mira:'Мира'};
 const formatTime=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 const selectActor=(root,id)=>id==='mira'?root?.otherSim:id==='alex'?root:null;
 export function sportsPhoneView(root,id){
- if(!root?.sportsWorld||!root.calendar||!names[id]||!Number.isFinite(root.minutes))return null;
- const now=root.minutes,fan=selectActor(root,id)?.sportsFan;
+ if(!root?.sportsWorld||!root.calendar||!Number.isFinite(root.minutes))return null;
+ const personalSupported=Object.hasOwn(names,id);
+ // Shared league/phone feed is read-only for existing co-residents.
+ // Keep the legacy personal fan and paired-TV mutation contracts unchanged.
+ if(!personalSupported&&!residentIdsForSimulation(root).includes(id))return null;
+ const residentName=personalSupported?names[id]:root.population?.residentsById?.[id]?.identity?.firstName;
+ if(typeof residentName!=='string'||!residentName)return null;
+ const now=root.minutes,fan=personalSupported?selectActor(root,id)?.sportsFan:null;
  const fixtures=sportsFixtures(root.sportsWorld);
  const byId=new Map(fixtures.map(m=>[m.id,m]));
  const resultMap=new Map((root.sportsWorld.results||[]).map(r=>[r.id,r]));
@@ -44,18 +51,18 @@ export function sportsPhoneView(root,id){
   teamCrests:SPORTS_TEAMS.map(t=>sportsCrest(t.id)),
   crest:club?sportsCrest(club):null,
   rounds:(SPORTS_TEAMS.length-1)*2,broadcast:sportsBroadcastFrame(root),
-  selectedResident:id,residentName:names[id],favoriteTeamId:club,
+  selectedResident:id,residentName,personalSupported,paused:Boolean(root.paused),favoriteTeamId:club,
   favorite:club?sportsTeam(club):null,
   fanIntensity:fan?.fanIntensity??0,
-  canChangeClub:!fan?.favoriteTeamId||now>=(fan?.nextChangeAt??0),
+  canChangeClub:personalSupported&&(!fan?.favoriteTeamId||now>=(fan?.nextChangeAt??0)),
   changeCooldown:Math.max(0,Math.ceil((fan?.nextChangeAt??0)-now)),
   table,live:live?formatMatch(live):null,
-  watch:sportsWatchOpportunity(root),
+  watch:personalSupported?sportsWatchOpportunity(root):null,
   upcoming,results,unread,
   nextFavorite:nextFavorite?formatMatch(nextFavorite):null,
   seasonHistory:Array.isArray(root.sportsWorld.history)
    ?root.sportsWorld.history.slice(-3).reverse():[],
-  sharedMemories:(root.sportsSharedWatch?.memories||[]).slice(-8).reverse()
+  sharedMemories:(personalSupported?(root.sportsSharedWatch?.memories||[]):[]).slice(-8).reverse()
     .map(r=>({matchId:r.matchId,at:r.at,
       matchTitle:byId.has(r.matchId)
         ?sportsTeam(byId.get(r.matchId).home)?.short+' — '+

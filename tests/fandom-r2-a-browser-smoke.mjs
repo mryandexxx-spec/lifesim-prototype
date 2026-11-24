@@ -80,7 +80,7 @@ try{
         trigger:document.querySelector('#pf02-open'),getRoot:()=>root,
         setCareerSystem:()=>{},save:()=>true,notify:()=>{}});
       window.pf02Fixture={advance:minute=>tickHousehold(root,minute-root.minutes),
-        pause:()=>{root.paused=true;},snapshot:()=>JSON.stringify(root)};
+        pause:value=>{root.paused=value;},snapshot:()=>JSON.stringify(root)};
     },fixture);
     await page.locator('#pf02-open').tap();
     await panel.locator('[data-phone-app="sports"]').tap();
@@ -97,11 +97,19 @@ try{
       !!(el.compareDocumentPosition(el.parentElement.querySelector('.sports-phone-live'))&Node.DOCUMENT_POSITION_FOLLOWING)),true,
       'broadcast image is before the physical-TV controls');
     assert.equal(await page.evaluate(()=>window.pf02Fixture.snapshot()),stateBefore,'watching is read-only');
+    await page.evaluate(()=>window.pf02Fixture.pause(true));
+    await page.waitForFunction(()=>document.querySelector('.sports-phone-stream-status')?.textContent.includes('игра на паузе'));
+    const pausedCanvas=await liveCanvas.evaluate(c=>c.toDataURL());
+    await page.evaluate(minute=>window.pf02Fixture.advance(minute),first.kickoff+12);
+    assert.equal(await liveCanvas.evaluate(c=>c.toDataURL()),pausedCanvas,'pause freezes the feed');
+    await page.evaluate(()=>window.pf02Fixture.pause(false));
+    await page.evaluate(minute=>window.pf02Fixture.advance(minute),first.kickoff+12);
+    await page.waitForFunction(old=>document.querySelector('.sports-phone-stream-canvas')?.toDataURL()!==old,pausedCanvas);
     await page.evaluate(minute=>window.pf02Fixture.advance(minute),first.end+1);
     await panel.locator('.sports-phone-live').waitFor({state:'detached',timeout:3500});
     await page.waitForFunction(()=>document.querySelector('.sports-phone-stream-status')?.textContent.includes('Следующий эфир'));
     assert.match(await panel.locator('.sports-phone-stream-status').innerText(),/\d{2}:\d{2}/);
-    await page.evaluate(()=>window.pf02Fixture.pause());
+    await page.evaluate(()=>window.pf02Fixture.pause(true));
     assert.equal(await panel.locator('.sports-watch-mobile').count(),0);
     assert.deepEqual(errors,[],'PF-02 presenter errors at '+width+'x'+height);
     await context.close();
