@@ -193,9 +193,18 @@ try{
         const corners=tool==='paint'?[[1.25,-8.75],[3.75,-7.25]]:[[18.75,8.75],[19.75,9.75]];
         const kind=tool==='paint'?'yard':'pool-water';
         for(const [i,[x,z]] of corners.entries()){
-          const at=await point(x,z,kind);
+          // Just as a player would, expose an off-screen target using the
+          // visible zoom control BEFORE tapping. Do not retry failed touches
+          // or bypass the actual pointer path. Reproject after each zoom.
+          let at=await point(x,z,kind);
+          const projections=[at];
+          for(let zoom=0;!at.clear&&zoom<3;zoom++){
+            await parcelAction(page,'zoom-out').tap();
+            at=await point(x,z,kind);
+            projections.push(at);
+          }
           assert.ok(at.clear&&at.hit?.kind===kind&&at.actualCell===at.expectedCell,
-            name+' '+tool+' corner '+i+' projection '+JSON.stringify(at));
+            name+' '+tool+' corner '+i+' projection '+JSON.stringify(projections));
           await page.touchscreen.tap(at.x,at.y);
           const expected=i===0?[.5,.5]:
             [Math.abs(corners[1][0]-corners[0][0])+.5,Math.abs(corners[1][1]-corners[0][1])+.5];
