@@ -23,6 +23,7 @@ import {HUD_COMPACT_KEY,createHudPanel} from './hud-panel.js';
 import {readV1Save,writeV1Save} from './qsk-09-save-safety.js';
 import {validateV1BackupText,exportV1BackupText,commitV1Backup,backupSummary,MAX_V1_BACKUP_BYTES} from './qsk-09-backup.js';
 import {createNeedTrendTracker} from './need-trends.js';
+import {createToastUI} from './qsk-11-toast-ui.js';
 import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
 import {createDayNightRenderer} from './day-night-render.js';
@@ -507,24 +508,12 @@ let resetRuntime = () => {};
 let restartAutonomyWait = () => {};
 let onManualCommandQueued = () => {};
 let inspectQueueWait=()=>null;
-let toastTimeout;
-function toast(message,{incidentResidentId=null}={}) {
-  const el=$('toast');
-  el.replaceChildren(document.createTextNode(message));
-  el.classList.toggle('toast-actionable',Boolean(incidentResidentId));
-  if(incidentResidentId&&pendingWorkIncident(game,incidentResidentId)){
-    const button=document.createElement('button');
-    button.type='button';button.className='toast-incident-cta';
-    button.textContent='Решить';
-    button.setAttribute('aria-label','Решить рабочую ситуацию: '+
-      (incidentResidentId==='mira'?'Мира':'Алекс'));
-    button.addEventListener('click',()=>openWorkIncident(incidentResidentId));
-    el.append(button);
-  }
-  el.classList.add('show');
-  clearTimeout(toastTimeout);
-  toastTimeout=setTimeout(()=>el.classList.remove('show'),incidentResidentId?8000:2600);
-}
+// The legacy toast(message, options) interface is preserved at every call site.
+const toast=createToastUI({
+  element:$('toast'),document,
+  incidentPending:id=>pendingWorkIncident(game,id),
+  openIncident:id=>openWorkIncident(id)
+});
 // Never serialize a not-yet-rendered fallback household during a failed 3D boot.
 // The last valid on-device save stays byte-for-byte untouched until startup succeeds.
 let bootReadyToSave=false;
