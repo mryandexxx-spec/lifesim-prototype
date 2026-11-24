@@ -67,7 +67,10 @@ test('UI4: save schema untouched and Pages packages both new modules',()=>{
  assert.match(pages,/node --check src\/required-choice-focus\.js/);
  const packaged=pages.split('\n').filter(line=>line.trim().startsWith('cp ')&&line.trim().endsWith(' site/src/')).flatMap(line=>line.trim().split(/\s+/).slice(1,-1));
  for(const file of ['plan-preview','ui-layout','required-choice-focus'])assert.ok(packaged.includes('src/'+file+'.js'),file);
- assert.match(src,/localStorage.getItem\(SAVE_KEY\)/);
+  assert.match(src,/readV1Save\(localStorage,SAVE_KEY\)/,
+    'save-v1 must be read without corrupting legacy household bytes');
+  assert.ok(packaged.includes('src/qsk-09-save-safety.js'),
+    'QSK-09 protected storage boundary must ship with game ESM');
  assert.match(html,/сборка \/ 1\.2u/);
  assert.match(html,/styles\.css\?v=1\.2u/);
  assert.match(html,/src\/game\.js\?v=1\.2u/);
