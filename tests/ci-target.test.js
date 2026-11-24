@@ -265,7 +265,7 @@ test('QSK-02 routes SW, startup and recovery risks to real mobile WebGL fault ma
 test('QSK-11 extracted live task UI routes real browser and social/queue regression',()=>{
   const plan=planChanges(['src/qsk-11-task-labels.js']);
   assert.equal(plan.browser,true);
-  for(const file of ['tests/qsk-11-task-labels.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js'])
+  for(const file of ['tests/qsk-11-task-labels.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js','tests/ui-nonblocking.test.js'])
     assert.ok(plan.tests.includes(file),file);
   assert.equal(planChanges(['src/kitchen.js']).browser,false);
 });
