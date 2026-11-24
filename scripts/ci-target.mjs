@@ -174,7 +174,7 @@ function main(){
   console.log('P4 Life Systems four-viewport integration:',plan.integration_qa?'required':'not needed');
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
-    'parcel_editor='+changed.some(f=>f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
+    'parcel_editor='+changed.some(f=>f==='src/qsk-11-home-menu.js'||f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
     'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'cas_hud='+(plan.cas_hud?'true':'false')+'\n'+
     'cas_soak='+(plan.cas_soak?'true':'false')+'\n'+'cas_modular='+(plan.cas_modular?'true':'false')+'\n'+'cas_alex='+(plan.cas_alex?'true':'false')+'\n'+'cas_styles='+(plan.cas_styles?'true':'false')+'\n'+'cas_cc0='+(plan.cas_cc0?'true':'false')+'\n'+'cas_c3='+(plan.cas_c3?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
     'qsk_02='+(plan.qsk_02?'true':'false')+'\n'+
