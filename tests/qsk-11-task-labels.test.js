@@ -49,7 +49,7 @@ test('QSK-11 active labels use real resident action and shared social state with
   alex.action={id:'music',activityId:'missing'};
   mira.action={id:'unknown'};
   const before=JSON.stringify(game);
-  assert.equal(labelActiveTask(game,'alex'),'Занятие');
+  assert.equal(labelActiveTask(game,'alex'),'Слушать музыку');
   assert.equal(labelActiveTask(game,'mira'),'Занятие');
   assert.equal(JSON.stringify(game),before);
   game.socialAction={initiator:'alex',partner:'mira',kind:'missing',conversation:{}};
