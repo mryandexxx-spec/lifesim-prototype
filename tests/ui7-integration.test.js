@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const html=read('../index.html'),css=read('../styles.css'),game=read('../src/game.js');
+const adapter=read('../src/qsk-11-tour-ui.js');
 const workflow=read('../.github/workflows/pages.yml');
 test('UI7 optional, keyboard dismissible, accessible three-step help without blocking 3D',()=>{
  for(const id of ['tour-panel','tour-replay','tour-progress','tour-title','tour-body',
@@ -12,17 +13,16 @@ test('UI7 optional, keyboard dismissible, accessible three-step help without blo
  assert.match(css,/\.tour-panel\[hidden\]\{display:none!important;\}/);
  assert.match(css,/\.tour-panel h2\{font-size:20px/);
  assert.match(css,/\.tour-actions button\{min-height:48px/);
- assert.match(game,/if\(event.key==='Escape'&&tourOpen/);
+ assert.match(adapter,/if\(event.key==='Escape'&&tourOpen/);
 });
 test('UI7 reads only separate UI preference, does not alter household save',()=>{
  assert.match(game,/localStorage\.getItem\(UI_TOUR_STORAGE_KEY\)/);
  assert.match(game,/localStorage\.setItem\(UI_TOUR_STORAGE_KEY,'done'\)/);
  assert.match(game,/shouldShowTour\(seen\)&&!dialogueNeedsDecision\(game\)/);
  assert.match(game,/if\(enteringRequired\)\{\s*closeTour\(\);/);
- const begin=game.indexOf('const uiTour=createUITour();');
- const end=game.indexOf('// View remains a presentation-only popover',begin);
- const section=game.slice(begin,end);
- assert.ok(begin>=0&&end>begin);
+ assert.match(game,/createTourUI\(\{/);
+ assert.match(game,/requiredDialogue:\(\)=>dialogueNeedsDecision\(game\)/);
+ const section=adapter;
  assert.doesNotMatch(section,/save\(|tick\(|cancelSocial\(|enqueueAction\(|game\.needs\s*=/);
 });
 test('UI7 six real bars and camera gestures are retained from concurrently released M4/UI6',()=>{
