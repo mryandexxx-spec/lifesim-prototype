@@ -1,20 +1,8 @@
 name: CAS-HEAD-V2-P2 experimental Blender art (isolated)
 on:
-  push:
-    branches: [art/cas-head-v2-p2-derivative-blender-20261124]
-    paths:
-      - 'art-review/cas-head-v2/blender-p2-derivative-wip.py'
-      - 'art-review/cas-head-v2/expand-sparse-p2.py'
-      - 'art-review/cas-head-v2/p2-lab/**'
-      - 'tests/cas-head-v2-p2-lab.test.js'
-      - '.github/workflows/cas-head-v2-p2-isolated.yml'
-  pull_request:
-    paths:
-      - 'art-review/cas-head-v2/**'
-      - 'tests/cas-head-v2-p2-lab.test.js'
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: cas-head-v2-p2-${{ github.ref }}
   cancel-in-progress: true
@@ -88,13 +76,3 @@ jobs:
             /vercel/p2-output/*-max5.png
             /vercel/p2-output/*-head-skin.png
             /vercel/p2-output/p2-structural-receipt.json
-      - name: Publish generated WIP GLBs only into review branch (not game or Pages)
-        if: github.event_name == 'push' && github.ref_name == 'art/cas-head-v2-p2-derivative-blender-20261124'
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add art-review/cas-head-v2/p2-lab/assets/*.glb
-          if ! git diff --cached --quiet; then
-            git commit -m "art(CAS-HEAD-V2-P2): generated Blender WIP GLB preview ONLY (art rejected)"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
