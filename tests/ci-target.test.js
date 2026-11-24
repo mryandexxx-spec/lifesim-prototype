@@ -279,3 +279,13 @@ test('QSK-11/B toast UI must route mobile WebGL, accessibility and social regres
     assert.ok(plan.tests.includes(file),file);
   assert.equal(planChanges(['README.md']).browser,false);
 });
+
+test('QSK-11/C view popover changes require mobile WebGL and input regression',()=>{
+  const plan=planChanges(['src/qsk-11-view-popover.js']);
+  assert.equal(plan.browser,true);
+  for(const file of [
+    'tests/qsk-11-view-popover.test.js','tests/ui-nonblocking.test.js',
+    'tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js',
+    'tests/q1-q4-regression.test.js'
+  ])assert.ok(plan.tests.includes(file),file);
+});

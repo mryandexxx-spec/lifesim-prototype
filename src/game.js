@@ -6,7 +6,8 @@ import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.j
 import {pickWorldRayTarget} from './world-interactions.js';
 import {planPreview,planTaskIcon} from './plan-preview.js';
 import {residentMoodInsight,socialReactionInsight,insightLayerPolicy} from './insight-presentation.js';
-import {contextualPlacement,viewMenuPlacement} from './ui-layout.js';
+import {contextualPlacement} from './ui-layout.js';
+import {createViewPopover} from './qsk-11-view-popover.js';
 import {createRequiredChoiceFocus} from './required-choice-focus.js';
 import {characterCardSnapshot,oncePerButton} from './ux05-character-ui.js';
 import {createLoadingProgress} from './loading-progress.js';
@@ -405,51 +406,20 @@ document.addEventListener('keydown',event=>{
   }
 },true);
 
-// View is a presentation-only popover: both existing preferences remain wired
-// to their original IDs and neither value enters the saved household schema.
-let viewOpen=false;
-const positionViewPanel=()=>{
-  if(!viewOpen)return;
-  const b=$('view-toggle').getBoundingClientRect();
-  const appRect=canvas.getBoundingClientRect();
-  const panel=$('view-panel');
-  const pos=viewMenuPlacement({
-    buttonLeft:b.left-appRect.left,buttonTop:b.top-appRect.top,
-    viewportWidth:canvas.clientWidth,viewportHeight:canvas.clientHeight,
-    menuWidth:panel.offsetWidth||226,menuHeight:panel.offsetHeight||160
-  });
-  panel.style.setProperty('--view-x',pos.x+'px');
-  panel.style.setProperty('--view-y',pos.y+'px');
-};
-function setViewOpen(open,{restoreFocus=false}={}){
-  if(open&&(dialogueNeedsDecision(game)||furnishMode||buildMode||outdoorMode))return;
-  viewOpen=Boolean(open);
-  $('view-panel').hidden=!viewOpen;
-  $('view-toggle').setAttribute('aria-expanded',String(viewOpen));
-  if(viewOpen){
+// View remains a presentation-only popover: all commands and mode guards
+// stay in game, while the DOM/pointer/focus wiring belongs to the adapter.
+const viewPopover=createViewPopover({
+  element:$,canvas,document,window,requestFrame:requestAnimationFrame,
+  canOpen:()=>!(dialogueNeedsDecision(game)||furnishMode||buildMode||outdoorMode),
+  requiredDialogue:()=>dialogueNeedsDecision(game),
+  onOpen:()=>{
     setHomeOpen(false);calendarUI.close();closeCalendarAnchorPanel();
     closeTour();closeMindPanel();closeInsightPanel();queueVisible=false;renderQueuePanel(true);
     closeSocialContext();
     select(null);
-    requestAnimationFrame(()=>{positionViewPanel();$('view-panel').focus({preventScroll:true});});
-  }else if(restoreFocus){
-    $('view-toggle').focus({preventScroll:true});
   }
-}
-$('view-toggle').addEventListener('click',()=>setViewOpen(!viewOpen));
-$('view-close').addEventListener('click',()=>setViewOpen(false,{restoreFocus:true}));
-document.addEventListener('pointerdown',event=>{
-  if(!viewOpen)return;
-  if($('view-panel').contains(event.target)||$('view-toggle').contains(event.target))return;
-  setViewOpen(false);
-},true);
-document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'&&viewOpen&&!dialogueNeedsDecision(game)){
-    event.preventDefault();setViewOpen(false,{restoreFocus:true});
-  }
-},true);
-window.addEventListener('resize',positionViewPanel);
-
+});
+const setViewOpen=viewPopover.setOpen;
 const META = {
   bed: { title: 'Уютная кровать', category: 'Спальня', description: 'Сон восстанавливает энергию', icon: '☾', anchor: [-2.5, 1.22, -1.48] },
   fridge: { title: 'Холодильник', category: 'Кухня', description: 'Быстрый перекус утоляет голод немного. Полноценный обед — за ближайшим подходящим столом', icon: '◕', anchor: [3.42, 2.13, -2.79] },
@@ -10073,7 +10043,7 @@ function boot() {
       socialFlashLeft=4.1;
     }
     socialFlashLeft=Math.max(0,socialFlashLeft-Math.min(dt,.06));
-    const optionalOpen=insightOpen||viewOpen||queueVisible||socialContextVisible||
+    const optionalOpen=insightOpen||viewPopover.isOpen()||queueVisible||socialContextVisible||
       Boolean(socialMenuCategory)||sharedPicker||conversationTopicPicker||
       branchPicker||selected!==null||!$('mind-panel').hidden;
     const layers=insightLayerPolicy({
