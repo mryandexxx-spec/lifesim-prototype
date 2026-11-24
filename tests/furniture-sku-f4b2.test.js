@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {isWindowPanel} from '../src/window-mount.js';
 import {runInNewContext} from 'node:vm';
 import {FURNITURE_PRODUCTS,FURNITURE_LEGACY_OFFERS,FURNITURE_APPEARANCES,
   furnitureProduct,compatibleFurnitureProduct} from '../src/furniture-products.js';
@@ -188,7 +189,7 @@ test('F4b2 product appearance is applied only on the bought clone, not every pla
       location:'home',x:0,z:0,yaw:0}]}}},
     decorNodes:nodes,decorTemplates:new Map([['plant',{clone(){clones++;return node();}}]]),
     MARKET_OFFERS:[{prefabId:'plant'}],app:{root:{addChild(){}}},
-    applySkuModel:(node,id)=>style.push(id),meshyFurnitureDisplaySku:()=>null,meshyFurniture:{attach(){}},PROCEDURAL_DEFAULT_SKU:{},MOUNTED_LIGHTS:{},refreshSofaSeat(){}};
+    applySkuModel:(node,id)=>style.push(id),meshyFurnitureDisplaySku:()=>null,meshyFurniture:{attach(){}},PROCEDURAL_DEFAULT_SKU:{},MOUNTED_LIGHTS:{},isWindowPanel,refreshSofaSeat(){}};
   runInNewContext('(()=>{'+game.slice(start,end)+'\nupdateDecorNodes();})()',ctx,{timeout:1200});
   assert.equal(clones,1);
   assert.deepEqual(style,['plant.amber']);

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {isWindowPanel} from '../src/window-mount.js';
 import {runInNewContext} from 'node:vm';
 import {newHousehold,loadHousehold} from '../src/household.js';
 import {createFurnitureEditor} from '../src/furniture-editor.js';
@@ -104,7 +105,7 @@ test('F2.1 PlayCanvas runtime creates, stores and removes real independent prefa
   const template={clone(){clones++;return fakeNode();}};
   const ctx={game,decorNodes:nodes,decorTemplates:new Map([['plant',template]]),
     MARKET_OFFERS:[{prefabId:'plant'}],app:{root:{addChild(){}}},
-    applySkuModel(){},meshyFurnitureDisplaySku:()=>null,meshyFurniture:{attach(){}},PROCEDURAL_DEFAULT_SKU:{},MOUNTED_LIGHTS:{},refreshSofaSeat(){refreshes++;}};
+    applySkuModel(){},meshyFurnitureDisplaySku:()=>null,meshyFurniture:{attach(){}},PROCEDURAL_DEFAULT_SKU:{},MOUNTED_LIGHTS:{},isWindowPanel,refreshSofaSeat(){refreshes++;}};
   assert.doesNotThrow(()=>runInNewContext(updateCode,ctx,{timeout:1000}));
   assert.equal(clones,1);
   assert.equal(nodes.get(duplicate).at.x,0);

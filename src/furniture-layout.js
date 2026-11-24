@@ -9,6 +9,8 @@ import {musicListeningSpots,chooseMusicListeningSpot} from './music-listening.js
 import {diningSeatMatches,diningSeatApproach,isPermittedDiningTuck} from './dining.js';
 import {MOUNTED_LIGHTS,mountedAnchorAt,lightingMountPose} from './mounted-lighting.js';
 
+import {isWindowPanel,quoteWindowMount} from './window-mount.js';
+
 const validPose=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&[0,90,180,270].includes(p.yaw);
 const overlap=(a,b)=>Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*
   Math.max(0,Math.min(a.maxZ,b.maxZ)-Math.max(a.minZ,b.minZ));
@@ -21,6 +23,13 @@ export function proposeFurnitureMove(world,instanceId,pose,{lockedInstanceIds=[]
   if(index<0)return {ok:false,reason:'missing-instance'};
   if(lockedInstanceIds.includes(instanceId))return {ok:false,reason:'reserved'};
   const original=source.instances[index];
+  if(isWindowPanel(original.itemDefinitionId)){
+    const q=quoteWindowMount(construction,source,original.itemDefinitionId,pose,instanceId);
+    if(!q.ok)return q;
+    return {ok:true,world:restoreFurnitureWorld({...source,revision:source.revision+1,
+      instances:source.instances.map((x,i)=>i===index?{...x,mount:q.mount,
+        x:q.pose.x,z:q.pose.z,yaw:q.pose.yaw}:x)})};
+  }
   if(MOUNTED_LIGHTS[original.itemDefinitionId]){
     const mount=mountedAnchorAt(construction,original.itemDefinitionId,pose.x,pose.z);
     const lightPose=mount&&lightingMountPose(construction,original.itemDefinitionId,mount);

@@ -79,6 +79,7 @@ import {ROOF_STYLES,ROOF_MATERIALS,ROOF_PITCHES,ROOF_EAVES,
 import {FURNITURE_CATALOG,ORIGINAL_FURNITURE,LEGACY_FURNITURE_IDS,
   instanceRect,furnitureRenderOrigin,rotateLocal} from './furniture-catalog.js';
 import {proposeFurnitureMove} from './furniture-layout.js';
+import {isWindowPanel,quoteWindowMount,windowMountPose,validateWindowMounts,windowMountVisible} from './window-mount.js';
 import {F1_MOVEABLE_PREFABS,createFurnitureEditor,canMoveFurniture,
   snapFurnitureCoordinate,furnitureFloorPoint} from './furniture-editor.js';
 import {FURNITURE_HOLD_MS,createFurnitureHoldGesture} from './furniture-hold.js';
@@ -2917,6 +2918,13 @@ function boot() {
       node.enabled=item.location==='home'||previewing;
       if(!node.enabled)continue;
       const pose=previewing?previewPose:item;
+      if(isWindowPanel(item.itemDefinitionId)){
+        const q=previewing?quoteWindowMount(game.world.construction,game.world.furniture,item.itemDefinitionId,pose,item.instanceId):null;
+        const windowPose=previewing?(q?.ok?q.pose:null):windowMountPose(game.world.construction,item.itemDefinitionId,item.mount);
+        node.enabled=!!windowPose&&(previewing||windowMountVisible(windowPose,constructionWallMode));
+        if(windowPose){node.setPosition(windowPose.x,windowPose.y,windowPose.z);node.setEulerAngles(0,-windowPose.yaw,0);}
+        continue;
+      }
       // A stored object is visible only as a transient ghost; no saved
       // location, instanceId or mounted-light anchor is changed here.
       const mount=previewing&&MOUNTED_LIGHTS[item.itemDefinitionId]
@@ -5161,6 +5169,12 @@ function boot() {
   let shopPlacing=false,shopPreviewEntity=null,shopPreviewType=null;
   let shopSwipeRawPose=null; // transient, unsnapped, never stored
   let lastShopCameraPreviewAt=0;
+  let windowPreviewWallMode=null;
+  const syncWindowPlacementWalls=()=>{
+    const active=!!(shopPlacing&&isWindowPanel(shopSelectedItemId)||ownedPlacement&&isWindowPanel(game.world.furniture.instances.find(i=>i.instanceId===ownedPlacement.instanceId)?.itemDefinitionId));
+    if(active&&windowPreviewWallMode===null){windowPreviewWallMode=constructionWallMode;constructionWallMode='up';syncConstructionRender(true);updateDecorNodes();}
+    else if(!active&&windowPreviewWallMode!==null){constructionWallMode=windowPreviewWallMode;windowPreviewWallMode=null;syncConstructionRender(true);updateDecorNodes();}
+  };
   const ghostValid=mat('#3b9c73',{opacity:.23});
   const ghostInvalid=mat('#b84d55',{opacity:.26});
   const furnitureGhost=box('F1 placement preview',0,.075,0,.1,.038,.1,ghostValid);
@@ -5284,6 +5298,9 @@ function boot() {
       'unreachable-utility':'К этой мебели нельзя подойти · освободи место перед ней',
       'insufficient-credits':'Недостаточно пробных кредитов',
       'full-household':'Слишком много предметов',
+      'missing-window-mount':'Подведи окно к свободной непрерывной стене',
+      'window-mount-occupied':'На этом участке стены уже есть окно или декор',
+      'window-mount-blocks-construction':'Сначала перенеси окно или убери его на склад',
       'missing-light-mount':'Нужна настоящая стена рядом или пол внутри комнаты',
       'light-mount-occupied':'На этом креплении уже есть светильник',
       'mounted-light-blocks-construction':'Сначала перенеси или убери светильник с изменяемой стены',
@@ -5304,6 +5321,7 @@ function boot() {
     game.world.furniture,game.shop,ownedPlacement.kind,
     ownedPlacement.instanceId,ownedPlacement.pose,editorContext()):null;
   const renderOwnedPlacement=()=>{
+    syncWindowPlacementWalls();
     const stage=ownedPlacement,box=$('furnish-owned-preview');
     box.hidden=!stage;
     $('furniture-editor').dataset.ownedPlacing=String(!!stage);
@@ -5323,7 +5341,9 @@ function boot() {
     $('furnish-owned-confirm').disabled=!canConfirm;
     $('furnish-owned-confirm').textContent=stage.kind==='restore'
       ?'✓ Вернуть бесплатно':'✓ Подтвердить';
-    const rect=instanceRect(stage.pose,FURNITURE_CATALOG[item.prefabId].footprint);
+    $('furnish-owned-turn').disabled=isWindowPanel(item.itemDefinitionId);
+    const installed=quote?.ok&&isWindowPanel(item.itemDefinitionId)?quote.world.instances.find(i=>i.instanceId===item.instanceId):null;
+    const rect=instanceRect(installed||stage.pose,FURNITURE_CATALOG[item.prefabId].footprint);
     furnitureGhost.setPosition((rect.minX+rect.maxX)/2,.075,(rect.minZ+rect.maxZ)/2);
     furnitureGhost.setLocalScale(Math.max(.15,rect.maxX-rect.minX),.038,
       Math.max(.15,rect.maxZ-rect.minZ));
@@ -5337,6 +5357,7 @@ function boot() {
   const cancelOwnedPlacement=(feedback=true)=>{
     if(!ownedPlacement)return;
     ownedPlacement=null;ownedSwipeRawPose=null;
+    syncWindowPlacementWalls();
     editDrag=null;canvas.dataset.furnitureGrab='false';
     furnitureGhost.enabled=false;
     updateDecorNodes();renderFurnitureSelection();renderWarehouse();
@@ -5544,6 +5565,12 @@ function boot() {
       }
     }
     if(shopPreviewEntity){
+      if(isWindowPanel(shopSelectedItemId)){
+        const q=quoteWindowMount(game.world.construction,game.world.furniture,shopSelectedItemId,shopPose);
+        shopPreviewEntity.enabled=q.ok;
+        if(q.ok){shopPreviewEntity.setPosition(q.pose.x,q.pose.y,q.pose.z);shopPreviewEntity.setEulerAngles(0,-q.pose.yaw,0);}
+        return;
+      }
       shopPreviewEntity.enabled=!!shopPose;
       if(shopPose){
         shopPreviewEntity.setPosition(shopPose.x,0,shopPose.z);
@@ -5552,6 +5579,7 @@ function boot() {
     }
   };
   const renderMarket=()=>{
+    syncWindowPlacementWalls();
     // In buy-to-place the one-finger gesture moves the object, not the camera.
     if(furnishMode&&shopPlacing)
       $('hint').textContent=oneFingerMode==='orbit'
@@ -5620,7 +5648,7 @@ function boot() {
     $('furnish-placement-guide').hidden=!shopPlacing;
     $('furnish-placing-name').textContent=listing?.name||'Предмет';
     $('furnish-placing-status').textContent=shopPlacing
-      ?(MOUNTED_LIGHTS[listing?.itemId]?.mount==='wall'
+      ?(isWindowPanel(listing?.itemId)?'Подведи окно к стене: поворот и крепление автоматические.':MOUNTED_LIGHTS[listing?.itemId]?.mount==='wall'
         ?'Проведи по полу вдоль стены: бра крепится к ближайшему свободному сегменту.'
         :MOUNTED_LIGHTS[listing?.itemId]?.mount==='ceiling'
           ?'Коснись пола нужной комнаты — светильник поднимется к потолку.'
@@ -5645,10 +5673,11 @@ function boot() {
     // Browsing/trying a SKU is free, even when the family cannot afford it.
     // Only the final purchase requires the authoritative wallet/placement quote.
     $('furnish-buy').disabled=shopPlacing?!suitable:!listing;
-    $('furnish-preview-turn').disabled=!shopPlacing||!shopPose;
+    $('furnish-preview-turn').disabled=!shopPlacing||!shopPose||isWindowPanel(shopSelectedItemId);
     syncShopPreviewEntity();
     if(shopPlacing&&shopPose&&listing){
-      const rect=instanceRect(shopPose,FURNITURE_CATALOG[shopSelected].footprint);
+      const installed=preview?.ok&&isWindowPanel(shopSelectedItemId)?preview.world.instances.find(i=>i.instanceId===preview.instanceId):null;
+      const rect=instanceRect(installed||shopPose,FURNITURE_CATALOG[shopSelected].footprint);
       marketGhost.setPosition((rect.minX+rect.maxX)/2,.079,(rect.minZ+rect.maxZ)/2);
       marketGhost.setLocalScale(Math.max(.22,rect.maxX-rect.minX+.14),.052,
         Math.max(.22,rect.maxZ-rect.minZ+.14));
@@ -5885,6 +5914,9 @@ function boot() {
       shopPlacing=true;shopPose=null;shopManualPose=false;shopSwipeRawPose=null;
       // Let the edit sheet collapse BEFORE choosing the visible room anchor.
       renderMarket();moveShopPreviewToCamera(true);
+      if(isWindowPanel(shopSelectedItemId)&&!quoteWindowMount(game.world.construction,game.world.furniture,shopSelectedItemId,shopPose).ok){
+        shopPose=findMarketPlacement(game.world.furniture,game.shop,shopSelectedItemId,editorContext());renderMarket();
+      }
       editorFeedback('Размещение: веди предмет по полу одним пальцем, двумя поворачивай камеру, затем «Установить».');
       return;
     }
@@ -5964,7 +5996,7 @@ function boot() {
       if(source.x===stage.pose.x&&source.z===stage.pose.z&&source.yaw===stage.pose.yaw)return;
       // The editor is the existing source of truth for reversible movement.
       if(!commitFurniture(stage.instanceId,stage.pose))return;
-      ownedPlacement=null;ownedSwipeRawPose=null;renderFurnitureSelection();
+      ownedPlacement=null;ownedSwipeRawPose=null;syncWindowPlacementWalls();renderFurnitureSelection();
     }else{
       if(!applyMarketTransaction(restoreMarketItem(game.world.furniture,game.shop,
         stage.instanceId,stage.pose,editorContext()),'Со склада · бесплатно'))return;
@@ -6059,7 +6091,10 @@ function boot() {
       toast('Сначала выбери ответ или заверши разговор');return;
     }
     editSession=createFurnitureEditor(game.world.furniture,game.shop);
-    editSession.setValidator(furniture=>protectPoolFromWorldEdit(game,{furniture}));
+    editSession.setValidator(furniture=>{
+      const guard=validateWindowMounts(game.world.construction,furniture);
+      return guard.ok?protectPoolFromWorldEdit(game,{furniture}):guard;
+    });
     // F5-D.2: reach built rooms across the 32×24 lot while arranging items.
     setCameraBuildBounds({minX:BUILD_LOT.minX+1,maxX:BUILD_LOT.maxX-1,
       minZ:BUILD_LOT.minZ+1,maxZ:BUILD_LOT.maxZ-1,maxDistance:100});
@@ -6082,6 +6117,7 @@ function boot() {
 
   // F5-A construction editor: separate transaction history, no change to Buy mode.
   const buildingReason={
+    'window-mount-blocks-construction':'На изменяемой стене окно: сначала перенеси его или убери на склад',
     'invalid-rectangle':'Протяни прямоугольник хотя бы 1×1 м',
     'pool-water-overlap':'Нельзя строить дом или стену поверх воды бассейна',
     'pool-landing-blocked':'Постройка перекроет вход или выход из бассейна',
@@ -6197,6 +6233,8 @@ function boot() {
     const guard=mountedFixturesSurviveEdit(game.world.construction,candidate.world,
       candidate.furniture||game.world.furniture);
     if(!guard.ok)return guard;
+    const windowGuard=validateWindowMounts(candidate.world,candidate.furniture||game.world.furniture);
+    if(!windowGuard.ok)return windowGuard;
     const poolGuard=protectPoolFromWorldEdit(game,{
       construction:candidate.world,furniture:candidate.furniture||game.world.furniture});
     return poolGuard.ok?candidate:poolGuard;
@@ -6618,7 +6656,7 @@ function boot() {
       constructionWallMode=btn.dataset.buildWalls;
       document.querySelectorAll('[data-build-walls]').forEach(element=>
         element.setAttribute('aria-pressed',String(element===btn)));
-      syncConstructionRender(true);
+      syncConstructionRender(true);updateDecorNodes();
       buildFeedback('Видимость стен: '+btn.textContent);
     }));
   $('build-roof-toggle').addEventListener('click',()=>{
@@ -6662,7 +6700,7 @@ function boot() {
     document.querySelector('.app-shell').dataset.buildMode='false';
     lotGround.enabled=!(game.world?.outdoors?.pools||[]).some(p=>p.cells?.length);
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
-    syncConstructionRender(true);renderPauseButton();save(true);
+    syncConstructionRender(true);updateDecorNodes();renderPauseButton();save(true);
   };
   const enterBuild=()=>{
     if(buildMode)return;
@@ -6671,8 +6709,10 @@ function boot() {
     }
     if(furnishMode)exitFurniture();
     buildSession=createHouseholdConstructionEditor(game.world.construction,game.world.furniture);
-    buildSession.setValidator((construction,furniture)=>
-      protectPoolFromWorldEdit(game,{construction,furniture}));
+    buildSession.setValidator((construction,furniture)=>{
+      const guard=validateWindowMounts(construction,furniture);
+      return guard.ok?protectPoolFromWorldEdit(game,{construction,furniture}):guard;
+    });
     // Never retain the previously selected drawing tool between sessions:
     // one-finger swipes must always pan when Build first opens.
     buildTool='camera';ceilingPreview=false;roofPreview=false;selectedBuildRoof=null;
@@ -7871,6 +7911,7 @@ function boot() {
         m.choices=['move-wall','erase-wall','door','window','arch','paint-wall','paint-facade'].map(id=>pick(id,titleForBuild(id)));
       }else if(f.kind==='furniture'){
         m.actions=m.actions.filter(a=>a.id==='back'||canMoveFurniture(editorItem(f.id)));
+        if(isWindowPanel(editorItem(f.id)?.itemDefinitionId))m.actions=m.actions.map(a=>a.id==='rotate'?{...a,disabled:true,label:'↻ Авто'}:a);
         if(!$('furnish-store').disabled)m.choices.push(command('store','На склад'));
         if(!$('furnish-sell').disabled)m.choices.push(command('sell','Продать…'));
       }else m.choices=[command('sell','Продать…')];
@@ -7901,7 +7942,9 @@ function boot() {
         const status=$(buying?'furnish-preview':'furnish-owned-status');
         m.hint=p.message||status.textContent;m.invalid=status.dataset.invalid==='true';
         m.wallet=balanceQuote(game.shop.credits,buying?listing?.price:0);
-        m.actions.push({...command('turn','↻ 90°'),disabled:buying&&$('furnish-preview-turn').disabled});
+        const autoWindow=isWindowPanel(buying?shopSelectedItemId:editorItem(ownedPlacement?.instanceId)?.itemDefinitionId);
+        if(autoWindow)m.hint+=' · поворот по стене автоматически';
+        m.actions.push({...command('turn',autoWindow?'↻ Авто':'↻ 90°'),disabled:autoWindow||(buying&&$('furnish-preview-turn').disabled)});
         m.actions.push(primary('apply',buying?'Купить':ownedPlacement?.kind==='restore'?'Поставить':'Сохранить',
           $(buying?'furnish-buy':'furnish-owned-confirm').disabled));
         m.choices=[command('auto','Найти место')];
@@ -7978,6 +8021,8 @@ function boot() {
       renderParcel();
     };
     if(!step.ok){fail(step.reason);return;}
+    const windowGuard=validateWindowMounts(step.world.construction||game.world.construction,step.world.furniture||game.world.furniture);
+    if(!windowGuard.ok){fail(windowGuard.reason);return;}
     if(step.poolChange){
       // Only the canonical pool editor may change basin/fixture topology.
       const outdoors=step.world.outdoors;
@@ -8021,7 +8066,7 @@ function boot() {
       updateDecorNodes();refreshMind(game,game.world);refreshMind(game.otherSim,game.world);
       renderWarehouse();renderMarket();
     }
-    if(step.changed.includes('construction'))syncConstructionRender(true);
+    if(step.changed.includes('construction')){syncConstructionRender(true);updateDecorNodes();}
     updateFamilyBalance();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     // Reinitialize native domain sessions from authoritative restored data;

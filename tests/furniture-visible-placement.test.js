@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {isWindowPanel} from '../src/window-mount.js';
 import {runInNewContext} from 'node:vm';
 import {cameraPlacementPose} from '../src/furniture-placement-preview.js';
 import {newFurnitureWorld,FURNITURE_CATALOG,instanceRect} from '../src/furniture-catalog.js';
@@ -32,7 +33,7 @@ test('actual PlayCanvas prefab staging fragment enables a real clone at known no
     destroy(){destroyCalls++;}
   });
   const template={clone(){cloneCalls++;return obj();}};
-  const context={shopOpen:true,shopPlacing:true,shopSelected:'plant',shopSelectedItemId:'legacy.plant',
+  const context={isWindowPanel,shopOpen:true,shopPlacing:true,shopSelected:'plant',shopSelectedItemId:'legacy.plant',
     shopPose:cameraPlacementPose({centerX:0,centerZ:0}),
     shopPreviewEntity:null,shopPreviewType:null,marketGhost:{enabled:false},
     decorTemplates:new Map([['plant',template]]),app:{root:{addChild(){added++;}}},applySkuModel(){},
@@ -87,6 +88,7 @@ test('renderMarket visibly selects exactly one card and enables valid 3D placeme
   const pos=cameraPlacementPose({centerX:0,centerZ:0});
   const visual={enabled:false,render:{material:null},setPosition(){},setLocalScale(){}};
   const state={
+    isWindowPanel,syncWindowPlacementWalls(){},
     $:key=>elements.get(key),shopOpen:true,warehouseOpen:false,oneFingerMode:'pan',
     shopSelected:'plant',shopSelectedItemId:'legacy.plant',shopPlacing:true,shopPose:pos,
     shopListings:[{itemId:'legacy.plant',name:'Растение',prefabId:'plant',price:130}],
