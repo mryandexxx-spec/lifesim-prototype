@@ -145,41 +145,67 @@ try{
       await assertMode(page,'outdoor-editor','pool');
       assert.equal((await page.evaluate(()=>
         window.__LifeSimPoolVisualStats?.()))?.hasPool,true);
-      // PF-01: use the visible unified parcel controls and actual camera ray.
-      // Test only touchable canvas pixels, respecting the clipped camera rect
-      // and current tray height, rather than forcing hidden native controls.
-      const point=async()=>page.evaluate(async world=>{
-        const {Application}=await import('playcanvas');
-        const {lotRaySurface}=await import('/src/lot-surface.js');
+      // PF-01: target canonical cell CENTERS inside the yard/pool, not the
+      // first available pixel on the clipped scene's edge. The latter was
+      // unreliable on landscape Chromium and only showed a tiny single cell.
+      // Verify projection and inverse ray before each real touch.
+      const point=async(x,z,kind)=>page.evaluate(async({x,z,kind,world})=>{
+        const {Application,Vec3}=await import('playcanvas');
+        const {lotRaySurface,outdoorCellAt}=await import('/src/lot-surface.js');
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
         const cam=Application.getApplication().root.findByName('Camera').camera;
         const canvas=document.querySelector('#game-canvas'),rect=canvas.getBoundingClientRect();
-        for(let y=20;y<rect.height-10;y+=10)
-          for(let x=10;x<rect.width-10;x+=10){
-            const sx=x+rect.left,sy=y+rect.top;
-            if(document.elementFromPoint(sx,sy)!==canvas)continue;
-            const near=cam.screenToWorld(x,y,cam.nearClip);
-            const far=cam.screenToWorld(x,y,cam.farClip);
-            const hit=lotRaySurface(near,far,world);
-            if(hit?.kind==='yard')return {x:sx,y:sy};
-          }
-        return null;
-      },initial.world);
+        const p=cam.worldToScreen(new Vec3(x,-.53,z));
+        const sx=Math.round(p.x+rect.left),sy=Math.round(p.y+rect.top);
+        const margin=5;
+        const clear=[[0,0],[-margin,0],[margin,0],[0,-margin],[0,margin]].every(([dx,dy])=>
+          document.elementFromPoint(sx+dx,sy+dy)===canvas);
+        const near=cam.screenToWorld(sx-rect.left,sy-rect.top,cam.nearClip);
+        const far=cam.screenToWorld(sx-rect.left,sy-rect.top,cam.farClip);
+        const hit=lotRaySurface(near,far,world);
+        return {x:sx,y:sy,clear,hit,expectedCell:outdoorCellAt(x,z),
+          actualCell:hit?outdoorCellAt(hit.x,hit.z):null,kind};
+      },{x,z,kind,world:initial.world});
+      // Passive evidence for distinguishing a missed touch, a cancelled
+      // gesture, and a renderer failure; do not inject gameplay events.
+      await page.evaluate(()=>{
+        window.__pf01TouchTrace=[];
+        for(const type of ['pointerdown','pointerup','pointercancel','lostpointercapture'])
+          document.addEventListener(type,e=>{
+            const trace=window.__pf01TouchTrace;
+            trace.push({type,target:e.target.id,x:e.clientX,y:e.clientY,time:e.timeStamp});
+            if(trace.length>16)trace.shift();
+          },{capture:true,passive:true});
+      });
       const outline=()=>page.evaluate(async()=>{
         const {Application}=await import('playcanvas');
         const root=Application.getApplication().root;
         const border=root.findByName('PF-01 pool preview outline');
         const fill=root.findByName('LOT-B1 paint preview');
+        const scale=fill.getLocalScale();
         return {enabled:border.enabled,edges:border.children.length,lit:border.children.some(n=>n.render.material.useLighting),
-          fill:fill.enabled,opacity:fill.render.material.opacity};
+          fill:fill.enabled,opacity:fill.render.material.opacity,size:[scale.x,scale.z]};
       });
       for(const tool of ['paint','erase']){
         await parcelAction(page,'group:water').tap();
         await parcelAction(page,'pick:'+tool).tap();
         assert.equal(await parcelAction(page,'apply').isDisabled(),true);
-        const at=await point();
-        assert.ok(at,'visible yard cell required for '+tool);
-        await page.touchscreen.tap(at.x,at.y);
-        assert.deepEqual(await outline(),{enabled:true,edges:4,lit:false,fill:true,opacity:.62});
+        const corners=tool==='paint'?[[1.25,-8.75],[3.75,-7.25]]:[[18.75,8.75],[19.75,9.75]];
+        const kind=tool==='paint'?'yard':'pool-water';
+        for(const [i,[x,z]] of corners.entries()){
+          const at=await point(x,z,kind);
+          assert.ok(at.clear&&at.hit?.kind===kind&&at.actualCell===at.expectedCell,
+            name+' '+tool+' corner '+i+' projection '+JSON.stringify(at));
+          await page.touchscreen.tap(at.x,at.y);
+          const expected=i===0?[.5,.5]:
+            [Math.abs(corners[1][0]-corners[0][0])+.5,Math.abs(corners[1][1]-corners[0][1])+.5];
+          const actual=await outline();
+          const trace=await page.evaluate(()=>window.__pf01TouchTrace);
+          assert.deepEqual(actual,{enabled:true,edges:4,lit:false,fill:true,opacity:.62,size:expected},
+            name+' '+tool+' corner '+i+' '+JSON.stringify({at,trace,
+              hint:await page.locator('#parcel-editor output').textContent()}));
+          if(i===0)assert.match(await page.locator('#parcel-editor output').textContent(),/противоположной клетки/);
+        }
         await page.screenshot({path:'artifacts/lot-e5/pf-01-'+tool+'-'+name+'.png'});
         await parcelAction(page,'cancel').tap();
         assert.equal((await outline()).enabled,false);
