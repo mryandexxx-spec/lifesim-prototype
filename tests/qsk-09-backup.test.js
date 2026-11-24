@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {SAVE_KEY,newGame} from '../src/simulation.js';
 import {newHousehold,loadHousehold} from '../src/household.js';
-import {MAX_V1_BACKUP_BYTES,validateV1BackupText,exportV1BackupText,commitV1Backup} from '../src/qsk-09-backup.js';
+import {MAX_V1_BACKUP_BYTES,backupSummary,validateV1BackupText,exportV1BackupText,commitV1Backup} from '../src/qsk-09-backup.js';
 
 function storage(seed=null){
   let bytes=seed,writes=0;
@@ -80,4 +80,13 @@ test('QSK-09 file: Safari markup, guarded confirmation and Pages module packagin
   assert.ok(game.includes('commitV1Backup(localStorage,SAVE_KEY,pendingBackup)'));
   assert.ok(pages.includes('cp src/qsk-09-backup.js site/src/'));
   assert.ok(pages.includes('node --check src/qsk-09-backup.js'));
+});
+
+test('QSK-09 backup preview: current root v1 population residentsById counts 3–4 residents',()=>{
+  const household=newHousehold();
+  household.population={schema:1,residentsById:{resident_3:{},resident_4:{}},
+    linksByResident:{},kinship:[],nextResidentSerial:5};
+  assert.equal(backupSummary(household).residents,4);
+  delete household.population.residentsById.resident_4;
+  assert.equal(backupSummary(household).residents,3);
 });
