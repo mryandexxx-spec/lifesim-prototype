@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
 const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-02-2-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|cas-f2-footwear-lab\.html|cas-f2-c3-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
-const isUI=f=>f==='src/cas-f2-c3-lab.js'||f==='cas-f2-c3-lab.html'||f==='src/cas-f2-footwear-lab.js'||f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||f==='src/cas-cc0-shoe-fit-policy.js'||/^(?:index\.html|cas-modular-lab\.html|cas-02-2-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
+const isUI=f=>f==='src/qsk-11-task-labels.js'||f==='src/cas-f2-c3-lab.js'||f==='cas-f2-c3-lab.html'||f==='src/cas-f2-footwear-lab.js'||f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||f==='src/cas-cc0-shoe-fit-policy.js'||/^(?:index\.html|cas-modular-lab\.html|cas-02-2-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
   // Changes to the live needs loop or SKU sleep quality require a real WebGL boot.
   /^src\/(?:simulation|need-balance|furniture-products)\.js$/.test(f)||
   /^src\/(?:game\.js|outdoor-character-motion|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
@@ -55,6 +55,8 @@ export function planChanges(files,root=ROOT){
     }
   }
   const extra=[
+    // Extracted live queue labels need UI/touch regression even when game.js itself is unchanged.
+    [/^src\/qsk-11-task-labels\.js$/,['tests/qsk-01-social-queue.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-11-task-labels.test.js']],
     // Legacy source-level VM tests extract live UI functions, not ESM imports.
     // They MUST run whenever the resident HUD or career phone is edited.
     [/^src\/(?:game|career-phone-ui)\.js$/,[

@@ -128,6 +128,7 @@ import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX
   MAX_BLOCKED_QUEUE} from './action-queue.js';
 import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand} from './queue-rescue.js';
 import {newQueuedHeadGuard,inspectQueuedHead} from './qsk-07-fairness.js';
+import {labelQueuedTask,labelActiveTask} from './qsk-11-task-labels.js';
 import {visibleActionPhase,queuedActionStatus,blockedActionMessage,
   interruptionQuestion,verifiedLastEvent} from './qsk-08-touch-ux.js';
 import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
@@ -633,31 +634,7 @@ $('calendar-anchor-apply').addEventListener('click',()=>{
     toast('Игровая дата: '+formatCalendarDay(calendarAt(game.calendar,game.minutes),{includeYear:true}));
   }catch{toast('Дату нельзя менять после планирования событий.');}
 });
-function taskLabel(task){
-  if(!task)return 'Неизвестное действие';
-  if(task.type==='move')return 'Идти в указанное место';
-  if(task.type==='outdoor')return 'Отдохнуть на садовой скамейке';
-  if(task.type==='grill')return 'Гриль: '+(grillRecipe(task.recipeId)?.label||'готовка');
-  if(task.type==='garden')return task.actionId==='water'?'Полить грядку':
-    task.actionId==='inspect'?'Осмотреть растение':
-    task.actionId==='harvest'?'Собрать садовые травы':
-    task.actionId==='replant'?'Посадить травы заново':'Полюбоваться садом';
-  if(task.type==='pool')return task.actionId==='jump'?'Прыгнуть и поплавать':'Плавать';
-  if(task.type==='object')return task.tvTalk===true?'Поговорить с телевизором':
-    task.mirrorPractice===true?'Репетировать речь':
-      ACTIONS[task.actionId]?.label||'Предмет';
-  if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
-    getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
-  if(task.type==='social')return SOCIAL_ACTIONS[task.actionId]?.label||'Общение';
-  if(task.type==='conversation')return 'Беседа: '+(CONVERSATION_TOPICS[task.topicId]?.label||'Разговор');
-  if(task.type==='branch')return BRANCH_ACTIONS[task.actionId]?.label||'Общение';
-  if(task.type==='shared'){
-    if(task.mode==='gift')return 'Подарить: '+(GIFT_CATALOG[inventoryFor(game,task.residentId||game.selectedSim)
-      .find(x=>x.id===task.choiceId)?.type]?.label||'предмет');
-    return LEISURE_CATALOG[task.choiceId]?.label||'Совместный досуг';
-  }
-  return 'Действие';
-}
+const taskLabel=task=>labelQueuedTask(game,task);
 function scheduleCommand(command,residentId=game.selectedSim){
   if(!HOUSEHOLD_IDS.includes(activeHudResident())&&residentId!==activeHudResident()){
     toast('Для выбранного жителя используй личную панель действий');
@@ -1699,23 +1676,7 @@ function renderSocialMenu(force=true){
   // Preference updates should not throw the player's place in a long list.
   if(sameCategory)panel.scrollTop=previousScroll;
 }
-function activeTaskLabel(id){
-  const s=game.socialAction;
-  if(s&&(s.initiator===id||s.partner===id)){
-    if(s.conversation)return 'Беседа с '+getActorName(s.partner===id?s.initiator:s.partner);
-    if(s.branchAction)return BRANCH_ACTIONS[s.branchAction.id]?.label||'Общение';
-    if(s.shared)return s.shared.choiceId==='tv'?'Смотрит телевизор вместе':
-      s.shared.mode==='gift'?'Вручает или принимает подарок':'Проводит время вместе';
-    return SOCIAL_ACTIONS[s.kind]?.label||'Общается';
-  }
-  const actor=getActor(game,id);
-  if(actor.action?.id==='swim')return poolActivityLabel(actor.action);
-  return actor.action
-    ?(actor.action.id==='music'
-      ?getActivityDefinition(HOBBY_ACTIVITIES,actor.action.activityId)?.label
-      :null)||ACTIONS[actor.action.id]?.label||'Занятие'
-    :null;
-}
+const activeTaskLabel=id=>labelActiveTask(game,id);
 // A single, read-only status area opens the EXISTING full queue. It never
 // dispatches/removes commands and never mutates serialized simulation state.
 function renderPlanPeek(){
