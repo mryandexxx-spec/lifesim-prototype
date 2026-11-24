@@ -4,7 +4,8 @@ export const PHONE_APPS=Object.freeze([
   Object.freeze({id:'food',label:'Блин’Ставка',caption:'Еда, продукты, мебель и декор',icon:'🛍'}),
   Object.freeze({id:'finance',label:'Блин’С Банк',caption:'Финансы семьи',icon:'💳'}),
   Object.freeze({id:'calls',label:'Звонки',caption:'Разговоры с близкими',icon:'☎'}),
-  Object.freeze({id:'sports',label:'Блин’С Спорт',caption:'Лига и матчи',icon:'⚽'})
+  Object.freeze({id:'sports',label:'Блин’С Спорт',caption:'Лига и матчи',icon:'⚽'}),
+  Object.freeze({id:'notifications',label:'Уведомления',caption:'История сообщений семьи',icon:'🔔'})
 ]);
 const APP_IDS=new Set(PHONE_APPS.map(x=>x.id));
 export const phoneAppRoute=id=>APP_IDS.has(id)?id:'home';

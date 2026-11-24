@@ -7,9 +7,9 @@ import {PHONE_APPS,phoneAppRoute} from '../src/phone-app-registry.js';
 import {sportsPhoneView} from '../src/sports-phone-model.js';
 
 const home=()=>newHousehold('2026-11-22');
-test('R1-D adds fifth original sports phone app without changing G routes',()=>{
- assert.deepEqual(PHONE_APPS.map(a=>a.id),['work','food','finance','calls','sports']);
- for(const id of ['work','food','finance','calls','sports'])assert.equal(phoneAppRoute(id),id);
+test('R1-D preserves sports and G routes alongside PF-06 notifications',()=>{
+ assert.deepEqual(PHONE_APPS.map(a=>a.id),['work','food','finance','calls','sports','notifications']);
+ for(const id of ['work','food','finance','calls','sports','notifications'])assert.equal(phoneAppRoute(id),id);
  assert.equal(phoneAppRoute('__proto__'),'home');
 });
 test('R1-D phone projection is entirely read-only on a new unassigned household',()=>{
