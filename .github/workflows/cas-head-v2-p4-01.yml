@@ -1,0 +1,41 @@
+name: CAS P4-01 isolated
+on:
+  pull_request:
+    paths:
+      - 'art-review/cas-head-v2/p4-01/**'
+      - '.github/workflows/cas-head-v2-p4-01.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  asya:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: sudo apt-get update -qq && sudo apt-get install -y libxxf86vm1 libgomp1 libsm6 libice6 libgl1 libgl1-mesa-dri libegl1
+      - run: pip install 'numpy==1.26.4' 'bpy==4.3.0' Pillow
+      - run: npm ci && npm install --no-save playwright@1.56.1
+      - run: npx playwright install --with-deps chromium --only-shell
+      - name: Exact candidate and geometry
+        run: |
+          p=art-review/cas-head-v2
+          mkdir -p /tmp/p4-artifacts
+          OPENBLAS_NUM_THREADS=1 python $p/p4-01/p4_build.py $p/p3-lab/assets/mira-p3.glb /tmp/p4-artifacts/geometry.glb | tee /tmp/p4-artifacts/structure.json
+          OPENBLAS_NUM_THREADS=1 python $p/p4-01/audit.py $p/p3-lab/assets/mira-p3.glb /tmp/p4-artifacts
+          OPENBLAS_NUM_THREADS=1 python $p/p4-01/native.py $p/p3-lab/assets/mira-p3.glb /tmp/p4-artifacts
+      - name: Isolated mobile WebGL
+        run: |
+          node art-review/cas-head-v2/p4-01/prepare.mjs
+          P4_ARTIFACTS=/tmp/p4-artifacts/mobile node art-review/cas-head-v2/p4-01/smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asya-p4-01-review
+          path: /tmp/p4-artifacts
