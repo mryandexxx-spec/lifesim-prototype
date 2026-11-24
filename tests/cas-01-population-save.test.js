@@ -167,8 +167,12 @@ test('CAS-01.3 game boot/write paths are fail-closed on load errors',()=>{
   assert.match(source,/catch \{\s*saveStorageLocked=true;\s*game=newHousehold/);
   assert.match(source,/const canWriteGameSave=\(\)=>bootReadyToSave&&!saveStorageLocked/);
   assert.match(source,/if\(!canWriteGameSave\(\)\)/);
-  const writes=[...source.matchAll(/localStorage\.setItem\(SAVE_KEY,/g)];
-  assert.equal(writes.length,4,'update guard test if any new save writer is added');
+  assert.match(source,/readV1Save\(localStorage,SAVE_KEY\)/,
+    'root-v1 loads must use the protected storage boundary');
+  const writes=[...source.matchAll(/writeV1Save\(localStorage,SAVE_KEY,/g)];
+  assert.equal(writes.length,4,'all four writers must use the guarded atomic v1 boundary');
+  assert.doesNotMatch(source,/localStorage\.setItem\(SAVE_KEY,/,
+    'bypassing protected save writer risks corruption or quota loss');
   assert.equal((source.match(/if\(!canWriteGameSave\(\)\)/g)||[]).length,4,
     'manual, pool, undo writers all must be locked');
 });

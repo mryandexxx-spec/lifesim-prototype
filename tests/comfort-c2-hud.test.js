@@ -30,7 +30,8 @@ test('C2 defers secondary navigation and retains protected gameplay/save flow',(
  assert.match(game,/setHomeOpen\(false\);\$\('build-toggle'\)\.click\(\)/);
  assert.match(game,/dialogueNeedsDecision\(game\)/);
  assert.match(game,/if \(!window\.confirm\('Начать новую жизнь\?/);
- assert.match(game,/localStorage\.setItem\(SAVE_KEY, JSON\.stringify\(game\)\)/);
+  assert.match(game,/writeV1Save\(localStorage,SAVE_KEY,game\)/,
+    'manual save must use QSK-09 protected v1 write boundary');
  assert.match(game,/readPreference:\(\)=>localStorage\.getItem\(HUD_COMPACT_KEY\)/);
  assert.match(game,/from '\.\/camera-gestures\.js'/);
  assert.match(game,/from '\.\/hud-panel\.js'/);
