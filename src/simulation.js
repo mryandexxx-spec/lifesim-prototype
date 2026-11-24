@@ -70,6 +70,18 @@ export const ACTIONS = Object.freeze({
 });
 // Keep consumption rates in one independent balance contract, not duplicated
 // across simulation, social personality logic, the HUD or action handlers.
+// PF-04/B: only a manual arrival selects the shortened physical care cycle.
+// The saved flags are optional v1 data; old in-progress actions retain timing.
+export const MANUAL_CARE_THRESHOLD=95;
+export const MANUAL_SLEEP_MIN_MINUTES=30;
+export function actionDuration(action){
+  const definition=ACTIONS[action?.id];
+  if(action?.automatic===false&&action.phase==='using'&&action.shortSelfCare===true){
+    if(action.id==='shower')return 16;
+    if(action.id==='toilet')return 18;
+  }
+  return definition?.duration??0;
+}
 export const BLADDER_LEGACY_DEFAULT=75;
 export const SAVE_KEY = 'lifesim.room01.v1';
 export const AUTONOMY_WAIT_SECONDS = 12; // Real active-time seconds; x3 never shortens the wait.
@@ -112,6 +124,12 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
       goal:{x:data.action.goal.x,z:data.action.goal.z}};
   }else if (data.action && ACTIONS[data.action.id] && ['walking', 'using'].includes(data.action.phase) && (next.autonomy.enabled || !data.action.automatic)) {
     next.action = { id: data.action.id, phase: data.action.phase, elapsed: Math.max(0, Math.min(1000, Number(data.action.elapsed) || 0)), automatic: Boolean(data.action.automatic) };
+    if(next.action.phase==='using'&&next.action.automatic===false){
+      if(['shower','toilet'].includes(next.action.id)&&data.action.shortSelfCare===true&&
+        next.action.elapsed<(next.action.id==='shower'?16:18))next.action.shortSelfCare=true;
+      if(next.action.id==='bed'&&data.action.manualSleepMinimum===true)
+        next.action.manualSleepMinimum=true;
+    }
     if(data.action.id==='dining'){
       if(validFurnitureInstanceId(data.action.diningSeatInstanceId)&&
         ['toFridge','taking','toSeat','eating'].includes(data.action.diningStage)){
@@ -276,6 +294,13 @@ export function arrive(state) {
   if (state.action?.phase !== 'walking') return;
   state.action.phase = 'using';
   state.action.elapsed = 0;
+  const action=state.action;
+  if(action.automatic===false){
+    if(['shower','toilet'].includes(action.id)&&
+      state.needs[ACTIONS[action.id].need]>=MANUAL_CARE_THRESHOLD)
+      action.shortSelfCare=true;
+    if(action.id==='bed')action.manualSleepMinimum=true;
+  }
 }
 
 export function tick(state, minutes,world=state?.world??null) {
@@ -300,8 +325,10 @@ export function tick(state, minutes,world=state?.world??null) {
   const sleepElapsed=sleeping?state.action.elapsed:0;
   // IMPROVEMENTS-BATCH2: a full Energy reserve is a real wake-up trigger,
   // even when the former minimum bed duration has not elapsed.
+  const manualSleepRemaining=sleeping&&state.action.automatic===false&&
+    state.action.manualSleepMinimum===true?Math.max(0,MANUAL_SLEEP_MIN_MINUTES-sleepElapsed):0;
   const untilWake=sleeping?Math.max(0,Math.min(profile.maxMinutes-sleepElapsed,
-    (SLEEP_WAKE_ENERGY-state.needs.energy)/profile.recoveryPerMinute)):0;
+    Math.max(manualSleepRemaining,(SLEEP_WAKE_ENERGY-state.needs.energy)/profile.recoveryPerMinute))):0;
   const sleepMinutes=Math.min(minutes,untilWake);
   for(const need of PHYSICAL_NEEDS){
     const elapsed=need==='energy'?Math.max(0,minutes-sofaRestMinutes-sleepMinutes):minutes;
@@ -381,7 +408,7 @@ export function tick(state, minutes,world=state?.world??null) {
     if(['hobby','music'].includes(state.action.id)&&!hobby){state.action=null;return;}
     const duration=state.action.id==='mirror'&&state.action.mirrorPractice===true
       ?MIRROR_SPEECH_DURATION:state.action.id==='garden'
-      ?(GARDEN_DURATION[state.action.gardenActionId]??definition.duration):hobby?.timeBudget.targetMinutes??definition.duration;
+      ?(GARDEN_DURATION[state.action.gardenActionId]??definition.duration):hobby?.timeBudget.targetMinutes??actionDuration(state.action);
     const amount = state.action.id==='bed'?sleepMinutes:
       Math.min(minutes, Math.max(0, duration - state.action.elapsed));
     // Hunger rises only when eating, not before taking food from the shelf.
@@ -412,15 +439,15 @@ export function tick(state, minutes,world=state?.world??null) {
       gained=definition.benefitPerMinute*(after-before)/(1-FRIDGE_EAT_START);
     }else if(state.action.id==='shower'){
       // Hygiene rises only under the closed privacy mask with the water on.
-      const from=definition.duration*SHOWER_WASH_START;
-      const to=definition.duration*SHOWER_WASH_END;
+      const from=duration*SHOWER_WASH_START;
+      const to=duration*SHOWER_WASH_END;
       const overlap=Math.max(0,Math.min(state.action.elapsed+amount,to)
         -Math.max(state.action.elapsed,from));
       gained=definition.benefitPerMinute*overlap/(SHOWER_WASH_END-SHOWER_WASH_START);
     }else if(state.action.id==='toilet'){
       // Real relief only during the privacy-enclosed seated window.
-      const from=definition.duration*TOILET_RELIEF_START;
-      const to=definition.duration*TOILET_RELIEF_END;
+      const from=duration*TOILET_RELIEF_START;
+      const to=duration*TOILET_RELIEF_END;
       const overlap=Math.max(0,Math.min(state.action.elapsed+amount,to)
         -Math.max(state.action.elapsed,from));
       gained=definition.benefitPerMinute*overlap/(TOILET_RELIEF_END-TOILET_RELIEF_START);
@@ -456,7 +483,7 @@ export function tick(state, minutes,world=state?.world??null) {
     state.action.elapsed += amount;
     const sleepWoke=sleeping&&sleepMinutes>=untilWake-1e-8;
     if (state.action.elapsed >= duration || sleepWoke ||
-        (!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) &&
+        (state.action.automatic!==false&&!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) &&
           !(state.action.id==='tv'&&state.action.tvTalk===true)&&
           state.needs[definition.need] >= 99.9)) {
       if(state.action.id==='toilet'&&state.action.elapsed>=duration){
