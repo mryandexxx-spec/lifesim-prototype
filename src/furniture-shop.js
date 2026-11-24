@@ -96,9 +96,9 @@ export function buyMarketItem(world,shop,prefabId,pose,opts={}){
     return reject('unreachable-tv');
   if(productPrefabId==='bookcase'&&!sofaReachable(valid.world,id,opts,'hobby'))
     return reject('unreachable-bookcase');
-  if(['chair','armchair'].includes(productPrefabId)&&
-    !sofaReachable(valid.world,id,opts,'seat'))
-    return reject('unreachable-seat');
+  // placement() already checks the real chair/armchair approach, including
+  // the dining side slot. Rechecking the standalone frontal slot rejects
+  // valid tucked chairs at purchase even though move/restore allow them.
   const utilityActions={floorlamp:'lamp',mirror:'mirror',dresser:'dresser',wardrobe:'wardrobe'};
   if(utilityActions[productPrefabId]&&
     !sofaReachable(valid.world,id,opts,utilityActions[productPrefabId]))
