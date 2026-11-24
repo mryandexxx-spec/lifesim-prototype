@@ -317,3 +317,9 @@ test('QSK-11/F time UI routes full Node and mobile browser',()=>{
   assert.equal(plan.browser,true);
   for(const file of ['tests/qsk-11-time-ui.test.js','tests/household.test.js','tests/simulation.test.js','tests/qsk-11-tour-ui.test.js','tests/comfort-c2-hud.test.js']) assert.ok(plan.tests.includes(file),file);
 });
+
+
+test('PF-07: F1 source-text release contract runs before merge on every inspected source',()=>{
+  for(const source of ['src/household.js','src/window-mount.js','src/game.js','src/qsk-11-home-menu.js','src/toilet-interaction.js','index.html','styles.css','.github/workflows/pages.yml'])
+    assert.ok(planChanges([source]).tests.includes('tests/furniture-f1-integration.test.js'),source);
+});
