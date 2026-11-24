@@ -26,13 +26,13 @@ function domainError(raw){
 }
 
 export function backupSummary(raw){
-  const extra=raw.population?.residents;
+  const extra=raw.population?.residentsById;
   const furniture=raw.world?.furniture;
   const items=Array.isArray(furniture?.instances)?furniture.instances.length:
     Array.isArray(furniture?.items)?furniture.items.length:null;
   const queue=raw.actionQueues?.byResident;
   return {
-    residents:1+(raw.otherSim?1:0)+(Array.isArray(extra)?extra.length:0),
+    residents:1+(raw.otherSim?1:0)+(plain(extra)?Object.keys(extra).length:0),
     minutes:raw.minutes,credits:Number.isSafeInteger(raw.shop?.credits)?raw.shop.credits:null,
     items,queued:plain(queue)?Object.values(queue).reduce((n,v)=>n+len(v),0):0
   };
