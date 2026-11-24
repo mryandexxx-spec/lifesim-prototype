@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const CORE=['tests/browser-startup-graph.test.js','tests/simulation.test.js','tests/household.test.js'];
 const isCode=f=>/^(?:src\/|tests\/|scripts\/)/.test(f)||/^(?:index\.html|cas-modular-lab\.html|cas-02-2-lab\.html|cas-alex-wardrobe-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|cas-f2-footwear-lab\.html|cas-f2-c3-lab\.html|styles\.css|sw\.js|package(?:-lock)?\.json)$/.test(f)||f.startsWith('.github/workflows/');
-const isUI=f=>f==='src/qsk-11-task-labels.js'||f==='src/qsk-11-toast-ui.js'||f==='src/qsk-11-view-popover.js'||f==='src/cas-f2-c3-lab.js'||f==='cas-f2-c3-lab.html'||f==='src/cas-f2-footwear-lab.js'||f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||f==='src/cas-cc0-shoe-fit-policy.js'||/^(?:index\.html|cas-modular-lab\.html|cas-02-2-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
+const isUI=f=>f==='src/qsk-11-task-labels.js'||f==='src/qsk-11-toast-ui.js'||f==='src/qsk-11-view-popover.js'||f==='src/qsk-11-home-menu.js'||f==='src/cas-f2-c3-lab.js'||f==='cas-f2-c3-lab.html'||f==='src/cas-f2-footwear-lab.js'||f==='src/cas-cc0-shoe-fit-lab.js'||f==='src/cas-cc0-shoe-rig-lab.js'||f==='src/cas-cc0-shoe-fit-policy.js'||/^(?:index\.html|cas-modular-lab\.html|cas-02-2-lab\.html|cas-resident-footwear-lab\.html|cas-cc0-shoe-fit-lab\.html|cas-cc0-shoe-rig-lab\.html|styles\.css|sw\.js|assets\/)/.test(f)||
   // Changes to the live needs loop or SKU sleep quality require a real WebGL boot.
   /^src\/(?:simulation|need-balance|furniture-products)\.js$/.test(f)||
   /^src\/(?:game\.js|outdoor-character-motion|camera-|mobile-|viewport-|ui|ux|meshy|.*(?:visual|presentation|render|interaction|editor|view|panel|layout|picker|controls|ui)\.js)/.test(f)||
@@ -59,6 +59,7 @@ export function planChanges(files,root=ROOT){
     [/^src\/qsk-11-task-labels\.js$/,['tests/qsk-01-social-queue.test.js','tests/qsk-08-touch-ux.test.js','tests/ui-nonblocking.test.js','tests/qsk-11-task-labels.test.js']],
     [/^src\/qsk-11-toast-ui\.js$/,['tests/qsk-11-toast-ui.test.js','tests/ui-nonblocking.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js','tests/q1-q4-regression.test.js']],
     [/^src\/qsk-11-view-popover\.js$/,['tests/qsk-11-view-popover.test.js','tests/ui-nonblocking.test.js','tests/qsk-08-touch-ux.test.js','tests/qsk-01-social-queue.test.js','tests/q1-q4-regression.test.js','tests/ui4-integration.test.js','tests/ui7-integration.test.js']],
+    [/^src\/qsk-11-home-menu\.js$/,['tests/qsk-11-home-menu.test.js','tests/ui-nonblocking.test.js','tests/qsk-08-touch-ux.test.js','tests/ui4-integration.test.js','tests/ui7-integration.test.js','tests/q1-q4-regression.test.js','tests/parcel-editor.test.js']],
     // Legacy source-text UI assertions span menu entry, bootstrap and Safari cache.
     [/^(?:index\.html|src\/game\.js)$/,['tests/ui4-integration.test.js','tests/ui7-integration.test.js','tests/qsk-11-toast-ui.test.js','tests/qsk-11-view-popover.test.js']],
     // Legacy source-level VM tests extract live UI functions, not ESM imports.
@@ -81,6 +82,9 @@ export function planChanges(files,root=ROOT){
   ];
   for(const [pattern,names] of extra)if(changed.some(f=>pattern.test(f)))
     for(const name of names)if(allTests.includes(name))selected.add(name);
+  // Structural game.js extraction can invalidate any legacy source contract.
+  // Run every Node suite before merging this boundary, not only imported modules.
+  if(changed.includes('src/qsk-11-home-menu.js'))for(const file of allTests)selected.add(file);
   const tests=[...selected].filter(f=>allTests.includes(f)).sort();
   const micro_ux=changed.some(f=>
     /^(?:src\/(?:micro-ux|camera-controls)\.js|tests\/micro-ux-r1-browser-smoke\.mjs)$/.test(f));
