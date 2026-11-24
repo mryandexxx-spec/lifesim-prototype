@@ -427,6 +427,14 @@ jobs:
           node scripts/cas-c4-pages-verify.mjs site
           node scripts/cas-c4c-pages-verify.mjs site
           node scripts/cas-02-2-pages-verify.mjs site
+      - name: Archive QSK-04 asset hash passport for release evidence
+        if: ${{ always() && hashFiles('artifacts/qsk-04/asset-passport.json') != '' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsk-04-pinned-asset-passport-pages
+          path: artifacts/qsk-04/asset-passport.json
+          if-no-files-found: warn
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
