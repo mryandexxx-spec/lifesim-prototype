@@ -52,6 +52,7 @@ jobs:
           if-no-files-found: warn
 
   contact-render:
+    if: false # R2 evidence already retained; D-TOOLS is independent
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -90,5 +91,55 @@ jobs:
         with:
           name: cf-body-d4-motion-audit
           path: d4-motion/
+          retention-days: 90
+          if-no-files-found: warn
+
+  ossos-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-adaptive-evidence
+          run-id: 45655678102
+          github-token: ${{ github.token }}
+          path: d1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d4-contact-audit
+          run-id: 45676236151
+          github-token: ${{ github.token }}
+          path: r1
+      - name: Verify upstream and build selected source without lifecycle scripts
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          grep -q 'Copyright (c) 2021 Sketchpunk Labs' upstream-ossos/LICENSE
+          npm install --prefix .dtools-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.dtools-deps/node_modules" upstream-ossos/node_modules
+          cp art-review/cf-body-d/ossos-gate.mjs upstream-ossos/gate.mjs
+          .dtools-deps/node_modules/.bin/esbuild upstream-ossos/gate.mjs --bundle --platform=node --target=node22 --format=esm --outfile=dtools-bundle.mjs
+          mkdir -p d-tools-out
+          cp upstream-ossos/LICENSE d-tools-out/OSSOS-LICENSE.txt
+          cp .dtools-deps/package-lock.json d-tools-out/dependency-lock.json
+      - name: Compare on actual D4 motion and held-out D1 skeletons
+        run: node dtools-bundle.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-tools-ossos-gate
+          path: d-tools-out/
           retention-days: 90
           if-no-files-found: warn
