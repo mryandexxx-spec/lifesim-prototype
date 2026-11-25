@@ -184,12 +184,12 @@ test('1.0s: actual browser panel is compact, modal, unclosable and has end actio
   assert.match($('conversation-subtitle').textContent,/Игровое время остановлено/);
   const flatten=()=>Array.from($('conversation-options').children).flatMap(x=>x.children?Array.from(x.children):[x]);
   assert.deepEqual(flatten().map(x=>x.label),['Как прошёл день?','Завершить разговор']);
-  scope.conversationOptions=()=>Array.from({length:7},(_,i)=>({id:'daily.test'+i,label:'Реплика '+i,locked:i===6}));
+  scope.conversationOptions=()=>Array.from({length:7},(_,i)=>({id:'daily.test'+i,label:'Реплика '+i,locked:i===6,lockReason:i===6?'Харизма 9':null}));
   scope.renderConversationPanel(true);
   assert.deepEqual(flatten().map(x=>x.label),['Реплика 0','Реплика 1','Реплика 2','Реплика 3','Реплика 4','Другие реплики','Завершить разговор']);
   flatten().find(x=>x.label==='Другие реплики').handler();
-  assert.deepEqual(flatten().map(x=>x.label),['Реплика 5','Реплика 6','Основные реплики','Завершить разговор']);
-  assert.equal(flatten().find(x=>x.label==='Реплика 6').disabled,true);
+  assert.deepEqual(flatten().map(x=>x.label),['Реплика 5','Реплика 6 · 🔒 Харизма 9','Основные реплики','Завершить разговор']);
+  assert.equal(flatten().find(x=>x.label==='Реплика 6 · 🔒 Харизма 9').disabled,true);
   flatten().find(x=>x.label==='Основные реплики').handler();
   assert.equal(flatten()[0].label,'Реплика 0');
 });
