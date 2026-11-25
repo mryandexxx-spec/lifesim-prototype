@@ -4,6 +4,8 @@ import {newHousehold,loadHousehold,tickHousehold,getActor,setHouseholdAutonomy} 
 import {createConversation,conversationOptions,chooseConversationTurn,restoreConversation,continueConversation} from '../src/conversation-engine.js';
 import {dialogueNeedsDecision,applyDialogueDecision} from '../src/dialogue-decision.js';
 import {newGame} from '../src/simulation.js';
+import {restoreSkillProgress} from '../src/skills-engine.js';
+import {HOBBY_SKILLS} from '../src/hobby-reading.js';
 import {isWalkable,findPath,isClearLine} from '../src/navigation.js';
 import {queueAddressedConversation,finishAddressedConversation,cancelAddressedSocial,dispatchAddressedSocial,tickAddressedSocial} from '../src/resident-social-runtime.js';
 import {getPair} from '../src/social-graph.js';
@@ -77,7 +79,8 @@ test('PF-10/A all twelve directed pairs use initiator skills, shared dialogue, r
     if(a===b)continue;
     const root=household();placePair(root,a,b);
     const actor=getActor(root,a),peer=getActor(root,b);
-    actor.skills.xpById.charisma=650;peer.skills.xpById.charisma=1090;
+    actor.skills=restoreSkillProgress({schema:1,xpById:{charisma:650}},HOBBY_SKILLS);
+    peer.skills=restoreSkillProgress({schema:1,xpById:{charisma:1090}},HOBBY_SKILLS);
     const legacy=ids.indexOf(a)<2&&ids.indexOf(b)<2;
     if(legacy){
       assert.ok(startConversation(root,a,actor.position,'daily'));
@@ -102,6 +105,8 @@ test('PF-10/A all twelve directed pairs use initiator skills, shared dialogue, r
     assert.equal(root.socialGraph.nextSeq,before);
     const restored=loadHousehold(clone(root));
     assert.ok(dialogueNeedsDecision(restored),a+' -> '+b+' restore');
+    assert.equal(getActor(restored,a).skills.xpById.charisma,650);
+    assert.equal(getActor(restored,b).skills.xpById.charisma,1090);
     assert.deepEqual((restored.socialAction||restored.additionalSocial).conversation,s.conversation);
     restored.paused=true;
     assert.ok(applyDialogueDecision(restored,r=>legacy?finishSocialConversation(r):finishAddressedConversation(r)));
