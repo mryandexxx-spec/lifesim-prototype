@@ -2,7 +2,7 @@ import pathlib,json,hashlib,io
 from PIL import Image
 from playwright.sync_api import sync_playwright
 import numpy as np
-R=pathlib.Path('body-c-continuous-out');L=R/'lab';F=L/'comparison';states=json.loads((L/'states.json').read_text());results=[]
+R=pathlib.Path('body-c-continuous-out');L=R/'lab';F=L/'comparison';states=json.loads((L/'states.json').read_text());results=[];performance=[]
 with sync_playwright() as p:
     for engine in ['chromium','webkit']:
         browser=getattr(p,engine).launch(headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-webgl'] if engine=='chromium' else [])
@@ -37,11 +37,19 @@ with sync_playwright() as p:
                         path=(F/(name+'.png')) if width==390 and engine=='chromium' else (R/(name+'-'+str(width)+'.png'))
                         path.write_bytes(data)
                         results.append({'engine':engine,'viewport':[width,height],'sex':sex,'state':state,'angle':angle,'valid_pixels':bool(valid),'sha256':digest,'weights_verified':True})
+                page.evaluate("window.setBodyState('grid_mix',45)")
+                # Software-rendered diagnostic, not physical mobile FPS. Capture
+                # RAF intervals while the camera and model are actually rendered.
+                times=page.evaluate("""() => new Promise(resolve=>{let t=[],n=0;
+                    function frame(now){t.push(now);if(++n===31)resolve(t.slice(1).map((v,i)=>v-t[i]));else requestAnimationFrame(frame)}
+                    requestAnimationFrame(frame)})""")
+                performance.append({'engine':engine,'viewport':[width,height],'sex':sex,'state':'grid_mix','raf_median_ms':float(np.median(times)),'raf_p95_ms':float(np.percentile(times,95))})
                 page.locator('#s-fullness').evaluate("el=>{el.value='0.37';el.dispatchEvent(new Event('input',{bubbles:true}))}");assert page.evaluate("window.labState.preset==='custom' && Object.keys(window.labState.weights).some(k=>k.startsWith('grid_'))")
                 page.locator('#reset').tap();assert all(v==0 for v in page.evaluate('window.labState.values').values());assert page.evaluate('window.labState.preset')=='neutral';assert page.evaluate('window.labState.heightScale')==1
             assert not errors,errors
             page.close()
         browser.close()
+(R/'performance-report.json').write_text(json.dumps(performance,indent=2))
 (R/'browser-report.json').write_text(json.dumps(results,indent=2))
 assert all(x['valid_pixels'] for x in results if x['engine']=='chromium'),'Chromium blank/stale frames'
 # WebKit blank/stale frames are explicitly OPEN, not reported as successful.
