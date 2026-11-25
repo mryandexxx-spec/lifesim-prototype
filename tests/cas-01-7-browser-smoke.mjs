@@ -240,7 +240,7 @@ try{
    const details=page.locator('#cas-resident-details');
    await details.waitFor({state:'visible'});
    await details.locator('select[aria-label="Собеседник"]').selectOption('resident_4');
-   await details.locator('select[aria-label="Тема беседы"]').selectOption('daily');
+   await details.locator('select[aria-label="Тема беседы"]').selectOption(topicId);
    await details.getByRole('button',{name:'В очередь · беседа',exact:true}).tap();
   }
   const panel=page.locator('#conversation-panel');
@@ -252,6 +252,13 @@ try{
   assert.equal(await locked.isDisabled(),true);
   const permitted=choices.getByRole('button',{name:careerTopic?'Разобрать трудность по шагам':'Помочь взглянуть иначе',exact:true});
   assert.equal(await permitted.isEnabled(),true);
+  if(!careerTopic){
+   await choices.getByRole('button',{name:'Другие реплики',exact:true}).tap();
+   assert.equal(await choices.getByRole('button',{name:'Пожаловаться на день',exact:true}).isVisible(),true);
+   assert.equal(await permitted.count(),0);
+   await choices.getByRole('button',{name:'Основные реплики',exact:true}).tap();
+   assert.equal(await permitted.isEnabled(),true);
+  }
   await page.screenshot({path:'artifacts/cas-01-7/pf-10a-'+(extra?'extra':'legacy')+'-'+topicId+'-'+width+'.png'});
   await permitted.tap();
   let saved=await stored();
