@@ -51,7 +51,8 @@ def corner_map(raw,faces,fuv):
     out=[]
     for f in raw:
         k=tuple(sorted(f.tolist())); assert k in lookup,('native face mismatch',k)
-        out.append([lookup.pop(k)[int(v)] for v in f])
+        entry=lookup.pop(k)
+        out.append([entry[int(v)] for v in f])
     assert not lookup
     return np.asarray(out,dtype=np.int32)
 torch.set_num_threads(2)
@@ -72,6 +73,8 @@ for p in sorted(masks.glob('*')):
     md[p.name]={'sha256':sha(p.read_bytes()),'size':im.size,'mode':im.mode,'extrema':im.getextrema()}
     shutil.copy2(p,ROOT/p.name)
 shutil.copy2(vendor/'mpfb2/LICENSE.md',ROOT/'mpfb-LICENSE.md')
+for name in ('anny-LICENSE','anny-README.md','NOTICE.txt'):
+    shutil.copy2(SRC/name,ROOT/name)
 check=Image.new('RGB',(1024,1024)); draw=ImageDraw.Draw(check)
 for y in range(16):
     for x in range(16):
