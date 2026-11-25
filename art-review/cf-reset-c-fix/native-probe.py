@@ -140,6 +140,40 @@ for sex,pin in pins.items():
         assert np.array_equal(coords(keys[k]),old[k])
     deltas={k:coords(keys[k])-b for k in names}
     min_area=1
+    # Topological connected components (known source skin + oral + two eyes).
+    parent=list(range(len(b)))
+    def find(i):
+        while parent[i]!=i:
+            parent[i]=parent[parent[i]]
+            i=parent[i]
+        return i
+    for a,c,d in tri:
+        a,c,d=map(find,(a,c,d))
+        parent[c]=a
+        parent[d]=a
+    groups={}
+    for i,t in enumerate(tri): groups.setdefault(find(int(t[0])),[]).append(i)
+    comps=sorted(groups.values(),key=len,reverse=True)
+    print(sex,'component triangle counts',[len(c) for c in comps])
+    assert len(comps)==4,(sex,[len(c) for c in comps])
+    def contacts(v):
+        trees=[BVHTree.FromPolygons(v.tolist(),tri[c].tolist(),all_triangles=True,epsilon=0) for c in comps]
+        return [len(trees[0].overlap(t)) for t in trees[1:]]
+    expr=['blink','smile','jawopen']
+    contact_report={}
+    oldd={k:old[k]-b for k in names}
+    samples=[('neutral',{}),*[(k,{k:1}) for k in names],('all_neg',{a+'_neg':1 for a in axes}),('all_pos',{a+'_pos':1 for a in axes})]
+    for label,weights in samples:
+        for e in ['neutral']+expr:
+            exp=0 if e=='neutral' else old[e]-b
+            v0=b+exp
+            v1=b+exp
+            for k,w in weights.items():
+                v0=v0+oldd[k]*w
+                v1=v1+deltas[k]*w
+            contact_report[label+'_'+e]={'baseline_candidates':contacts(v0),'new_candidates':contacts(v1)}
+    (root/(sex+'-contacts.json')).write_text(json.dumps(contact_report,indent=2))
+    print(sex,'contact candidate counts',json.dumps(contact_report))
     # All 243 identity endpoint combinations; report geometry not full contact certification.
     for vals in itertools.product([-1,0,1],repeat=5):
         v=b.copy()
@@ -188,6 +222,6 @@ for sex,pin in pins.items():
     assert set(saved)==set(k.name for k in keys)
     for k in keys:
         assert np.allclose(coords(k),saved[k.name],atol=1e-6,rtol=0),(sex,k.name)
-    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN')
+    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN; BVH counts recorded, not penetration classification')
 (root/'report.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report))
