@@ -8,14 +8,13 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-skin-base-uv-gate:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'art/cf-skin-base'
+  cf-skin-base-lookdev:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'art/cf-skin-base'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    env:
-      OMP_NUM_THREADS: '2'
-      MKL_NUM_THREADS: '2'
-      CUDA_VISIBLE_DEVICES: ''
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,21 +25,33 @@ jobs:
           ref: 265a6f079b8c56f4b7722c3aa1dce98745d0dceb
           path: pinned-vis
           persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-skin-base-uv-evidence
+          path: verified-uv
+          run-id: 45579145444
+          github-token: ${{ github.token }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install pinned native CPU toolchain
+      - run: |
+          python -m pip install bpy==4.5.0 numpy==1.26.4 scipy==1.15.3 pillow==11.3.0 playwright==1.56.0
+          python -m playwright install --with-deps chromium webkit
+      - name: Bake original layered albedo and iris, exact morph checks, actual Blender frames
+        run: python art-review/cf-skin-base/lookdev.py
+      - name: Test actual mobile WebGL and compare frames
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
         run: |
-          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install 'anny @ git+https://github.com/naver/anny.git@8f35dc2df1c4062fd2fae86734f9705de50c0c2b' bpy==4.5.0 scipy==1.15.3 pillow==11.3.0
-          python -c 'import bpy,torch; assert bpy.app.version==(4,5,0); assert torch.version.cuda is None'
-      - name: Verify exact UV correspondence, all target fields and real checker renders
-        run: python art-review/cf-skin-base/uv_gate.py
+          node --check skin-lookdev/lab/lab.js
+          python -m http.server 8765 --bind 127.0.0.1 --directory skin-lookdev/lab >/tmp/skin-http.log 2>&1 &
+          xvfb-run -a python art-review/cf-skin-base/browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cf-skin-base-uv-evidence
-          path: skin-out/
+          name: cf-skin-base-lookdev
+          path: skin-lookdev/
           if-no-files-found: warn
           retention-days: 90
 
