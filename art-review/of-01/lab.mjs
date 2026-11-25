@@ -27,20 +27,21 @@ const images=[];for(const color of [new pc.Color(1,0,0),new pc.Color(0,1,0)]){ca
 cam.camera.clearColor=before;root.enabled=visible;floor.enabled=ground;frame();await settle();return {images,info:window.lastRenderInfo};}
 let lot=null;
 async function stress(v){
- if(lot)lot.destroy();lot=new pc.Entity('Diagnostic lot');app.root.addChild(lot);root.enabled=false;floor.enabled=true;deck.enabled=wall.enabled=false;light.enabled=false;
+ if(lot)lot.destroy();lot=new pc.Entity('Diagnostic lot');app.root.addChild(lot);root.enabled=false;floor.enabled=true;deck.enabled=wall.enabled=false;light.enabled=false;key.light.intensity=1.5;fill.light.intensity=.6;app.scene.ambientLight=new pc.Color(.55,.57,.60);
  const ids=['diningtable.farm','floorlamp.arc','sculpture.balance','tree.round'];
  let n=0,triangles=0;
  for(let i=0;i<24;i++){const id=ids[i%4],item=data[id][v],a=await asset(item.file),e=a.resource.instantiateRenderEntity();lot.addChild(e);e.setLocalPosition((i%6-2.5)*2.2,0,(Math.floor(i/6)-1.5)*2.5);e.setLocalEulerAngles(0,(i%4)*90,0);n++;triangles+=item.triangles;}
  const a=await asset(data['pool.ladder'][v].file),e=a.resource.instantiateRenderEntity();lot.addChild(e);e.setLocalPosition(6,0,-5);n++;triangles+=data['pool.ladder'][v].triangles;
- cam.setPosition(12,14,17);cam.lookAt(0,0,0);cam.camera.orthoHeight=11*Math.max(1,canvas.clientHeight/canvas.clientWidth);
+ cam.setPosition(12,14,17);cam.lookAt(0,0,0);cam.camera.orthoHeight=8.5*Math.max(1,canvas.clientHeight/canvas.clientWidth);
  await settle();const timings=[];let last=performance.now();for(let i=0;i<100;i++){app.renderNextFrame=true;await new Promise(r=>app.once('postrender',r));const t=performance.now();if(i>=10)timings.push(t-last);last=t;}
  timings.sort((a,b)=>a-b);return {instances:n,triangles,medianMs:timings[45],p95Ms:timings[85],drawCalls:app.stats?.drawCalls?.total??null};
 }
 function resetStress(){lot?.destroy();lot=null;root.enabled=true;frame();app.renderNextFrame=true;}
+function visible(e){for(let n=e;n;n=n.parent)if(!n.enabled)return false;let count=0;function walk(n){if(!n.enabled)return;if(n.render?.enabled)count+=n.render.meshInstances.filter(m=>m.visible).length;for(const child of n.children)walk(child);}walk(e);return count>0;}
 async function placeProbe(p){
  const saved=root.getLocalPosition().clone(),rotation=root.getLocalEulerAngles().clone();
  root.setLocalPosition(p.x,0,p.z);root.setLocalEulerAngles(0,-p.yaw,0);const ghost=current.clone();root.addChild(ghost);current.enabled=false;await settle();
- const pos=ghost.getPosition(),actual={x:pos.x,z:pos.z,yaw:Math.atan2(-root.forward.x,-root.forward.z)*180/Math.PI,ghostVisible:ghost.enabledInHierarchy,committedHidden:!current.enabled};
- ghost.destroy();current.enabled=true;root.setLocalPosition(saved);root.setLocalEulerAngles(rotation);await settle();return {...actual,ghostRemoved:!root.children.includes(ghost),committedVisible:current.enabledInHierarchy};
+ const pos=ghost.getPosition(),actual={x:pos.x,z:pos.z,yaw:Math.atan2(-root.forward.x,-root.forward.z)*180/Math.PI,ghostVisible:visible(ghost),committedHidden:!current.enabled};
+ ghost.destroy();current.enabled=true;root.setLocalPosition(saved);root.setLocalEulerAngles(rotation);await settle();return {...actual,ghostRemoved:!root.children.includes(ghost),committedVisible:visible(current)};
 }
-window.ofLab={show,data,app,framebuffer,stress,resetStress,placeProbe,clearProbe,visibility:async visible=>{root.enabled=visible;await settle();}};resize();run();
+window.ofLab={show,data,app,framebuffer,stress,resetStress,placeProbe,clearProbe,lotVisibility:async visible=>{lot.enabled=visible;await settle();},visibility:async visible=>{root.enabled=visible;await settle();}};resize();run();

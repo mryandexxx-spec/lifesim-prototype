@@ -11,7 +11,7 @@ for(const {mode,rows} of reports){let ok=true;for(const width of [320,390]){
  const valid=s.length===expected&&s.every(x=>x.valid&&x.framebuffer?.valid)&&new Set(s.map(x=>x.sha256)).size===expected&&new Set(s.map(x=>x.framebufferSHA256)).size===expected;
  const rawOK=raw?.supported&&raw.error===0&&JSON.stringify(raw.samples)==='[[255,0,0,255],[0,255,0,255]]';
  const nightOK=night.length===2&&night.every(x=>x.valid&&x.framebuffer?.valid)&&night[0].sha256!==night[1].sha256;
- const lotOK=lots.length===2&&lots.every(x=>x.metrics.instances===25&&Number.isFinite(x.metrics.p95Ms));
+ const lotOK=lots.length===2&&lots.every(x=>x.metrics.instances===25&&Number.isFinite(x.metrics.p95Ms)&&x.valid&&x.framebuffer?.valid)&&lots[0].sha256!==lots[1].sha256&&lots[0].framebufferSHA256!==lots[1].framebufferSHA256;
  const probe=rows.find(x=>x.name==='webkit'&&x.width===width&&x.placement);
  const p=probe?.placement,rr=probe?.reloaded;
  const match=(a,b)=>a&&b&&Math.abs(a.x-b.x)<.001&&Math.abs(a.z-b.z)<.001&&Math.abs(((a.yaw+b.yaw+180)%360+360)%360-180)<.01&&a.ghostVisible&&a.committedHidden&&a.ghostRemoved&&a.committedVisible;
