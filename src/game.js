@@ -41,7 +41,7 @@ import {pendingWorkIncident} from './career-incidents.js';
 import {createCareerShiftSummaryUI} from './career-shift-summary-ui.js';
 import {applyWorkMoodContext} from './career-worklife.js';
 import {residentWorkPhase,residentUnavailableForHome,residentAwayAtWork,
-  residentWorkStatus,arriveCareerPortal,finishCareerReturn} from './career-work.js';
+  residentWorkStatus,arriveCareerPortal,finishCareerReturn,socialCommandBlockedByWork} from './career-work.js';
 import {workPresenceView} from './work-presence-ui.js';
 import { findPath, nearestWalkable, isWalkable } from './navigation.js';
 import {lotRaySurface,lotActorHeight,outdoorCellAt,OUTDOOR_GRID_WIDTH} from './lot-surface.js';
@@ -559,6 +559,9 @@ $('calendar-anchor-apply').addEventListener('click',()=>{
 });
 const taskLabel=task=>labelQueuedTask(game,task);
 function scheduleCommand(command,residentId=game.selectedSim){
+  if(['social','conversation','branch'].includes(command.type)&&socialCommandBlockedByWork(game,residentId,command)){
+    toast('Общение недоступно: участник на работе или в дороге');return false;
+  }
   if(!HOUSEHOLD_IDS.includes(activeHudResident())&&residentId!==activeHudResident()){
     toast('Для выбранного жителя используй личную панель действий');
     return false;
@@ -1800,6 +1803,9 @@ function renderQueuePanel(force=true){
     retry.textContent='Повторить';
     retry.setAttribute('aria-label','Вернуть в очередь: '+taskLabel({...task,residentId}));
     retry.addEventListener('click',()=>{
+      if(['social','conversation','branch'].includes(task.type)&&socialCommandBlockedByWork(game,residentId,task)){
+        toast('Общение недоступно: участник на работе или в дороге');return;
+      }
       const result=retryBlockedAction(game.actionQueues,residentId,task.seq,game.minutes);
       if(!result){toast('Очередь заполнена. Убери ненужное задание.');return;}
       $('queue-feedback').textContent='Задание возвращено в конец плана: '+
@@ -2387,6 +2393,9 @@ function renderCasDetails(force=false){
    const retry=document.createElement('button');retry.type='button';retry.textContent='Повторить';
    retry.setAttribute('aria-label','Повторить отложенное: '+title.textContent);
    retry.addEventListener('click',()=>{
+     if(['social','conversation','branch'].includes(task.type)&&socialCommandBlockedByWork(game,id,task)){
+       toast('Общение недоступно: участник на работе или в дороге');return;
+     }
      const result=retryBlockedAction(game.actionQueues,id,task.seq,game.minutes);
      if(!result){toast('Очередь заполнена; убери ненужное задание');return;}
      save(true);renderCasDetails(true);toast(row.name+': задание снова в очереди');
@@ -9212,7 +9221,9 @@ function boot() {
         });
       if(stranded&&game.socialAction){
         const stalledSocial=game.socialAction;
-        const replay=recoverableSocialCommand(stalledSocial);
+        const candidate=recoverableSocialCommand(stalledSocial);
+        const workCanceled=candidate&&socialCommandBlockedByWork(game,stalledSocial.initiator,candidate);
+        const replay=workCanceled?null:candidate;
         const full=replay&&pendingActions(game.actionQueues,stalledSocial.initiator).length>=MAX_ACTION_QUEUE;
         const overflow=full&&blockedActions(game.actionQueues,stalledSocial.initiator).length>=MAX_BLOCKED_QUEUE;
         if(overflow){
@@ -9248,7 +9259,7 @@ function boot() {
             }
           }
           restartAutonomyWait();
-          const message=replay
+          const message=workCanceled?'Общение отменено: участник на работе или в дороге.' : replay
             ?restored
               ?full
                 ?'Встреча зависла и сохранена в «Отложено»: очередь полна. Остальные действия доступны.'

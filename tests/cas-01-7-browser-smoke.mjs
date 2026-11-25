@@ -2,12 +2,15 @@
 import assert from 'node:assert/strict';
 import {mkdirSync} from 'node:fs';
 import {chromium} from 'playwright';
-import {newHousehold,loadHousehold,getActor} from '../src/household.js';
+import {newHousehold,loadHousehold,getActor,tickHousehold,setHouseholdAutonomy} from '../src/household.js';
 import {startConversation,arriveSocial} from '../src/relationships.js';
 import {isWalkable,isClearLine} from '../src/navigation.js';
 import {restoreSkillProgress} from '../src/skills-engine.js';
 import {HOBBY_SKILLS} from '../src/hobby-reading.js';
 import {newGame,SAVE_KEY} from '../src/simulation.js';
+import {hireCareer} from '../src/career-state.js';
+import {careerDepartureLeadMinutes} from '../src/career-work.js';
+import {enqueueAction} from '../src/action-queue.js';
 import {acceptCareerOffer} from '../src/career-job-board.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
@@ -206,6 +209,55 @@ try{
   assert.deepEqual(errors,[],width+'x'+height+' JS errors');
   await context.close();
  }
+
+ // PF-11: the live game, not a simulated UI, must release the queued
+ // conversation at the work departure boundary and execute its FIFO successor.
+ for(const [width,height] of [[390,844],[320,568]]){
+  const state=newHousehold('2026-11-16');
+  setHouseholdAutonomy(state,false);
+  state.careerSystem=hireCareer(state.careerSystem,'alex','editorial',state.minutes);
+  tickHousehold(state,1);
+  const shift=state.careerSystem.byResident.alex.currentShift;
+  assert.equal(shift.phase,'pending');
+  state.minutes=shift.start-careerDepartureLeadMinutes(state,'alex');
+  state.otherSim.minutes=state.minutes;
+  state.otherSim.needs.hunger=20;
+  const talk=enqueueAction(state.actionQueues,'mira',{type:'conversation',targetId:'alex',topicId:'daily'});
+  const next=enqueueAction(state.actionQueues,'mira',{type:'object',actionId:'fridge'});
+  assert.ok(talk&&next);
+  const graph=state.socialGraph.nextSeq;
+  const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
+  await context.addInitScript(({key,record,tour})=>{
+   if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
+   localStorage.setItem(tour,'done');
+  },{key:SAVE_KEY,record:state,tour:UI_TOUR_STORAGE_KEY});
+  const page=await context.newPage(),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('WebGL crashed'));
+  await page.goto('http://127.0.0.1:8765/?pf-11=qa',{waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+  await page.waitForFunction(({key,talkSeq,nextSeq})=>{
+   const saved=JSON.parse(localStorage.getItem(key)||'null');
+   const phase=saved?.careerSystem?.byResident?.alex?.currentShift?.phase;
+   return ['departing','waiting','working'].includes(phase)&&
+     !saved.actionQueues.byResident.mira.some(t=>t.seq===talkSeq||t.seq===nextSeq)&&
+     (saved.otherSim.action?.id==='fridge'||saved.otherSim.needs.hunger>20)&&
+     !saved.socialAction&&!saved.additionalSocial;
+  },{key:SAVE_KEY,talkSeq:talk.seq,nextSeq:next.seq},{timeout:30000});
+  let saved=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
+  assert.equal(saved.socialGraph.nextSeq,graph,'canceled talk grants no social event');
+  assert.equal(saved.version,1);
+  await page.locator('#pick-mira').tap();
+  await page.screenshot({path:'artifacts/cas-01-7/pf-11-work-'+width+'.png'});
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+  saved=JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
+  assert.equal(saved.version,1);
+  assert.ok(!saved.actionQueues.byResident.mira.some(t=>t.seq===talk.seq));
+  assert.equal(saved.socialGraph.nextSeq,graph);
+  assert.deepEqual(errors,[],width+'x'+height+' PF-11 JS errors');
+  await context.close();
+ }
+ console.log('PF-11 real mobile work departure cancels talk and dispatches next meal; v1 reload and no social receipt PASS');
 
  // PF-10/A: real required-choice UI, not a fake DOM, at both iPhone sizes.
  for(const [width,height] of [[390,844],[320,568]])for(const [extra,topicId] of [[false,'daily'],[true,'daily'],[true,'career']]){
