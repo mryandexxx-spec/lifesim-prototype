@@ -46,7 +46,7 @@ for path in sorted(root.glob('*.glb')):
     meshes=[o for o in bpy.context.scene.objects if o.type=='MESH'];assert meshes
     body=max(meshes,key=lambda o:len(o.data.vertices))
     actions=list(bpy.data.actions)
-    assert all(any(k in a.name for a in actions) for k in ('elbow','reach','seat_probe','seat_contact_candidate')),[a.name for a in actions]
+    assert all(any(k in a.name for a in actions) for k in ('elbow','reach','seat_probe','seat_contact_candidate','reach_target','seat_hands')),[a.name for a in actions]
     row={'blender_version':bpy.app.version_string,'bones':len(arm.data.bones),'actions':[a.name for a in actions],'mesh_vertices':len(body.data.vertices),'poses':{}}
     setup();fixture=seat[path.name]['fixture']
     # A real neutral reference independent of any clip; reset every pose bone.
@@ -60,8 +60,8 @@ for path in sorted(root.glob('*.glb')):
     row['neutral_floor_z_m']=min(v[2] for v in neutral)
     # glTF +Z is Blender -Y. Chair is rendered as the fixed collision slab.
     chair=cube('seat fixture',(0,-fixture['center_z'],fixture['floor_m']+.43-.02),(.52,.42,.04),(.22,.34,.45))
-    for k in ('elbow','reach','seat_probe','seat_contact_candidate'):
-        action=next(a for a in actions if k in a.name);start,end=map(round,action.frame_range)
+    for k in ('elbow','reach','seat_probe','seat_contact_candidate','reach_target','seat_hands'):
+        action=next(a for a in actions if a.name==k);start,end=map(round,action.frame_range)
         active_frame(arm,action,start);v0=vertices(body)
         reset_error=max(math.dist(a,b) for a,b in zip(v0,neutral))
         assert reset_error<.0001,(path.name,k,'start differs from independent neutral',reset_error)
