@@ -344,23 +344,28 @@ def flower_head(c,r,petal,center,n=7):
         fs.extend([(o,o+1,o+4),(o+1,o+2,o+4),(o+2,o+3,o+4),(o+3,o,o+4)])
     o=mesh('Shaped petals',vs,fs,[petal]);bpy.context.view_layer.objects.active=o;mod=o.modifiers.new('Petal thickness','SOLIDIFY');mod.thickness=.003;bpy.ops.object.modifier_apply(modifier=mod.name)
     orb('Flower heart',(x,y+.026,z),(r*.65,.04,r*.65),center,12,6)
-def flowers(id):
+def flowers(id,stage=3,wet=False,harvested=False):
     stem=mat('Plant green','#527e46');leaf=mat('Leaf green','#78a65d');yellow=mat('Golden pollen','#e6b843')
     garden=id.startswith('garden.');herb='herb' in id;origin=.25 if garden else 0
     if garden:
         for x in [-.46,.46]:box('Cedar raised bed rail',(x,.105,0),(.08,.21,1.0),dark(),.013)
         for z in [-.46,.46]:box('Cedar end rail',(0,.105,z),(.84,.21,.08),wood(),.013)
-        box('Inset soil',(0,.215,0),(.84,.07,.84),mat('Dry soil','#795b42'),.015)
+        box('Inset soil',(0,.215,0),(.84,.07,.84),mat('Wet soil','#544536') if wet else mat('Dry soil','#795b42'),.015)
         spots=[(-.25,-.24),(.24,-.23),(-.22,.23),(.23,.23)]
     else:spots=[(-.12,-.11),(.12,.09),(0,.16),(.10,-.14)]
+    if garden and stage==0:
+        for x,z in spots:orb('Sown earth mound',(x,.255,z),(.13,.035,.13),mat('Seed earth','#806448'),10,5)
+        return
     for i,(x,z) in enumerate(spots):
-        h=(.65 if garden else .40)+.045*sin(i*2.4)
+        h=((.22 if stage==1 else .51 if stage==2 else .65) if garden else .40)+.025*sin(i*2.4)
+        if harvested:h=.42
         tube('Living stem',[(x,origin,z),(x+.015,origin+h*.54,z-.025),(x,origin+h,z)],.013 if garden else .009,stem,3)
-        for j in range(5 if herb else 3):
+        for j in range(2 if stage==1 or harvested else 5 if herb else 3):
             a=j*2.4+i;y=origin+h*(.25+j*.13);d=.14 if garden else .085
             c=(x+d*.52*cos(a),y+.035,z+d*.52*sin(a))
             vs=[(x,y,z),(c[0]-.035*sin(a),c[1],c[2]+.035*cos(a)),(x+d*cos(a),y+.09,z+d*sin(a)),(c[0]+.035*sin(a),c[1],c[2]-.035*cos(a)),(c[0],c[1]+.02,c[2])]
             o=mesh('Folded botanical leaf',vs,[(0,1,4),(1,2,4),(2,3,4),(3,0,4)],[leaf]);bpy.context.view_layer.objects.active=o;mod=o.modifiers.new('Leaf thickness','SOLIDIFY');mod.thickness=.002;bpy.ops.object.modifier_apply(modifier=mod.name)
+        if garden and (stage<3 or harvested):continue
         if herb:
             # More rounded leaves for lemon balm, pointed mint profile.
             for j in range(3):
@@ -461,6 +466,13 @@ for id,info in catalog.items():
             report[id][kind]=export(id,kind)
             if kind=='new':bpy.ops.wm.save_as_mainfile(filepath=str((OUT/(id+'.blend')).resolve()))
             scene(id,kind)
+    if id=='tree.round':
+        reset();foliage(id);report[id]['lod']=export(id,'lod');scene(id,'lod')
+    if info['category']=='garden':
+        variants=[('seed',0,False,False),('sprout',1,False,False),('growing',2,False,False),('wet',3,True,False)]
+        if 'herb' in id:variants.append(('harvested',3,False,True))
+        for kind,stage,wet,harvested in variants:
+            reset();flowers(id,stage,wet,harvested);report[id][kind]=export(id,kind);scene(id,kind)
     info['frame']=centers[id]
     (LAB/'manifest.json').write_text(json.dumps(report,indent=2))
     (LAB/'catalog.json').write_text(json.dumps(catalog,indent=2))
