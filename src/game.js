@@ -121,6 +121,7 @@ import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnai
 import {ofInteriorDiningPlateY,ofInteriorOverlay} from './of-interior-assets.js';
 import {createOutdoorVegetationVisual} from './of-vegetation-visual.js';
 import {createGardenVisual} from './of-garden-visual.js';
+import {createOutdoorFurnitureVisual} from './of-outdoor-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -3226,6 +3227,8 @@ function boot() {
       actors:Object.fromEntries(['alex','mira'].map(id=>{const a=getActor(game,id);return [id,{position:{...a.position},action:a.action?{...a.action}:null,event:a.event}];})),
       gardens:structuredClone(game.world.outdoors.gardens||{}),credits:game.shop.credits,herbs:game.kitchen.pantry.herbs});
   }
+  const outdoorFurnitureVisual=createOutdoorFurnitureVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&new URLSearchParams(location.search).get('outdoor-furniture')!=='legacy'});
+  if(furnitureVisualMode==='qa')window.__LifeSimOutdoorFurnitureStats=outdoorFurnitureVisual.stats;
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
@@ -3380,6 +3383,8 @@ function boot() {
       }
       if(def.category==='garden')gardenVisual.attach(node,item.itemId,gardenView(game.world.outdoors,item.instanceId,game.minutes));
       vegetation.attach(node,item.itemId);
+      // The static grill never owns the existing articulated skewer/food overlay.
+      outdoorFurnitureVisual.attach(node,item.itemId,item.itemId==='garden.grill'?grillAnimated.at(-1).skewers:[]);
     }
     syncOutdoorLights(currentOutdoorDaylight);
     gardenStageSignature=currentGardenStageSignature();
