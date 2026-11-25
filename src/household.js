@@ -9,7 +9,7 @@ import {restoreReminderReceipts} from './calendar-reminders.js';
 import {newCareerSystem,restoreCareerSystem} from './career-state.js';
 import {migrateLegacyCareerSchedules} from './career-rank-schedules.js';
 import {newRecruitmentSystem,restoreRecruitmentSystem,progressCareerRecruitment} from './career-recruitment.js';
-import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork} from './career-work.js';
+import {progressCareerWork,residentUnavailableForHome,residentAwayAtWork,cancelUnavailableSocialCommands} from './career-work.js';
 import {progressWorkNeeds} from './career-work-needs.js';
 import {applyWorkMoodContext} from './career-worklife.js';
 import {DISH_AUTO_WASH_THRESHOLD,COOKING_SKILL_ID,kitchenRecipe,newKitchen,restoreKitchen,replenishKitchen,
@@ -416,7 +416,10 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
   if(!raw.socialGraph||!Object.hasOwn(raw.socialGraph,'lifeStages'))
     for(const id of HOUSEHOLD_IDS)setLifeStage(root.socialGraph,id,'adult');
   root.socialAction=loadSocialAction(raw.socialAction,root);
+  if(root.socialAction&&[root.socialAction.initiator,root.socialAction.partner].some(id=>residentUnavailableForHome(root,id)))
+    cancelSocial(root);
   root.additionalSocial=restoreAddressedSocial(raw.additionalSocial,root);
+  cancelUnavailableSocialCommands(root);
   // R2-C optional saved v1 co-watch receipt: after physical social restoration.
   root.sportsSharedWatch=restoreSportsSharedWatch(raw.sportsSharedWatch,root);
   // F4D: reject ambiguous/corrupt saved double-seat reservations before
