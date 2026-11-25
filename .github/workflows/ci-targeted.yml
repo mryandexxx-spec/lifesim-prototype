@@ -39,7 +39,7 @@ jobs:
               assert hashlib.sha256((p/n).read_bytes()).hexdigest()==h,n
               assert not n.endswith(('.blend','.zip'))
           assert m['male-body.glb']=='fe0963efd05debe860e79d6b889d59a1f8ec1444616c572638f47dbca9dd83ab'
-          assert m['female-body.glb']=='5bea7149cf6b53e2760102cdb49a481f8f8282b0dca291669fada8a50d51ad63'
+          assert m['female-body.glb']=='94bb796fbe3e4baf16633d24fbeb0a84d7d50db6a2cfb90af9e8e9e9bdb6e430'
           # Only the disclosure text changes after evidence review.
           f=p/'index.html';s=f.read_text()
           assert '<div id="status">' in s
