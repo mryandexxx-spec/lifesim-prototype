@@ -119,6 +119,7 @@ import {proceduralFurnitureModel} from './furniture-procedural-library.js';
 import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
 import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnailUrl} from './meshy-furniture-policy.js';
 import {ofInteriorDiningPlateY,ofInteriorOverlay} from './of-interior-assets.js';
+import {createOutdoorVegetationVisual} from './of-vegetation-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -3208,6 +3209,9 @@ function boot() {
   // LOT-B2: original low-poly plants and boundaries, grouped under one node
   // per owned instance. Only the 96-item bounded save controls these meshes.
   const outdoorFeatureNodes=[],outdoorLightNodes=[],grillAnimated=[];
+  const vegetationMode=new URLSearchParams(window.location.search).get('vegetation');
+  const vegetation=createOutdoorVegetationVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&vegetationMode!=='legacy',instancing:vegetationMode!=='unbatched'});
+  if(furnitureVisualMode==='qa'){window.__LifeSimVegetationStats=vegetation.stats;window.__LifeSimVegetationInstancing=vegetation.setInstancing;}
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
@@ -3231,6 +3235,7 @@ function boot() {
     ember:mat('#d56f40'),meat:mat('#995d43'),chicken:mat('#dbac73')
   };
   const renderOutdoorFeatures=()=>{
+    vegetation.clear();
     for(const node of outdoorFeatureNodes.splice(0))node.destroy();
     outdoorLightNodes.length=0;grillAnimated.length=0;
     for(const item of game.world?.outdoors?.features||[]){
@@ -3359,6 +3364,7 @@ function boot() {
         for(const x of [-.17,.05,.20])
           part('sphere','hedge foliage',x,.55,0,.31,.63,.44,'darkLeaf');
       }
+      vegetation.attach(node,item.itemId);
     }
     syncOutdoorLights(currentOutdoorDaylight);
     gardenStageSignature=currentGardenStageSignature();
@@ -8842,7 +8848,9 @@ function boot() {
   let accumulator=0, uiTimer=0, autosaveTime=0;
   const approach = (a,b,rate,dt) => a+(b-a)*(1-Math.exp(-rate*dt));
   const approachAngle=(a,b,rate,dt)=>a+((((b-a+540)%360)+360)%360-180)*(1-Math.exp(-rate*dt));
+  let vegetationTimer=0;
   app.on('update',dt=>{
+    vegetationTimer+=dt;if(vegetationTimer>=.25){vegetationTimer=0;vegetation.update(camera.getPosition());}
     viewportHealth.markUpdate(performance.now());
     dt=Math.min(dt,.06);
     syncCasFigures();
