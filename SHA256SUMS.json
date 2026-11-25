@@ -1,5 +1,5 @@
 {
-  "3d.html": "f1b7e9bff9bd80951544312e8efadb346d45e114fcfdb3bd2032071e46c36c78",
+  "3d.html": "cf4e0e8c6d29dd25db770e5e798e40250fd4df6f1b9c41ad391c45e3aaa0ac98",
   "baseline.json": "63980fc1441d531a1956e848909b36a876452bd88d7b307f8442c9ac28bfd315",
   "blender/diningtable.farm-donor-front.png": "3356f5be253d27d85af9b208228cd539519941cbf1d83fb3fed0d0fe14ef327f",
   "blender/diningtable.farm-donor-profile.png": "63a340ceef84cd286a47eefb0843b22e06e72c3fa7bcbbcc8588ad5c8f064242",
@@ -40,8 +40,8 @@
   "donors/table/source.json": "1e16bf5c8a78d41ad7fdc8539810002c87a13f15a65f4be576c3d9cad7cc1c29",
   "donors/tree/license.txt": "cb96b75e3560ac78d7a53ce6f083f4cdb5c53faea6141b62d63458dcfe1e4b9d",
   "donors/tree/source.json": "727d0548f2acab9bfffdb3e5374df66b858a2f94254e6691b1f565610a882e92",
-  "index.html": "f79d6223a4b7458d32c7f78dc0710d0197447608db0befe7f0c1cce746640aaf",
-  "lab.mjs": "353b3cc84b06d6d862a150ff866ac80553b6888fbc43b0856a0ce77703608846",
+  "index.html": "add69370c53e42d41617c8a2af46ab282bef284341b5f479677bbae62aa3c28b",
+  "lab.mjs": "aa2fa684549107c441a0090b40a5360961db3c7a7f12420f1a6fa4c8b4f51cf7",
   "manifest.json": "330a164dbd60dd5ac397ba78503fdb7a6f9c15948c78578c8f4230a458aa4448",
   "models/diningtable.farm-donor.glb": "fae0832571ae4f58f81f8b33849cb15b69e18273af3ee47abad6ac13067763a2",
   "models/diningtable.farm-new.glb": "7a2910b7a0e6d7bfc2765b4edd98d42aa7482543d7e125fa9e89299c8422f645",
