@@ -3209,7 +3209,8 @@ function boot() {
   // LOT-B2: original low-poly plants and boundaries, grouped under one node
   // per owned instance. Only the 96-item bounded save controls these meshes.
   const outdoorFeatureNodes=[],outdoorLightNodes=[],grillAnimated=[];
-  const vegetation=createOutdoorVegetationVisual({pc,app,enabled:furnitureVisualMode!=='legacy'});
+  const vegetationMode=new URLSearchParams(window.location.search).get('vegetation');
+  const vegetation=createOutdoorVegetationVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&vegetationMode!=='legacy'});
   if(furnitureVisualMode==='qa')window.__LifeSimVegetationStats=vegetation.stats;
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
