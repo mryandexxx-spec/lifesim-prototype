@@ -427,3 +427,6 @@ export const OF_INTERIOR_SPECS=Object.freeze(Object.fromEntries(OF_INTERIOR_ENTR
 export function ofInteriorSpec(sku){return typeof sku==='string'&&Object.hasOwn(OF_INTERIOR_SPECS,sku)?OF_INTERIOR_SPECS[sku]:null;}
 /** Do not normalize or center: lamp overhang, mount, plates and active drawer overlays use authored coordinates. */
 export function ofInteriorFit(sku){const e=ofInteriorSpec(sku);if(!e)return null;const {min,max}=e.bounds;return Object.freeze({sku,prefabId:e.prefabId,mount:e.mount,rotationX:0,rotationY:0,scale:Object.freeze({x:1,y:1,z:1}),offset:Object.freeze({x:0,y:0,z:0}),footprint:Object.freeze({width:max[0]-min[0],height:max[1]-min[1],depth:max[2]-min[2]})});}
+
+/** Visual plate center: tabletop + half of the 24 mm plate thickness + 1 mm clearance. */
+export function ofInteriorDiningPlateY(sku){return sku==='diningtable.farm'?.873:sku==='diningtable.oval'?.868:null;}

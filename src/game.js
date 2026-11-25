@@ -118,6 +118,7 @@ import {furnitureProduct,FURNITURE_APPEARANCES,FURNITURE_SHOP_TYPES,
 import {proceduralFurnitureModel} from './furniture-procedural-library.js';
 import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
 import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnailUrl} from './meshy-furniture-policy.js';
+import {ofInteriorDiningPlateY} from './of-interior-assets.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -9892,8 +9893,11 @@ function boot() {
       const dish=diningDishes[id];
       dish.plate.enabled=Boolean(pos);dish.food.enabled=Boolean(pos);
       if(pos){
-        dish.plate.setPosition(pos.x,pos.y,pos.z);
-        dish.food.setPosition(pos.x,pos.y+.055,pos.z);
+        const table=game.world.furniture.instances.find(i=>i.instanceId===a.targetInstanceId);
+        const node=table&&decorNodes.get(table.instanceId);
+        const y=(node&&meshyFurniture.hasModel(node)?ofInteriorDiningPlateY(table.itemDefinitionId):null)??pos.y;
+        dish.plate.setPosition(pos.x,y,pos.z);
+        dish.food.setPosition(pos.x,y+.055,pos.z);
         const size=Math.max(.07,1-a.elapsed/ACTIONS.dining.duration);
         dish.food.setLocalScale(.23*size,.075,.18*size);
       }
