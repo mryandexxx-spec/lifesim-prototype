@@ -8,6 +8,9 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-anim-source-intake:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-sources' && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/cf-anim-source-intake.yml
   of-integration-b:
     permissions:
       contents: read

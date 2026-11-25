@@ -73,6 +73,13 @@ def main():
         try:
             data=download(repo,path,size,sha)
             entry.update(verified=True,inventory=zip_inventory(data) if path.endswith(".zip") else bvh(data))
+            if path.endswith(".zip"):
+                import io
+                staging=pathlib.Path("/tmp/cf-anim-sources")
+                staging.mkdir(exist_ok=True)
+                with zipfile.ZipFile(io.BytesIO(data)) as z:
+                    name=next(i.filename for i in z.infolist() if i.filename.endswith("/UAL"+key[-1]+"_Standard.glb"))
+                    (staging/(key+".glb")).write_bytes(z.read(name))
         except Exception as e:
             entry.update(verified=False,error=str(e))
         results.append(entry)
