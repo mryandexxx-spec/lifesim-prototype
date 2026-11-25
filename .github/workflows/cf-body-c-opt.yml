@@ -47,6 +47,17 @@ jobs:
           trap 'kill "$server" || true' EXIT
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/reference/index.html >/dev/null && break; sleep 1; done
           xvfb-run -a python art-review/cf-body-c-opt/browser.py
+      - name: Bake selected profiles with original face morphs
+        run: python art-review/cf-body-c-opt/bake.py
+      - name: Actual fixed-body A/B render and expression checks
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          python -m http.server 8765 --directory served >opt-out/baked-server.log 2>&1 &
+          server=$!
+          trap 'kill "$server" || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/reference/index.html >/dev/null && break; sleep 1; done
+          xvfb-run -a python art-review/cf-body-c-opt/baked_browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
