@@ -1,12 +1,17 @@
-import json,io,hashlib
+import json,io,hashlib,base64
 from pathlib import Path
 from PIL import Image,ImageStat
 from playwright.sync_api import sync_playwright
 from compare import ROOT,LAB,FRAMES,PIN,STATES,ANGLES,sha
 def capture(page,path):
-    raw=page.locator("#canvas").screenshot(timeout=30000)
+    data=page.locator("#canvas").evaluate("c=>({url:c.toDataURL('image/png'),width:c.width,height:c.height,rect:[c.clientWidth,c.clientHeight]})")
+    assert data["width"]>0 and data["height"]>0 and abs(data["width"]-data["height"])<=2, data["rect"]
+    raw=base64.b64decode(data["url"].split(",",1)[1])
     im=Image.open(io.BytesIO(raw)).convert("RGB")
     std=max(ImageStat.Stat(im).stddev)
+    # Require variation inside the actual central framebuffer, not UI or overlay.
+    center=im.crop((im.width//4,im.height//4,3*im.width//4,3*im.height//4))
+    std=min(std,max(ImageStat.Stat(center).stddev))
     # Nonuniform frame is necessary, not sufficient for artistic success.
     im.resize((384,384),Image.Resampling.LANCZOS).save(path)
     return round(std,3)
@@ -64,8 +69,20 @@ def main():
             browser.close()
     for sex,digest in PIN.items():assert sha(LAB/(sex+"-candidate.glb"))==digest
     assert len(report["frames"])==72 and len(report["mobile"])==8
+    for sex in PIN:
+        a=Image.open(FRAMES/f"{sex}-neutral-0-chromium-matched.png")
+        b=Image.open(FRAMES/f"{sex}-neutral-90-chromium-matched.png")
+        from PIL import ImageChops
+        assert max(ImageStat.Stat(ImageChops.difference(a,b)).mean)>3,sex
+    # WebKit must also show a changing framebuffer to count as visible.
+    for sex in PIN:
+        a=Image.open(FRAMES/f"{sex}-neutral-0-webkit-matched.png")
+        b=Image.open(FRAMES/f"{sex}-neutral-90-webkit-matched.png")
+        if max(ImageStat.Stat(ImageChops.difference(a,b)).mean)<=3:
+            for f in report["frames"]:
+                if f["engine"]=="webkit" and f["sex"]==sex:f["valid"]=False
     report["art"]="OPEN: direct human inspection required; nonblank is not approval"
-    report["webkit_visual"]="PASS_NONBLANK_ONLY" if all(f["valid"] for f in report["frames"] if f["engine"]=="webkit") else "OPEN_INVALID_FRAME"
+    report["webkit_visual"]="PASS_NONBLANK_FRAMEBUFFER_ONLY" if all(f["valid"] for f in report["frames"] if f["engine"]=="webkit") else "OPEN_INVALID_FRAME"
     (ROOT/"report.json").write_text(json.dumps(report,indent=2))
     (LAB/"VIS-REPORT.json").write_text(json.dumps(report,indent=2))
     files={str(f.relative_to(LAB)):sha(f) for f in LAB.rglob("*") if f.is_file() and f.name!="SHA256SUMS.json"}
