@@ -1,0 +1,76 @@
+{
+  "neutral": {},
+  "short": {
+    "__scale": 0.9
+  },
+  "tall": {
+    "__scale": 1.1
+  },
+  "slender": {
+    "slender": 1
+  },
+  "full": {
+    "full": 1
+  },
+  "athletic": {
+    "athletic": 1
+  },
+  "proportion_low": {
+    "proportion_low": 1
+  },
+  "proportion_high": {
+    "proportion_high": 1
+  },
+  "combined": {
+    "combined": 1
+  },
+  "combined_native_control": {
+    "combined_native_control": 1
+  },
+  "tall_athletic": {
+    "athletic": 1,
+    "__scale": 1.1
+  },
+  "face_mixed": {
+    "full": 1,
+    "smile": 1,
+    "jaw_pos": 1
+  },
+  "grid_full": {
+    "grid_211": 1
+  },
+  "grid_muscle": {
+    "grid_121": 1
+  },
+  "grid_proportion": {
+    "grid_112": 1
+  },
+  "grid_slender": {
+    "grid_011": 1
+  },
+  "grid_low_muscle": {
+    "grid_101": 1
+  },
+  "grid_low_proportion": {
+    "grid_110": 1
+  },
+  "grid_full_low_muscle_low_prop": {
+    "grid_200": 1
+  },
+  "grid_full_low_muscle_mid_prop": {
+    "grid_201": 1
+  },
+  "grid_full_low_muscle_high_prop": {
+    "grid_202": 1
+  },
+  "grid_mix": {
+    "grid_222": 0.125,
+    "grid_221": 0.125,
+    "grid_212": 0.125,
+    "grid_122": 0.125,
+    "grid_211": 0.125,
+    "grid_121": 0.125,
+    "grid_112": 0.125,
+    "__scale": 1.05
+  }
+}
