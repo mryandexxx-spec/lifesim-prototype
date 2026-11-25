@@ -1,4 +1,5 @@
 /** OF-B: exact approved R2 vegetation, native game coordinates. */
+import {OF_FAR_LODS} from './of-vegetation-far-data.js';
 export const OF_VEGETATION_ENTRIES=Object.freeze([
   {
     "sku": "tree.round",
@@ -211,7 +212,10 @@ export const OF_VEGETATION_ENTRIES=Object.freeze([
 export const OF_VEGETATION_DIR='./assets/furniture/of-r2/';
 const specs=new Map(OF_VEGETATION_ENTRIES.map(e=>[e.sku,e]));
 export const ofVegetationSpec=sku=>specs.get(sku)||null;
+export const vegetationLevelSpec=(sku,level)=>level==='far'?OF_FAR_LODS[sku]||null:level==='lod'?ofVegetationSpec(sku)?.lod||null:ofVegetationSpec(sku);
 export function vegetationLod(sku,distance,previous='high'){
- if(!ofVegetationSpec(sku)?.lod||!Number.isFinite(distance))return 'high';
+ if(!Number.isFinite(distance))return 'high';
+ if(OF_FAR_LODS[sku])return distance>18?'far':distance<14?'high':previous==='far'?'far':'high';
+ if(!ofVegetationSpec(sku)?.lod)return 'high';
  return distance>20?'lod':distance<16?'high':previous==='lod'?'lod':'high';
 }
