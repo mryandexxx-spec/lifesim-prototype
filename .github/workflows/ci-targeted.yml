@@ -82,6 +82,58 @@ jobs:
           path: recovery/
           retention-days: 2
           if-no-files-found: error
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reconstruct editable derivatives from the recovered public GLBs
+        run: |
+          python -m pip install bpy==4.5.0
+          mkdir -p derived
+          python - <<'PY'
+          import bpy, hashlib, json, pathlib, numpy as np
+          assert bpy.app.version==(4,5,0)
+          root=pathlib.Path.cwd()
+          expected=['jaw_neg','jaw_pos','cheeks_neg','cheeks_pos','nose_neg','nose_pos','mouth_neg','mouth_pos','eyes_neg','eyes_pos','blink','smile','jawopen','neck_neg','neck_pos']
+          report={}
+          for sex in ('male','female'):
+              bpy.ops.wm.read_factory_settings(use_empty=True)
+              bpy.ops.import_scene.gltf(filepath=str(root/'recovery'/f'{sex}.glb'))
+              meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
+              assert len(meshes)==1
+              obj=meshes[0]
+              def signature(obj):
+                  keys=obj.data.shape_keys.key_blocks
+                  assert len(obj.data.vertices)==13718
+                  assert len(obj.data.polygons)==27420
+                  assert [k.name for k in keys][1:]==expected
+                  coords=[]
+                  for key in keys:
+                      a=np.empty(len(key.data)*3,dtype=np.float32)
+                      key.data.foreach_get('co',a)
+                      assert np.isfinite(a).all()
+                      coords.append(a)
+                  assert all(np.max(np.abs(a-coords[0]))>0 for a in coords[1:])
+                  return [hashlib.sha256(a.tobytes()).hexdigest() for a in coords]
+              original=signature(obj)
+              obj['provenance']='Reconstructed from published RESET-C runtime GLB; not original authoring file'
+              for k in obj.data.shape_keys.key_blocks: k.value=0
+              out=root/'derived'/f'{sex}-runtime-derived.blend'
+              bpy.ops.wm.save_as_mainfile(filepath=str(out))
+              bpy.ops.wm.read_factory_settings(use_empty=True)
+              bpy.ops.wm.open_mainfile(filepath=str(out))
+              restored=[o for o in bpy.context.scene.objects if o.type=='MESH']
+              assert len(restored)==1 and signature(restored[0])==original
+              report[sex]={'source_sha256':hashlib.sha256((root/'recovery'/f'{sex}.glb').read_bytes()).hexdigest(),'derived_sha256':hashlib.sha256(out.read_bytes()).hexdigest(),'vertices':13718,'triangles':27420,'morphs':expected,'coordinate_hashes':original,'kind':'runtime-derived editable file, not original','reopen':'PASS'}
+              print(sex,report[sex])
+          (root/'derived'/'manifest.json').write_text(json.dumps(report,indent=2))
+          PY
+          (cd derived && sha256sum *.blend manifest.json > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-runtime-editable-derivatives
+          path: derived/
+          retention-days: 2
+          if-no-files-found: error
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
