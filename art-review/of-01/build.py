@@ -57,7 +57,13 @@ def lathe(name,center,profile,m,n=40):
         vs.extend([V((center[0]+r*cos(2*pi*i/n),center[1]+y,center[2]+r*sin(2*pi*i/n))) for i in range(n)])
     for j in range(len(profile)-1):
         for i in range(n):a=j*n+i;b=j*n+(i+1)%n;faces.append((a,a+n,b+n,b))
-    faces.extend([tuple(reversed(range(n))),tuple(range((len(profile)-1)*n,len(profile)*n))])
+    if profile[0]==profile[-1]:
+        # Close the shade shell without filling its open mouth or duplicating a cap.
+        vs=vs[:-n];faces=[]
+        for j in range(len(profile)-1):
+            for i in range(n):
+                a=j*n+i;b=j*n+(i+1)%n;k=((j+1)%(len(profile)-1))*n;faces.append((a,k+i,k+(i+1)%n,b))
+    else:faces.extend([tuple(reversed(range(n))),tuple(range((len(profile)-1)*n,len(profile)*n))])
     mesh=bpy.data.meshes.new(name);mesh.from_pydata(vs,[],faces);mesh.update();o=bpy.data.objects.new(name,mesh);bpy.context.collection.objects.link(o)
     return finish(o,name,m,True)
 def original(id):
