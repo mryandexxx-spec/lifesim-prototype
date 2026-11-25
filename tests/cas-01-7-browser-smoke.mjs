@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict';
 import {mkdirSync} from 'node:fs';
 import {chromium} from 'playwright';
-import {newHousehold,loadHousehold} from '../src/household.js';
+import {newHousehold,loadHousehold,getActor} from '../src/household.js';
+import {startConversation,arriveSocial} from '../src/relationships.js';
+import {isWalkable,isClearLine} from '../src/navigation.js';
 import {newGame,SAVE_KEY} from '../src/simulation.js';
 import {acceptCareerOffer} from '../src/career-job-board.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
@@ -202,5 +204,73 @@ try{
   assert.deepEqual(errors,[],width+'x'+height+' JS errors');
   await context.close();
  }
+
+ // PF-10/A: real required-choice UI, not a fake DOM, at both iPhone sizes.
+ for(const [width,height] of [[390,844],[320,568]])for(const extra of [false,true]){
+  const state=loadHousehold(copy(root));state.autonomy.enabled=false;
+  const a=extra?'resident_3':'alex',b=extra?'resident_4':'mira';
+  const first=getActor(state,a),second=getActor(state,b);
+  first.skills.xpById.charisma=485;second.skills.xpById.charisma=1360;
+  let placed=false;
+  for(let x=-4;x<=3&&!placed;x+=.5)for(let z=-3;z<=3&&!placed;z+=.5){
+   const p={x,z},q={x:x+1.05,z};
+   if(!isWalkable(p.x,p.z,state.world)||!isWalkable(q.x,q.z,state.world)||!isClearLine(p,q,state.world))continue;
+   if(['alex','mira','resident_3','resident_4'].filter(id=>id!==a&&id!==b).some(id=>
+    [p,q].some(point=>Math.hypot(point.x-getActor(state,id).position.x,point.z-getActor(state,id).position.z)<1.2)))continue;
+   first.position=p;second.position=q;placed=true;
+  }
+  assert.ok(placed,'physical conversation location');
+  if(!extra){assert.ok(startConversation(state,a,first.position,'daily'));assert.ok(arriveSocial(state));}
+  const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
+  await context.addInitScript(({key,record,tour})=>{
+   if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
+   localStorage.setItem(tour,'done');
+  },{key:SAVE_KEY,record:state,tour:UI_TOUR_STORAGE_KEY});
+  const page=await context.newPage(),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('WebGL crashed'));
+  await page.goto('http://127.0.0.1:8765/?pf-10a=qa',{waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+  const stored=async()=>JSON.parse(await page.evaluate(key=>localStorage.getItem(key),SAVE_KEY));
+  if(extra){
+   await page.locator('#pick-resident_3').tap();
+   const details=page.locator('#cas-resident-details');
+   await details.waitFor({state:'visible'});
+   await details.locator('select[aria-label="Собеседник"]').selectOption('resident_4');
+   await details.locator('select[aria-label="Тема беседы"]').selectOption('daily');
+   await details.getByRole('button',{name:'В очередь · беседа',exact:true}).tap();
+  }
+  const panel=page.locator('#conversation-panel');
+  await panel.waitFor({state:'visible',timeout:30000});
+  assert.equal(await panel.getAttribute('aria-modal'),'true');
+  assert.match(await page.locator('#conversation-subtitle').innerText(),extra?/Вера.*Игорь/:/Алекс.*Мира/);
+  const choices=page.locator('#conversation-options');
+  const locked=choices.getByRole('button',{name:/Вдохновить на перемены.*Харизма 9/});
+  assert.equal(await locked.isDisabled(),true);
+  const permitted=choices.getByRole('button',{name:'Помочь взглянуть иначе',exact:true});
+  assert.equal(await permitted.isEnabled(),true);
+  await page.screenshot({path:'artifacts/cas-01-7/pf-10a-'+(extra?'extra':'legacy')+'-'+width+'.png'});
+  await permitted.tap();
+  let saved=await stored();
+  const action=()=>saved.socialAction||saved.additionalSocial;
+  assert.equal(action().conversation.turns[0].id,'daily.reframe');
+  assert.equal(action().conversation.turns.length,1);
+  const minute=saved.minutes,seq=saved.socialGraph.nextSeq;
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+  await panel.waitFor({state:'visible',timeout:30000});
+  assert.match(await page.locator('#conversation-lines').innerText(),/Что из сегодняшнего дня/);
+  await choices.getByRole('button',{name:'Продолжить беседу',exact:true}).tap();
+  saved=await stored();
+  assert.equal(saved.minutes,minute,'mandatory choice freezes simulation over reload');
+  await choices.getByRole('button',{name:'Завершить разговор',exact:true}).tap();
+  saved=await stored();
+  assert.equal(saved.socialAction,null);
+  assert.equal(saved.additionalSocial,null);
+  assert.equal(saved.socialGraph.nextSeq,seq+1);
+  assert.equal(saved.version,1);
+  assert.deepEqual(errors,[],width+'x'+height+' '+a+' JS errors');
+  await context.close();
+ }
+ console.log('PF-10/A real mobile legacy + addressed topic picker, locked choices, reply, clock, v1 reload, exactly-one receipt PASS');
  console.log('CAS-01.7 WebGL HUD, scene, career, touch 390x844/320x568 PASS; physical Safari QA deferred');
 }finally{await browser.close();}
