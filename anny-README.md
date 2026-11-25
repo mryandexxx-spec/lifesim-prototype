@@ -1,0 +1,149 @@
+<!-- <h1 style="text-align: center;">Anny Body</h1> -->
+
+<p align="center">
+  <img src="docs/figures/anny_banner.svg" alt="Anny — A human model for every body" width="900" align="top" style="display:block;width:100%;max-width:900px;margin:auto"/>
+  <img src="docs/figures/anny_teaser.jpg" alt="Anny" width="900" align="top" style="display:block;width:100%;max-width:900px;margin:auto"/>
+</p>
+
+Anny is a differentiable human body mesh model written in PyTorch.
+Anny models a large variety of human body shapes, from infants to elders, using a common topology and parameter space.
+
+
+<p align="center">
+  <a href="https://pypi.org/project/anny/"><img src="https://img.shields.io/pypi/v/anny?color=3776AB" alt="PyPI version"/></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-2E7D32" alt="License"/></a>
+  <a href="https://arxiv.org/abs/2511.03589"><img src="https://img.shields.io/badge/arXiv-2511.03589-B31B1B" alt="arXiv"/></a>
+  <a href="http://anny-demo.europe.naverlabs.com/"><img src="https://img.shields.io/badge/Demo-7C3AED" alt="Demo"/></a>
+  <a href="https://europe.naverlabs.com/blog/anny-a-free-to-use-3d-human-parametric-model-for-all-ages/"><img src="https://img.shields.io/badge/Blogpost-C75B12" alt="Blogpost"/></a>
+</p>
+
+### Features
+- Anny is based on the tremendous work of the [MakeHuman](https://static.makehumancommunity.org/) community, which offers plenty of opportunities for extensions.
+- We provide both full body and part-specific models for hands and faces.
+- Anny is open-source and free.
+
+### News
+See [CHANGELOG.md](CHANGELOG.md) for more details:
+ - **2026-10-26**: v0.6.2: significant speed-ups, compact phenotype blendshapes by default, SMPL-H support, and various bug fixes.
+ - **2026-08-06**: v0.6: new "anny" rig, facial actions, improved SOMA compatibility, API refactoring, and better torch.compile support.
+ - **2026-06-03**: v0.5: code refactoring (one can now use `anny.Anny` syntax). Support for ["soma"](https://github.com/NVlabs/SOMA-X) rig and topology. SMPLX wrapper with "anny" topology support.
+ - **2026-02-04**: v0.3: "smplx" topology available for interoperability with [SMPL-X](https://smpl-x.is.tue.mpg.de/) (non-commercial use only). Nipple blend shapes excluded from default settings (use `local_changes="all"` for backward compatibility).
+ - **2025-11-21**: v0.2: support for different mesh topologies.
+ - **2025-11-05**: v0.1: initial release.
+
+## Installation
+
+```bash
+pip install anny[smpl,examples] # Full install (non-free dependencies).
+pip install anny[examples] # Free install.
+pip install anny # Minimal install.
+# Note that the free install may download non-commercial only assets when needed.
+pip install anny[examples]@git+https://github.com/naver/anny.git # latest sources.
+```
+
+## Quickstart example
+```python
+import torch, anny, trimesh
+model = anny.Anny(local_changes="default", facial_actions="all").to(dtype=torch.float32)
+# The model accept both dictionnary and stacked tensor inputs.
+# Skeletal rig pose parameters (see model.bone_labels).
+pose_parameters = torch.eye(4)[None, None].repeat(1, model.bone_count, 1, 1)
+# High-level shape parameters (within [0,1], see model.phenotype_labels):
+phenotype_kwargs = {key : 0.5 for key in model.phenotype_labels}
+# Local shape changes (within [-1,1], see model.local_change_labels):
+local_changes = {'stomach-pregnant-incr': 1.}
+# Facial expression changes (within [0,1], see model.facial_action_labels):
+facial_actions = {"jawOpen": 0.8, "mouthSmileLeft": 0.4}
+# Export default mesh output
+output = model(
+      pose_parameters=pose_parameters,
+      phenotype_kwargs=phenotype_kwargs,
+      local_changes_kwargs=local_changes,
+      facial_actions=facial_actions
+      )
+trimesh.Trimesh(vertices = output["vertices"].squeeze(dim=0).numpy(), faces=model.faces).export("anny_output.ply")
+```
+
+## Tutorials
+
+To get started with Anny, you can have a look at the different tutorials in the `tutorials` directory:
+- [Shape parameterization](https://naver.github.io/anny/build/shape_parameterization.html)
+- [Pose parameterization](https://naver.github.io/anny/build/pose_parameterization.html)
+- [Portability of pose parameterizations](https://naver.github.io/anny/build/pose_transfer.html)
+- [Texture coordinates](https://naver.github.io/anny/build/texture.html)
+- [Alternative models](https://naver.github.io/anny/build/alternative_models.html)
+
+### Interactive demo
+
+We provide a simple Gradio demo enabling to interact with the model easily:
+```bash
+python -m anny.examples.interactive_demo
+```
+
+<img src="docs/figures/interactive_demo.jpg" alt="Interactive demo" style="display:block;max-width:100%;max-height:24em;margin:auto"/>
+
+## Technical details
+
+### Default `anny` rig
+
+By default, `anny.Anny()` uses the compact `anny` rig with 104 bones. This is the recommended default for most full-body use cases: it keeps the main body, hand, and head articulation while removing facial expression, eye, tongue, and other zero-weight/pruned bones that are present in the full MakeHuman rig. For comparison, `Anny(rig="makehuman")` exposes the full 163-bone MakeHuman rig with the old blender/root-identity orientation. Choose `rig="anny"` for a smaller, stable default skeleton; choose `rig="makehuman"` if you need exact compatibility with old models or direct access to the removed face/tongue/eye bones. Facial action blendshapes remain available separately with `facial_actions="all"`.
+
+### Default `anny` topology
+
+By default, `anny.Anny()` uses the `anny` topology: a MakeHuman-derived full-body mesh with Anny's minor nudity-related mesh edits, unattached vertices removed, and triangular faces. This is the recommended topology for new full-body models because every output vertex is referenced by the mesh connectivity and the triangulated faces work directly with downstream tools such as anthropometry and most mesh processing libraries. Use `topology="anny-quads"` if you need the original quad faces, `topology="anny-full"` if you need to keep unattached vertices and disable the nudity-related mesh edits, or `topology="makehuman"` for the unedited quad MakeHuman body mesh convention. Alternative retopologies such as `smplx`, `smpl`, and `soma` are available when interoperability with those ecosystems is more important than using Anny's native mesh.
+
+### Migration from legacy defaults
+
+`anny.Anny()` defaults to the new Anny model (`rig="anny"`, `topology="anny"`, `pose_parameterization="local-ref"`), while the deprecated `anny.create_fullbody_model(...)` factory preserves the legacy full-body defaults. If you just want the new defaults, call `anny.Anny()` directly. If you need the exact legacy behavior, either keep using `create_fullbody_model(...)` while migrating, or translate its arguments to `Anny(...)` as follows:
+
+| Legacy `create_fullbody_model(...)` argument | Equivalent `anny.Anny(...)` argument |
+|---|---|
+| `rig="default"` (full 163-bone MakeHuman rig) | `rig="makehuman"` |
+| `topology="default"` (with the default `triangulate_faces=False`) | `topology="anny-quads"` |
+| `topology="default", triangulate_faces=True` | `topology="anny"` |
+| `remove_unattached_vertices=False` | append `-full` to the topology string (e.g. `topology="anny-quads-full"`) |
+| `pose_parameterization` (default `"local-bone"`) | `pose_parameterization="local-bone"`, passed explicitly (`Anny()` defaults to `"local-ref"`) |
+| `all_phenotypes=True` | `phenotypes="all"` |
+| `bone_orientation=...` | folded into the rig string via modifiers such as `-blender` or `-rootidentity` |
+
+⚠️ Pose parameters are not interchangeable across pose parameterizations: pose data saved with the legacy `"local-bone"` default will not produce the same pose under the new `"local-ref"` default. Either pass `pose_parameterization="local-bone"` explicitly for compatibility, or convert existing pose data with `anny.utils.pose.transfer_pose_parameters` (see the [pose portability tutorial](https://naver.github.io/anny/build/pose_transfer.html)).
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list of changes.
+
+### Caching
+
+Anny parses MakeHuman assets and caches pre-computed blend shape data to avoid recomputation on subsequent runs.
+The first instantiation of a model can take a few minutes. 
+By default the cache is stored in `~/.cache/anny/`. To use a different location, set the `ANNY_CACHE_DIR` environment variable:
+
+```bash
+export ANNY_CACHE_DIR=/path/to/cache
+```
+
+
+## License
+
+The code of Anny, Copyright (c) 2025 NAVER Corp., is licensed under the Apache License, Version 2.0 (see [LICENSE](LICENSE)).
+
+**data/mpfb2**: *Anny* relies on [MakeHuman](https://static.makehumancommunity.org/) assets adapted from [MPFB2](https://github.com/makehumancommunity/mpfb2/) that are licensed under the [CC0 1.0 Universal](src/anny/data/mpfb2/LICENSE.md) License.
+
+**data/faceunits01**: Facial actions of *Anny* rely on [Face Units asset pack](https://static.makehumancommunity.org/assets/assetpacks/index.html#functional-asset-packs) by Mika Suominen, licensed under the [CC0 1.0 Universal](src/anny/data/mpfb2/LICENSE.md) License.
+
+**data/soma**: *Anny* provide a "soma" topology adapted from [SOMA-X](https://github.com/NVlabs/SOMA-X) which is licenced under the [Apache 2.0](https://github.com/NVlabs/SOMA-X/blob/main/LICENSE) license.
+
+**smplx**: A "smplx" topology can be downloaded for non-commercial use only, allowing interoperability with [SMPL-X](https://smpl-x.is.tue.mpg.de/). See LICENSE.txt and NOTICE.txt files in http://download.europe.naverlabs.com/humans/Anny/noncommercial.zip for more information.
+
+## Citation
+
+```bibtex
+@inproceedings{anny,
+      title={Human Mesh Modeling for {A}nny {B}ody},
+      author={Romain Br{\'e}gier and Gu{\'e}nol{\'e} Fiche and Laura Bravo-S{\'a}nchez and Thomas Lucas and Matthieu Armando and Philippe Weinzaepfel and Gr{\'e}gory Rogez and Fabien Baradel},
+      booktitle="Computer Vision -- ECCV 2026",
+      year={2026},
+      publisher="Springer Nature Switzerland",
+      address="Cham",
+      pages="170--188",
+      isbn="978-3-032-37314-4"
+}
+```

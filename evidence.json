@@ -1,0 +1,13 @@
+{
+  "source_run": 45563179091,
+  "source_head": "0329a0f956cfbb0cee7216a4c76d7a59067fa9a7",
+  "model_sha256": {
+    "male-candidate.glb": "4ce29a6ffce21817f92bb2c7df8c27afe630d0dd88e373a05e2ceca591fdcbb8",
+    "female-candidate.glb": "f4973254fb39f2ff962f429725e66c17a478d7e4110ed556679babb400c7d85e",
+    "male-original.glb": "5873589a1a97b6fdccbe460b3aaf739b2539ce6a1f75520c5d12845ee6598eb3",
+    "female-original.glb": "fc8c47af2e9dfa0935bac0a2ad1384cf6b1a3926e255dd8728f145cf5bc5bf9f",
+    "male-candidate.blend": "7b15d1c7092c7fd880efd1ac0e2642533a797b2d0f6caa63f4e54ffbc641294f",
+    "female-candidate.blend": "c5a7f71716013e441276bb342e6c4769f2e654ba1926e32d0192d7742c04cbcb"
+  },
+  "contact_gate": "candidate counts only; penetration classification open"
+}
