@@ -430,3 +430,11 @@ export function ofInteriorFit(sku){const e=ofInteriorSpec(sku);if(!e)return null
 
 /** Visual plate center: tabletop + half of the 24 mm plate thickness + 1 mm clearance. */
 export function ofInteriorDiningPlateY(sku){return sku==='diningtable.farm'?.873:sku==='diningtable.oval'?.868:null;}
+
+/** Contact overlay anchors measured from the approved GLB material geometry. Only applied with a visible R2 mesh. */
+const OF_OVERLAYS=Object.freeze({
+  'floorlamp.arc':Object.freeze({bulbScale:Object.freeze([.12,.12,.12])}),
+  'sconce.leaf':Object.freeze({bulbs:Object.freeze([Object.freeze([-.15,-.03,-.01]),Object.freeze([.15,-.03,-.01])]),bulbScale:Object.freeze([.075,.075,.075])}),
+  'mirror.oval':Object.freeze({glintZ:-.068})
+});
+export function ofInteriorOverlay(sku){return Object.hasOwn(OF_OVERLAYS,sku)?OF_OVERLAYS[sku]:null;}

@@ -118,7 +118,7 @@ import {furnitureProduct,FURNITURE_APPEARANCES,FURNITURE_SHOP_TYPES,
 import {proceduralFurnitureModel} from './furniture-procedural-library.js';
 import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
 import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnailUrl} from './meshy-furniture-policy.js';
-import {ofInteriorDiningPlateY} from './of-interior-assets.js';
+import {ofInteriorDiningPlateY,ofInteriorOverlay} from './of-interior-assets.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -2960,6 +2960,10 @@ function boot() {
         bulb.addComponent('render',{type:'sphere',material:mat('#fff4d0',{emissive:1.1})});
         bulb.setLocalScale(.11,.11,.11);
         light.addChild(bulb);node.addChild(light);
+        if(item.itemDefinitionId==='sconce.leaf'){
+          const second=bulb.clone();second.name='C3 mounted bulb second';
+          light.addChild(second);second.enabled=false;
+        }
         light.light.enabled=false;bulb.enabled=false;
       }
       // F4G cookware is attached to the specific purchased appliance, never to the room.
@@ -10054,7 +10058,11 @@ function boot() {
         if(light?.light){
           light.light.enabled=litIds.has(item.instanceId);
           const bulb=light.findByName('F4E lamp bulb');
-          if(bulb)bulb.enabled=light.light.enabled;
+          if(bulb){
+            const fit=meshyFurniture.hasModel(node)?ofInteriorOverlay(item.itemDefinitionId):null;
+            if(item.itemDefinitionId==='floorlamp.arc')bulb.setLocalScale(...(fit?.bulbScale||[.20,.16,.20]));
+            bulb.enabled=light.light.enabled;
+          }
         }
       }
       if(MOUNTED_LIGHTS[item.itemDefinitionId]){
@@ -10062,7 +10070,19 @@ function boot() {
         if(light?.light){
           light.light.enabled=litIds.has(item.instanceId);
           const bulb=light.findByName('C3 mounted bulb');
-          if(bulb)bulb.enabled=light.light.enabled;
+          if(bulb){
+            const fit=meshyFurniture.hasModel(node)?ofInteriorOverlay(item.itemDefinitionId):null;
+            if(item.itemDefinitionId==='sconce.leaf'){
+              bulb.setLocalPosition(...(fit?.bulbs[0]||[0,0,0]));
+              bulb.setLocalScale(...(fit?.bulbScale||[.11,.11,.11]));
+              const second=light.findByName('C3 mounted bulb second');
+              if(second){
+                if(fit){second.setLocalPosition(...fit.bulbs[1]);second.setLocalScale(...fit.bulbScale);}
+                second.enabled=Boolean(fit&&light.light.enabled);
+              }
+            }
+            bulb.enabled=light.light.enabled;
+          }
         }
       }
       if(item.prefabId==='easel'){
@@ -10080,6 +10100,11 @@ function boot() {
         continue;
       }
       if(!['dresser','wardrobe','mirror'].includes(item.prefabId))continue;
+      if(item.itemDefinitionId==='mirror.oval'){
+        const glint=node.findByName('F4E mirror highlight');
+        const fit=meshyFurniture.hasModel(node)?ofInteriorOverlay(item.itemDefinitionId):null;
+        glint?.setLocalPosition(0,1.36,fit?.glintZ??-.16);
+      }
       const utilityUsers=residentIdsForSimulation(game).map(id=>getActor(game,id)?.action);
       const weight=Math.max(0,...residentIdsForSimulation(game).map(id=>
         furnitureUseWeight(getActor(game,id)?.action,item.instanceId)));
