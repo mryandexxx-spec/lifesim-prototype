@@ -1,9 +1,7 @@
 name: CF-BODY C exact repack diagnostic
 on:
-  pull_request:
-    paths:
-      - 'art-review/cf-body-c-opt/**'
-      - '.github/workflows/cf-body-c-opt.yml'
+  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
   actions: read
@@ -12,13 +10,13 @@ concurrency:
   cancel-in-progress: true
 jobs:
   exact-repack:
-    if: github.head_ref == 'art/cf-body-c-opt' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' || (github.head_ref == 'art/cf-body-c-opt' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
