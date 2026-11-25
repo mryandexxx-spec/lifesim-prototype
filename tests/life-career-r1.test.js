@@ -26,7 +26,8 @@ test('append-only 12 CAREER-R1 stories: two per career, three choices and exact 
     const bank=WORK_INCIDENT_CATALOG[id];
     assert.deepEqual(bank.slice(3,5),CAREER_R1_SCENES[id]);
     assert.deepEqual(bank.slice(3,5).map(s=>[s.minRank,s.maxRank]),[[0,4],[5,7]]);
-    assert.equal(bank.length,7);
+    assert.equal(bank.length,15);
+    assert.equal(bank.slice(7).filter(s=>s.id.startsWith('pf09b-')).length,8);
     for(const scene of bank.slice(3,5)){
       assert.equal(scene.options.length,3);
       assert.ok(scene.title.length>8&&scene.text.length>40);
