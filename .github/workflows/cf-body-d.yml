@@ -95,6 +95,7 @@ jobs:
           if-no-files-found: warn
 
   ossos-gate:
+    if: false # Exact D-TOOLS/1 result retained in run 45680624386
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -141,5 +142,76 @@ jobs:
         with:
           name: cf-body-d-tools-ossos-gate
           path: d-tools-out/
+          retention-days: 90
+          if-no-files-found: warn
+
+  ossos-full-rig:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-adaptive-evidence
+          run-id: 45655678102
+          github-token: ${{ github.token }}
+          path: d1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d4-contact-audit
+          run-id: 45676236151
+          github-token: ${{ github.token }}
+          path: r1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-c-continuous-evidence
+          run-id: 45634752787
+          github-token: ${{ github.token }}
+          path: reviewed
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: cf-body-d-bpy-4.5.0-py311-linux-v1
+      - name: Prepare real held-out body meshes and full rig
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.15.3
+          python -m py_compile art-review/cf-body-d/dtools-full.py art-review/cf-body-d/dtools-render.py
+          python art-review/cf-body-d/dtools-full.py prepare
+      - name: Apply upstream IK to 104-joint skeleton
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          npm install --prefix .dtools-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.dtools-deps/node_modules" upstream-ossos/node_modules
+          cp art-review/cf-body-d/dtools-full.mjs upstream-ossos/gate.mjs
+          .dtools-deps/node_modules/.bin/esbuild upstream-ossos/gate.mjs --bundle --platform=node --target=node22 --format=esm --outfile=dtools-full-bundle.mjs
+          node dtools-full-bundle.mjs
+          python art-review/cf-body-d/dtools-full.py bake
+          cp upstream-ossos/LICENSE full-out/OSSOS-LICENSE.txt
+          cp .dtools-deps/package-lock.json full-out/dependency-lock.json
+      - name: Independent Blender skin and fixed-seat A/B renders
+        run: python art-review/cf-body-d/dtools-render.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-tools-full-rig
+          path: full-out/
           retention-days: 90
           if-no-files-found: warn
