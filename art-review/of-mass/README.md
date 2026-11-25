@@ -1,0 +1,2 @@
+# OF-MASS diagnostic
+43 SKU pairs, 33 families; five exact pilot pairs from verified artifact. Original authored meshes, no paid assets. Old outdoor baseline reconstructed from pinned renderer geometry; mature dry garden only in this first pass, transient grill state omitted; neither actual game integration nor physical iPhone certification. ART gate requires direct review of real outputs before publication. Do not merge into main.

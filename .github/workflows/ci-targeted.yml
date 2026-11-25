@@ -8,6 +8,65 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  of-mass:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/of-mass' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: of-01-object-lab-evidence
+          run-id: 45637220167
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify pilot payload before reuse
+        run: |
+          python - <<'PY'
+          import pathlib,hashlib,json
+          p=pathlib.Path('reviewed')
+          selected=sorted(x for x in p.rglob('*') if x.is_file() and (str(x.relative_to(p)).startswith(('lab/','blender/')) or str(x.relative_to(p)) in ['donors/tree/source.json','donors/tree/license.txt','donors/table/source.json']))
+          m={str(x.relative_to(p)):hashlib.sha256(x.read_bytes()).hexdigest() for x in selected}
+          assert len(m)==56
+          assert hashlib.sha256(json.dumps(m,sort_keys=True,separators=(',',':')).encode()).hexdigest()=='9dd2d6f9b3dfc1e23b14f4f03dace2a8f6ca8d4ce96bf36ba937e4d1edcd3731'
+          PY
+      - name: Install CPU authoring and browser tools
+        run: |
+          python -m pip install bpy==4.5.0
+          npm ci
+          npm install --no-save playwright@1.56.1 pngjs@7.0.0
+          npx playwright install --with-deps chromium webkit
+      - name: Build 43 catalog pairs
+        run: |
+          node art-review/of-mass/baseline.mjs
+          python art-review/of-mass/build.py
+          node art-review/of-mass/verify.mjs
+          cp art-review/of-mass/{index.html,lab.mjs} artifacts/of-mass/lab/
+          cp node_modules/playcanvas/build/playcanvas.mjs artifacts/of-mass/lab/
+      - name: Mobile PlayCanvas matched captures and 97-instance diagnostic lot
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 &
+          sleep 2
+          node art-review/of-mass/capture.mjs
+      - name: Archive real evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: of-mass-evidence
+          path: artifacts/of-mass/
+          if-no-files-found: error
+
   of-01-fix:
     if: github.event_name == 'pull_request' && github.head_ref == 'art/of-01-object-lab' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
