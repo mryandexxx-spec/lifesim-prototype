@@ -27,8 +27,26 @@ try{
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:65000});
   assert.ok((await page.locator('#game-canvas').screenshot()).length>2000);
+  const cameraPosition=()=>page.evaluate(async()=>{
+    const pc=await import('playcanvas');
+    const p=pc.Application.getApplication().root.findByName('Camera').getPosition();
+    return [p.x,p.y,p.z];
+  });
+  const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
+  const initial=await cameraPosition();
   await page.locator('#pick-mira').tap();
   assert.equal(await page.locator('#pick-mira').getAttribute('aria-pressed'),'true');
+  await page.waitForTimeout(500);
+  assert.ok(distance(initial,await cameraPosition())<.001,'single tap must not move camera');
+  const box=await page.locator('#pick-mira').boundingBox();
+  assert.ok(box);
+  const tapMira=()=>page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);
+  await tapMira();await tapMira();
+  await page.waitForFunction(async(initial)=>{
+    const pc=await import('playcanvas');
+    const p=pc.Application.getApplication().root.findByName('Camera').getPosition();
+    return Math.hypot(p.x-initial[0],p.y-initial[1],p.z-initial[2])>.05;
+  },initial,{timeout:5000});
   // The two always-visible resident-name buttons are the mobile tap targets.
   // In compact HUD layouts the nested descriptive label can have no tap box.
   assert.match(await page.locator('#pick-mira').textContent(),/Мира/);
