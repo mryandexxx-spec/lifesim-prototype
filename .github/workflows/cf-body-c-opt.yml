@@ -38,6 +38,23 @@ jobs:
           cp -a reviewed/lab served/reference
           cp -a reviewed/lab served/candidate
           cp opt-out/models/*.glb served/candidate/
+      - name: Fixed framebuffer experiment (isolated lab copies)
+        run: |
+          cat > /tmp/fixed-buffer.py <<'PY'
+          import pathlib
+          for d in pathlib.Path('served').iterdir():
+              p=d/'lab.js'
+              if not p.is_file(): continue
+              s=p.read_text()
+              old='app=new pc.Application(canvas,{graphicsDeviceOptions:{antialias:true'
+              assert old in s
+              s=s.replace(old,'canvas.width=Math.max(1,canvas.clientWidth);canvas.height=Math.max(1,canvas.clientHeight);app=new pc.Application(canvas,{graphicsDeviceOptions:{antialias:false',1)
+              a='app.setCanvasResolution(pc.RESOLUTION_AUTO);const resize=()=>app.resizeCanvas(Math.max(1,canvas.clientWidth),Math.max(1,canvas.clientHeight));new ResizeObserver(resize).observe(canvas.parentElement);resize();'
+              b='app.setCanvasResolution(pc.RESOLUTION_FIXED,canvas.width,canvas.height);const resize=()=>{const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);if(canvas.width!==w||canvas.height!==h)app.setCanvasResolution(pc.RESOLUTION_FIXED,w,h);app.renderNextFrame=true};window.addEventListener("resize",resize);window.postRenderFrame=()=>new Promise(resolve=>{app.once("postrender",()=>{const gl=app.graphicsDevice.gl;resolve({lost:gl.isContextLost(),error:gl.getError(),width:gl.drawingBufferWidth,height:gl.drawingBufferHeight})});app.renderNextFrame=true});'
+              assert a in s
+              p.write_text(s.replace(a,b,1))
+          PY
+          python /tmp/fixed-buffer.py
       - name: Actual A/B Chromium and WebKit renders
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
@@ -49,6 +66,11 @@ jobs:
           xvfb-run -a python art-review/cf-body-c-opt/browser.py
       - name: Bake selected profiles with original face morphs
         run: python art-review/cf-body-c-opt/bake.py
+      - name: Apply fixed framebuffer to newly baked copies
+        run: |
+          cp reviewed/lab/lab.js served/reference/lab.js
+          cp reviewed/lab/lab.js served/candidate/lab.js
+          python /tmp/fixed-buffer.py
       - name: Actual fixed-body A/B render and expression checks
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
