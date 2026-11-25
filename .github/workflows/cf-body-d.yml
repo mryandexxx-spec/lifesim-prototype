@@ -78,6 +78,9 @@ jobs:
       - name: Install exact independent Blender runtime
         run: |
           python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4
+          python -m pip check
+          python -c 'import bpy, numpy; assert bpy.app.version == (4,5,0); assert numpy.__version__ == "1.26.4"'
+          python -m py_compile art-review/cf-body-d/contact_audit.py
       - name: Audit actual skinned triangle contacts and render matched closeups
         run: python art-review/cf-body-d/contact_audit.py
       - uses: actions/upload-artifact@v4
