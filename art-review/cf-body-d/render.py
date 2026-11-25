@@ -1,6 +1,6 @@
 """Blender independent real skinned GLB reimport and matched pose renders."""
 import bpy, pathlib, json, math
-from mathutils import Vector
+from mathutils import Vector, Matrix
 root=pathlib.Path('d2');renders=root/'renders';renders.mkdir(exist_ok=True)
 report={}
 def material(name,color):
@@ -26,7 +26,10 @@ def active_frame(arm,action,frame):
     for o in bpy.data.objects:
         if o.animation_data:
             for tr in o.animation_data.nla_tracks:tr.mute=True
-    ad=arm.animation_data_create();ad.action=action
+    ad=arm.animation_data_create();ad.action=None
+    for bone in arm.pose.bones:bone.matrix_basis=Matrix.Identity(4)
+    bpy.context.view_layer.update()
+    ad.action=action
     if hasattr(action,'slots') and len(action.slots):
         matches=[s for s in action.slots if s.target_id_type=='OBJECT']
         if matches:ad.action_slot=matches[0]
@@ -46,20 +49,34 @@ for path in sorted(root.glob('*.glb')):
     assert all(any(k in a.name for a in actions) for k in ('elbow','reach','seat_probe','seat_contact_candidate')),[a.name for a in actions]
     row={'blender_version':bpy.app.version_string,'bones':len(arm.data.bones),'actions':[a.name for a in actions],'mesh_vertices':len(body.data.vertices),'poses':{}}
     setup();fixture=seat[path.name]['fixture']
+    # A real neutral reference independent of any clip; reset every pose bone.
+    for o in bpy.data.objects:
+        if o.animation_data:
+            o.animation_data.action=None
+            for tr in o.animation_data.nla_tracks:tr.mute=True
+    for bone in arm.pose.bones:bone.matrix_basis=Matrix.Identity(4)
+    bpy.context.view_layer.update();neutral=vertices(body)
+    assert abs(min(v[2] for v in neutral))<.005
+    row['neutral_floor_z_m']=min(v[2] for v in neutral)
     # glTF +Z is Blender -Y. Chair is rendered as the fixed collision slab.
     chair=cube('seat fixture',(0,-fixture['center_z'],fixture['floor_m']+.43-.02),(.52,.42,.04),(.22,.34,.45))
     for k in ('elbow','reach','seat_probe','seat_contact_candidate'):
         action=next(a for a in actions if k in a.name);start,end=map(round,action.frame_range)
         active_frame(arm,action,start);v0=vertices(body)
+        reset_error=max(math.dist(a,b) for a,b in zip(v0,neutral))
+        assert reset_error<.0001,(path.name,k,'start differs from independent neutral',reset_error)
         active_frame(arm,action,end);v1=vertices(body)
         move=max(math.dist(a,b) for a,b in zip(v0,v1));assert move>.02,(path.name,k,move)
-        row['poses'][k]={'max_displacement_m':move,'floor_z_min_m':min(v[2] for v in v1)}
+        row['poses'][k]={'max_displacement_m':move,'start_neutral_error_m':reset_error,'floor_z_min_m':min(v[2] for v in v1)}
         chair.hide_render=not k.startswith('seat')
         for view,pos in [('front',(0,-4,1.05)),('profile',(4,0,1.05)),('threequarter',(3,-4,1.05))]:
             # Only the neutral and candidate seat need all angles; other poses keep profile and 3/4.
             if view=='front' and k in ('elbow','reach','seat_probe'):continue
             camera_at(pos,(0,0,.93));bpy.context.scene.render.filepath=str((renders/(path.stem+'-'+k+'-'+view+'.png')).resolve());bpy.ops.render.render(write_still=True)
     active_frame(arm,next(a for a in actions if 'elbow' in a.name),round(next(a for a in actions if 'elbow' in a.name).frame_range[0]))
+    final_reset=max(math.dist(a,b) for a,b in zip(vertices(body),neutral))
+    assert final_reset<.0001,(path.name,'final neutral drift',final_reset)
+    row['final_neutral_error_m']=final_reset
     chair.hide_render=True
     for view,pos in [('front',(0,-4,1.05)),('profile',(4,0,1.05)),('threequarter',(3,-4,1.05))]:
         camera_at(pos,(0,0,.93));bpy.context.scene.render.filepath=str((renders/(path.stem+'-neutral-'+view+'.png')).resolve());bpy.ops.render.render(write_still=True)
