@@ -80,9 +80,41 @@ test('F2.1 frontend owns one compatible shop for world furniture and safeguards'
     'furnish-store','furnish-restore','furnish-sell','furnish-balance'])
     assert.ok(html.includes('id="'+id+'"'));
   assert.match(css,/\.furnish-shop\[hidden\]/);
-  assert.ok(!game.includes('game.paused=true;'));
+  // The editor must not set the canonical pause flag. The explicit OF-C
+  // startup QA exception is independently executed below, not ignored.
+  const start=game.indexOf('// OF-C deterministic browser evidence:');
+  const end=game.indexOf('const musicAudio=createMusicAudio();',start);
+  assert.ok(start>=0&&end>start);
+  const outside=game.slice(0,start)+game.slice(end);
+  assert.doesNotMatch(outside,/\bgame(?:\.otherSim)?\.paused\s*=\s*true\b/);
+  assert.equal((outside.match(/\bgame(?:\.otherSim)?\.paused\s*=(?!=)/g)||[]).length,1,
+    'only the ordinary pause toggle may assign outside startup QA');
+  assert.match(outside,/game\.paused\s*=\s*!game\.paused;/);
   assert.ok(FURNITURE_CATALOG.plant.price===null,
     'provisional pricing must not be presented as final prefab balance');
+});
+
+test('F2.1 / OF-C startup pause requires both explicit QA parameters and never mutates regular sessions',()=>{
+  const game=source('../src/game.js');
+  const start=game.indexOf('// OF-C deterministic browser evidence:');
+  const end=game.indexOf('const musicAudio=createMusicAudio();',start);
+  assert.ok(start>=0&&end>start);
+  const startup=game.slice(start,end);
+  for(const [search,expected] of [
+    ['',false],['?furniture=qa',false],['?garden-start-paused=1',false],
+    ['?furniture=legacy&garden-start-paused=1',false],
+    ['?furniture=qa&garden-start-paused=0',false],
+    ['?furniture=qa&garden-start-paused=true',false],
+    ['?furniture=qa&garden-start-paused=1',true]
+  ]){
+    for(const initial of [false,true]){
+      const state={paused:initial,otherSim:{paused:initial},minutes:9360,shop:{credits:5000}};
+      const before=copy(state);
+      runInNewContext(startup,{game:state,location:{search},URLSearchParams},{timeout:1000});
+      if(expected){before.paused=true;before.otherSim.paused=true;}
+      assert.deepEqual(state,before,search+' initial='+initial);
+    }
+  }
 });
 
 test('F2.1 PlayCanvas runtime creates, stores and removes real independent prefab copies',()=>{
