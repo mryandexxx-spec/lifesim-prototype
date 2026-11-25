@@ -5,7 +5,7 @@ import {chromium} from 'playwright';
 import {newHousehold} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
 import {plannedCareerShift} from '../src/career-scheduler.js';
-import {planWorkIncident} from '../src/career-incidents.js';
+import {planWorkIncident,selectWorkScenario,workScenario} from '../src/career-incidents.js';
 import {SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 function fixture(status){
@@ -14,12 +14,13 @@ function fixture(status){
   root.autonomy.enabled=false;root.otherSim.autonomy.enabled=false;
   root.careerSystem=hireCareer(root.careerSystem,'alex','editorial',480);
   const c=root.careerSystem.byResident.alex;
-  for(let day=0;day<60;day++){
+  for(let day=0;day<365;day++){
     const shift=plannedCareerShift(root.calendar,c,day);
     if(!shift)continue;
     const active={...shift,phase:'working',departedAt:shift.start,readiness:75};
     const plan=planWorkIncident(c,'alex',active);
     if(plan.status!==status)continue;
+    if(status==='due'&&(plan.rarity!=='rare'||!selectWorkScenario(root,'alex',active,plan)?.startsWith('pf09b-')))continue;
     c.currentShift=active;
     root.minutes=status==='due'?plan.dueAt-3:active.end-10;
     root.otherSim.minutes=root.minutes;
@@ -32,7 +33,7 @@ mkdirSync('artifacts/career-shifts-r1',{recursive:true});
 const browser=await chromium.launch({headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 try{
   for(const [width,height] of [[390,844],[320,568]])for(const status of ['due','none']){
-    const {root,shift}=fixture(status);
+    const {root,shift,plan}=fixture(status);
     const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
     await context.addInitScript(({key,record,tour})=>{
       if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(record));
@@ -60,7 +61,11 @@ try{
       await phone.locator('.career-work-option').first().tap();
       const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
       assert.equal(saved.careerSystem.incidentIds.filter(id=>id===shift.id+'#work').length,1);
-      assert.ok(saved.careerSystem.byResident.alex.currentShift.incident.choiceId);
+      const chosen=saved.careerSystem.byResident.alex.currentShift.incident;
+      assert.ok(chosen.choiceId);
+      assert.ok(chosen.scenarioId.startsWith('pf09b-'));
+      assert.equal(workScenario('editorial',chosen.scenarioId).rarity,plan.rarity);
+      assert.equal(saved.careerSystem.incidentHistory.alex.at(-1).scenarioId,chosen.scenarioId);
       assert.ok(saved.notificationHistory.entries.some(e=>e.incidentId===shift.id+'#work'));
       await page.reload({waitUntil:'domcontentloaded'});
       await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
@@ -82,5 +87,5 @@ try{
     assert.deepEqual(errors,[],status+' '+width);
     await context.close();
   }
-  console.log('PF-09/A live mobile WebGL scheduled choice, v1 reload, notification and no-event salary PASS');
+  console.log('PF-09/A+B live mobile WebGL scheduled choice, v1 reload, notification and no-event salary PASS');
 }finally{await browser.close();}

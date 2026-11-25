@@ -24,14 +24,14 @@ function prepare(career,track,resident='alex',rank=5){
   root.minutes=245;root.otherSim.minutes=245;
   return {root,contract,resident};
 }
-test('42 stable work stories: R2 adds exactly one immutable scene per existing specialist track',()=>{
+test('90 stable work stories: R2 adds exactly one immutable scene per existing specialist track',()=>{
   let count=0;const ids=new Set();
   for(const {id} of CAREER_CATALOG){
     const bank=WORK_INCIDENT_CATALOG[id];
-    assert.equal(bank.length,7);
+    assert.equal(bank.length,15);
     assert.deepEqual(bank.slice(3,5),CAREER_R1_SCENES[id]);
-    assert.deepEqual(bank.slice(5),CAREER_R2_SCENES[id]);
-    assert.deepEqual(bank.slice(5).map(s=>s.trackId),CAREER_SPECIALIZATIONS[id].map(t=>t.id));
+    assert.deepEqual(bank.slice(5,7),CAREER_R2_SCENES[id]);
+    assert.deepEqual(bank.slice(5,7).map(s=>s.trackId),CAREER_SPECIALIZATIONS[id].map(t=>t.id));
     for(const scene of bank){
       assert.ok(!ids.has(id+':'+scene.id));ids.add(id+':'+scene.id);count++;
     }
@@ -47,7 +47,7 @@ test('42 stable work stories: R2 adds exactly one immutable scene per existing s
       assert.equal(workScenario(id,scene.id),scene);
     }
   }
-  assert.equal(count,42);assert.equal(ids.size,42);
+  assert.equal(count,90);assert.equal(ids.size,90);
 });
 test('rank and actual track gate are applied before scoring; no cross-branch stories',()=>{
   for(const {id} of CAREER_CATALOG){
