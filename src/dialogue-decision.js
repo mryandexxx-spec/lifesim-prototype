@@ -5,7 +5,7 @@
  */
 const PHASES=new Set(['opening','response','followUp']);
 export function dialogueNeedsDecision(root){
-  const action=root?.socialAction;
+  const action=root?.socialAction||root?.additionalSocial;
   return action?.phase==='using'&&
     PHASES.has(action.conversation?.phase);
 }
