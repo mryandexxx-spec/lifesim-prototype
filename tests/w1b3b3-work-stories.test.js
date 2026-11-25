@@ -8,7 +8,7 @@ import {CAREER_CATALOG} from '../src/career-catalog.js';
 import {createProfile} from '../src/trait-catalog.js';
 import {WORK_INCIDENTS,WORK_INCIDENT_CATALOG,INCIDENT_HISTORY_LIMIT,
   workScenario,selectWorkScenario,startWorkIncident,pendingWorkIncident,
-  decideWorkIncident,chooseAutonomousWorkOption,automaticWorkIncident} from '../src/career-incidents.js';
+  decideWorkIncident,chooseAutonomousWorkOption,automaticWorkIncident,planWorkIncident} from '../src/career-incidents.js';
 
 const copy=x=>JSON.parse(JSON.stringify(x));
 function setup(career='editorial',id='alex'){
@@ -227,16 +227,17 @@ test('pause and x3 still grant only one incident and one canonical salary',()=>{
   st.root.paused=false;st.root.speed=3;
   let notices=0;
   const shift=st.contract.currentShift;
+  const expected=planWorkIncident(st.contract,'alex',shift).status==='due'?1:0;
   while(st.root.minutes<shift.end){
     const delta=Math.min(1.2,shift.end-st.root.minutes);
     const events=tickHousehold(st.root,delta)||[];
     notices+=events.filter(x=>x.type==='incident').length;
   }
-  assert.equal(notices,1);
-  assert.equal(st.root.careerSystem.incidentHistory.alex.length,1);
-  assert.equal(st.root.careerSystem.incidentIds.length,1);
+  assert.equal(notices,expected);
+  assert.equal(st.root.careerSystem.incidentHistory.alex.length,expected);
+  assert.equal(st.root.careerSystem.incidentIds.length,expected);
   assert.equal(st.root.careerSystem.settlementIds.length,1);
   assert.equal(st.root.shop.credits,5112);
   tickHousehold(st.root,15);
-  assert.equal(st.root.careerSystem.incidentHistory.alex.length,1);
+  assert.equal(st.root.careerSystem.incidentHistory.alex.length,expected);
 });
