@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {syncResidentPickerWorkStatus} from '../src/resident-hud.js';
 const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const game=read('src/game.js');
 test('PF-01: pool preview keeps exact cell bounds, fixed four strips, resets for ground and invalid input',()=>{
@@ -33,8 +34,19 @@ test('PF-01: career HUD keeps canonical label and selected resident, hides absen
  const gameState={careerSystem:{byResident:{alex:{},mira:{}}}};
  const labels={alex:{label:'Ожидает: 2026-11-25 22:00–06:00'},mira:{label:'На работе · до 18:00'}};
  const source=game.slice(game.indexOf('function updateCareerHud(){'),game.indexOf('const residentSwitch='));
- const update=vm.runInNewContext(source+';updateCareerHud',{workHud,game:gameState,activeHudResident:()=>id,residentWorkStatus:(_,who)=>labels[who]});
+ // Execute the real PF-08 picker synchronizer, not a no-op mock.
+ const button=()=>({dataset:{},attrs:{},getAttribute(key){return this.attrs[key]??null;},setAttribute(key,value){this.attrs[key]=value;}});
+ const buttons={'pick-alex':button(),'pick-mira':button()};
+ gameState.careerSystem.byResident.mira.currentShift={phase:'working'};
+ const update=vm.runInNewContext(source+';updateCareerHud',{workHud,game:gameState,activeHudResident:()=>id,residentWorkStatus:(_,who)=>labels[who],syncResidentPickerWorkStatus,$:key=>buttons[key]});
  update();assert.equal(workHud.textContent,labels.alex.label);assert.equal(workHud.hidden,false);
+ assert.equal(buttons['pick-mira'].dataset.away,'true');
+ assert.match(buttons['pick-mira'].getAttribute('aria-label'),/на работе/);
+ // Mira returns while Alex is still selected.
+ gameState.careerSystem.byResident.mira.currentShift=null;
+ update();assert.equal(workHud.textContent,labels.alex.label);
+ assert.equal(buttons['pick-mira'].dataset.away,'false');
+ assert.equal(buttons['pick-mira'].getAttribute('aria-label'),'Выбрать Мира');
  id='mira';update();assert.equal(workHud.textContent,labels.mira.label);
  gameState.careerSystem.byResident.mira.currentShift={incident:{choiceId:null}};
  update();assert.match(workHud.textContent,/Рабочая ситуация/);
