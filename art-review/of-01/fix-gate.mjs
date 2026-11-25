@@ -14,7 +14,7 @@ for(const {mode,rows} of reports){let ok=true;for(const width of [320,390]){
  const lotOK=lots.length===2&&lots.every(x=>x.metrics.instances===25&&Number.isFinite(x.metrics.p95Ms));
  const probe=rows.find(x=>x.name==='webkit'&&x.width===width&&x.placement);
  const p=probe?.placement,rr=probe?.reloaded;
- const match=(a,b)=>a&&b&&Math.abs(a.x-b.x)<.001&&Math.abs(a.z-b.z)<.001&&Math.abs(a.yaw+b.yaw)<.01&&a.ghostVisible&&a.committedHidden&&a.ghostRemoved&&a.committedVisible;
+ const match=(a,b)=>a&&b&&Math.abs(a.x-b.x)<.001&&Math.abs(a.z-b.z)<.001&&Math.abs(((a.yaw+b.yaw+180)%360+360)%360-180)<.01&&a.ghostVisible&&a.committedHidden&&a.ghostRemoved&&a.committedVisible;
  const placementOK=p?.poses?.length===4&&p.poses.every((x,i)=>x.yaw===i*90)&&p.pool?.length===4&&p.pool.every(x=>x&&Number.isFinite(x.x)&&Number.isFinite(x.z))&&JSON.stringify(p.state)===JSON.stringify(rr?.state)&&match(p.ghost,p.state.pose)&&match(rr?.probe,p.state.pose);
  console.log(JSON.stringify({mode,width,valid,rawOK,nightOK,lotOK,placementOK,lots:lots.map(x=>x.metrics)}));ok&&=valid&&rawOK&&nightOK&&lotOK&&placementOK;
  }passed||=ok;}

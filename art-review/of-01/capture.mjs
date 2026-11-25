@@ -16,7 +16,7 @@ const placement=await page.evaluate(async()=>{const {cameraPlacementPose}=await 
  const poses=[0,90,180,270].map(yaw=>cameraPlacementPose({centerX:2.23,centerZ:-1.12},{yaw},'lot'));
  const pool=['west','east','north','south'].map(side=>poolFixtureVisualPose({edgeCell:100,side}));
  const state={sku:'diningtable.farm',pose:poses[1]};localStorage.setItem('of01-fix-probe',JSON.stringify(state));
- const ghost=await window.ofLab.placeProbe(state.pose);
+ await window.ofLab.show(state.sku,'new',1,false);const ghost=await window.ofLab.placeProbe(state.pose);
  return {poses,pool,state,ghost};});
 await page.reload();await page.waitForFunction(()=>window.ready===true,{},{timeout:25000});const reloaded=await page.evaluate(async()=>{const s=JSON.parse(localStorage.getItem('of01-fix-probe'));await window.ofLab.show(s.sku,'new',1,false);const probe=await window.ofLab.placeProbe(s.pose);localStorage.removeItem('of01-fix-probe');return {state:s,probe};});
 results.push({name,width,placement,reloaded});
