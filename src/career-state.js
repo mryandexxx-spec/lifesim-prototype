@@ -1,6 +1,6 @@
 /** W1-B.3a: additive root-v1 career save contract and sanitized work receipts. */
 import {careerDefinition} from './career-catalog.js';
-import {restoreWorkIncident,workScenario,INCIDENT_HISTORY_LIMIT} from './career-incidents.js';
+import {restoreWorkIncident,restoreIncidentPlan,restoreIncidentProofWait,workScenario,INCIDENT_HISTORY_LIMIT} from './career-incidents.js';
 import {newProfessionalGoals,restoreProfessionalGoals} from './career-goals.js';
 import {careerRankForContract,restoreCareerSpecialization} from './career-specializations.js';
 import {restoreSeniorProof} from './career-seniority.js';
@@ -46,6 +46,8 @@ function cleanWorkShift(raw,contract){
   shift.workMode=cleanWorkMode(raw.workMode??contract.workMode);
   if(phase==='working'||phase==='returning')shift.workNeeds=restoreWorkNeeds(raw.workNeeds,shift);
   shift.incident=restoreWorkIncident(shift,raw.incident);
+  const plan=restoreIncidentPlan(raw.incidentPlan,shift,contract);
+  if(plan)shift.incidentPlan=plan;
   return shift;
 }
 function cleanLastShift(raw,contract){
@@ -102,6 +104,8 @@ function cleanContract(raw,id){
   if(seniorProof)contract.seniorProofs=seniorProof;
   contract.timeOff=restoreCareerTimeOff(raw.timeOff,contract.employmentId);
   contract.discipline=restoreCareerDiscipline(raw.discipline,contract.employmentId);
+  const proofWait=restoreIncidentProofWait(raw.incidentProofWait,contract);
+  if(proofWait)contract.incidentProofWait=proofWait;
   contract.currentShift=cleanWorkShift(raw.currentShift,contract);
   const last=cleanLastShift(raw.lastShift,contract);
   if(last)contract.lastShift=last;
