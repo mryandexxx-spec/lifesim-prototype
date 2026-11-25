@@ -413,7 +413,7 @@ function additionalAutonomyBlock(root,id){
     [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))
     return 'social-or-phone-busy';
   if(queueHeads(root.actionQueues).some(({command})=>
-    ['social','branch'].includes(command.type)&&command.targetId===id))
+    ['social','branch','conversation'].includes(command.type)&&command.targetId===id))
     return 'incoming-social-command';
   if(!residentIdsForSimulation(root).slice(2).includes(id))return 'outside-household';
   if(['departing','waiting','working','returning'].includes(
