@@ -6,7 +6,7 @@ import {plannedCareerShift} from '../src/career-scheduler.js';
 import {progressCareerWork,arriveCareerPortal,finishCareerReturn} from '../src/career-work.js';
 import {WORK_INCIDENTS,startWorkIncident,pendingWorkIncident,
   decideWorkIncident,automaticWorkIncident,chooseAutonomousWorkOption,
-  restoreWorkIncident,workIncidentChoiceDescription} from '../src/career-incidents.js';
+  restoreWorkIncident,workIncidentChoiceDescription,planWorkIncident,workScenario} from '../src/career-incidents.js';
 import {CAREER_CATALOG} from '../src/career-catalog.js';
 
 const json=x=>JSON.parse(JSON.stringify(x));
@@ -24,7 +24,10 @@ function employed(career='editorial',id='alex'){
 }
 function reached(career='editorial',id='alex'){
   const state=employed(career,id);
-  tickHousehold(state.root,state.shift.duration/2+1);
+  // Explicit legacy pending fixture: these tests exercise choice and receipt contracts, not scheduling.
+  const at=state.shift.start+state.shift.duration/2+1;
+  state.root.minutes=at;state.root.otherSim.minutes=at;
+  assert.equal(startWorkIncident(state.root,state.id,at),true);
   return state;
 }
 test('six original careers have authored distinct situations and three unique decisions',()=>{
@@ -40,14 +43,15 @@ test('six original careers have authored distinct situations and three unique de
   }
   assert.equal(titles.size,6);
 });
-test('work incident fires halfway through real shift, not before, and only once',()=>{
-  const {root,shift}=employed();
-  assert.equal(startWorkIncident(root,'alex',shift.start+shift.duration/2-1),false);
+test('work incident follows its deterministic plan, never before due and at most once',()=>{
+  const {root,shift,contract}=employed();
+  const p=planWorkIncident(contract,'alex',contract.currentShift);
+  const first=p.status==='due'?p.dueAt-.01:shift.end-20;
+  assert.equal(tickHousehold(root,first-root.minutes).filter(x=>x.type==='incident').length,0);
   assert.equal(pendingWorkIncident(root,'alex'),null);
-  const messages=tickHousehold(root,shift.duration/2+1);
-  assert.equal(messages.filter(x=>x.type==='incident').length,1);
-  assert.ok(pendingWorkIncident(root,'alex'));
-  assert.equal(startWorkIncident(root,'alex',root.minutes+1),false);
+  const messages=tickHousehold(root,1);
+  assert.equal(messages.filter(x=>x.type==='incident').length,p.status==='due'?1:0);
+  assert.equal(Boolean(pendingWorkIncident(root,'alex')),p.status==='due');
   assert.equal(tickHousehold(root,1).filter(x=>x.type==='incident').length,0);
 });
 test('manual decision changes actual performance, needs, memory and emotion once',()=>{
@@ -137,7 +141,8 @@ test('paused simulation leaves pending event and all related stats untouched',()
   assert.ok(pendingWorkIncident(root,'alex'));
 });
 test('speed x3 steps use same single event and salary receipts',()=>{
-  const {root,shift}=employed();
+  const {root,shift,contract}=employed();
+  const expected=planWorkIncident(contract,'alex',contract.currentShift).status==='due'?1:0;
   root.speed=3;root.otherSim.speed=3;
   let events=0;
   while(root.minutes<shift.end){
@@ -145,8 +150,8 @@ test('speed x3 steps use same single event and salary receipts',()=>{
     const messages=tickHousehold(root,delta)||[];
     events+=messages.filter(x=>x.type==='incident').length;
   }
-  assert.equal(events,1);
-  assert.equal(root.careerSystem.incidentIds.length,1);
+  assert.equal(events,expected);
+  assert.equal(root.careerSystem.incidentIds.length,expected);
   assert.equal(root.careerSystem.settlementIds.length,1);
   assert.equal(root.shop.credits,5112);
 });
@@ -158,8 +163,10 @@ test('Alex and Mira working simultaneously keep independent events, effects and 
   progressCareerWork(root,539,540);
   assert.equal(arriveCareerPortal(root,'alex',540),true);
   assert.equal(arriveCareerPortal(root,'mira',540),true);
-  const found=tickHousehold(root,241);
-  assert.equal(found.filter(x=>x.type==='incident').length,2);
+  // Two explicitly pending legacy incidents isolate independent manual/auto receipts.
+  root.minutes=781;root.otherSim.minutes=781;
+  assert.equal(startWorkIncident(root,'alex',781),true);
+  assert.equal(startWorkIncident(root,'mira',781),true);
   assert.ok(decideWorkIncident(root,'alex','verify').ok);
   assert.ok(pendingWorkIncident(root,'mira'));
   assert.equal(root.careerSystem.incidentIds.length,1);

@@ -133,22 +133,27 @@ export function workStoryFollowUp(root,id,scene){
     h.choiceId===scene.echoChoiceId&&h.performanceDelta>0);
 }
 /** Contextual, reproducible scoring; never a random call or a second game clock. */
-export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?.[id]?.currentShift){
+export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?.[id]?.currentShift,plan=null){
   const bank=WORK_INCIDENT_CATALOG[shift?.careerId],contract=root?.careerSystem?.byResident?.[id];
   if(!bank)return null;
   const history=root?.careerSystem?.incidentHistory?.[id]||[];
   // First shift keeps the original W1-B.3b.2 scenario and its familiar choices.
-  if(!history.length&&!(contract?.workedShifts>0))return 'legacy';
+  if(!plan&&!history.length&&!(contract?.workedShifts>0))return 'legacy';
   const actor=actorFor(root,id),axes=deriveAxes(actor?.personality);
   const mood=clip(actor?.mind?.mood?.value),energy=clip(actor?.needs?.energy);
   const recent=history.slice(-6);
   const last=recent.at(-1)?.scenarioId;
   const track=specializationDefinition(contract?.careerId,contract?.specialization?.id);
   const rankIndex=Number.isInteger(contract?.level)?contract.level:0;
-  const available=bank.filter(scene=>rankIndex>=(scene.minRank??0)&&
+  let available=bank.filter(scene=>rankIndex>=(scene.minRank??0)&&
     rankIndex<=(scene.maxRank??7)&&(!scene.trackId||scene.trackId===track?.id));
+  if(plan){
+    const proof=available.filter(s=>plan.proofScenes.includes(s.id));
+    const rarity=available.filter(s=>(s.rarity??'ordinary')===plan.rarity);
+    if(proof.length)available=proof;else if(rarity.length)available=rarity;
+  }
   const scores=available.map((scene,index)=>{
-    const variety=(hash(shift.id+'|'+scene.id+'|'+id)%100)/20;
+    const variety=plan?incidentRoll(shift.id,id,'scene|'+scene.id)*5:(hash(shift.id+'|'+scene.id+'|'+id)%100)/20;
     const trait=(axes[scene.focus]-.5)*6;
     const condition=scene.tone==='pressure'?(energy>=55?1.5:-2)+(mood>=55?1:0):
       (mood>=65?2:0)+(energy<40?-1:1);
@@ -164,10 +169,82 @@ export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?
       (contract.specialization.focusReceiptId?3:100):0;
     const senior=seniorMissingScenes(contract).includes(scene.id)?70:0;
     return variety+trait+condition+rank+skill+continuity-repetition+focus+senior-
-      (last===scene.id?1000:0);
+      (last===scene.id&&!plan?.proofScenes.includes(scene.id)?1000:0);
   });
   const order=available.map((_,index)=>index).sort((a,b)=>scores[b]-scores[a]||a-b);
   return available[order[0]]?.id??null;
+}
+/** PF-09/A: deterministic per-shift scheduling; no per-tick RNG. */
+export const INCIDENT_PLAN_VERSION=1;
+const RARITIES=['ordinary','unusual','rare'];
+const WINDOWS=[[.15,.30],[.40,.60],[.65,.80]];
+const MIN_DECISION=15;
+export function incidentRoll(shiftId,id,stream){
+  let h=hash('pf09a-v1|'+shiftId+'|'+id+'|'+stream);
+  h=Math.imul(h^(h>>>16),0x7feb352d);
+  h=Math.imul(h^(h>>>15),0x846ca68b);
+  return ((h^(h>>>16))>>>0)/4294967296;
+}
+export function incidentOutcome(shiftId,id){
+  const n=incidentRoll(shiftId,id,'outcome');
+  return n<.4?'none':n<.8?'ordinary':n<.95?'unusual':'rare';
+}
+const proofKey=c=>c?.specialization?.id?c.level+'|'+c.specialization.id+'|'+c.specialization.chosenAt:null;
+function proofScenes(c,s){
+  const track=specializationDefinition(c?.careerId,c?.specialization?.id);
+  if(!track)return [];
+  const ids=[...(c.level===4&&!c.specialization.focusReceiptId?[track.scenarioId]:[]),...seniorMissingScenes(c)];
+  return [...new Set(ids)].filter(id=>{
+    const scene=workScenario(s.careerId,id);
+    return scene&&c.level>=(scene.minRank??0)&&c.level<=(scene.maxRank??7)&&(!scene.trackId||scene.trackId===track.id);
+  });
+}
+export function restoreIncidentProofWait(raw,c){
+  const key=proofKey(c);
+  return key&&raw?.key===key&&Number.isInteger(raw.skipped)&&raw.skipped>=0&&raw.skipped<=3?{key,skipped:raw.skipped}:null;
+}
+export function planWorkIncident(c,id,s){
+  const start=Math.max(s.start,s.departedAt??s.start),span=s.end-start;
+  const empty={version:1,status:'none',rarity:null,dueAt:null,proofScenes:[]};
+  if(span<2*MIN_DECISION||!WORK_INCIDENT_CATALOG[s.careerId])return empty;
+  const proofs=proofScenes(c,s),skipped=restoreIncidentProofWait(c.incidentProofWait,c)?.skipped??0;
+  let rarity=incidentOutcome(s.id,id);
+  if(proofs.length&&rarity==='none'&&(skipped>=3||incidentRoll(s.id,id,'proof')<.5))rarity='ordinary';
+  if(rarity==='none')return {...empty,proofScenes:proofs};
+  const w=WINDOWS[Math.floor(incidentRoll(s.id,id,'window')*WINDOWS.length)];
+  const t=w[0]+(w[1]-w[0])*incidentRoll(s.id,id,'minute');
+  return {version:1,status:'due',rarity,dueAt:Math.max(start+MIN_DECISION,Math.min(s.end-MIN_DECISION,Math.round(start+span*t))),proofScenes:proofs};
+}
+export function restoreIncidentPlan(raw,s,c){
+  if(!raw||raw.version!==1||!['none','due','processed'].includes(raw.status)||
+    !['working','returning'].includes(s.phase)||!Array.isArray(raw.proofScenes)||
+    raw.proofScenes.length>2||new Set(raw.proofScenes).size!==raw.proofScenes.length)return null;
+  const track=specializationDefinition(c?.careerId,c?.specialization?.id);
+  if(raw.proofScenes.some(id=>!track||!workScenario(s.careerId,id)))return null;
+  if(raw.status==='none'){
+    if(raw.rarity!==null||raw.dueAt!==null)return null;
+  }else if(!RARITIES.includes(raw.rarity)||!valid(raw.dueAt)||
+    raw.dueAt<Math.max(s.start,s.departedAt)+MIN_DECISION||raw.dueAt>s.end-MIN_DECISION)return null;
+  return {version:1,status:raw.status,rarity:raw.rarity,dueAt:raw.dueAt,proofScenes:[...raw.proofScenes]};
+}
+export function advanceWorkIncident(root,id,at){
+  const c=root?.careerSystem?.byResident?.[id],s=c?.currentShift;
+  if(!s||s.phase!=='working'||!valid(at))return false;
+  const p=s.incidentPlan??(s.incidentPlan=planWorkIncident(c,id,s));
+  if(s.incident||root.careerSystem.incidentIds?.includes(incidentId(s))){
+    if(p.status==='due')p.status='processed';return false;
+  }
+  if(p.status!=='due'||at<p.dueAt)return false;
+  // Never fabricate an invisible incident after the useful decision window.
+  if(at>s.end-MIN_DECISION){p.status='processed';return false;}
+  const created=startWorkIncident(root,id,at,p);p.status='processed';return created;
+}
+export function recordIncidentOpportunity(c,s){
+  const p=s.incidentPlan,key=proofKey(c);
+  if(!key||!p?.proofScenes.length)return;
+  const offered=p.proofScenes.includes(s.incident?.scenarioId);
+  const skipped=restoreIncidentProofWait(c.incidentProofWait,c)?.skipped??0;
+  c.incidentProofWait={key,skipped:offered?0:Math.min(3,skipped+1)};
 }
 export function restoreWorkIncident(shift,raw){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
@@ -190,13 +267,14 @@ export function pendingWorkIncident(root,id){
   const shift=root?.careerSystem?.byResident?.[id]?.currentShift;
   return shift?.phase==='working'&&shift.incident?.choiceId===null?shift.incident:null;
 }
-export function startWorkIncident(root,id,at){
+/** Explicit incident materializer; gameplay uses advanceWorkIncident. */
+export function startWorkIncident(root,id,at,plan=null){
   const shift=root?.careerSystem?.byResident?.[id]?.currentShift;
   if(!shift||shift.phase!=='working'||!valid(at)||
-    at<shift.start+(shift.end-shift.start)/2||shift.incident||
+    at>=shift.end||at<(plan?.dueAt??(shift.start+(shift.end-shift.start)/2))||shift.incident||
     root.careerSystem.incidentIds?.includes(incidentId(shift))||
     !WORK_INCIDENT_CATALOG[shift.careerId])return false;
-  const scenarioId=selectWorkScenario(root,id,shift);
+  const scenarioId=selectWorkScenario(root,id,shift,plan);
   if(!workScenario(shift.careerId,scenarioId))return false;
   shift.incident={id:incidentId(shift),careerId:shift.careerId,scenarioId,
     createdAt:Math.min(at,shift.end),choiceId:null,resolvedAt:null,auto:false,

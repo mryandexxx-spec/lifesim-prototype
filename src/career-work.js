@@ -11,7 +11,7 @@ import {careerRankForContract} from './career-specializations.js';
 import {SHOP_MAX_CREDITS} from './furniture-shop.js';
 import {recordFinanceChange} from './finance-ledger.js';
 import {careerReadiness,recordCompletedCareerShift,recordMissedCareerShift,promotionReadiness} from './career-progression.js';
-import {startWorkIncident,automaticWorkIncident} from './career-incidents.js';
+import {advanceWorkIncident,automaticWorkIncident,recordIncidentOpportunity} from './career-incidents.js';
 import {recordProfessionalShift} from './career-goals.js';
 import {creditCareerPaidLeave,careerTimeOffForShift,settleCareerTimeOff} from './career-timeoff.js';
 import {WORK_MODES,cleanWorkMode,newWorkNeeds,progressWorkNeeds,workNeedsReport} from './career-work-needs.js';
@@ -138,6 +138,7 @@ function settle(root,contract,id,at){
     ledger.push(shift.id);
     if(ledger.length>256)ledger.splice(0,ledger.length-256);
     // Salary, performance, fatigue and receipt belong to ONE saved snapshot.
+    recordIncidentOpportunity(contract,shift);
     result=recordCompletedCareerShift(contract,actorFor(root,id),shift,worked,lateMinutes);
     creditCareerPaidLeave(contract);
     badges=recordProfessionalShift(root,id,shift);
@@ -225,7 +226,7 @@ export function progressCareerWork(root,before,after){
     }
     if(shift.phase==='working'){
       if(isExtra(id))progressWorkNeeds(root,before,after);
-      if(startWorkIncident(root,id,after)&&after<shift.end)
+      if(advanceWorkIncident(root,id,after))
         emit(messages,id,'incident','новая ситуация на работе · открой смартфон, чтобы выбрать решение');
       if(after>=shift.end){
         automaticWorkIncident(root,id);

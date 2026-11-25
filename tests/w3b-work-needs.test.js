@@ -66,6 +66,12 @@ test('W3-B: four modes have bounded, materially different performance and needs'
 test('W3-B: one large tick and small x1/x3 steps stay nearly identical',()=>{
   const base=started('network');
   base.needs.hunger=28;base.needs.bladder=23;base.needs.social=55;
+  // Isolate the workplace needs integrator from optional incident effects.
+  // Both branches use the same explicit no-incident plan; PF-09/A tests
+  // separately verify that a coarse tick cannot create an invisible event.
+  base.careerSystem.byResident.alex.currentShift.incidentPlan={
+    version:1,status:'none',rarity:null,dueAt:null,proofScenes:[]
+  };
   const a=loadHousehold(clone(base)),b=loadHousehold(clone(base));
   const until=a.careerSystem.byResident.alex.currentShift.end-a.minutes;
   tickHousehold(a,until);
@@ -75,6 +81,8 @@ test('W3-B: one large tick and small x1/x3 steps stay nearly identical',()=>{
   assert.deepEqual(a.careerSystem.byResident.alex.lastShift.workReport,
     b.careerSystem.byResident.alex.lastShift.workReport);
   assert.equal(a.shop.credits,b.shop.credits);
+  assert.equal(a.careerSystem.incidentIds.length,0);
+  assert.equal(b.careerSystem.incidentIds.length,0);
 });
 test('W3-B: save/reload in shift does not repeat lunch or count conversation twice',()=>{
   let root=started('network');
