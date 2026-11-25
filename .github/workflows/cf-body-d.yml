@@ -1,0 +1,51 @@
+name: CF-BODY D adaptive rig diagnostic
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  adaptive-rig:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 265a6f079b8c56f4b7722c3aa1dce98745d0dceb
+          path: pinned-vis
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-c-continuous-evidence
+          run-id: 45634752787
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify source and install pinned CPU tools
+        run: |
+          echo '4ce29a6ffce21817f92bb2c7df8c27afe630d0dd88e373a05e2ceca591fdcbb8  pinned-vis/male-candidate.glb' | sha256sum -c
+          echo 'f4973254fb39f2ff962f429725e66c17a478d7e4110ed556679babb400c7d85e  pinned-vis/female-candidate.glb' | sha256sum -c
+          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install 'anny @ git+https://github.com/naver/anny.git@8f35dc2df1c4062fd2fae86734f9705de50c0c2b' numpy==2.2.6 scipy==1.15.3
+      - name: Compute actual per-shape bind and skin diagnostic
+        run: |
+          python -m py_compile art-review/cf-body-d/*.py
+          python art-review/cf-body-d/adaptive.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-adaptive-evidence
+          path: d-out/
+          retention-days: 90
+          if-no-files-found: warn
