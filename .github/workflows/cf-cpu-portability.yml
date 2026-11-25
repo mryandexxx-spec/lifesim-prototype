@@ -17,7 +17,7 @@ jobs:
       OMP_NUM_THREADS: '2'
       MKL_NUM_THREADS: '2'
       CUDA_VISIBLE_DEVICES: ''
-      ANNY_CACHE_DIR: ${{ runner.temp }}/anny-cache
+      ANNY_CACHE_DIR: /tmp/cf-anny-cache
     steps:
       - uses: actions/setup-python@v5
         with:
@@ -73,7 +73,7 @@ jobs:
           obj.shape_key_add(name="Basis")
           key=obj.shape_key_add(name="JawOpen")
           key.data.foreach_set("co",a.astype(np.float32).ravel())
-          key.value=0.8
+          key.value=1.0
           mat=bpy.data.materials.new("Clay")
           mat.diffuse_color=(0.48,0.55,0.62,1)
           obj.data.materials.append(mat)
