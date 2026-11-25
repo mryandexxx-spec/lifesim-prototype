@@ -52,49 +52,6 @@ jobs:
           if-no-files-found: warn
 
   contact-render:
-    if: false # D4 audits pinned D3 evidence without repeating D2/D3 generation
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    env:
-      OMP_NUM_THREADS: '2'
-      OPENBLAS_NUM_THREADS: '2'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - uses: actions/download-artifact@v4
-        with:
-          name: cf-body-d-adaptive-evidence
-          run-id: 45655678102
-          github-token: ${{ github.token }}
-          path: d1
-      - name: Install CPU numeric dependencies
-        run: python -m pip install numpy==2.2.6 scipy==1.15.3
-      - name: Evaluate and correct pinned D1 surface contacts
-        run: python art-review/cf-body-d/arm_contact.py
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: cf-body-d-bpy-4.5.0-py311-linux-v1
-      - name: Install pinned Blender 4.5.0 Python runtime
-        run: |
-          python -m pip install --only-binary=:all: bpy==4.5.0
-          python -c 'import bpy; assert bpy.app.version == (4,5,0); print(bpy.app.version_string)'
-      - name: Real independent reimport and matched pose renders
-        run: python art-review/cf-body-d/render.py
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cf-body-d-contact-render-evidence
-          path: d2/
-          retention-days: 90
-          if-no-files-found: warn
-
-  d4-contact-audit:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
