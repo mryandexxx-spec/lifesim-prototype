@@ -8,65 +8,57 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-body-c-continuous-probe:
+  cf-body-c-continuous-distribution:
     if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-c-continuous' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
     permissions:
-      contents: read
+      contents: write
       actions: read
-    env:
-      OMP_NUM_THREADS: '2'
-      MKL_NUM_THREADS: '2'
-      CUDA_VISIBLE_DEVICES: ''
-      LIBGL_ALWAYS_SOFTWARE: '1'
-      WEBKIT_DISABLE_DMABUF_RENDERER: '1'
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: 5166e763c6fe8a9e55a81c49d04dd3c05d80d6b8
-          path: pinned-skin
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: 265a6f079b8c56f4b7722c3aa1dce98745d0dceb
-          path: pinned-vis
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: a180829f495b036e51219cbd9b865147aee68135
-          path: pinned-reset
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install pinned CPU and actual Blender / browser tools
-        run: |
-          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install 'anny @ git+https://github.com/naver/anny.git@8f35dc2df1c4062fd2fae86734f9705de50c0c2b' bpy==4.5.0 scipy==1.15.3 pillow==11.3.0 playwright==1.56.0
-          python -m playwright install --with-deps chromium webkit
-          python -c 'import bpy,torch; assert bpy.app.version==(4,5,0); assert torch.version.cuda is None'
-      - name: Generate actual joint phenotype presets and stature comparison
-        run: |
-          node --test art-review/cf-body-c-continuous/interpolate.test.mjs
-          python -m py_compile art-review/cf-body-c-continuous/probe.py art-review/cf-body-c-continuous/browser.py
-          python art-review/cf-body-c-continuous/probe.py
-      - name: Real mobile PlayCanvas browser evidence
-        run: |
-          node --check body-c-continuous-out/lab/lab.js
-          python -m http.server 8765 --bind 127.0.0.1 --directory body-c-continuous-out/lab >/tmp/body-c-http.log 2>&1 &
-          xvfb-run -a python art-review/cf-body-c-continuous/browser.py
-      - uses: actions/upload-artifact@v4
-        if: always()
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
         with:
           name: cf-body-c-continuous-evidence
-          path: body-c-continuous-out/
-          if-no-files-found: warn
-          retention-days: 90
+          run-id: 45634752787
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify and distribute reviewed diagnostic only
+        run: |
+          python - <<'PY'
+          import pathlib,json,hashlib
+          p=pathlib.Path('reviewed/lab')
+          raw=(p/'SHA256SUMS.json').read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='31b3f6e4e5ae9fc0634b67fadf00c7d22a8b593f284daaba952ef090b655dc67'
+          m=json.loads(raw);assert len(m)==276
+          assert {str(x.relative_to(p)) for x in p.rglob('*') if x.is_file()}==set(m)|{'SHA256SUMS.json'}
+          for n,h in m.items():
+              assert not (p/n).is_symlink()
+              assert hashlib.sha256((p/n).read_bytes()).hexdigest()==h,n
+              assert not n.endswith(('.blend','.zip'))
+          assert m['male-body.glb']=='fe0963efd05debe860e79d6b889d59a1f8ec1444616c572638f47dbca9dd83ab'
+          assert m['female-body.glb']=='5bea7149cf6b53e2760102cdb49a481f8f8282b0dca291669fada8a50d51ad63'
+          # Only the disclosure text changes after evidence review.
+          f=p/'index.html';s=f.read_text()
+          assert '<div id="status">' in s
+          s=s.replace('<div id="status">','<p><strong>Кандидат для оценки владельцем, не релиз.</strong> Геометрия проверенных состояний исправлена; мускулатура и пропорции меняются умеренно. WebKit-кадры невалидны, физическая проверка Safari, риг и производительность не подтверждены. GLB около 18,4 МБ на модель.</p><div id="status">',1)
+          f.write_text(s)
+          m['index.html']=hashlib.sha256(f.read_bytes()).hexdigest()
+          (p/'SHA256SUMS.json').write_text(json.dumps(m,indent=2))
+          print('276 original hashes verified; only diagnostic disclosure updated')
+          print('Published manifest SHA256:',hashlib.sha256((p/'SHA256SUMS.json').read_bytes()).hexdigest())
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_INDEX_FILE="$(mktemp -u)"
+          git --work-tree="$PWD/reviewed/lab" read-tree --empty
+          git --work-tree="$PWD/reviewed/lab" add -A -- .
+          tree=$(git write-tree)
+          sha=$(git commit-tree "$tree" -m "CF-BODY C continuous reviewed diagnostic payload run 45634752787")
+          git push origin "$sha:refs/heads/art/cf-body-c-continuous-lab"
+          echo "Distribution SHA: $sha"
 
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
