@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {CAMERA_INITIAL,stepCameraFocus} from '../src/camera-controls.js';
-import {sleepZzzVisible,dismissOnCanvasTap} from '../src/micro-ux.js';
+import {sleepZzzVisible,dismissOnCanvasTap,createResidentDoubleTap,RESIDENT_DOUBLE_TAP_MS} from '../src/micro-ux.js';
 import {newHousehold,loadHousehold,chooseResidentAction,tickHousehold,
   furnitureAvailable} from '../src/household.js';
 import {arrive,ACTIONS,SAVE_KEY} from '../src/simulation.js';
@@ -146,4 +146,32 @@ test('MICRO mobile source contract: name focus, Zzz overlay, separate TV action,
   assert.match(game,/tv-talk-button/);
   assert.match(html,/id="tv-talk-button"/);
   assert.match(html,/micro-ux-r1/);
+});
+
+test('resident picker double tap is same resident, consecutive, bounded and consumed once',()=>{
+  const gesture=createResidentDoubleTap(),tap=(id,now,physical)=>gesture.tap(id,now,physical);
+  assert.equal(tap('mira',0),false);
+  assert.equal(tap('mira',RESIDENT_DOUBLE_TAP_MS),true);
+  assert.equal(tap('mira',RESIDENT_DOUBLE_TAP_MS+1),false);
+  gesture.clear();
+  assert.equal(tap('alex',1000),false);
+  assert.equal(tap('mira',1050),false);
+  assert.equal(tap('alex',1100),false);
+  assert.equal(tap('alex',1451),false);
+  assert.equal(tap('alex',1452,false),false);
+  assert.equal(tap('alex',1453),false);
+  gesture.clear();
+  assert.equal(tap('alex',1454),false);
+  assert.equal(tap('alex',1455),true);
+  assert.equal(tap('extra-resident',2000),false);
+  assert.equal(tap('extra-resident',2001),true);
+});
+test('resident picker selects immediately without implicit focus, other shortcuts remain explicit',()=>{
+  const game=source('../src/game.js'),html=source('../index.html');
+  assert.match(game,/function handleResidentPickerTap\(id,event\)\{\s*if\(!chooseHudResident\(id,\{focus:false\}\)\)/);
+  assert.match(game,/if\(residentDoubleTap\.tap\(id,performance\.now\(\),physical\)\)focusSelectedCamera\(id\)/);
+  assert.match(game,/if\(focus\)\{residentDoubleTap\.clear\(\);focusSelectedCamera\(id\);\}/);
+  assert.match(game,/handleResidentPickerTap\(row\.id,event\)/);
+  assert.match(game,/handleResidentPickerTap\(id,event\)/);
+  assert.match(html,/micro-ux-r1-resident-double-tap/);
 });
