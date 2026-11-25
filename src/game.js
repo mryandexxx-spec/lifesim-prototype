@@ -3232,6 +3232,7 @@ function boot() {
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
+    outdoorFurnitureVisual.setBrightness(brightness);
     for(const light of outdoorLightNodes)
       light.light.intensity=brightness*(light.name.includes('standing')?1.75:1.15);
   };
@@ -4323,6 +4324,7 @@ function boot() {
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
   const benchVisualTargets={alex:null,mira:null};
+  if(furnitureVisualMode==='qa')window.__LifeSimOutdoorSeatQA=()=>({progress:sofaStates.alex.progress,target:benchVisualTargets.alex,action:game.action?.id});
   // F4F.1: entirely cosmetic chair draw-out. Keep the selected table/seat
   // through the reverse stand-up animation, but never persist a moved chair.
   const diningVisual={alex:null,mira:null};

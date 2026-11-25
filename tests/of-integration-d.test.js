@@ -22,3 +22,8 @@ test('OF-D atomic replacement retains moving overlays, fallback on failed load o
  const h=fixture(),off=createOutdoorFurnitureVisual({...h,enabled:false});assert.equal(off.attach(h.node,'garden.grill'),false);assert.equal(h.legacy.enabled,true);
  const stale=fixture(),loader=createOutdoorFurnitureVisual(stale);loader.attach(stale.node,'garden.grill');stale.events.destroy();stale.resolve();await flush();assert.equal(stale.legacy.enabled,true);assert.equal(stale.pivot.parent,undefined);
 });
+
+test('OF-D emitter budget, shared material isolation and glow lifecycle',async()=>{
+ const f=fixture();let updates=0,disposals=0;const source={name:'Warm opal',emissiveIntensity:0,clone(){return {name:this.name,update(){updates++},destroy(){disposals++}}}};const mesh={material:source};f.pc.Color=class{};f.pivot.findComponents=()=>[{meshInstances:[mesh]}];const base=f.node.findComponents;f.node.findComponents=type=>type==='light'?[{}]:base();const v=createOutdoorFurnitureVisual(f);v.setBrightness(1);v.attach(f.node,'light.path');f.resolve();await flush();assert.notEqual(mesh.material,source);assert.equal(mesh.material.emissiveIntensity,1.25);assert.equal(source.emissiveIntensity,0);v.setBrightness(0);assert.equal(mesh.material.emissiveIntensity,0);v.setBrightness(0);assert.equal(updates,2);f.events.destroy();assert.equal(disposals,1);
+ const n=fixture();const mesh2={material:source};n.pivot.findComponents=()=>[{meshInstances:[mesh2]}];const find=n.node.findComponents;n.node.findComponents=t=>t==='light'?[]:find();const off=createOutdoorFurnitureVisual(n);off.setBrightness(1);off.attach(n.node,'light.path');n.resolve();await flush();assert.equal(mesh2.material,source);assert.equal(off.stats().objects[0].glow,null);
+});
