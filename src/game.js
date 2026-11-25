@@ -4881,7 +4881,13 @@ function boot() {
     const started=dispatchActionQueues(game.actionQueues,{
       canStart(residentId,command){
         if(!HOUSEHOLD_IDS.includes(residentId)||game.socialAction||
+           [game.additionalSocial?.initiator,game.additionalSocial?.partner].includes(residentId)||
            residentUnavailableForHome(game,residentId))return false;
+        if(residentIdsForSimulation(game).some(id=>!HOUSEHOLD_IDS.includes(id)&&
+          pendingActions(game.actionQueues,id)[0]?.type==='conversation'&&
+          pendingActions(game.actionQueues,id)[0].targetId===residentId&&
+          pendingActions(game.actionQueues,id)[0].seq<command.seq&&
+          !residentUnavailableForHome(game,id)&&!getActor(game,id)?.action))return false;
         if((routeRetryAt.get(command.seq)||0)>performance.now())return false;
         const actor=getActor(game,residentId);
         if(actor.action||sofaStates[residentId].progress>0||
