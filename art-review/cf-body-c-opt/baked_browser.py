@@ -6,7 +6,9 @@ from playwright.sync_api import sync_playwright
 R=pathlib.Path('opt-out');F=R/'baked-frames';F.mkdir(exist_ok=True)
 states=json.loads(pathlib.Path('reviewed/lab/states.json').read_text());records=[];failures=[]
 def settle(page):
-    page.evaluate("""() => new Promise(resolve=>{let n=0;function f(){window.requestLabFrame();if(++n<5)requestAnimationFrame(f);else requestAnimationFrame(resolve)}requestAnimationFrame(f)})""")
+    for _ in range(2):
+        info=page.evaluate('window.postRenderFrame()')
+        assert not info['lost'] and info['error']==0 and info['width']>0 and info['height']>0,info
     page.wait_for_timeout(100)
 def pixels(data):return np.asarray(Image.open(io.BytesIO(data)).convert('RGB'),dtype=np.int16)
 def nonflat(a):return float(a.std(axis=(0,1)).mean())>3
@@ -62,5 +64,5 @@ with sync_playwright() as p:
 for e in ('chromium','webkit'):
     rows=[x for x in records if x['engine']==e]
     print('fixed-body',e,'valid',sum(x['valid'] for x in rows),'of',len(rows),'max mean delta',max((x['mean_abs_pixel_delta'] for x in rows),default=None),'max pixels >8 %',max((x['different_pixels_gt8_pct'] for x in rows),default=None),flush=True)
-    if e=='chromium':
-        assert len(rows)==30 and all(x['valid'] and x['mean_abs_pixel_delta']<=1 and x['different_pixels_gt8_pct']<=1 for x in rows) and not any(x['engine']==e for x in failures),'Fixed body Chromium visual regression'
+    if e in ('chromium','webkit'):
+        assert len(rows)==30 and all(x['valid'] and x['mean_abs_pixel_delta']<=1 and x['different_pixels_gt8_pct']<=1 for x in rows) and not any(x['engine']==e for x in failures),(e,'Fixed body visual regression')
