@@ -1,6 +1,8 @@
 /** Original, headless 0.9a conversation engine. Saves only validated IDs, no player text. */
 import {getPerspective} from './social-perspective.js';
-import {charismaSocialBonus} from './hobby-reading.js';
+import {charismaSocialBonus,HOBBY_SKILLS,CHARISMA_SKILL_ID} from './hobby-reading.js';
+import {currentSkillLevel} from './skills-engine.js';
+import {isWalkable,isClearLine} from './navigation.js';
 import {episodeContext,getPair,getDirectedView} from './social-graph.js';
 import {boundaryDisposition,cueConversationBias} from './social-boundaries.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
@@ -63,7 +65,20 @@ export function conversationActor(root,id){
     ?p.residentsById?.[id]?.actor||null:null;
 }
 const extraPair=(a,b)=>!['alex','mira'].includes(a)||!['alex','mira'].includes(b);
-const tier=(root,id)=>charismaSocialBonus(conversationActor(root,id)?.skills)*3;
+const tier=(root,id)=>currentSkillLevel(conversationActor(root,id)?.skills,HOBBY_SKILLS,CHARISMA_SKILL_ID);
+const atHome=(root,id)=>!['departing','working','waiting','returning'].includes(root?.careerSystem?.byResident?.[id]?.currentShift?.phase);
+function validLiveSession(root,s){
+  if(!s||s.initiator===s.partner||!atHome(root,s.initiator)||!atHome(root,s.partner))return false;
+  const a=conversationActor(root,s.initiator),b=conversationActor(root,s.partner);
+  if(!a||!b||a.action||b.action)return false;
+  if(s===root.additionalSocial){
+    if(root.socialAction||!a.position||!b.position)return false;
+    const d=Math.hypot(a.position.x-b.position.x,a.position.z-b.position.z);
+    if(d<.76||d>1.55||!isWalkable(a.position.x,a.position.z,root.world)||
+      !isWalkable(b.position.x,b.position.z,root.world)||!isClearLine(a.position,b.position,root.world))return false;
+  }
+  return true;
+}
 const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
 
 export function createConversation(topic){
@@ -97,10 +112,14 @@ export function conversationOptions(session,root=null){
     ids.sort((a,b)=>Number(act(b).tone==='warm')-Number(act(a).tone==='warm'));
   return ids.map(id=>{
     const a=act(id),minLevel=a.minLevel||0;
-    return {id,label:a.label,tone:a.tone,...(root?{minLevel,locked:tier(root,action?.initiator)<minLevel}:{})};
+    const skillLocked=tier(root,action?.initiator)<minLevel;
+    const contextLocked=Boolean(previous&&!previous.accepted&&['daily.tact','daily.inspire'].includes(id));
+    return {id,label:a.label,tone:a.tone,...(root?{minLevel,locked:skillLocked||contextLocked,
+      lockReason:skillLocked?'Харизма '+minLevel:contextLocked?'Собеседник пока не готов':null}:{})};
+
   });
 }
-export function evaluateResponse(root,initiator,topic,id,partnerId=initiator==='alex'?'mira':'alex',previous=null){
+export function evaluateResponse(root,initiator,topic,id,partnerId=initiator==='alex'?'mira':initiator==='mira'?'alex':null,previous=null){
   if(!inTopic(topic,id)||initiator===partnerId)return null;
   const self=conversationActor(root,initiator),partner=conversationActor(root,partnerId);
   if(!self||!partner||!Number.isFinite(root?.minutes))return null;
@@ -122,7 +141,7 @@ export function evaluateResponse(root,initiator,topic,id,partnerId=initiator==='
 /** No social event is applied before explicit completion of the conversation. */
 export function chooseConversationTurn(root,id){
   const s=activeConversationAction(root),c=s?.conversation;
-  if(root?.paused||s?.phase!=='using'||!c||!conversationOptions(c,root).some(x=>x.id===id&&!x.locked))return null;
+  if(root?.paused||s?.phase!=='using'||!c||!validLiveSession(root,s)||c.turns.length>=CONVERSATION_MAX_TURNS||!conversationOptions(c,root).some(x=>x.id===id&&!x.locked))return null;
   const reaction=evaluateResponse(root,s.initiator,c.topic,id,s.partner,c.turns.at(-1));
   if(!reaction)return null;
   c.turns.push({id,accepted:reaction.accepted});
@@ -139,7 +158,7 @@ export function chooseConversationTurn(root,id){
 }
 export function continueConversation(root){
   const s=activeConversationAction(root),c=s?.conversation;
-  if(root?.paused||s?.phase!=='using'||c?.phase!=='response'||
+  if(root?.paused||s?.phase!=='using'||c?.phase!=='response'||!validLiveSession(root,s)||
     c.turns.length>=CONVERSATION_MAX_TURNS)return false;
   c.phase='followUp';
   return true;
