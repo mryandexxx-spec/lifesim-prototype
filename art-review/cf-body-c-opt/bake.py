@@ -59,10 +59,11 @@ for profile in profiles:
     (d/'lab.js').write_text(lab)
     meta=json.loads((d/'models.json').read_text())
     weights={k:float(v) for k,v in states[profile].items() if k!='__scale'}
-    assert states[profile].get('__scale',1)==1
+    scale=float(states[profile].get('__scale',1));assert .9<=scale<=1.1
     report[profile]={}
     for sex in ('male','female'):
         report[profile][sex]=bake(source/(sex+'-body.glb'),d/(sex+'-body.glb'),weights)
+        report[profile][sex]['height_scale']=scale
         meta[sex]['targets']=meta[sex]['targets'][:15]+['body_baked']
     (d/'models.json').write_text(json.dumps(meta))
 (R/'bake-report.json').write_text(json.dumps(report,indent=2))
