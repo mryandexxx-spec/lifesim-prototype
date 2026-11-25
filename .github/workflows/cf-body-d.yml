@@ -271,7 +271,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cf-body-d-tools-world-contact-r1
+          name: cf-body-d-tools-world-contact-r2
           path: contact-out/
           retention-days: 90
           if-no-files-found: warn
