@@ -11,6 +11,35 @@ jobs:
   cf-anim-source-intake:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-sources' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-anim-source-intake.yml
+  of-integration-c:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-c' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact garden GLBs, wet growth and real care/harvest/replant contracts
+        run: node --test tests/of-integration-c.test.js tests/lot-c1.test.js tests/lot-c3a.test.js tests/garden-r1.test.js
+      - name: Actual Chromium and WebKit native garden states
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/of-c-http.log 2>&1 &
+          sleep 3
+          node tests/of-c-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: of-c-game-evidence
+          path: artifacts/of-c/
+          if-no-files-found: warn
   of-integration-b:
     permissions:
       contents: read
