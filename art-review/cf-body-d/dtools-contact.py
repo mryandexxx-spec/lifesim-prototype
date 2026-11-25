@@ -1,4 +1,4 @@
-"""D-TOOLS/3 contact-window experiment. Reuse exact D-TOOLS/2 meshes, never change skin."""
+"""D-TOOLS/3R1 triangle-aware contact-window experiment. Reuse exact D-TOOLS/2 meshes, never change skin."""
 import sys,json,pathlib
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -28,11 +28,13 @@ def prepare():
         wi=decode(j,b,pr['attributes']['JOINTS_0']);ww=decode(j,b,pr['attributes']['WEIGHTS_0'])
         inv=decode(j,b,j['skins'][0]['inverseBindMatrices']).reshape(-1,4,4).transpose(0,2,1).astype(float)
         assert np.max(abs(ww.sum(1)-1))<1e-5
-        # Precompute bind-local weighted skin positions for real lower body surface.
-        ids=np.flatnonzero(v[:,1]<p['rest'][0]['p'][1]+.15)
+        # Use complete connected body triangles, including edges crossing the chair footprint.
+        faces=decode(j,b,pr['indices']).reshape(-1,3).astype(int)
+        assert faces.min()>=0 and faces.max()<len(v)
+        ids=np.arange(len(v))
         h=np.column_stack([v[ids],np.ones(len(ids))])
         local=np.einsum('nkij,nj->nki',inv[wi[ids]],h)[:,:,:3]
-        skin={'v':v[ids].tolist(),'wi':wi[ids].tolist(),'ww':ww[ids].tolist(),'local':local.tolist()}
+        skin={'v':v[ids].tolist(),'wi':wi[ids].tolist(),'ww':ww[ids].tolist(),'local':local.tolist(),'faces':faces.tolist()}
         records.append({'key':key,'rest':p['rest'],'floor':p['floor'],'skin':skin,'source':prior[key]['clips']['base_seat_hands_refined']})
     pathlib.Path('contact-input.json').write_text(json.dumps({'labels':labels,'parents':parents,'targets':records},separators=(',',':')))
 def bake():
@@ -41,8 +43,8 @@ def bake():
         path=I/(key+'.glb');assert sha(path.read_bytes())==p['candidate_sha256']
         j,ob=read(path);b=bytearray(ob);nodes=j['skins'][0]['joints']
         for clip,d in solved[key].items():
-            frames=d['frames'];assert len(frames)==33
-            time=acc(j,b,np.linspace(0,2,33),'SCALAR');channels=[];samplers=[]
+            frames=d['frames'];assert len(frames)==65
+            time=acc(j,b,np.linspace(0,2,65),'SCALAR');channels=[];samplers=[]
             for i,node in enumerate(nodes):
                 for prop,k,typ in [('rotation','r','VEC4'),('translation','p','VEC3')]:
                     a=np.array([f[i][k] for f in frames]);assert np.isfinite(a).all()

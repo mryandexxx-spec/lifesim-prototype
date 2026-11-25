@@ -3,6 +3,24 @@
 const legs=['L','R'].map(s=>['upperleg01.'+s,'lowerleg01.'+s,'foot.'+s].map(idx));
 const smooth=t=>t*t*(3-2*t);
 const lerp=(a,b,t)=>a+(b-a)*t;
+// Clip an entire triangle to the four vertical planes of the fixed seat footprint.
+// Minimum Y is attained at a vertex of the clipped polygon, including edge intersections.
+function clippedMin(tri,x0,x1,z0,z1){
+ let poly=tri;
+ for(const [axis,bound,sign] of [[0,x0,1],[0,x1,-1],[2,z0,1],[2,z1,-1]]){
+  const next=[];
+  for(let i=0;i<poly.length;i++){
+   const a=poly[i],b=poly[(i+1)%poly.length],da=sign*(a[axis]-bound),db=sign*(b[axis]-bound);
+   if(da>=0)next.push(a);
+   if((da>=0)!==(db>=0)){const t=da/(da-db);next.push([lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)]);}
+  }
+  poly=next;if(!poly.length)return Infinity;
+ }
+ return Math.min(...poly.map(a=>a[1]));
+}
+// Regression: a crossing triangle with no vertex in the footprint.
+assert.equal(clippedMin([[-2,.2,0],[2,.2,0],[0,.2,2]],-.5,.5,-.5,.5),.2);
+assert.equal(clippedMin([[2,0,2],[3,1,2],[2,2,3]],-.5,.5,-.5,.5),Infinity);
 const all={};let cases=0;
 for(const target of targets){
  const rest=target.rest,tr=world(rest),skin=target.skin, floor=target.floor;
@@ -24,17 +42,24 @@ for(const target of targets){
   }
   return {l,w:world(l),maxAnchor};
  }
- // Real LBS: lower-body vertices in neutral-selected set, not joint proxies.
+ // Real LBS: full body vertices and complete connected triangles, not joint proxies.
  function surface(w,top){
-  let minY=Infinity,insideMin=Infinity,seatVertices=0,underSeat=0;
+  let minY=Infinity,insideMin=Infinity,seatVertices=0,underSeat=0;const positions=[];
   for(let n=0;n<skin.v.length;n++){
    let x=0,y=0,z=0;
    for(let k=0;k<4;k++){
     const a=skin.ww[n][k];if(a===0)continue;const b=w[skin.wi[n][k]],r=rot(skin.local[n][k],b.r);
     x+=(r[0]+b.p[0])*a;y+=(r[1]+b.p[1])*a;z+=(r[2]+b.p[2])*a;
    }
-   minY=Math.min(minY,y);
+   positions.push([x,y,z]);minY=Math.min(minY,y);
    if(Math.abs(x-cx)<=hw&&Math.abs(z-cz)<=hd){insideMin=Math.min(insideMin,y);if(y<top)underSeat++;if(y>top-.04&&y<top)seatVertices++;}
+  }
+  const x0=cx-hw,x1=cx+hw,z0=cz-hd,z1=cz+hd;
+  for(const [i,j,k] of skin.faces){
+   const a=positions[i],b=positions[j],c=positions[k];
+   if(Math.min(a[1],b[1],c[1])>=insideMin)continue;
+   if(Math.max(a[0],b[0],c[0])<x0||Math.min(a[0],b[0],c[0])>x1||Math.max(a[2],b[2],c[2])<z0||Math.min(a[2],b[2],c[2])>z1)continue;
+   insideMin=Math.min(insideMin,clippedMin([a,b,c],x0,x1,z0,z1));
   }
   return {minY,insideMin:Number.isFinite(insideMin)?insideMin:null,seatVertices,underSeat};
  }
@@ -54,7 +79,7 @@ for(const target of targets){
   for(let i=0;i<=40;i++){
    const y=top+.035+i*.005, a=pose(1,y,endZ,anchors),s=surface(a.w,top);
    if(s.insideMin===null)continue;
-   const score=Math.abs(s.insideMin-top-.002)+10*Math.max(0,top-s.insideMin)+10*Math.max(0,floor-s.minY)+4*a.maxAnchor;
+   const score=Math.abs(s.insideMin-top-.003)+10*Math.max(0,top-s.insideMin)+10*Math.max(0,floor-s.minY)+4*a.maxAnchor;
    if(best===null||score<best.score)best={y,score,s};
   }
   assert(best,'seat region absent');
@@ -62,22 +87,22 @@ for(const target of targets){
   const coarse=best.y;
   for(let i=-10;i<=10;i++){
    const y=coarse+i*.0005,a=pose(1,y,endZ,anchors),s=surface(a.w,top);if(s.insideMin===null)continue;
-   const score=Math.abs(s.insideMin-top-.002)+10*Math.max(0,top-s.insideMin)+10*Math.max(0,floor-s.minY)+4*a.maxAnchor;
+   const score=Math.abs(s.insideMin-top-.003)+10*Math.max(0,top-s.insideMin)+10*Math.max(0,floor-s.minY)+4*a.maxAnchor;
    if(score<best.score)best={y,score,s};
   }
   const frames=[],metrics=[];
-  for(let i=0;i<=32;i++){
-   const t=i/32,u=smooth(t);
+  for(let i=0;i<=64;i++){
+   const t=i/64,u=smooth(t);
    // Move hips back while still above the seat; descend continuously. Feet remain anchored.
    const z=lerp(startZ,endZ,smooth(Math.min(1,t/.8))),y=lerp(startY,best.y,u);
    let a=pose(t,y,z,anchors),s=surface(a.w,top);
    // Bounded vertical clearance correction, never moves the fixture or feet.
    // Report any unreachable constraints instead of changing the anchors.
    let lift=0;
-   if(i>0&&i<32&&s.insideMin!==null&&s.insideMin<top+.002){
+   if(i>0&&i<64&&s.insideMin!==null&&s.insideMin<top+.003){
     for(let k=0;k<12;k++){
      lift+=.005;const b=pose(t,y+lift,z,anchors),ss=surface(b.w,top);
-     if(ss.insideMin===null||ss.insideMin>=top+.002){a=b;s=ss;break;}
+     if(ss.insideMin===null||ss.insideMin>=top+.003){a=b;s=ss;break;}
     }
    }
    frames.push(a.l);metrics.push({t,floorMin:s.minY-floor,seatMin:s.insideMin===null?null:s.insideMin-top,seatVertices:s.seatVertices,underSeat:s.underSeat,anchorError:a.maxAnchor,lift});
