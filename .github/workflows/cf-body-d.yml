@@ -75,13 +75,16 @@ jobs:
         run: python -m pip install numpy==2.2.6 scipy==1.15.3
       - name: Evaluate and correct pinned D1 surface contacts
         run: python art-review/cf-body-d/contact.py
-      - name: Download Blender 4.5.0 CPU
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: cf-body-d-bpy-4.5.0-py311-linux-v1
+      - name: Install pinned Blender 4.5.0 Python runtime
         run: |
-          curl -fL --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.0-linux-x64.tar.xz -o /tmp/blender.tar.xz
-          tar -xJf /tmp/blender.tar.xz -C /tmp
-          /tmp/blender-4.5.0-linux-x64/blender --version
+          python -m pip install --only-binary=:all: bpy==4.5.0
+          python -c 'import bpy; assert bpy.app.version == (4,5,0); print(bpy.app.version_string)'
       - name: Real independent reimport and matched pose renders
-        run: /tmp/blender-4.5.0-linux-x64/blender -b -t 4 --python-exit-code 1 --python art-review/cf-body-d/render.py
+        run: python art-review/cf-body-d/render.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
