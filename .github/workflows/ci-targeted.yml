@@ -8,6 +8,50 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-skin-base-distribution:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-skin-base' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-skin-base-donor-evidence
+          run-id: 45598012572
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Publish only exact reviewed static diagnostic payload to a new isolated branch
+        run: |
+          python - <<'PY'
+          import pathlib,json,hashlib
+          p=pathlib.Path('reviewed/lab')
+          raw=(p/'SHA256SUMS.json').read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='1ca35d5a78e51d8eb4a106778fe2ec9351d6a3f7d82972bcf207a0a02d741a51'
+          m=json.loads(raw);assert len(m)==190
+          assert {str(x.relative_to(p)) for x in p.rglob('*') if x.is_file()}==set(m)|{'SHA256SUMS.json'}
+          for n,h in m.items():
+              assert not (p/n).is_symlink()
+              assert hashlib.sha256((p/n).read_bytes()).hexdigest()==h,n
+              assert not n.endswith(('.mhmat','.blend','.zip'))
+          assert m['male-mobile.glb']=='36abba2916a5938ecc32a94fb2582101875fe9183ec6a764fc9eeb3df89931c5'
+          assert m['female-mobile.glb']=='d7c697af0cfab84f536f94e0b51e4385ffd653f0587245fad61c2a962b4f40c7'
+          print('190 reviewed payload hashes verified; diagnostic only')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_INDEX_FILE="$(mktemp -u)"
+          git --work-tree="$PWD/reviewed/lab" read-tree --empty
+          git --work-tree="$PWD/reviewed/lab" add -A -- .
+          tree=$(git write-tree)
+          sha=$(git commit-tree "$tree" -m "CF-SKIN BASE reviewed diagnostic payload run 45598012572")
+          git push origin "$sha:refs/heads/art/cf-skin-base-lab"
+          echo "Distribution SHA: $sha"
+
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
