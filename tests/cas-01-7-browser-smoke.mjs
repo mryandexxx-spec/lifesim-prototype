@@ -247,21 +247,21 @@ try{
   assert.equal(await panel.getAttribute('aria-modal'),'true');
   assert.match(await page.locator('#conversation-subtitle').innerText(),extra?/Вера.*Игорь/:/Алекс.*Мира/);
   const choices=page.locator('#conversation-options');
-  const locked=choices.getByRole('button',{name:/Вдохновить на перемены.*Харизма 9/});
+  const locked=choices.getByRole('button',{name:extra?/Вдохновить на профессиональный рост.*Харизма 9/:/Вдохновить на перемены.*Харизма 9/});
   assert.equal(await locked.isDisabled(),true);
-  const permitted=choices.getByRole('button',{name:'Помочь взглянуть иначе',exact:true});
+  const permitted=choices.getByRole('button',{name:extra?'Разобрать трудность по шагам':'Помочь взглянуть иначе',exact:true});
   assert.equal(await permitted.isEnabled(),true);
   await page.screenshot({path:'artifacts/cas-01-7/pf-10a-'+(extra?'extra':'legacy')+'-'+width+'.png'});
   await permitted.tap();
   let saved=await stored();
   const action=()=>saved.socialAction||saved.additionalSocial;
-  assert.equal(action().conversation.turns[0].id,'daily.reframe');
+  assert.equal(action().conversation.turns[0].id,extra?'career.reflect':'daily.reframe');
   assert.equal(action().conversation.turns.length,1);
   const minute=saved.minutes,seq=saved.socialGraph.nextSeq;
   await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
   await panel.waitFor({state:'visible',timeout:30000});
-  assert.match(await page.locator('#conversation-lines').innerText(),/Что из сегодняшнего дня/);
+  assert.match(await page.locator('#conversation-lines').innerText(),extra?/Если разделить сложную задачу/:/Что из сегодняшнего дня/);
   await choices.getByRole('button',{name:'Продолжить беседу',exact:true}).tap();
   saved=await stored();
   assert.equal(saved.minutes,minute,'mandatory choice freezes simulation over reload');
@@ -274,6 +274,6 @@ try{
   assert.deepEqual(errors,[],width+'x'+height+' '+a+' JS errors');
   await context.close();
  }
- console.log('PF-10/A real mobile legacy + addressed topic picker, locked choices, reply, clock, v1 reload, exactly-one receipt PASS');
+ console.log('PF-10/A+B real mobile legacy daily + addressed career topic picker, locked choices, reply, clock, v1 reload, exactly-one receipt PASS');
  console.log('CAS-01.7 WebGL HUD, scene, career, touch 390x844/320x568 PASS; physical Safari QA deferred');
 }finally{await browser.close();}

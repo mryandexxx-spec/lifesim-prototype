@@ -1492,7 +1492,7 @@ function renderSocialMenu(force=true){
   $('social-menu-title').textContent=titles[category]||'Общение';
   $('social-menu-subtitle').textContent=getActorName(game.selectedSim)+' → '+getActorName(targetId)+' · выбери действие, затем подтверди очередь';
   const options=$('social-menu-options');options.replaceChildren();
-  const add=(label,request)=>{
+  const add=(label,request,host=options)=>{
     const initiator=game.selectedSim;
     const choice=conversationButton(label,()=>{
       options.querySelector('[data-ux05-confirm]')?.remove();
@@ -1513,11 +1513,11 @@ function renderSocialMenu(force=true){
       box.scrollIntoView({block:'nearest',inline:'nearest'});
       agree.focus({preventScroll:true});
     });
-    options.append(choice);
+    host.append(choice);
   };
-  const addTopic=id=>{
+  const addTopic=(id,host=options)=>{
     const topic=CONVERSATION_TOPICS[id];
-    if(topic)add(topic.label,{type:'conversation',topicId:id});
+    if(topic)add(topic.label,{type:'conversation',topicId:id},host);
   };
   const addBranch=id=>{
     const found=availableSocialActions(game.socialGraph,game.selectedSim,targetId,game.minutes)
@@ -1532,6 +1532,17 @@ function renderSocialMenu(force=true){
     addBranch('acquaint.introduce');
     addBranch('acquaint.chat');
     for(const id of ['daily','hobbies','plans','support'])addTopic(id);
+    for(const [label,ids] of [
+      ['Жизнь и цели',['career','dreams','money','memories']],
+      ['Люди и взгляды',['family','relationships','philosophy','gossip']]
+    ]){
+      const group=document.createElement('details');
+      const summary=document.createElement('summary');summary.className='conversation-option';
+      summary.textContent=label;group.append(summary);
+      const choices=document.createElement('div');choices.className='conversation-options';
+      for(const id of ids)addTopic(id,choices);
+      group.append(choices);options.append(group);
+    }
     appendAddressedTopicPicker(options,game.selectedSim,addressedSocialPeers(game,game.selectedSim).filter(p=>!HOUSEHOLD_IDS.includes(p.id)));
   }else if(category==='humor'){
     addTopic('humor');
@@ -2067,12 +2078,21 @@ function renderConversationPanel(force=true){
         s.phase==='using'?'Разговор с '+getActorName(s.partner):'Подготовка беседы')
       :'Начни разговор с '+getActorName(game.selectedSim==='alex'?'mira':'alex');
   if(!session){
-    for(const [id,topic] of Object.entries(CONVERSATION_TOPICS))
-      options.append(conversationButton(topic.label,()=>{
+    for(const [label,ids] of [
+      ['Повседневное',['daily','hobbies','humor','support','plans','conflict','sports']],
+      ['Жизнь и цели',['career','dreams','money','memories']],
+      ['Люди и взгляды',['family','relationships','philosophy','gossip']]
+    ]){
+      const group=document.createElement('details');
+      const summary=document.createElement('summary');summary.className='conversation-option';summary.textContent=label;
+      const items=document.createElement('div');items.className='conversation-options';
+      for(const id of ids)items.append(conversationButton(CONVERSATION_TOPICS[id].label,()=>{
         if(queuedSocial('conversation',{topicId:id})){
           conversationTopicPicker=false;renderConversationPanel();
         }
       }));
+      group.append(summary,items);options.append(group);
+    }
     return;
   }
   for(const entry of conversationTranscript(session)){
@@ -2095,16 +2115,30 @@ function renderConversationPanel(force=true){
         }
       }));
   }else{
-    for(const choice of conversationOptions(session,game)){
-      const button=conversationButton(choice.label+(choice.locked?' · 🔒 '+choice.lockReason:''),()=>{
-        if(choice.locked)return false;
-        if(applyDialogueDecision(game,root=>chooseSocialLine(root,choice.id))){
-          save(true);renderConversationPanel();
-        }
-      });
-      button.disabled=choice.locked;
-      options.append(button);
-    }
+    const choices=conversationOptions(session,game);
+    const group=document.createElement('div');group.className='conversation-options';
+    options.append(group);
+    let page=0;
+    const showPage=()=>{
+      group.replaceChildren();
+      for(const choice of choices.slice(page*5,page*5+5)){
+        const button=conversationButton(choice.label+(choice.locked?' · 🔒 '+choice.lockReason:''),()=>{
+          if(choice.locked)return false;
+          if(applyDialogueDecision(game,root=>chooseSocialLine(root,choice.id))){
+            save(true);renderConversationPanel();
+          }
+        });
+        button.disabled=choice.locked;group.append(button);
+      }
+      if(choices.length>5){
+        const more=conversationButton(page?'Основные реплики':'Другие реплики',()=>{
+          page=(page+1)%Math.ceil(choices.length/5);showPage();
+          group.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
+        },true);
+        group.append(more);
+      }
+    };
+    showPage();
   }
   // Explicit completion records the actual turns; explicit cancellation never does.
   options.append(conversationButton('Завершить разговор',endPlayerConversation,true));
