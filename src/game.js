@@ -17,7 +17,7 @@ import {createFridgeR2UI} from './fridge-ui-dom.js';
 import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds,stepCameraFocus} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
-import {sleepZzzVisible,dismissOnCanvasTap} from './micro-ux.js';
+import {sleepZzzVisible,dismissOnCanvasTap,createResidentDoubleTap} from './micro-ux.js';
 import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
 import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './viewport-health.js';
 import {UI_TOUR_STORAGE_KEY,shouldShowTour} from './ui-onboarding.js';
@@ -403,6 +403,8 @@ const META = {
 };
 
 let focusSelectedCamera=()=>false; // Bound once to the live PlayCanvas camera in boot.
+let cancelSelectedCameraFocus=()=>{};
+const residentDoubleTap=createResidentDoubleTap();
 let updatePhoneProps=()=>{}; // Cosmetic phone mesh is bound when the 3D rigs exist.
 let furnishMode=false; // F1 is an independent, unsaved UI mode; manual pause is untouched.
 let buildMode=false; // F5-A separate pause-on-editor; house geometry persists, UI mode does not.
@@ -2335,7 +2337,7 @@ function updateResidentPicker(){
    let button=$('pick-'+row.id);
    if(!button){
      button=document.createElement('button');button.id='pick-'+row.id;button.type='button';
-     button.addEventListener('click',()=>chooseHudResident(row.id));
+     button.addEventListener('click',event=>handleResidentPickerTap(row.id,event));
      residentSwitch.append(button);casButtons.set(row.id,button);
    }
    button.textContent=row.name;
@@ -2353,13 +2355,14 @@ function updateResidentPicker(){
  if(HOUSEHOLD_IDS.includes(hudResidentId))renderMindIdentity();
  renderCasDetails(true);
 }
-function chooseHudResident(id){
+function chooseHudResident(id,{focus=true}={}){
  if(!residentIdsForSimulation(game).includes(id)||dialogueNeedsDecision(game))return false;
  careerPhone.close({focus:false});setHomeOpen(false);setViewOpen(false);
  if(HOUSEHOLD_IDS.includes(id))selectResident(game,id);
  hudResidentId=id;
  mindInspectResident=game.selectedSim;
- focusSelectedCamera(id);closeInsightPanel();
+ if(focus){residentDoubleTap.clear();focusSelectedCamera(id);}
+ closeInsightPanel();
  conversationTopicPicker=false;sharedPicker=false;branchPicker=false;
  socialMenuCategory=null;socialContextVisible=false;socialAnchor=null;
  select(null);closeMindPanel();queueInspectResident=game.selectedSim;
@@ -2368,8 +2371,20 @@ function chooseHudResident(id){
  renderBranchPanel();renderSocialMenu();renderQueuePanel();
  save(true);toast('Выбран житель: '+hudName());return true;
 }
+// A single tap selects synchronously. Only a second consecutive physical tap
+// on the same resident within the gesture window starts camera movement.
+function handleResidentPickerTap(id,event){
+ if(!chooseHudResident(id,{focus:false})){residentDoubleTap.clear();return;}
+ cancelSelectedCameraFocus();
+ const physical=event.detail>0||event.pointerType==='touch'||event.pointerType==='pen';
+ if(residentDoubleTap.tap(id,performance.now(),physical))focusSelectedCamera(id);
+}
 for(const id of HOUSEHOLD_IDS)
- $('pick-'+id).addEventListener('click',()=>chooseHudResident(id));
+ $('pick-'+id).addEventListener('click',event=>handleResidentPickerTap(id,event));
+document.addEventListener('pointerdown',event=>{
+ if(!residentSwitch.contains(event.target))residentDoubleTap.clear();
+},true);
+document.addEventListener('visibilitychange',()=>residentDoubleTap.clear());
 updateResidentPicker();
 // Tap the HUD name for focus; the containing mind button keeps its original behavior.
 $('resident-name').addEventListener('click',event=>{
@@ -5094,6 +5109,7 @@ function boot() {
   }
   function setView(next){Object.assign(view,next);cameraUpdate();}
   let cameraFocus=null;
+  cancelSelectedCameraFocus=()=>{cameraFocus=null;};
   focusSelectedCamera=id=>{
     if(!residentIdsForSimulation(game).includes(id)||buildMode||furnishMode||outdoorMode)return false;
     if(residentAwayAtWork(game,id)){
