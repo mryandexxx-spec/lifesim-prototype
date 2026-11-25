@@ -1,0 +1,15 @@
+{
+  "entry": "table.gltf",
+  "author": "Poly Haven contributors",
+  "license": "CC0",
+  "licensePage": "https://polyhaven.com/license",
+  "assetPage": "https://polyhaven.com/a/painted_wooden_table",
+  "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/painted_wooden_table/painted_wooden_table_1k.gltf",
+  "sha256": {
+    "table.gltf": "7e1ba86ae2c570e3464c42556e4e6cc09186a99127b86eaf54e7dbecb2fbafc3",
+    "textures/painted_wooden_table_nor_gl_1k.jpg": "0fe881c3f0c2ef0e4e67fa05280355f9b852adc6447af71a61cc3b15fff66338",
+    "textures/painted_wooden_table_diff_1k.jpg": "826738d2efab2c5786e498c39dd58edd6479e08c0503619727a2b9b6b2e796dc",
+    "painted_wooden_table.bin": "aac5e2e7411a319b8fdf6915cdb452a3b490179c354c75785a22f560e8413059",
+    "textures/painted_wooden_table_arm_1k.jpg": "670863aece034184ac1643ebe3de1254c3565a10b01ce3f9e8ba3a67980b4bb3"
+  }
+}

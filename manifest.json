@@ -1,0 +1,265 @@
+{
+  "diningtable.farm": {
+    "old": {
+      "file": "models/diningtable.farm-old.glb",
+      "sha256": "917f46d02dcebfd756d4cfc566f63e6f19f47a9b0153a42f1e8665da5849b54c",
+      "bytes": 8860,
+      "triangles": 96,
+      "boundsBlender": [
+        [
+          -1.0499999523162842,
+          -0.625,
+          0.015000015497207642
+        ],
+        [
+          1.0499999523162842,
+          0.625,
+          0.8600000143051147
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/diningtable.farm-new.glb",
+      "sha256": "7a2910b7a0e6d7bfc2765b4edd98d42aa7482543d7e125fa9e89299c8422f645",
+      "bytes": 114716,
+      "triangles": 2336,
+      "boundsBlender": [
+        [
+          -1.0499999523162842,
+          -0.6234999895095825,
+          0.0
+        ],
+        [
+          1.0499999523162842,
+          0.6234999895095825,
+          0.8600000143051147
+        ]
+      ],
+      "materials": 3
+    },
+    "donor": {
+      "file": "models/diningtable.farm-donor.glb",
+      "sha256": "fae0832571ae4f58f81f8b33849cb15b69e18273af3ee47abad6ac13067763a2",
+      "bytes": 1778700,
+      "triangles": 600,
+      "boundsBlender": [
+        [
+          -1.0790419578552246,
+          -0.5099981427192688,
+          0.0
+        ],
+        [
+          1.0790419578552246,
+          0.509998083114624,
+          0.8600000143051147
+        ]
+      ],
+      "materials": 1,
+      "source": {
+        "entry": "table.gltf",
+        "author": "Poly Haven contributors",
+        "license": "CC0",
+        "licensePage": "https://polyhaven.com/license",
+        "assetPage": "https://polyhaven.com/a/painted_wooden_table",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/painted_wooden_table/painted_wooden_table_1k.gltf",
+        "sha256": {
+          "table.gltf": "7e1ba86ae2c570e3464c42556e4e6cc09186a99127b86eaf54e7dbecb2fbafc3",
+          "textures/painted_wooden_table_nor_gl_1k.jpg": "0fe881c3f0c2ef0e4e67fa05280355f9b852adc6447af71a61cc3b15fff66338",
+          "textures/painted_wooden_table_diff_1k.jpg": "826738d2efab2c5786e498c39dd58edd6479e08c0503619727a2b9b6b2e796dc",
+          "painted_wooden_table.bin": "aac5e2e7411a319b8fdf6915cdb452a3b490179c354c75785a22f560e8413059",
+          "textures/painted_wooden_table_arm_1k.jpg": "670863aece034184ac1643ebe3de1254c3565a10b01ce3f9e8ba3a67980b4bb3"
+        }
+      }
+    }
+  },
+  "floorlamp.arc": {
+    "old": {
+      "file": "models/floorlamp.arc-old.glb",
+      "sha256": "744d15c9a4ef5374096954d18e380927c3ffe0fb2d1233796d1ce4602eb0d023",
+      "bytes": 25652,
+      "triangles": 728,
+      "boundsBlender": [
+        [
+          -0.2549999952316284,
+          -0.24500000476837158,
+          0.004999995231628418
+        ],
+        [
+          0.6800000071525574,
+          0.24500000476837158,
+          1.6913689374923706
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/floorlamp.arc-new.glb",
+      "sha256": "dfe59954c6ee8621d318663968acd638525a79ebeb625936a8fd461921511114",
+      "bytes": 51336,
+      "triangles": 2008,
+      "boundsBlender": [
+        [
+          -0.2549999952316284,
+          -0.2549999952316284,
+          0.0
+        ],
+        [
+          0.6899999976158142,
+          0.2549999952316284,
+          1.681963324546814
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "sculpture.balance": {
+    "old": {
+      "file": "models/sculpture.balance-old.glb",
+      "sha256": "26ef97a8a201b1e34a2e8009531da49b850957ee820f1ac090a41a189c518c82",
+      "bytes": 28436,
+      "triangles": 984,
+      "boundsBlender": [
+        [
+          -0.455000102519989,
+          -0.33500006794929504,
+          0.005000010132789612
+        ],
+        [
+          0.3450000286102295,
+          0.33000001311302185,
+          1.434999942779541
+        ]
+      ],
+      "materials": 4
+    },
+    "new": {
+      "file": "models/sculpture.balance-new.glb",
+      "sha256": "37a2b6f86b07d6b55a54807fb061029304a56328469b553b4778a357a63def58",
+      "bytes": 60128,
+      "triangles": 2292,
+      "boundsBlender": [
+        [
+          -0.419999897480011,
+          -0.33000001311302185,
+          0.0
+        ],
+        [
+          0.3799999952316284,
+          0.33000001311302185,
+          1.4900000095367432
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "tree.round": {
+    "old": {
+      "file": "models/tree.round-old.glb",
+      "sha256": "43e19ccd126205c55c294d247ad72d0b873837f5c9883efd74529c398826e47f",
+      "bytes": 36104,
+      "triangles": 1412,
+      "boundsBlender": [
+        [
+          -0.6900001764297485,
+          -0.5940001010894775,
+          0.0
+        ],
+        [
+          0.7400000095367432,
+          0.593999981880188,
+          2.119999885559082
+        ]
+      ],
+      "materials": 4
+    },
+    "new": {
+      "file": "models/tree.round-new.glb",
+      "sha256": "3c7ff238a72c20f0cee054672f244df259b9e4c552cad7f51f14e3689fcb4d06",
+      "bytes": 315996,
+      "triangles": 5152,
+      "boundsBlender": [
+        [
+          -0.6754997372627258,
+          -0.4986583888530731,
+          0.0
+        ],
+        [
+          0.7142906188964844,
+          0.5819490551948547,
+          2.132319450378418
+        ]
+      ],
+      "materials": 3
+    },
+    "donor": {
+      "file": "models/tree.round-donor.glb",
+      "sha256": "36265b1d1792f27e8e9b0f1671a284654390313004ae9aad587a36b028288eac",
+      "bytes": 9024,
+      "triangles": 114,
+      "boundsBlender": [
+        [
+          -0.468590646982193,
+          -0.40581125020980835,
+          0.0
+        ],
+        [
+          0.468590646982193,
+          0.40581125020980835,
+          2.120000123977661
+        ]
+      ],
+      "materials": 2,
+      "source": {
+        "entry": "tree.glb",
+        "author": "Kenney",
+        "license": "CC0",
+        "assetPage": "https://kenney.nl/assets/nature-kit",
+        "archiveURL": "https://github.com/WaviestSun/atelier-packs/releases/download/packs-2/kenney_nature-kit.zip",
+        "archiveSHA256": "fa7974a0d342bfe63c38664ba9f8ec1a4aab8ea25f099bdc56870e33588c4d9d",
+        "member": "Models/GLTF format/tree_default.glb",
+        "sha256": "562d29638c902de3c7bee465d3a53bb77117efbc392ae04ed894faf6b5dc691d"
+      }
+    }
+  },
+  "pool.ladder": {
+    "old": {
+      "file": "models/pool.ladder-old.glb",
+      "sha256": "12b0be3fddbdbc7b990e1a25078b32b28d45516a864fb935ecca28e335e620ee",
+      "bytes": 12164,
+      "triangles": 156,
+      "boundsBlender": [
+        [
+          -0.23250000178813934,
+          -0.18000000715255737,
+          -0.8100000619888306
+        ],
+        [
+          0.23250000178813934,
+          0.15449999272823334,
+          0.5174999833106995
+        ]
+      ],
+      "materials": 1
+    },
+    "new": {
+      "file": "models/pool.ladder-new.glb",
+      "sha256": "2e7ecddd47e746964eb2954df45285caccecf54afd37f43476b6530f2853af21",
+      "bytes": 99088,
+      "triangles": 2824,
+      "boundsBlender": [
+        [
+          -0.23250000178813934,
+          -0.18691934645175934,
+          -0.8100000023841858
+        ],
+        [
+          0.23250000178813934,
+          0.15449999272823334,
+          0.5442253947257996
+        ]
+      ],
+      "materials": 2
+    }
+  }
+}

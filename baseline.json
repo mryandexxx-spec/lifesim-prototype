@@ -1,0 +1,428 @@
+{
+  "diningtable.farm": [
+    {
+      "kind": "box",
+      "name": "farm plank top",
+      "x": 0,
+      "y": 0.79,
+      "z": 0,
+      "sx": 2.1,
+      "sy": 0.14,
+      "sz": 1.25,
+      "color": "#b58a6b",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "table solid leg",
+      "x": -0.89,
+      "y": 0.37,
+      "z": -0.47,
+      "sx": 0.14,
+      "sy": 0.71,
+      "sz": 0.14,
+      "color": "#775746",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "table solid leg",
+      "x": -0.89,
+      "y": 0.37,
+      "z": 0.47,
+      "sx": 0.14,
+      "sy": 0.71,
+      "sz": 0.14,
+      "color": "#775746",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "table solid leg",
+      "x": 0.89,
+      "y": 0.37,
+      "z": -0.47,
+      "sx": 0.14,
+      "sy": 0.71,
+      "sz": 0.14,
+      "color": "#775746",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "table solid leg",
+      "x": 0.89,
+      "y": 0.37,
+      "z": 0.47,
+      "sx": 0.14,
+      "sy": 0.71,
+      "sz": 0.14,
+      "color": "#775746",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "farm low stretcher -0.87",
+      "x": -0.87,
+      "y": 0.29,
+      "z": 0,
+      "sx": 0.08,
+      "sy": 0.08,
+      "sz": 0.87,
+      "color": "#775746",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "farm low stretcher 0.87",
+      "x": 0.87,
+      "y": 0.29,
+      "z": 0,
+      "sx": 0.08,
+      "sy": 0.08,
+      "sz": 0.87,
+      "color": "#775746",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "farm end brace",
+      "x": 0,
+      "y": 0.23,
+      "z": 0,
+      "sx": 1.83,
+      "sy": 0.09,
+      "sz": 0.07,
+      "color": "#775746",
+      "rotation": null
+    }
+  ],
+  "floorlamp.arc": [
+    {
+      "kind": "cylinder",
+      "name": "arc heavy foot",
+      "x": 0,
+      "y": 0.08,
+      "z": 0,
+      "sx": 0.51,
+      "sy": 0.15,
+      "sz": 0.49,
+      "color": "#3e4c4b",
+      "rotation": null
+    },
+    {
+      "kind": "cylinder",
+      "name": "arc tall stem",
+      "x": -0.1,
+      "y": 0.82,
+      "z": 0,
+      "sx": 0.075,
+      "sy": 1.53,
+      "sz": 0.075,
+      "color": "#c9b07e",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "arc horizontal arm",
+      "x": 0.18,
+      "y": 1.58,
+      "z": 0,
+      "sx": 0.66,
+      "sy": 0.065,
+      "sz": 0.07,
+      "color": "#c9b07e",
+      "rotation": [
+        0,
+        0,
+        -14
+      ]
+    },
+    {
+      "kind": "cylinder",
+      "name": "arc hanging bell",
+      "x": 0.48,
+      "y": 1.4,
+      "z": 0,
+      "sx": 0.4,
+      "sy": 0.28,
+      "sz": 0.4,
+      "color": "#e6dfcb",
+      "rotation": null
+    },
+    {
+      "kind": "sphere",
+      "name": "warm arc bulb",
+      "x": 0.48,
+      "y": 1.23,
+      "z": 0,
+      "sx": 0.2,
+      "sy": 0.14,
+      "sz": 0.2,
+      "color": "#c9b07e",
+      "rotation": null
+    }
+  ],
+  "sculpture.balance": [
+    {
+      "kind": "cylinder",
+      "name": "balance foot",
+      "x": 0,
+      "y": 0.15,
+      "z": 0,
+      "sx": 0.66,
+      "sy": 0.29,
+      "sz": 0.66,
+      "color": "#3e4c4b",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "balance leaning beam",
+      "x": 0,
+      "y": 0.79,
+      "z": 0,
+      "sx": 0.16,
+      "sy": 1.03,
+      "sz": 0.17,
+      "color": "#c9b07e",
+      "rotation": [
+        0,
+        0,
+        32
+      ]
+    },
+    {
+      "kind": "sphere",
+      "name": "balance left orb",
+      "x": -0.2,
+      "y": 1.18,
+      "z": 0.09,
+      "sx": 0.51,
+      "sy": 0.51,
+      "sz": 0.49,
+      "color": "#d7ac99",
+      "rotation": null
+    },
+    {
+      "kind": "sphere",
+      "name": "balance right orb",
+      "x": 0.21,
+      "y": 0.88,
+      "z": -0.07,
+      "sx": 0.27,
+      "sy": 0.27,
+      "sz": 0.26,
+      "color": "#90a6b0",
+      "rotation": null
+    }
+  ],
+  "tree.round": [
+    {
+      "kind": "cylinder",
+      "name": "trunk",
+      "x": 0,
+      "y": 0.7,
+      "z": 0,
+      "sx": 0.28,
+      "sy": 1.4,
+      "sz": 0.28,
+      "color": "#775746",
+      "rotation": null
+    },
+    {
+      "kind": "sphere",
+      "name": "canopy",
+      "x": 0,
+      "y": 1.65,
+      "z": 0,
+      "sx": 1.188,
+      "sy": 0.94,
+      "sz": 1.188,
+      "color": "#63865a",
+      "rotation": null
+    },
+    {
+      "kind": "sphere",
+      "name": "east",
+      "x": 0.38,
+      "y": 1.43,
+      "z": -0.14,
+      "sx": 0.72,
+      "sy": 0.72,
+      "sz": 0.72,
+      "color": "#8ca46a",
+      "rotation": null
+    },
+    {
+      "kind": "sphere",
+      "name": "west",
+      "x": -0.37,
+      "y": 1.48,
+      "z": 0.2,
+      "sx": 0.64,
+      "sy": 0.68,
+      "sz": 0.66,
+      "color": "#4e7048",
+      "rotation": null
+    }
+  ],
+  "pool.ladder": [
+    {
+      "kind": "box",
+      "name": "socket",
+      "x": -0.18,
+      "y": 0.015,
+      "z": -0.102,
+      "sx": 0.105,
+      "sy": 0.04,
+      "sz": 0.105,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "deck rail",
+      "x": -0.18,
+      "y": 0.25,
+      "z": -0.102,
+      "sx": 0.055,
+      "sy": 0.5,
+      "sz": 0.055,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "grip",
+      "x": -0.18,
+      "y": 0.49,
+      "z": 0.025,
+      "sx": 0.055,
+      "sy": 0.055,
+      "sz": 0.31,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "wet rail",
+      "x": -0.18,
+      "y": -0.15,
+      "z": 0.15,
+      "sx": 0.055,
+      "sy": 1.32,
+      "sz": 0.055,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "socket",
+      "x": 0.18,
+      "y": 0.015,
+      "z": -0.102,
+      "sx": 0.105,
+      "sy": 0.04,
+      "sz": 0.105,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "deck rail",
+      "x": 0.18,
+      "y": 0.25,
+      "z": -0.102,
+      "sx": 0.055,
+      "sy": 0.5,
+      "sz": 0.055,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "grip",
+      "x": 0.18,
+      "y": 0.49,
+      "z": 0.025,
+      "sx": 0.055,
+      "sy": 0.055,
+      "sz": 0.31,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "wet rail",
+      "x": 0.18,
+      "y": -0.15,
+      "z": 0.15,
+      "sx": 0.055,
+      "sy": 1.32,
+      "sz": 0.055,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "rung",
+      "x": 0,
+      "y": 0.12,
+      "z": 0.15,
+      "sx": 0.37,
+      "sy": 0.045,
+      "sz": 0.06,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "rung",
+      "x": 0,
+      "y": -0.08000000000000002,
+      "z": 0.15,
+      "sx": 0.37,
+      "sy": 0.045,
+      "sz": 0.06,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "rung",
+      "x": 0,
+      "y": -0.28,
+      "z": 0.15,
+      "sx": 0.37,
+      "sy": 0.045,
+      "sz": 0.06,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "rung",
+      "x": 0,
+      "y": -0.4800000000000001,
+      "z": 0.15,
+      "sx": 0.37,
+      "sy": 0.045,
+      "sz": 0.06,
+      "color": "#aab8b7",
+      "rotation": null
+    },
+    {
+      "kind": "box",
+      "name": "rung",
+      "x": 0,
+      "y": -0.68,
+      "z": 0.15,
+      "sx": 0.37,
+      "sy": 0.045,
+      "sz": 0.06,
+      "color": "#aab8b7",
+      "rotation": null
+    }
+  ]
+}
