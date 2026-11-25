@@ -41,7 +41,7 @@ with sync_playwright() as p:
                 # Software-rendered diagnostic, not physical mobile FPS. Capture
                 # RAF intervals while the camera and model are actually rendered.
                 times=page.evaluate("""() => new Promise(resolve=>{let t=[],n=0;
-                    function frame(now){t.push(now);if(++n===31)resolve(t.slice(1).map((v,i)=>v-t[i]));else requestAnimationFrame(frame)}
+                    function frame(now){window.requestLabFrame();t.push(now);if(++n===31)resolve(t.slice(1).map((v,i)=>v-t[i]));else requestAnimationFrame(frame)}
                     requestAnimationFrame(frame)})""")
                 performance.append({'engine':engine,'viewport':[width,height],'sex':sex,'state':'grid_mix','raf_median_ms':float(np.median(times)),'raf_p95_ms':float(np.percentile(times,95))})
                 page.locator('#s-fullness').evaluate("el=>{el.value='0.37';el.dispatchEvent(new Event('input',{bubbles:true}))}");assert page.evaluate("window.labState.preset==='custom' && Object.keys(window.labState.weights).some(k=>k.startsWith('grid_'))")

@@ -212,6 +212,27 @@ PRESET_NAMES=list(PRESETS)
 GRID={f'grid_{i}{j}{k}':{'weight':(.15,.5,.85)[i],'muscle':(.10,.5,.90)[j],'proportions':(.12,.5,.88)[k]}
       for i,j,k in itertools.product(range(3),repeat=3) if (i,j,k)!=(1,1,1)}
 BODY=PRESET_NAMES+list(GRID)
+def calibrate_contact_regions(raw,d,sex):
+    # Preserve foot-local shape while translating the foot with the native leg.
+    # Original accepted discrete presets are NEVER modified.
+    out=d.copy()
+    if sex=='male':
+        floor=float(raw[:,1].min())
+        for sign in (-1,1):
+            side=raw[:,0]*sign>0
+            core=side&(raw[:,1]<floor+.055)
+            blend=(1-smooth((raw[:,1]-floor-.055)/.12))*side
+            trans=np.median(d[core],axis=0);trans[1]=0
+            out=out*(1-blend[:,None])+trans*blend[:,None]
+    else:
+        # Two measured inward pelvis triangles reverse only at full/low-muscle.
+        # Keep a tiny local rest surface, transition over surrounding 2.5 cm.
+        radius=np.linalg.norm(raw-np.array([0,.842,-.039]),axis=1)
+        core=radius<.013;assert core.any()
+        blend=1-smooth((radius-.013)/.025)
+        trans=np.median(d[core],axis=0)
+        out=out*(1-blend[:,None])+trans*blend[:,None]
+    return out.astype('<f4')
 def interp(q,fields,raw):
     x=np.clip(np.array(q,dtype=np.float64),-1,1)+1
     lo=np.minimum(np.floor(x).astype(int),1); f=x-lo
@@ -223,7 +244,7 @@ def interp(q,fields,raw):
     return out
 states={'neutral':{},'short':{'__scale':.90},'tall':{'__scale':1.10},
         **{k:{k:1} for k in PRESET_NAMES},'tall_athletic':{'athletic':1,'__scale':1.10},
-        'face_mixed':{'full':1,'smile':1,'jaw_pos':1},'grid_full':{'grid_211':1},'grid_muscle':{'grid_121':1},'grid_proportion':{'grid_112':1},'grid_mix':{'grid_222':.125,'grid_221':.125,'grid_212':.125,'grid_122':.125,'grid_211':.125,'grid_121':.125,'grid_112':.125,'__scale':1.05}}
+        'face_mixed':{'full':1,'smile':1,'jaw_pos':1},'grid_full':{'grid_211':1},'grid_muscle':{'grid_121':1},'grid_proportion':{'grid_112':1},'grid_slender':{'grid_011':1},'grid_low_muscle':{'grid_101':1},'grid_low_proportion':{'grid_110':1},'grid_full_low_muscle_low_prop':{'grid_200':1},'grid_full_low_muscle_mid_prop':{'grid_201':1},'grid_full_low_muscle_high_prop':{'grid_202':1},'grid_mix':{'grid_222':.125,'grid_221':.125,'grid_212':.125,'grid_122':.125,'grid_211':.125,'grid_121':.125,'grid_112':.125,'__scale':1.05}}
 report={'classification':'diagnostic; no acceptance','profiles':PRESETS,'sexes':{},
  'limitations':['Diagnostic joint native lattice with trilinear interpolation, not production memory or performance proof.',
  'Uniform height scale also scales head, feet and hands; normalized head shape is unchanged.',
@@ -258,10 +279,12 @@ for sex,(pin,rpin) in PINS.items():
         else:
             out[:,1]-=ground*(1-smooth((raw[:,1]-floor)/.45))
             assert np.max(np.abs(out[raw[:,1]>=cut]))<1e-7
-        out=out.astype('<f4');fields[name]=out
+        before=out.astype('<f4');out=calibrate_contact_regions(raw,before,sex) if name in GRID else before
+        fields[name]=out
         vv=raw+out;assert np.isfinite(vv).all()
         c=cross(vv,tri);a=np.linalg.norm(c,axis=1)
         metrics[name]={'parameters':params,'measurements':measures(vv,tri),
+            'calibration_max_mm':float(np.linalg.norm(out-before,axis=1).max()*1000),
             'max_displacement_mm':float(np.linalg.norm(out,axis=1).max()*1000),
             'head_max_displacement_mm':float(np.linalg.norm(out[raw[:,1]>=cut],axis=1).max()*1000),
             'new_degenerate':int((valid&(a<2e-10)).sum()),
@@ -295,13 +318,21 @@ for sex,(pin,rpin) in PINS.items():
         params={k:float(np.interp(x,[-1,0,1],ends)) for k,x,ends in zip(('weight','muscle','proportions'),q,((.15,.5,.85),(.10,.5,.90),(.12,.5,.88)))}
         v,_=native({**profile,**params});direct=((v-donor)@T)*mask
         direct[:,1]-=float((raw+direct)[:,1].min()-floor)*(1-smooth((raw[:,1]-floor)/.45))
+        native_raw=direct.copy();direct=calibrate_contact_regions(raw,direct,sex)
         approx=interp(q,fields,raw);err=approx-direct
         vv=raw+approx;c=cross(vv,tri);a=np.linalg.norm(c,axis=1)
-        random.append({'q':q.tolist(),'rms_mm':float(np.sqrt(np.mean(np.sum(err**2,axis=1)))*1000),
+        random.append({'q':q.tolist(),'raw_native_max_mm':float(np.linalg.norm(approx-native_raw,axis=1).max()*1000),'calibration_max_mm':float(np.linalg.norm(direct-native_raw,axis=1).max()*1000),'rms_mm':float(np.sqrt(np.mean(np.sum(err**2,axis=1)))*1000),
             'max_mm':float(np.linalg.norm(err,axis=1).max()*1000),'new_degenerate':int((valid&(a<2e-10)).sum()),
             'normal_reversal_candidates':int((valid&(np.sum(c*c0,axis=1)<0)).sum()),
             'new_bvh_candidates':len(contact_pairs(vv,tri)-baseline_pairs),'measurements':measures(vv,tri)})
     assert len(factorial)==81 and len(random)==12
+    # Measure low-rank opportunity without changing the runtime representation.
+    X=np.stack([fields[k].reshape(-1) for k in GRID]);u,s,vt=np.linalg.svd(X,full_matrices=False)
+    rank_study={}
+    for rank in (6,8,10,12,16):
+        err=(X-(u[:,:rank]*s[:rank])@vt[:rank]).reshape(len(X),-1,3)
+        rank_study[str(rank)]={'rms_mm':float(np.sqrt(np.mean(np.sum(err**2,axis=2)))*1000),'max_mm':float(np.linalg.norm(err,axis=2).max()*1000)}
+    # This is position-only diagnostic evidence, not a tested compressed GLB.
     # Preserve original exact published preset fields by independent pinned binary comparison.
     accepted=pathlib.Path('pinned-reset')/(sex+'-body.glb')
     aj,ab=read(accepted)
@@ -340,7 +371,7 @@ for sex,(pin,rpin) in PINS.items():
         assert zb[i:i+vv['byteLength']]==b0[i:i+vv['byteLength']]
     neutral=measures(raw,tri)
     report['sexes'][sex]={'source_sha':pin,'glb_sha':sha(out.read_bytes()),'exact_existing_attributes_targets_textures':True,
-      'factorial':factorial,'heldout_native':random,'glb_bytes':out.stat().st_size,'rig_rest':'OPEN: no production rest/bind proof', 'native_mapping_error':e,'head_cut_m':cut,'neutral':neutral,'profiles':metrics,
+      'factorial':factorial,'heldout_native':random,'position_only_rank_study':rank_study,'glb_bytes':out.stat().st_size,'rig_rest':'OPEN: no production rest/bind proof', 'native_mapping_error':e,'head_cut_m':cut,'neutral':neutral,'profiles':metrics,
       'height_scale_endpoints_m':[neutral['height']*.90,neutral['height']*1.10],
       'combined_vs_additive_rms_mm':float(np.sqrt(np.mean(np.sum(err**2,axis=1)))*1000),
       'combined_vs_additive_max_mm':float(np.linalg.norm(err,axis=1).max()*1000)}
@@ -352,4 +383,5 @@ for n in ('index.html','lab.js','interpolate.mjs'):shutil.copy2(pathlib.Path(__f
 (L/'models.json').write_text(json.dumps(models,indent=2))
 (L/'states.json').write_text(json.dumps(states,indent=2))
 save()
+assert all(not s['normal_reversal_candidates'] and not s['new_degenerate'] for x in report['sexes'].values() for s in x['factorial']+x['heldout_native']), 'New lattice orientation/area defect'
 print('C continuous joint lattice diagnostic generated; TECH/ART remain OPEN until review',flush=True)
