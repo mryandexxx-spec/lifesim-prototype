@@ -146,6 +146,7 @@ jobs:
           if-no-files-found: warn
 
   ossos-full-rig:
+    if: false # D-TOOLS/2 exact artifact is reused
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -213,5 +214,64 @@ jobs:
         with:
           name: cf-body-d-tools-full-rig
           path: full-out/
+          retention-days: 90
+          if-no-files-found: warn
+
+  ossos-world-contact:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: cf-body-d-bpy-4.5.0-py311-linux-v1
+      - name: Prepare exact skin and contact input
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.15.3
+          python -m py_compile art-review/cf-body-d/dtools-contact.py art-review/cf-body-d/dtools-contact-render.py
+          python art-review/cf-body-d/dtools-contact.py prepare
+      - name: Plan world anchors and solve contact-aware pelvis trajectory
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          npm install --prefix .dtools-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.dtools-deps/node_modules" upstream-ossos/node_modules
+          python -c "from pathlib import Path; s=Path('art-review/cf-body-d/dtools-full.mjs').read_text().split('const results={};')[0].replace('full-input/poses.json','contact-input.json'); Path('upstream-ossos/contact.mjs').write_text(s+Path('art-review/cf-body-d/dtools-contact.mjs').read_text())"
+          .dtools-deps/node_modules/.bin/esbuild upstream-ossos/contact.mjs --bundle --platform=node --target=node22 --format=esm --outfile=dtools-contact-bundle.mjs
+          node dtools-contact-bundle.mjs
+          python art-review/cf-body-d/dtools-contact.py bake
+          cp upstream-ossos/LICENSE contact-out/OSSOS-LICENSE.txt
+          cp .dtools-deps/package-lock.json contact-out/dependency-lock.json
+      - name: Independent dense contact sampling and real renders
+        run: python art-review/cf-body-d/dtools-contact-render.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-tools-world-contact
+          path: contact-out/
           retention-days: 90
           if-no-files-found: warn
