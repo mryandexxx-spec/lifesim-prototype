@@ -20,6 +20,35 @@ jobs:
       contents: read
       actions: read
     uses: ./.github/workflows/cf-anim-tools.yml
+  of-integration-d:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-d' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact native outdoor GLBs, seating, cooking, lights and save contracts
+        run: node --test tests/of-integration-d.test.js tests/lot-b3.test.js tests/grill-r1.test.js tests/furniture-shop-integration.test.js
+      - name: Actual Chromium and WebKit outdoor day/night and active overlay
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/of-d-http.log 2>&1 &
+          sleep 3
+          node tests/of-d-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: of-d-game-evidence
+          path: artifacts/of-d/
+          if-no-files-found: warn
   of-integration-c:
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-c' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

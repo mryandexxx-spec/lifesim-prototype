@@ -58,7 +58,7 @@ import {POOL_FIXTURE_PRICES,poolHasExit} from './pool-equipment.js';
 import {previewPoolTiles,previewPoolFixture,previewRotatedPoolFixture,previewPoolHistory,
   poolEditorSnapshot,commitPoolPreviewPersisted} from './pool-editor.js';
 import {createPoolVisual,poolFixtureVisualPose} from './pool-visual.js';
-import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
+import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,outdoorBenchSurface,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
 import {GRILL_RECIPES,grillRecipe,grillApproach,grillAvailable,
   canGrillRecipe,chooseOutdoorDining} from './grill-r1.js';
@@ -121,6 +121,7 @@ import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnai
 import {ofInteriorDiningPlateY,ofInteriorOverlay} from './of-interior-assets.js';
 import {createOutdoorVegetationVisual} from './of-vegetation-visual.js';
 import {createGardenVisual} from './of-garden-visual.js';
+import {createOutdoorFurnitureVisual} from './of-outdoor-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -3226,9 +3227,12 @@ function boot() {
       actors:Object.fromEntries(['alex','mira'].map(id=>{const a=getActor(game,id);return [id,{position:{...a.position},action:a.action?{...a.action}:null,event:a.event}];})),
       gardens:structuredClone(game.world.outdoors.gardens||{}),credits:game.shop.credits,herbs:game.kitchen.pantry.herbs});
   }
+  const outdoorFurnitureVisual=createOutdoorFurnitureVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&new URLSearchParams(location.search).get('outdoor-furniture')!=='legacy'});
+  if(furnitureVisualMode==='qa')window.__LifeSimOutdoorFurnitureStats=outdoorFurnitureVisual.stats;
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
+    outdoorFurnitureVisual.setBrightness(brightness);
     for(const light of outdoorLightNodes)
       light.light.intensity=brightness*(light.name.includes('standing')?1.75:1.15);
   };
@@ -3380,6 +3384,8 @@ function boot() {
       }
       if(def.category==='garden')gardenVisual.attach(node,item.itemId,gardenView(game.world.outdoors,item.instanceId,game.minutes));
       vegetation.attach(node,item.itemId);
+      // The static grill never owns the existing articulated skewer/food overlay.
+      outdoorFurnitureVisual.attach(node,item.itemId,item.itemId==='garden.grill'?grillAnimated.at(-1).skewers:[]);
     }
     syncOutdoorLights(currentOutdoorDaylight);
     gardenStageSignature=currentGardenStageSignature();
@@ -4318,6 +4324,7 @@ function boot() {
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
   const benchVisualTargets={alex:null,mira:null};
+  if(furnitureVisualMode==='qa')window.__LifeSimOutdoorSeatQA=(id='alex')=>({progress:sofaStates[id].progress,target:benchVisualTargets[id],action:getActor(game,id).action?.id,position:{...(id==='alex'?display:miraDisplay)}});
   // F4F.1: entirely cosmetic chair draw-out. Keep the selected table/seat
   // through the reverse stand-up animation, but never persist a moved chair.
   const diningVisual={alex:null,mira:null};
@@ -4467,7 +4474,9 @@ function boot() {
             :furnitureActionApproach(game.world,'cook',game.action.targetInstanceId)):null;
     const actual=dest||(game.action.id==='bench'
       ?outdoorBenchApproach(game.world,game.action.targetInstanceId)
-      :furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId));
+      :game.action.id==='grill'
+        ?(game.action.grillStage==='storing'?furnitureActionApproach(game.world,'fridge'):grillApproach(game.world,game.action.targetInstanceId))
+        :furnitureActionApproach(game.world,game.action.id,game.action.targetInstanceId));
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.action.id].location;
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
@@ -4491,7 +4500,9 @@ function boot() {
             :furnitureActionApproach(game.world,'cook',game.otherSim.action.targetInstanceId)):null;
     const actual=dest||(game.otherSim.action.id==='bench'
       ?outdoorBenchApproach(game.world,game.otherSim.action.targetInstanceId)
-      :furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId));
+      :game.otherSim.action.id==='grill'
+        ?(game.otherSim.action.grillStage==='storing'?furnitureActionApproach(game.world,'fridge'):grillApproach(game.world,game.otherSim.action.targetInstanceId))
+        :furnitureActionApproach(game.world,game.otherSim.action.id,game.otherSim.action.targetInstanceId));
     const [x,z]=actual?[actual.x,actual.z]:ACTIONS[game.otherSim.action.id].location;
     game.otherSim.position={x,z};
   }
@@ -9811,7 +9822,8 @@ function boot() {
       paintingFrame:miraUseId==='paint'?{phase:'using',elapsed:game.otherSim.action?.elapsed||0}:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
-      seat:miraMeshSeatId&&meshyFurniture.hasModel(decorNodes.get(miraMeshSeatId))?miraSupport:null,
+      seat:gardenMiraPose&&seatContactEnabled?outdoorBenchSurface(game.world,benchVisualTargets.mira):
+        miraMeshSeatId&&meshyFurniture.hasModel(decorNodes.get(miraMeshSeatId))?miraSupport:null,
       bedBusy:bedStates.mira.progress>0,
       bedFrame:miraBedPose,
       platformBed:miraBedding&&meshyFurniture.hasModel(decorNodes.get(bedVisualTargets.mira)),
@@ -9863,7 +9875,7 @@ function boot() {
       paintingFrame:useId==='paint'?{phase:'using',elapsed:game.action?.elapsed||0}:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
-      seat:seatContactEnabled?(alexDiningVisual&&
+      seat:seatContactEnabled?(gardenSeatPose?outdoorBenchSurface(game.world,benchVisualTargets.alex):alexDiningVisual&&
         alexDiningVisual.chairId===sofaVisualTargets.alex
         ?purchasedDiningSeatSurface(game.world,alexDiningVisual.chairId,
           diningChairPullOffset(sofaStates.alex.progress,alexDiningVisual.maxPull))

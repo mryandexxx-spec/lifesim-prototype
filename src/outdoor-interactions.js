@@ -2,8 +2,20 @@
  * Pure gameplay geometry; no PlayCanvas, DOM or duplicate simulation clock.
  */
 import {OUTDOOR_CATALOG} from './outdoor-catalog.js';
+import {SOFA_LAYOUT,SOFA_POSE} from './pose-config.js';
+import {createSeatSurface,seatSlot} from './interaction-anchors.js';
 
 export const OUTDOOR_BENCH_ITEM='garden.bench';
+// Physical top of both legacy and approved native GLB slats, in lot units.
+export const OUTDOOR_BENCH_SEAT_HEIGHT=.64;
+const BENCH_FLOOR_Y=-.53;
+export function outdoorBenchSurface(world,instanceId){
+  const bench=outdoorBench(world,instanceId);if(!bench)return null;
+  const {width,depth}=OUTDOOR_CATALOG[OUTDOOR_BENCH_ITEM];
+  return seatSlot(createSeatSurface({id:instanceId,origin:{x:bench.x,y:BENCH_FLOOR_Y,z:bench.z},
+    yaw:180-bench.yaw,width,depth,seatHeight:BENCH_FLOOR_Y+OUTDOOR_BENCH_SEAT_HEIGHT,
+    floorY:BENCH_FLOOR_Y,slots:1,sideMargin:.2,backClearance:.10,approachGap:.55}),0);
+}
 export const OUTDOOR_LIGHT_LIMIT=8;
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
 export function outdoorBench(world,instanceId){
@@ -38,11 +50,16 @@ export function outdoorBenchPose(world,instanceId,progress){
   const bench=outdoorBench(world,instanceId);
   const approach=outdoorBenchApproach(world,instanceId);
   if(!bench||!approach)return null;
-  const p=ease(progress),a=bench.yaw*Math.PI/180;
+  const p=ease(progress);
+  const seat=outdoorBenchSurface(world,instanceId);
+  const referenceHeight=SOFA_LAYOUT.seatCenterY+SOFA_LAYOUT.seatHeight/2;
+  // Same calibrated fallback as purchased chairs: seat height difference,
+  // not a per-avatar offset. Skinned seat runtime refines actual contact.
+  const lift=seat.contact.y-seat.floorY-referenceHeight;
   return {x:approach.x+(bench.x-approach.x)*p,
-    y:-.53-.225*p,
+    y:seat.floorY+(SOFA_POSE.y+lift)*p,
     z:approach.z+(bench.z-approach.z)*p,
-    yaw:bench.yaw+180*p,pitch:0,sofaWeight:p};
+    yaw:-bench.yaw+180*p,pitch:0,sofaWeight:p};
 }
 export function outdoorLightFactor(daylight){
   const daylightAmount=daylight?.normalizedDaylight;
