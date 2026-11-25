@@ -1,0 +1,38 @@
+name: OF-MASS — publish exact reviewed diagnostic artifact
+on:
+  push:
+    branches: [art/of-mass-lab]
+    paths: [.github/workflows/of-mass-publish.yml]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/art/of-mass-lab'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: of-mass-evidence
+          run-id: 45654383776
+          github-token: ${{ github.token }}
+          path: /tmp/of-mass
+      - name: Validate reviewed lab exact bytes
+        run: |
+          python - <<'PY'
+          import pathlib,hashlib,json
+          p=pathlib.Path('/tmp/of-mass/lab')
+          m={str(x.relative_to(p)):hashlib.sha256(x.read_bytes()).hexdigest() for x in p.rglob('*') if x.is_file()}
+          assert len(m)==111
+          assert hashlib.sha256(json.dumps(m,sort_keys=True,separators=(',',':')).encode()).hexdigest()=='1760f0c9433f3539413a3a82e967d3bb2e887c25b21cebf5dc767afa0ea92f17'
+          PY
+      - name: Commit only verified static lab on isolated branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p public
+          cp -a /tmp/of-mass/lab/. public/
+          git add public
+          git commit -m "OF-MASS: publish exact green R2 lab from run 45654383776"
+          git push origin HEAD:refs/heads/art/of-mass-lab
