@@ -10,7 +10,7 @@ SRC=pathlib.Path('pinned-skin'); RAW=pathlib.Path('pinned-vis')
 PINS={'male':('36abba2916a5938ecc32a94fb2582101875fe9183ec6a764fc9eeb3df89931c5','4ce29a6ffce21817f92bb2c7df8c27afe630d0dd88e373a05e2ceca591fdcbb8'),'female':('d7c697af0cfab84f536f94e0b51e4385ffd653f0587245fad61c2a962b4f40c7','f4973254fb39f2ff962f429725e66c17a478d7e4110ed556679babb400c7d85e')}
 AXES={'height':'height','fullness':'weight','muscle':'muscle','proportions':'proportions'}
 # Moderate initial bracket, not a production range or clinical measurement.
-AMPL={'height':.25,'fullness':.25,'muscle':.25,'proportions':.25}
+AMPL={'height':.125,'fullness':.25,'muscle':.25,'proportions':.25}
 FACE={'jaw':['chin-width-incr'],'cheeks':['l-cheek-volume-incr','r-cheek-volume-incr'],'nose':['nose-scale-depth-incr'],'mouth':['mouth-scale-horiz-incr'],'eyes':['l-eye-trans-out','r-eye-trans-out']}
 NAMES=[a+'_'+s for a in FACE for s in ('neg','pos')]+['blink','smile','jawopen','neck_neg','neck_pos']
 BODY=[a+'_'+s for a in AXES for s in ('neg','pos')]
@@ -58,14 +58,24 @@ def components(n,t):
 # Actual horizontal mesh section loops. Discard open chains and side loops;
 # report central cross section rather than a guessed clinical circumference.
 def section(v,t,y):
-    tv=v[t];ys=tv[:,:,1]-y;chosen=tv[(ys.min(1)<0)&(ys.max(1)>0)]
-    edges={}
+    # Identify crossings by mesh edge, not rounded floating coordinates:
+    # the same edge interpolated in reverse can land in adjacent rounding bins.
+    # Canonicalize exact coincident seam vertices before joining the loops.
+    _,canonical=np.unique(v,axis=0,return_inverse=True)
+    canonical=canonical.reshape(-1)
+    tv=v[t];ys=tv[:,:,1]-y
+    chosen=t[(ys.min(1)<0)&(ys.max(1)>0)]
+    edges={};points={}
     for f in chosen:
         hits=[]
         for i,k in ((0,1),(1,2),(2,0)):
-            a,b=f[i],f[k]
+            ia,ib=int(f[i]),int(f[k]);a,b=v[ia],v[ib]
             if (a[1]<y)!=(b[1]<y):
-                q=a+(b-a)*((y-a[1])/(b[1]-a[1]));hits.append(tuple(np.round(q[[0,2]],6)))
+                key=tuple(sorted((int(canonical[ia]),int(canonical[ib]))))
+                if key not in points:
+                    q=a.astype(np.float64)+(b.astype(np.float64)-a)*((y-a[1])/(b[1]-a[1]))
+                    points[key]=q[[0,2]]
+                hits.append(key)
         if len(hits)==2 and hits[0]!=hits[1]:
             a,b=hits;edges.setdefault(a,set()).add(b);edges.setdefault(b,set()).add(a)
     pending=set(edges);loops=[]
@@ -75,9 +85,9 @@ def section(v,t,y):
             for a in edges[stack.pop()]:
                 if a not in group:group.add(a);pending.discard(a);stack.append(a)
         if not all(len(edges[a])==2 for a in group):continue
-        x=np.array(list(group));width=float(np.ptp(x[:,0]))
+        x=np.array([points[q] for q in group]);width=float(np.ptp(x[:,0]))
         if x[:,0].min()<0<x[:,0].max():
-            circ=sum(np.linalg.norm(np.array(a)-np.array(b)) for a in group for b in edges[a])/2
+            circ=sum(np.linalg.norm(points[a]-points[b]) for a in group for b in edges[a])/2
             loops.append((float(circ),width,float(np.ptp(x[:,1]))))
     return max(loops,default=(None,None,None),key=lambda q:q[0] if q[0] is not None else -1)
 def measures(v,t):
@@ -126,14 +136,24 @@ def orient(profile,raw_face):
     e,T=min(candidates,key=lambda a:a[0]);assert e<.12,(e,T)
     return T,e,b
 def rigid_head(raw,d,cut,axis):
-    y=raw[:,1];a=smooth((y-(cut-.09))/.09)[:,None]
+    y=raw[:,1];a=smooth((y-(cut-.12))/.12)[:,None]
     trans=np.median(d[y>=cut],axis=0)
     if axis!='height':trans[1]=0
     out=d*(1-a)+trans*a
-    # Floor anchor correction fades before the neck, so face stays rigid.
     ground=(raw+out)[:,1].min()-y.min()
-    out[:,1]-=ground*(1-a[:,0])
+    if axis=='height':
+        # Grounding is a WORLD translation, not an extra neck deformation.
+        # The former fade injected the entire floor displacement into 9 cm
+        # of neck, visibly swallowing/elongating it at the height endpoints.
+        out[:,1]-=ground
+        trans[1]-=ground
+    else:
+        # Preserve vertical head position for non-height fields; distribute
+        # the normally tiny grounding adjustment below the knees only.
+        anchor=1-smooth((y-y.min())/.45)
+        out[:,1]-=ground*anchor
     assert np.max(np.abs(out[y>=cut]-trans))<1e-6
+    assert abs(float((raw+out)[:,1].min()-y.min()))<2e-5
     return out.astype('<f4')
 def map_positions(base,raw,fields):
     # Exact accepted positions identify seam duplicates; reject ambiguous
@@ -260,3 +280,7 @@ for n in ('index.html','lab.js'):shutil.copy2(pathlib.Path(__file__).parent/n,L/
 (L/'states.json').write_text(json.dumps(states,indent=2))
 save()
 print('Generated 162 factorial + 24 seeded mixed samples; inspect report and actual images before acceptance',flush=True)
+# A green generation step must not conceal the severe orientation regression
+# observed in the initial height candidate. Retain the full report/renders.
+assert all(not s['normal_reversal_candidates'] for z in report['sexes'].values() for s in z['samples']), 'Unresolved triangle normal reversal candidates; inspect archived evidence'
+
