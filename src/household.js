@@ -31,6 +31,7 @@ import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychol
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {strictLegacyActor} from './resident-registry.js';
 import {restorePopulation} from './resident-population.js';
+import {dialogueNeedsDecision} from './dialogue-decision.js';
 import {residentIdsForSimulation,savedAdditionalActor,extraReservesFurniture,
   tickAdditionalResidents} from './resident-activity-runtime.js';
 import {reconcileAdditionalSocialGraph,restoreAddressedSocial,
@@ -942,7 +943,7 @@ function advancePainting(root,id,minutes){
 /** A single time step, applied to both actors without doubling the household clock. */
 export function tickHousehold(root,minutes) {
   // A paused or invalid tick must be completely side-effect free, including Mira's fields.
-  if (root.paused || !Number.isFinite(minutes) || minutes<=0) return;
+  if (root.paused || dialogueNeedsDecision(root) || !Number.isFinite(minutes) || minutes<=0) return;
   // Preserve the actual verified TV-use window BEFORE the simulation action
   // expires during this tick. A score itself never grants an unobserved reward.
   const previousSportMinute=root.minutes;
