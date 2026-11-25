@@ -8,6 +8,68 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  of-01-fix:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/of-01-object-lab' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: of-01-object-lab-evidence
+          run-id: 45637220167
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify exact reviewed geometry and render payload
+        run: |
+          python - <<'PY'
+          import pathlib,hashlib,json,shutil
+          p=pathlib.Path('reviewed')
+          selected=sorted(x for x in p.rglob('*') if x.is_file() and (str(x.relative_to(p)).startswith(('lab/','blender/')) or str(x.relative_to(p)) in ['donors/tree/source.json','donors/tree/license.txt','donors/table/source.json']))
+          m={str(x.relative_to(p)):hashlib.sha256(x.read_bytes()).hexdigest() for x in selected}
+          assert len(m)==56
+          assert hashlib.sha256(json.dumps(m,sort_keys=True,separators=(',',':')).encode()).hexdigest()=='9dd2d6f9b3dfc1e23b14f4f03dace2a8f6ca8d4ce96bf36ba937e4d1edcd3731'
+          shutil.copytree(p/'lab',pathlib.Path('artifacts/of-01/lab'))
+          PY
+          node art-review/of-01/verify.mjs
+          cp art-review/of-01/lab.mjs artifacts/of-01/lab/
+      - name: Install pinned browser tools
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1 pngjs@7.0.0
+          npx playwright install --with-deps chromium webkit
+      - name: Existing game placement and persistence regression tests
+        run: node --test tests/furniture-placement-flow.test.js tests/furniture-visible-placement.test.js tests/furniture-shop-integration.test.js tests/furniture-f1b.test.js tests/furniture-f1b-integration.test.js tests/qsk-09-save-safety.test.js
+      - name: Capture headless and headed WebKit under Xvfb
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 &
+          sleep 2
+          set +e
+          timeout 480s env OF_MODE=headless node art-review/of-01/capture.mjs
+          headless=$?
+          timeout 480s env OF_MODE=headed xvfb-run -a node art-review/of-01/capture.mjs
+          headed=$?
+          set -e
+          echo "Capture process exits: headless=$headless headed=$headed"
+          node art-review/of-01/fix-gate.mjs
+          test "$headless" -eq 0
+          test "$headed" -eq 0
+      - name: Archive diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: of-01-fix-evidence
+          path: artifacts/of-01/
+          if-no-files-found: error
+
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
