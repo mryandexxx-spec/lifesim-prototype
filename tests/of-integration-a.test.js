@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {OF_INTERIOR_ENTRIES,ofInteriorSpec} from '../src/of-interior-assets.js';
+import {meshyFurnitureFit,meshyFurnitureDisplaySku,meshyFurnitureUrl,meshyFurnitureThumbnailUrl} from '../src/meshy-furniture-policy.js';
+import {FURNITURE_PRODUCT_BY_ID} from '../src/furniture-products.js';
+test('OF-A: exact 20 approved R2 GLBs, native game coordinates and SKU identity',()=>{assert.equal(OF_INTERIOR_ENTRIES.length,20);for(const e of OF_INTERIOR_ENTRIES){assert.equal(FURNITURE_PRODUCT_BY_ID[e.sku].prefabId,e.prefabId,e.sku);const path=meshyFurnitureUrl(e.sku);const b=readFileSync(path);assert.equal(b.length,e.bytes);assert.equal(createHash('sha256').update(b).digest('hex'),e.sha256,e.sku);assert.equal(b.toString('ascii',0,4),'glTF');assert.equal(b.readUInt32LE(4),2);assert.equal(b.readUInt32LE(8),b.length);assert.equal(meshyFurnitureDisplaySku(e.sku),e.sku);const f=meshyFurnitureFit(e.sku);assert.deepEqual(f.scale,{x:1,y:1,z:1});assert.deepEqual(f.offset,{x:0,y:0,z:0});assert.equal(f.rotationY,0);assert.equal(meshyFurnitureThumbnailUrl(e.sku),'./assets/furniture/of-r2/thumbnails/'+e.sku+'.png');if(e.mount==='floor')assert.ok(Math.abs(e.bounds.min[1])<.02,e.sku);}});
+test('OF-A: tabletop height and overhang/mount anchors retained instead of footprint normalization',()=>{assert.ok(Math.abs(ofInteriorSpec('diningtable.farm').bounds.max[1]-.86)<.002);assert.ok(Math.abs(ofInteriorSpec('diningtable.oval').bounds.max[1]-.855)<.002);assert.ok(ofInteriorSpec('floorlamp.arc').bounds.max[0]>.65);assert.ok(ofInteriorSpec('fanflag.copper-gulls').bounds.min[0]<-.55);const wall=ofInteriorSpec('sconce.leaf');assert.equal(wall.mount,'wall');assert.ok(wall.bounds.min[1]<-.50&&wall.bounds.max[1]>.15);assert.equal(ofInteriorSpec('tree.round'),null);});

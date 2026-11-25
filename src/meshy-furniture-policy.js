@@ -1,3 +1,4 @@
+import {OF_INTERIOR_DIR,ofInteriorSpec,ofInteriorFit} from './of-interior-assets.js';
 import {MESHY_ROOM_V2_ENTRIES} from './meshy-room-v2-data.js';
 import {MESHY_ROOM_V3_ENTRIES} from './meshy-room-v3-data.js';
 /**
@@ -67,11 +68,13 @@ export const MESHY_ROOM_V3_SKUS=Object.freeze(Object.keys(MESHY_ROOM_V3_SPECS));
 
 export function meshyFurnitureSpec(sku){
   if(typeof sku!=='string')return null;
+  if(ofInteriorSpec(sku))return ofInteriorSpec(sku);
   if(Object.hasOwn(MESHY_FURNITURE_SPECS,sku))return MESHY_FURNITURE_SPECS[sku];
   if(Object.hasOwn(MESHY_ROOM_V2_SPECS,sku))return MESHY_ROOM_V2_SPECS[sku];
   return Object.hasOwn(MESHY_ROOM_V3_SPECS,sku)?MESHY_ROOM_V3_SPECS[sku]:null;
 }
 export function meshyFurnitureUrl(sku){
+  if(ofInteriorSpec(sku))return OF_INTERIOR_DIR+sku+'.glb';
   if(!meshyFurnitureSpec(sku))return null;
   if(Object.hasOwn(MESHY_ROOM_V3_SPECS,sku))
     return './assets/furniture/meshy-room-v3/'+sku+'.glb';
@@ -81,6 +84,7 @@ export function meshyFurnitureUrl(sku){
 }
 /** Store thumbnails always use the same actual mesh as 3D placement. */
 export function meshyFurnitureThumbnailUrl(sku){
+  if(ofInteriorSpec(sku))return OF_INTERIOR_DIR+'thumbnails/'+sku+'.png';
   const spec=meshyFurnitureSpec(sku);
   if(!spec)return null;
   if(Object.hasOwn(MESHY_ROOM_V3_SPECS,sku))
@@ -97,6 +101,7 @@ export function meshyFurnitureThumbnailUrl(sku){
  * parent -90deg X pivot maps original Y->horizontal Z, Z->vertical Y.
  */
 export function meshyFurnitureFit(sku){
+  if(ofInteriorSpec(sku))return ofInteriorFit(sku);
   const spec=meshyFurnitureSpec(sku);
   if(!spec)return null;
   const def=FURNITURE_CATALOG[spec.prefabId];
