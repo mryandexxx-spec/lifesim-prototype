@@ -1,0 +1,2083 @@
+{
+  "tree.round": {
+    "old": {
+      "file": "models/tree.round-old.glb",
+      "sha256": "43e19ccd126205c55c294d247ad72d0b873837f5c9883efd74529c398826e47f",
+      "bytes": 36104,
+      "triangles": 1412,
+      "boundsBlender": [
+        [
+          -0.6900001764297485,
+          -0.5940001010894775,
+          0.0
+        ],
+        [
+          0.7400000095367432,
+          0.593999981880188,
+          2.119999885559082
+        ]
+      ],
+      "materials": 4
+    },
+    "new": {
+      "file": "models/tree.round-new.glb",
+      "sha256": "3c7ff238a72c20f0cee054672f244df259b9e4c552cad7f51f14e3689fcb4d06",
+      "bytes": 315996,
+      "triangles": 5152,
+      "boundsBlender": [
+        [
+          -0.6754997372627258,
+          -0.4986583888530731,
+          0.0
+        ],
+        [
+          0.7142906188964844,
+          0.5819490551948547,
+          2.132319450378418
+        ]
+      ],
+      "materials": 3
+    },
+    "lod": {
+      "file": "models/tree.round-lod.glb",
+      "sha256": "aaa252ef8fbf49c20745fcc2cae8a3b7105eb5e41b96866ce12215c0104ac96f",
+      "bytes": 155420,
+      "triangles": 2156,
+      "boundsBlender": [
+        [
+          -0.5690614581108093,
+          -0.365540087223053,
+          0.0
+        ],
+        [
+          0.5731702446937561,
+          0.3543674647808075,
+          2.148005962371826
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "tree.tall": {
+    "old": {
+      "file": "models/tree.tall-old.glb",
+      "sha256": "894af05d747fec40f53871ecbe1f82e06109540665b66b2a5880574719219546",
+      "bytes": 17152,
+      "triangles": 532,
+      "boundsBlender": [
+        [
+          -0.6480002999305725,
+          -0.648000180721283,
+          0.0
+        ],
+        [
+          0.6480000615119934,
+          0.6480000019073486,
+          2.75600004196167
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/tree.tall-new.glb",
+      "sha256": "f8d88b946ffdd25cabc466d994e69b9be56b1486865973236fff6052a1af825c",
+      "bytes": 118984,
+      "triangles": 1672,
+      "boundsBlender": [
+        [
+          -0.4723758101463318,
+          -0.3954876661300659,
+          0.0
+        ],
+        [
+          0.41245269775390625,
+          0.40594547986984253,
+          2.5658679008483887
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "tree.broad": {
+    "old": {
+      "file": "models/tree.broad-old.glb",
+      "sha256": "386f572750387ddc2ee654e2182d52c41e13c397dde244771c13dd2ccd8d4c86",
+      "bytes": 36108,
+      "triangles": 1412,
+      "boundsBlender": [
+        [
+          -0.8100003600120544,
+          -0.8100001811981201,
+          0.0
+        ],
+        [
+          0.8100001215934753,
+          0.8100000023841858,
+          2.3744001388549805
+        ]
+      ],
+      "materials": 4
+    },
+    "new": {
+      "file": "models/tree.broad-new.glb",
+      "sha256": "b6152c7ffc907df823cba6bb31c99bc6b2860e2f7c8dac5ca51d99d06b5ef78d",
+      "bytes": 155424,
+      "triangles": 2156,
+      "boundsBlender": [
+        [
+          -0.7920072674751282,
+          -0.4671098291873932,
+          0.0
+        ],
+        [
+          0.7977587580680847,
+          0.4595523178577423,
+          2.15256929397583
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "shrub.small": {
+    "old": {
+      "file": "models/shrub.small-old.glb",
+      "sha256": "01522ee83be8884b36241e8809a9680883d8d188a58d076e25368a7e4ea37f88",
+      "bytes": 12556,
+      "triangles": 440,
+      "boundsBlender": [
+        [
+          -0.3575001657009125,
+          -0.3575000762939453,
+          0.06000000238418579
+        ],
+        [
+          0.35750001668930054,
+          0.35749998688697815,
+          0.800000011920929
+        ]
+      ],
+      "materials": 1
+    },
+    "new": {
+      "file": "models/shrub.small-new.glb",
+      "sha256": "55a59ec9e1e40b95014d8e8d534fe405957e2afad6693ca269e005ad5eb577fd",
+      "bytes": 118080,
+      "triangles": 1624,
+      "boundsBlender": [
+        [
+          -0.3149316608905792,
+          -0.2725588083267212,
+          0.0037363450974226
+        ],
+        [
+          0.31293386220932007,
+          0.311882346868515,
+          0.5219689011573792
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "shrub.flowering": {
+    "old": {
+      "file": "models/shrub.flowering-old.glb",
+      "sha256": "5d09299c44da77272475f89da117bc805c6f3fadfea6f646c284dd068338f036",
+      "bytes": 47424,
+      "triangles": 1760,
+      "boundsBlender": [
+        [
+          -0.4400002062320709,
+          -0.44000011682510376,
+          0.06000000238418579
+        ],
+        [
+          0.440000057220459,
+          0.4399999976158142,
+          0.8449999690055847
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/shrub.flowering-new.glb",
+      "sha256": "d5b5e847f52d2002902aece4b009c197ee9e6016412a2392f12201874b7a9fcd",
+      "bytes": 203576,
+      "triangles": 3224,
+      "boundsBlender": [
+        [
+          -0.4118750989437103,
+          -0.3573267161846161,
+          0.013830093666911125
+        ],
+        [
+          0.409379780292511,
+          0.40829822421073914,
+          0.68995201587677
+        ]
+      ],
+      "materials": 5
+    }
+  },
+  "shrub.broad": {
+    "old": {
+      "file": "models/shrub.broad-old.glb",
+      "sha256": "1e22d145129afaa6d81b913c791e0119d39704db62d0239a5bc37a81b2026df0",
+      "bytes": 22032,
+      "triangles": 880,
+      "boundsBlender": [
+        [
+          -0.5500002503395081,
+          -0.5500001311302185,
+          0.06000000238418579
+        ],
+        [
+          0.690000057220459,
+          0.550000011920929,
+          0.800000011920929
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/shrub.broad-new.glb",
+      "sha256": "b6ec7100fa40acf71781752a3eca302e1cb82565aa8acf86fedcf2340b368812",
+      "bytes": 118084,
+      "triangles": 1624,
+      "boundsBlender": [
+        [
+          -0.4991242289543152,
+          -0.43361783027648926,
+          0.008486343547701836
+        ],
+        [
+          0.49618110060691833,
+          0.49507254362106323,
+          0.5998188853263855
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "flower.daisy": {
+    "old": {
+      "file": "models/flower.daisy-old.glb",
+      "sha256": "375d72d43ba90f258c41ade7adfc98e593b4e15150503962595771094b1f0889",
+      "bytes": 73964,
+      "triangles": 2916,
+      "boundsBlender": [
+        [
+          -0.24000003933906555,
+          -0.27000001072883606,
+          0.0
+        ],
+        [
+          0.25,
+          0.19999998807907104,
+          0.5099999904632568
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/flower.daisy-new.glb",
+      "sha256": "3fbb2e3588a464920a8bb373918db752dc2c2ba8fb51dfe03ddcc1c1ed996a28",
+      "bytes": 96900,
+      "triangles": 1600,
+      "boundsBlender": [
+        [
+          -0.20575881004333496,
+          -0.2457588165998459,
+          -0.0011104368604719639
+        ],
+        [
+          0.20575881004333496,
+          0.22575880587100983,
+          0.46584171056747437
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "flower.tulip": {
+    "old": {
+      "file": "models/flower.tulip-old.glb",
+      "sha256": "082f54faf1b3882ebc29c44d2c6d6138fefda7c95b667b0cfc073b07f0ec80cc",
+      "bytes": 47140,
+      "triangles": 1596,
+      "boundsBlender": [
+        [
+          -0.24000003933906555,
+          -0.27000001072883606,
+          0.0
+        ],
+        [
+          0.25,
+          0.19999998807907104,
+          0.4649999737739563
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/flower.tulip-new.glb",
+      "sha256": "58330a7abbe73dcdb9a55ee1e6fa5f5b28524d459a600bc61b369ca4418cd6f2",
+      "bytes": 78600,
+      "triangles": 1888,
+      "boundsBlender": [
+        [
+          -0.1855982542037964,
+          -0.23729027807712555,
+          -0.0011104368604719639
+        ],
+        [
+          0.1952691525220871,
+          0.20990265905857086,
+          0.5248416662216187
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "flower.lavender": {
+    "old": {
+      "file": "models/flower.lavender-old.glb",
+      "sha256": "274f1b936070d61a10f38c8c50ae379370c7b816c4e969cc2c40b0cf7176a12a",
+      "bytes": 47140,
+      "triangles": 1596,
+      "boundsBlender": [
+        [
+          -0.24000003933906555,
+          -0.27000001072883606,
+          0.0
+        ],
+        [
+          0.25,
+          0.19999998807907104,
+          0.4649999737739563
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/flower.lavender-new.glb",
+      "sha256": "aaefeded413ee08f670244537a8763a402e9ecfec0fc12a654c4326b10007ed3",
+      "bytes": 77384,
+      "triangles": 1856,
+      "boundsBlender": [
+        [
+          -0.1826784610748291,
+          -0.23729027807712555,
+          -0.0011104368604719639
+        ],
+        [
+          0.1952691525220871,
+          0.20568497478961945,
+          0.5248417258262634
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "garden.flower.calendula": {
+    "old": {
+      "file": "models/garden.flower.calendula-old.glb",
+      "sha256": "e6140283cd82fc560fcb728d2992980fc9d005dee1566b377f96c41f574520b6",
+      "bytes": 204044,
+      "triangles": 7432,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          1.1649999618530273
+        ]
+      ],
+      "materials": 7
+    },
+    "new": {
+      "file": "models/garden.flower.calendula-new.glb",
+      "sha256": "34a9d9df76d507c8340b9748a63373a4859e29ea592ed7220b9d17fa18fd3991",
+      "bytes": 162976,
+      "triangles": 2588,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.9658416509628296
+        ]
+      ],
+      "materials": 7
+    },
+    "seed": {
+      "file": "models/garden.flower.calendula-seed.glb",
+      "sha256": "d85789e40ecd890ee67f330f8fcd4266a3e425c1effd56fd747e9fb901e244f9",
+      "bytes": 38892,
+      "triangles": 860,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.27250000834465027
+        ]
+      ],
+      "materials": 4
+    },
+    "sprout": {
+      "file": "models/garden.flower.calendula-sprout.glb",
+      "sha256": "c6f1f32e04a63176198f952829f0638f17f1c47bc6f0831f290fa3ebfb339dcd",
+      "bytes": 55964,
+      "triangles": 1052,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.49271807074546814
+        ]
+      ],
+      "materials": 5
+    },
+    "growing": {
+      "file": "models/garden.flower.calendula-growing.glb",
+      "sha256": "d0e0c0cc9b7e711e6b894ad7d1b6f1825a941abb61511dd590bad10c340e5da7",
+      "bytes": 80736,
+      "triangles": 1340,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.781178891658783
+        ]
+      ],
+      "materials": 5
+    },
+    "wet": {
+      "file": "models/garden.flower.calendula-wet.glb",
+      "sha256": "b0e5fcfb34a0276b3280901039f4701b4f52e1a34ad3c66b5f16ce12b42dbdf7",
+      "bytes": 162972,
+      "triangles": 2588,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.9658416509628296
+        ]
+      ],
+      "materials": 7
+    }
+  },
+  "garden.flower.cornflower": {
+    "old": {
+      "file": "models/garden.flower.cornflower-old.glb",
+      "sha256": "14a022b4397287942ad009f87ddd81442cde8599f090577ef6f1c18e04565ed9",
+      "bytes": 193348,
+      "triangles": 7432,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          1.1649999618530273
+        ]
+      ],
+      "materials": 7
+    },
+    "new": {
+      "file": "models/garden.flower.cornflower-new.glb",
+      "sha256": "7a5ecd732800411104a6dc1e5a96dd0b0d23289be3f1db16f731ad5169593bfe",
+      "bytes": 140960,
+      "triangles": 2332,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.9658416509628296
+        ]
+      ],
+      "materials": 7
+    },
+    "seed": {
+      "file": "models/garden.flower.cornflower-seed.glb",
+      "sha256": "cfaf2a8b5a180fbc147a18403e588b1f07a90a162189de402fba7d02e96b2c0b",
+      "bytes": 38892,
+      "triangles": 860,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.27250000834465027
+        ]
+      ],
+      "materials": 4
+    },
+    "sprout": {
+      "file": "models/garden.flower.cornflower-sprout.glb",
+      "sha256": "a83398eb332076dfdfb642da92f50fbf2153817bb925cbb6ddd52e0d4bc15ba9",
+      "bytes": 55964,
+      "triangles": 1052,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.49271807074546814
+        ]
+      ],
+      "materials": 5
+    },
+    "growing": {
+      "file": "models/garden.flower.cornflower-growing.glb",
+      "sha256": "475cce5d888608b407a4e5eb90b1ff51219d74263770ebffedc7a4858376cdbf",
+      "bytes": 80736,
+      "triangles": 1340,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.781178891658783
+        ]
+      ],
+      "materials": 5
+    },
+    "wet": {
+      "file": "models/garden.flower.cornflower-wet.glb",
+      "sha256": "ce84da57e8d36ec1a867c50df20206bd2a1108bd44662e2feeca5e75b9b52bb6",
+      "bytes": 140956,
+      "triangles": 2332,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.9658416509628296
+        ]
+      ],
+      "materials": 7
+    }
+  },
+  "garden.herb.mint": {
+    "old": {
+      "file": "models/garden.herb.mint-old.glb",
+      "sha256": "d973391b17f5cb877cef8b369720bf51844eed78128cb9af3ce42ba3e7c94f99",
+      "bytes": 156892,
+      "triangles": 5672,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          1.1399999856948853
+        ]
+      ],
+      "materials": 5
+    },
+    "new": {
+      "file": "models/garden.herb.mint-new.glb",
+      "sha256": "a5394ec12b86650e5ce5fbdfd3d401ae0efcb58a9dd4a2167b027af8daacf24f",
+      "bytes": 116516,
+      "triangles": 1756,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.969841718673706
+        ]
+      ],
+      "materials": 5
+    },
+    "seed": {
+      "file": "models/garden.herb.mint-seed.glb",
+      "sha256": "a35fb54472926e6bd486b939584400603ccf0b5b47e73ba67064e9ff5e37a2f0",
+      "bytes": 38892,
+      "triangles": 860,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.27250000834465027
+        ]
+      ],
+      "materials": 4
+    },
+    "sprout": {
+      "file": "models/garden.herb.mint-sprout.glb",
+      "sha256": "d72fa7ea5181d87220135e252b0e935f511074c1e9d49baeb99790815987b370",
+      "bytes": 55968,
+      "triangles": 1052,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.49271807074546814
+        ]
+      ],
+      "materials": 5
+    },
+    "growing": {
+      "file": "models/garden.herb.mint-growing.glb",
+      "sha256": "ef875d3f5d1a3c70aa777edd2124fbd83a24aedd24d9e1c07ed34ab5bb54d6e7",
+      "bytes": 105508,
+      "triangles": 1628,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.781178891658783
+        ]
+      ],
+      "materials": 5
+    },
+    "wet": {
+      "file": "models/garden.herb.mint-wet.glb",
+      "sha256": "1da8eb6a111b0716d2b4cfabf4e6bba7b131f35354f296bfd04f5e3479895dbb",
+      "bytes": 116512,
+      "triangles": 1756,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.969841718673706
+        ]
+      ],
+      "materials": 5
+    },
+    "harvested": {
+      "file": "models/garden.herb.mint-harvested.glb",
+      "sha256": "ef54e441853c49cbe9b588f4030fde3cc788b80a2f199ae783199523f29c5419",
+      "bytes": 72480,
+      "triangles": 1244,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.6716799139976501
+        ]
+      ],
+      "materials": 5
+    }
+  },
+  "garden.herb.melissa": {
+    "old": {
+      "file": "models/garden.herb.melissa-old.glb",
+      "sha256": "bdca3358f414d3d48561cc5c78ada146159447748f8efa583ba8aca147967270",
+      "bytes": 156892,
+      "triangles": 5672,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          1.1399999856948853
+        ]
+      ],
+      "materials": 5
+    },
+    "new": {
+      "file": "models/garden.herb.melissa-new.glb",
+      "sha256": "feecb44c58edc6712b167042d0cc9a93f8092d6063ef08bdb45701ba77ccffed",
+      "bytes": 116516,
+      "triangles": 1756,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.969841718673706
+        ]
+      ],
+      "materials": 5
+    },
+    "seed": {
+      "file": "models/garden.herb.melissa-seed.glb",
+      "sha256": "7e25da43ed24b16dacdd394b1d44d632246fca5bf646e7f02558c48c8bb48387",
+      "bytes": 38892,
+      "triangles": 860,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.27250000834465027
+        ]
+      ],
+      "materials": 4
+    },
+    "sprout": {
+      "file": "models/garden.herb.melissa-sprout.glb",
+      "sha256": "55b5e007ccdf069857ae0f3a5a3b5262af6790a8dbf002c56c6e8ecf1a842701",
+      "bytes": 55968,
+      "triangles": 1052,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.49271807074546814
+        ]
+      ],
+      "materials": 5
+    },
+    "growing": {
+      "file": "models/garden.herb.melissa-growing.glb",
+      "sha256": "9e0ac77d9613440c7166bdbe77a7387faad707bc46db9029c64927fdc0b1c84b",
+      "bytes": 105508,
+      "triangles": 1628,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.781178891658783
+        ]
+      ],
+      "materials": 5
+    },
+    "wet": {
+      "file": "models/garden.herb.melissa-wet.glb",
+      "sha256": "2910f52cff760b2a75dc04c2a3f9da6f8ec905626317227339eb13f7203c56af",
+      "bytes": 116512,
+      "triangles": 1756,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.969841718673706
+        ]
+      ],
+      "materials": 5
+    },
+    "harvested": {
+      "file": "models/garden.herb.melissa-harvested.glb",
+      "sha256": "4a26857c0bd59cd2dbd14a7f4317846ab541f4e63609e2b56d2d475412603f4f",
+      "bytes": 72480,
+      "triangles": 1244,
+      "boundsBlender": [
+        [
+          -0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          0.5,
+          0.5,
+          0.6716799139976501
+        ]
+      ],
+      "materials": 5
+    }
+  },
+  "garden.bench": {
+    "old": {
+      "file": "models/garden.bench-old.glb",
+      "sha256": "a19b62c022a4759003fc7027e7f05f66452546117a565a98042b2f0c398b5e50",
+      "bytes": 8440,
+      "triangles": 96,
+      "boundsBlender": [
+        [
+          -0.75,
+          -0.3149999976158142,
+          0.0
+        ],
+        [
+          0.75,
+          0.3149999976158142,
+          1.1749999523162842
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/garden.bench-new.glb",
+      "sha256": "eb4407b9e6abc3ad42568f90e3a5d9242845dd7af81fa7f84714aeb4de7cd30b",
+      "bytes": 66344,
+      "triangles": 1592,
+      "boundsBlender": [
+        [
+          -0.75,
+          -0.3149999976158142,
+          0.0
+        ],
+        [
+          0.75,
+          0.3149999976158142,
+          1.1799999475479126
+        ]
+      ],
+      "materials": 2
+    }
+  },
+  "garden.table": {
+    "old": {
+      "file": "models/garden.table-old.glb",
+      "sha256": "3d31635ffae9133d363ba234ac56709f043a13768dd1b9050d7296f6dbbedeb1",
+      "bytes": 12864,
+      "triangles": 232,
+      "boundsBlender": [
+        [
+          -0.5299999713897705,
+          -0.5299999713897705,
+          0.030000001192092896
+        ],
+        [
+          0.5299999713897705,
+          0.5299999713897705,
+          0.9150000214576721
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/garden.table-new.glb",
+      "sha256": "2d594a6fd0c2640d423cc5b702384dbfe1c6c6e224aca4a95822d968651144d1",
+      "bytes": 33264,
+      "triangles": 1080,
+      "boundsBlender": [
+        [
+          -0.5299999713897705,
+          -0.5299999713897705,
+          0.015420431271195412
+        ],
+        [
+          0.5299999713897705,
+          0.5299999713897705,
+          0.9150000214576721
+        ]
+      ],
+      "materials": 2
+    }
+  },
+  "garden.grill": {
+    "old": {
+      "file": "models/garden.grill-old.glb",
+      "sha256": "589a71435846f364d9dda8199918055c42395dad4859c379dd700f5f7c549f31",
+      "bytes": 101264,
+      "triangles": 3256,
+      "boundsBlender": [
+        [
+          -0.6100000143051147,
+          -0.4099999964237213,
+          0.0
+        ],
+        [
+          0.75,
+          0.4099999964237213,
+          1.0555000305175781
+        ]
+      ],
+      "materials": 4
+    },
+    "new": {
+      "file": "models/garden.grill-new.glb",
+      "sha256": "c8131547df8ced619ddc3e19540765270b22559150d5bdc533acfa9858965dd0",
+      "bytes": 96200,
+      "triangles": 2128,
+      "boundsBlender": [
+        [
+          -0.6100000143051147,
+          -0.4099999964237213,
+          0.0
+        ],
+        [
+          0.7893686890602112,
+          0.4099999964237213,
+          1.0555000305175781
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "light.path": {
+    "old": {
+      "file": "models/light.path-old.glb",
+      "sha256": "5910cb6872fda9fcd7ba18f1d707945875dcf94b373405d6626642a08d92044e",
+      "bytes": 19768,
+      "triangles": 556,
+      "boundsBlender": [
+        [
+          -0.19499999284744263,
+          -0.19499999284744263,
+          0.0
+        ],
+        [
+          0.19499999284744263,
+          0.19499999284744263,
+          1.375
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/light.path-new.glb",
+      "sha256": "90c7413f1a3acf96cba96a28b446a195b96f69b83b4b275dd2cc58f6ce19d788",
+      "bytes": 48572,
+      "triangles": 1312,
+      "boundsBlender": [
+        [
+          -0.23119999468326569,
+          -0.23119999468326569,
+          0.0
+        ],
+        [
+          0.23119999468326569,
+          0.23119999468326569,
+          1.4850000143051147
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "light.standing": {
+    "old": {
+      "file": "models/light.standing-old.glb",
+      "sha256": "2bd580e889e93ca13c2f9582a002cdf19b19290befd0f64cc069bf9ce6163861",
+      "bytes": 19744,
+      "triangles": 556,
+      "boundsBlender": [
+        [
+          -0.2549999952316284,
+          -0.2549999952316284,
+          0.0
+        ],
+        [
+          0.2549999952316284,
+          0.2549999952316284,
+          2.6649999618530273
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/light.standing-new.glb",
+      "sha256": "4493232feb97bd7f7edc9e0c0b85c525aaaf811ac387a632f19b56c44058c0bb",
+      "bytes": 49312,
+      "triangles": 1312,
+      "boundsBlender": [
+        [
+          -0.2924000024795532,
+          -0.2924000024795532,
+          0.0
+        ],
+        [
+          0.2924000024795532,
+          0.2924000024795532,
+          2.7750000953674316
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "fence.wood": {
+    "old": {
+      "file": "models/fence.wood-old.glb",
+      "sha256": "ea1f4a3af2bb92dc04940e211d1db09f635046b787f9dd69121e8db5481a9c63",
+      "bytes": 5236,
+      "triangles": 48,
+      "boundsBlender": [
+        [
+          -0.2549999952316284,
+          -0.05000000074505806,
+          0.0
+        ],
+        [
+          0.2549999952316284,
+          0.05000000074505806,
+          0.8799999952316284
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/fence.wood-new.glb",
+      "sha256": "e50c6a2b94d7efcd5d8c012e15f8b9b362440d7e100d0e296d4fac0aa0a87fbe",
+      "bytes": 30280,
+      "triangles": 648,
+      "boundsBlender": [
+        [
+          -0.2549999952316284,
+          -0.057500001043081284,
+          0.0
+        ],
+        [
+          0.2549999952316284,
+          0.057500001043081284,
+          0.8974999785423279
+        ]
+      ],
+      "materials": 2
+    }
+  },
+  "hedge.short": {
+    "old": {
+      "file": "models/hedge.short-old.glb",
+      "sha256": "753302d14b953b4fc23639483b2176ac84db9ac8c7ea07ed9519931049708f18",
+      "bytes": 36952,
+      "triangles": 1332,
+      "boundsBlender": [
+        [
+          -0.3250000774860382,
+          -0.22000005841255188,
+          0.12999999523162842
+        ],
+        [
+          0.35500001907348633,
+          0.2199999988079071,
+          0.8650000095367432
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/hedge.short-new.glb",
+      "sha256": "1fc869007b254a4639eaa8064b9b1fd40726fb96f4be681789819707fb432b92",
+      "bytes": 107080,
+      "triangles": 1560,
+      "boundsBlender": [
+        [
+          -0.2656571567058563,
+          -0.20679208636283875,
+          0.018139388412237167
+        ],
+        [
+          0.26510119438171387,
+          0.1894395351409912,
+          0.8338212370872498
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "diningtable.farm": {
+    "old": {
+      "file": "models/diningtable.farm-old.glb",
+      "sha256": "917f46d02dcebfd756d4cfc566f63e6f19f47a9b0153a42f1e8665da5849b54c",
+      "bytes": 8860,
+      "triangles": 96,
+      "boundsBlender": [
+        [
+          -1.0499999523162842,
+          -0.625,
+          0.015000015497207642
+        ],
+        [
+          1.0499999523162842,
+          0.625,
+          0.8600000143051147
+        ]
+      ],
+      "materials": 2
+    },
+    "new": {
+      "file": "models/diningtable.farm-new.glb",
+      "sha256": "7a2910b7a0e6d7bfc2765b4edd98d42aa7482543d7e125fa9e89299c8422f645",
+      "bytes": 114716,
+      "triangles": 2336,
+      "boundsBlender": [
+        [
+          -1.0499999523162842,
+          -0.6234999895095825,
+          0.0
+        ],
+        [
+          1.0499999523162842,
+          0.6234999895095825,
+          0.8600000143051147
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "diningtable.oval": {
+    "old": {
+      "file": "models/diningtable.oval-old.glb",
+      "sha256": "0fd3c7f4e70c69e43dba3154dea9dbb15e77e5870193188175485a05040b2142",
+      "bytes": 10584,
+      "triangles": 196,
+      "boundsBlender": [
+        [
+          -1.059999942779541,
+          -0.625,
+          0.03500000387430191
+        ],
+        [
+          1.059999942779541,
+          0.625,
+          0.8550000190734863
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/diningtable.oval-new.glb",
+      "sha256": "c62d80e446707fec81d5374762c8d7013a8ff30a96f1758cf56527b429da2fdc",
+      "bytes": 66380,
+      "triangles": 2196,
+      "boundsBlender": [
+        [
+          -1.059999942779541,
+          -0.625,
+          0.0
+        ],
+        [
+          1.059999942779541,
+          0.625,
+          0.8550000190734863
+        ]
+      ],
+      "materials": 2
+    }
+  },
+  "floorlamp.arc": {
+    "old": {
+      "file": "models/floorlamp.arc-old.glb",
+      "sha256": "744d15c9a4ef5374096954d18e380927c3ffe0fb2d1233796d1ce4602eb0d023",
+      "bytes": 25652,
+      "triangles": 728,
+      "boundsBlender": [
+        [
+          -0.2549999952316284,
+          -0.24500000476837158,
+          0.004999995231628418
+        ],
+        [
+          0.6800000071525574,
+          0.24500000476837158,
+          1.6913689374923706
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/floorlamp.arc-new.glb",
+      "sha256": "dfe59954c6ee8621d318663968acd638525a79ebeb625936a8fd461921511114",
+      "bytes": 51336,
+      "triangles": 2008,
+      "boundsBlender": [
+        [
+          -0.2549999952316284,
+          -0.2549999952316284,
+          0.0
+        ],
+        [
+          0.6899999976158142,
+          0.2549999952316284,
+          1.681963324546814
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "sconce.leaf": {
+    "old": {
+      "file": "models/sconce.leaf-old.glb",
+      "sha256": "58a3b188e1257d431b7ca4e0770747dfda988fbef97200f9779671fc211e9e69",
+      "bytes": 25580,
+      "triangles": 904,
+      "boundsBlender": [
+        [
+          -0.2900000810623169,
+          -0.10000000149011612,
+          -0.5199999809265137
+        ],
+        [
+          0.2850000262260437,
+          0.27000001072883606,
+          0.17000000178813934
+        ]
+      ],
+      "materials": 4
+    },
+    "new": {
+      "file": "models/sconce.leaf-new.glb",
+      "sha256": "840c6bf26ba65a6529e433fef3791e4078fc2c68d34cec8057e2137a33f0bebe",
+      "bytes": 38512,
+      "triangles": 1324,
+      "boundsBlender": [
+        [
+          -0.3411877155303955,
+          -0.10000000149011612,
+          -0.5141733884811401
+        ],
+        [
+          0.3411876857280731,
+          0.25,
+          0.17000000178813934
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "dresser.arch": {
+    "old": {
+      "file": "models/dresser.arch-old.glb",
+      "sha256": "48f6b272c8fc1d4187baab22a353c0ceebaddcc66270fef35dcb198abe6a3ec6",
+      "bytes": 37192,
+      "triangles": 1112,
+      "boundsBlender": [
+        [
+          -0.8600000143051147,
+          -0.38999998569488525,
+          0.07999998331069946
+        ],
+        [
+          0.8600000143051147,
+          0.5199999809265137,
+          1.059999942779541
+        ]
+      ],
+      "materials": 4
+    },
+    "new": {
+      "file": "models/dresser.arch-new.glb",
+      "sha256": "27414c4f07224a9205db4bf94c723babda65f8cb205330e2c5e593b6bec80c2b",
+      "bytes": 66932,
+      "triangles": 1760,
+      "boundsBlender": [
+        [
+          -0.8799999952316284,
+          -0.4000000059604645,
+          0.0
+        ],
+        [
+          0.8799999952316284,
+          0.5024999976158142,
+          1.097499966621399
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "mirror.oval": {
+    "old": {
+      "file": "models/mirror.oval-old.glb",
+      "sha256": "d955f565b93c55603acac4ff911f4d15be9a5b212183ed86f18037a356409038",
+      "bytes": 33132,
+      "triangles": 1064,
+      "boundsBlender": [
+        [
+          -0.3900001645088196,
+          -0.2199999988079071,
+          0.010000001639127731
+        ],
+        [
+          0.39000004529953003,
+          0.2199999988079071,
+          2.049999952316284
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/mirror.oval-new.glb",
+      "sha256": "99483111c4f7ec136937386b9b4fc3fdc2a45d1f2e1d2358723af03951d242f5",
+      "bytes": 43644,
+      "triangles": 1536,
+      "boundsBlender": [
+        [
+          -0.3840000033378601,
+          -0.2199999988079071,
+          0.0
+        ],
+        [
+          0.3840000033378601,
+          0.2199999988079071,
+          2.0439999103546143
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "sculpture.balance": {
+    "old": {
+      "file": "models/sculpture.balance-old.glb",
+      "sha256": "26ef97a8a201b1e34a2e8009531da49b850957ee820f1ac090a41a189c518c82",
+      "bytes": 28436,
+      "triangles": 984,
+      "boundsBlender": [
+        [
+          -0.455000102519989,
+          -0.33500006794929504,
+          0.005000010132789612
+        ],
+        [
+          0.3450000286102295,
+          0.33000001311302185,
+          1.434999942779541
+        ]
+      ],
+      "materials": 4
+    },
+    "new": {
+      "file": "models/sculpture.balance-new.glb",
+      "sha256": "37a2b6f86b07d6b55a54807fb061029304a56328469b553b4778a357a63def58",
+      "bytes": 60128,
+      "triangles": 2292,
+      "boundsBlender": [
+        [
+          -0.419999897480011,
+          -0.33000001311302185,
+          0.0
+        ],
+        [
+          0.3799999952316284,
+          0.33000001311302185,
+          1.4900000095367432
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "sculpture.spire": {
+    "old": {
+      "file": "models/sculpture.spire-old.glb",
+      "sha256": "09209a630ee0cb54e54c42d560ab399d5300e4b0e44a033ae07bb0360b9a86b7",
+      "bytes": 19780,
+      "triangles": 556,
+      "boundsBlender": [
+        [
+          -0.3793494999408722,
+          -0.3149999976158142,
+          0.0
+        ],
+        [
+          0.43955081701278687,
+          0.3149999976158142,
+          1.8100000619888306
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/sculpture.spire-new.glb",
+      "sha256": "2b3ee29e6079965d03cb73cd94fbd39bbb551f02749a29e1c3b35f563f889910",
+      "bytes": 29832,
+      "triangles": 1148,
+      "boundsBlender": [
+        [
+          -0.32889777421951294,
+          -0.377188116312027,
+          0.0
+        ],
+        [
+          0.3615994155406952,
+          0.377188116312027,
+          1.8100000619888306
+        ]
+      ],
+      "materials": 3
+    }
+  },
+  "fanflag.copper-gulls": {
+    "old": {
+      "file": "models/fanflag.copper-gulls-old.glb",
+      "sha256": "8a9a1e75b2bba437d49bf0b64e24ebe83804a10b596eafe4f71e2cf0d65255e4",
+      "bytes": 18376,
+      "triangles": 336,
+      "boundsBlender": [
+        [
+          -0.5199999809265137,
+          -0.20999999344348907,
+          0.0
+        ],
+        [
+          0.20999999344348907,
+          0.20999999344348907,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanflag.copper-gulls-new.glb",
+      "sha256": "fc3ec35e931a3e0d7eb8acbb314de08ce2623686822567ebdeccec0852537df1",
+      "bytes": 24184,
+      "triangles": 756,
+      "boundsBlender": [
+        [
+          -0.5811485648155212,
+          -0.2199999988079071,
+          0.0
+        ],
+        [
+          0.2199999988079071,
+          0.2199999988079071,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanflag.forest-lanterns": {
+    "old": {
+      "file": "models/fanflag.forest-lanterns-old.glb",
+      "sha256": "236679286d3b214d07d9b0b3362bb14859b79694de7b183551aca19074574e7b",
+      "bytes": 19216,
+      "triangles": 348,
+      "boundsBlender": [
+        [
+          -0.5199999809265137,
+          -0.20999999344348907,
+          0.0
+        ],
+        [
+          0.20999999344348907,
+          0.20999999344348907,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanflag.forest-lanterns-new.glb",
+      "sha256": "3cc714f9c669531dbf4233cef31564cb709d95bf65fe18e61f5e515d776703ad",
+      "bytes": 24580,
+      "triangles": 756,
+      "boundsBlender": [
+        [
+          -0.5811485648155212,
+          -0.2199999988079071,
+          0.0
+        ],
+        [
+          0.2199999988079071,
+          0.2199999988079071,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanflag.sapphire-sparks": {
+    "old": {
+      "file": "models/fanflag.sapphire-sparks-old.glb",
+      "sha256": "d999486a69bfd0019308ce8f248956284939013ae2be59d930df77118970f12b",
+      "bytes": 20056,
+      "triangles": 360,
+      "boundsBlender": [
+        [
+          -0.5199999809265137,
+          -0.20999999344348907,
+          0.0
+        ],
+        [
+          0.20999999344348907,
+          0.20999999344348907,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanflag.sapphire-sparks-new.glb",
+      "sha256": "203cfb68601894b0a65f1847c4ae9870c187b04044aeeeca236b48ec90f6b737",
+      "bytes": 24960,
+      "triangles": 756,
+      "boundsBlender": [
+        [
+          -0.5811485648155212,
+          -0.2199999988079071,
+          0.0
+        ],
+        [
+          0.2199999988079071,
+          0.2199999988079071,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanflag.amber-pier": {
+    "old": {
+      "file": "models/fanflag.amber-pier-old.glb",
+      "sha256": "60c14e3be7ce7d6fd9f83b96a284bdc8cb24ac95c4bf9bdfcc68a99b7f17050c",
+      "bytes": 20896,
+      "triangles": 372,
+      "boundsBlender": [
+        [
+          -0.5199999809265137,
+          -0.20999999344348907,
+          0.0
+        ],
+        [
+          0.20999999344348907,
+          0.20999999344348907,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanflag.amber-pier-new.glb",
+      "sha256": "a334b71d7772305de40cc571b38e1af726e22c2c12cc8f82461b22cfcfe569c5",
+      "bytes": 24956,
+      "triangles": 756,
+      "boundsBlender": [
+        [
+          -0.5811485648155212,
+          -0.2199999988079071,
+          0.0
+        ],
+        [
+          0.2199999988079071,
+          0.2199999988079071,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanflag.moon-foxes": {
+    "old": {
+      "file": "models/fanflag.moon-foxes-old.glb",
+      "sha256": "c2a6b49b4d4ec6181c6e88ccbe38cf0f7fd3e7d2c477a37d14a103e4c663e13b",
+      "bytes": 21736,
+      "triangles": 384,
+      "boundsBlender": [
+        [
+          -0.5199999809265137,
+          -0.20999999344348907,
+          0.0
+        ],
+        [
+          0.23100000619888306,
+          0.20999999344348907,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanflag.moon-foxes-new.glb",
+      "sha256": "55ceb70ff8162aa5914b796fa027ab448499e731bc039f0f6ed5adf5cf8d36f9",
+      "bytes": 25276,
+      "triangles": 756,
+      "boundsBlender": [
+        [
+          -0.5811485648155212,
+          -0.2199999988079071,
+          0.0
+        ],
+        [
+          0.2199999988079071,
+          0.2199999988079071,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanflag.steppe-sails": {
+    "old": {
+      "file": "models/fanflag.steppe-sails-old.glb",
+      "sha256": "cb3ed674d7dad2847d67632083c2fe75d1516b0da5fc38c785487f5d978cd4cd",
+      "bytes": 22580,
+      "triangles": 396,
+      "boundsBlender": [
+        [
+          -0.5199999809265137,
+          -0.20999999344348907,
+          0.0
+        ],
+        [
+          0.31599998474121094,
+          0.20999999344348907,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanflag.steppe-sails-new.glb",
+      "sha256": "651268613d1e58957d5f7fa3752ef73012ab49ccfda58cb74ad18e8e77955140",
+      "bytes": 25596,
+      "triangles": 756,
+      "boundsBlender": [
+        [
+          -0.5811485648155212,
+          -0.2199999988079071,
+          0.0
+        ],
+        [
+          0.2199999988079071,
+          0.2199999988079071,
+          1.8350000381469727
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanstand.copper-gulls": {
+    "old": {
+      "file": "models/fanstand.copper-gulls-old.glb",
+      "sha256": "5fdefd020a148f7d2373f45caf41c1bba5a0470da19d1e819d04223dba610c13",
+      "bytes": 31608,
+      "triangles": 964,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanstand.copper-gulls-new.glb",
+      "sha256": "61bfd6882d75c4edf5b1d3443c75bf1f718b04727fd077677b624acf73f449ee",
+      "bytes": 39204,
+      "triangles": 904,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanstand.forest-lanterns": {
+    "old": {
+      "file": "models/fanstand.forest-lanterns-old.glb",
+      "sha256": "b55fedf5e0e7f060b373c63b1e261eb19fdcd285a0602ebcc81502cd3a7d11f0",
+      "bytes": 42916,
+      "triangles": 1404,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanstand.forest-lanterns-new.glb",
+      "sha256": "45d36cedef8d350cb66986fb3a3a0fdfdd0b7966fec0eb4d031ddd66237c44be",
+      "bytes": 42784,
+      "triangles": 1024,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanstand.sapphire-sparks": {
+    "old": {
+      "file": "models/fanstand.sapphire-sparks-old.glb",
+      "sha256": "9b557fe9001a380ac329bf8a6361dd2ae9d219c79c2953d5fbd67383045578bb",
+      "bytes": 54228,
+      "triangles": 1844,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanstand.sapphire-sparks-new.glb",
+      "sha256": "435b46784b7d210d07c1879971333ac7ab0c52d186955aa4f22160873b02aaf9",
+      "bytes": 46356,
+      "triangles": 1144,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanstand.amber-pier": {
+    "old": {
+      "file": "models/fanstand.amber-pier-old.glb",
+      "sha256": "447591666b7168bfcec98cd41451c81dcafecdaaeef47d0fbd2b040bf13e5577",
+      "bytes": 65544,
+      "triangles": 2284,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanstand.amber-pier-new.glb",
+      "sha256": "6ce80180acd3864c3f50cc21946fb5786f418934c95a31002ec3263748003b70",
+      "bytes": 49920,
+      "triangles": 1264,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanstand.moon-foxes": {
+    "old": {
+      "file": "models/fanstand.moon-foxes-old.glb",
+      "sha256": "5802d26af922c95f292f648a061c8b10c93952a2acfe739cfed20f83229f5875",
+      "bytes": 76856,
+      "triangles": 2724,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanstand.moon-foxes-new.glb",
+      "sha256": "df95c81da885cde7b8b2fdc62d08cb35e5fce542c7547456df9c3860eaed4e20",
+      "bytes": 53476,
+      "triangles": 1384,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "fanstand.steppe-sails": {
+    "old": {
+      "file": "models/fanstand.steppe-sails-old.glb",
+      "sha256": "d1330997682e77d8cea15df6cef6e6559e7bbc5a0cc5419e7c6d887aa89bf5ac",
+      "bytes": 88172,
+      "triangles": 3164,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/fanstand.steppe-sails-new.glb",
+      "sha256": "717856de7b167f607200dd0c7c6a66183337a6d2bd4e5b116fa6b632b52a8e33",
+      "bytes": 57056,
+      "triangles": 1504,
+      "boundsBlender": [
+        [
+          -0.45500001311302185,
+          -0.2849999964237213,
+          0.0
+        ],
+        [
+          0.45500001311302185,
+          0.3399999737739563,
+          1.6999999284744263
+        ]
+      ],
+      "materials": 4
+    }
+  },
+  "pool.ladder": {
+    "old": {
+      "file": "models/pool.ladder-old.glb",
+      "sha256": "12b0be3fddbdbc7b990e1a25078b32b28d45516a864fb935ecca28e335e620ee",
+      "bytes": 12164,
+      "triangles": 156,
+      "boundsBlender": [
+        [
+          -0.23250000178813934,
+          -0.18000000715255737,
+          -0.8100000619888306
+        ],
+        [
+          0.23250000178813934,
+          0.15449999272823334,
+          0.5174999833106995
+        ]
+      ],
+      "materials": 1
+    },
+    "new": {
+      "file": "models/pool.ladder-new.glb",
+      "sha256": "2e7ecddd47e746964eb2954df45285caccecf54afd37f43476b6530f2853af21",
+      "bytes": 99088,
+      "triangles": 2824,
+      "boundsBlender": [
+        [
+          -0.23250000178813934,
+          -0.18691934645175934,
+          -0.8100000023841858
+        ],
+        [
+          0.23250000178813934,
+          0.15449999272823334,
+          0.5442253947257996
+        ]
+      ],
+      "materials": 2
+    }
+  },
+  "pool.steps": {
+    "old": {
+      "file": "models/pool.steps-old.glb",
+      "sha256": "7c6c5e27e9d7307bb4975c990adb6c5cb90d328e4bed8c5615d94d1e0a80783a",
+      "bytes": 3752,
+      "triangles": 36,
+      "boundsBlender": [
+        [
+          -0.23499999940395355,
+          -0.5929999947547913,
+          -1.2000000476837158
+        ],
+        [
+          0.23499999940395355,
+          0.012999996542930603,
+          -0.04000002145767212
+        ]
+      ],
+      "materials": 1
+    },
+    "new": {
+      "file": "models/pool.steps-new.glb",
+      "sha256": "392aa92e1263df840dc5a9b9e7f89c0e4b00c999c5aa182b83d6d32cecc6909c",
+      "bytes": 61000,
+      "triangles": 1296,
+      "boundsBlender": [
+        [
+          -0.23499999940395355,
+          -0.5929999947547913,
+          -1.2000000476837158
+        ],
+        [
+          0.23499999940395355,
+          0.012999996542930603,
+          -0.035999998450279236
+        ]
+      ],
+      "materials": 2
+    }
+  },
+  "pool.board": {
+    "old": {
+      "file": "models/pool.board-old.glb",
+      "sha256": "9a8de07a1e4ed1aa9a457e7971ee11185f705a1b637a55749184bbc475982e3a",
+      "bytes": 6220,
+      "triangles": 48,
+      "boundsBlender": [
+        [
+          -0.23000000417232513,
+          -0.597000002861023,
+          0.0
+        ],
+        [
+          0.23000000417232513,
+          0.39500001072883606,
+          0.47749999165534973
+        ]
+      ],
+      "materials": 3
+    },
+    "new": {
+      "file": "models/pool.board-new.glb",
+      "sha256": "04155960e172980fb8de491a713a5e08176c4665457d4cad5e4573b5a855b88c",
+      "bytes": 47144,
+      "triangles": 972,
+      "boundsBlender": [
+        [
+          -0.23000000417232513,
+          -0.597000002861023,
+          0.0
+        ],
+        [
+          0.23000000417232513,
+          0.39500001072883606,
+          0.4819999933242798
+        ]
+      ],
+      "materials": 4
+    }
+  }
+}
