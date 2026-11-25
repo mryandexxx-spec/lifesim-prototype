@@ -8,8 +8,8 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-body-c-probe:
-    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-c' && github.event.pull_request.head.repo.full_name == github.repository
+  cf-body-c-reset-probe:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-c-reset' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
@@ -45,20 +45,20 @@ jobs:
           python -m pip install 'anny @ git+https://github.com/naver/anny.git@8f35dc2df1c4062fd2fae86734f9705de50c0c2b' bpy==4.5.0 scipy==1.15.3 pillow==11.3.0 playwright==1.56.0
           python -m playwright install --with-deps chromium webkit
           python -c 'import bpy,torch; assert bpy.app.version==(4,5,0); assert torch.version.cuda is None'
-      - name: Generate actual native body targets and inspect all combinations
+      - name: Generate actual joint phenotype presets and stature comparison
         run: |
-          python -m py_compile art-review/cf-body-c/probe.py art-review/cf-body-c/browser.py
-          python art-review/cf-body-c/probe.py
+          python -m py_compile art-review/cf-body-c-reset/probe.py art-review/cf-body-c-reset/browser.py
+          python art-review/cf-body-c-reset/probe.py
       - name: Real mobile PlayCanvas browser evidence
         run: |
-          node --check body-c-out/lab/lab.js
-          python -m http.server 8765 --bind 127.0.0.1 --directory body-c-out/lab >/tmp/body-c-http.log 2>&1 &
-          xvfb-run -a python art-review/cf-body-c/browser.py
+          node --check body-c-reset-out/lab/lab.js
+          python -m http.server 8765 --bind 127.0.0.1 --directory body-c-reset-out/lab >/tmp/body-c-http.log 2>&1 &
+          xvfb-run -a python art-review/cf-body-c-reset/browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cf-body-c-evidence
-          path: body-c-out/
+          name: cf-body-c-reset-evidence
+          path: body-c-reset-out/
           if-no-files-found: warn
           retention-days: 90
 
