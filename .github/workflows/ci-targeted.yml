@@ -24,7 +24,7 @@ jobs:
         run: |
           python -m pip install bpy==4.5.0
           npm ci
-          npm install --no-save playwright@1.56.1
+          npm install --no-save playwright@1.56.1 pngjs@7.0.0
           npx playwright install --with-deps chromium webkit
       - name: Extract actual catalog baseline and retrieve free CC0 comparison candidates
         run: |
