@@ -1,0 +1,40 @@
+{
+  "prior_run": 45592921737,
+  "prior_artifact": 15013952135,
+  "license_scope": "CC0 diffuse images only, not vendor mhmat/shader",
+  "art": "OPEN",
+  "sexes": {
+    "male": {
+      "author": "Mindfront",
+      "page": "https://static.makehumancommunity.org/assets/assetpacks/skins02.html",
+      "source_texture_sha256": "268ee6d1ea9665f8050d040c7b47971884428628021418ae52f68912859f5e60",
+      "source_archive_sha256": "1613f1ef3afca53094511d26620ed7cf1d2dedc29ed3d384d60bdebe250698ae",
+      "donor": {
+        "glb_sha256": "e148f303194a943dcd13011e2a8d830272476ea309102119ea3a184733f202ca",
+        "texture_bytes": 1020178,
+        "unchanged_accessors_meshes_nodes_and_original_binary": true
+      },
+      "layered": {
+        "glb_sha256": "239aa3bc541e795998a2f1e13c62d555f1267c655900dfa03f249badfe4ce66e",
+        "texture_bytes": 572122,
+        "unchanged_accessors_meshes_nodes_and_original_binary": true
+      }
+    },
+    "female": {
+      "author": "callharvey3d",
+      "page": "https://static.makehumancommunity.org/assets/assetpacks/skins01.html",
+      "source_texture_sha256": "dd0e953bb1ec3eee3d4956853599372c8faf5ba69982f0b4c3cc220b70cb0be0",
+      "source_archive_sha256": "7495ab99287053bd19ff1636114e64b608994d9f7437fea6cc75ea387f96dba9",
+      "donor": {
+        "glb_sha256": "843865480c4ecd8a58612aa31b46f45eeef594aa543a27e8df8577227d853733",
+        "texture_bytes": 1013079,
+        "unchanged_accessors_meshes_nodes_and_original_binary": true
+      },
+      "layered": {
+        "glb_sha256": "6e95808224d125b8a7bb2e82d878879a0d820558f3be98911adf3710ce16fad4",
+        "texture_bytes": 532085,
+        "unchanged_accessors_meshes_nodes_and_original_binary": true
+      }
+    }
+  }
+}

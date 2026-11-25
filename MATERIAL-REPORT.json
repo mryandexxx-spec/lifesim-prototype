@@ -1,0 +1,88 @@
+{
+  "status": "candidate; art and physical Safari OPEN",
+  "sexes": {
+    "male": {
+      "geometry_and_all_targets_exact": true,
+      "triangles": 27420,
+      "eye_triangles": 280,
+      "skin_maps_bytes": 1308363,
+      "glb_bytes": 7496576,
+      "sha256": "630afdd6450a7295c0a014066ec2efde8cdc8beda97238116078736c65e2b51a",
+      "source_uv_sha": "1f9f6f7b814f834bea7b094c11015870f489591034bae94751e9edac4c2d6283",
+      "texture_memory_rgba8_mib": 23.0,
+      "mobile_sha256": "36abba2916a5938ecc32a94fb2582101875fe9183ec6a764fc9eeb3df89931c5",
+      "mobile_skin_maps_bytes": 397045,
+      "mobile_texture_memory_rgba8_mib": 7.0
+    },
+    "female": {
+      "geometry_and_all_targets_exact": true,
+      "triangles": 27420,
+      "eye_triangles": 280,
+      "skin_maps_bytes": 1421790,
+      "glb_bytes": 7610016,
+      "sha256": "5fc1f82c2271ce7c4bdfb5b5ff1008bfc9c2036aff500f496f22623e075f2201",
+      "source_uv_sha": "5b372c1baf7d0dcb248bf9b66cd9862e64c849574b91f126472983db4f2d04aa",
+      "texture_memory_rgba8_mib": 23.0,
+      "mobile_sha256": "d7c697af0cfab84f536f94e0b51e4385ffd653f0587245fad61c2a962b4f40c7",
+      "mobile_skin_maps_bytes": 432848,
+      "mobile_texture_memory_rgba8_mib": 7.0
+    }
+  },
+  "donor": "not verified; no third-party albedo used",
+  "donor_probe": {
+    "skins01": {
+      "page": "https://static.makehumancommunity.org/assets/assetpacks/skins01.html",
+      "archive_links": [
+        "https://files2.makehumancommunity.org/asset_packs/skins01/skins01_cc0.zip",
+        "https://files.makehumancommunity.org/asset_packs/skins01/skins01_cc0.zip"
+      ],
+      "archive_sha256": "7495ab99287053bd19ff1636114e64b608994d9f7437fea6cc75ea387f96dba9",
+      "source": "https://files2.makehumancommunity.org/asset_packs/skins01/skins01_cc0.zip",
+      "material_candidates": [
+        "skins/callharvey3d_midtoned_female/callharvey3d_midtoned_female.mhmat"
+      ],
+      "license_paths": [],
+      "selected": [
+        {
+          "material": "skins/callharvey3d_midtoned_female/callharvey3d_midtoned_female.mhmat",
+          "texture": "skins/callharvey3d_midtoned_female/harvey_midtoned_female_diffuse.png",
+          "source_sha256": "dd0e953bb1ec3eee3d4956853599372c8faf5ba69982f0b4c3cc220b70cb0be0",
+          "size": [
+            2048,
+            2048
+          ],
+          "preview": "skins01-donor-0.png",
+          "material_sha256": "806a323f06c50b687908ff29a82e82eb99442f7563f4b2806bd4c5e8665cc636",
+          "metadata": "# This is a material file for MakeHuman \n#\n# Copyright (C) 2016 Data Collection AB, https://www.datacollection.se\n# Copyright (C) 2016 Joel Palmius \n# Copyright (C) 2016 Jonas Hauquier\n#\n# The primary legal contact for MakeHuman is Data Collection AB.\n#\n# For more information, see homepage at http://www.makehuman.org\n#\n# This file is licensed AGPLv3\n#\n#    This file is part of MakeHuman (www.makehuman.org).\n#\n#    This program is free software: you can redistribute it and/or modify\n#    it under the terms of the GNU Affero General Public License as\n#    published by the Free Software Foundation, either version 3 of the\n#    License, or (at your option) any later version.\n#\n#    This program is distributed in the hope that it will be useful,\n#    but WITHOUT ANY WARRANTY; without even the implied warranty of\n#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n#    GNU Affero General Public License for more details.\n#\n#    You should have received a copy of the GNU Affero General Public License\n#    along with this program.  If not, see <http://www.gnu.org/licenses/>.\n\nname young_african_female\nambientColor 0.301960784314 0.278431372549 0.278431372549\ndiffuseColor 0.5 0.5 0.5\nspecularColor 0.043137254902 0.0274509803922 0.0274509803922\nshininess 0.5\nemissiveColor 0.196078431373 0.101960784314 0.101960784314\nopacity 1.0\ntranslucency 0.0\nshadeless False\nwireframe False\ntransparent False\nalphaToCoverage True\nbackfaceCull True\ndepthless False\ncastShadows True\nreceiveShadows True\n\ntag young\ntag african\ntag female\n\ndiffuseTexture harvey_midtoned_female_diffuse.png\n\nsssEnabled True\nsssRScale 5.0\nsssGScale 2.5\nsssBScale 1.0\n\nshader data/shaders/glsl/litsphere\n\nshaderParam litsphereTexture data/litspheres/lit_standard_skin.png\n\nshaderConfig ambientOcclusion True\nshaderConfig normal False\nshaderConfig bump True\nshaderConfig displacement False\nshaderConfig vertexColors True\nshaderConfig spec True\nshaderConfig transparency True\nshaderConfig diffuse True\n"
+        }
+      ]
+    },
+    "skins02": {
+      "page": "https://static.makehumancommunity.org/assets/assetpacks/skins02.html",
+      "archive_links": [
+        "https://files2.makehumancommunity.org/asset_packs/skins02/skins02_cc0.zip",
+        "https://files.makehumancommunity.org/asset_packs/skins02/skins02_cc0.zip"
+      ],
+      "archive_sha256": "1613f1ef3afca53094511d26620ed7cf1d2dedc29ed3d384d60bdebe250698ae",
+      "source": "https://files2.makehumancommunity.org/asset_packs/skins02/skins02_cc0.zip",
+      "material_candidates": [
+        "skins/mindfront_aksel_skin/mindfront_aksel_skin.mhmat"
+      ],
+      "license_paths": [],
+      "selected": [
+        {
+          "material": "skins/mindfront_aksel_skin/mindfront_aksel_skin.mhmat",
+          "texture": "skins/mindfront_aksel_skin/Aksel_Skin_diffuse.png",
+          "source_sha256": "268ee6d1ea9665f8050d040c7b47971884428628021418ae52f68912859f5e60",
+          "size": [
+            2048,
+            2048
+          ],
+          "preview": "skins02-donor-0.png",
+          "material_sha256": "ed79cb17edbb5929dd83474a46f045df7d5f31d0b9c1156c87f563bd2bbbfab6",
+          "metadata": "# Material definition for Aksel\n\nname aksel_skin\ndescription Male skin\nambientColor 0.301960784314 0.278431372549 0.278431372549\ndiffuseColor 1.0 1.0 1.0\nspecularColor 0.02 0.02 0.02\nshininess 0.5\nemissiveColor 0.196078431373 0.101960784314 0.101960784314\nopacity 1.0\ntranslucency 0.0\n\nshadeless False\nwireframe False\ntransparent False\nalphaToCoverage True\nbackfaceCull True\ndepthless False\n\ntag male\ntag middleage\n\ncastShadows True\n\nreceiveShadows True\n\ndiffuseTexture Aksel_Skin_diffuse.png\nnormalmapTexture Aksel_Skin_NRM.png\nspecularTexture Aksel_Skin_SPEC.png\n\n# Sub-surface scattering parameters\nsssEnabled True\nsssRScale 5.0\nsssGScale 2.5\nsssBScale 1.0\n\nshader shaders/glsl/litsphere\n\nshaderParam litsphereTexture litspheres/lit_standard_skin.png\n\nshaderConfig ambientOcclusion True\nshaderConfig normal True\nshaderConfig bump False\nshaderConfig displacement False\nshaderConfig vertexColors True\nshaderConfig spec True\nshaderConfig transparency True\nshaderConfig diffuse True\n"
+        }
+      ]
+    }
+  }
+}

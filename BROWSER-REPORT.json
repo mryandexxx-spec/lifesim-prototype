@@ -1,0 +1,856 @@
+{
+  "frames": [
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "original",
+      "std": 57.319587072201095,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "original",
+      "std": 45.31900212119978,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "original",
+      "std": 25.436190271779168,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 58.66779054135958,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 46.117656435989254,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 26.209641038982763,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "all-pos",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 59.36884796868203,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "all-pos",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 46.62643141435743,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "all-pos",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 25.9264472020549,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "all-neg",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 58.32886376105959,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "all-neg",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 45.76544891667378,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "all-neg",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 25.998324819120867,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "smile",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 58.662614780594105,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "smile",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 46.202009561168175,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "smile",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 26.315479315388696,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "blink",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 58.880123299716274,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "jawopen",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 58.167604111856875,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neck_neg",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 58.17609106917808,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neck_pos",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 58.23912109420586,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "mobile",
+      "std": 58.637074411168705,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "mobile",
+      "std": 46.09569693374245,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "mobile",
+      "std": 26.19316488676513,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "original",
+      "std": 57.6266112194841,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "original",
+      "std": 42.59811509849328,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "original",
+      "std": 20.428919096093903,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 67.61394920698329,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 50.06960951850212,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 26.144959389188006,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "all-pos",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 68.22145203828019,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "all-pos",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 50.598487205491296,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "all-pos",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 26.084945804446093,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "all-neg",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 67.33606066659769,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "all-neg",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 49.81481870758311,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "all-neg",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 26.170593103112324,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "smile",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 67.56022358962211,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "smile",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 50.111373214435346,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "smile",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 26.128712959954793,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "blink",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 67.81419988260522,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "jawopen",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 67.26048865584758,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neck_neg",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 67.6396004868014,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neck_pos",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "candidate",
+      "std": 68.0425218721421,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "chromium",
+      "variant": "mobile",
+      "std": 67.57911573562131,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "chromium",
+      "variant": "mobile",
+      "std": 50.04079995693074,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "chromium",
+      "variant": "mobile",
+      "std": 26.12648462541811,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "original",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "original",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "original",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "all-pos",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "all-pos",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "all-pos",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "all-neg",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "all-neg",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "all-neg",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "smile",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "smile",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "smile",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "blink",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "jawopen",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neck_neg",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neck_pos",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "mobile",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "mobile",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "mobile",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "original",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "original",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "original",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "all-pos",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "all-pos",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "all-pos",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "all-neg",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "all-neg",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "all-neg",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "smile",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "smile",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "smile",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "blink",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "jawopen",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neck_neg",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neck_pos",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "candidate",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 0,
+      "engine": "webkit",
+      "variant": "mobile",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 45,
+      "engine": "webkit",
+      "variant": "mobile",
+      "std": 58.47161928551513,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "state": "neutral",
+      "angle": 90,
+      "engine": "webkit",
+      "variant": "mobile",
+      "std": 58.47161928551513,
+      "valid": false
+    }
+  ],
+  "mobile": [
+    {
+      "sex": "male",
+      "engine": "chromium",
+      "width": 390,
+      "std": 25.865446207532813,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "engine": "chromium",
+      "width": 390,
+      "std": 26.039362886379102,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "engine": "chromium",
+      "width": 320,
+      "std": 25.818889570632336,
+      "valid": true
+    },
+    {
+      "sex": "female",
+      "engine": "chromium",
+      "width": 320,
+      "std": 26.05460717266182,
+      "valid": true
+    },
+    {
+      "sex": "male",
+      "engine": "webkit",
+      "width": 390,
+      "std": 0.0,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "engine": "webkit",
+      "width": 390,
+      "std": 0.0,
+      "valid": false
+    },
+    {
+      "sex": "male",
+      "engine": "webkit",
+      "width": 320,
+      "std": 0.0,
+      "valid": false
+    },
+    {
+      "sex": "female",
+      "engine": "webkit",
+      "width": 320,
+      "std": 0.0,
+      "valid": false
+    }
+  ],
+  "webkit_visual": "OPEN_INVALID_FRAME",
+  "art": "OPEN: direct review required"
+}
