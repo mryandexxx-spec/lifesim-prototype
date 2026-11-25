@@ -26,9 +26,18 @@ export function createOutdoorVegetationVisual({pc,app,enabled=true,instancing=tr
    const buffer=new pc.VertexBuffer(app.graphicsDevice,format,group.length,{data});
    const node=new pc.Entity('OF vegetation instanced '+first.mi.mesh.id);
    const mesh=new pc.MeshInstance(first.mi.mesh,first.mi.material,node);
-   try{mesh.setInstancing(buffer,true);mesh.aabb=bounds;
-    node.addComponent('render',{meshInstances:[mesh],layers:[...first.c.layers],castShadows:first.mi.castShadow,receiveShadows:first.mi.receiveShadow});
-    app.root.addChild(node);batches.push({node,buffer,count:group.length});
+   try{
+    // Component initialization can overwrite MeshInstance bounds and attachment.
+    // Assign the mesh explicitly, then set component-level group bounds.
+    node.addComponent('render',{type:'asset',layers:[...first.c.layers],castShadows:first.mi.castShadow,receiveShadows:first.mi.receiveShadow});
+    node.render.meshInstances=[mesh];
+    node.render.customAabb=bounds;
+    app.root.addChild(node);
+    // Disable whole-group culling until spatial chunking is separately validated.
+    // This is PlayCanvas' documented default for hardware instancing.
+    mesh.setInstancing(buffer,false);mesh.cull=false;
+    if(node.render.meshInstances[0]!==mesh||mesh.instancingCount!==group.length)throw Error('instancing attachment mismatch');
+    batches.push({node,buffer,count:group.length});
     for(const {mi} of group)mi.visible=false;
    }catch(e){node.destroy();buffer.destroy();throw e;}
   }}catch(e){clearBatches();instancingEnabled=false;instancingFailures++;console.warn('OF vegetation instancing fallback',e);}
