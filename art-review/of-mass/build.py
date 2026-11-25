@@ -170,18 +170,21 @@ def export(id,kind):
     return {'file':str(path.relative_to(LAB)),'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data),'triangles':tri,'boundsBlender':bounds,'materials':len({m.name for m in bpy.context.object.data.materials if m})}
 def scene(id,kind):
     cy,scale=centers[id]
-    if id.startswith('pool.'):
+    if id=='sconce.leaf':
+        box('Mounted wall plane',(0,-.10,.16),(4,4,.12),mat('Wall plaster','#ddd7c8'))
+    elif id.startswith('pool.'):
         box('Pool deck',(0,-.04,-.75),(3,.08,1.5),mat('Deck','#d8ceba'))
         box('Pool wall',(0,-.64,-.04),(3,1.2,.08),mat('Pool wall','#729aa3'))
     else:box('Studio floor',(0,-.055,0),(200,.1,200),mat('Ground','#c5c8bd'))
     sc=bpy.context.scene;sc.render.engine='CYCLES';sc.cycles.samples=8;sc.cycles.use_denoising=True
     sc.render.resolution_x=360;sc.render.resolution_y=360;sc.render.resolution_percentage=100
     sc.world.use_nodes=True;sc.world.node_tree.nodes['Background'].inputs[0].default_value=(.62,.66,.72,1);sc.world.node_tree.nodes['Background'].inputs[1].default_value=.45
-    for name,p,power,size in [('Key',(3,5,3),500,4),('Fill',(-3,3,2),250,4)]:
+    for name,p,power,size in [('Key',(3,5,-3 if id=='sconce.leaf' else 3),500,4),('Fill',(-3,3,-2 if id=='sconce.leaf' else 2),250,4)]:
         bpy.ops.object.light_add(type='AREA',location=V(p));o=bpy.context.object;o.data.energy=power;o.data.shape='DISK';o.data.size=size;o.rotation_euler=(V((0,cy,0))-o.location).to_track_quat('-Z','Y').to_euler()
     bpy.ops.object.camera_add();cam=bpy.context.object;cam.data.type='ORTHO';cam.data.ortho_scale=scale;sc.camera=cam
     sc.view_settings.view_transform='AgX'
-    for label,pos in [('front',(0,cy+.25,5)),('three-quarter',(3.5,cy+2.5,4)),('profile',(5,cy+.25,0))]:
+    front=-1 if id in ('sconce.leaf','dresser.arch','mirror.oval','garden.bench') or id.startswith(('fanstand.','fanflag.')) else 1
+    for label,pos in [('front',(0,cy+.25,5*front)),('three-quarter',(3.5,cy+2.5,4*front)),('profile',(5,cy+.25,.08*front))]:
         cam.location=V(pos);cam.rotation_euler=(V((0,cy,0))-cam.location).to_track_quat('-Z','Y').to_euler()
         sc.render.filepath=str(IMG/(id+'-'+kind+'-'+label+'.png'));bpy.ops.render.render(write_still=True)
 def donor(id):
