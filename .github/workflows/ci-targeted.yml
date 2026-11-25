@@ -8,6 +8,47 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  of-integration-a:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-a' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: of-mass-evidence
+          run-id: 45654383776
+          github-token: ${{ github.token }}
+          path: /tmp/of-mass
+      - name: Verify approved model hashes and exact committed thumbnails
+        run: |
+          node --test tests/of-integration-a.test.js
+          node scripts/of-a-thumbnails.mjs /tmp/of-mass
+          git diff --exit-code -- assets/furniture/of-r2/thumbnails/
+          test -z "$(git ls-files --others --exclude-standard assets/furniture/of-r2/thumbnails/)"
+      - name: Real game Chromium and WebKit — 20 SKU, thumbnails and v1 reload
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/of-a-http.log 2>&1 &
+          sleep 3
+          node tests/of-a-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: of-a-game-evidence
+          path: artifacts/of-a/
+          if-no-files-found: warn
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
