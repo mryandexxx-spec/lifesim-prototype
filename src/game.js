@@ -2106,8 +2106,15 @@ function renderConversationPanel(force=true){
       options.append(button);
     }
   }
-  // This is the only exit from a required-choice dialogue.
+  // Explicit completion records the actual turns; explicit cancellation never does.
   options.append(conversationButton('Завершить разговор',endPlayerConversation,true));
+  if(session.turns.length)options.append(conversationButton('Прервать без результата',()=>{
+    const canceled=applyDialogueDecision(game,root=>activeConversationAction(root)===root.additionalSocial
+      ?cancelAddressedSocial(root):cancelSocial(root));
+    if(!canceled)return false;
+    conversationTopicPicker=false;save(true);renderConversationPanel();renderQueuePanel(true);
+    toast('Разговор прерван');return true;
+  },true));
   if(required)requiredChoiceFocus.focusChoice(enteringRequired?0:formerFocusIndex);
 }
 renderConversationPanel();
