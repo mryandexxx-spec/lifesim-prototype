@@ -145,6 +145,43 @@ def proxy(name,loc,size,color):
     o=bpy.context.object;o.name=name;o.dimensions=(size[0],size[2],size[1])
     m=bpy.data.materials.new(name);m.diffuse_color=(*color,1);o.data.materials.append(m);return o
 def clone(f):return json.loads(json.dumps(f))
+def horizontal(v):
+    v=v.copy();v.y=0;return v
+def stance_travel(t,frames,windows,dt):
+    w=[world(t,f) for f in frames];vel=[]
+    for side in ("l","r"):
+        e=t["roles"]["foot_"+side]
+        for a,b in windows[side]:
+            a+=2;b-=2
+            if b>a:vel.append(-horizontal(pos(w[b],e)-pos(w[a],e))/((b-a)*dt))
+    assert vel,"no stance samples for root motion"
+    return Vector(np.median(np.array([list(v) for v in vel]),axis=0))
+def seat_axes(t,w):
+    l=pos(w,t["roles"]["thigh_l"]);r=pos(w,t["roles"]["thigh_r"])
+    x=unit(horizontal(l-r))
+    knee=(pos(w,t["roles"]["shin_l"])+pos(w,t["roles"]["shin_r"]))/2
+    front=horizontal(knee-(l+r)/2);front=unit(front-x*front.dot(x))
+    return x,front
+def oriented_seat(center,x,front,width,depth):
+    o=proxy("seat-proxy",center,(width,.10,depth),(.20,.40,.55))
+    bx=Y.inverted().to_3x3()@x;by=Y.inverted().to_3x3()@front;bz=Y.inverted().to_3x3()@Vector((0,1,0))
+    if bx.cross(by).dot(bz)<0:by=-by
+    o.rotation_euler=Matrix((bx,by,bz)).transposed().to_euler()
+    return o
+def seat_overlap(meshes,info):
+    center,x,front,width,depth,top=info
+    pts=surface([(o,list(range(len(o.data.vertices)))) for o in meshes])
+    return sum(abs((p-center).dot(x))<width/2 and abs((p-center).dot(front))<depth/2 and top-.10<p.y<top-.002 for p in pts)
+def feasible_root_shift(t,f,hip,goals):
+    w=world(t,f);shift=0.
+    for side,goal in goals.items():
+        a,b,e=[t["roles"][r+"_"+side] for r in ("thigh","shin","foot")]
+        A,B,E=[pos(w,i) for i in (a,b,e)]
+        reach=(B-A).length+(E-B).length-.004
+        d=goal-A;planar=horizontal(d).length
+        if d.y<0 and planar<reach:shift=min(shift,d.y+math.sqrt(max(0,reach*reach-planar*planar)))
+    return max(-.12,shift)
+
 def summarize(rows):
     out={}
     for key in rows[0]:
@@ -155,7 +192,7 @@ def main():
     data=read("input.json"); solved=read("solved.json"); inv=read("semantic-inventory.json")
     for k,r in data["sources"].items():r["roles"]=inv["sources"][k]["map"]
     for k,r in data["targets"].items():r["roles"]=inv["targets"][k]["map"]
-    report={"production":"BLOCKED","ART":"OPEN","scope":"R1: actual skin floor measurements, source stance windows, pelvic skin and head-surface seat/phone proxy experiment, nonterminal finger direction transfer; twist/terminal curl/grasp and exact collisions open","profiles":{}}
+    report={"production":"BLOCKED","ART":"OPEN","scope":"R2: reconstructed root motion, seat slab occupancy and actual skin floor measurements, source stance windows, pelvic skin and head-surface seat/phone proxy experiment, nonterminal finger direction transfer; twist/terminal curl/grasp and exact collisions open","profiles":{}}
     for key,t in data["targets"].items():
         p=pathlib.Path("prior-full")/(key+".glb");assert digest(p)==t["sha256"]
         arm,bones=import_rig(p);reset(arm,bones);rest=locals_(arm,bones,True)
@@ -167,7 +204,7 @@ def main():
         report["profiles"][key]={}
         for sk,s in data["sources"].items():
             for name,c in s["clips"].items():
-                baseline=solved[key][name]["variants"]["upf_common"]
+                baseline=clone(solved[key][name]["variants"]["upf_common"])
                 assert len(baseline)==len(c["frames"])
                 dt=c["duration"]/(len(baseline)-1)
                 sw=[world(s,f) for f in c["frames"]]
@@ -177,16 +214,26 @@ def main():
                     role="foot_"+side
                     windows[side],weights[side]=contact_windows([list(pos(w,s["roles"][role])) for w in sw],dt,.035)
                     anchors[side]={i:pos(tw[a],t["roles"][role]) for a,b in windows[side] for i in range(a,b+1)}
+                travel=Vector((0,0,0))
+                if name=="Walk_Loop":
+                    travel=stance_travel(t,baseline,windows,dt)
+                    for i,f in enumerate(baseline):move_root(t,f,t["roles"]["hip"],travel*(i*dt))
+                    tw=[world(t,f) for f in baseline]
+                    for side in anchors:anchors[side]={i:pos(tw[a],t["roles"]["foot_"+side]) for a,b in windows[side] for i in range(a,b+1)}
                 pairs,missing=finger_map(s,t)
                 hip=t["roles"]["hip"];sh=s["roles"]["hip"]
                 hipy=np.array([pos(w,sh).y for w in sw])
-                seatw=np.zeros(len(sw));seat=None
+                seatw=np.zeros(len(sw));seat=None;seat_info=None
                 if "Sitting_" in name:
                     drop=float(max(hipy)-min(hipy))
                     if drop>.08:
                         seatw=np.array([smooth((max(hipy)-y)/drop) for y in hipy])
                         idx=int(np.argmin(hipy));center=pos(tw[idx],hip)
-                        seat=proxy("seat-proxy",(center.x,floor+.40,center.z),(.60,.10,.55),(.20,.40,.55))
+                        x,front=seat_axes(t,tw[idx])
+                        depth=.38;width=.52
+                        center=center-front*(depth*.35);center.y=floor+.40
+                        seat=oriented_seat(center,x,front,width,depth)
+                        seat_info=(center,x,front,width,depth,floor+.45)
                 phonew=np.zeros(len(sw));phone=None;pside=None
                 if "Phone" in name:
                     shead=s["roles"]["head"]
@@ -200,6 +247,7 @@ def main():
                     f=clone(bf);apply(arm,bones,rest,bf)
                     bsole={side:sole(regs[side])-floor for side in regs}
                     bseat=min(p.y for p in surface(pelvis))-floor if seat else None
+                    bcollision=seat_overlap(meshes,seat_info) if seat else None
                     fingers(s,t,sf,f,pairs)
                     # Seat target is a fixed physical plane, not a per-character joint height.
                     if seat and seatw[i]>.01:
@@ -208,6 +256,18 @@ def main():
                         move_root(t,f,hip,Vector((0,delta,0)))
                     apply(arm,bones,rest,f)
                     corrections=[]
+                    goals={}
+                    for side in regs:
+                        e=t["roles"]["foot_"+side];w=world(t,f);P=pos(w,e)
+                        low=sole(regs[side])
+                        if weights[side][i]>0:
+                            target=anchors[side][i].copy();target.y=P.y+floor-low
+                            goals[side]=P.lerp(target,float(weights[side][i]))
+                        elif low<floor:goals[side]=P+Vector((0,floor-low,0))
+                    if name=="Walk_Loop" and goals:
+                        shift=feasible_root_shift(t,f,hip,goals)
+                        move_root(t,f,hip,Vector((0,shift,0)))
+                        apply(arm,bones,rest,f)
                     for side in regs:
                         if weights[side][i]>.0:
                             e=t["roles"]["foot_"+side];w=world(t,f);P=pos(w,e)
@@ -216,6 +276,14 @@ def main():
                             chain=[t["roles"][r+"_"+side] for r in ("thigh","shin","foot")]
                             m=ik(t,f,chain,target,float(weights[side][i]))
                             if m:corrections.append(m["reach_clamp_m"])
+                    for iteration in range(2):
+                        for side in regs:
+                            apply(arm,bones,rest,f);low=sole(regs[side])
+                            if low<floor-.001:
+                                chain=[t["roles"][r+"_"+side] for r in ("thigh","shin","foot")]
+                                w=world(t,f);target=pos(w,chain[-1])+Vector((0,floor-low,0))
+                                m=ik(t,f,chain,target,1.)
+                                if m:corrections.append(m["reach_clamp_m"])
                     # Phone target: head-relative geometric ear proxy; not anatomical ear validation.
                     phonepos=None;handerr=None;basehanderr=None
                     if phone:
@@ -240,13 +308,14 @@ def main():
                     if seat and seatw[i]>.9:
                         row["baseline_seat_surface_error_m"]=abs(bseat-.45)
                         row["contact_seat_surface_error_m"]=abs(min(p.y for p in surface(pelvis))-floor-.45)
+                    if seat:row.update(baseline_seat_slab_vertices=bcollision,contact_seat_slab_vertices=seat_overlap(meshes,seat_info))
                     if handerr is not None and phonew[i]>.5:row.update(baseline_phone_proxy_gap_m=basehanderr,contact_phone_proxy_gap_m=handerr)
                     assert all(math.isfinite(x) for b in f for x in b["p"]+b["r"])
                     rows.append(row);variants["baseline"].append(bf);variants["contacts"].append(f);props.append(list(phonepos) if phonepos else None)
                 # Summarize union of keys (stance/seat/phone may begin after frame zero).
                 keys=set().union(*(r.keys() for r in rows))
                 summary=summarize([{k:r.get(k) for k in keys} for r in rows])
-                item={"windows":windows,"finger_map_count":len(pairs),"missing_finger_roles":missing,"terminal_twist_status":"OPEN","phone_side":pside,"phone_proxy_only":bool(phone),"seat_proxy_only":bool(seat),"samples":rows,"summary":summary}
+                item={"root_velocity_m_s":list(travel),"windows":windows,"finger_map_count":len(pairs),"missing_finger_roles":missing,"terminal_twist_status":"OPEN","phone_side":pside,"phone_proxy_only":bool(phone),"seat_proxy_only":bool(seat),"samples":rows,"summary":summary}
                 report["profiles"][key][name]=item
                 (OUT/"report.json").write_text(json.dumps(report,indent=2))
                 # Matched real videos of both sexes, central height profiles only.
@@ -265,5 +334,5 @@ def main():
                 for obj in (seat,phone):
                     if obj:bpy.data.objects.remove(obj,do_unlink=True)
     assert len(report["profiles"])==6 and all(len(x)==4 for x in report["profiles"].values())
-    print("Completed R1 contact diagnostic; no production or art acceptance.")
+    print("Completed R2 contact diagnostic; no production or art acceptance.")
 if __name__=="__main__":main()
