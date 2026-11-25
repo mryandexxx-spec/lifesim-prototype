@@ -344,13 +344,28 @@ for sex,(pin,rpin) in PINS.items():
         sv,_=native({**profile,k:v});additive+=sv-donor
     err=(cv-donor)-additive
     m=j['meshes'][0];assert m['extras']['targetNames']==NAMES
-    old=[]
-    for p in m['primitives']:
+    old=[];preset_regeneration_drift={}
+    assert len(m['primitives'])==len(aj['meshes'][0]['primitives'])
+    for p,ap in zip(m['primitives'],aj['meshes'][0]['primitives']):
         pos=acc(j,b,p['attributes']['POSITION']);mp=map_positions(pos,raw,fields)
         assert np.array_equal(pos,raw[mp])
         old.append({'attributes':{k:acc(j,b,i) for k,i in p['attributes'].items()},'indices':acc(j,b,p['indices']),'targets':[{k:acc(j,b,i) for k,i in t.items()} for t in p['targets']]})
         for name,t in zip(NAMES,p['targets']):assert np.array_equal(acc(j,b,t['POSITION']),face[name][mp])
-        for k in BODY:p['targets'].append({'POSITION':append(j,b,fields[k][mp]),'NORMAL':append(j,b,(normals(raw+fields[k],tri)-n0)[mp])})
+        # Published preset arrays are immutable input, not regenerated output.
+        # A fresh Anny evaluation can differ in float32; record that difference
+        # but never use the recomputed preset to overwrite the accepted asset.
+        assert np.array_equal(pos,acc(aj,ab,ap['attributes']['POSITION']))
+        assert np.array_equal(acc(j,b,p['indices']),acc(aj,ab,ap['indices']))
+        for k in p['attributes']:
+            assert np.array_equal(acc(j,b,p['attributes'][k]),acc(aj,ab,ap['attributes'][k]))
+        for i,k in enumerate(PRESET_NAMES,start=len(NAMES)):
+            at=ap['targets'][i]
+            exact=acc(aj,ab,at['POSITION']);diff=fields[k][mp]-exact
+            preset_regeneration_drift[k]=max(preset_regeneration_drift.get(k,0.),float(np.linalg.norm(diff,axis=1).max()*1000))
+            assert set(at)=={'POSITION','NORMAL'}
+            p['targets'].append({key:append(j,b,acc(aj,ab,at[key])) for key in at})
+        for k in GRID:
+            p['targets'].append({'POSITION':append(j,b,fields[k][mp]),'NORMAL':append(j,b,(normals(raw+fields[k],tri)-n0)[mp])})
     m['extras']['targetNames']=NAMES+BODY;m['weights']=[0]*len(NAMES+BODY)
     for node in j['nodes']:
         if 'weights' in node:node['weights']=[0]*len(NAMES+BODY)
@@ -371,7 +386,7 @@ for sex,(pin,rpin) in PINS.items():
         assert zb[i:i+vv['byteLength']]==b0[i:i+vv['byteLength']]
     neutral=measures(raw,tri)
     report['sexes'][sex]={'source_sha':pin,'glb_sha':sha(out.read_bytes()),'exact_existing_attributes_targets_textures':True,
-      'factorial':factorial,'heldout_native':random,'position_only_rank_study':rank_study,'glb_bytes':out.stat().st_size,'rig_rest':'OPEN: no production rest/bind proof', 'native_mapping_error':e,'head_cut_m':cut,'neutral':neutral,'profiles':metrics,
+      'preset_regeneration_drift_max_mm':preset_regeneration_drift,'preset_metrics_note':'Native re-evaluation metrics for comparison only; exported presets copied exactly from pinned C-RESET arrays.', 'factorial':factorial,'heldout_native':random,'position_only_rank_study':rank_study,'glb_bytes':out.stat().st_size,'rig_rest':'OPEN: no production rest/bind proof', 'native_mapping_error':e,'head_cut_m':cut,'neutral':neutral,'profiles':metrics,
       'height_scale_endpoints_m':[neutral['height']*.90,neutral['height']*1.10],
       'combined_vs_additive_rms_mm':float(np.sqrt(np.mean(np.sum(err**2,axis=1)))*1000),
       'combined_vs_additive_max_mm':float(np.linalg.norm(err,axis=1).max()*1000)}
