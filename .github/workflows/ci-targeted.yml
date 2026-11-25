@@ -8,6 +8,12 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-anim-tools:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-tools' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/cf-anim-tools.yml
   of-integration-c:
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-c' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
