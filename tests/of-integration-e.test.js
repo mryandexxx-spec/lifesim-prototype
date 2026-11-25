@@ -31,7 +31,7 @@ test('OF-E all four wall origins and inward +Z align with canonical dry approach
  const cases=[['west',start+3*64,1,0],['east',start+3*64+7,-1,0],['north',start+3,0,1],['south',start+7*64+3,0,-1]];
  for(const [side,edgeCell,dx,dz] of cases)for(const kind of ['ladder','steps','board']){
   const pose=poolFixtureVisualPose({edgeCell,side}),site=poolFixtureSite(pool,edgeCell,side,kind),b=poolCellBounds(edgeCell);
-  assert.ok(site);assert.equal(pose.dx,dx);assert.equal(pose.dz,dz);
+  assert.ok(site);assert.ok(pose.dx===dx&&pose.dz===dz,'exact cardinal direction (signed zero is geometrically identical)');
   assert.ok(Math.abs((pose.x-site.dryApproach.x)*dx+(pose.z-site.dryApproach.z)*dz-.29)<1e-8);
   assert.ok(Math.abs(pose.x+dx*.25-(b.minX+b.maxX)/2)<1e-8&&Math.abs(pose.z+dz*.25-(b.minZ+b.maxZ)/2)<1e-8);
  }
