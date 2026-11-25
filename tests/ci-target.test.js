@@ -323,3 +323,8 @@ test('PF-07: F1 source-text release contract runs before merge on every inspecte
   for(const source of ['src/household.js','src/window-mount.js','src/game.js','src/qsk-11-home-menu.js','src/toilet-interaction.js','index.html','styles.css','.github/workflows/pages.yml'])
     assert.ok(planChanges([source]).tests.includes('tests/furniture-f1-integration.test.js'),source);
 });
+
+ test('PF-01 legacy HUD VM and pool contracts run on live dependency edits',()=>{
+  for(const file of ['src/game.js','src/resident-hud.js','src/career-work.js','index.html','styles.css'])
+    assert.ok(planChanges([file]).tests.includes('tests/pf-01.test.js'),file);
+});
