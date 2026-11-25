@@ -532,3 +532,42 @@ jobs:
           path: vis-out/
           if-no-files-found: warn
           retention-days: 90
+
+  cf-reset-c-vis-distribution:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-reset-c-vis' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-reset-c-vis-evidence
+          run-id: 45569743690
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify reviewed payload and publish only isolated static tree
+        run: |
+          python - <<'PY'
+          import json,hashlib,pathlib
+          p=pathlib.Path('reviewed/lab')
+          m=json.loads((p/'SHA256SUMS.json').read_text())
+          assert len(m)==175
+          assert {str(x.relative_to(p)) for x in p.rglob('*') if x.is_file()}==set(m)|{'SHA256SUMS.json'}
+          for n,h in m.items(): assert hashlib.sha256((p/n).read_bytes()).hexdigest()==h,n
+          assert m['male-candidate.glb']=='4ce29a6ffce21817f92bb2c7df8c27afe630d0dd88e373a05e2ceca591fdcbb8'
+          assert m['female-candidate.glb']=='f4973254fb39f2ff962f429725e66c17a478d7e4110ed556679babb400c7d85e'
+          print('175 exact reviewed payloads verified')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_INDEX_FILE="$(mktemp -u)"
+          git --work-tree="$PWD/reviewed/lab" read-tree --empty
+          git --work-tree="$PWD/reviewed/lab" add -A -- .
+          tree=$(git write-tree)
+          sha=$(git commit-tree "$tree" -m "RESET-C-VIS reviewed diagnostic payload run 45569743690")
+          git push origin "$sha:refs/heads/art/cf-reset-c-vis-lab"
+          echo "Distribution SHA: $sha"
