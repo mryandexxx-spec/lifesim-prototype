@@ -1,7 +1,9 @@
 /** Original, headless 0.9a conversation engine. Saves only validated IDs, no player text. */
 import {getPerspective} from './social-perspective.js';
-import {charismaSocialBonus} from './hobby-reading.js';
-import {episodeContext,getPair} from './social-graph.js';
+import {charismaSocialBonus,HOBBY_SKILLS,CHARISMA_SKILL_ID} from './hobby-reading.js';
+import {currentSkillLevel} from './skills-engine.js';
+import {isWalkable,isClearLine} from './navigation.js';
+import {episodeContext,getPair,getDirectedView} from './social-graph.js';
 import {boundaryDisposition,cueConversationBias} from './social-boundaries.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
 import {evaluateSocialReaction} from './social-reactions.js';
@@ -44,8 +46,39 @@ export const CONVERSATION_ACTS=Object.freeze({
 export const CONVERSATION_MAX_TURNS=3;
 const isRecord=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const knownTopic=x=>typeof x==='string'&&Object.hasOwn(CONVERSATION_TOPICS,x);
-const inTopic=(topic,id)=>knownTopic(topic)&&CONVERSATION_TOPICS[topic].lines.includes(id);
-const contribution=(id,accepted)=>accepted?Math.max(1,CONVERSATION_ACTS[id].weight):-4;
+const inTopic=(topic,id)=>knownTopic(topic)&&(CONVERSATION_TOPICS[topic].lines.includes(id)||(topic==='daily'&&Object.hasOwn(pilotActs,id)));
+const pilotActs=Object.freeze({
+  'daily.tact':{...saying('Подбодрить с юмором','Может, сегодняшний день просто репетирует завтрашний?','Хорошо сказано.','Мне сейчас не до юмора.','warm',3),minLevel:3},
+  'daily.reframe':{...saying('Помочь взглянуть иначе','Что из сегодняшнего дня всё-таки получилось?','Об этом я не подумал(а).','Не хочу сейчас искать плюсы.','neutral',3),minLevel:6},
+  'daily.inspire':{...saying('Вдохновить на перемены','Какой маленький шаг сделал бы завтра лучше?','Попробую об этом подумать.','Мне нужно решить это самостоятельно.','warm',3),minLevel:9}
+});
+const act=id=>CONVERSATION_ACTS[id]||pilotActs[id];
+const contribution=(id,accepted)=>accepted?Math.max(1,act(id).weight):-4;
+export const activeConversationAction=root=>root?.socialAction?.conversation?root.socialAction:
+  root?.additionalSocial?.conversation?root.additionalSocial:null;
+export function conversationActor(root,id){
+  if(id==='alex')return root;
+  if(id==='mira')return root?.otherSim;
+  if(typeof id!=='string'||!/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/.test(id))return null;
+  const p=root?.population,home=p?.linksByResident?.alex?.dwellingId;
+  return home&&p?.linksByResident?.[id]?.dwellingId===home
+    ?p.residentsById?.[id]?.actor||null:null;
+}
+const extraPair=(a,b)=>!['alex','mira'].includes(a)||!['alex','mira'].includes(b);
+const tier=(root,id)=>currentSkillLevel(conversationActor(root,id)?.skills,HOBBY_SKILLS,CHARISMA_SKILL_ID);
+const atHome=(root,id)=>!['departing','working','waiting','returning'].includes(root?.careerSystem?.byResident?.[id]?.currentShift?.phase);
+function validLiveSession(root,s){
+  if(!s||s.initiator===s.partner||!atHome(root,s.initiator)||!atHome(root,s.partner))return false;
+  const a=conversationActor(root,s.initiator),b=conversationActor(root,s.partner);
+  if(!a||!b||a.action||b.action)return false;
+  if(s===root.additionalSocial){
+    if(root.socialAction||!a.position||!b.position)return false;
+    const d=Math.hypot(a.position.x-b.position.x,a.position.z-b.position.z);
+    if(d<.76||d>1.55||!isWalkable(a.position.x,a.position.z,root.world)||
+      !isWalkable(b.position.x,b.position.z,root.world)||!isClearLine(a.position,b.position,root.world))return false;
+  }
+  return true;
+}
 const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
 
 export function createConversation(topic){
@@ -67,38 +100,49 @@ export function restoreConversation(raw){
   if(turns.reduce((sum,x)=>sum+contribution(x.id,x.accepted),0)!==raw.score)return null;
   return {topic:raw.topic,phase:raw.phase,turns,score:raw.score};
 }
-export function conversationOptions(session){
+export function conversationOptions(session,root=null){
   if(!isRecord(session)||!knownTopic(session.topic)||
     !['opening','followUp'].includes(session.phase))return [];
   const used=new Set((session.turns||[]).map(x=>x.id));
-  return CONVERSATION_TOPICS[session.topic].lines.filter(id=>!used.has(id))
-    .map(id=>({id,label:CONVERSATION_ACTS[id].label,tone:CONVERSATION_ACTS[id].tone}));
+  const action=activeConversationAction(root);
+  const ids=[...CONVERSATION_TOPICS[session.topic].lines,
+    ...(root&&session.topic==='daily'?Object.keys(pilotActs):[])].filter(id=>!used.has(id));
+  const previous=session.turns?.at(-1);
+  if(root&&previous&&!previous.accepted)
+    ids.sort((a,b)=>Number(act(b).tone==='warm')-Number(act(a).tone==='warm'));
+  return ids.map(id=>{
+    const a=act(id),minLevel=a.minLevel||0;
+    const skillLocked=tier(root,action?.initiator)<minLevel;
+    const contextLocked=Boolean(previous&&!previous.accepted&&['daily.tact','daily.inspire'].includes(id));
+    return {id,label:a.label,tone:a.tone,...(root?{minLevel,locked:skillLocked||contextLocked,
+      lockReason:skillLocked?'Харизма '+minLevel:contextLocked?'Собеседник пока не готов':null}:{})};
+
+  });
 }
-export function evaluateResponse(root,initiator,topic,id){
-  if(!inTopic(topic,id)||!['alex','mira'].includes(initiator))return null;
-  const partnerId=initiator==='alex'?'mira':'alex';
-  const partner=partnerId==='alex'?root:root?.otherSim;
-  if(!partner||!Number.isFinite(root?.minutes))return null;
-  const a=CONVERSATION_ACTS[id];
+export function evaluateResponse(root,initiator,topic,id,partnerId=initiator==='alex'?'mira':initiator==='mira'?'alex':null,previous=null){
+  if(!inTopic(topic,id)||initiator===partnerId)return null;
+  const self=conversationActor(root,initiator),partner=conversationActor(root,partnerId);
+  if(!self||!partner||!Number.isFinite(root?.minutes))return null;
+  const a=act(id);
   const reaction=evaluateSocialReaction({
-    kind:'conversation',recipient:partner,view:getPerspective(root,partnerId),
+    kind:'conversation',recipient:partner,view:extraPair(initiator,partnerId)
+      ?getDirectedView(root.socialGraph,partnerId,initiator):getPerspective(root,partnerId),
     minutes:root.minutes,tag:CONVERSATION_DISCOVERY_TAGS[id]||CONVERSATION_TOPICS[topic].tag,
     tone:a.tone,weight:a.weight,
     historyBias:episodeContext(root.socialGraph,partnerId,initiator,root.minutes).bias,
-    compatibilityBias:socialCompatibility(partner.personality,
-      (initiator==='alex'?root:root?.otherSim)?.personality).bias,
+    compatibilityBias:socialCompatibility(partner.personality,self.personality).bias,
     styleBias:boundaryDisposition(partner.personality,id)+
       cueConversationBias(getPair(root.socialGraph,initiator,partnerId),initiator,id)+
-      (a.tone==='sharp'?0:charismaSocialBonus(
-        (initiator==='alex'?root:root?.otherSim)?.skills))
+      (a.tone==='sharp'?0:charismaSocialBonus(self.skills))+
+      (previous&&!previous.accepted&&a.tone==='sharp'?-2:0)
   });
   return reaction?{accepted:reaction.accepted,confidence:reaction.confidence}:null;
 }
 /** No social event is applied before explicit completion of the conversation. */
 export function chooseConversationTurn(root,id){
-  const s=root?.socialAction,c=s?.conversation;
-  if(root?.paused||s?.phase!=='using'||!c||!conversationOptions(c).some(x=>x.id===id))return null;
-  const reaction=evaluateResponse(root,s.initiator,c.topic,id);
+  const s=activeConversationAction(root),c=s?.conversation;
+  if(root?.paused||s?.phase!=='using'||!c||!validLiveSession(root,s)||c.turns.length>=CONVERSATION_MAX_TURNS||!conversationOptions(c,root).some(x=>x.id===id&&!x.locked))return null;
+  const reaction=evaluateResponse(root,s.initiator,c.topic,id,s.partner,c.turns.at(-1));
   if(!reaction)return null;
   c.turns.push({id,accepted:reaction.accepted});
   c.score+=contribution(id,reaction.accepted);
@@ -107,14 +151,14 @@ export function chooseConversationTurn(root,id){
   emitSocialReaction(root,{
     actorId:s.initiator,responderId:s.partner,eventType:'conversation.line',
     outcome:socialOutcome({kind:'conversation',accepted:reaction.accepted,
-      score:reaction.confidence,tone:CONVERSATION_ACTS[id].tone}),
+      score:reaction.confidence,tone:act(id).tone}),
     intensity:Math.min(100,Math.max(30,Math.abs(reaction.confidence-50)*2))
   });
   return reaction;
 }
 export function continueConversation(root){
-  const s=root?.socialAction,c=s?.conversation;
-  if(root?.paused||s?.phase!=='using'||c?.phase!=='response'||
+  const s=activeConversationAction(root),c=s?.conversation;
+  if(root?.paused||s?.phase!=='using'||c?.phase!=='response'||!validLiveSession(root,s)||
     c.turns.length>=CONVERSATION_MAX_TURNS)return false;
   c.phase='followUp';
   return true;
@@ -124,7 +168,7 @@ export function conversationTranscript(c){
   const out=[{speaker:'initiator',line:CONVERSATION_TOPICS[c.topic].opener}];
   for(const t of c.turns.slice(0,CONVERSATION_MAX_TURNS)){
     if(!inTopic(c.topic,t.id)||typeof t.accepted!=='boolean')continue;
-    const a=CONVERSATION_ACTS[t.id];
+    const a=act(t.id);
     out.push({speaker:'initiator',line:a.line},{speaker:'partner',line:t.accepted?a.yes:a.no});
   }
   return out;

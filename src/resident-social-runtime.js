@@ -13,6 +13,11 @@ import {evaluateSocialReaction} from './social-reactions.js';
 import {creditCompletedSocialNeed} from './social-need.js';
 import {feelMemory} from './emotion-engine.js';
 import {refreshMind} from './psychology.js';
+import {createConversation,restoreConversation,conversationOutcome,CONVERSATION_TOPICS} from './conversation-engine.js';
+import {learnSocialPreference,learnSocialCue} from './social-graph.js';
+import {CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
+import {cueFromAnswer} from './social-boundaries.js';
+import {dialogueNeedsDecision} from './dialogue-decision.js';
 
 export const ADDRESSED_SOCIAL_SCHEMA=1;
 export const ADDRESSED_SOCIAL_DURATION=18;
@@ -28,10 +33,13 @@ const isExtra=id=>typeof id==='string'&&/^resident_(?:[3-9]|[1-9][0-9]{1,7})$/.t
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const participating=(s,id)=>s&&(s.initiator===id||s.partner===id);
 const validAction=actionId=>['talk','argue',...ADDRESSED_BRANCHES].includes(actionId);
+// Sports currently has a separate legacy-pair match receipt; do not fabricate one for other pairs.
+const validTopic=topic=>typeof topic==='string'&&topic!=='sports'&&Object.hasOwn(CONVERSATION_TOPICS,topic);
+const validCommand=command=>command?.type==='conversation'?validTopic(command.topicId):validAction(command?.actionId);
 const validPair=(root,a,b)=>Boolean(root?.population&&a!==b&&
   (isExtra(a)||isExtra(b))&&residentIdsForSimulation(root).includes(a)&&
   residentIdsForSimulation(root).includes(b)&&actor(root,a)?.position&&actor(root,b)?.position);
-const available=(root,id)=>!['working','waiting'].includes(
+const available=(root,id)=>!['departing','working','waiting','returning'].includes(
   root?.careerSystem?.byResident?.[id]?.currentShift?.phase);
 const canMeet=(root,a,b)=>validPair(root,a,b)&&available(root,a)&&available(root,b);
 const allActors=root=>Object.fromEntries(residentIdsForSimulation(root)
@@ -92,6 +100,15 @@ export function queueAddressedSocial(root,initiator,partner,actionId='talk'){
   }
   return receipt;
 }
+export function queueAddressedConversation(root,initiator,partner,topicId){
+  if(!validTopic(topicId)||!canMeet(root,initiator,partner)||!root.actionQueues||dialogueNeedsDecision(root))return null;
+  const receipt=enqueueAction(root.actionQueues,initiator,{type:'conversation',targetId:partner,topicId});
+  if(receipt)for(const id of [initiator,partner]){
+    const person=actor(root,id);
+    if(person?.action?.automatic){person.action=null;person.event='Ожидает социального действия';}
+  }
+  return receipt;
+}
 const allowedBranch=(root,a,b,id)=>availableSocialActions(
   root.socialGraph,a,b,root.minutes).some(x=>x.id===id&&x.enabled);
 const actionAllowed=(root,a,b,id)=>!ADDRESSED_BRANCHES.includes(id)||
@@ -99,11 +116,13 @@ const actionAllowed=(root,a,b,id)=>!ADDRESSED_BRANCHES.includes(id)||
 const canBegin=(root,id,command)=>{
   const peer=command?.targetId;
   if(!canMeet(root,id,peer)||root.paused||root.socialAction||
-    root.additionalSocial||!validAction(command.actionId)||!available(root,id)||
+    root.additionalSocial||!validCommand(command)||!available(root,id)||
     !available(root,peer)||!actionAllowed(root,id,peer,command.actionId))return false;
   // Never hijack another person's manual work/queued action or active routine.
   if(actor(root,id).action||actor(root,peer).action||
-    pendingActions(root.actionQueues,peer).length)return false;
+    (command.type==='conversation'
+      ?(pendingActions(root.actionQueues,peer)[0]?.seq??Infinity)<command.seq
+      :pendingActions(root.actionQueues,peer).length))return false;
   return Boolean(approach(root,id,peer));
 };
 const reachable=(root,a,b,point)=>{
@@ -137,13 +156,14 @@ function approach(root,sourceId,targetId){
 export function dispatchAddressedSocial(root){
   if(!root?.population||root.paused||root.additionalSocial)return false;
   for(const {residentId,command} of queueHeads(root.actionQueues)){
-    if(!['social','branch'].includes(command.type)||!isExtra(residentId)&&
+    if(!['social','branch','conversation'].includes(command.type)||!isExtra(residentId)&&
       !isExtra(command.targetId)||!canBegin(root,residentId,command))continue;
     const head=pendingActions(root.actionQueues,residentId);
     if(head[0]?.seq!==command.seq)continue;
     root.additionalSocial={schema:ADDRESSED_SOCIAL_SCHEMA,seq:command.seq,
-      initiator:residentId,partner:command.targetId,actionId:command.actionId,
-      phase:'walking',elapsed:0,createdAt:root.minutes};
+      initiator:residentId,partner:command.targetId,actionId:command.type==='conversation'?'talk':command.actionId,
+      phase:'walking',elapsed:0,createdAt:root.minutes,
+      ...(command.type==='conversation'?{conversation:createConversation(command.topicId)}:{})};
     head.shift();
     actor(root,residentId).event='Идёт к собеседнику';
     actor(root,command.targetId).event='Ожидает разговора';
@@ -161,7 +181,7 @@ export function restoreAddressedSocial(raw,root){
   if(raw==null)return null;
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||
     Object.keys(raw).some(k=>!['schema','seq','initiator','partner','actionId',
-      'phase','elapsed','createdAt'].includes(k))||
+      'phase','elapsed','createdAt','conversation'].includes(k))||
     raw.schema!==ADDRESSED_SOCIAL_SCHEMA||
     !Number.isSafeInteger(raw.seq)||raw.seq<1||
     raw.seq>=root.actionQueues?.nextSeq||
@@ -178,7 +198,9 @@ export function restoreAddressedSocial(raw,root){
     if(dist(a.position,b.position)<.76||dist(a.position,b.position)>1.55||
       !isClearLine(a.position,b.position,root.world))return null;
   }
-  return {...raw};
+  const conversation=raw.conversation===undefined?null:restoreConversation(raw.conversation);
+  if(raw.conversation!==undefined&&(!conversation||!validTopic(conversation.topic)||raw.actionId!=='talk'||raw.elapsed!==0||raw.phase==='walking'&&conversation.phase!=='opening'))return null;
+  return {...raw,...(conversation?{conversation}:{})};
 }
 function stepTowards(root,id,goal,minutes){
   const person=actor(root,id),path=findPath(person.position,goal,root.world);
@@ -203,8 +225,8 @@ export function tickAddressedSocial(root,minutes){
   if(!s||root.paused||!Number.isFinite(minutes)||minutes<=0)return false;
   if(!hasTime(root,s)||!canMeet(root,s.initiator,s.partner)||
     root.socialAction||actor(root,s.initiator).action||actor(root,s.partner).action||
-    pendingActions(root.actionQueues,s.initiator).length||
-    pendingActions(root.actionQueues,s.partner).length||
+    (!s.conversation&&(pendingActions(root.actionQueues,s.initiator).length||
+      pendingActions(root.actionQueues,s.partner).length))||
     !actionAllowed(root,s.initiator,s.partner,s.actionId)){
     cancelAddressedSocial(root);return false;
   }
@@ -230,6 +252,7 @@ export function tickAddressedSocial(root,minutes){
     !isClearLine(a.position,b.position,root.world)){
     cancelAddressedSocial(root);return false;
   }
+  if(s.conversation)return false; // shared explicit-choice gate; no automatic receipt
   s.elapsed+=minutes;
   if(s.elapsed<ADDRESSED_SOCIAL_DURATION)return false;
   let outcome=null;
@@ -243,15 +266,24 @@ export function tickAddressedSocial(root,minutes){
       weight:s.actionId==='argue'?-4:3});
     if(response?.accepted)outcome={type:s.actionId,accepted:true};
   }
+  return settleAddressedSocial(root,s,outcome);
+}
+function settleAddressedSocial(root,s,outcome){
+  const a=actor(root,s.initiator),b=actor(root,s.partner);
   const receipt=outcome&&applySocialEvent(root.socialGraph,{
     actorId:s.initiator,targetId:s.partner,type:outcome.type,at:root.minutes,
     token:'cas-social:'+s.seq
   });
   if(receipt){
     creditCompletedSocialNeed(allActors(root),receipt);
+    if(s.conversation)for(const turn of s.conversation.turns){
+      const tag=CONVERSATION_DISCOVERY_TAGS[turn.id];
+      if(turn.accepted&&tag)learnSocialPreference(root.socialGraph,receipt,s.initiator,s.partner,b.personality,tag);
+      if(cueFromAnswer(turn.id,turn.accepted))learnSocialCue(root.socialGraph,receipt,s.initiator,s.partner,turn.id,turn.accepted);
+    }
     for(const [id,person] of [[s.initiator,a],[s.partner,b]]){
       const memory={id:outcome.accepted?
-        s.actionId==='argue'?(id===s.initiator?'regret':'hurt'):'talk':
+        (s.actionId==='argue'||outcome.type==='conversation.argue')?(id===s.initiator?'regret':'hurt'):'talk':
         'hurt',at:root.minutes,fulfilled:false};
       if(Array.isArray(person.mind?.memories)){
         person.mind.memories.push(memory);
@@ -265,4 +297,17 @@ export function tickAddressedSocial(root,minutes){
   }
   root.additionalSocial=null;
   return Boolean(receipt);
+}
+
+/** The addressed physical adapter commits through its existing canonical receipt path. */
+export function finishAddressedConversation(root){
+  const s=root?.additionalSocial;
+  if(root?.paused||s?.phase!=='using'||!s.conversation||!canMeet(root,s.initiator,s.partner))return null;
+  const a=actor(root,s.initiator),b=actor(root,s.partner);
+  if(a.action||b.action||root.socialAction||!isWalkable(a.position.x,a.position.z,root.world)||
+    !isWalkable(b.position.x,b.position.z,root.world)||dist(a.position,b.position)<.76||
+    dist(a.position,b.position)>1.55||!isClearLine(a.position,b.position,root.world))return null;
+  const outcome=conversationOutcome(s.conversation);
+  if(!outcome)return null;
+  return settleAddressedSocial(root,s,{type:'conversation.'+outcome.kind,accepted:true})?outcome:null;
 }

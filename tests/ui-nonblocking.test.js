@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {enqueueAction,newActionQueues,pendingActions} from '../src/action-queue.js';
 import {HOUSEHOLD_IDS} from '../src/household.js';
+import {activeConversationAction} from '../src/conversation-engine.js';
 import {labelQueuedTask} from '../src/qsk-11-task-labels.js';
 
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
@@ -97,7 +98,7 @@ test('1.0q: a walking conversation stays nonblocking until choices are actually 
     $,game:{selectedSim:'alex',socialAction:{
       phase:'walking',conversation:{topic:'daily',phase:'opening',turns:[]}
     },paused:false},
-    dialogueNeedsDecision:()=>false,conversationTopicPicker:false,
+    dialogueNeedsDecision:()=>false,activeConversationAction,conversationTopicPicker:false,
     conversationDisplayKey:'',socialMenuCategory:null,
     requiredChoiceFocus:{activate:()=>{},focusChoice:()=>{}}
   };
@@ -145,7 +146,7 @@ test('1.0o: tapping Беседа reopens an active multi-turn conversation on de
     game:{selectedSim:'alex',socialAction:{
       conversation:{topic:'daily',phase:'choice',turns:[]}
     }},
-    conversationTopicPicker:false,selected:'bed',
+    activeConversationAction,conversationTopicPicker:false,selected:'bed',
     closeSocialPickers:()=>{},select:()=>{},closeMindPanel:()=>{},
     renderConversationPanel:()=>{scope.wasShown=true;},
     renderSocialContext:()=>{},
