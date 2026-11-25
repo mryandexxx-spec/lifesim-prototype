@@ -1,0 +1,46 @@
+name: CF-ANIM contacts diagnostic
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  surface-contacts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated Blender dependencies and validate source
+        run: |
+          python -m py_compile tools/cf_anim_contacts.py tools/cf_anim_tools.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+      - name: Compare actual surface contacts and matched videos
+        run: python tools/cf_anim_contacts.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-contacts-evidence
+          path: anim-contacts-out/
+          if-no-files-found: warn
