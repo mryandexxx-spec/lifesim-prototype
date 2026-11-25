@@ -102,7 +102,7 @@ def regions(meshes,t,side=None):
         for i,p in enumerate(t["parents"]):
             if p in ids:ids.add(i)
     else:
-        ids={m["hip"],m["thigh_l"],m["thigh_r"]}
+        ids={m["hip"]}
         ids.update(i for i,n in enumerate(names) if n.lower().startswith("pelvis"))
     result=[]
     for o in meshes:
@@ -118,6 +118,28 @@ def surface(reg):
         out.extend(Y@e.matrix_world@m.vertices[i].co for i in ix);e.to_mesh_clear()
     return out
 def sole(reg):return min(p.y for p in surface(reg))
+def head_region(meshes,t):
+    name=t["names"][t["roles"]["head"]];out=[]
+    for o in meshes:
+        vg={g.index for g in o.vertex_groups if g.name==name}
+        ix=[v.index for v in o.data.vertices if sum(g.weight for g in v.groups if g.group in vg)>.65]
+        if ix:out.append((o,ix))
+    assert out,"missing head skin support"
+    return out
+def ear_candidates(meshes,t):
+    # Infer a surface proxy from lateral head support, not from global body height.
+    pts=surface(head_region(meshes,t));wr=world(t,t["rest"]);head=wr[t["roles"]["head"]]
+    lateral=unit(pos(wr,t["roles"]["upperarm_l"])-pos(wr,t["roles"]["upperarm_r"]))
+    lo=min(p.y for p in pts);hi=max(p.y for p in pts)
+    band=[p for p in pts if lo+.42*(hi-lo)<=p.y<=lo+.68*(hi-lo)]
+    assert len(band)>10
+    result={}
+    for side,sign in (("l",1),("r",-1)):
+        ranked=sorted(band,key=lambda p:sign*p.dot(lateral),reverse=True)
+        top=ranked[:max(3,len(ranked)//20)]
+        center=sum(top,Vector((0,0,0)))/len(top)
+        result[side]=head.inverted()@center
+    return result
 def proxy(name,loc,size,color):
     bpy.ops.mesh.primitive_cube_add(size=1,location=Y.inverted()@Vector(loc))
     o=bpy.context.object;o.name=name;o.dimensions=(size[0],size[2],size[1])
@@ -133,7 +155,7 @@ def main():
     data=read("input.json"); solved=read("solved.json"); inv=read("semantic-inventory.json")
     for k,r in data["sources"].items():r["roles"]=inv["sources"][k]["map"]
     for k,r in data["targets"].items():r["roles"]=inv["targets"][k]["map"]
-    report={"production":"BLOCKED","ART":"OPEN","scope":"R1: actual skin floor measurements, source stance windows, seat/phone proxy experiment, nonterminal finger direction transfer; twist/terminal curl/grasp and exact collisions open","profiles":{}}
+    report={"production":"BLOCKED","ART":"OPEN","scope":"R1: actual skin floor measurements, source stance windows, pelvic skin and head-surface seat/phone proxy experiment, nonterminal finger direction transfer; twist/terminal curl/grasp and exact collisions open","profiles":{}}
     for key,t in data["targets"].items():
         p=pathlib.Path("prior-full")/(key+".glb");assert digest(p)==t["sha256"]
         arm,bones=import_rig(p);reset(arm,bones);rest=locals_(arm,bones,True)
@@ -141,6 +163,7 @@ def main():
         assert meshes;h,floor=setup(meshes)
         regs={side:regions(meshes,t,side) for side in ("l","r")}
         pelvis=regions(meshes,t)
+        ears=ear_candidates(meshes,t)
         report["profiles"][key]={}
         for sk,s in data["sources"].items():
             for name,c in s["clips"].items():
@@ -169,7 +192,7 @@ def main():
                     shead=s["roles"]["head"]
                     distances={side:np.array([(pos(w,s["roles"]["hand_"+side])-pos(w,shead)).length for w in sw]) for side in ("l","r")}
                     pside=min(distances,key=lambda side:float(np.median(distances[side])))
-                    d=distances[pside];limit=float(np.quantile(d,.75))+.015
+                    d=distances[pside];limit=float(np.quantile(d,.75))+.06
                     phonew=np.array([smooth((limit-x)/.06) for x in d])
                     phone=proxy("phone-proxy",(0,0,0),(.075,.145,.012),(.12,.12,.15))
                 rows=[];variants={"baseline":[],"contacts":[]};props=[]
@@ -196,11 +219,8 @@ def main():
                     # Phone target: head-relative geometric ear proxy; not anatomical ear validation.
                     phonepos=None;handerr=None;basehanderr=None
                     if phone:
-                        w=world(t,f);head=pos(w,t["roles"]["head"])
-                        wr=world(t,t["rest"]);headrest=pos(wr,t["roles"]["head"])
-                        lateral=unit(pos(wr,t["roles"]["upperarm_l"])-pos(wr,t["roles"]["upperarm_r"]))
-                        headrot=w[t["roles"]["head"]].to_quaternion()@wr[t["roles"]["head"]].to_quaternion().inverted()
-                        phonepos=head+headrot@lateral*(h*.056*(1 if pside=="l" else -1))
+                        w=world(t,f)
+                        phonepos=w[t["roles"]["head"]]@ears[pside]
                         _,palmpos=palm(t,w,pside,False)
                         chain=[t["roles"][r+"_"+pside] for r in ("upperarm","forearm","hand")]
                         hand=pos(w,chain[-1]);target=hand+(phonepos-palmpos)
