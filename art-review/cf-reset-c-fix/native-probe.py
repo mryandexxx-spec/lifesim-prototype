@@ -1,4 +1,4 @@
-import bpy, numpy as np, torch, anny, pathlib, urllib.request, hashlib, json, itertools, math
+import bpy, numpy as np, torch, anny, pathlib, urllib.request, hashlib, json, itertools, math, struct
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 root=pathlib.Path.cwd()/'reset-fix'
@@ -93,29 +93,112 @@ def setup(obj,b):
     scene.render.resolution_percentage=100
     scene.render.image_settings.file_format='PNG'
     return scene,cam,center
+# Read and preserve the actual published glTF indices/accessors, rather than
+# assuming Blender's polygon indices are the original native triangle array.
+def read_glb(path):
+    raw=path.read_bytes()
+    assert raw[:4]==b'glTF' and struct.unpack_from('<I',raw,8)[0]==len(raw)
+    n,kind=struct.unpack_from('<II',raw,12)
+    assert kind==0x4e4f534a
+    j=json.loads(raw[20:20+n])
+    m,kind=struct.unpack_from('<II',raw,20+n)
+    assert kind==0x004e4942
+    return j,bytearray(raw[28+n:28+n+m])
+def accessor(j,buf,i):
+    a=j['accessors'][i]
+    dt=np.dtype({5121:'u1',5123:'<u2',5125:'<u4',5126:'<f4'}[a['componentType']])
+    width={'SCALAR':1,'VEC3':3}[a['type']]
+    def view(spec,count,typ,w):
+        v=j['bufferViews'][spec['bufferView']]
+        off=v.get('byteOffset',0)+spec.get('byteOffset',0)
+        return np.ndarray((count,w),dtype=typ,buffer=buf,offset=off,strides=(v.get('byteStride',typ.itemsize*w),typ.itemsize)).copy()
+    arr=view(a,a['count'],dt,width) if 'bufferView' in a else np.zeros((a['count'],width),dtype=dt)
+    if 'sparse' in a:
+        q=a['sparse']
+        typ=np.dtype({5121:'u1',5123:'<u2',5125:'<u4'}[q['indices']['componentType']])
+        idx=view(q['indices'],q['count'],typ,1).ravel()
+        arr[idx]=view(q['values'],q['count'],dt,width)
+    return arr
+def to_blender(v):
+    return v[:,[0,2,1]]*np.array([1,-1,1],dtype=np.float32)
+def to_gltf(v):
+    return v[:,[0,2,1]]*np.array([1,1,-1],dtype=np.float32)
+def canonical_faces(f):
+    f=np.sort(np.asarray(f,dtype=np.int32),axis=1)
+    return f[np.lexsort((f[:,2],f[:,1],f[:,0]))]
+def write_glb(path,j,buf):
+    j['buffers'][0]['byteLength']=len(buf)
+    js=json.dumps(j,separators=(',',':')).encode()
+    js+=b' '*((-len(js))%4)
+    buf+=b'\0'*((-len(buf))%4)
+    path.write_bytes(struct.pack('<4sII',b'glTF',2,12+8+len(js)+8+len(buf))+struct.pack('<II',len(js),0x4e4f534a)+js+struct.pack('<II',len(buf),0x004e4942)+buf)
+def append_vec(j,buf,data):
+    data=np.ascontiguousarray(data,dtype='<f4')
+    buf+=b'\0'*((-len(buf))%4)
+    view=len(j['bufferViews'])
+    j['bufferViews'].append(dict(buffer=0,byteOffset=len(buf),byteLength=data.nbytes))
+    buf.extend(data.tobytes())
+    idx=len(j['accessors'])
+    j['accessors'].append(dict(bufferView=view,componentType=5126,count=len(data),type='VEC3',min=data.min(0).tolist(),max=data.max(0).tolist()))
+    return idx
+def vertex_normals(v,tri):
+    a,b,c=v[tri[:,0]],v[tri[:,1]],v[tri[:,2]]
+    cross=np.cross(b-a,c-a)
+    n=np.zeros_like(v)
+    for i in range(3): np.add.at(n,tri[:,i],cross)
+    return n/np.maximum(np.linalg.norm(n,axis=1,keepdims=True),1e-20)
 report={}
 for sex,pin in pins.items():
     source=root/(sex+'-original.glb')
     source.write_bytes(urllib.request.urlopen(base+sex+'.glb',timeout=30).read())
     assert hashlib.sha256(source.read_bytes()).hexdigest()==pin
+    j,buf=read_glb(source)
+    mesh=j['meshes'][0]
+    prim=mesh['primitives'][0]
+    target_names=mesh['extras']['targetNames']
+    tri=accessor(j,buf,prim['indices']).reshape(-1,3).astype(np.int32)
+    assert tri.shape==(27420,3)
+    topology_hash=sha(tri.astype('<i8'))
+    assert topology_hash=='72a1d21fc87e04b194835769265008a4bcac5fdb5a1b1be4846d850960c5bca1',(sex,topology_hash)
+    vendor_faces=np.asarray(model.faces,dtype=np.int32)
+    # Compare raw source indices with vendor before involving Blender. Record
+    # whether the vendor face representation differs; source pin + exact local
+    # displacement direction and index correspondence remain independent gates.
+    vendor_hash=sha(vendor_faces.astype('<i8'))
+    raw_vendor_same=bool(np.array_equal(canonical_faces(tri),canonical_faces(vendor_faces)))
+    print(sex,'raw topology',topology_hash,'vendor topology',vendor_hash,'canonical same',raw_vendor_same)
+    raw_base=accessor(j,buf,prim['attributes']['POSITION'])
+    b=to_blender(raw_base)
+    assert b.shape==(13718,3)
+    old={'Basis':b.copy()}
+    for k,t in zip(target_names,prim['targets']):
+        old[k]=b+to_blender(accessor(j,buf,t['POSITION']))
+    assert set(old)=={'Basis',*names,'blink','smile','jawopen','neck_neg','neck_pos'}
+    area=metrics(b,tri)
+    # Use Blender to create the editable model from the exact ordered GLB
+    # coordinates and triangles, never from an implicit reordered import.
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(source))
-    obj=next(o for o in bpy.context.scene.objects if o.type=='MESH')
+    imported=next(o for o in bpy.context.scene.objects if o.type=='MESH')
+    imported_tri=np.array([p.vertices[:] for p in imported.data.polygons],dtype=np.int32)
+    print(sex,'imported topology same',bool(np.array_equal(canonical_faces(imported_tri),canonical_faces(tri))))
+    mats=list(imported.data.materials)
+    bpy.data.objects.remove(imported,do_unlink=True)
+    data=bpy.data.meshes.new(sex+' exact source index mesh')
+    data.from_pydata(b.tolist(),[],tri.tolist())
+    data.update()
+    obj=bpy.data.objects.new(sex+' RESET-C-FIX derivative',data)
+    bpy.context.collection.objects.link(obj)
+    for mat in mats:data.materials.append(mat)
+    for p in data.polygons:p.use_smooth=True
+    bpy.context.view_layer.objects.active=obj
+    obj.select_set(True)
+    for k,v in old.items():
+        key=obj.shape_key_add(name=k)
+        key.data.foreach_set('co',v.ravel())
+        key.value=0
     keys=obj.data.shape_keys.key_blocks
-    b=coords(keys[0])
-    assert b.shape==(13718,3)
-    assert all(k in keys for k in names)
-    tri=np.array([p.vertices[:] for p in obj.data.polygons],dtype=np.int32)
-    assert tri.shape==(27420,3)
-    # Independently prove index-level topology, irrespective of face winding/order.
-    def canonical_faces(f):
-        f=np.sort(np.asarray(f,dtype=np.int32),axis=1)
-        return f[np.lexsort((f[:,2],f[:,1],f[:,0]))]
-    vendor_faces=np.asarray(model.faces,dtype=np.int32)
-    assert np.array_equal(canonical_faces(tri),canonical_faces(vendor_faces)),(sex,'native vertex-index triangle topology mismatch')
-    topology_hash=sha(canonical_faces(tri))
-    area=metrics(b,tri)
-    old={k.name:coords(k) for k in keys}
+    assert np.array_equal(coords(keys[0]),b)
     # Verify spatial correspondence by comparing native and recovered displacement
     # magnitudes on the actual vertex order. If Blender reordered vertices, fail
     # closed instead of projecting the wrong anatomy or changing the neutral.
@@ -143,7 +226,7 @@ for sex,pin in pins.items():
             err=float(np.linalg.norm(X@T-Y)/np.linalg.norm(Y))
             candidates.append((err,T))
     err,T=min(candidates,key=lambda x:x[0])
-    # With independently identical index topology, validate axis orientation using six matching native supports.
+    # With exact pinned raw source topology, validate axis orientation using six matching native supports.
     # A small relative discrepancy on a millimetre-sized field is not an index mismatch.
     exact=[k for k in matched if axis_report[k]['native_support_cosine']>.9999]
     assert len(exact)>=6
@@ -241,20 +324,50 @@ for sex,pin in pins.items():
             bpy.ops.render.render(write_still=True)
     for k in keys:k.value=0
     bpy.ops.wm.save_as_mainfile(filepath=str(root/(sex+'-candidate.blend')))
-    bpy.ops.object.select_all(action='DESELECT')
-    obj.select_set(True)
-    bpy.context.view_layer.objects.active=obj
-    bpy.ops.export_scene.gltf(filepath=str(root/(sex+'-candidate.glb')),export_format='GLB',use_selection=True,export_morph=True,export_morph_normal=True)
-    # Verify the reimported candidate, including all preserved key coordinates.
+    # Preserve every original non-identity accessor and the exact triangle
+    # array. Append only new identity POSITION/NORMAL targets to the source GLB.
+    base_norm=vertex_normals(raw_base,tri)
+    normal_src=accessor(j,buf,prim['attributes']['NORMAL'])
+    normal_cos=np.sum(base_norm*normal_src,axis=1)
+    assert float(np.quantile(normal_cos,.01))>.80,(sex,float(np.quantile(normal_cos,.01)))
+    for k in names:
+        i=target_names.index(k)
+        d=to_gltf(deltas[k])
+        nd=vertex_normals(raw_base+d,tri)-base_norm
+        assert np.isfinite(nd).all()
+        prim['targets'][i]={'POSITION':append_vec(j,buf,d),'NORMAL':append_vec(j,buf,nd)}
+    out=root/(sex+'-candidate.glb')
+    write_glb(out,j,buf)
+    jj,bb=read_glb(out)
+    jp=jj['meshes'][0]['primitives'][0]
+    oj,ob=read_glb(source)
+    op=oj['meshes'][0]['primitives'][0]
+    for attr,i in op['attributes'].items():
+        assert np.array_equal(accessor(jj,bb,jp['attributes'][attr]),accessor(oj,ob,i)),(sex,attr)
+    assert np.array_equal(accessor(jj,bb,jp['indices']),accessor(oj,ob,op['indices']))
+    for k in target_names:
+        i=target_names.index(k)
+        if k not in names:
+            for attr,a in op['targets'][i].items():
+                assert np.array_equal(accessor(jj,bb,jp['targets'][i][attr]),accessor(oj,ob,a)),(sex,k,attr)
+        else:
+            actual=to_blender(accessor(jj,bb,jp['targets'][i]['POSITION']))
+            assert np.array_equal(actual,deltas[k]),(sex,k)
     saved={k.name:coords(k) for k in keys}
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=str(root/(sex+'-candidate.glb')))
+    bpy.ops.import_scene.gltf(filepath=str(out))
     obj=next(o for o in bpy.context.scene.objects if o.type=='MESH')
     keys=obj.data.shape_keys.key_blocks
     assert len(obj.data.vertices)==13718 and len(obj.data.polygons)==27420
     assert set(saved)==set(k.name for k in keys)
-    for k in keys:
-        assert np.allclose(coords(k),saved[k.name],atol=1e-6,rtol=0),(sex,k.name)
-    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),canonical_topology_sha=topology_hash,glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN; BVH counts recorded, not penetration classification')
+    # Match imported vertex order by exact neutral coordinate keys, with
+    # multiplicity-aware signatures including all target coordinates.
+    expected=np.concatenate([saved[k] for k in saved],axis=1)
+    actual=np.concatenate([coords(keys[k]) for k in saved],axis=1)
+    if not np.allclose(expected,actual,atol=1e-6,rtol=0):
+        from scipy.spatial import cKDTree
+        distance,index=cKDTree(expected).query(actual,k=1)
+        assert float(distance.max())<1e-5 and len(np.unique(index))==len(index),(sex,float(distance.max()),len(np.unique(index)))
+    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),canonical_topology_sha=topology_hash,vendor_topology_sha=vendor_hash,raw_vendor_canonical_same=raw_vendor_same,base_normal_cosine_p01=float(np.quantile(normal_cos,.01)),glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN; BVH counts recorded, not penetration classification')
 (root/'report.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report))
