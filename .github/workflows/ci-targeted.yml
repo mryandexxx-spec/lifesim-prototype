@@ -8,8 +8,8 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-body-c-reset-probe:
-    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-c-reset' && github.event.pull_request.head.repo.full_name == github.repository
+  cf-body-c-continuous-probe:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-c-continuous' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
@@ -36,6 +36,11 @@ jobs:
           ref: 265a6f079b8c56f4b7722c3aa1dce98745d0dceb
           path: pinned-vis
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: a180829f495b036e51219cbd9b865147aee68135
+          path: pinned-reset
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -47,17 +52,18 @@ jobs:
           python -c 'import bpy,torch; assert bpy.app.version==(4,5,0); assert torch.version.cuda is None'
       - name: Generate actual joint phenotype presets and stature comparison
         run: |
-          python -m py_compile art-review/cf-body-c-reset/probe.py art-review/cf-body-c-reset/browser.py
-          python art-review/cf-body-c-reset/probe.py
+          node --test art-review/cf-body-c-continuous/interpolate.test.mjs
+          python -m py_compile art-review/cf-body-c-continuous/probe.py art-review/cf-body-c-continuous/browser.py
+          python art-review/cf-body-c-continuous/probe.py
       - name: Real mobile PlayCanvas browser evidence
         run: |
           node --check body-c-reset-out/lab/lab.js
           python -m http.server 8765 --bind 127.0.0.1 --directory body-c-reset-out/lab >/tmp/body-c-http.log 2>&1 &
-          xvfb-run -a python art-review/cf-body-c-reset/browser.py
+          xvfb-run -a python art-review/cf-body-c-continuous/browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cf-body-c-reset-evidence
+          name: cf-body-c-continuous-evidence
           path: body-c-reset-out/
           if-no-files-found: warn
           retention-days: 90
