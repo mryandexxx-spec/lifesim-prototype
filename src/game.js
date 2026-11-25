@@ -263,6 +263,12 @@ try {
   calendarNeedsPersistence=true;
   billsNeedsPersistence=true;
 }
+// OF-C deterministic browser evidence: the normal v1 loader resumes time.
+ // Only an explicit QA URL starts paused; production save semantics are unchanged.
+ if(new URLSearchParams(location.search).get('furniture')==='qa'&&
+    new URLSearchParams(location.search).get('garden-start-paused')==='1'){
+   game.paused=true;game.otherSim.paused=true;
+ }
 const musicAudio=createMusicAudio();
 let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
 const audioButton=$('music-audio-toggle');

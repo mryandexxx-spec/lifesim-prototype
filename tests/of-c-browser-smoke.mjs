@@ -32,7 +32,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    await ctx.addInitScript(({key,tour,seed})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');},{key:SAVE_KEY,tour:UI_TOUR_STORAGE_KEY,seed});
    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));
    const ready=async()=>{await page.locator('#loading').waitFor({state:'hidden',timeout:100000});await page.waitForFunction(n=>{const s=window.__LifeSimGardenStats?.();return s&&s.plots.length===n&&s.plots.every(p=>p.attached&&!p.fallbackVisible)&&!s.failures;},features.length,{timeout:100000});};
-   await page.goto('http://127.0.0.1:8765/?furniture=qa',{waitUntil:'domcontentloaded'});await ready();
+   await page.goto('http://127.0.0.1:8765/?furniture=qa&garden-start-paused=1',{waitUntil:'domcontentloaded'});await ready();
    const stats=await page.evaluate(()=>window.__LifeSimGardenStats());
    for(const [i,f] of features.entries()){const p=stats.plots.find(p=>p.node==='LOT-B2 '+f.instanceId+' '+f.itemId),e=expected[i];assert.ok(p&&p.meshInstances>0);assert.equal(p.variant,e.variant);assert.equal(p.wet,e.wet);assert.equal(p.soil,e.wet?'Wet soil':'Dry soil');}
    const capture=async f=>page.evaluate(async f=>{
@@ -53,7 +53,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
    assert.equal(saved.version,1);assert.deepEqual(saved.world.outdoors.features,features);assert.deepEqual(saved.world.outdoors.gardens,gardens);
    if(width===390){
-    await page.goto('http://127.0.0.1:8765/?furniture=qa&garden=legacy',{waitUntil:'domcontentloaded'});
+    await page.goto('http://127.0.0.1:8765/?furniture=qa&garden-start-paused=1&garden=legacy',{waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:100000});
     for(const [i,f] of features.entries())store(name+'-legacy-'+f.itemId+'-'+expected[i].variant,await capture(f));
    }
@@ -71,11 +71,16 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
   try{
    await ctx.addInitScript(({key,tour,seed})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');},{key:SAVE_KEY,tour:UI_TOUR_STORAGE_KEY,seed});
    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));
-   await page.goto('http://127.0.0.1:8765/?furniture=qa',{waitUntil:'domcontentloaded'});await page.locator('#loading').waitFor({state:'hidden',timeout:100000});
+   await page.goto('http://127.0.0.1:8765/?furniture=qa&garden-start-paused=1',{waitUntil:'domcontentloaded'});await page.locator('#loading').waitFor({state:'hidden',timeout:100000});
    await page.waitForFunction(from=>{const p=window.__LifeSimGardenStats?.().plots[0];return p?.attached&&p.variant===from&&!p.fallbackVisible;},from,{timeout:100000});
    await page.locator('#pause-btn').click();
    await page.waitForFunction(({to,wet})=>{const p=window.__LifeSimGardenStats?.().plots[0];return p?.attached&&p.variant===to&&p.wet===wet&&p.soil===(wet?'Wet soil':'Dry soil')&&!p.fallbackVisible;},{to,wet},{timeout:35000});
    await page.locator('#pause-btn').click();
+   // Pause is transient, so pagehide is the real persistence boundary for
+   // watering and growth; reload also proves the selected model survived.
+   await page.reload({waitUntil:'domcontentloaded'});
+   await page.locator('#loading').waitFor({state:'hidden',timeout:100000});
+   await page.waitForFunction(({to,wet})=>{const p=window.__LifeSimGardenStats?.().plots[0];return p?.attached&&p.variant===to&&p.wet===wet&&!p.fallbackVisible;},{to,wet},{timeout:100000});
    const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
    assert.equal(saved.version,1);
    if(verb==='harvest'){assert.equal(saved.kitchen.pantry.herbs,2);assert.notEqual(saved.world.outdoors.gardens['out-1'].harvestedAt,null);}
