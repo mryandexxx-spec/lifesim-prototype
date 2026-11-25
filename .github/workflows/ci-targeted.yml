@@ -8,6 +8,38 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  of-integration-e:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-e' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact pool GLBs, all sides, original swim and editor contracts
+        run: node --test tests/of-integration-e.test.js tests/lot-d1b.test.js tests/lot-d1c.test.js tests/lot-d2a.test.js tests/lot-d2b.test.js tests/lot-d2c.test.js tests/lot-d2d.test.js tests/lot-d3a.test.js tests/lot-d3b-stress.test.js
+      - name: Actual Chromium and WebKit native and legacy pool fixtures
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor artifacts/lot-d2c
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/of-e-http.log 2>&1 &
+          sleep 3
+          node tests/of-e-browser-smoke.mjs
+          node tests/lot-d2c-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: of-e-game-evidence
+          path: |
+            artifacts/of-e/
+            artifacts/lot-d2c/
+          if-no-files-found: warn
   of-integration-d:
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-d' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

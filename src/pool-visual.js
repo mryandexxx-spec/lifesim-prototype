@@ -81,7 +81,98 @@ export function poolFixtureVisualPose(fixture){
     dx:-out.x,dz:-out.z,tx:out.z,tz:-out.x};
 }
 
-export function createPoolVisual({pc,app,mat,box,lotGround}){
+// Exact owner-approved OF-MASS/R2 native GLBs. glTF +Z enters the water.
+export const OF_POOL_SOURCE='926416f7e79d37ee2969dd41732591e770a8d43a';
+export const OF_POOL_ASSETS=Object.freeze({
+  "ladder": {
+    "file": "models/pool.ladder-new.glb",
+    "sha256": "2e7ecddd47e746964eb2954df45285caccecf54afd37f43476b6530f2853af21",
+    "bytes": 99088,
+    "triangles": 2824,
+    "boundsBlender": [
+      [
+        -0.23250000178813934,
+        -0.18691934645175934,
+        -0.8100000023841858
+      ],
+      [
+        0.23250000178813934,
+        0.15449999272823334,
+        0.5442253947257996
+      ]
+    ],
+    "materials": 2
+  },
+  "steps": {
+    "file": "models/pool.steps-new.glb",
+    "sha256": "392aa92e1263df840dc5a9b9e7f89c0e4b00c999c5aa182b83d6d32cecc6909c",
+    "bytes": 61000,
+    "triangles": 1296,
+    "boundsBlender": [
+      [
+        -0.23499999940395355,
+        -0.5929999947547913,
+        -1.2000000476837158
+      ],
+      [
+        0.23499999940395355,
+        0.012999996542930603,
+        -0.035999998450279236
+      ]
+    ],
+    "materials": 2
+  },
+  "board": {
+    "file": "models/pool.board-new.glb",
+    "sha256": "04155960e172980fb8de491a713a5e08176c4665457d4cad5e4573b5a855b88c",
+    "bytes": 47144,
+    "triangles": 972,
+    "boundsBlender": [
+      [
+        -0.23000000417232513,
+        -0.597000002861023,
+        0
+      ],
+      [
+        0.23000000417232513,
+        0.39500001072883606,
+        0.4819999933242798
+      ]
+    ],
+    "materials": 4
+  }
+});
+export function createPoolFixtureModels({pc,app,enabled=true}){
+  const cache=new Map(),records=new Map();let failures=0;
+  function load(kind){
+    if(!cache.has(kind)){
+      const pending=new Promise((resolve,reject)=>{
+        const asset=new pc.Asset('OF pool '+kind,'container',{url:'./assets/furniture/of-r2/pool.'+kind+'-new.glb'});
+        app.assets.add(asset);asset.ready(()=>resolve(asset));asset.once('error',e=>reject(e||Error(kind)));app.assets.load(asset);
+      });
+      cache.set(kind,pending);pending.catch(()=>{});
+    }
+    return cache.get(kind);
+  }
+  function attach(root,kind){
+    if(!enabled||!Object.hasOwn(OF_POOL_ASSETS,kind)||records.has(root))return false;
+    const r={root,kind,fallback:root.findComponents('render').filter(c=>c.enabled),pivot:null};
+    records.set(root,r);root.once('destroy',()=>records.delete(root));
+    load(kind).then(asset=>{
+      if(records.get(root)!==r||!root.parent)return;
+      const pivot=asset.resource.instantiateRenderEntity();
+      try{
+        if(!pivot.findComponents('render').some(c=>c.meshInstances?.length))throw Error('empty pool fixture '+kind);
+        pivot.name='OF pool '+kind;root.addChild(pivot);r.pivot=pivot;
+        for(const c of r.fallback)c.enabled=false;
+      }catch(e){pivot.destroy();throw e;}
+    }).catch(e=>{if(records.get(root)!==r)return;failures++;console.warn('OF pool legacy fallback',kind,e);});
+    return true;
+  }
+  return {attach,stats:()=>({failures,cached:cache.size,objects:[...records.values()].map(r=>({node:r.root.name,kind:r.kind,visible:r.root.enabled,attached:!!r.pivot?.parent,meshInstances:r.pivot?.findComponents('render').reduce((n,c)=>n+c.meshInstances.length,0)||0,fallbackVisible:r.fallback.some(c=>c.enabled)}))})};
+}
+export function createPoolVisual({pc,app,mat,box,lotGround,fixtureModels=true}){
+  const models=createPoolFixtureModels({pc,app,enabled:fixtureModels});
   const material={
     lawn:mat('#8fb78b'),water:mat('#48aec7',{opacity:.74}),
     floor:mat('#b8e3df'),walls:mat('#6eaeb2'),rim:mat('#e4d4c0'),
@@ -125,6 +216,7 @@ export function createPoolVisual({pc,app,mat,box,lotGround}){
       part('launch board',0,.435,.12,.46,.085,.94,'board');
       part('board lip',0,.435,.585,.46,.085,.024,'steel');
     }
+    models.attach(root,f.kind);
     return root;
   }
   function previewFixture(f=null){
@@ -163,6 +255,6 @@ export function createPoolVisual({pc,app,mat,box,lotGround}){
     previewFixture,
     dispose(){previewFixture();fixtureRoots.clear();clear();signature=null;lotGround.enabled=true;},
     stats:()=>({nodeCount:nodes.length,meshCount:meshes.length,
-      hasPool:!lotGround.enabled})
+      hasPool:!lotGround.enabled,fixtureModels:models.stats()})
   };
 }
