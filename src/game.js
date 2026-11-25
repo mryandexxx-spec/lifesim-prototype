@@ -2096,7 +2096,7 @@ function renderConversationPanel(force=true){
       }));
   }else{
     for(const choice of conversationOptions(session,game)){
-      const button=conversationButton(choice.label+(choice.locked?' · 🔒 Харизма '+choice.minLevel:''),()=>{
+      const button=conversationButton(choice.label+(choice.locked?' · 🔒 '+choice.lockReason:''),()=>{
         if(choice.locked)return false;
         if(applyDialogueDecision(game,root=>chooseSocialLine(root,choice.id))){
           save(true);renderConversationPanel();
