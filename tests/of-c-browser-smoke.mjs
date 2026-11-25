@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {chromium,webkit} from 'playwright';
-import {newHousehold} from '../src/household.js';
+import {newHousehold,loadHousehold} from '../src/household.js';
 import {restoreOutdoorsWorld} from '../src/lot-surface.js';
-import {newGardenRecord} from '../src/gardening.js';
+import {newGardenRecord,gardenApproach,GARDEN_DURATION} from '../src/gardening.js';
 import {OUTDOOR_CATALOG} from '../src/outdoor-catalog.js';
 import {OF_GARDEN_ASSETS,gardenModelState} from '../src/of-garden-assets.js';
 import {SAVE_KEY} from '../src/simulation.js';
@@ -52,9 +52,38 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    await page.reload({waitUntil:'domcontentloaded'});await ready();
    const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
    assert.equal(saved.version,1);assert.deepEqual(saved.world.outdoors.features,features);assert.deepEqual(saved.world.outdoors.gardens,gardens);
-   // Live clock crossing: wet sprout and growing are seeded just before
-   // their next boundary in a separate document; no direct mutation of the live game.
+   if(width===390){
+    await page.goto('http://127.0.0.1:8765/?furniture=qa&garden=legacy',{waitUntil:'domcontentloaded'});
+    await page.locator('#loading').waitFor({state:'hidden',timeout:100000});
+    for(const [i,f] of features.entries())store(name+'-legacy-'+f.itemId+'-'+expected[i].variant,await capture(f));
+   }
    assert.deepEqual(errors,[]);report.push({name,width,group,stats});writeFileSync(out+'/report.json',JSON.stringify(report,null,2));
   }finally{await ctx.close();}
- }}finally{await b.close();}
+ }
+ // Actual action settlement and visual transition in a live game. A valid
+ // saved physical session is just before completion; no writes to live state.
+ for(const [verb,from,to,wet] of [['water','seed','seed',true],['harvest','new','harvested',false],['replant','harvested','seed',false],['growth','sprout','growing',true]]){
+  const {seed}=fixture(0),sku='garden.herb.mint',item={instanceId:'out-1',itemId:sku,x:19,z:8,yaw:90,purchasePriceCredits:110};
+  const at=seed.minutes,record={...newGardenRecord(0),evaluatedAt:at,progressWetMinutes:verb==='water'?0:verb==='growth'?2879.7:4320,hydratedUntil:verb==='growth'?at+1000:0,lastWateredAt:verb==='growth'?at-100:null,harvestedAt:verb==='replant'?at-1:null};
+  seed.world.outdoors={...seed.world.outdoors,features:[item],gardens:{'out-1':record},nextId:2};seed.shop.credits=1000;seed.kitchen.pantry.herbs=0;
+  if(verb!=='growth'){const route=gardenApproach(seed.world,'out-1',seed.position);assert.ok(route);seed.position={...route.goal};seed.action={id:'garden',phase:'using',automatic:false,elapsed:GARDEN_DURATION[verb]-.5,targetInstanceId:'out-1',gardenActionId:verb,gardenPlantedAt:record.plantedAt,gardenGoal:{...route.goal}};assert.equal(loadHousehold(structuredClone(seed)).action?.gardenActionId,verb);}
+  const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true});
+  try{
+   await ctx.addInitScript(({key,tour,seed})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');},{key:SAVE_KEY,tour:UI_TOUR_STORAGE_KEY,seed});
+   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));
+   await page.goto('http://127.0.0.1:8765/?furniture=qa',{waitUntil:'domcontentloaded'});await page.locator('#loading').waitFor({state:'hidden',timeout:100000});
+   await page.waitForFunction(from=>{const p=window.__LifeSimGardenStats?.().plots[0];return p?.attached&&p.variant===from&&!p.fallbackVisible;},from,{timeout:100000});
+   await page.locator('#pause-btn').click();
+   await page.waitForFunction(({to,wet})=>{const p=window.__LifeSimGardenStats?.().plots[0];return p?.attached&&p.variant===to&&p.wet===wet&&p.soil===(wet?'Wet soil':'Dry soil')&&!p.fallbackVisible;},{to,wet},{timeout:35000});
+   await page.locator('#pause-btn').click();
+   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+   assert.equal(saved.version,1);
+   if(verb==='harvest'){assert.equal(saved.kitchen.pantry.herbs,2);assert.notEqual(saved.world.outdoors.gardens['out-1'].harvestedAt,null);}
+   if(verb==='replant'){assert.equal(saved.shop.credits,970);assert.equal(saved.world.outdoors.gardens['out-1'].harvestedAt,null);}
+   if(verb==='water')assert.ok(saved.world.outdoors.gardens['out-1'].hydratedUntil>saved.minutes);
+   assert.deepEqual(errors,[]);await page.screenshot({path:out+'/'+name+'-live-'+verb+'.png'});
+   report.push({name,live:verb,from,to,wet});writeFileSync(out+'/report.json',JSON.stringify(report,null,2));
+  }finally{await ctx.close();}
+ }
+ }finally{await b.close();}
 }
