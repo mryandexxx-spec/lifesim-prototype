@@ -11,18 +11,33 @@ export const HEEL_PINS = Object.freeze({
 
 export const heelSourceFile = name => 'c4c-heel-source-' + name;
 
+// The previous verified Pages release publishes the original CC0 files,
+// not only the fitted wearable. Treat it as a mirror, never as a trust root.
+export const HEEL_MIRROR = 'https://mryandexxx-spec.github.io/lifesim-prototype/assets/characters/cas-c3/';
+
+export async function fetchPinnedHeelFile(name, hash, request = fetch) {
+  const urls = [HEEL_MIRROR + heelSourceFile(name), HEEL_SOURCE + name];
+  const failures = [];
+  for (const url of urls) {
+    try {
+      const response = await request(url, {
+        redirect: 'error', signal: AbortSignal.timeout(30000)
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = Buffer.from(await response.arrayBuffer());
+      if (digest(data) !== hash) throw new Error('SHA-256 mismatch');
+      return data;
+    } catch (error) {
+      failures.push(url + ': ' + error.message);
+    }
+  }
+  throw new Error('C4C no exact pinned source for ' + name + ': ' + failures.join('; '));
+}
+
 export async function readHeelSource(folder) {
   const records = await Promise.all(Object.entries(HEEL_PINS).map(async ([name, hash]) => {
     const path = new URL(heelSourceFile(name), folder);
-    let data;
-    if (existsSync(path)) data = readFileSync(path);
-    else {
-      const response = await fetch(HEEL_SOURCE + name, {
-        redirect: 'error', signal: AbortSignal.timeout(30000)
-      });
-      if (!response.ok) throw new Error('C4C publisher returned ' + response.status + ' for ' + name);
-      data = Buffer.from(await response.arrayBuffer());
-    }
+    const data = existsSync(path) ? readFileSync(path) : await fetchPinnedHeelFile(name, hash);
     if (digest(data) !== hash) throw new Error('C4C publisher checksum changed for ' + name);
     writeFileSync(path, data);
     return data;
