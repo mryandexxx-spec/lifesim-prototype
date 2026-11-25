@@ -67,10 +67,10 @@ jobs:
           python-version: '3.11'
       - uses: actions/download-artifact@v4
         with:
-          name: cf-body-d-contact-render-evidence
-          run-id: 45664468588
+          name: cf-body-d4-contact-audit
+          run-id: 45676236151
           github-token: ${{ github.token }}
-          path: d3
+          path: r1
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -82,17 +82,13 @@ jobs:
           # identical wheel importing and rendering successfully in D3.
           # Require real import, exact versions and an evaluated mesh instead.
           python -c 'import bpy, numpy; assert bpy.app.version == (4,5,0); assert numpy.__version__ == "1.26.4"; bpy.ops.mesh.primitive_cube_add(); assert len(bpy.context.object.data.vertices) == 8; print(bpy.app.version_string, numpy.__version__)'
-          python -m py_compile art-review/cf-body-d/contact_audit.py
-      - name: Generate calibrated seated endpoint candidates from exact D3 GLBs
-        run: python art-review/cf-body-d/refine.py
-      - name: Audit actual skinned triangle contacts and render matched closeups
-        run: python art-review/cf-body-d/contact_audit.py
+          python -m py_compile art-review/cf-body-d/contact_audit.py art-review/cf-body-d/motion_audit.py
+      - name: Sample motion, classify skin BVH candidates and render full body
+        run: python art-review/cf-body-d/motion_audit.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cf-body-d4-contact-audit
-          path: |
-            d4/
-            d4-candidates/
+          name: cf-body-d4-motion-audit
+          path: d4-motion/
           retention-days: 90
           if-no-files-found: warn
