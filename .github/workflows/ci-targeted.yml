@@ -8,6 +8,58 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-body-c-continuous-distribution:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-c-continuous' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-c-continuous-evidence
+          run-id: 45634752787
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify and distribute reviewed diagnostic only
+        run: |
+          python - <<'PY'
+          import pathlib,json,hashlib
+          p=pathlib.Path('reviewed/lab')
+          raw=(p/'SHA256SUMS.json').read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='31b3f6e4e5ae9fc0634b67fadf00c7d22a8b593f284daaba952ef090b655dc67'
+          m=json.loads(raw);assert len(m)==276
+          assert {str(x.relative_to(p)) for x in p.rglob('*') if x.is_file()}==set(m)|{'SHA256SUMS.json'}
+          for n,h in m.items():
+              assert not (p/n).is_symlink()
+              assert hashlib.sha256((p/n).read_bytes()).hexdigest()==h,n
+              assert not n.endswith(('.blend','.zip'))
+          assert m['male-body.glb']=='fe0963efd05debe860e79d6b889d59a1f8ec1444616c572638f47dbca9dd83ab'
+          assert m['female-body.glb']=='94bb796fbe3e4baf16633d24fbeb0a84d7d50db6a2cfb90af9e8e9e9bdb6e430'
+          # Only the disclosure text changes after evidence review.
+          f=p/'index.html';s=f.read_text()
+          assert '<div id="status">' in s
+          s=s.replace('<div id="status">','<p><strong>Кандидат для оценки владельцем, не релиз.</strong> Геометрия проверенных состояний исправлена; мускулатура и пропорции меняются умеренно. WebKit-кадры невалидны, физическая проверка Safari, риг и производительность не подтверждены. GLB около 18,4 МБ на модель.</p><div id="status">',1)
+          f.write_text(s)
+          m['index.html']=hashlib.sha256(f.read_bytes()).hexdigest()
+          (p/'SHA256SUMS.json').write_text(json.dumps(m,indent=2))
+          print('276 original hashes verified; only diagnostic disclosure updated')
+          print('Published manifest SHA256:',hashlib.sha256((p/'SHA256SUMS.json').read_bytes()).hexdigest())
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_INDEX_FILE="$(mktemp -u)"
+          git --work-tree="$PWD/reviewed/lab" read-tree --empty
+          git --work-tree="$PWD/reviewed/lab" add -A -- .
+          tree=$(git write-tree)
+          sha=$(git commit-tree "$tree" -m "CF-BODY C continuous reviewed diagnostic payload run 45634752787")
+          git push origin "$sha:refs/heads/art/cf-body-c-continuous-lab"
+          echo "Distribution SHA: $sha"
+
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
