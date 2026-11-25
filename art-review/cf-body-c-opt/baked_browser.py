@@ -29,12 +29,22 @@ with sync_playwright() as p:
                         for i,pg in enumerate(pages):
                             pg.evaluate('([s,a])=>window.setBodyState(s,a)',[profile if i==0 else 'neutral',angle])
                             if i:pg.locator('#height').evaluate('(el,v)=>{el.value=String(v);el.dispatchEvent(new Event("input",{bubbles:true}))}',scale)
-                            if expression:pg.locator('[data-expr="'+expression+'"]').click()
+                            if expression:
+                                panel=pg.locator('details').filter(has=pg.locator('#face'))
+                                if not panel.evaluate('el=>el.open'):
+                                    panel.locator('summary').click()
+                                button=panel.locator('[data-expr="'+expression+'"]')
+                                assert button.is_visible()
+                                button.click(timeout=10000)
+                                assert button.get_attribute('aria-pressed')=='true'
                             settle(pg)
                             actual=pg.evaluate('window.labState')
                             assert abs(actual['actualScale']-scale)<1e-5,(profile,actual)
                             w=pg.evaluate('window.actualWeights')
-                            assert w and all(abs(m.get(expression,0)-1)<1e-5 for m in w) if expression else w
+                            assert w
+                            if expression:
+                                assert actual['expression']==expression
+                                assert all(abs(m.get(expression,0)-1)<1e-5 for m in w)
                             expected={'body_baked':1} if i else {k:v for k,v in states[profile].items() if k!='__scale'}
                             assert all(all(abs(m.get(k,0)-v)<1e-5 for k,v in expected.items()) for m in w)
                             assert actual['targets']==[16,16] if i else actual['targets']==[48,48],actual
