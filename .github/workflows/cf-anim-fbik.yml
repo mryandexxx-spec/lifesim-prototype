@@ -1,10 +1,7 @@
 name: CF-ANIM FBIK diagnostic
 on:
-  pull_request:
-    paths:
-      - 'tools/cf_anim_fbik.py'
-      - '.github/workflows/cf-anim-fbik.yml'
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
   actions: read
@@ -51,10 +48,29 @@ jobs:
         run: |
           mkdir -p fbik-out
           python -m py_compile tools/cf_anim_fbik.py
-          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1
           python -m pip inspect > fbik-out/dependency-inspect.json
           python -m pip freeze > fbik-out/dependency-freeze.txt
-          python -m pip check
+          # pip can reject the bpy wheel tag even after installing it on Linux.
+          # Only that exact metadata diagnostic may be superseded by actual runtime checks.
+          python - <<'PY'
+          import subprocess, sys, pathlib
+          p = subprocess.run([sys.executable, "-m", "pip", "check"], capture_output=True, text=True)
+          log = p.stdout + p.stderr
+          print(log)
+          pathlib.Path("fbik-out/pip-check.txt").write_text(log)
+          if p.returncode:
+              assert log.strip() == "bpy 4.5.0 is not supported on this platform", log
+          import bpy, numpy, mujoco, mink, qpsolvers, importlib.metadata as md
+          assert bpy.app.version == (4, 5, 0)
+          assert md.version("mink") == "0.0.13" and mujoco.__version__ == "3.3.6"
+          assert "daqp" in qpsolvers.available_solvers
+          model = mujoco.MjModel.from_xml_string('<mujoco><worldbody><body><joint type="hinge"/><geom size=".1"/></body></worldbody></mujoco>')
+          config = mink.Configuration(model)
+          assert len(config.q) == 1
+          bpy.ops.wm.read_factory_settings(use_empty=True)
+          print("Blender and Mink native runtime preflight PASS")
+          PY
       - name: Real rig simultaneous target comparison and matched videos
         run: python tools/cf_anim_fbik.py
       - uses: actions/upload-artifact@v4
