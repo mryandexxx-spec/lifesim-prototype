@@ -16,7 +16,7 @@ import {recordProfessionalShift} from './career-goals.js';
 import {creditCareerPaidLeave,careerTimeOffForShift,settleCareerTimeOff} from './career-timeoff.js';
 import {WORK_MODES,cleanWorkMode,newWorkNeeds,progressWorkNeeds,workNeedsReport} from './career-work-needs.js';
 import {nearestWalkable,findPath} from './navigation.js';
-import {enqueueAction} from './action-queue.js';
+import {enqueueAction,pendingActions,removeQueuedAction} from './action-queue.js';
 
 const NAMES={alex:'Алекс',mira:'Мира'};
 const ACTIVE=new Set(['departing','waiting','working','returning']);
@@ -30,6 +30,32 @@ export function residentWorkPhase(root,id){
 }
 export function residentUnavailableForHome(root,id){
   return ACTIVE.has(residentWorkPhase(root,id));
+}
+/** PF-11: work is a terminal invalidation for a pending conversation, not a
+ * temporary resource wait. Preserve unrelated tasks and their sequence IDs. */
+export function socialCommandBlockedByWork(root,id,command){
+  return ['social','conversation','branch'].includes(command?.type)&&
+    (residentUnavailableForHome(root,id)||residentUnavailableForHome(root,command.targetId));
+}
+export function cancelUnavailableSocialCommands(root){
+  const messages=[];
+  for(const id of Object.keys(root?.actionQueues?.byResident||{})){
+    let count=0;
+    for(const task of [...pendingActions(root.actionQueues,id)]){
+      if(socialCommandBlockedByWork(root,id,task)&&
+        removeQueuedAction(root.actionQueues,id,task.seq))count++;
+    }
+    if(count){
+      const actor=actorFor(root,id);
+      const message='Общение отменено: участник на работе или в дороге ('+count+')';
+      if(actor&&!actor.action&&!residentUnavailableForHome(root,id)&&
+        !root.socialAction&&![root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))
+        actor.event=message;
+      messages.push({type:'social-canceled',residentId:id,count,
+        text:(NAMES[id]||root.population?.residentsById?.[id]?.identity?.firstName||id)+': '+message});
+    }
+  }
+  return messages;
 }
 export function residentAwayAtWork(root,id){
   return ['waiting','working','returning'].includes(residentWorkPhase(root,id));
@@ -163,7 +189,7 @@ function settle(root,contract,id,at){
 export function progressCareerWork(root,before,after){
   if(!root||root.paused||!validMinute(before)||!validMinute(after)||
      after<=before||!root.calendar||!root.careerSystem||!root.shop)return [];
-  const messages=[];
+  const messages=cancelUnavailableSocialCommands(root);
   for(const id of residentIdsForSimulation(root)){
     const contract=root.careerSystem.byResident?.[id];
     const actor=actorFor(root,id);
@@ -282,6 +308,7 @@ export function progressCareerWork(root,before,after){
       }
     }
   }
+  messages.push(...cancelUnavailableSocialCommands(root));
   return messages;
 }
 /** Manual departure can begin after the T-60 reminder (even earlier than auto departure). */
@@ -289,11 +316,13 @@ export function requestCareerDeparture(root,id,at=root?.minutes){
   const contract=root?.careerSystem?.byResident?.[id],shift=contract?.currentShift;
   const actor=actorFor(root,id);
   if(!shift||shift.phase!=='pending'||!validMinute(at)||
-    at<shift.start-60||at>=shift.end||!actor||actor.action||root.socialAction)
+    at<shift.start-60||at>=shift.end||!actor||actor.action||root.socialAction||
+    [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))
     return {ok:false,reason:'Сначала заверши текущее действие или дождись начала смены'};
   shift.phase='departing';
   actor.event='Идёт к выходу на работу';
-  return {ok:true};
+  const canceled=cancelUnavailableSocialCommands(root);
+  return {ok:true,...(canceled.length?{canceledSocial:canceled.reduce((n,item)=>n+item.count,0)}:{})};
 }
 export function arriveCareerPortal(root,id,at=root?.minutes){
   const shift=root?.careerSystem?.byResident?.[id]?.currentShift;
@@ -337,6 +366,7 @@ export function selectCareerWorkMode(root,id,mode){
 export function finishCareerReturn(root,id){
   const contract=root?.careerSystem?.byResident?.[id];
   if(contract?.currentShift?.phase!=='returning')return false;
+  cancelUnavailableSocialCommands(root);
   contract.currentShift=null;
   const actor=actorFor(root,id);
   if(actor){actor.action=null;actor.event='Вернулся домой с работы';}
