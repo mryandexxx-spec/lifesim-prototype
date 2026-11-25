@@ -5,6 +5,8 @@ import {chromium} from 'playwright';
 import {newHousehold,loadHousehold,getActor} from '../src/household.js';
 import {startConversation,arriveSocial} from '../src/relationships.js';
 import {isWalkable,isClearLine} from '../src/navigation.js';
+import {restoreSkillProgress} from '../src/skills-engine.js';
+import {HOBBY_SKILLS} from '../src/hobby-reading.js';
 import {newGame,SAVE_KEY} from '../src/simulation.js';
 import {acceptCareerOffer} from '../src/career-job-board.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
@@ -210,7 +212,8 @@ try{
   const state=loadHousehold(copy(root));state.autonomy.enabled=false;
   const a=extra?'resident_3':'alex',b=extra?'resident_4':'mira';
   const first=getActor(state,a),second=getActor(state,b);
-  first.skills.xpById.charisma=485;second.skills.xpById.charisma=1360;
+  first.skills=restoreSkillProgress({schema:1,xpById:{charisma:485}},HOBBY_SKILLS);
+  second.skills=restoreSkillProgress({schema:1,xpById:{charisma:1360}},HOBBY_SKILLS);
   let placed=false;
   for(let x=-4;x<=3&&!placed;x+=.5)for(let z=-3;z<=3&&!placed;z+=.5){
    const p={x,z},q={x:x+1.05,z};
