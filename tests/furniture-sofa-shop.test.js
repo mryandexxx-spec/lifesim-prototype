@@ -93,7 +93,9 @@ test('visual sit and exit stay bound to action target; Meshy seat contact is per
  assert.match(game,/makeSofaSeat=\(instanceId=null,romanticSlot=null\)=>/);
  assert.match(game,/furnitureInstance\(game.world,'sofa',instanceId\)/);
  assert.match(game,/alexSeatInstanceId=sofaVisualTargets.alex/);
- assert.match(game,/seat:seatContactEnabled\?\(alexDiningVisual&&/);
+ assert.match(game,/seat:seatContactEnabled\?\(gardenSeatPose\?outdoorBenchSurface\(game.world,benchVisualTargets.alex\):alexDiningVisual&&/);
+ assert.match(game,/:livingSofaSeat\):null/);
+ assert.match(game,/seat:gardenMiraPose&&seatContactEnabled\?outdoorBenchSurface\(game.world,benchVisualTargets.mira\):\s*miraMeshSeatId&&meshyFurniture.hasModel/);
  assert.match(game,/purchasedDiningSeatSurface\(game.world,alexDiningVisual.chairId/);
  assert.match(game,/if\(!seating\)\{sofaVisualTargets.alex=null;romanticSofaSlots.alex=null;diningVisual.alex=null;\}/);
  assert.match(game,/if\(!miraSeating\)\{sofaVisualTargets.mira=null;romanticSofaSlots.mira=null;diningVisual.mira=null;\}/);
