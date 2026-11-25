@@ -3210,8 +3210,8 @@ function boot() {
   // per owned instance. Only the 96-item bounded save controls these meshes.
   const outdoorFeatureNodes=[],outdoorLightNodes=[],grillAnimated=[];
   const vegetationMode=new URLSearchParams(window.location.search).get('vegetation');
-  const vegetation=createOutdoorVegetationVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&vegetationMode!=='legacy'});
-  if(furnitureVisualMode==='qa')window.__LifeSimVegetationStats=vegetation.stats;
+  const vegetation=createOutdoorVegetationVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&vegetationMode!=='legacy',instancing:vegetationMode!=='unbatched'});
+  if(furnitureVisualMode==='qa'){window.__LifeSimVegetationStats=vegetation.stats;window.__LifeSimVegetationInstancing=vegetation.setInstancing;}
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);

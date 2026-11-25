@@ -215,6 +215,8 @@ export const ofVegetationSpec=sku=>specs.get(sku)||null;
 export const vegetationLevelSpec=(sku,level)=>level==='far'?OF_FAR_LODS[sku]||null:level==='lod'?ofVegetationSpec(sku)?.lod||null:ofVegetationSpec(sku);
 export function vegetationLod(sku,distance,previous='high'){
  if(!Number.isFinite(distance))return 'high';
+ // Flowers retain approved high geometry: reduced petals visibly distorted.
+ if(sku.startsWith('flower.'))return 'high';
  if(OF_FAR_LODS[sku])return distance>18?'far':distance<14?'high':previous==='far'?'far':'high';
  if(!ofVegetationSpec(sku)?.lod)return 'high';
  return distance>20?'lod':distance<16?'high':previous==='lod'?'lod':'high';

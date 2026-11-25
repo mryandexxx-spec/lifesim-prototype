@@ -10,7 +10,7 @@ concurrency:
 jobs:
   of-integration-b:
     permissions:
-      contents: write
+      contents: read
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-b' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -26,23 +26,13 @@ jobs:
       - name: Real game WebGL and comparative 36-feature lot profile
         run: |
           npm ci
-          npm install --no-save playwright@1.56.1 @gltf-transform/core@4.1.1 @gltf-transform/extensions@4.1.1 @gltf-transform/functions@4.1.1 meshoptimizer@0.22.0
-          node scripts/of-b-generate-far.mjs
-          node --test tests/of-integration-b.test.js
+          npm install --no-save playwright@1.56.1
           npx playwright install --with-deps chromium webkit
           mkdir -p vendor
           cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/of-b-http.log 2>&1 &
           sleep 3
           node tests/of-b-browser-smoke.mjs
-      - name: Stage exact verified far candidates only (temporary guarded writer)
-        run: |
-          git add src/of-vegetation-far-data.js assets/furniture/of-r2/*-far.glb
-          git diff --cached --quiet && exit 0
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'OF-B: generated and tested far vegetation candidates'
-          git push origin HEAD:refs/heads/feature/of-integration-b
       - uses: actions/upload-artifact@v4
         if: always()
         with:
