@@ -45,12 +45,14 @@ def main():
                     state(page,name)
                     for angle in ANGLES:
                         page.locator(f'[data-angle="{angle}"]').click()
-                        for mode in ("matched","legacy") if engine=="chromium" else ("matched",):
+                        for mode in (("matched","legacy","axis-only") if name=="neutral" else ("matched","legacy")) if engine=="chromium" else ("matched",):
                             page.evaluate("m=>window.setVis(m)",mode)
+                            directions=page.evaluate("window.visDirections")
+                            assert len(directions)==3 and all(abs(d["dot"]-(0 if mode=="legacy" else 1))<1e-4 for d in directions),directions
                             page.wait_for_timeout(400)
                             path=FRAMES/f"{sex}-{name}-{angle}-{engine}-{mode}.png"
                             std=capture(page,path)
-                            report["frames"].append(dict(sex=sex,state=name,angle=angle,engine=engine,mode=mode,std=std,valid=std>5))
+                            report["frames"].append(dict(sex=sex,state=name,angle=angle,engine=engine,mode=mode,std=std,valid=std>5,directions=directions))
                             if engine=="chromium":assert std>5,path
             assert not errors,errors
             for width,height in ((390,844),(320,568)):
@@ -68,18 +70,23 @@ def main():
                 m.close()
             browser.close()
     for sex,digest in PIN.items():assert sha(LAB/(sex+"-candidate.glb"))==digest
-    assert len(report["frames"])==72 and len(report["mobile"])==8
+    assert len(report["frames"])==78 and len(report["mobile"])==8
     for sex in PIN:
         a=Image.open(FRAMES/f"{sex}-neutral-0-chromium-matched.png")
         b=Image.open(FRAMES/f"{sex}-neutral-90-chromium-matched.png")
         from PIL import ImageChops
         assert max(ImageStat.Stat(ImageChops.difference(a,b)).mean)>3,sex
+        before=Image.open(FRAMES/f"{sex}-neutral-0-chromium-legacy.png")
+        axis=Image.open(FRAMES/f"{sex}-neutral-0-chromium-axis-only.png")
+        axis_delta=max(ImageStat.Stat(ImageChops.difference(before,axis)).mean)
+        assert axis_delta>3,(sex,axis_delta)
+        report.setdefault("axis_only_mean_rgb_delta",{})[sex]=axis_delta
     # WebKit must also show a changing framebuffer to count as visible.
     for sex in PIN:
         a=Image.open(FRAMES/f"{sex}-neutral-0-webkit-matched.png")
         b=Image.open(FRAMES/f"{sex}-neutral-90-webkit-matched.png")
         if max(ImageStat.Stat(ImageChops.difference(a,b)).mean)<=3:
-            for f in report["frames"]:
+            for f in report["frames"]+report["mobile"]:
                 if f["engine"]=="webkit" and f["sex"]==sex:f["valid"]=False
     report["art"]="OPEN: direct human inspection required; nonblank is not approval"
     report["webkit_visual"]="PASS_NONBLANK_FRAMEBUFFER_ONLY" if all(f["valid"] for f in report["frames"] if f["engine"]=="webkit") else "OPEN_INVALID_FRAME"
