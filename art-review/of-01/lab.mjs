@@ -34,4 +34,10 @@ async function stress(v){
  timings.sort((a,b)=>a-b);return {instances:n,triangles,medianMs:timings[45],p95Ms:timings[85],drawCalls:app.stats?.drawCalls?.total??null};
 }
 function resetStress(){lot?.destroy();lot=null;root.enabled=true;frame();app.renderNextFrame=true;}
-window.ofLab={show,data,app,framebuffer,stress,resetStress,visibility:async visible=>{root.enabled=visible;await settle();}};resize();run();
+async function placeProbe(p){
+ const saved=root.getLocalPosition().clone(),rotation=root.getLocalEulerAngles().clone();
+ root.setLocalPosition(p.x,0,p.z);root.setLocalEulerAngles(0,-p.yaw,0);const ghost=current.clone();root.addChild(ghost);current.enabled=false;await settle();
+ const pos=ghost.getPosition(),actual={x:pos.x,z:pos.z,yaw:root.getLocalEulerAngles().y,ghostVisible:ghost.enabledInHierarchy,committedHidden:!current.enabled};
+ ghost.destroy();current.enabled=true;root.setLocalPosition(saved);root.setLocalEulerAngles(rotation);await settle();return {...actual,ghostRemoved:!root.children.includes(ghost),committedVisible:current.enabledInHierarchy};
+}
+window.ofLab={show,data,app,framebuffer,stress,resetStress,placeProbe,visibility:async visible=>{root.enabled=visible;await settle();}};resize();run();

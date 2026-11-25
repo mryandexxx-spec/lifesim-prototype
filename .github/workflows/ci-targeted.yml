@@ -46,13 +46,22 @@ jobs:
           npm ci
           npm install --no-save playwright@1.56.1 pngjs@7.0.0
           npx playwright install --with-deps chromium webkit
+      - name: Existing game placement and persistence regression tests
+        run: node --test tests/furniture-placement-flow.test.js tests/furniture-visible-placement.test.js tests/furniture-shop-integration.test.js tests/furniture-f1b.test.js tests/furniture-f1b-integration.test.js tests/qsk-09-save-safety.test.js
       - name: Capture headless and headed WebKit under Xvfb
         run: |
           python -m http.server 8765 --bind 127.0.0.1 &
           sleep 2
-          OF_MODE=headless node art-review/of-01/capture.mjs
-          OF_MODE=headed xvfb-run -a node art-review/of-01/capture.mjs
+          set +e
+          timeout 480s env OF_MODE=headless node art-review/of-01/capture.mjs
+          headless=$?
+          timeout 480s env OF_MODE=headed xvfb-run -a node art-review/of-01/capture.mjs
+          headed=$?
+          set -e
+          echo "Capture process exits: headless=$headless headed=$headed"
           node art-review/of-01/fix-gate.mjs
+          test "$headless" -eq 0
+          test "$headed" -eq 0
       - name: Archive diagnostic evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
