@@ -1,0 +1,64 @@
+name: CF-ANIM tools comparison
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  motion-comparison:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify and sample actual pinned motion and six diagnostic rigs
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          python -m py_compile tools/cf_anim_source_intake.py tools/cf_anim_tools.py
+          python tools/cf_anim_source_intake.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+          python tools/cf_anim_tools.py prepare
+      - name: Run unmodified upstream retarget and relative limb solver
+        run: |
+          npm install --prefix .anim-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.anim-deps/node_modules" upstream-ossos/node_modules
+          cp tools/cf_anim_tools.mjs upstream-ossos/anim-tools.mjs
+          .anim-deps/node_modules/.bin/esbuild upstream-ossos/anim-tools.mjs --bundle --platform=node --target=node22 --format=esm --outfile=anim-tools-bundle.mjs
+          cp upstream-ossos/LICENSE anim-tools-out/ossos-LICENSE
+          cp .anim-deps/package-lock.json anim-tools-out/dependency-lock.json
+          node anim-tools-bundle.mjs
+      - name: Real target motion videos at matched framing
+        run: python tools/cf_anim_tools.py render
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-tools-evidence
+          path: |
+            anim-tools-out/
+            cf-anim-source-report/inventory.json
+            cf-anim-source-report/ATTRIBUTION.md
+          if-no-files-found: warn
