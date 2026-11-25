@@ -4,3 +4,5 @@ for(const [id,vs] of Object.entries(m))for(const k of ['old','new']){const v=vs[
 console.log('43 SKU pairs, 33 families, actual GLBs and Blender frame files verified; ART OPEN');
 
 for(const [id,vs] of Object.entries(m))for(const [k,v] of Object.entries(vs)){if(['old','new'].includes(k))continue;const b=readFileSync(root+v.file);assert.equal(createHash('sha256').update(b).digest('hex'),v.sha256);assert.ok(v.triangles>0&&v.triangles<=4000,id+' '+k);for(const angle of ['front','three-quarter','profile'])assert.ok(existsSync('artifacts/of-mass/blender/'+id+'-'+k+'-'+angle+'.png'));}assert.ok(m['tree.round'].lod.triangles<m['tree.round'].new.triangles*.75);for(const id of Object.keys(c).filter(x=>x.startsWith('garden.flower.')||x.startsWith('garden.herb.'))){for(const k of ['seed','sprout','growing','wet'])assert.ok(m[id][k],id+' '+k);if(id.includes('herb'))assert.ok(m[id].harvested,id)}
+
+for(const id of ['flower.tulip','flower.lavender'])assert.ok(m[id].new.triangles<=2200,id+' optimized flower budget');for(const id of Object.keys(m).filter(x=>x.startsWith('fanflag.')))assert.ok(m[id].new.materials>=4,id+' club motif');

@@ -13,7 +13,7 @@ let current=null,version='new',angle=1,night=false,seq=0;const cache=new Map();l
 function prune(){for(const [url,promise] of cache){if(url===activeUrl||keep.has(url))continue;cache.delete(url);promise.then(a=>{a.unload();app.assets.remove(a)}).catch(()=>{});}}
 function material(c){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(...c);m.update();return m}
 function box(n,p,s,c){let e=new pc.Entity(n);e.addComponent('render',{type:'box',material:material(c)});e.setPosition(...p);e.setLocalScale(...s);app.root.addChild(e);return e}
-const floor=box('Floor',[0,-.06,0],[20,.1,20],[.77,.79,.74]);const deck=box('Deck',[0,-.04,-.75],[3,.08,1.5],[.85,.80,.72]);const wall=box('Pool wall',[0,-.64,-.04],[3,1.2,.08],[.45,.62,.65]);
+const floor=box('Floor',[0,-.06,0],[30,.1,24],[.77,.79,.74]);const deck=box('Deck',[0,-.04,-.75],[3,.08,1.5],[.85,.80,.72]);const wall=box('Pool wall',[0,-.64,-.04],[3,1.2,.08],[.45,.62,.65]);
 const mount=box('Mount wall',[0,-.10,.16],[4,4,.12],[.86,.84,.78]);
 function frame(){const id=sku.value;let [y,s]=frames[id];const front=['sconce.leaf','dresser.arch','mirror.oval','garden.bench'].includes(id)||id.startsWith('fanflag.')||id.startsWith('fanstand.')?-1:1;const ps=[[0,y+.25,5*front],[3.5,y+2.5,4*front],[5,y+.25,.08*front]];cam.setPosition(...ps[angle]);cam.lookAt(0,y,0);cam.camera.orthoHeight=s/2*Math.max(1,canvas.clientHeight/canvas.clientWidth);const pool=id.startsWith('pool.');mount.enabled=id==='sconce.leaf';floor.enabled=!pool&&!mount.enabled;deck.enabled=wall.enabled=pool;key.setEulerAngles(48,mount.enabled?148:32,0);fill.setEulerAngles(38,mount.enabled?80:-100,0)}
 function resize(){const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);if(canvas.width!==w||canvas.height!==h)app.setCanvasResolution(pc.RESOLUTION_FIXED,w,h);frame();app.renderNextFrame=true}window.addEventListener('resize',resize);
@@ -35,7 +35,7 @@ async function stress(v){
  let n=0,triangles=0;
  for(let i=0;i<96;i++){const id=ids[i%ids.length],item=data[id][v==='new'&&id==='tree.round'?'lod':v];keep.add(item.file);const a=await asset(item.file),e=a.resource.instantiateRenderEntity();lot.addChild(e);e.setLocalPosition((i%12-5.5)*2.2,0,(Math.floor(i/12)-3.5)*2.5);e.setLocalEulerAngles(0,(i%4)*90,0);n++;triangles+=item.triangles;}
  keep.add(data['pool.ladder'][v].file);const a=await asset(data['pool.ladder'][v].file),e=a.resource.instantiateRenderEntity();lot.addChild(e);e.setLocalPosition(6,0,-5);n++;triangles+=data['pool.ladder'][v].triangles;
- cam.setPosition(12,14,17);cam.lookAt(0,0,0);cam.camera.orthoHeight=16*Math.max(1,canvas.clientHeight/canvas.clientWidth);
+ cam.setPosition(12,14,17);cam.lookAt(0,0,0);cam.camera.orthoHeight=19*Math.max(1,canvas.clientHeight/canvas.clientWidth);
  await settle();const timings=[];let last=performance.now();for(let i=0;i<100;i++){app.renderNextFrame=true;await new Promise(r=>app.once('postrender',r));const t=performance.now();if(i>=10)timings.push(t-last);last=t;}
  timings.sort((a,b)=>a-b);return {instances:n,triangles,medianMs:timings[45],p95Ms:timings[85],drawCalls:app.stats?.drawCalls?.total??null};
 }

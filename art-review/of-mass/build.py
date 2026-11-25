@@ -255,7 +255,7 @@ def mirror():
     cylinder('Weighted oval base',(0,.07,0),(.64,.14,.44),dark(),40,.014)
     tube('Stand',[(0,.13,0),(0,.70,.02),(0,1.34,.02)],.035,brass(),4)
     # Flat elliptical reflective-looking tinted surface, no live reflection.
-    o=cylinder('Flat oval mirror glass',(0,1.39,-.038),(.68,.034,1.20),mat('Muted mirror glass','#b6d9d8',.18,.65),48);o.rotation_euler[0]=pi/2
+    o=cylinder('Flat oval mirror glass',(0,1.39,-.038),(.68,.034,1.20),mat('Muted mirror glass','#a9c7c9',.30,.10),48);o.rotation_euler[0]=pi/2
     ringoval('Continuous brass bezel',(0,1.39,-.055),.36,.63,.024,brass())
 def spire():
     lathe('Stone plinth',(0,0,0),[(0,.29),(.024,.315),(.25,.315),(.28,.28)],cream(),32)
@@ -283,10 +283,11 @@ def sports(id,color):
             for j in range(9):
                 u=j/8;y=1.20+.56*u+.10*t*(1-abs(2*u-1));vs.append((x,y,-.035+.045*sin(t*pi*2+u*.8)))
         inds=[]
+        idx=['copper-gulls','forest-lanterns','sapphire-sparks','amber-pier','moon-foxes','steppe-sails'].index(id.split('.')[1])
         for i in range(12):
             for j in range(8):
-                a=i*9+j;fs.append((a,a+9,a+10,a+1));inds.append(0 if j>=2 else 1)
-        o=mesh('Woven rippled pennant',vs,fs,[tone,ink],inds);bpy.context.view_layer.objects.active=o
+                a=i*9+j;fs.append((a,a+9,a+10,a+1));motif=2<=i<10 and i%2==0 and (4<=j<=5 if idx%2==0 else 3<=j<=4) and (i-2)//2<min(4,idx+2);accent=(idx>=4 and j==6 and 4<=i<=7);inds.append(2 if motif or accent else 0 if j>=2 else 1)
+        o=mesh('Woven rippled pennant with integral club motif',vs,fs,[tone,ink,white],inds);bpy.context.view_layer.objects.active=o
         mod=o.modifiers.new('Fabric thickness','SOLIDIFY');mod.thickness=.008;bpy.ops.object.modifier_apply(modifier=mod.name)
         for f in o.data.polygons:f.use_smooth=True
         tube('Top brass rod',[(.02,1.80,0),(-.58,1.80,-.03)],.023,gold,3)
@@ -329,15 +330,26 @@ def foliage(id):
             orb('Inner crown',(x,y,z),(rx*1.85,ry*1.85,rz*1.85),deep if i%2 else sun,10,6)
         leaves('Batched folded crown',cs,76,93,.17 if broad else .14)
     else:
-        w=.30 if id.endswith('small') else .41 if id.endswith('flowering') else .50
-        cs=[(-w*.4,.36,0,w*.60,.30,w*.78),(w*.4,.38,.04,w*.65,.31,w*.75),(0,.48,-.06,w*.72,.30,w*.74)]
-        if id=='hedge.short':cs=[(-.15,.51,0,.12,.33,.20),(.15,.51,0,.12,.33,.20),(0,.51,0,.13,.34,.20)]
-        for i,(x,y,z,rx,ry,rz) in enumerate(cs):orb('Interior foliage',(x,y,z),(rx*1.8,ry*1.8,rz*1.8),deep if i%2 else sun,10,6)
-        leaves('Batched folded foliage',cs,46,18,.105)
+        # Low overlapping branch-tip masses, not three exposed sphere cores.
+        w=.30 if id.endswith('small') else .40 if id.endswith('flowering') else .49
+        h=.49 if id.endswith('small') else .66 if id.endswith('flowering') else .57
+        cs=[]
+        if id=='hedge.short':
+            w=.23;h=.75
+            cs=[(x,y,z,.12,.15,.16) for x in [-.13,.13] for y,z in [(.19,0),(.38,.035),(.58,-.02),(.67,0)]]
+        else:
+            for i in range(7):
+                ang=i*2.39996;rad=w*(.54 if i<5 else .22)
+                cs.append((rad*cos(ang),h*(.35 if i<5 else .72),rad*sin(ang),w*.44,h*.30,w*.43))
+        # Short stems below foliage keep the silhouette grounded.
+        for i,(x,y,z,rx,ry,rz) in enumerate(cs):
+            if i<5:tube('Low woody shoot',[(x*.18,.025,z*.18),(x*.7,y*.65,z*.7),(x,y,z)],.014,bark,2,8)
+            orb('Irregular shaded leaf mass',(x,y,z),(rx*1.52,ry*1.55,rz*1.52),deep if i%3 else sun,8,5)
+        leaves('Dense overlapping folded foliage',cs,32 if id!='hedge.short' else 24,18,.14 if id!='hedge.short' else .105)
         if id.endswith('flowering'):
             pink=mat('Rose blossom','#d99aa7')
-            for i in range(9):
-                a=i*2.39996;flower_head((w*.68*cos(a),.64+.07*sin(i),w*.65*sin(a)),.06,pink,cream(),5)
+            for i in range(8):
+                x,y,z,rx,ry,rz=cs[i%len(cs)];flower_head((x,y+ry*.82,z),.065,pink,cream(),5)
 def flower_head(c,r,petal,center,n=7):
     # Single petal corolla mesh, gently cupped, distinct silhouette.
     x,y,z=c;vs=[];fs=[]
@@ -363,28 +375,38 @@ def flowers(id,stage=3,wet=False,harvested=False):
         h=((.22 if stage==1 else .51 if stage==2 else .65) if garden else .40)+.025*sin(i*2.4)
         if harvested:h=.42
         tube('Living stem',[(x,origin,z),(x+.015,origin+h*.54,z-.025),(x,origin+h,z)],.013 if garden else .009,stem,3)
-        for j in range(2 if stage==1 or harvested else 5 if herb else 3):
-            a=j*2.4+i;y=origin+h*(.25+j*.13);d=.14 if garden else .085
-            c=(x+d*.52*cos(a),y+.035,z+d*.52*sin(a))
-            vs=[(x,y,z),(c[0]-.035*sin(a),c[1],c[2]+.035*cos(a)),(x+d*cos(a),y+.09,z+d*sin(a)),(c[0]+.035*sin(a),c[1],c[2]-.035*cos(a)),(c[0],c[1]+.02,c[2])]
-            o=mesh('Folded botanical leaf',vs,[(0,1,4),(1,2,4),(2,3,4),(3,0,4)],[leaf]);bpy.context.view_layer.objects.active=o;mod=o.modifiers.new('Leaf thickness','SOLIDIFY');mod.thickness=.002;bpy.ops.object.modifier_apply(modifier=mod.name)
+        # Broad, paired foliage for herbs. Stage changes remain visually obvious.
+        count=2 if stage==1 else 4 if harvested else 8 if herb else 5 if garden else 3
+        for j in range(count):
+            a=(j//2)*2.05+(j%2)*pi+i if herb else j*2.4+i
+            y=origin+h*(.22+.64*(j//2)/max(1,(count-1)//2)) if herb else origin+h*(.25+j*.11)
+            d=(.19 if 'melissa' in id else .165 if herb else .15 if garden else .085)
+            if stage==1:d*=.57
+            if harvested:d*=.8
+            w=d*(.42 if 'melissa' in id else .31 if herb else .22)
+            dx,dz=cos(a),sin(a);sx,sz=-dz,dx
+            lift=d*.26
+            vs=[(x,y,z),(x+d*.35*dx+w*sx,y+lift*.6,z+d*.35*dz+w*sz),(x+d*.72*dx+w*.7*sx,y+lift,z+d*.72*dz+w*.7*sz),(x+d*dx,y+lift*.65,z+d*dz),(x+d*.72*dx-w*.7*sx,y+lift,z+d*.72*dz-w*.7*sz),(x+d*.35*dx-w*sx,y+lift*.6,z+d*.35*dz-w*sz),(x+d*.49*dx,y+lift*1.5,z+d*.49*dz)]
+            o=mesh('Broad folded botanical leaf',vs,[(j,(j+1)%6,6) for j in range(6)],[leaf]);bpy.context.view_layer.objects.active=o;mod=o.modifiers.new('Leaf thickness','SOLIDIFY');mod.thickness=.002;bpy.ops.object.modifier_apply(modifier=mod.name)
         if garden and (stage<3 or harvested):continue
         if herb:
-            # More rounded leaves for lemon balm, pointed mint profile.
-            for j in range(3):
-                a=j*2.1+i;orb('Herb tip',(x+.045*cos(a),origin+h-.04+j*.025,z+.045*sin(a)),(.11 if 'melissa' in id else .075,.055,.095),leaf,10,6)
+            # Small paired top leaves, not spherical buds.
+            for j in range(2):
+                a=i+j*pi;d=.10;dx,dz=cos(a),sin(a)
+                o=mesh('Herb growing tip',[(x,origin+h-.04,z),(x+d*.5*dx-.035*dz,origin+h+.02,z+d*.5*dz+.035*dx),(x+d*dx,origin+h+.05,z+d*dz),(x+d*.5*dx+.035*dz,origin+h+.02,z+d*.5*dz-.035*dx),(x+d*.5*dx,origin+h+.04,z+d*.5*dz)],[(0,1,4),(1,2,4),(2,3,4),(3,0,4)],[leaf]);bpy.context.view_layer.objects.active=o;mod=o.modifiers.new('Leaf thickness','SOLIDIFY');mod.thickness=.002;bpy.ops.object.modifier_apply(modifier=mod.name)
         elif 'lavender' in id:
             purple=mat('Lavender','#8f77b6')
-            for j in range(5):
-                for k in range(3):
-                    a=2*pi*k/3+j;orb('Lavender floret',(x+.028*cos(a),origin+h-.07+j*.037,z+.028*sin(a)),(.055,.046,.055),purple,8,5)
+            # Six compact tapered flower whorls per stem, shared low-poly lathe.
+            for j in range(6):
+                r=.042*(1-j*.09)
+                lathe('Lavender flower whorl',(x,origin+h-.09+j*.033,z),[(0,r*.50),(.011,r),(.024,r*.64),(.030,r*.28)],purple,7)
         elif 'tulip' in id:
             pink=mat('Tulip rose','#d893a2')
             for j in range(5):
-                a=j*2*pi/5;o=orb('Upright cupped tulip petal',(x+.037*cos(a),origin+h+.04,z+.037*sin(a)),(.075,.13,.073),pink,12,8)
+                a=j*2*pi/5;o=orb('Upright cupped tulip petal',(x+.037*cos(a),origin+h+.04,z+.037*sin(a)),(.075,.13,.073),pink,8,5)
         else:
             petal=mat('Petal '+id,'#e5a352' if 'calendula' in id else '#7197d8' if 'cornflower' in id else '#f6eee0')
-            flower_head((x,origin+h,z),.105 if garden else .085,petal,yellow,10 if 'calendula' in id else 8)
+            flower_head((x,origin+h,z),.13 if garden else .085,petal,yellow,12 if 'calendula' in id else 8)
 def bench():
     for x in [-.57,.57]:
         for z in [-.20,.20]:box('Cast frame leg',(x,.30,z),(.105,.60,.105),iron(),.014)
