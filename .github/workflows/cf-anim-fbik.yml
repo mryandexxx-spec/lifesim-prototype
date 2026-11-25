@@ -12,7 +12,7 @@ jobs:
     env:
       OMP_NUM_THREADS: '2'
       OPENBLAS_NUM_THREADS: '2'
-      MUJOCO_GL: egl
+      MUJOCO_GL: disable
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,6 +68,11 @@ jobs:
           model = mujoco.MjModel.from_xml_string('<mujoco><worldbody><body><joint type="hinge"/><geom size=".1"/></body></worldbody></mujoco>')
           config = mink.Configuration(model)
           assert len(config.q) == 1
+          task = mink.PostureTask(model, cost=1.)
+          task.set_target_from_configuration(config)
+          velocity = mink.solve_ik(config, [task], .05, "daqp", damping=.001)
+          assert numpy.isfinite(velocity).all() and numpy.linalg.norm(velocity) < 1e-6
+          config.integrate_inplace(velocity, .05)
           bpy.ops.wm.read_factory_settings(use_empty=True)
           print("Blender and Mink native runtime preflight PASS")
           PY
