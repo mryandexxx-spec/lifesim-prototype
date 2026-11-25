@@ -13,7 +13,10 @@ def camera_at(pos,target):
 def setup():
     s=bpy.context.scene;s.render.engine='CYCLES';s.cycles.samples=16;s.cycles.use_denoising=True
     s.render.resolution_x=480;s.render.resolution_y=640;s.render.resolution_percentage=100
-    s.world.color=(.22,.22,.22)
+    s.world=bpy.data.worlds.new('Diagnostic World')
+    s.world.use_nodes=True
+    s.world.node_tree.nodes.get('Background').inputs['Color'].default_value=(.22,.22,.22,1)
+    s.world.node_tree.nodes.get('Background').inputs['Strength'].default_value=.65
     bpy.ops.object.camera_add();s.camera=bpy.context.object;s.camera.data.type='ORTHO';s.camera.data.ortho_scale=2.25
     for loc,power,size in [((3,-4,5),500,4),((-3,-2,3),250,3),((0,3,4),350,3)]:
         bpy.ops.object.light_add(type='AREA',location=loc);o=bpy.context.object;o.data.energy=power;o.data.shape='DISK';o.data.size=size;o.rotation_euler=(Vector((0,0,1))-o.location).to_track_quat('-Z','Y').to_euler()
