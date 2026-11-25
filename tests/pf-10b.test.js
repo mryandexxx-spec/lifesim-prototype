@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CONVERSATION_TOPICS,CONVERSATION_ACTS,createConversation,conversationOptions,restoreConversation,conversationTranscript,evaluateResponse,chooseConversationTurn,continueConversation} from '../src/conversation-engine.js';
 import {newHousehold,loadHousehold} from '../src/household.js';
+import {newGame} from '../src/simulation.js';
+import {registerPerson,markAcquainted,applySocialEvent,learnSocialPreference} from '../src/social-graph.js';
 import {startConversation,arriveSocial,finishSocialConversation} from '../src/relationships.js';
 const setup=(topic,xp=0)=>{
  const root=newHousehold();root.skills.xpById.charisma=xp;
@@ -11,8 +13,8 @@ const setup=(topic,xp=0)=>{
 const newTopics=['memories','career','dreams','money','family','relationships','philosophy','gossip'];
 test('PF-10/B catalogue: distinct authored lines, valid reply and old IDs',()=>{
  assert.equal(Object.keys(CONVERSATION_TOPICS).length,15);
- assert.equal(Object.keys(CONVERSATION_ACTS).length,101);
- assert.equal(new Set(Object.values(CONVERSATION_ACTS).map(a=>a.line)).size,101);
+ assert.equal(Object.keys(CONVERSATION_ACTS).length,105);
+ assert.equal(new Set(Object.values(CONVERSATION_ACTS).map(a=>a.line)).size,105);
  for(const [topic,t] of Object.entries(CONVERSATION_TOPICS)){
   assert.ok(t.lines.length>=6,topic);
   for(const id of t.lines){const a=CONVERSATION_ACTS[id];assert.ok(a?.line&&a.yes&&a.no&&id.startsWith(topic+'.'),id);}
@@ -62,4 +64,28 @@ test('PF-10/B save validation rejects forged follow-up branches, preserves histo
  assert.equal(restoreConversation({topic:'career',phase:'response',turns:[{id:'career.repair',accepted:true}],score:3}),null);
  assert.equal(restoreConversation({topic:'career',phase:'response',turns:[{id:'career.ask',accepted:true},{id:'career.repair',accepted:true}],score:6}),null);
  assert.ok(restoreConversation({topic:'daily',phase:'response',turns:[{id:'daily.inspire',accepted:true}],score:3}));
+});
+
+test('PF-10/B gossip requires genuine learned preference of a shared acquaintance; never leaks profile or writes knowledge',()=>{
+ const [root,c]=setup('gossip');
+ const id='gossip.musicLikes',third='resident_3';
+ assert.equal(chooseConversationTurn(root,id),null);
+ const actor=newGame();actor.personality.preferences={likes:['music'],dislikes:['books']};
+ root.population={schema:1,nextResidentSerial:4,residentsById:{[third]:{id:third,actor,identity:{firstName:'Вера',lastName:'Тест',lifeStage:'adult'}}},
+  linksByResident:{alex:{dwellingId:'dwelling_1',familyId:'family_1'},mira:{dwellingId:'dwelling_1',familyId:'family_1'},[third]:{dwellingId:'dwelling_1',familyId:'family_2'}},kinship:[]};
+ registerPerson(root.socialGraph,third);
+ markAcquainted(root.socialGraph,'mira',third,root.minutes);
+ assert.equal(conversationOptions(c,root).some(x=>x.id===id),false,'profile alone is not knowledge');
+ const receipt=applySocialEvent(root.socialGraph,{actorId:'alex',targetId:third,type:'conversation.talk',at:root.minutes});
+ assert.ok(receipt);
+ assert.ok(learnSocialPreference(root.socialGraph,receipt,'alex',third,actor.personality,'music'));
+ assert.ok(conversationOptions(c,root).some(x=>x.id===id&&!x.locked));
+ assert.equal(conversationOptions(c,root).some(x=>x.id==='gossip.musicDislikes'),false);
+ assert.equal(conversationOptions(c,root).some(x=>x.id==='gossip.booksDislikes'),false);
+ const before=root.socialGraph.nextSeq;
+ assert.ok(chooseConversationTurn(root,id));
+ assert.equal(root.socialGraph.nextSeq,before,'speech before finish has no new receipt');
+ assert.deepEqual(restoreConversation(c),c);
+ assert.match(conversationTranscript(c)[1].line,/нравится музыка/);
+ assert.ok(finishSocialConversation(root));assert.equal(root.socialGraph.nextSeq,before+1);
 });

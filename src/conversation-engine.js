@@ -5,7 +5,7 @@ import {currentSkillLevel} from './skills-engine.js';
 import {isWalkable,isClearLine} from './navigation.js';
 import {episodeContext,getPair,getDirectedView} from './social-graph.js';
 import {boundaryDisposition,cueConversationBias} from './social-boundaries.js';
-import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
+import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS,knownPreferences} from './social-compatibility.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction,socialOutcome} from './social-feedback.js';
 
@@ -51,7 +51,7 @@ const expandedTopics=Object.freeze({
   family:row("Семья и близкие","Что помогает близким людям ладить друг с другом?","socializing",["family.ask","family.share","family.tact","family.reflect","family.deep","family.yes","family.repair"]),
   relationships:row("Дружба и отношения","Поговорим о том, что помогает людям понимать друг друга.","socializing",["relationships.ask","relationships.share","relationships.tact","relationships.reflect","relationships.deep","relationships.yes","relationships.repair"]),
   philosophy:row("Философия жизни","Интересно обсудить вопросы без единственно верного ответа.","calm_leisure",["philosophy.ask","philosophy.share","philosophy.tact","philosophy.reflect","philosophy.deep","philosophy.yes","philosophy.repair"]),
-  gossip:row("Слухи и факты","Как отличить то, что мы знаем, от чужих домыслов?","socializing",["gossip.ask","gossip.share","gossip.tact","gossip.reflect","gossip.deep","gossip.yes","gossip.repair"])
+  gossip:row("Слухи и факты","Как отличить то, что мы знаем, от чужих домыслов?","socializing",["gossip.ask","gossip.share","gossip.tact","gossip.reflect","gossip.deep","gossip.yes","gossip.repair","gossip.musicLikes","gossip.musicDislikes","gossip.booksLikes","gossip.booksDislikes"])
 });
 const expandedActs=Object.freeze({
   "memories.ask":Object.freeze({...saying("Спросить о детских радостях","Что в детстве могло бы радовать больше всего?","Наверное, целый свободный день.","Не хочу возвращаться к детству.","warm",3),minLevel:0,branch:"any"}),
@@ -110,6 +110,10 @@ const expandedActs=Object.freeze({
   "gossip.deep":Object.freeze({...saying("Поговорить об ответственности за слухи","Стоит ли отказаться от интересной истории, если она может несправедливо навредить?","Да, интерес не оправдывает вред.","Не хочу обсуждать моральные дилеммы.","neutral",2),minLevel:9,branch:"any"}),
   "gossip.yes":Object.freeze({...saying("Поддержать осторожность","Лучше оставить неизвестное неизвестным, пока нет подтверждения?","Да, это честнее.","Давай не будем продолжать.","warm",3),minLevel:0,branch:"accepted"}),
   "gossip.repair":Object.freeze({...saying("Отказаться от пересудов","Не будем обсуждать отсутствующих. Поговорим о том, что происходит здесь.","Спасибо, так лучше.","Я хочу закончить беседу.","warm",3),minLevel:0,branch:"refused"}),
+  "gossip.musicLikes":Object.freeze({...saying("Рассказать о любви знакомого к музыке","Я узнал, что одному из наших знакомых нравится музыка. Может, в следующий раз поговорим о любимых мелодиях?","Хорошая идея, это повод узнать человека лучше.","Не хочется обсуждать чужие вкусы.","neutral",2),minLevel:0,branch:"any",evidence:Object.freeze({tag:"music",stance:"likes"})}),
+  "gossip.musicDislikes":Object.freeze({...saying("Рассказать о нелюбви знакомого к музыке","Один из наших знакомых, как выяснилось, не любит музыку. Лучше не навязывать ему прослушивание.","Да, стоит учитывать разные вкусы.","Думаю, это лучше обсудить с самим человеком.","neutral",2),minLevel:0,branch:"any",evidence:Object.freeze({tag:"music",stance:"dislikes"})}),
+  "gossip.booksLikes":Object.freeze({...saying("Рассказать о любви знакомого к книгам","Мне стало известно, что один из наших знакомых любит книги. Можно будет поговорить с ним об интересных историях.","Это хороший повод для беседы.","Я предпочитаю узнавать людей напрямую.","neutral",2),minLevel:0,branch:"any",evidence:Object.freeze({tag:"books",stance:"likes"})}),
+  "gossip.booksDislikes":Object.freeze({...saying("Рассказать о нелюбви знакомого к книгам","Я узнал, что одному из наших знакомых книги не по душе. Не стоит считать чтение универсальным увлечением.","Верно, у каждого свои интересы.","Не хочу обсуждать отсутствующих.","neutral",2),minLevel:0,branch:"any",evidence:Object.freeze({tag:"books",stance:"dislikes"})}),
   "daily.yes":Object.freeze({...saying("Уточнить приятный момент","Что сегодня оказалось лучше, чем ожидалось?","Даже маленькая удача поднимает настроение.","Не хочется подводить итоги.","warm",3),minLevel:0,branch:"accepted"}),
   "daily.repair":Object.freeze({...saying("Сменить тон разговора","Прости, не буду давить. Можно просто поболтать.","Так мне спокойнее.","Мне нужно побыть одному.","warm",3),minLevel:0,branch:"refused"}),
   "daily.extra":Object.freeze({...saying("Обсудить вечер","Как лучше провести оставшуюся часть дня?","Без лишней спешки.","Я пока не хочу строить планы.","neutral",2),minLevel:0,branch:"any"}),
@@ -154,6 +158,22 @@ export function conversationActor(root,id){
   const p=root?.population,home=p?.linksByResident?.alex?.dwellingId;
   return home&&p?.linksByResident?.[id]?.dwellingId===home
     ?p.residentsById?.[id]?.actor||null:null;
+}
+/** Gossip may cite only a real preference already learned by the speaker
+ * about a third co-resident acquainted with both participants. No profile
+ * peek, fabricated rumor, or new relationship/knowledge reward. The static
+ * historical utterance ID is sufficient to restore the transcript. */
+function hasConversationEvidence(root,initiator,partner,evidence){
+  if(!evidence)return true;
+  if(!root||!initiator||!partner)return false;
+  const graph=root.socialGraph;
+  return (graph?.persons||[]).some(id=>{
+    if(id===initiator||id===partner||!conversationActor(root,id))return false;
+    const a=getPair(graph,initiator,id),b=getPair(graph,partner,id);
+    if(!Number.isFinite(a?.metAt)||!Number.isFinite(b?.metAt))return false;
+    return knownPreferences(a,initiator).some(k=>k.tag===evidence.tag&&
+      k.stance===evidence.stance&&k.at<=root.minutes);
+  });
 }
 const extraPair=(a,b)=>!['alex','mira'].includes(a)||!['alex','mira'].includes(b);
 const tier=(root,id)=>currentSkillLevel(conversationActor(root,id)?.skills,HOBBY_SKILLS,CHARISMA_SKILL_ID);
@@ -201,7 +221,8 @@ export function conversationOptions(session,root=null){
   let ids=[...CONVERSATION_TOPICS[session.topic].lines,
     ...(root&&session.topic==='daily'?Object.keys(pilotActs):[])].filter(id=>!used.has(id));
   const previous=session.turns?.at(-1);
-  ids=ids.filter(id=>!act(id).branch||act(id).branch==='any'||(previous&&(act(id).branch==='accepted')===previous.accepted));
+  ids=ids.filter(id=>(!act(id).branch||act(id).branch==='any'||(previous&&(act(id).branch==='accepted')===previous.accepted))&&
+    hasConversationEvidence(root,action?.initiator,action?.partner,act(id).evidence));
   if(previous){
     ids.sort((a,b)=>Number(act(b).branch&&act(b).branch!=='any')-Number(act(a).branch&&act(a).branch!=='any')||
       (!previous.accepted?Number(act(b).tone==='warm')-Number(act(a).tone==='warm'):0));
@@ -223,6 +244,7 @@ export function evaluateResponse(root,initiator,topic,id,partnerId=initiator==='
   const self=conversationActor(root,initiator),partner=conversationActor(root,partnerId);
   if(!self||!partner||!Number.isFinite(root?.minutes))return null;
   const a=act(id);
+  if(!hasConversationEvidence(root,initiator,partnerId,a.evidence))return null;
   const reaction=evaluateSocialReaction({
     kind:'conversation',recipient:partner,view:extraPair(initiator,partnerId)
       ?getDirectedView(root.socialGraph,partnerId,initiator):getPerspective(root,partnerId),

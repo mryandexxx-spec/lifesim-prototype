@@ -15,10 +15,10 @@ const begin=(root,topic='support',id='alex')=>{
 };
 test('legacy topics survive and expanded catalogue contains at least 90 meaningful choices',()=>{
   assert.equal(Object.keys(CONVERSATION_TOPICS).length,15);
-  assert.equal(Object.keys(CONVERSATION_ACTS).length,101);
+  assert.equal(Object.keys(CONVERSATION_ACTS).length,105);
   assert.equal(CONVERSATION_MAX_TURNS,3);
   const ids=Object.values(CONVERSATION_TOPICS).flatMap(t=>t.lines);
-  assert.equal(new Set(ids).size,98);
+  assert.equal(new Set(ids).size,102);
   for(const id of ids){
     const act=CONVERSATION_ACTS[id];
     assert.ok(act.line.length>12&&act.yes.length>5&&act.no.length>5);
