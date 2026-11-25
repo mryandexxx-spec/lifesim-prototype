@@ -1,0 +1,58 @@
+name: CF-BODY C exact repack diagnostic
+on:
+  pull_request:
+    paths:
+      - 'art-review/cf-body-c-opt/**'
+      - '.github/workflows/cf-body-c-opt.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: cf-body-c-opt-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  exact-repack:
+    if: github.head_ref == 'art/cf-body-c-opt' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-c-continuous-evidence
+          run-id: 45634752787
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Install CPU-only browser and numeric dependencies
+        run: |
+          python -m pip install numpy==2.2.6 pillow==11.2.1 playwright==1.52.0
+          python -m playwright install --with-deps chromium webkit
+      - name: Verify pinned accepted GLBs and repack exact arrays
+        run: |
+          mkdir -p opt-out
+          python art-review/cf-body-c-opt/repack.py reviewed/lab opt-out/models
+          mkdir -p served
+          cp -a reviewed/lab served/reference
+          cp -a reviewed/lab served/candidate
+          cp opt-out/models/*.glb served/candidate/
+      - name: Actual A/B Chromium and WebKit renders
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          python -m http.server 8765 --directory served >opt-out/server.log 2>&1 &
+          server=$!
+          trap 'kill "$server" || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/reference/index.html >/dev/null && break; sleep 1; done
+          xvfb-run -a python art-review/cf-body-c-opt/browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-c-opt-evidence
+          path: opt-out/
+          retention-days: 90
+          if-no-files-found: warn
