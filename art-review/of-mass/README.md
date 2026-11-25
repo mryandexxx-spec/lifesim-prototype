@@ -1,0 +1,4 @@
+# OF-MASS diagnostic
+43 SKU pairs, 33 families; five exact pilot pairs from verified artifact. Original authored meshes, no paid assets. Old outdoor baseline reconstructed from pinned renderer geometry; mature dry A/B plus candidate growth, wet and harvested previews, transient grill state omitted; neither actual game integration nor physical iPhone certification. Round tree retains exact pilot and separate optimized LOD candidate; the synthetic 96-item lot uses LOD. ART gate requires direct review of real outputs before publication. Do not merge into main.
+
+R2 art correction after direct review of first 43 pairs: more grounded shrub/hedge silhouettes, wider paired herb foliage, less costly lavender/tulip meshes, integrated club flag motifs, brighter mirror material and lot framing. Re-evaluate actual new captures and performance; do not assume art pass.
