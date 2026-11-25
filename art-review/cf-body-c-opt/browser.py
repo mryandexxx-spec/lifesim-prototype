@@ -15,7 +15,9 @@ def rgb(data):return np.asarray(Image.open(io.BytesIO(data)).convert('RGB'),dtyp
 def valid(data):return float(rgb(data).std(axis=(0,1)).mean())>3
 def digest(data):return hashlib.sha256(data).hexdigest()
 def settle(page):
-    page.evaluate("""() => new Promise(resolve=>{let n=0;function f(){window.requestLabFrame();if(++n<5)requestAnimationFrame(f);else requestAnimationFrame(resolve)}requestAnimationFrame(f)})""")
+    for _ in range(2):
+        info=page.evaluate('window.postRenderFrame()')
+        assert not info['lost'] and info['error']==0 and info['width']>0 and info['height']>0,info
     page.wait_for_timeout(100)
 def capture(page,state,angle):
     page.evaluate('([s,a])=>window.setBodyState(s,a)',[state,angle]);settle(page)
@@ -77,4 +79,4 @@ for engine in ['chromium-headless','webkit-headless','webkit-headed']:
     good=[x for x in rows if x['reference_valid'] and x['candidate_valid'] and x['pixel_exact']]
     direct=[x for x in rows if x['direct_reference_valid'] and x['direct_candidate_valid'] and x['direct_pixel_exact']]
     print(engine,'screen',len(good),'direct',len(direct),'expected',expected,flush=True)
-    if engine=='chromium-headless':assert len(rows)==expected and len(good)==expected and not any(x['engine']==engine for x in failures),'Chromium A/B regression'
+    assert len(rows)==expected and len(good)==expected and len(direct)==expected and not any(x['engine']==engine for x in failures),(engine,'A/B render regression',len(good),len(direct),expected)
