@@ -8,6 +8,58 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-body-c-reset-distribution:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-c-reset' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-c-reset-evidence
+          run-id: 45623965738
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify and distribute reviewed diagnostic only
+        run: |
+          python - <<'PY'
+          import pathlib,json,hashlib
+          p=pathlib.Path('reviewed/lab')
+          raw=(p/'SHA256SUMS.json').read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='615f235fac0c30c7fb2e35b0d4f6571b68e9d38a4403efbf2992be8fff8272d8'
+          m=json.loads(raw);assert len(m)==155
+          assert {str(x.relative_to(p)) for x in p.rglob('*') if x.is_file()}==set(m)|{'SHA256SUMS.json'}
+          for n,h in m.items():
+              assert not (p/n).is_symlink()
+              assert hashlib.sha256((p/n).read_bytes()).hexdigest()==h,n
+              assert not n.endswith(('.blend','.zip'))
+          assert m['male-body.glb']=='103a126dbf1bbf58b8b85ee1ed0836d54a2ea579672da73b24d6015b8a45ecaf'
+          assert m['female-body.glb']=='5bea7149cf6b53e1550102cdb49a481f8f8282b0dca291669fada8a50d51ad63'
+          # Only the disclosure text changes after evidence review.
+          f=p/'index.html';s=f.read_text()
+          assert '<div id="status">' in s
+          s=s.replace('<div id="status">','<p><strong>Не принятый художественно эксперимент.</strong> Рост меняется общим масштабом; стройность и мускулатура пока слабо различимы. WebKit-кадры невалидны, физическая проверка Safari и проверка контактов не завершены.</p><div id="status">',1)
+          f.write_text(s)
+          m['index.html']=hashlib.sha256(f.read_bytes()).hexdigest()
+          (p/'SHA256SUMS.json').write_text(json.dumps(m,indent=2))
+          print('155 original hashes verified; only diagnostic disclosure updated')
+          print('Published manifest SHA256:',hashlib.sha256((p/'SHA256SUMS.json').read_bytes()).hexdigest())
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_INDEX_FILE="$(mktemp -u)"
+          git --work-tree="$PWD/reviewed/lab" read-tree --empty
+          git --work-tree="$PWD/reviewed/lab" add -A -- .
+          tree=$(git write-tree)
+          sha=$(git commit-tree "$tree" -m "CF-BODY C-RESET reviewed diagnostic payload run 45623965738")
+          git push origin "$sha:refs/heads/art/cf-body-c-reset-lab"
+          echo "Distribution SHA: $sha"
+
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
