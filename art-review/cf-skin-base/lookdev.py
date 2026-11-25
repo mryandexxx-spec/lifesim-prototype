@@ -61,8 +61,8 @@ def spatial(pos,uv,tri,head,centers,size):
             cx,cy,cz=center
             side=1 if cx>0 else -1
             along=(x-cx)*side/.020
-            arch=cy+.015+.004*np.maximum(0,1-(along-.12)**2)-.003*np.maximum(0,along)
-            thickness=.0017*(.30+.70*np.maximum(0,1-(along/1.1)**2))
+            arch=cy+.020+.004*np.maximum(0,1-(along-.12)**2)-.003*np.maximum(0,along)
+            thickness=(.0030 if centers[0][1]>1.65 else .0026)*(.45+.55*np.maximum(0,1-(along/1.1)**2))
             br=np.exp(-((y-arch)/np.maximum(thickness,.0004))**2)*np.clip((1.13-abs(along))*6,0,1)*np.clip((z-(cz-.020))/.012,0,1)
             ch=np.exp(-((x-cx-side*.012)/.022)**2-((y-cy+.024)/.017)**2)*np.clip((z-(cz-.035))/.027,0,1)
             sl=np.s_[lo[1]:hi[1],lo[0]:hi[0]]
@@ -78,20 +78,33 @@ def texture(sex,size,sp):
     a=mix(a,[217,157,133] if sex=='male' else [232,182,164],mask('face',size)*.18)
     a=mix(a,[175,100,91] if sex=='male' else [191,112,112],sp[1]*.23+sp[2]*.08)
     a=mix(a,[185,105,92] if sex=='male' else [202,121,116],mask('ears',size)*.30)
-    a=mix(a,[122,64,57] if sex=='male' else [151,79,86],mask('lips',size)*.80)
+    a=mix(a,[163,105,98] if sex=='male' else [180,112,119],mask('lips',size)*.72)
     a=mix(a,[124,72,64],mask('eyelids',size)*.23)
     a=mix(a,[64,28,33],mask('inside-mouth',size)*.96)
     a=mix(a,[211,174,151],np.maximum(mask('fingernails',size),mask('toenails',size))*.40)
-    a=mix(a,[75,49,36] if sex=='male' else [104,65,46],sp[0]*.86)
+    a=mix(a,[72,49,39] if sex=='male' else [103,70,55],sp[0]*.93)
+    # Material variation follows anatomical masks, not baked directional lighting.
+    rng=np.random.default_rng(218 if sex=='male' else 319)
+    low=gaussian_filter(rng.normal(size=(size,size)),5);low/=max(low.std(),1e-6)
+    fine=gaussian_filter(rng.normal(size=(size,size)),.75);fine/=max(fine.std(),1e-6)
+    noise=np.clip(low*.007+fine*.0025,-.022,.022)
+    a=np.clip(a*(1+noise[...,None]),0,1)
+    # Region paint overrides generic skin for oral cavity and tongue. Use nearest
+    # region labels, dilated softly only within the original oral mask.
+    reg=np.asarray(Image.fromarray(REG).resize((size,size),Image.Resampling.NEAREST))
+    oral=np.all(reg==[112,172,255],axis=2).astype(np.float32)
+    tongue=np.all(reg==[206,153,167],axis=2).astype(np.float32)
+    a=mix(a,[93,43,48],oral*.98)
+    a=mix(a,[159,76,91],tongue*.98)
     p=R/f'{sex}-albedo-{size}.png';save(a,p)
     return p
 def eye_map(sex):
     sz=256;y,x=np.mgrid[:sz,:sz];x=(x+.5-sz/2)/(sz*.44);y=(y+.5-sz/2)/(sz*.44);r=np.hypot(x,y);angle=np.arctan2(y,x)
-    a=np.broadcast_to(linear([232,222,211]),(sz,sz,3)).copy()
-    iris=np.clip((.46-r)*80,0,1); radial=(np.sin(angle*31+r*38)+np.sin(angle*53-r*20))*.5
+    a=np.broadcast_to(linear([218,210,201]),(sz,sz,3)).copy()
+    iris=np.clip((.49-r)*80,0,1); radial=(np.sin(angle*31+r*38)+np.sin(angle*53-r*20))*.5
     a=mix(a,[99,68,40] if sex=='male' else [75,106,101],iris)
     a=mix(a,[151,108,64] if sex=='male' else [144,158,112],iris*np.clip(.24+radial*.10,0,.45))
-    a=mix(a,[42,39,31],np.clip((.46-r)*80,0,1)*np.clip((r-.39)*40,0,1))
+    a=mix(a,[42,39,31],np.clip((.49-r)*80,0,1)*np.clip((r-.43)*40,0,1))
     a=mix(a,[18,17,15],np.clip((.19-r)*90,0,1))
     p=R/f'{sex}-iris.png';save(a,p);return p
 def region_labels(uv,tri):
@@ -143,6 +156,14 @@ def render(sex,path,kind):
             p=F/f'{sex}-{label}-{angle}-blender-{kind}.png';scene.render.filepath=str(p.resolve());bpy.ops.render.render(write_still=True)
             im=Image.open(p).convert('RGBA');bg=Image.new('RGBA',im.size,(46,59,74,255));bg.alpha_composite(im);bg.convert('RGB').save(p)
     if kind=='candidate':
+        # Full-body and game-scale evidence retained outside public lab.
+        scene.render.resolution_x=384;scene.render.resolution_y=640;cam.data.ortho_scale=2.0
+        bodycenter=Vector((0,0,.93))
+        for angle in (0,180):
+            for o in meshes:
+                for key in o.data.shape_keys.key_blocks[1:]:key.value=0
+            r=math.radians(angle);cam.location=bodycenter+Vector((math.sin(r)*2.5,-math.cos(r)*2.5,0));cam.rotation_euler=(bodycenter-cam.location).to_track_quat('-Z','Y').to_euler()
+            scene.render.filepath=str((R/f'{sex}-body-{angle}.png').resolve());bpy.ops.render.render(write_still=True)
         for o in meshes:
             for key in o.data.shape_keys.key_blocks[1:]:key.value=0
         bpy.ops.wm.save_as_mainfile(filepath=str((R/f'{sex}-skin.blend').resolve()))
@@ -157,7 +178,7 @@ for sex,pin in PINS.items():
         idx=np.unique(tri[front|back]);fi=np.unique(tri[front]);c=(pos[idx].min(0)+pos[idx].max(0))/2;centers.append(c)
         ext=(pos[idx].max(0)-pos[idx].min(0))/2
         eyeuv[fi,0]=.5+.44*(pos[fi,0]-c[0])/ext[0];eyeuv[fi,1]=.5-.44*(pos[fi,1]-c[1])/ext[1]
-    size=1024;sp=spatial(pos,uv,tri,np.all(rgb==[90,86,255],axis=1),centers,size)
+    size=2048;sp=spatial(pos,uv,tri,np.all(rgb==[90,86,255],axis=1),centers,size)
     for n,a in zip(('brow','cheek','nose'),sp):Image.fromarray(np.rint(np.clip(a,0,1)*255).astype('u1')).save(R/f'{sex}-{n}-mask.png')
     albedo=texture(sex,size,sp);eye=eye_map(sex)
     rough=np.empty((512,512,3),np.uint8);rough[:,:,0]=255;rough[:,:,1]=np.rint(255*(.71-mask('lips',512)*.18)).astype('u1');rough[:,:,2]=0
@@ -165,9 +186,14 @@ for sex,pin in PINS.items():
     out=L/f'{sex}-candidate.glb';n=pack(sex,j,b,o,tri,[~eg,eg],[uv,eyeuv],albedo,rp,eye,out)
     shutil.copy2(SRC/f'{sex}-candidate.glb',L/f'{sex}-original.glb')
     assert sha((L/f'{sex}-original.glb').read_bytes())==audit['sexes'][sex]['source_sha']
-    report['sexes'][sex]={'geometry_and_all_targets_exact':True,'triangles':len(tri),'eye_triangles':int(eg.sum()),'skin_maps_bytes':sum(p.stat().st_size for p in [albedo,rp,eye]),'glb_bytes':n,'sha256':sha(out.read_bytes()),'source_uv_sha':pin,'texture_memory_rgba8_mib':round((1024**2+512**2+256**2)*4*4/3/2**20,3)}
+    report['sexes'][sex]={'geometry_and_all_targets_exact':True,'triangles':len(tri),'eye_triangles':int(eg.sum()),'skin_maps_bytes':sum(p.stat().st_size for p in [albedo,rp,eye]),'glb_bytes':n,'sha256':sha(out.read_bytes()),'source_uv_sha':pin,'texture_memory_rgba8_mib':round((size**2+512**2+256**2)*4*4/3/2**20,3)}
     (R/'report.json').write_text(json.dumps(report,indent=2))
     render(sex,out,'candidate');render(sex,L/f'{sex}-original.glb','original')
+    # Compare actual 1024 atlas against 2048 detail without changing geometry.
+    small=R/f'{sex}-albedo-1024.png';Image.open(albedo).resize((1024,1024),Image.Resampling.LANCZOS).save(small,optimize=True)
+    low=L/f'{sex}-mobile.glb';pack(sex,j,b,o,tri,[~eg,eg],[uv,eyeuv],small,rp,eye,low)
+    report['sexes'][sex]['mobile_sha256']=sha(low.read_bytes());report['sexes'][sex]['mobile_skin_maps_bytes']=sum(p.stat().st_size for p in [small,rp,eye]);report['sexes'][sex]['mobile_texture_memory_rgba8_mib']=7.0
+    render(sex,low,'mobile')
 # Bounded donor retrieval probe: exact asset-name provenance; no unauthorized
 # or unverified material use. Source comparison remains OPEN if inaccessible.
 class Links(HTMLParser):
@@ -186,7 +212,53 @@ def donor_probe():
             result[pack]={'page':page,'archive_links':urls}
         except Exception as e:result[pack]={'page':page,'error':str(e)}
     return result
-report['donor_probe']=donor_probe();(R/'report.json').write_text(json.dumps(report,indent=2))
+report['donor_probe']=donor_probe()
+# Download only official CC0 pack archives advertised on the publisher pages.
+# Inventory and exact source hashes before the later UV/art acceptance decision.
+for pack,needle in [('skins01','midtoned'),('skins02','aksel')]:
+    result=report['donor_probe'].get(pack,{})
+    for url in result.get('archive_links',[]):
+        if urllib.parse.urlparse(url).hostname not in ('files2.makehumancommunity.org','files.makehumancommunity.org'):continue
+        try:
+            with urllib.request.urlopen(url,timeout=30) as response:
+                data=response.read(160*1024*1024+1)
+            assert len(data)<=160*1024*1024,'archive size cap'
+            z=zipfile.ZipFile(io.BytesIO(data));names=z.namelist()
+            result['archive_sha256']=sha(data);result['source']=url
+            candidates=[n for n in names if needle in n.lower() and n.lower().endswith('.mhmat')]
+            result['material_candidates']=candidates
+            result['license_paths']=[n for n in names if any(k in pathlib.PurePosixPath(n).name.lower() for k in ('license','copyright','readme'))][:50]
+            selected=[]
+            for n in candidates[:8]:
+                mat=z.read(n).decode('utf8',errors='replace')
+                match=re.search(r'^diffuseTexture\\s+(.+)
+h=(L/'index.html').read_text().replace('RESET-C-VIS','CF-SKIN/BASE').replace('Сравнение нативных морфов Anny. Нейтраль и мимика сохранены. Выбери «До» и «После» при одинаковых настройках.','Первый материал кожи и глаз. Сравнение с глиняной моделью.').replace('>До</button>','>Без текстур</button>').replace('>После</button>','>Кожа</button>').replace('Диагностическое сравнение света и камеры; художественная приёмка не завершена. Модели не изменены.','Диагностический материал; художественная приёмка не завершена. Геометрия и морфы сохранены.').replace('Согласованные кадры · Blender / PlayCanvas / исходный свет / только ось (нейтраль)','Реальные кадры · Blender и PlayCanvas').replace('<details><summary>Реальные рендеры Blender · до / после</summary><div class="grid" id="renders"></div></details>','')
+h=h.replace('<button id="candidate"','<button id="mobile" aria-pressed="false">Кожа 1024</button><button id="candidate"').replace('>Кожа</button>','>Кожа 2048</button>')
+(L/'index.html').write_text(h)
+s=(L/'lab.js').read_text()
+start=s.index('function gallery(){');end=s.index('async function load',start)
+s=s[:start]+"""function gallery(){const p=$('pairs');p.replaceChildren();for(const state of ['neutral','all-pos','all-neg','smile'])for(const angle of [0,45,90]){const d=document.createElement('div');d.innerHTML='<p>'+state+' · '+angle+'°</p><div class="grid">'+['blender-candidate','chromium-candidate',...(state==='neutral'?['blender-original','chromium-original']:[])].map(k=>'<figure><img loading="lazy" src="comparison/'+sex+'-'+state+'-'+angle+'-'+k+'.png" alt="'+k+'"><figcaption>'+k+'</figcaption></figure>').join('')+'</div>';p.append(d)}}\n"""+s[end:]
+s=s.replace("const a=await new Promise((resolve,reject)=>app.assets.loadFromUrl('./'+s+'-'+v+'.glb','container',(e,x)=>e?reject(e):resolve(x)));","const a=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Тайм-аут загрузки модели')),45000);app.assets.loadFromUrl('./'+s+'-'+v+'.glb','container',(e,x)=>{clearTimeout(timer);e?reject(e):resolve(x)})});")
+s=s.replace("app.start();await load('male')","canvas.addEventListener('webglcontextlost',()=>{status.textContent='WebGL потерян. Перезагрузи страницу.'});app.start();await load('male')")
+s=s.replace("$('original').onclick=", "$('mobile').onclick=()=>load(sex,'mobile',true);$('original').onclick=")
+s=s.replace("$('original').setAttribute('aria-pressed'", "$('mobile').setAttribute('aria-pressed',String(v==='mobile'));$('original').setAttribute('aria-pressed'")
+s=s.replace("$('candidate').disabled=true", "$('candidate').disabled=$('mobile').disabled=true").replace("$('candidate').disabled=false", "$('candidate').disabled=$('mobile').disabled=false")
+s=s.replace("app.start();await load('male')", "app.start();await load('male')")
+(L/'lab.js').write_text(s)
+(L/'MATERIAL-REPORT.json').write_text(json.dumps(report,indent=2))
+print(json.dumps(report))
+,mat,re.M)
+                if not match:continue
+                path=str(pathlib.PurePosixPath(n).parent/match.group(1).strip())
+                if path not in names:continue
+                raw=z.read(path);im=Image.open(io.BytesIO(raw)).convert('RGB')
+                dest=R/f'{pack}-donor-{len(selected)}.png';im.resize((2048,2048),Image.Resampling.LANCZOS).save(dest)
+                selected.append(dict(material=n,texture=path,source_sha256=sha(raw),size=im.size,preview=dest.name,material_sha256=sha(z.read(n)),metadata=mat[:4000]))
+                (R/f'{pack}-donor-{len(selected)-1}.mhmat').write_text(mat)
+            result['selected']=selected
+            break
+        except Exception as e:result['error']=str(e)
+(R/'report.json').write_text(json.dumps(report,indent=2))
 h=(L/'index.html').read_text().replace('RESET-C-VIS','CF-SKIN/BASE').replace('Сравнение нативных морфов Anny. Нейтраль и мимика сохранены. Выбери «До» и «После» при одинаковых настройках.','Первый материал кожи и глаз. Сравнение с глиняной моделью.').replace('>До</button>','>Без текстур</button>').replace('>После</button>','>Кожа</button>').replace('Диагностическое сравнение света и камеры; художественная приёмка не завершена. Модели не изменены.','Диагностический материал; художественная приёмка не завершена. Геометрия и морфы сохранены.').replace('Согласованные кадры · Blender / PlayCanvas / исходный свет / только ось (нейтраль)','Реальные кадры · Blender и PlayCanvas').replace('<details><summary>Реальные рендеры Blender · до / после</summary><div class="grid" id="renders"></div></details>','')
 (L/'index.html').write_text(h)
 s=(L/'lab.js').read_text()
