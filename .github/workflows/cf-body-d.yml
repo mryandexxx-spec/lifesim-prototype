@@ -77,7 +77,7 @@ jobs:
           key: cf-body-d-bpy-4.5.0-py311-linux-v1
       - name: Install exact independent Blender runtime
         run: |
-          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==2.2.6
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4
       - name: Audit actual skinned triangle contacts and render matched closeups
         run: python art-review/cf-body-d/contact_audit.py
       - uses: actions/upload-artifact@v4
