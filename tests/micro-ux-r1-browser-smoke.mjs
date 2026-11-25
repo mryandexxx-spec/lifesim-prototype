@@ -1,14 +1,96 @@
 /** MICRO-UX-R1: actual mobile Chromium touch, real PlayCanvas/WebGL. */
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-import {newHousehold} from '../src/household.js';
-import {SAVE_KEY} from '../src/simulation.js';
+import {newHousehold,loadHousehold} from '../src/household.js';
+import {newGame,SAVE_KEY} from '../src/simulation.js';
+import {acceptCareerOffer} from '../src/career-job-board.js';
+import {nextCareerShift} from '../src/career-scheduler.js';
+import {progressCareerWork} from '../src/career-work.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 
 const browser=await chromium.launch({headless:true,args:[
   '--enable-webgl','--use-gl=angle','--use-angle=swiftshader',
   '--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 try{
+ // PF-08: use real, valid settled shifts, then exercise the actual game's
+ // returning -> home transition without ever selecting the away residents.
+ for(const [width,height,count] of [[390,844,2],[320,568,3],[390,844,4]]){
+   const base=newHousehold('2026-11-23');
+   base.calendar.anchorConfirmed=true;
+   base.autonomy.enabled=false;base.otherSim.autonomy.enabled=false;
+   if(count>2){
+     const residentsById={},linksByResident={
+       alex:{familyId:'family_1',dwellingId:'dwelling_1'},
+       mira:{familyId:'family_1',dwellingId:'dwelling_1'}};
+     for(let i=3;i<=count;i++){
+       const id='resident_'+i,actor=newGame();actor.position={x:i-2,z:1.2};
+       residentsById[id]={id,identity:{firstName:'Тест'+i,lastName:'Житель',lifeStage:'adult'},actor};
+       linksByResident[id]={familyId:'family_'+i,dwellingId:'dwelling_1'};
+     }
+     base.population={schema:1,nextResidentSerial:count+1,residentsById,linksByResident,kinship:[]};
+   }
+   const seed=loadHousehold(JSON.parse(JSON.stringify(base)));
+   const workers=['mira',...Array.from({length:count-2},(_,i)=>'resident_'+(i+3))];
+   let end;
+   for(const id of workers){
+     const offer=acceptCareerOffer(seed,id,'editorial');assert.equal(offer.ok,true,offer.reason);
+     seed.careerSystem=offer.careerSystem;
+     const contract=seed.careerSystem.byResident[id];
+     const planned=nextCareerShift(seed.calendar,contract,seed.minutes);
+     assert.ok(planned);end=planned.end;
+     contract.currentShift={...planned,phase:'working',departedAt:planned.start,workMode:'normal'};
+   }
+   seed.minutes=end-1;seed.otherSim.minutes=end-1;seed.paused=false;
+   progressCareerWork(seed,end-1,end);
+   seed.minutes=end;seed.otherSim.minutes=end;
+   for(const id of workers)assert.equal(seed.careerSystem.byResident[id].currentShift.phase,'returning');
+   const balance=seed.shop.credits;
+   const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,
+     hasTouch:true,isMobile:true,serviceWorkers:'block'});
+   await context.addInitScript(({key,root,tour,workers})=>{
+     if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(root));
+     localStorage.setItem(tour,'done');
+     // Capture the initial picker projection even if WebGL startup finishes
+     // the return before the loading overlay is dismissed.
+     window.pf08Seen={};window.pf08Buttons={};
+     new MutationObserver(()=>{
+       for(const id of workers){
+         const b=document.getElementById('pick-'+id);
+         if(b?.dataset.away==='true'){
+           window.pf08Seen[id]=true;window.pf08Buttons[id]??=b;
+         }
+       }
+     }).observe(document,{subtree:true,childList:true,attributes:true,attributeFilter:['data-away']});
+   },{key:SAVE_KEY,root:seed,tour:UI_TOUR_STORAGE_KEY,workers});
+   const page=await context.newPage(),errors=[];
+   page.on('pageerror',e=>errors.push(e.message));
+   await page.goto('http://127.0.0.1:8765/?pf08',{waitUntil:'domcontentloaded'});
+   await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+   assert.ok((await page.locator('#game-canvas').screenshot()).length>2000);
+   await page.waitForFunction(({key,workers})=>{
+     const saved=JSON.parse(localStorage.getItem(key));
+     return workers.every(id=>saved.careerSystem.byResident[id]?.currentShift===null);
+   },{key:SAVE_KEY,workers},{timeout:30000});
+   for(const id of workers){
+     assert.equal(await page.evaluate(id=>window.pf08Seen[id],id),true,'initial away state '+id);
+     await page.waitForFunction(id=>{
+       const b=document.getElementById('pick-'+id);
+       return b?.dataset.away==='false'&&!b.getAttribute('aria-label').includes('на работе');
+     },id,{timeout:5000});
+     assert.equal(await page.evaluate(id=>window.pf08Buttons[id]===document.getElementById('pick-'+id),id),true,
+       'status refresh must preserve original button '+id);
+   }
+   assert.equal(await page.locator('#pick-alex').getAttribute('aria-pressed'),'true');
+   assert.equal(await page.locator('#dashboard .resident-switch button').count(),count);
+   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
+   assert.equal(saved.version,1);assert.equal(saved.shop.credits,balance,'return must not pay twice');
+   assert.deepEqual(errors,[]);
+   await page.reload({waitUntil:'domcontentloaded'});
+   await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
+   for(const id of workers)assert.equal(await page.locator('#pick-'+id).getAttribute('data-away'),'false');
+   await context.close();
+   console.log('PF-08 actual returning -> home, '+count+' residents '+width+'x'+height+' PASS');
+ }
  for(const [width,height] of [[390,844],[320,568]]){
   const seed=newHousehold('2026-11-22');
   seed.paused=true;seed.otherSim.paused=true;
