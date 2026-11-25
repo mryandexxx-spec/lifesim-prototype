@@ -1,0 +1,343 @@
+name: CF-BODY D adaptive rig diagnostic
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  adaptive-rig:
+    if: false # D1 exact artifacts reused by D2; no repeated CPU generation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 265a6f079b8c56f4b7722c3aa1dce98745d0dceb
+          path: pinned-vis
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-c-continuous-evidence
+          run-id: 45634752787
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify source and install pinned CPU tools
+        run: |
+          echo '4ce29a6ffce21817f92bb2c7df8c27afe630d0dd88e373a05e2ceca591fdcbb8  pinned-vis/male-candidate.glb' | sha256sum -c
+          echo 'f4973254fb39f2ff962f429725e66c17a478d7e4110ed556679babb400c7d85e  pinned-vis/female-candidate.glb' | sha256sum -c
+          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install 'anny @ git+https://github.com/naver/anny.git@8f35dc2df1c4062fd2fae86734f9705de50c0c2b' numpy==2.2.6 scipy==1.15.3
+      - name: Compute actual per-shape bind and skin diagnostic
+        run: |
+          python -m py_compile art-review/cf-body-d/*.py
+          python art-review/cf-body-d/adaptive.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-adaptive-evidence
+          path: d-out/
+          retention-days: 90
+          if-no-files-found: warn
+
+  contact-render:
+    if: false # R2 evidence already retained; D-TOOLS is independent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d4-contact-audit
+          run-id: 45676236151
+          github-token: ${{ github.token }}
+          path: r1
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: cf-body-d-bpy-4.5.0-py311-linux-v1
+      - name: Install exact independent Blender runtime
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.15.3
+          # pip check rejects this wheel's platform tag on the runner despite the
+          # identical wheel importing and rendering successfully in D3.
+          # Require real import, exact versions and an evaluated mesh instead.
+          python -c 'import bpy, numpy; assert bpy.app.version == (4,5,0); assert numpy.__version__ == "1.26.4"; bpy.ops.mesh.primitive_cube_add(); assert len(bpy.context.object.data.vertices) == 8; print(bpy.app.version_string, numpy.__version__)'
+          python -m py_compile art-review/cf-body-d/contact_audit.py art-review/cf-body-d/motion_audit.py
+      - name: Sample motion, classify skin BVH candidates and render full body
+        run: python art-review/cf-body-d/motion_audit.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d4-motion-audit
+          path: d4-motion/
+          retention-days: 90
+          if-no-files-found: warn
+
+  ossos-gate:
+    if: false # Exact D-TOOLS/1 result retained in run 45680624386
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-adaptive-evidence
+          run-id: 45655678102
+          github-token: ${{ github.token }}
+          path: d1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d4-contact-audit
+          run-id: 45676236151
+          github-token: ${{ github.token }}
+          path: r1
+      - name: Verify upstream and build selected source without lifecycle scripts
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          grep -q 'Copyright (c) 2021 Sketchpunk Labs' upstream-ossos/LICENSE
+          npm install --prefix .dtools-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.dtools-deps/node_modules" upstream-ossos/node_modules
+          cp art-review/cf-body-d/ossos-gate.mjs upstream-ossos/gate.mjs
+          .dtools-deps/node_modules/.bin/esbuild upstream-ossos/gate.mjs --bundle --platform=node --target=node22 --format=esm --outfile=dtools-bundle.mjs
+          mkdir -p d-tools-out
+          cp upstream-ossos/LICENSE d-tools-out/OSSOS-LICENSE.txt
+          cp .dtools-deps/package-lock.json d-tools-out/dependency-lock.json
+      - name: Compare on actual D4 motion and held-out D1 skeletons
+        run: node dtools-bundle.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-tools-ossos-gate
+          path: d-tools-out/
+          retention-days: 90
+          if-no-files-found: warn
+
+  ossos-full-rig:
+    if: false # D-TOOLS/2 exact artifact is reused
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-adaptive-evidence
+          run-id: 45655678102
+          github-token: ${{ github.token }}
+          path: d1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d4-contact-audit
+          run-id: 45676236151
+          github-token: ${{ github.token }}
+          path: r1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-c-continuous-evidence
+          run-id: 45634752787
+          github-token: ${{ github.token }}
+          path: reviewed
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: cf-body-d-bpy-4.5.0-py311-linux-v1
+      - name: Prepare real held-out body meshes and full rig
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.15.3
+          python -m py_compile art-review/cf-body-d/dtools-full.py art-review/cf-body-d/dtools-render.py
+          python art-review/cf-body-d/dtools-full.py prepare
+      - name: Apply upstream IK to 104-joint skeleton
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          npm install --prefix .dtools-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.dtools-deps/node_modules" upstream-ossos/node_modules
+          cp art-review/cf-body-d/dtools-full.mjs upstream-ossos/gate.mjs
+          .dtools-deps/node_modules/.bin/esbuild upstream-ossos/gate.mjs --bundle --platform=node --target=node22 --format=esm --outfile=dtools-full-bundle.mjs
+          node dtools-full-bundle.mjs
+          python art-review/cf-body-d/dtools-full.py bake
+          cp upstream-ossos/LICENSE full-out/OSSOS-LICENSE.txt
+          cp .dtools-deps/package-lock.json full-out/dependency-lock.json
+      - name: Independent Blender skin and fixed-seat A/B renders
+        run: python art-review/cf-body-d/dtools-render.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-tools-full-rig
+          path: full-out/
+          retention-days: 90
+          if-no-files-found: warn
+
+  ossos-world-contact:
+    if: false # exact D-TOOLS/3 R2 evidence retained
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: cf-body-d-bpy-4.5.0-py311-linux-v1
+      - name: Prepare exact skin and contact input
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.15.3
+          python -m py_compile art-review/cf-body-d/dtools-contact.py art-review/cf-body-d/dtools-contact-render.py
+          python art-review/cf-body-d/dtools-contact.py prepare
+      - name: Plan world anchors and solve contact-aware pelvis trajectory
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          npm install --prefix .dtools-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.dtools-deps/node_modules" upstream-ossos/node_modules
+          python -c "from pathlib import Path; s=Path('art-review/cf-body-d/dtools-full.mjs').read_text().split('const results={};')[0].replace('full-input/poses.json','contact-input.json'); Path('upstream-ossos/contact.mjs').write_text(s+Path('art-review/cf-body-d/dtools-contact.mjs').read_text())"
+          .dtools-deps/node_modules/.bin/esbuild upstream-ossos/contact.mjs --bundle --platform=node --target=node22 --format=esm --outfile=dtools-contact-bundle.mjs
+          node dtools-contact-bundle.mjs
+          python art-review/cf-body-d/dtools-contact.py bake
+          cp upstream-ossos/LICENSE contact-out/OSSOS-LICENSE.txt
+          cp .dtools-deps/package-lock.json contact-out/dependency-lock.json
+      - name: Independent dense contact sampling and real renders
+        run: python art-review/cf-body-d/dtools-contact-render.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-tools-world-contact-r2
+          path: contact-out/
+          retention-days: 90
+          if-no-files-found: warn
+
+  ossos-world-reach:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-world-contact-r2
+          run-id: 45685603326
+          github-token: ${{ github.token }}
+          path: prior-seat
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: cf-body-d-bpy-4.5.0-py311-linux-v1
+      - name: Prepare exact skin and contact input
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.15.3
+          python -m py_compile art-review/cf-body-d/dtools-reach.py art-review/cf-body-d/dtools-reach-render.py
+          python art-review/cf-body-d/dtools-reach.py prepare
+      - name: Solve fixed world fingertip goals and reject infeasible clips
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          npm install --prefix .dtools-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.dtools-deps/node_modules" upstream-ossos/node_modules
+          python -c "from pathlib import Path; s=Path('art-review/cf-body-d/dtools-full.mjs').read_text().split('const results={};')[0].replace('full-input/poses.json','reach-input.json'); Path('upstream-ossos/reach.mjs').write_text(s+Path('art-review/cf-body-d/dtools-reach.mjs').read_text())"
+          .dtools-deps/node_modules/.bin/esbuild upstream-ossos/reach.mjs --bundle --platform=node --target=node22 --format=esm --outfile=dtools-reach-bundle.mjs
+          node dtools-reach-bundle.mjs
+          python art-review/cf-body-d/dtools-reach.py bake
+          cp upstream-ossos/LICENSE reach-out/OSSOS-LICENSE.txt
+          cp .dtools-deps/package-lock.json reach-out/dependency-lock.json
+      - name: Independent Blender landmark and foot-lock sampling and renders
+        run: python art-review/cf-body-d/dtools-reach-render.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-tools-world-reach
+          path: reach-out/
+          retention-days: 90
+          if-no-files-found: warn
