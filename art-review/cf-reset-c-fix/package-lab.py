@@ -41,7 +41,7 @@ js=patch(js,"window.labState={ready:","window.actualWeights=instances.map(mi=>Ob
 js=patch(js,"async function load(s){","async function load(s,v=variant,keep=false){")
 js=patch(js,"$('male').disabled=$('female').disabled=true;","$('male').disabled=$('female').disabled=$('original').disabled=$('candidate').disabled=true;")
 js=patch(js,"'./'+s+'.glb'","'./'+s+'-'+v+'.glb'")
-js=patch(js,"model=n;asset=a;instances=ms;sex=s;values=Object.fromEntries(axes.map(([k])=>[k,0]));expression='neutral';","model=n;if(asset){asset.unload();app.assets.remove(asset)}asset=a;instances=ms;sex=s;variant=v;if(!keep){values=Object.fromEntries(axes.map(([k])=>[k,0]));expression='neutral'}$('original').setAttribute('aria-pressed',String(v==='original'));$('candidate').setAttribute('aria-pressed',String(v==='candidate'));")
+js=patch(js,"model=n;asset=a;instances=ms;sex=s;values=Object.fromEntries(axes.map(([k])=>[k,0]));expression='neutral';","model=n;if(asset&&asset!==a){asset.unload();app.assets.remove(asset)}asset=a;instances=ms;sex=s;variant=v;if(!keep){values=Object.fromEntries(axes.map(([k])=>[k,0]));expression='neutral'}$('original').setAttribute('aria-pressed',String(v==='original'));$('candidate').setAttribute('aria-pressed',String(v==='candidate'));")
 js=patch(js,"$('male').disabled=$('female').disabled=false;","$('male').disabled=$('female').disabled=$('original').disabled=$('candidate').disabled=false;")
 js=patch(js,"$('male').onclick=()=>load('male');","$('original').onclick=()=>load(sex,'original',true);$('candidate').onclick=()=>load(sex,'candidate',true);$('male').onclick=()=>load('male');")
 # Use verified renders from the exact candidate run, grouped by axis and endpoint.
@@ -54,6 +54,9 @@ for f in root.glob('*.png'):
 # Rights provenance of the existing published source, without copying private docs.
 (site/'NOTICE.txt').write_text('LifeSim RESET-C-FIX experimental derivative of the existing public RESET-C models. Anny 0.6.2, naver/anny commit 8f35dc2df1c4062fd2fae86734f9705de50c0c2b (Apache-2.0 code); MPFB and Face Units CC0 as documented by pinned upstream. PlayCanvas engine MIT; source: https://github.com/playcanvas/engine. Original source lab: '+base+'\nNo production asset or topology approval.\n')
 (site/'evidence.json').write_text(json.dumps({'source_run':45563179091,'source_head':'0329a0f956cfbb0cee7216a4c76d7a59067fa9a7','model_sha256':pins,'contact_gate':'candidate counts only; penetration classification open'},indent=2))
+# Retain the upstream pinned license and README provenance with the derivative.
+for name in ('LICENSE','README.md'):
+    (site/('anny-'+name)).write_bytes(urllib.request.urlopen('https://raw.githubusercontent.com/naver/anny/8f35dc2df1c4062fd2fae86734f9705de50c0c2b/'+name,timeout=30).read())
 manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in site.iterdir()}
 (site/'SHA256SUMS.json').write_text(json.dumps(manifest,indent=2))
 print('Packaged',len(manifest),'files; exact candidate pins verified.')
