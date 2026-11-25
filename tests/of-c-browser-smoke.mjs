@@ -63,18 +63,24 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
  // Actual action settlement and visual transition in a live game. A valid
  // saved physical session is just before completion; no writes to live state.
  for(const [verb,from,to,wet] of [['water','seed','seed',true],['harvest','new','harvested',false],['replant','harvested','seed',false],['growth','sprout','growing',true]]){
-  const {seed}=fixture(0),sku='garden.herb.mint',item={instanceId:'out-1',itemId:sku,x:19,z:8,yaw:90,purchasePriceCredits:110};
+  const {seed}=fixture(0),resident=verb==='harvest'||verb==='replant'?'mira':'alex',sku='garden.herb.mint',item={instanceId:'out-1',itemId:sku,x:19,z:8,yaw:90,purchasePriceCredits:110};
   const at=seed.minutes,record={...newGardenRecord(0),evaluatedAt:at,progressWetMinutes:verb==='water'?0:verb==='growth'?2879.7:4320,hydratedUntil:verb==='growth'?at+1000:0,lastWateredAt:verb==='growth'?at-100:null,harvestedAt:verb==='replant'?at-1:null};
   seed.world.outdoors={...seed.world.outdoors,features:[item],gardens:{'out-1':record},nextId:2};seed.shop.credits=1000;seed.kitchen.pantry.herbs=0;
-  if(verb!=='growth'){const route=gardenApproach(seed.world,'out-1',seed.position);assert.ok(route);seed.position={...route.goal};seed.action={id:'garden',phase:'using',automatic:false,elapsed:GARDEN_DURATION[verb]-.5,targetInstanceId:'out-1',gardenActionId:verb,gardenPlantedAt:record.plantedAt,gardenGoal:{...route.goal}};assert.equal(loadHousehold(structuredClone(seed)).action?.gardenActionId,verb);}
+  if(verb!=='growth'){const actor=resident==='alex'?seed:seed.otherSim;const route=gardenApproach(seed.world,'out-1',actor.position);assert.ok(route);actor.position={...route.goal};actor.action={id:'garden',phase:'using',automatic:false,elapsed:GARDEN_DURATION[verb]-.5,targetInstanceId:'out-1',gardenActionId:verb,gardenPlantedAt:record.plantedAt,gardenGoal:{...route.goal}};const restored=loadHousehold(structuredClone(seed));assert.equal((resident==='alex'?restored:restored.otherSim).action?.gardenActionId,verb);}
   const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true});
   try{
    await ctx.addInitScript(({key,tour,seed})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');},{key:SAVE_KEY,tour:UI_TOUR_STORAGE_KEY,seed});
    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));
    await page.goto('http://127.0.0.1:8765/?furniture=qa&garden-start-paused=1',{waitUntil:'domcontentloaded'});await page.locator('#loading').waitFor({state:'hidden',timeout:100000});
    await page.waitForFunction(from=>{const p=window.__LifeSimGardenStats?.().plots[0];return p?.attached&&p.variant===from&&!p.fallbackVisible;},from,{timeout:100000});
+   const initial=await page.evaluate(()=>window.__LifeSimGardenSessionQA());
+   assert.equal(initial.paused,true);
+   if(verb!=='growth'){const actor=initial.actors[resident];assert.equal(actor.action?.gardenActionId,verb);assert.ok(Math.hypot(actor.position.x-actor.action.gardenGoal.x,actor.position.z-actor.action.gardenGoal.z)<.45,'active garden reload must retain physical approach '+resident);}
+   assert.equal(await page.locator('#pause-btn').getAttribute('aria-label'),'Продолжить');
+   console.log(name,verb,resident,'before',JSON.stringify(initial));
    await page.locator('#pause-btn').click();
-   await page.waitForFunction(({to,wet})=>{const p=window.__LifeSimGardenStats?.().plots[0];return p?.attached&&p.variant===to&&p.wet===wet&&p.soil===(wet?'Wet soil':'Dry soil')&&!p.fallbackVisible;},{to,wet},{timeout:35000});
+   try{await page.waitForFunction(({to,wet})=>{const p=window.__LifeSimGardenStats?.().plots[0];return p?.attached&&p.variant===to&&p.wet===wet&&p.soil===(wet?'Wet soil':'Dry soil')&&!p.fallbackVisible;},{to,wet},{timeout:35000});}
+   catch(error){const debug=await page.evaluate(()=>({session:window.__LifeSimGardenSessionQA(),visual:window.__LifeSimGardenStats()}));writeFileSync(out+'/'+name+'-failed-'+verb+'.json',JSON.stringify(debug,null,2));console.log(name,verb,'FAILED',JSON.stringify(debug));throw error;}
    await page.locator('#pause-btn').click();
    // Pause is transient, so pagehide is the real persistence boundary for
    // watering and growth; reload also proves the selected model survived.
@@ -87,7 +93,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    if(verb==='replant'){assert.equal(saved.shop.credits,970);assert.equal(saved.world.outdoors.gardens['out-1'].harvestedAt,null);}
    if(verb==='water')assert.ok(saved.world.outdoors.gardens['out-1'].hydratedUntil>saved.minutes);
    assert.deepEqual(errors,[]);await page.screenshot({path:out+'/'+name+'-live-'+verb+'.png'});
-   report.push({name,live:verb,from,to,wet});writeFileSync(out+'/report.json',JSON.stringify(report,null,2));
+   report.push({name,live:verb,resident,from,to,wet});writeFileSync(out+'/report.json',JSON.stringify(report,null,2));
   }finally{await ctx.close();}
  }
  }finally{await b.close();}

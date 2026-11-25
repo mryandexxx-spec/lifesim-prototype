@@ -3220,7 +3220,12 @@ function boot() {
   const vegetation=createOutdoorVegetationVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&vegetationMode!=='legacy',instancing:vegetationMode!=='unbatched'});
   if(furnitureVisualMode==='qa'){window.__LifeSimVegetationStats=vegetation.stats;window.__LifeSimVegetationInstancing=vegetation.setInstancing;}
   const gardenVisual=createGardenVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&new URLSearchParams(location.search).get('garden')!=='legacy'});
-  if(furnitureVisualMode==='qa')window.__LifeSimGardenStats=gardenVisual.stats;
+  if(furnitureVisualMode==='qa'){
+    window.__LifeSimGardenStats=gardenVisual.stats;
+    window.__LifeSimGardenSessionQA=()=>({minutes:game.minutes,paused:game.paused,
+      actors:Object.fromEntries(['alex','mira'].map(id=>{const a=getActor(game,id);return [id,{position:{...a.position},action:a.action?{...a.action}:null,event:a.event}];})),
+      gardens:structuredClone(game.world.outdoors.gardens||{}),credits:game.shop.credits,herbs:game.kitchen.pantry.herbs});
+  }
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
@@ -4441,7 +4446,9 @@ function boot() {
     wash: {x:0,y:0,z:-1.05,pitch:0,yaw:0},
     paint: {x:0,y:0,z:-1.00,pitch:0,yaw:0}
   };
-  if(game.action?.phase==='using') {
+  // Garden sessions already have validated saved physical approach positions.
+  // Never apply legacy indoor stand migration to an active garden session.
+  if(game.action?.phase==='using'&&game.action.id!=='garden') {
     const dest=game.action.id==='bed'
       ?bedDestinationFor(game,'alex',game.action.targetInstanceId):
       game.action.id==='tv'&&game.action.watchSeatInstanceId
@@ -4465,7 +4472,7 @@ function boot() {
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
   game.position=nearestWalkable(game.position,game.world);
-  if(game.otherSim.action?.phase==='using') {
+  if(game.otherSim.action?.phase==='using'&&game.otherSim.action.id!=='garden') {
     const dest=game.otherSim.action.id==='bed'
       ?bedDestinationFor(game,'mira',game.otherSim.action.targetInstanceId):
       game.otherSim.action.id==='tv'&&game.otherSim.action.watchSeatInstanceId
