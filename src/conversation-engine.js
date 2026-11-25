@@ -11,7 +11,7 @@ import {emitSocialReaction,socialOutcome} from './social-feedback.js';
 
 const row=(label,opener,tag,lines)=>Object.freeze({label,opener,tag,lines:Object.freeze(lines)});
 const saying=(label,line,yes,no,tone,weight)=>Object.freeze({label,line,yes,no,tone,weight});
-export const CONVERSATION_TOPICS=Object.freeze({
+const legacyTopics=Object.freeze({
   daily:row('Как проходит день','Как у тебя сегодня дела?','calm_leisure',['daily.listen','daily.news','daily.critic']),
   hobbies:row('Увлечения','Чем бы тебе хотелось заняться?','music',['hobbies.music','hobbies.books','hobbies.mock']),
   humor:row('Юмор','У меня для тебя одна забавная история.','games',['humor.joke','humor.story','humor.tease']),
@@ -20,7 +20,7 @@ export const CONVERSATION_TOPICS=Object.freeze({
   conflict:row('Разобраться','Между нами осталось что-то недосказанное.','socializing',['conflict.apologize','conflict.explain','conflict.blame']),
   sports:row('Обсудить матч','Как тебе последний матч Лиги Блин’С?','games',['sports.result','sports.cheer','sports.debate'])
 });
-export const CONVERSATION_ACTS=Object.freeze({
+const legacyActs=Object.freeze({
   'daily.listen':saying('Спросить о настроении','Мне важно знать, как ты себя чувствуешь.','Спасибо, что интересуешься.','Не хочу об этом говорить.','warm',3),
   'daily.news':saying('Поделиться новостью','Сегодня было кое-что интересное!','Расскажи поподробнее.','Сейчас мне не до новостей.','neutral',2),
   'daily.critic':saying('Пожаловаться на день','Опять всё пошло не по плану.','Да, иногда бывает непросто.','Пожалуйста, не вымещай это на мне.','sharp',-2),
@@ -43,6 +43,96 @@ export const CONVERSATION_ACTS=Object.freeze({
   'sports.cheer':saying('Порадоваться победе','Вот это был красивый момент!','Разделяю твой восторг.','Мне этот футбол не слишком интересен.','warm',3),
   'sports.debate':saying('Поспорить о счёте','Я бы по-другому оценил(а) этот матч.','Интересная точка зрения!','Давай не превращать это в ссору.','sharp',-1)
 });
+const expandedTopics=Object.freeze({
+  memories:row("Детство и воспоминания","Какие мелочи могли бы напомнить о детстве?","calm_leisure",["memories.ask","memories.share","memories.tact","memories.reflect","memories.deep","memories.yes","memories.repair"]),
+  career:row("Работа и карьера","Как ты относишься к работе и профессиональным целям?","socializing",["career.ask","career.share","career.tact","career.reflect","career.deep","career.yes","career.repair"]),
+  dreams:row("Мечты","Представим, чего можно захотеть в будущем.","drawing",["dreams.ask","dreams.share","dreams.tact","dreams.reflect","dreams.deep","dreams.yes","dreams.repair"]),
+  money:row("Деньги и привычки","Поговорим о том, как разумно распоряжаться деньгами.","calm_leisure",["money.ask","money.share","money.tact","money.reflect","money.deep","money.yes","money.repair"]),
+  family:row("Семья и близкие","Что помогает близким людям ладить друг с другом?","socializing",["family.ask","family.share","family.tact","family.reflect","family.deep","family.yes","family.repair"]),
+  relationships:row("Дружба и отношения","Поговорим о том, что помогает людям понимать друг друга.","socializing",["relationships.ask","relationships.share","relationships.tact","relationships.reflect","relationships.deep","relationships.yes","relationships.repair"]),
+  philosophy:row("Философия жизни","Интересно обсудить вопросы без единственно верного ответа.","calm_leisure",["philosophy.ask","philosophy.share","philosophy.tact","philosophy.reflect","philosophy.deep","philosophy.yes","philosophy.repair"]),
+  gossip:row("Слухи и факты","Как отличить то, что мы знаем, от чужих домыслов?","socializing",["gossip.ask","gossip.share","gossip.tact","gossip.reflect","gossip.deep","gossip.yes","gossip.repair"])
+});
+const expandedActs=Object.freeze({
+  "memories.ask":Object.freeze({...saying("Спросить о детских радостях","Что в детстве могло бы радовать больше всего?","Наверное, целый свободный день.","Не хочу возвращаться к детству.","warm",3),minLevel:0,branch:"any"}),
+  "memories.share":Object.freeze({...saying("Представить старый двор","Представь двор, где всегда есть время для игры.","Интересно, что бы мы там придумали.","Мне ближе настоящее.","neutral",2),minLevel:0,branch:"any"}),
+  "memories.tact":Object.freeze({...saying("Пошутить о каникулах","Детская мечта о бесконечных каникулах и сейчас заманчиво звучит.","Вот бы ещё без домашних заданий!","Не всем детство кажется беззаботным.","warm",3),minLevel:3,branch:"any"}),
+  "memories.reflect":Object.freeze({...saying("Обсудить уроки прошлого","Какой совет взрослый мог бы дать себе в детстве?","Не сравнивать себя с другими.","Это слишком личное.","neutral",2),minLevel:6,branch:"any"}),
+  "memories.deep":Object.freeze({...saying("Поговорить о прошлом без сожалений","Можно ценить прошлое, не пытаясь его повторить. Как думаешь?","Да, это помогает смотреть вперёд.","Я пока не готов к такому разговору.","neutral",2),minLevel:9,branch:"any"}),
+  "memories.yes":Object.freeze({...saying("Развить приятное воспоминание","Что из такого ощущения хотелось бы вернуть в обычный день?","Больше времени без спешки.","Не хочется ничего возвращать.","warm",3),minLevel:0,branch:"accepted"}),
+  "memories.repair":Object.freeze({...saying("Оставить прошлое в покое","Не будем ворошить прошлое. Мне интересно, как тебе сегодня.","Спасибо, так комфортнее.","Мне нужно немного тишины.","warm",3),minLevel:0,branch:"refused"}),
+  "career.ask":Object.freeze({...saying("Выслушать о работе","Что для тебя самое трудное в рабочих делах?","Иногда трудно понять, с чего начать.","Сейчас не хочется говорить о работе.","warm",3),minLevel:0,branch:"any"}),
+  "career.share":Object.freeze({...saying("Обсудить отдых","Как лучше переключаться после напряжённого рабочего дня?","Мне помогает сменить обстановку.","Работа и так занимает слишком много места.","neutral",2),minLevel:0,branch:"any"}),
+  "career.tact":Object.freeze({...saying("Разрядить рабочее напряжение","Иногда самый важный коллега — чашка чая, которая ничего не требует.","У такой коллеги прекрасный характер!","Шутки сейчас не помогают.","warm",3),minLevel:3,branch:"any"}),
+  "career.reflect":Object.freeze({...saying("Разобрать трудность по шагам","Если разделить сложную задачу на маленькие, какой шаг будет первым?","Так проблема уже кажется посильной.","Не хочу превращать беседу в совещание.","neutral",2),minLevel:6,branch:"any"}),
+  "career.deep":Object.freeze({...saying("Вдохновить на профессиональный рост","Что бы ты попробовал в работе, если бы не боялся ошибиться?","Есть над чем подумать. Возможно, стоит рискнуть.","Мне не нужна мотивационная речь.","neutral",2),minLevel:9,branch:"any"}),
+  "career.yes":Object.freeze({...saying("Поддержать выбранный подход","Что ещё могло бы помочь справиться с рабочими трудностями?","Наверное, больше времени на себя.","Давай не будем углубляться.","warm",3),minLevel:0,branch:"accepted"}),
+  "career.repair":Object.freeze({...saying("Отложить рабочие разговоры","Дома необязательно обсуждать работу. Оставим её за дверью.","Вот это мне сейчас нужно.","Хочу просто побыть в тишине.","warm",3),minLevel:0,branch:"refused"}),
+  "dreams.ask":Object.freeze({...saying("Спросить о мечте","Если бы было свободное время, чему хотелось бы его посвятить?","Попробовать что-нибудь совсем новое.","Я пока об этом не думал.","warm",3),minLevel:0,branch:"any"}),
+  "dreams.share":Object.freeze({...saying("Помечтать о путешествии","Представь, что можно выбрать любое место для отдыха.","Я бы выбрал место без суеты.","Мне нравится оставаться дома.","neutral",2),minLevel:0,branch:"any"}),
+  "dreams.tact":Object.freeze({...saying("Поддержать воображение","Даже у необычной мечты есть преимущество: скучно точно не будет.","Тогда можно мечтать смелее!","Не хочу превращать это в игру.","warm",3),minLevel:3,branch:"any"}),
+  "dreams.reflect":Object.freeze({...saying("Найти первый шаг","Что из желаемого можно начать делать уже на этой неделе?","Небольшой шаг звучит реально.","Не хочу сейчас ничего планировать.","neutral",2),minLevel:6,branch:"any"}),
+  "dreams.deep":Object.freeze({...saying("Обсудить смысл мечты","Что важнее в мечте: результат или то, кем ты станешь по пути?","Пожалуй, важен и сам путь.","Не хочется анализировать свои желания.","neutral",2),minLevel:9,branch:"any"}),
+  "dreams.yes":Object.freeze({...saying("Развить идею","Какая часть этой идеи тебе нравится больше всего?","Возможность самому выбирать.","Давай оставим это просто мечтой.","warm",3),minLevel:0,branch:"accepted"}),
+  "dreams.repair":Object.freeze({...saying("Не торопить с планами","Не обязательно знать будущее. Можно наслаждаться сегодняшним днём.","Да, это снимает напряжение.","Мне хочется сменить тему.","warm",3),minLevel:0,branch:"refused"}),
+  "money.ask":Object.freeze({...saying("Обсудить покупки","Что тебе важнее при покупке: цена или качество?","Скорее хороший баланс.","Не хочу обсуждать деньги.","warm",3),minLevel:0,branch:"any"}),
+  "money.share":Object.freeze({...saying("Поговорить о накоплениях","Полезнее откладывать понемногу или ждать большой суммы?","Маленькие шаги выглядят надёжнее.","У каждого свои обстоятельства.","neutral",2),minLevel:0,branch:"any"}),
+  "money.tact":Object.freeze({...saying("Пошутить о списке покупок","Список покупок иногда считает себя списком желаний.","Главное, чтобы кошелёк не узнал!","Деньги для меня не повод для шуток.","warm",3),minLevel:3,branch:"any"}),
+  "money.reflect":Object.freeze({...saying("Найти компромисс в расходах","Можно выделить немного на удовольствие и остальное на важное. Как тебе такой принцип?","Звучит разумно, без крайностей.","Не хочу советов о том, как тратить.","neutral",2),minLevel:6,branch:"any"}),
+  "money.deep":Object.freeze({...saying("Обсудить ценность свободы","Что значит финансовая свобода, если не измерять её суммой?","Возможность не бояться каждого решения.","Это слишком личная тема.","neutral",2),minLevel:9,branch:"any"}),
+  "money.yes":Object.freeze({...saying("Уточнить приоритеты","Какие расходы ты считаешь действительно стоящими?","Те, что делают жизнь удобнее.","Не хочу разбирать свои траты.","warm",3),minLevel:0,branch:"accepted"}),
+  "money.repair":Object.freeze({...saying("Уважить личный бюджет","Не буду спрашивать о твоих деньгах. Это личное дело.","Спасибо за понимание.","Давай закончим этот разговор.","warm",3),minLevel:0,branch:"refused"}),
+  "family.ask":Object.freeze({...saying("Спросить о традициях","Какая семейная традиция могла бы делать дом уютнее?","Совместный ужин без спешки.","Мне не хочется говорить о семье.","warm",3),minLevel:0,branch:"any"}),
+  "family.share":Object.freeze({...saying("Обсудить домашние обязанности","Как лучше делить домашние дела, чтобы никому не было обидно?","Договориться заранее было бы полезно.","У каждого свой способ.","neutral",2),minLevel:0,branch:"any"}),
+  "family.tact":Object.freeze({...saying("Пошутить о домашнем уюте","Иногда самый семейный спор — кто оставил последнюю крошку на столе.","У крошки наверняка есть алиби!","Не люблю шутки о домашних ссорах.","warm",3),minLevel:3,branch:"any"}),
+  "family.reflect":Object.freeze({...saying("Обсудить разные потребности","Как сохранить близость, если каждому нужно своё пространство?","Наверное, стоит говорить об этом прямо.","Не хочу обсуждать это.","neutral",2),minLevel:6,branch:"any"}),
+  "family.deep":Object.freeze({...saying("Поговорить о доверии дома","Что делает дом местом, где можно быть собой?","Когда не приходится оправдываться.","Не хочу открываться на эту тему.","neutral",2),minLevel:9,branch:"any"}),
+  "family.yes":Object.freeze({...saying("Предложить идею традиции","Может, иногда устраивать вечер без спешки и дел?","Такая традиция мне нравится.","Я не хочу связывать себя планами.","warm",3),minLevel:0,branch:"accepted"}),
+  "family.repair":Object.freeze({...saying("Не расспрашивать о близких","Не будем обсуждать личную жизнь семьи без желания.","Спасибо, это уважительно.","Мне лучше сменить тему.","warm",3),minLevel:0,branch:"refused"}),
+  "relationships.ask":Object.freeze({...saying("Спросить о дружбе","Что ты особенно ценишь в хорошем друге?","Когда можно говорить без осуждения.","Не хочется обсуждать личное.","warm",3),minLevel:0,branch:"any"}),
+  "relationships.share":Object.freeze({...saying("Обсудить общение","Обязательно ли близким людям иметь одинаковые интересы?","Нет, различия тоже интересны.","Не хочется рассуждать об этом.","neutral",2),minLevel:0,branch:"any"}),
+  "relationships.tact":Object.freeze({...saying("Отметить внимательность","Приятно, что мы можем обсуждать разные взгляды, а не только соглашаться.","Это приятно слышать.","Не надо делать поспешных выводов.","warm",3),minLevel:3,branch:"any"}),
+  "relationships.reflect":Object.freeze({...saying("Обсудить границы","Как лучше сказать человеку, что тебе нужно немного пространства?","Спокойно и без обвинений.","Не хочу говорить о границах сейчас.","neutral",2),minLevel:6,branch:"any"}),
+  "relationships.deep":Object.freeze({...saying("Поговорить о доверии","Можно ли доверять человеку и всё же не соглашаться с ним?","Думаю, это даже признак доверия.","Я пока не готов к такому разговору.","neutral",2),minLevel:9,branch:"any"}),
+  "relationships.yes":Object.freeze({...saying("Уточнить ценности дружбы","Что помогает сохранить уважение, когда мнения расходятся?","Умение дослушать до конца.","Не хочу продолжать эту тему.","warm",3),minLevel:0,branch:"accepted"}),
+  "relationships.repair":Object.freeze({...saying("Уважить дистанцию","Не будем углубляться. У каждого есть право на личные темы.","Спасибо, это важно.","Мне хочется закончить.","warm",3),minLevel:0,branch:"refused"}),
+  "philosophy.ask":Object.freeze({...saying("Спросить о хорошем дне","Что делает день удачным, даже если ничего особенного не произошло?","Ощущение спокойствия вполне достаточно.","Не люблю абстрактные вопросы.","warm",3),minLevel:0,branch:"any"}),
+  "philosophy.share":Object.freeze({...saying("Обсудить случайности","В жизни больше зависит от выбора или от случая?","Наверное, они постоянно переплетаются.","Не хочется об этом спорить.","neutral",2),minLevel:0,branch:"any"}),
+  "philosophy.tact":Object.freeze({...saying("Пошутить о мудрости","Может, мудрость начинается с признания, что чай уже остыл?","Тогда у меня богатый жизненный опыт!","Не вижу смысла в шутке.","warm",3),minLevel:3,branch:"any"}),
+  "philosophy.reflect":Object.freeze({...saying("Рассмотреть другую точку зрения","Можно ли считать ошибку полезной, если она помогла изменить решение?","Да, иногда это лучший урок.","Не хочу оправдывать ошибки.","neutral",2),minLevel:6,branch:"any"}),
+  "philosophy.deep":Object.freeze({...saying("Обсудить смысл успеха","Если никто не оценивает твои достижения, по чему ты определяешь успех?","По ощущению, что делаю важное для себя.","Не готов формулировать это сейчас.","neutral",2),minLevel:9,branch:"any"}),
+  "philosophy.yes":Object.freeze({...saying("Развить мысль","Как этот взгляд мог бы повлиять на обычный завтрашний день?","Возможно, я буду меньше спешить.","Давай не искать практического смысла.","warm",3),minLevel:0,branch:"accepted"}),
+  "philosophy.repair":Object.freeze({...saying("Оставить вопрос открытым","Не обязательно приходить к одному ответу. Пусть каждый сохранит своё мнение.","С этим я согласен.","Давай поговорим о другом.","warm",3),minLevel:0,branch:"refused"}),
+  "gossip.ask":Object.freeze({...saying("Обсудить проверку слухов","Если кто-то расскажет новость о знакомом, как понять, что она верна?","Лучше спросить самого человека.","Не люблю обсуждать слухи.","warm",3),minLevel:0,branch:"any"}),
+  "gossip.share":Object.freeze({...saying("Отделить факт от мнения","Мы сейчас разговариваем — это факт. А мысли друг друга можем только уточнять.","Хорошее различие.","Не хочу разбирать каждое слово.","neutral",2),minLevel:0,branch:"any"}),
+  "gossip.tact":Object.freeze({...saying("Пошутить об испорченном телефоне","Чем длиннее цепочка пересказов, тем больше шансов у истории стать сказкой.","Особенно если у сказки вырастут крылья!","Лучше ничего не пересказывать.","warm",3),minLevel:3,branch:"any"}),
+  "gossip.reflect":Object.freeze({...saying("Обсудить честный пересказ","Как пересказать чужие слова, не приписывая человеку лишнего?","Отделить услышанное от своих выводов.","Я бы просто не пересказывал.","neutral",2),minLevel:6,branch:"any"}),
+  "gossip.deep":Object.freeze({...saying("Поговорить об ответственности за слухи","Стоит ли отказаться от интересной истории, если она может несправедливо навредить?","Да, интерес не оправдывает вред.","Не хочу обсуждать моральные дилеммы.","neutral",2),minLevel:9,branch:"any"}),
+  "gossip.yes":Object.freeze({...saying("Поддержать осторожность","Лучше оставить неизвестное неизвестным, пока нет подтверждения?","Да, это честнее.","Давай не будем продолжать.","warm",3),minLevel:0,branch:"accepted"}),
+  "gossip.repair":Object.freeze({...saying("Отказаться от пересудов","Не будем обсуждать отсутствующих. Поговорим о том, что происходит здесь.","Спасибо, так лучше.","Я хочу закончить беседу.","warm",3),minLevel:0,branch:"refused"}),
+  "daily.yes":Object.freeze({...saying("Уточнить приятный момент","Что сегодня оказалось лучше, чем ожидалось?","Даже маленькая удача поднимает настроение.","Не хочется подводить итоги.","warm",3),minLevel:0,branch:"accepted"}),
+  "daily.repair":Object.freeze({...saying("Сменить тон разговора","Прости, не буду давить. Можно просто поболтать.","Так мне спокойнее.","Мне нужно побыть одному.","warm",3),minLevel:0,branch:"refused"}),
+  "daily.extra":Object.freeze({...saying("Обсудить вечер","Как лучше провести оставшуюся часть дня?","Без лишней спешки.","Я пока не хочу строить планы.","neutral",2),minLevel:0,branch:"any"}),
+  "hobbies.yes":Object.freeze({...saying("Спросить о творческом процессе","Что больше нравится: осваивать новое или совершенствовать знакомое?","Мне нравится видеть свой прогресс.","Не хочется сравнивать.","warm",3),minLevel:0,branch:"accepted"}),
+  "hobbies.repair":Object.freeze({...saying("Уважить чужой вкус","У всех свои увлечения, не буду спорить о твоих.","Спасибо за понимание.","Я лучше займусь своим делом.","warm",3),minLevel:0,branch:"refused"}),
+  "hobbies.extra":Object.freeze({...saying("Предложить новое хобби","Какое занятие стоило бы попробовать хотя бы раз?","Что-нибудь, где можно создать вещь руками.","Мне хватает привычных занятий.","neutral",2),minLevel:0,branch:"any"}),
+  "humor.yes":Object.freeze({...saying("Продолжить игру воображения","А если бы чайник мог давать советы, что бы он сказал?","Не кипятись по пустякам!","Мне уже хватило шуток.","warm",3),minLevel:0,branch:"accepted"}),
+  "humor.repair":Object.freeze({...saying("Извиниться за неудачную шутку","Прости, юмор оказался не к месту.","Спасибо, что заметил это.","Пока не хочется смеяться.","warm",3),minLevel:0,branch:"refused"}),
+  "humor.extra":Object.freeze({...saying("Придумать забавный вопрос","Какое животное было бы худшим кассиром?","Осьминог — слишком много рук для сдачи.","Не хочется придумывать загадки.","neutral",2),minLevel:0,branch:"any"}),
+  "support.yes":Object.freeze({...saying("Уточнить нужную помощь","Тебе сейчас полезнее совет или просто компания?","Наверное, просто компания.","Хочу разобраться самостоятельно.","warm",3),minLevel:0,branch:"accepted"}),
+  "support.repair":Object.freeze({...saying("Дать пространство","Не буду настаивать. Если захочешь поговорить, я рядом.","Спасибо, мне это нужно.","Давай закончим.","warm",3),minLevel:0,branch:"refused"}),
+  "support.extra":Object.freeze({...saying("Предложить передышку","Может, стоит ненадолго отвлечься от дел?","Да, передышка пригодится.","Я хочу сначала разобраться.","neutral",2),minLevel:0,branch:"any"}),
+  "plans.yes":Object.freeze({...saying("Уточнить детали идеи","Что из этого плана хотелось бы сделать первым?","Начать с самого простого.","Пока рано решать.","warm",3),minLevel:0,branch:"accepted"}),
+  "plans.repair":Object.freeze({...saying("Не навязывать планы","Не обязательно решать сейчас. Выберем время позже.","Так гораздо лучше.","Мне не хочется ничего обещать.","warm",3),minLevel:0,branch:"refused"}),
+  "plans.extra":Object.freeze({...saying("Предложить запасной вариант","А если всё пойдёт иначе, какой вариант оставить про запас?","Хорошо иметь альтернативу.","Не люблю думать о неудачах.","neutral",2),minLevel:0,branch:"any"}),
+  "conflict.yes":Object.freeze({...saying("Найти точку согласия","Что мы уже можем признать общим, даже если спорим?","Нам обоим хочется, чтобы стало спокойнее.","Пока не вижу общего.","warm",3),minLevel:0,branch:"accepted"}),
+  "conflict.repair":Object.freeze({...saying("Предложить паузу","Не хочу усугублять спор. Вернёмся к нему, когда будем готовы.","Хорошо, мне нужна пауза.","Я пока не готов обсуждать даже это.","warm",3),minLevel:0,branch:"refused"}),
+  "conflict.extra":Object.freeze({...saying("Отделить поступок от человека","Давай обсуждать конкретную ситуацию, а не характер друг друга.","Это справедливый подход.","Мне трудно говорить спокойно.","neutral",2),minLevel:0,branch:"any"}),
+  "sports.yes":Object.freeze({...saying("Обсудить тактику","Что тебе интереснее: точная тактика или неожиданные моменты?","Неожиданности делают матч живым.","Не хочу разбирать игру.","warm",3),minLevel:0,branch:"accepted"}),
+  "sports.repair":Object.freeze({...saying("Уважить разные команды","Не обязательно болеть за одну команду, чтобы нормально общаться.","Согласен, это всего лишь игра.","Давай без футбола.","warm",3),minLevel:0,branch:"refused"}),
+  "sports.extra":Object.freeze({...saying("Обсудить атмосферу","Что делает просмотр матча интересным, кроме результата?","Атмосфера и ожидание гола.","Мне футбол не особенно интересен.","neutral",2),minLevel:0,branch:"any"})
+});
+export const CONVERSATION_TOPICS=Object.freeze({...Object.fromEntries(Object.entries(legacyTopics).map(([id,t])=>[id,row(t.label,t.opener,t.tag,[...t.lines,...Object.keys(expandedActs).filter(key=>key.startsWith(id+'.'))])])),...expandedTopics});
 export const CONVERSATION_MAX_TURNS=3;
 const isRecord=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const knownTopic=x=>typeof x==='string'&&Object.hasOwn(CONVERSATION_TOPICS,x);
@@ -52,7 +142,8 @@ const pilotActs=Object.freeze({
   'daily.reframe':{...saying('Помочь взглянуть иначе','Что из сегодняшнего дня всё-таки получилось?','Об этом я не подумал(а).','Не хочу сейчас искать плюсы.','neutral',3),minLevel:6},
   'daily.inspire':{...saying('Вдохновить на перемены','Какой маленький шаг сделал бы завтра лучше?','Попробую об этом подумать.','Мне нужно решить это самостоятельно.','warm',3),minLevel:9}
 });
-const act=id=>CONVERSATION_ACTS[id]||pilotActs[id];
+export const CONVERSATION_ACTS=Object.freeze({...legacyActs,...pilotActs,...expandedActs});
+const act=id=>CONVERSATION_ACTS[id];
 const contribution=(id,accepted)=>accepted?Math.max(1,act(id).weight):-4;
 export const activeConversationAction=root=>root?.socialAction?.conversation?root.socialAction:
   root?.additionalSocial?.conversation?root.additionalSocial:null;
@@ -105,15 +196,21 @@ export function conversationOptions(session,root=null){
     !['opening','followUp'].includes(session.phase))return [];
   const used=new Set((session.turns||[]).map(x=>x.id));
   const action=activeConversationAction(root);
-  const ids=[...CONVERSATION_TOPICS[session.topic].lines,
+  let ids=[...CONVERSATION_TOPICS[session.topic].lines,
     ...(root&&session.topic==='daily'?Object.keys(pilotActs):[])].filter(id=>!used.has(id));
   const previous=session.turns?.at(-1);
-  if(root&&previous&&!previous.accepted)
-    ids.sort((a,b)=>Number(act(b).tone==='warm')-Number(act(a).tone==='warm'));
+  ids=ids.filter(id=>!act(id).branch||act(id).branch==='any'||(previous&&(act(id).branch==='accepted')===previous.accepted));
+  if(previous){
+    ids.sort((a,b)=>Number(act(b).branch&&act(b).branch!=='any')-Number(act(a).branch&&act(a).branch!=='any')||
+      (!previous.accepted?Number(act(b).tone==='warm')-Number(act(a).tone==='warm'):0));
+  }else if(session.topic==='daily'&&root){
+    const priority=['daily.listen','daily.news','daily.tact','daily.reframe','daily.inspire'];
+    ids.sort((a,b)=>(priority.includes(a)?priority.indexOf(a):99)-(priority.includes(b)?priority.indexOf(b):99));
+  }
   return ids.map(id=>{
     const a=act(id),minLevel=a.minLevel||0;
     const skillLocked=tier(root,action?.initiator)<minLevel;
-    const contextLocked=Boolean(previous&&!previous.accepted&&['daily.tact','daily.inspire'].includes(id));
+    const contextLocked=Boolean(previous&&!previous.accepted&&(['daily.tact','daily.inspire'].includes(id)||a.minLevel>=9));
     return {id,label:a.label,tone:a.tone,...(root?{minLevel,locked:skillLocked||contextLocked,
       lockReason:skillLocked?'Харизма '+minLevel:contextLocked?'Собеседник пока не готов':null}:{})};
 
@@ -134,7 +231,8 @@ export function evaluateResponse(root,initiator,topic,id,partnerId=initiator==='
     styleBias:boundaryDisposition(partner.personality,id)+
       cueConversationBias(getPair(root.socialGraph,initiator,partnerId),initiator,id)+
       (a.tone==='sharp'?0:charismaSocialBonus(self.skills))+
-      (previous&&!previous.accepted&&a.tone==='sharp'?-2:0)
+      (previous&&!previous.accepted&&a.tone==='sharp'?-2:0)+
+      (a.branch==='refused'&&previous&&!previous.accepted?3:0)-(a.minLevel>=9&&a.branch==='any'?6:0)
   });
   return reaction?{accepted:reaction.accepted,confidence:reaction.confidence}:null;
 }
