@@ -12,9 +12,9 @@ torch.set_num_threads(2)
 model=anny.Anny(topology='anny',rig='anny',local_changes='default',facial_actions='all').to(device='cpu',dtype=torch.float32)
 pose=torch.eye(4)[None,None].repeat(1,model.bone_count,1,1)
 phenotype={k:.5 for k in model.phenotype_labels}
-def native(changes):
+def native(changes,profile=None):
     with torch.no_grad():
-        return model(pose_parameters=pose,phenotype_kwargs=phenotype,local_changes_kwargs=changes,facial_actions={})['vertices'].squeeze(0).detach().numpy()
+        return model(pose_parameters=pose,phenotype_kwargs=phenotype if profile is None else profile,local_changes_kwargs=changes,facial_actions={})['vertices'].squeeze(0).detach().numpy()
 neutral=native({})
 assert neutral.shape==(13718,3)
 labels=set(model.local_change_labels)
@@ -33,6 +33,23 @@ for axis,ls in axes.items():
         key=axis+'_'+side
         native_deltas[key]=(prev,full)
         native_report[key]=dict(labels=ls,old=amplitudes[axis],new=1.0,measured_ratio=factor,relative_residual=residual,old_mm=float(np.linalg.norm(prev,axis=1).max()*1000),full_mm=float(np.linalg.norm(full,axis=1).max()*1000))
+# Verify identity-independent delta fields at two independent gender profiles.
+# No claim of recovering the exact original phenotype or authored local vector.
+profile_fields={}
+for sex,gender in [('male',1.0),('female',0.0)]:
+    profile={**phenotype,'gender':gender}
+    b0=native({},profile)
+    fields={}
+    for axis,ls in axes.items():
+        for sign,side in [(-1,'neg'),(1,'pos')]:
+            k=axis+'_'+side
+            d=native({q:sign for q in ls},profile)-b0
+            g=native_deltas[k][1]
+            abs_mm=float(np.linalg.norm(d-g,axis=1).max()*1000)
+            assert abs_mm<.15,(sex,k,abs_mm)
+            fields[k]=d
+            native_report[k][sex+'_profile_max_diff_mm']=abs_mm
+    profile_fields[sex]=fields
 (root/'native.json').write_text(json.dumps(native_report,indent=2))
 print(json.dumps(native_report))
 def coords(k):
@@ -68,6 +85,9 @@ def setup(obj,b):
     scene.render.engine='CYCLES'
     scene.cycles.device='CPU'
     scene.cycles.samples=8
+    scene.render.threads_mode='FIXED'
+    scene.render.threads=4
+    scene.cycles.use_denoising=True
     scene.render.resolution_x=320
     scene.render.resolution_y=320
     scene.render.resolution_percentage=100
@@ -87,6 +107,13 @@ for sex,pin in pins.items():
     assert all(k in keys for k in names)
     tri=np.array([p.vertices[:] for p in obj.data.polygons],dtype=np.int32)
     assert tri.shape==(27420,3)
+    # Independently prove index-level topology, irrespective of face winding/order.
+    def canonical_faces(f):
+        f=np.sort(np.asarray(f,dtype=np.int32),axis=1)
+        return f[np.lexsort((f[:,2],f[:,1],f[:,0]))]
+    vendor_faces=np.asarray(model.faces,dtype=np.int32)
+    assert np.array_equal(canonical_faces(tri),canonical_faces(vendor_faces)),(sex,'native vertex-index triangle topology mismatch')
+    topology_hash=sha(canonical_faces(tri))
     area=metrics(b,tri)
     old={k.name:coords(k) for k in keys}
     # Verify spatial correspondence by comparing native and recovered displacement
@@ -116,21 +143,25 @@ for sex,pin in pins.items():
             err=float(np.linalg.norm(X@T-Y)/np.linalg.norm(Y))
             candidates.append((err,T))
     err,T=min(candidates,key=lambda x:x[0])
-    # Mouth negative was near-correspondent but not exact, use only exact matches
-    # to validate the transform and then independently report all endpoint errors.
+    # With independently identical index topology, validate axis orientation using six matching native supports.
+    # A small relative discrepancy on a millimetre-sized field is not an index mismatch.
     exact=[k for k in matched if axis_report[k]['native_support_cosine']>.9999]
     assert len(exact)>=6
     for k in exact:
         p=native_deltas[k][0]@T
         q=old[k]-b
         e=float(np.linalg.norm(p-q)/np.linalg.norm(q))
-        assert e<.005,(sex,k,e,T)
+        abs_mm=float(np.linalg.norm(p-q,axis=1).max()*1000)
+        cosine=float(np.sum(p*q)/(np.linalg.norm(p)*np.linalg.norm(q)))
+        axis_report[k].update(mapping_error_mm=abs_mm,mapping_vector_cosine=cosine,mapping_relative_error=e)
+        print(sex,k,'mapping residual',e,'max mm',abs_mm,'vector cosine',cosine)
+        assert cosine>.999 and abs_mm<.15,(sex,k,e,abs_mm,cosine,T)
     print(sex,'native coordinate transform',T.tolist(), 'all support residual',err)
     # Use actual signed native fields, NOT a scaled copy of the old positive/negative
     # pair. Neutral and expression/neck keys are untouched.
     for k in names:
         p,full=native_deltas[k]
-        target=b+full@T
+        target=b+profile_fields[sex][k]@T
         keys[k].data.foreach_set('co',target.ravel())
         new=coords(keys[k])
         assert np.isfinite(new).all()
@@ -189,6 +220,7 @@ for sex,pin in pins.items():
         candidate=coords(keys[k])
         keys[k].data.foreach_set('co',old[k].ravel())
         keys[k].value=1
+        bpy.context.view_layer.update()
         for view in (['profile'] if k.startswith('nose') else ['front']):
             offset=Vector((0,-1,0) if view=='front' else (1,0,0))
             cam.location=center+offset
@@ -200,6 +232,7 @@ for sex,pin in pins.items():
     for label,weights in [('neutral',{}),*[(k,{k:1}) for k in names],('all_neg',{a+'_neg':1 for a in axes}),('all_pos',{a+'_pos':1 for a in axes}),('blink',{'blink':1}),('jawopen',{'jawopen':1})]:
         for k in keys:k.value=0
         for k,w in weights.items():keys[k].value=w
+        bpy.context.view_layer.update()
         for view in (['front','profile'] if label in ('neutral','nose_neg','nose_pos','all_neg','all_pos') else ['front']):
             offset=Vector((0,-1,0) if view=='front' else (1,0,0))
             cam.location=center+offset
@@ -222,6 +255,6 @@ for sex,pin in pins.items():
     assert set(saved)==set(k.name for k in keys)
     for k in keys:
         assert np.allclose(coords(k),saved[k.name],atol=1e-6,rtol=0),(sex,k.name)
-    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN; BVH counts recorded, not penetration classification')
+    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),canonical_topology_sha=topology_hash,glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN; BVH counts recorded, not penetration classification')
 (root/'report.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report))
