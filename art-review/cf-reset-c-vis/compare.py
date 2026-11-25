@@ -7,7 +7,7 @@ FRAMES=LAB/"comparison"
 PIN={"male":"4ce29a6ffce21817f92bb2c7df8c27afe630d0dd88e373a05e2ceca591fdcbb8","female":"f4973254fb39f2ff962f429725e66c17a478d7e4110ed556679babb400c7d85e"}
 STATES={"neutral":{},"all-pos":{k+"_pos":1 for k in ("jaw","cheeks","nose","mouth","eyes")},"all-neg":{k+"_neg":1 for k in ("jaw","cheeks","nose","mouth","eyes")},"smile":{"smile":1}}
 ANGLES=(0,45,90)
-LIGHTS=[((-2,3,4),1.2),((3,2,3),.35),((2,3,-3),.55)]
+LIGHTS=[((-2,1.8,4),1.0),((3,.8,3),.45),((2,2,-3),.30)]
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def prepare(src):
     LAB.mkdir(parents=True,exist_ok=True)
@@ -33,14 +33,14 @@ def prepare(src):
     s=s.replace(old,"function gallery(){const p=$('pairs');p.replaceChildren();for(const state of ['neutral','all-pos','all-neg','smile'])for(const angle of [0,45,90]){const d=document.createElement('div');d.innerHTML='<p>'+state+' · '+angle+'°</p><div class=\"grid\">'+['blender','chromium-matched','chromium-legacy'].map(k=>'<figure><img loading=\"lazy\" src=\"comparison/'+sex+'-'+state+'-'+angle+'-'+k+'.png\" alt=\"'+k+'\"><figcaption>'+k+'</figcaption></figure>').join('')+'</div>';p.append(d)}",1)
     old="function rotate(a)"
     assert old in s
-    s=s.replace(old,"function setVis(mode){visMode=mode;const legacy=mode==='legacy';app.scene.ambientLight=new pc.Color(legacy?.58:0,legacy?.58:0,legacy?.58:0);app.scene.toneMapping=legacy?pc.TONEMAP_AGX:pc.TONEMAP_LINEAR;app.scene.exposure=legacy?1.45:1;visLights.forEach((l,i)=>{l.light.intensity=(legacy?[1.2,.7,1]:[1.2,.35,.55])[i];const p=[[-2,3,4],[3,2,3],[2,3,-3]][i];const z=models[sex].center;l.setPosition(p[0],p[1]+(legacy?0:z),p[2]);l.lookAt(0,legacy?1.65:z,0)});$('vis-mode').textContent=legacy?'Свет RESET-C-FIX':'Согласованный свет';$('vis-mode').setAttribute('aria-pressed',String(!legacy))} window.setVis=setVis; function rotate(a)",1)
+    s=s.replace(old,"function setVis(mode){visMode=mode;const legacy=mode==='legacy';app.scene.ambientLight=new pc.Color(legacy?.58:.16,legacy?.58:.16,legacy?.58:.16);app.scene.toneMapping=legacy?pc.TONEMAP_AGX:pc.TONEMAP_AGX;app.scene.exposure=legacy?1.45:.85;visLights.forEach((l,i)=>{l.light.intensity=(legacy?[1.2,.7,1]:[1.0,.45,.30])[i];const p=(legacy?[[-2,3,4],[3,2,3],[2,3,-3]]:[[-2,1.8,4],[3,.8,3],[2,2,-3]])[i];const z=models[sex].center;l.setPosition(p[0],p[1]+(legacy?0:z),p[2]);l.lookAt(0,legacy?1.65:z,0)});$('vis-mode').textContent=legacy?'Свет RESET-C-FIX':'Согласованный свет';$('vis-mode').setAttribute('aria-pressed',String(!legacy))} window.setVis=setVis; function rotate(a)",1)
     s=s.replace("cam.lookAt(0,z,0);update()","cam.lookAt(0,z,0);setVis(visMode);update()",1)
     s=s.replace("app.root.addChild(l);l.setPosition","app.root.addChild(l);visLights.push(l);l.setPosition",1)
     s=s.replace("app.start();await load('male')","$('vis-mode').onclick=()=>setVis(visMode==='legacy'?'matched':'legacy');app.start();await load('male')",1)
     (LAB/"lab.js").write_text(s)
     html=(LAB/"index.html").read_text().replace("RESET-C-FIX","RESET-C-VIS")
     html=html.replace('<div class="work">','<p>Диагностическое сравнение света и камеры; художественная приёмка не завершена. Модели не изменены.</p><button id="vis-mode" aria-pressed="true">Согласованный свет</button><div class="work">',1)
-    html=html.replace('</style>','.view{height:auto;aspect-ratio:1;max-width:480px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}</style>',1)
+    html=html.replace('</style>','.view{height:auto;aspect-ratio:1;max-width:480px}canvas{position:absolute;inset:0;width:100%!important;height:100%!important}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}</style>',1)
     html=html.replace('<details><summary>Реальные рендеры Blender','<details><summary>Согласованные кадры · Blender / PlayCanvas / исходный свет</summary><div id="pairs"></div></details><details><summary>Реальные рендеры Blender',1)
     (LAB/"index.html").write_text(html)
 def render():
@@ -59,7 +59,8 @@ def render():
         center=cv((0,models[sex]["center"],0))
         scene.world=bpy.data.worlds.new("Black ambient")
         scene.world.use_nodes=True
-        scene.world.node_tree.nodes["Background"].inputs[1].default_value=0
+        scene.world.node_tree.nodes["Background"].inputs[0].default_value=(.16,.16,.16,1)
+        scene.world.node_tree.nodes["Background"].inputs[1].default_value=1
         for offset,power in LIGHTS:
             bpy.ops.object.light_add(type="SUN",location=center+cv(offset))
             l=bpy.context.object
@@ -75,7 +76,7 @@ def render():
         scene.camera=cam
         scene.render.engine="CYCLES"
         scene.cycles.device="CPU"
-        scene.cycles.samples=12
+        scene.cycles.samples=16
         scene.cycles.use_denoising=True
         scene.render.threads_mode="FIXED"
         scene.render.threads=4
@@ -83,9 +84,9 @@ def render():
         scene.render.resolution_percentage=100
         scene.render.film_transparent=True
         scene.render.image_settings.file_format="PNG"
-        scene.view_settings.view_transform="Standard"
+        scene.view_settings.view_transform="AgX"
         scene.view_settings.look="None"
-        scene.view_settings.exposure=0
+        scene.view_settings.exposure=math.log2(.85)
         scene.view_settings.gamma=1
         for state,w in STATES.items():
             for o in meshes:
