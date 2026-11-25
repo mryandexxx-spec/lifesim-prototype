@@ -17,6 +17,7 @@ import {createConversation,restoreConversation,conversationOutcome,CONVERSATION_
 import {learnSocialPreference,learnSocialCue} from './social-graph.js';
 import {CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
 import {cueFromAnswer} from './social-boundaries.js';
+import {dialogueNeedsDecision} from './dialogue-decision.js';
 
 export const ADDRESSED_SOCIAL_SCHEMA=1;
 export const ADDRESSED_SOCIAL_DURATION=18;
@@ -100,7 +101,7 @@ export function queueAddressedSocial(root,initiator,partner,actionId='talk'){
   return receipt;
 }
 export function queueAddressedConversation(root,initiator,partner,topicId){
-  if(!validTopic(topicId)||!canMeet(root,initiator,partner)||!root.actionQueues||root.paused)return null;
+  if(!validTopic(topicId)||!canMeet(root,initiator,partner)||!root.actionQueues||dialogueNeedsDecision(root))return null;
   const receipt=enqueueAction(root.actionQueues,initiator,{type:'conversation',targetId:partner,topicId});
   if(receipt)for(const id of [initiator,partner]){
     const person=actor(root,id);
