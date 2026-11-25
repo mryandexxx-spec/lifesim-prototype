@@ -59,6 +59,9 @@ def main():
     seat=json.loads((root/'seat-report.json').read_text())
     prior=json.loads((root/'blender-report.json').read_text())
     assert set(p.name for p in root.glob('*.glb'))==set(PINS)==set(seat)==set(prior)
+    refined=pathlib.Path('d4-candidates')
+    refinement=json.loads((refined/'refinement.json').read_text())
+    assert set(refinement)==set(PINS)
     report={}
     def reset(arm,action=None,frame=1):
         for o in bpy.data.objects:
@@ -85,7 +88,9 @@ def main():
         bpy.ops.mesh.primitive_cube_add(size=1,location=center);o=bpy.context.object;o.name=name;o.dimensions=dims
         m=bpy.data.materials.new(name);m.diffuse_color=(*color,1);o.data.materials.append(m);return o
     for name,pin in sorted(PINS.items()):
-        path=root/name;assert hashlib.sha256(path.read_bytes()).hexdigest()==pin
+        original=root/name;assert hashlib.sha256(original.read_bytes()).hexdigest()==pin
+        path=refined/name;candidate_pin=refinement[name]['candidate_sha256']
+        assert refinement[name]['source_sha256']==pin and hashlib.sha256(path.read_bytes()).hexdigest()==candidate_pin
         bpy.ops.wm.read_factory_settings(use_empty=True)
         bpy.ops.import_scene.gltf(filepath=str(path.resolve()))
         arms=[o for o in bpy.context.scene.objects if o.type=='ARMATURE'];assert len(arms)==1
@@ -110,22 +115,28 @@ def main():
         # Exact contact plane at z=floor (D3 floor visual top was 1cm lower).
         fixture('floor',(0,0,floor-.025),(8,8,.05),(.42,.44,.47))
         chair=fixture('seat',(0,cy,top-.02),(fx['width_m'],fx['depth_m'],.04),(.22,.34,.45))
-        bpy.ops.object.camera_add();s.camera=bpy.context.object;s.camera.data.type='ORTHO';s.camera.data.ortho_scale=1.35
+        bpy.ops.object.camera_add();s.camera=bpy.context.object;s.camera.data.type='ORTHO';s.camera.data.ortho_scale=1.65
         for loc,power,size in [((3,-4,5),500,4),((-3,-2,3),250,3),((0,3,4),350,3)]:
             bpy.ops.object.light_add(type='AREA',location=loc);o=bpy.context.object;o.data.energy=power;o.data.shape='DISK';o.data.size=size;o.rotation_euler=(Vector((0,0,.6))-o.location).to_track_quat('-Z','Y').to_euler()
-        row={'source_sha256':pin,'neutral_floor_m':float(neutral[:,2].min()-floor),'poses':{}}
-        for k in ('seat_contact_candidate','seat_hands'):
+        row={'source_sha256':pin,'candidate_sha256':candidate_pin,'neutral_floor_m':float(neutral[:,2].min()-floor),'poses':{}}
+        for old,k in [('seat_contact_candidate','seat_contact_refined'),('seat_hands','seat_hands_refined')]:
+            # Original clips preserved: replay D3 endpoint before testing appended correction.
+            original_action=bpy.data.actions[old];reset(arm,original_action,round(original_action.frame_range[1]));original_v,_=sample(body)
+            assert abs(float(original_v[:,2].min())-prior[name]['poses'][old]['floor_z_min_m'])<.00001
             a=bpy.data.actions[k];start,end=map(round,a.frame_range)
             reset(arm,a,start);v,f=sample(body);assert np.array_equal(f,faces)
             err=float(np.linalg.norm(v-neutral,axis=1).max());assert err<.0001
             reset(arm,a,end);v,f=sample(body);assert np.array_equal(f,faces)
             minimum=float(v[:,2].min()-floor)
-            assert abs(minimum+floor-prior[name]['poses'][k]['floor_z_min_m'])<.00001
+            expected=refinement[name]['poses'][k]['floor_min_m']
+            assert abs(minimum-expected)<.00001
             contact=slab(v,f,lo,hi)
             gaps=[float(v[g,2].min()-floor) for g in groups]
-            row['poses'][k]={'neutral_error_m':err,'floor_min_m':minimum,'floor_vertices_below_1mm':int((v[:,2]<floor-.001).sum()),'sole_group_minima_m':gaps,'seat':contact,'strict_contact_pass':minimum>=-.001 and all(abs(x)<=.01 for x in gaps) and contact['intersecting_triangles']==0}
+            inside=(abs(v[:,0])<=fx['width_m']/2)&(abs(v[:,1]-cy)<=fx['depth_m']/2)&(v[:,2]>=top)&(v[:,2]<top+.05)
+            gap=float(v[inside,2].min()-top) if inside.any() else None
+            row['poses'][k]={'neutral_error_m':err,'floor_min_m':minimum,'floor_vertices_below_1mm':int((v[:,2]<floor-.001).sum()),'sole_group_minima_m':gaps,'seat':contact,'seat_gap_m':gap,'strict_contact_pass':minimum>=-.001 and all(abs(x)<=.01 for x in gaps) and contact['intersecting_triangles']==0 and gap is not None and gap<=.01}
             for angle,pos in [('profile',(4,0,.65)),('threequarter',(3,-4,.8))]:
-                s.camera.location=pos;s.camera.rotation_euler=(Vector((0,0,.52))-s.camera.location).to_track_quat('-Z','Y').to_euler()
+                s.camera.location=pos;s.camera.rotation_euler=(Vector((0,0,.55))-s.camera.location).to_track_quat('-Z','Y').to_euler()
                 s.render.filepath=str((out/(path.stem+'-'+k+'-'+angle+'.png')).resolve());bpy.ops.render.render(write_still=True)
         reset(arm);v,f=sample(body);assert float(np.linalg.norm(v-neutral,axis=1).max())<.0001
         report[name]=row
@@ -134,6 +145,7 @@ def main():
     assert len(report)==6 and len(list(out.glob('*.png')))==24
     summary={'evidence_complete':True,'strict_contact_pass':all(p['strict_contact_pass'] for r in report.values() for p in r['poses'].values()),'note':'Endpoint triangle audit, not full motion/mesh self-collision or physical device certification.'}
     (out/'summary.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary),flush=True)
+    assert summary['strict_contact_pass'], 'Refined endpoint contact gate failed'
 
 if __name__=='__main__':
     self_test()
