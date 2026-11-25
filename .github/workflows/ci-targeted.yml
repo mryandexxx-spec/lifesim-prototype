@@ -57,14 +57,14 @@ jobs:
           python art-review/cf-body-c-continuous/probe.py
       - name: Real mobile PlayCanvas browser evidence
         run: |
-          node --check body-c-reset-out/lab/lab.js
-          python -m http.server 8765 --bind 127.0.0.1 --directory body-c-reset-out/lab >/tmp/body-c-http.log 2>&1 &
+          node --check body-c-continuous-out/lab/lab.js
+          python -m http.server 8765 --bind 127.0.0.1 --directory body-c-continuous-out/lab >/tmp/body-c-http.log 2>&1 &
           xvfb-run -a python art-review/cf-body-c-continuous/browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cf-body-c-continuous-evidence
-          path: body-c-reset-out/
+          path: body-c-continuous-out/
           if-no-files-found: warn
           retention-days: 90
 
