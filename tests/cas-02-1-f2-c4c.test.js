@@ -7,7 +7,7 @@ import {modelResolver, multiply} from '../scripts/cas-c3-rig.mjs';
 import {intoFootFrame} from '../scripts/cas-c3-foot-frame.mjs';
 import {meshSections, rayDistance} from '../scripts/cas-c4-open-upper.mjs';
 import {HEEL_CLIPS} from '../scripts/cas-c4c-heel-motion.mjs';
-import {HEEL_PINS, heelSourceFile, normalizeHeelPair} from '../scripts/cas-c4c-heel-source.mjs';
+import {HEEL_PINS, HEEL_SOURCE, HEEL_MIRROR, heelSourceFile, normalizeHeelPair, fetchPinnedHeelFile} from '../scripts/cas-c4c-heel-source.mjs';
 
 const root = new URL('../assets/characters/cas-c3/', import.meta.url);
 const read = file => readFileSync(new URL(file, root));
@@ -136,4 +136,39 @@ test('C4C keeps real heel and forefoot contacts across subframes with alternatin
     }
     if (walk) assert.deepEqual(flags, sides.map(() => ({strike: true, pushOff: true, swing: true})));
   }
+});
+
+test('C4C pinned mirror works without reaching the publisher', async () => {
+  const bytes = Buffer.from('exact fixture bytes');
+  const calls = [];
+  const result = await fetchPinnedHeelFile('high-heels.glb', digest(bytes), async (url, options) => {
+    calls.push(url);
+    assert.equal(options.redirect, 'error');
+    return new Response(bytes);
+  });
+  assert.deepEqual(result, bytes);
+  assert.deepEqual(calls, [HEEL_MIRROR + heelSourceFile('high-heels.glb')]);
+});
+
+test('C4C unavailable or corrupt mirror falls back only to exact publisher bytes', async () => {
+  const bytes = Buffer.from('exact fixture bytes');
+  for (const fail of [() => { throw new Error('timeout'); }, () => new Response('corrupt'),
+    () => new Response('unavailable', {status: 503})]) {
+    const calls = [];
+    const result = await fetchPinnedHeelFile('LICENSE.txt', digest(bytes), async url => {
+      calls.push(url);
+      return calls.length === 1 ? fail() : new Response(bytes);
+    });
+    assert.deepEqual(result, bytes);
+    assert.deepEqual(calls, [HEEL_MIRROR + heelSourceFile('LICENSE.txt'), HEEL_SOURCE + 'LICENSE.txt']);
+  }
+});
+
+test('C4C fails closed if neither endpoint returns the pinned bytes', async () => {
+  const calls = [];
+  await assert.rejects(fetchPinnedHeelFile('manifest.json', digest(Buffer.from('expected')), async url => {
+    calls.push(url);
+    return new Response('incorrect');
+  }), /no exact pinned source.*SHA-256 mismatch.*SHA-256 mismatch/);
+  assert.equal(calls.length, 2);
 });
