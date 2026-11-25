@@ -167,7 +167,7 @@ def map_positions(base,raw,fields):
 def render(sex,path,states,cut):
     bpy.ops.wm.read_factory_settings(use_empty=True);bpy.ops.import_scene.gltf(filepath=str(path.resolve()))
     objs=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.data.shape_keys]
-    assert len(objs)>=1 and all(len(o.data.shape_keys.key_blocks)==22 for o in objs)
+    assert len(objs)>=1 and all(len(o.data.shape_keys.key_blocks)==23 for o in objs)
     scene=bpy.context.scene;center=Vector((0,0,.94))
     scene.world=bpy.data.worlds.new('World');scene.world.use_nodes=True;scene.world.node_tree.nodes['Background'].inputs[0].default_value=(.28,.28,.28,1)
     for offset,power in [((-2,-4,1.8),1),((3,-3,.8),.45),((2,3,2),.3)]:
