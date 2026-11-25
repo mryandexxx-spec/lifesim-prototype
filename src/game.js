@@ -120,6 +120,7 @@ import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
 import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnailUrl} from './meshy-furniture-policy.js';
 import {ofInteriorDiningPlateY,ofInteriorOverlay} from './of-interior-assets.js';
 import {createOutdoorVegetationVisual} from './of-vegetation-visual.js';
+import {createGardenVisual} from './of-garden-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -3212,6 +3213,8 @@ function boot() {
   const vegetationMode=new URLSearchParams(window.location.search).get('vegetation');
   const vegetation=createOutdoorVegetationVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&vegetationMode!=='legacy',instancing:vegetationMode!=='unbatched'});
   if(furnitureVisualMode==='qa'){window.__LifeSimVegetationStats=vegetation.stats;window.__LifeSimVegetationInstancing=vegetation.setInstancing;}
+  const gardenVisual=createGardenVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&new URLSearchParams(location.search).get('garden')!=='legacy'});
+  if(furnitureVisualMode==='qa')window.__LifeSimGardenStats=gardenVisual.stats;
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
@@ -3364,6 +3367,7 @@ function boot() {
         for(const x of [-.17,.05,.20])
           part('sphere','hedge foliage',x,.55,0,.31,.63,.44,'darkLeaf');
       }
+      if(def.category==='garden')gardenVisual.attach(node,item.itemId,gardenView(game.world.outdoors,item.instanceId,game.minutes));
       vegetation.attach(node,item.itemId);
     }
     syncOutdoorLights(currentOutdoorDaylight);
