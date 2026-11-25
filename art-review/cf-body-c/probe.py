@@ -237,7 +237,7 @@ for sex,(pin,rpin) in PINS.items():
         c=cross(v,tri);aa=np.linalg.norm(c,axis=1);ratio=aa[valid]/a0[valid]
         deg=int((valid&(aa<2e-10)).sum());flip=int((valid&(np.sum(c*c0,axis=1)<0)).sum())
         # Rigid local face coordinates under all body combinations.
-        hd=(v-raw)[raw[:,1]>=cut];head_error=float(np.linalg.norm(hd-hd.mean(0),axis=1).max())
+        hd=(v.astype(np.float64)-raw.astype(np.float64))[raw[:,1]>=cut];head_error=float(np.linalg.norm(hd-hd.mean(0),axis=1).max())
         assert head_error<2e-6,(sex,vals,head_error)
         pairs=contact_pairs(v,tri)
         mm=measures(v,tri)
