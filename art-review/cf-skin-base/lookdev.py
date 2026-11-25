@@ -231,7 +231,18 @@ for pack,needle in [('skins01','midtoned'),('skins02','aksel')]:
             selected=[]
             for n in candidates[:8]:
                 mat=z.read(n).decode('utf8',errors='replace')
-                match=re.search(r'^diffuseTexture\\s+(.+)
+                match=next((line.split(None,1)[1].strip() for line in mat.splitlines() if line.split() and line.split()[0]=='diffuseTexture' and len(line.split(None,1))==2),None)
+                if not match:continue
+                path=str(pathlib.PurePosixPath(n).parent/match)
+                if path not in names:continue
+                raw=z.read(path);im=Image.open(io.BytesIO(raw)).convert('RGB')
+                dest=R/f'{pack}-donor-{len(selected)}.png';im.resize((2048,2048),Image.Resampling.LANCZOS).save(dest)
+                selected.append(dict(material=n,texture=path,source_sha256=sha(raw),size=im.size,preview=dest.name,material_sha256=sha(z.read(n)),metadata=mat[:4000]))
+                (R/f'{pack}-donor-{len(selected)-1}.mhmat').write_text(mat)
+            result['selected']=selected
+            break
+        except Exception as e:result['error']=str(e)
+(R/'report.json').write_text(json.dumps(report,indent=2))
 h=(L/'index.html').read_text().replace('RESET-C-VIS','CF-SKIN/BASE').replace('Сравнение нативных морфов Anny. Нейтраль и мимика сохранены. Выбери «До» и «После» при одинаковых настройках.','Первый материал кожи и глаз. Сравнение с глиняной моделью.').replace('>До</button>','>Без текстур</button>').replace('>После</button>','>Кожа</button>').replace('Диагностическое сравнение света и камеры; художественная приёмка не завершена. Модели не изменены.','Диагностический материал; художественная приёмка не завершена. Геометрия и морфы сохранены.').replace('Согласованные кадры · Blender / PlayCanvas / исходный свет / только ось (нейтраль)','Реальные кадры · Blender и PlayCanvas').replace('<details><summary>Реальные рендеры Blender · до / после</summary><div class="grid" id="renders"></div></details>','')
 h=h.replace('<button id="candidate"','<button id="mobile" aria-pressed="false">Кожа 1024</button><button id="candidate"').replace('>Кожа</button>','>Кожа 2048</button>')
 (L/'index.html').write_text(h)
@@ -243,29 +254,6 @@ s=s.replace("app.start();await load('male')","canvas.addEventListener('webglcont
 s=s.replace("$('original').onclick=", "$('mobile').onclick=()=>load(sex,'mobile',true);$('original').onclick=")
 s=s.replace("$('original').setAttribute('aria-pressed'", "$('mobile').setAttribute('aria-pressed',String(v==='mobile'));$('original').setAttribute('aria-pressed'")
 s=s.replace("$('candidate').disabled=true", "$('candidate').disabled=$('mobile').disabled=true").replace("$('candidate').disabled=false", "$('candidate').disabled=$('mobile').disabled=false")
-s=s.replace("app.start();await load('male')", "app.start();await load('male')")
-(L/'lab.js').write_text(s)
-(L/'MATERIAL-REPORT.json').write_text(json.dumps(report,indent=2))
-print(json.dumps(report))
-,mat,re.M)
-                if not match:continue
-                path=str(pathlib.PurePosixPath(n).parent/match.group(1).strip())
-                if path not in names:continue
-                raw=z.read(path);im=Image.open(io.BytesIO(raw)).convert('RGB')
-                dest=R/f'{pack}-donor-{len(selected)}.png';im.resize((2048,2048),Image.Resampling.LANCZOS).save(dest)
-                selected.append(dict(material=n,texture=path,source_sha256=sha(raw),size=im.size,preview=dest.name,material_sha256=sha(z.read(n)),metadata=mat[:4000]))
-                (R/f'{pack}-donor-{len(selected)-1}.mhmat').write_text(mat)
-            result['selected']=selected
-            break
-        except Exception as e:result['error']=str(e)
-(R/'report.json').write_text(json.dumps(report,indent=2))
-h=(L/'index.html').read_text().replace('RESET-C-VIS','CF-SKIN/BASE').replace('Сравнение нативных морфов Anny. Нейтраль и мимика сохранены. Выбери «До» и «После» при одинаковых настройках.','Первый материал кожи и глаз. Сравнение с глиняной моделью.').replace('>До</button>','>Без текстур</button>').replace('>После</button>','>Кожа</button>').replace('Диагностическое сравнение света и камеры; художественная приёмка не завершена. Модели не изменены.','Диагностический материал; художественная приёмка не завершена. Геометрия и морфы сохранены.').replace('Согласованные кадры · Blender / PlayCanvas / исходный свет / только ось (нейтраль)','Реальные кадры · Blender и PlayCanvas').replace('<details><summary>Реальные рендеры Blender · до / после</summary><div class="grid" id="renders"></div></details>','')
-(L/'index.html').write_text(h)
-s=(L/'lab.js').read_text()
-start=s.index('function gallery(){');end=s.index('async function load',start)
-s=s[:start]+"""function gallery(){const p=$('pairs');p.replaceChildren();for(const state of ['neutral','all-pos','all-neg','smile'])for(const angle of [0,45,90]){const d=document.createElement('div');d.innerHTML='<p>'+state+' · '+angle+'°</p><div class="grid">'+['blender-candidate','chromium-candidate',...(state==='neutral'?['blender-original','chromium-original']:[])].map(k=>'<figure><img loading="lazy" src="comparison/'+sex+'-'+state+'-'+angle+'-'+k+'.png" alt="'+k+'"><figcaption>'+k+'</figcaption></figure>').join('')+'</div>';p.append(d)}}\n"""+s[end:]
-s=s.replace("const a=await new Promise((resolve,reject)=>app.assets.loadFromUrl('./'+s+'-'+v+'.glb','container',(e,x)=>e?reject(e):resolve(x)));","const a=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Тайм-аут загрузки модели')),45000);app.assets.loadFromUrl('./'+s+'-'+v+'.glb','container',(e,x)=>{clearTimeout(timer);e?reject(e):resolve(x)})});")
-s=s.replace("app.start();await load('male')","canvas.addEventListener('webglcontextlost',()=>{status.textContent='WebGL потерян. Перезагрузи страницу.'});app.start();await load('male')")
 (L/'lab.js').write_text(s)
 (L/'MATERIAL-REPORT.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report))
