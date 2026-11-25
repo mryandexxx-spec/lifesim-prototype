@@ -120,6 +120,7 @@ import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
 import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnailUrl} from './meshy-furniture-policy.js';
 import {ofInteriorDiningPlateY,ofInteriorOverlay} from './of-interior-assets.js';
 import {createOutdoorVegetationVisual} from './of-vegetation-visual.js';
+import {createGardenVisual} from './of-garden-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
   fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
@@ -262,6 +263,12 @@ try {
   calendarNeedsPersistence=true;
   billsNeedsPersistence=true;
 }
+// OF-C deterministic browser evidence: the normal v1 loader resumes time.
+ // Only an explicit QA URL starts paused; production save semantics are unchanged.
+ if(new URLSearchParams(location.search).get('furniture')==='qa'&&
+    new URLSearchParams(location.search).get('garden-start-paused')==='1'){
+   game.paused=true;game.otherSim.paused=true;
+ }
 const musicAudio=createMusicAudio();
 let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
 const audioButton=$('music-audio-toggle');
@@ -3212,6 +3219,13 @@ function boot() {
   const vegetationMode=new URLSearchParams(window.location.search).get('vegetation');
   const vegetation=createOutdoorVegetationVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&vegetationMode!=='legacy',instancing:vegetationMode!=='unbatched'});
   if(furnitureVisualMode==='qa'){window.__LifeSimVegetationStats=vegetation.stats;window.__LifeSimVegetationInstancing=vegetation.setInstancing;}
+  const gardenVisual=createGardenVisual({pc,app,enabled:furnitureVisualMode!=='legacy'&&new URLSearchParams(location.search).get('garden')!=='legacy'});
+  if(furnitureVisualMode==='qa'){
+    window.__LifeSimGardenStats=gardenVisual.stats;
+    window.__LifeSimGardenSessionQA=()=>({minutes:game.minutes,paused:game.paused,
+      actors:Object.fromEntries(['alex','mira'].map(id=>{const a=getActor(game,id);return [id,{position:{...a.position},action:a.action?{...a.action}:null,event:a.event}];})),
+      gardens:structuredClone(game.world.outdoors.gardens||{}),credits:game.shop.credits,herbs:game.kitchen.pantry.herbs});
+  }
   let currentOutdoorDaylight=null;
   const syncOutdoorLights=daylight=>{
     const brightness=outdoorLightFactor(daylight);
@@ -3364,6 +3378,7 @@ function boot() {
         for(const x of [-.17,.05,.20])
           part('sphere','hedge foliage',x,.55,0,.31,.63,.44,'darkLeaf');
       }
+      if(def.category==='garden')gardenVisual.attach(node,item.itemId,gardenView(game.world.outdoors,item.instanceId,game.minutes));
       vegetation.attach(node,item.itemId);
     }
     syncOutdoorLights(currentOutdoorDaylight);
@@ -4431,7 +4446,9 @@ function boot() {
     wash: {x:0,y:0,z:-1.05,pitch:0,yaw:0},
     paint: {x:0,y:0,z:-1.00,pitch:0,yaw:0}
   };
-  if(game.action?.phase==='using') {
+  // Garden sessions already have validated saved physical approach positions.
+  // Never apply legacy indoor stand migration to an active garden session.
+  if(game.action?.phase==='using'&&game.action.id!=='garden') {
     const dest=game.action.id==='bed'
       ?bedDestinationFor(game,'alex',game.action.targetInstanceId):
       game.action.id==='tv'&&game.action.watchSeatInstanceId
@@ -4455,7 +4472,7 @@ function boot() {
     game.position={x,z}; // old v0.1 saves used different stand positions
   }
   game.position=nearestWalkable(game.position,game.world);
-  if(game.otherSim.action?.phase==='using') {
+  if(game.otherSim.action?.phase==='using'&&game.otherSim.action.id!=='garden') {
     const dest=game.otherSim.action.id==='bed'
       ?bedDestinationFor(game,'mira',game.otherSim.action.targetInstanceId):
       game.otherSim.action.id==='tv'&&game.otherSim.action.watchSeatInstanceId
