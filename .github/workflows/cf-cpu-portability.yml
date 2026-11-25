@@ -1,0 +1,177 @@
+name: CF CPU portability pilot
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/cf-cpu-portability.yml']
+permissions:
+  contents: read
+concurrency:
+  group: cf-cpu-portability-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  generate:
+    if: github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+      CUDA_VISIBLE_DEVICES: ''
+      ANNY_CACHE_DIR: ${{ runner.temp }}/anny-cache
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install CPU toolchain
+        run: |
+          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install 'anny @ git+https://github.com/naver/anny.git@8f35dc2df1c4062fd2fae86734f9705de50c0c2b' bpy==4.5.0
+          python -m pip check
+      - name: Generate native Anny neutral and expression on CPU
+        run: |
+          mkdir -p evidence
+          python -m pip freeze > evidence/python-lock.txt
+          python - <<'PY'
+          import json, numpy as np, torch, anny, importlib.metadata
+          torch.set_num_threads(2)
+          model = anny.Anny(topology="anny", rig="anny", local_changes="default", facial_actions="all").to(device="cpu", dtype=torch.float32)
+          pose = torch.eye(4)[None,None].repeat(1,model.bone_count,1,1)
+          phenotype = {k:0.5 for k in model.phenotype_labels}
+          def sample(actions):
+              with torch.no_grad():
+                  return model(pose_parameters=pose,phenotype_kwargs=phenotype,local_changes_kwargs={},facial_actions=actions)["vertices"].squeeze(0).detach().cpu().numpy()
+          neutral=sample({})
+          action=sample({"jawOpen":0.8})
+          faces=np.asarray(model.faces,dtype=np.int32)
+          assert neutral.shape==(13718,3), neutral.shape
+          assert faces.shape==(27420,3), faces.shape
+          assert np.isfinite(neutral).all() and np.isfinite(action).all()
+          assert faces.min()>=0 and faces.max()<len(neutral)
+          delta=np.linalg.norm(action-neutral,axis=1)
+          assert delta.max()>1e-5
+          np.savez_compressed("evidence/native.npz",neutral=neutral,action=action,faces=faces)
+          report=dict(source="8f35dc2df1c4062fd2fae86734f9705de50c0c2b",anny=importlib.metadata.version("anny"),torch=torch.__version__,device=str(pose.device),phenotype=phenotype,facial_action={"jawOpen":0.8},vertices=len(neutral),triangles=len(faces),max_delta=float(delta.max()))
+          with open("evidence/generate.json","w") as f: json.dump(report,f,indent=2)
+          print(report)
+          PY
+      - name: Real Blender scene, morph export and CPU render
+        run: |
+          python - <<'PY'
+          import bpy, numpy as np
+          from mathutils import Vector
+          bpy.ops.wm.read_factory_settings(use_empty=True)
+          d=np.load("evidence/native.npz")
+          v,a,f=d["neutral"],d["action"],d["faces"]
+          mesh=bpy.data.meshes.new("Native public diagnostic")
+          mesh.from_pydata(v.tolist(),[],f.tolist())
+          mesh.update()
+          obj=bpy.data.objects.new("Diagnostic",mesh)
+          bpy.context.collection.objects.link(obj)
+          bpy.context.view_layer.objects.active=obj
+          obj.select_set(True)
+          for p in mesh.polygons: p.use_smooth=True
+          obj.shape_key_add(name="Basis")
+          key=obj.shape_key_add(name="JawOpen")
+          key.data.foreach_set("co",a.astype(np.float32).ravel())
+          key.value=0.8
+          mat=bpy.data.materials.new("Clay")
+          mat.diffuse_color=(0.48,0.55,0.62,1)
+          obj.data.materials.append(mat)
+          extent=np.ptp(v,axis=0)
+          center=Vector(((v.max(0)+v.min(0))*0.5).tolist())
+          up=int(np.argmax(extent))
+          depth=int(np.argmin(extent))
+          offset=Vector([0.,0.,0.])
+          offset[depth]=float(extent[up])*2.5
+          bpy.ops.object.camera_add(location=center+offset)
+          camera=bpy.context.object
+          camera.rotation_euler=(-offset).to_track_quat('-Z','Y').to_euler()
+          camera.data.type="ORTHO"
+          camera.data.ortho_scale=float(extent[up])*1.2
+          scene=bpy.context.scene
+          scene.camera=camera
+          scene.world=bpy.data.worlds.new("World")
+          scene.world.use_nodes=True
+          scene.world.node_tree.nodes.get("Background").inputs[0].default_value=(0.25,0.25,0.25,1)
+          bpy.ops.object.light_add(type="AREA",location=center+offset*0.8)
+          light=bpy.context.object
+          light.rotation_euler=(-offset).to_track_quat('-Z','Y').to_euler()
+          light.data.energy=500
+          light.data.shape="DISK"
+          light.data.size=2
+          scene.render.engine="CYCLES"
+          scene.cycles.device="CPU"
+          scene.cycles.samples=8
+          scene.render.resolution_x=256
+          scene.render.resolution_y=256
+          scene.render.resolution_percentage=100
+          scene.render.image_settings.file_format="PNG"
+          scene.render.filepath="//pilot.png"
+          bpy.ops.wm.save_as_mainfile(filepath=__import__("os").path.abspath("evidence/pilot.blend"))
+          bpy.ops.render.render(write_still=True)
+          bpy.ops.object.select_all(action="DESELECT")
+          obj.select_set(True)
+          bpy.context.view_layer.objects.active=obj
+          key.value=0
+          bpy.ops.export_scene.gltf(filepath=__import__("os").path.abspath("evidence/pilot.glb"),export_format="GLB",use_selection=True,export_morph=True,export_morph_normal=True)
+          assert bpy.app.version_string.startswith("4.5.0")
+          PY
+          test -s evidence/pilot.png
+          test -s evidence/pilot.blend
+          test -s evidence/pilot.glb
+          printf '%s\n' 'Diagnostic generated from upstream NAVER Anny (Apache-2.0); MPFB2 and Face Units assets CC0. Source: https://github.com/naver/anny/tree/8f35dc2df1c4062fd2fae86734f9705de50c0c2b ; native topology only. No project-specific character assets.' > evidence/NOTICE.txt
+          (cd evidence && sha256sum * > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cf-cpu-portability-source
+          path: evidence/
+          retention-days: 2
+          if-no-files-found: error
+  restore:
+    needs: generate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-cpu-portability-source
+          path: evidence
+      - name: Restore in clean runner and validate editable and runtime files
+        run: |
+          (cd evidence && sha256sum -c SHA256SUMS)
+          python -m pip install bpy==4.5.0
+          python - <<'PY'
+          import bpy, numpy as np, os, json
+          bpy.ops.wm.open_mainfile(filepath=os.path.abspath("evidence/pilot.blend"))
+          obj=bpy.data.objects["Diagnostic"]
+          d=np.load("evidence/native.npz")
+          assert len(obj.data.vertices)==len(d["neutral"])
+          assert len(obj.data.polygons)==len(d["faces"])
+          keys=obj.data.shape_keys.key_blocks
+          for name,expected in [("Basis",d["neutral"]),("JawOpen",d["action"])]:
+              actual=np.empty(expected.size,dtype=np.float32)
+              keys[name].data.foreach_get("co",actual)
+              assert np.allclose(actual.reshape(expected.shape),expected,rtol=0,atol=1e-6)
+          bpy.context.scene.render.filepath=os.path.abspath("restored.png")
+          bpy.ops.render.render(write_still=True)
+          assert os.path.getsize("restored.png")>100
+          bpy.ops.wm.read_factory_settings(use_empty=True)
+          bpy.ops.import_scene.gltf(filepath=os.path.abspath("evidence/pilot.glb"))
+          meshes=[o for o in bpy.context.scene.objects if o.type=="MESH"]
+          assert len(meshes)==1
+          obj=meshes[0]
+          keys=obj.data.shape_keys.key_blocks
+          assert "JawOpen" in keys
+          delta=max((a.co-b.co).length for a,b in zip(keys["JawOpen"].data,keys["Basis"].data))
+          assert np.isfinite(delta) and delta>1e-5
+          print(json.dumps(dict(restore="PASS",blender=bpy.app.version_string,glb_vertices=len(obj.data.vertices),glb_delta=delta)))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cf-cpu-portability-restored
+          path: restored.png
+          retention-days: 2
+          if-no-files-found: error
