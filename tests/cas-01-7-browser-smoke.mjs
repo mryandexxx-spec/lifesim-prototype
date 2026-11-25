@@ -208,7 +208,8 @@ try{
  }
 
  // PF-10/A: real required-choice UI, not a fake DOM, at both iPhone sizes.
- for(const [width,height] of [[390,844],[320,568]])for(const extra of [false,true]){
+ for(const [width,height] of [[390,844],[320,568]])for(const [extra,topicId] of [[false,'daily'],[true,'daily'],[true,'career']]){
+  const careerTopic=topicId==='career';
   const state=loadHousehold(copy(root));state.autonomy.enabled=false;
   const a=extra?'resident_3':'alex',b=extra?'resident_4':'mira';
   const first=getActor(state,a),second=getActor(state,b);
@@ -239,7 +240,7 @@ try{
    const details=page.locator('#cas-resident-details');
    await details.waitFor({state:'visible'});
    await details.locator('select[aria-label="Собеседник"]').selectOption('resident_4');
-   await details.locator('select[aria-label="Тема беседы"]').selectOption('daily');
+   await details.locator('select[aria-label="Тема беседы"]').selectOption(topicId);
    await details.getByRole('button',{name:'В очередь · беседа',exact:true}).tap();
   }
   const panel=page.locator('#conversation-panel');
@@ -247,21 +248,28 @@ try{
   assert.equal(await panel.getAttribute('aria-modal'),'true');
   assert.match(await page.locator('#conversation-subtitle').innerText(),extra?/Вера.*Игорь/:/Алекс.*Мира/);
   const choices=page.locator('#conversation-options');
-  const locked=choices.getByRole('button',{name:/Вдохновить на перемены.*Харизма 9/});
+  const locked=choices.getByRole('button',{name:careerTopic?/Вдохновить на профессиональный рост.*Харизма 9/:/Вдохновить на перемены.*Харизма 9/});
   assert.equal(await locked.isDisabled(),true);
-  const permitted=choices.getByRole('button',{name:'Помочь взглянуть иначе',exact:true});
+  const permitted=choices.getByRole('button',{name:careerTopic?'Разобрать трудность по шагам':'Помочь взглянуть иначе',exact:true});
   assert.equal(await permitted.isEnabled(),true);
-  await page.screenshot({path:'artifacts/cas-01-7/pf-10a-'+(extra?'extra':'legacy')+'-'+width+'.png'});
+  if(!careerTopic){
+   await choices.getByRole('button',{name:'Другие реплики',exact:true}).tap();
+   assert.equal(await choices.getByRole('button',{name:'Пожаловаться на день',exact:true}).isVisible(),true);
+   assert.equal(await permitted.count(),0);
+   await choices.getByRole('button',{name:'Основные реплики',exact:true}).tap();
+   assert.equal(await permitted.isEnabled(),true);
+  }
+  await page.screenshot({path:'artifacts/cas-01-7/pf-10a-'+(extra?'extra':'legacy')+'-'+topicId+'-'+width+'.png'});
   await permitted.tap();
   let saved=await stored();
   const action=()=>saved.socialAction||saved.additionalSocial;
-  assert.equal(action().conversation.turns[0].id,'daily.reframe');
+  assert.equal(action().conversation.turns[0].id,careerTopic?'career.reflect':'daily.reframe');
   assert.equal(action().conversation.turns.length,1);
   const minute=saved.minutes,seq=saved.socialGraph.nextSeq;
   await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
   await panel.waitFor({state:'visible',timeout:30000});
-  assert.match(await page.locator('#conversation-lines').innerText(),/Что из сегодняшнего дня/);
+  assert.match(await page.locator('#conversation-lines').innerText(),careerTopic?/Если разделить сложную задачу/:/Что из сегодняшнего дня/);
   await choices.getByRole('button',{name:'Продолжить беседу',exact:true}).tap();
   saved=await stored();
   assert.equal(saved.minutes,minute,'mandatory choice freezes simulation over reload');
@@ -274,6 +282,6 @@ try{
   assert.deepEqual(errors,[],width+'x'+height+' '+a+' JS errors');
   await context.close();
  }
- console.log('PF-10/A real mobile legacy + addressed topic picker, locked choices, reply, clock, v1 reload, exactly-one receipt PASS');
+ console.log('PF-10/A+B real mobile legacy daily + addressed daily/career topic picker, locked choices, reply, clock, v1 reload, exactly-one receipt PASS');
  console.log('CAS-01.7 WebGL HUD, scene, career, touch 390x844/320x568 PASS; physical Safari QA deferred');
 }finally{await browser.close();}

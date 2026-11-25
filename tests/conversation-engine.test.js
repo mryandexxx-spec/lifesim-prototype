@@ -13,12 +13,12 @@ const begin=(root,topic='support',id='alex')=>{
   assert.equal(startConversation(root,id,place,topic),true);
   assert.equal(arriveSocial(root),true);
 };
-test('seven original topics have exactly 21 meaningful choices',()=>{
-  assert.equal(Object.keys(CONVERSATION_TOPICS).length,7);
-  assert.equal(Object.keys(CONVERSATION_ACTS).length,21);
+test('legacy topics survive and expanded catalogue contains at least 90 meaningful choices',()=>{
+  assert.equal(Object.keys(CONVERSATION_TOPICS).length,15);
+  assert.equal(Object.keys(CONVERSATION_ACTS).length,105);
   assert.equal(CONVERSATION_MAX_TURNS,3);
   const ids=Object.values(CONVERSATION_TOPICS).flatMap(t=>t.lines);
-  assert.equal(new Set(ids).size,21);
+  assert.equal(new Set(ids).size,102);
   for(const id of ids){
     const act=CONVERSATION_ACTS[id];
     assert.ok(act.line.length>12&&act.yes.length>5&&act.no.length>5);

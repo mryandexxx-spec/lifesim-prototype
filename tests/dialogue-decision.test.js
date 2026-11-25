@@ -161,8 +161,10 @@ test('1.0s: actual browser panel is compact, modal, unclosable and has end actio
     conversationTranscript:()=>[],getActorName:id=>id,residentDisplayName:(_root,id)=>id,
     activeConversationAction:root=>root.socialAction||root.additionalSocial,
     conversationOptions:()=>[{id:'daily.ask',label:'Как прошёл день?'}],
-    conversationButton:(label,handler,secondary=false)=>({label,handler,secondary}),
-    document:{createElement:()=>({textContent:'',className:''})},
+    conversationButton:(label,handler,secondary=false)=>({label,handler,secondary,focus(){this.focused=true;}}),
+    document:{createElement:()=>({textContent:'',className:'',children:[],
+      replaceChildren(){this.children=[];},append(...items){this.children.push(...items);},
+      querySelector(){return this.children.find(x=>!x.disabled)||null;}})},
     endPlayerConversation:()=>{},CONVERSATION_MAX_TURNS:3,
     requiredChoiceFocus:{activate:required=>{if(required)$('conversation-panel').focus();},focusChoice:()=>{}},
     setViewOpen:()=>{},setHomeOpen:()=>{},closeTour:()=>{},closeInsightPanel:()=>{},
@@ -180,8 +182,16 @@ test('1.0s: actual browser panel is compact, modal, unclosable and has end actio
   assert.equal($('conversation-panel').attrs.get('aria-modal'),'true');
   assert.equal($('conversation-panel').focused,true);
   assert.match($('conversation-subtitle').textContent,/Игровое время остановлено/);
-  assert.deepEqual($('conversation-options').children.map(x=>x.label),
-    ['Как прошёл день?','Завершить разговор']);
+  const flatten=()=>Array.from($('conversation-options').children).flatMap(x=>x.children?Array.from(x.children):[x]);
+  assert.deepEqual(flatten().map(x=>x.label),['Как прошёл день?','Завершить разговор']);
+  scope.conversationOptions=()=>Array.from({length:7},(_,i)=>({id:'daily.test'+i,label:'Реплика '+i,locked:i===6,lockReason:i===6?'Харизма 9':null}));
+  scope.renderConversationPanel(true);
+  assert.deepEqual(flatten().map(x=>x.label),['Реплика 0','Реплика 1','Реплика 2','Реплика 3','Реплика 4','Другие реплики','Завершить разговор']);
+  flatten().find(x=>x.label==='Другие реплики').handler();
+  assert.deepEqual(flatten().map(x=>x.label),['Реплика 5','Реплика 6 · 🔒 Харизма 9','Основные реплики','Завершить разговор']);
+  assert.equal(flatten().find(x=>x.label==='Реплика 6 · 🔒 Харизма 9').disabled,true);
+  flatten().find(x=>x.label==='Основные реплики').handler();
+  assert.equal(flatten()[0].label,'Реплика 0');
 });
 test('1.0q: even a synthetic click on hidden X cannot dismiss a required prompt',()=>{
   const $=fakeDom(),root=started();let rerender=0;
