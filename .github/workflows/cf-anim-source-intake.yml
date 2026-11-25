@@ -1,0 +1,24 @@
+name: CF-ANIM source intake
+on:
+  pull_request:
+    paths:
+      - 'tools/cf_anim_source_intake.py'
+      - '.github/workflows/cf-anim-source-intake.yml'
+permissions:
+  contents: read
+jobs:
+  source-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and inspect pinned source bytes
+        run: |
+          python3 -m py_compile tools/cf_anim_source_intake.py
+          python3 tools/cf_anim_source_intake.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-source-inventory
+          path: cf-anim-source-report/
+          if-no-files-found: warn
