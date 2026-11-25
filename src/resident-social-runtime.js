@@ -119,7 +119,9 @@ const canBegin=(root,id,command)=>{
     !available(root,peer)||!actionAllowed(root,id,peer,command.actionId))return false;
   // Never hijack another person's manual work/queued action or active routine.
   if(actor(root,id).action||actor(root,peer).action||
-    pendingActions(root.actionQueues,peer).length)return false;
+    (command.type==='conversation'
+      ?(pendingActions(root.actionQueues,peer)[0]?.seq??Infinity)<command.seq
+      :pendingActions(root.actionQueues,peer).length))return false;
   return Boolean(approach(root,id,peer));
 };
 const reachable=(root,a,b,point)=>{
@@ -222,8 +224,8 @@ export function tickAddressedSocial(root,minutes){
   if(!s||root.paused||!Number.isFinite(minutes)||minutes<=0)return false;
   if(!hasTime(root,s)||!canMeet(root,s.initiator,s.partner)||
     root.socialAction||actor(root,s.initiator).action||actor(root,s.partner).action||
-    pendingActions(root.actionQueues,s.initiator).length||
-    pendingActions(root.actionQueues,s.partner).length||
+    (!s.conversation&&(pendingActions(root.actionQueues,s.initiator).length||
+      pendingActions(root.actionQueues,s.partner).length))||
     !actionAllowed(root,s.initiator,s.partner,s.actionId)){
     cancelAddressedSocial(root);return false;
   }
@@ -301,7 +303,8 @@ export function finishAddressedConversation(root){
   const s=root?.additionalSocial;
   if(root?.paused||s?.phase!=='using'||!s.conversation||!canMeet(root,s.initiator,s.partner))return null;
   const a=actor(root,s.initiator),b=actor(root,s.partner);
-  if(a.action||b.action||root.socialAction||dist(a.position,b.position)<.76||
+  if(a.action||b.action||root.socialAction||!isWalkable(a.position.x,a.position.z,root.world)||
+    !isWalkable(b.position.x,b.position.z,root.world)||dist(a.position,b.position)<.76||
     dist(a.position,b.position)>1.55||!isClearLine(a.position,b.position,root.world))return null;
   const outcome=conversationOutcome(s.conversation);
   if(!outcome)return null;
