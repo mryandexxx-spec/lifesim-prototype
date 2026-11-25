@@ -8,6 +8,10 @@ pins={'male':'5873589a1a97b6fdccbe460b3aaf739b2539ce6a1f75520c5d12845ee6598eb3',
 axes={'jaw':['chin-width-incr'],'cheeks':['l-cheek-volume-incr','r-cheek-volume-incr'],'nose':['nose-scale-depth-incr'],'mouth':['mouth-scale-horiz-incr'],'eyes':['l-eye-trans-out','r-eye-trans-out']}
 amplitudes={'jaw':.30,'cheeks':.30,'nose':.35,'mouth':.35,'eyes':.35}
 names=[a+'_'+s for a in axes for s in ['neg','pos']]
+# Full signed native range is diagnostic. The first actual male render shows
+# excessive flattening of the bridge at nose_neg=-1. Use bounded .65 there.
+# Other endpoints retain native full range pending both-sex visual review.
+range_limits={k:(.65 if k=='nose_neg' else 1.0) for k in names}
 torch.set_num_threads(2)
 model=anny.Anny(topology='anny',rig='anny',local_changes='default',facial_actions='all').to(device='cpu',dtype=torch.float32)
 pose=torch.eye(4)[None,None].repeat(1,model.bone_count,1,1)
@@ -47,7 +51,9 @@ for sex,gender in [('male',1.0),('female',0.0)]:
             g=native_deltas[k][1]
             abs_mm=float(np.linalg.norm(d-g,axis=1).max()*1000)
             assert abs_mm<.15,(sex,k,abs_mm)
-            fields[k]=d
+            limit=range_limits[k]
+            fields[k]=d if limit==1 else native({q:sign*limit for q in ls},profile)-b0
+            native_report[k]['candidate_limit']=limit
             native_report[k][sex+'_profile_max_diff_mm']=abs_mm
     profile_fields[sex]=fields
 (root/'native.json').write_text(json.dumps(native_report,indent=2))
@@ -222,7 +228,7 @@ for sex,pin in pins.items():
     for perm in itertools.permutations(range(3)):
         for signs in itertools.product([-1,1],repeat=3):
             T=np.zeros((3,3),dtype=np.float32)
-            for i,j in enumerate(perm): T[j,i]=signs[i]
+            for i,axis_index in enumerate(perm): T[axis_index,i]=signs[i]
             err=float(np.linalg.norm(X@T-Y)/np.linalg.norm(Y))
             candidates.append((err,T))
     err,T=min(candidates,key=lambda x:x[0])
@@ -324,6 +330,7 @@ for sex,pin in pins.items():
             bpy.ops.render.render(write_still=True)
     for k in keys:k.value=0
     bpy.ops.wm.save_as_mainfile(filepath=str(root/(sex+'-candidate.blend')))
+    assert isinstance(j,dict) and 'accessors' in j, 'GLB document invariant before export'
     # Preserve every original non-identity accessor and the exact triangle
     # array. Append only new identity POSITION/NORMAL targets to the source GLB.
     base_norm=vertex_normals(raw_base,tri)
@@ -368,6 +375,7 @@ for sex,pin in pins.items():
         from scipy.spatial import cKDTree
         distance,index=cKDTree(expected).query(actual,k=1)
         assert float(distance.max())<1e-5 and len(np.unique(index))==len(index),(sex,float(distance.max()),len(np.unique(index)))
-    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),canonical_topology_sha=topology_hash,vendor_topology_sha=vendor_hash,raw_vendor_canonical_same=raw_vendor_same,base_normal_cosine_p01=float(np.quantile(normal_cos,.01)),glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN; BVH counts recorded, not penetration classification')
+    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),canonical_topology_sha=topology_hash,vendor_topology_sha=vendor_hash,raw_vendor_canonical_same=raw_vendor_same,base_normal_cosine_p01=float(np.quantile(normal_cos,.01)),glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN; BVH counts recorded, not penetration classification',range_limits=range_limits)
+    (root/'report.json').write_text(json.dumps(report,indent=2))
 (root/'report.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report))
