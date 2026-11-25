@@ -16,7 +16,7 @@ for(const {mode,rows} of reports){let ok=true;for(const width of [320,390]){
  const p=probe?.placement,rr=probe?.reloaded;
  const match=(a,b)=>a&&b&&Math.abs(a.x-b.x)<.001&&Math.abs(a.z-b.z)<.001&&Math.abs(((a.yaw+b.yaw+180)%360+360)%360-180)<.01&&a.ghostVisible&&a.committedHidden&&a.ghostRemoved&&a.committedVisible;
  const placementOK=p?.poses?.length===4&&p.poses.every((x,i)=>x.yaw===i*90)&&p.pool?.length===4&&p.pool.every(x=>x&&Number.isFinite(x.x)&&Number.isFinite(x.z))&&JSON.stringify(p.state)===JSON.stringify(rr?.state)&&match(p.ghost,p.state.pose)&&match(rr?.probe,p.state.pose);
- console.log(JSON.stringify({mode,width,valid,rawOK,nightOK,lotOK,placementOK,lots:lots.map(x=>x.metrics)}));ok&&=valid&&rawOK&&nightOK&&lotOK&&placementOK;
+ const clear=rows.find(x=>x.name==='webkit'&&x.width===width&&x.engineClear)?.engineClear;const clearOK=clear?.sample?.[0]?.[0]>200&&clear?.sample?.[0]?.[1]<30&&clear?.sample?.[1]?.[1]>200&&clear?.sample?.[1]?.[0]<30;console.log(JSON.stringify({mode,width,valid,rawOK,clearOK,nightOK,lotOK,placementOK:!!placementOK,lots:lots.map(x=>x.metrics)}));ok&&=valid&&rawOK&&clearOK&&nightOK&&lotOK&&placementOK;
  }passed||=ok;}
 assert.ok(passed,'WebKit evidence gate OPEN: neither execution mode produced valid evidence for both viewports');
 console.log('Diagnostic browser gate PASS; actual game placement and physical iPhone performance remain OPEN');
