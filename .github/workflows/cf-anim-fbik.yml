@@ -1,0 +1,65 @@
+name: CF-ANIM FBIK diagnostic
+on:
+  pull_request:
+    paths:
+      - 'tools/cf_anim_fbik.py'
+      - '.github/workflows/cf-anim-fbik.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  full-body-comparison:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      MUJOCO_GL: egl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-contacts-evidence
+          run-id: 45711417970
+          github-token: ${{ github.token }}
+          path: prior-contacts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated pinned direct dependencies
+        run: |
+          mkdir -p fbik-out
+          python -m py_compile tools/cf_anim_fbik.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2
+          python -m pip inspect > fbik-out/dependency-inspect.json
+          python -m pip freeze > fbik-out/dependency-freeze.txt
+          python -m pip check
+      - name: Real rig simultaneous target comparison and matched videos
+        run: python tools/cf_anim_fbik.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-fbik-evidence
+          path: fbik-out/
+          if-no-files-found: warn
