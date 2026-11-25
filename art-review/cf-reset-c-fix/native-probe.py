@@ -20,6 +20,8 @@ assert neutral.shape==(13718,3)
 labels=set(model.local_change_labels)
 native_report={}
 native_deltas={}
+# Compare native local delta fields across distinct phenotype states.
+print('phenotype labels',list(model.phenotype_labels))
 for axis,ls in axes.items():
     assert set(ls)<=labels,(axis,ls,sorted(labels))
     for sign,side in [(-1,'neg'),(1,'pos')]:
@@ -100,20 +102,39 @@ for sex,pin in pins.items():
         axis_report[k]=dict(native_support_cosine=similarity,original_mm=float(x.max()*1000),native_full_mm=native_report[k]['full_mm'])
     (root/(sex+'-correspondence.json')).write_text(json.dumps(axis_report,indent=2))
     print(sex,json.dumps(axis_report))
-    # No blind gain: match native support and relative range for each signed axis.
-    # If vertex order is not identical, there is no proven mapping and no export.
-    if min(x['native_support_cosine'] for x in axis_report.values())<.97:
-        report[sex]={'status':'BLOCKED: native support correspondence not verified','axes':axis_report}
-        continue
+    # Seven previously verified supports pin vertex order and coordinate basis.
+    matched=[k for k in names if axis_report[k]['native_support_cosine']>.97]
+    assert len(matched)>=7,(sex,matched)
+    X=np.concatenate([native_deltas[k][0] for k in matched])
+    Y=np.concatenate([old[k]-b for k in matched])
+    # A signed orthogonal axis permutation, not a fitted deformation field.
+    candidates=[]
+    for perm in itertools.permutations(range(3)):
+        for signs in itertools.product([-1,1],repeat=3):
+            T=np.zeros((3,3),dtype=np.float32)
+            for i,j in enumerate(perm): T[j,i]=signs[i]
+            err=float(np.linalg.norm(X@T-Y)/np.linalg.norm(Y))
+            candidates.append((err,T))
+    err,T=min(candidates,key=lambda x:x[0])
+    # Mouth negative was near-correspondent but not exact, use only exact matches
+    # to validate the transform and then independently report all endpoint errors.
+    exact=[k for k in matched if axis_report[k]['native_support_cosine']>.9999]
+    assert len(exact)>=6
+    for k in exact:
+        p=native_deltas[k][0]@T
+        q=old[k]-b
+        e=float(np.linalg.norm(p-q)/np.linalg.norm(q))
+        assert e<.005,(sex,k,e,T)
+    print(sex,'native coordinate transform',T.tolist(), 'all support residual',err)
+    # Use actual signed native fields, NOT a scaled copy of the old positive/negative
+    # pair. Neutral and expression/neck keys are untouched.
     for k in names:
-        d=old[k]-b
-        factor=native_report[k]['measured_ratio']
-        # Max native coefficient, never extrapolate beyond documented range.
-        target=b+d*factor
+        p,full=native_deltas[k]
+        target=b+full@T
         keys[k].data.foreach_set('co',target.ravel())
         new=coords(keys[k])
         assert np.isfinite(new).all()
-        axis_report[k].update(new_mm=float(np.linalg.norm(new-b,axis=1).max()*1000),factor=factor)
+        axis_report[k].update(new_mm=float(np.linalg.norm(new-b,axis=1).max()*1000),old_native_residual=float(np.linalg.norm(p@T-(old[k]-b))/np.linalg.norm(old[k]-b)))
     assert np.array_equal(coords(keys[0]),b)
     for k in ['blink','smile','jawopen','neck_neg','neck_pos']:
         assert np.array_equal(coords(keys[k]),old[k])
@@ -129,6 +150,19 @@ for sex,pin in pins.items():
         assert not np.any((area>1e-10)&(m<1e-10)),(sex,vals,float(m.min()))
         min_area=min(min_area,float(m.min()))
     scene,cam,center=setup(obj,b)
+    # Matched original endpoint renders alongside new candidate.
+    for k in names:
+        candidate=coords(keys[k])
+        keys[k].data.foreach_set('co',old[k].ravel())
+        keys[k].value=1
+        for view in (['profile'] if k.startswith('nose') else ['front']):
+            offset=Vector((0,-1,0) if view=='front' else (1,0,0))
+            cam.location=center+offset
+            cam.rotation_euler=(-offset).to_track_quat('-Z','Y').to_euler()
+            scene.render.filepath=str(root/f'{sex}-old-{k}-{view}.png')
+            bpy.ops.render.render(write_still=True)
+        keys[k].value=0
+        keys[k].data.foreach_set('co',candidate.ravel())
     for label,weights in [('neutral',{}),*[(k,{k:1}) for k in names],('all_neg',{a+'_neg':1 for a in axes}),('all_pos',{a+'_pos':1 for a in axes}),('blink',{'blink':1}),('jawopen',{'jawopen':1})]:
         for k in keys:k.value=0
         for k,w in weights.items():keys[k].value=w
@@ -144,6 +178,16 @@ for sex,pin in pins.items():
     obj.select_set(True)
     bpy.context.view_layer.objects.active=obj
     bpy.ops.export_scene.gltf(filepath=str(root/(sex+'-candidate.glb')),export_format='GLB',use_selection=True,export_morph=True,export_morph_normal=True)
-    report[sex]=dict(status='candidate only',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN')
+    # Verify the reimported candidate, including all preserved key coordinates.
+    saved={k.name:coords(k) for k in keys}
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.gltf(filepath=str(root/(sex+'-candidate.glb')))
+    obj=next(o for o in bpy.context.scene.objects if o.type=='MESH')
+    keys=obj.data.shape_keys.key_blocks
+    assert len(obj.data.vertices)==13718 and len(obj.data.polygons)==27420
+    assert set(saved)==set(k.name for k in keys)
+    for k in keys:
+        assert np.allclose(coords(k),saved[k.name],atol=1e-6,rtol=0),(sex,k.name)
+    report[sex]=dict(status='candidate only',coordinate_transform=T.tolist(),glb_reimport='PASS',axes=axis_report,neutral_sha=sha(b),expression_sha={k:sha(old[k]) for k in ['blink','smile','jawopen','neck_neg','neck_pos']},tested_identity_combinations=243,min_triangle_area=min_area,contact_classification='OPEN')
 (root/'report.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report))
