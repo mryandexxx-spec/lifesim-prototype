@@ -8,6 +8,80 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-public-recovery:
+    if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-02-public-recovery' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Recover only already-public immutable runtime GLBs
+        run: |
+          mkdir -p recovery
+          python3 - <<'PY'
+          import concurrent.futures, hashlib, json, pathlib, re, urllib.request, urllib.parse, struct
+          BASE="https://lifesim-cf-body-reset-c-lab.vercel.app/"
+          EXPECTED={
+              "male.glb":"5873589a1a97b6fdccbe460b3aaf739b2539ce6a1f75520c5d12845ee6598eb3",
+              "female.glb":"fc8c47af2e9dfa0935bac0a2ad1384cf6b1a3926e255dd8728f145cf5bc5bf9f",
+          }
+          def fetch(url, limit):
+              assert urllib.parse.urlsplit(url).netloc==urllib.parse.urlsplit(BASE).netloc
+              req=urllib.request.Request(url,headers={"User-Agent":"LifeSim public runtime integrity check"})
+              with urllib.request.urlopen(req,timeout=15) as res:
+                  assert urllib.parse.urlsplit(res.geturl()).netloc==urllib.parse.urlsplit(BASE).netloc
+                  data=res.read(limit+1)
+                  if len(data)>limit: raise ValueError("size limit")
+                  return data
+          html=fetch(BASE,2_000_000).decode("utf-8")
+          text=[(BASE,html)]
+          for path in re.findall(r'<script[^>]+src=["\x27]([^"\x27]+)',html,re.I):
+              u=urllib.parse.urljoin(BASE,path)
+              if urllib.parse.urlsplit(u).netloc==urllib.parse.urlsplit(BASE).netloc:
+                  try: text.append((u,fetch(u,2_000_000).decode("utf-8")))
+                  except Exception as e: print("script probe:",type(e).__name__)
+          urls={name:{urllib.parse.urljoin(BASE,folder+name) for folder in ["","assets/","models/","lab/","assets/models/","glb/","data/"]} for name in EXPECTED}
+          for parent,source in text:
+              for path in re.findall(r'["\x27` ]([^"\x27` \n<>]+\.glb(?:\?[^"\x27` \n<>]*)?)',source,re.I):
+                  if "$" in path or "{" in path: continue
+                  u=urllib.parse.urljoin(parent,path)
+                  if urllib.parse.urlsplit(u).netloc!=urllib.parse.urlsplit(BASE).netloc: continue
+                  filename=urllib.parse.urlsplit(u).path.rsplit("/",1)[-1]
+                  if filename in urls: urls[filename].add(u)
+          report={}
+          def probe(item):
+              name,url=item
+              try:
+                  data=fetch(url,16_000_000)
+                  digest=hashlib.sha256(data).hexdigest()
+                  if digest==EXPECTED[name]:
+                      assert data[:4]==b"glTF" and struct.unpack_from("<I",data,8)[0]==len(data)
+                      return name,url,data
+                  if data[:4]==b"glTF": print("Unexpected digest:",name,url,digest)
+              except Exception as e: print("Probe:",url,type(e).__name__)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+              for result in pool.map(probe,[(n,u) for n,items in urls.items() for u in sorted(items)]):
+                  if not result: continue
+                  name,url,data=result
+                  if name in report: continue
+                  length,kind=struct.unpack_from("<II",data,12)
+                  assert kind==0x4e4f534a
+                  doc=json.loads(data[20:20+length])
+                  targets=[len(p.get("targets",[])) for m in doc["meshes"] for p in m["primitives"]]
+                  assert max(targets)>0
+                  pathlib.Path("recovery",name).write_bytes(data)
+                  report[name]={"url":url,"bytes":len(data),"sha256":EXPECTED[name],"primitive_target_counts":targets,"kind":"published-runtime-not-editable-original"}
+                  print(name,report[name])
+          pathlib.Path("recovery/manifest.json").write_text(json.dumps(report,indent=2))
+          assert set(report)==set(EXPECTED), "Missing exact published runtime models"
+          PY
+          (cd recovery && sha256sum male.glb female.glb manifest.json > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-runtime-recovery
+          path: recovery/
+          retention-days: 2
+          if-no-files-found: error
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
