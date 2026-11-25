@@ -1,6 +1,7 @@
 """Render actual pinned UAL skinned source motion; not target-character retarget."""
 import bpy, pathlib, json, math, subprocess, tempfile
 from mathutils import Vector, Matrix
+from imageio_ffmpeg import get_ffmpeg_exe
 ROOT=pathlib.Path("cf-anim-source-report")
 CLIPS={"ual1":["Walk_Loop","Sitting_Enter","Sitting_Exit","Idle_Talking_Loop"],
        "ual2":["Consume","Farm_Watering","Farm_Harvest","Idle_TalkingPhone_Loop"]}
@@ -74,7 +75,7 @@ def main():
                         import shutil
                         shutil.copyfile(s.render.filepath,ROOT/f"{key}-{name}-{i:03d}.png")
                 rate=(n-1)/duration
-                subprocess.run(["ffmpeg","-y","-loglevel","error","-framerate",str(rate),"-i",tmp+"/%03d.png","-c:v","libx264","-pix_fmt","yuv420p","-movflags","+faststart",str(ROOT/f"{key}-{name}.mp4")],check=True)
+                subprocess.run([get_ffmpeg_exe(),"-y","-loglevel","error","-framerate",str(rate),"-i",tmp+"/%03d.png","-c:v","libx264","-pix_fmt","yuv420p","-movflags","+faststart",str(ROOT/f"{key}-{name}.mp4")],check=True)
             assert move>h*.005,(name,move,h)
             report[key+"/"+name]={"source_frames":[start,end],"fps":fps,"duration_s":duration,"rendered_samples":n,"max_surface_displacement":move,"height":h,"floor_min_range":[min(mins),max(mins)]}
             (ROOT/"playback.json").write_text(json.dumps({"clips":report,"art":"OPEN","hold_visual":"OPEN","target_retarget":"OPEN"},indent=2))
