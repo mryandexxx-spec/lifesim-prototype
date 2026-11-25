@@ -1,0 +1,58 @@
+{
+  "male": {
+    "targets": [
+      "jaw_neg",
+      "jaw_pos",
+      "cheeks_neg",
+      "cheeks_pos",
+      "nose_neg",
+      "nose_pos",
+      "mouth_neg",
+      "mouth_pos",
+      "eyes_neg",
+      "eyes_pos",
+      "blink",
+      "smile",
+      "jawopen",
+      "neck_neg",
+      "neck_pos",
+      "slender",
+      "full",
+      "athletic",
+      "proportion_low",
+      "proportion_high",
+      "combined",
+      "combined_native_control"
+    ],
+    "center": 1.6522721004486085,
+    "floor": 0.0
+  },
+  "female": {
+    "targets": [
+      "jaw_neg",
+      "jaw_pos",
+      "cheeks_neg",
+      "cheeks_pos",
+      "nose_neg",
+      "nose_pos",
+      "mouth_neg",
+      "mouth_pos",
+      "eyes_neg",
+      "eyes_pos",
+      "blink",
+      "smile",
+      "jawopen",
+      "neck_neg",
+      "neck_pos",
+      "slender",
+      "full",
+      "athletic",
+      "proportion_low",
+      "proportion_high",
+      "combined",
+      "combined_native_control"
+    ],
+    "center": 1.6413792324066163,
+    "floor": 0.0
+  }
+}

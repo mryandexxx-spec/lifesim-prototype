@@ -1,0 +1,39 @@
+{
+  "neutral": {},
+  "short": {
+    "__scale": 0.9
+  },
+  "tall": {
+    "__scale": 1.1
+  },
+  "slender": {
+    "slender": 1
+  },
+  "full": {
+    "full": 1
+  },
+  "athletic": {
+    "athletic": 1
+  },
+  "proportion_low": {
+    "proportion_low": 1
+  },
+  "proportion_high": {
+    "proportion_high": 1
+  },
+  "combined": {
+    "combined": 1
+  },
+  "combined_native_control": {
+    "combined_native_control": 1
+  },
+  "tall_athletic": {
+    "athletic": 1,
+    "__scale": 1.1
+  },
+  "face_mixed": {
+    "full": 1,
+    "smile": 1,
+    "jaw_pos": 1
+  }
+}

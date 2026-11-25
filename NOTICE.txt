@@ -1,0 +1,2 @@
+LifeSim RESET-C-FIX experimental derivative of the existing public RESET-C models. Anny 0.6.2, naver/anny commit 8f35dc2df1c4062fd2fae86734f9705de50c0c2b (Apache-2.0 code); MPFB and Face Units CC0 as documented by pinned upstream. PlayCanvas engine MIT; source: https://github.com/playcanvas/engine. Original source lab: https://lifesim-cf-body-reset-c-lab.vercel.app/
+No production asset or topology approval.
