@@ -277,6 +277,11 @@ export function dispatchAdditionalResidentQueues(root){
       if(!ids.has(id)||['departing','waiting','working','returning'].includes(
         root.careerSystem?.byResident?.[id]?.currentShift?.phase)||root.socialAction||
         [root.additionalSocial?.initiator,root.additionalSocial?.partner].includes(id))return false;
+      if(queueHeads(root.actionQueues).some(({residentId,command:invite})=>
+        residentId!==id&&invite.type==='conversation'&&invite.targetId===id&&
+        invite.seq<command.seq&&residentIdsForSimulation(root).includes(residentId)&&
+        !['departing','waiting','working','returning'].includes(root.careerSystem?.byResident?.[residentId]?.currentShift?.phase)&&
+        !(residentId==='alex'?root:residentId==='mira'?root.otherSim:savedAdditionalActor(root,residentId))?.action))return false;
       const guard=residentGuards(root,id).head;
       // A* must not execute every render tick during deterministic backoff.
       // A busy item can be released at any time: inspect the cheap physical
