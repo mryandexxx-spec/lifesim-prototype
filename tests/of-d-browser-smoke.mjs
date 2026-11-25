@@ -31,7 +31,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
     const {Application,Vec3}=await import('playcanvas');const app=Application.getApplication(),cam=app.root.findByName('Camera'),node=f&&app.root.findByName('LOT-B2 '+f.instanceId+' '+f.itemId);
     const cp=cam.getPosition().clone(),cr=cam.getRotation().clone(),np=node?.getPosition().clone();
     try{
-     if(node){const p=node.getLocalPosition();if(Math.abs(p.x-f.x)>.001||Math.abs(p.y+.53)>.001||Math.abs(p.z-f.z)>.001)throw Error('bad outdoor origin');node.setPosition(5,18,0);const tall=f.itemId==='light.standing';const center=new Vec3(5,18+(tall?1.35:.68),0);cam.setPosition(center.clone().add(new Vec3(.76,.55,-1).normalize().mulScalar(tall?5.8:3.8)));cam.lookAt(center);}
+     if(node){const p=node.getLocalPosition();if(Math.abs(p.x-f.x)>.001||Math.abs(p.y+.53)>.001||Math.abs(p.z-f.z)>.001)throw Error('bad outdoor origin');if(!f.inPlace)node.setPosition(5,18,0);const tall=f.itemId==='light.standing';const p0=node.getPosition();const center=new Vec3(p0.x,p0.y+(tall?1.35:f.inPlace?1.05:.68),p0.z);cam.setPosition(center.clone().add(new Vec3(.76,.55,-1).normalize().mulScalar(tall?5.8:3.8)));cam.lookAt(center);}
      else{cam.setPosition(18,8,1);cam.lookAt(new Vec3(18,-.25,-3.75));}
      await new Promise(r=>setTimeout(r,350));
      for(let i=0;i<8;i++){const img=await new Promise(resolve=>{app.once('postrender',()=>resolve(app.graphicsDevice.canvas.toDataURL('image/png')));app.renderNextFrame=true;});const bitmap=await createImageBitmap(await (await fetch(img)).blob());const probe=document.createElement('canvas');probe.width=96;probe.height=96;const c=probe.getContext('2d');c.drawImage(bitmap,0,0,96,96);bitmap.close();const data=c.getImageData(0,0,96,96).data,colors=new Set();for(let j=0;j<data.length;j+=4)colors.add((data[j]>>4)*256+(data[j+1]>>4)*16+(data[j+2]>>4));if(colors.size>=8)return img;}
@@ -41,10 +41,21 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
 
    const store=(file,png)=>writeFileSync(out+'/'+file+'.png',Buffer.from(png.split(',')[1],'base64'));
    const label=name+'-'+width+'-'+(night?'night':'day');store(label+'-lot',await capture(null));
+   if(night){
+    const savedActors=await page.evaluate(()=>window.__LifeSimGardenSessionQA().actors);
+    assert.equal(savedActors.alex.action?.id,'bench');assert.equal(savedActors.mira.action?.id,'grill');
+    for(const [id,p] of [['alex',seed.position],['mira',seed.otherSim.position]])assert.ok(Math.hypot(savedActors[id].position.x-p.x,savedActors[id].position.z-p.z)<.45,'loaded outdoor contact '+id);
+    await page.locator('#pause-btn').click();
+    await page.waitForFunction(async()=>{const {Application}=await import('playcanvas');const g=Application.getApplication().root.findByName('LOT-B2 out-3 garden.grill');return g.children.filter(n=>n.name==='GRILL-R1 animated skewer').some(n=>Math.abs(n.getLocalEulerAngles().x)>4);},null,{timeout:15000});
+    await page.waitForTimeout(800);
+    await page.locator('#pause-btn').click();
+    store(label+'-active-bench',await capture({...features[0],inPlace:true}));
+    store(label+'-active-grill',await capture({...features[2],inPlace:true}));
+   }
    if(width===390)for(const f of features)store(label+'-new-'+f.itemId,await capture(f));
    await page.reload({waitUntil:'domcontentloaded'});await ready();const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);assert.equal(saved.version,1);assert.deepEqual(saved.world.outdoors.features,features);
    if(width===390){await page.goto(url+'&outdoor-furniture=legacy',{waitUntil:'domcontentloaded'});await page.locator('#loading').waitFor({state:'hidden',timeout:100000});assert.equal((await page.evaluate(()=>window.__LifeSimOutdoorFurnitureStats())).objects.length,0);for(const f of features)store(label+'-legacy-'+f.itemId,await capture(f));}
    assert.deepEqual(errors,[]);report.push({name,width,night,scene:s});writeFileSync(out+'/report.json',JSON.stringify(report,null,2));
   }finally{await ctx.close();}
- }finally{await b.close();}
+ }}finally{await b.close();}
 }
