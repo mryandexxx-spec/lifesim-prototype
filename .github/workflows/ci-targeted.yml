@@ -8,6 +8,35 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  of-integration-b:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-b' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact source and vegetation tests
+        run: node --test tests/of-integration-b.test.js
+      - name: Real game WebGL and comparative 36-feature lot profile
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/of-b-http.log 2>&1 &
+          sleep 3
+          node tests/of-b-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: of-b-game-evidence
+          path: artifacts/of-b/
+          if-no-files-found: warn
   of-integration-a:
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-a' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
