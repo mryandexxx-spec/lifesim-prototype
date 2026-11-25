@@ -184,7 +184,11 @@ for sex,(pin,rpin) in PINS.items():
     assert rm['extras']['targetNames']==NAMES
     face={n:acc(r,rb,t['POSITION']) for n,t in zip(NAMES,rawp['targets'])}
     support=np.maximum.reduce([np.linalg.norm(face[n],axis=1) for n in NAMES[:13]])>1e-5
-    cut=float(min(raw[support,1].min()-.005,raw[:,1].max()-.265))
+    # Native face fields can have small remote support; use the anatomical
+    # head band, and report remote support separately instead of freezing torso.
+    cut=float(raw[:,1].max()-.265)
+    print(sex,'bounds',raw.min(0).tolist(),raw.max(0).tolist(),'face support min',float(raw[support,1].min()),'head cut',cut,flush=True)
+    assert np.any(support & (raw[:,1]>=cut))
     assert raw[:,1].max()-.45<cut<raw[:,1].max()-.16,(sex,cut)
     profile={k:.5 for k in model.phenotype_labels};profile['gender']=1. if sex=='male' else 0.
     T,e,donor=orient(profile,face)
