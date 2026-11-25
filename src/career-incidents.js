@@ -10,6 +10,7 @@ import {specializationDefinition,recordSpecializationIncident} from './career-sp
 import {seniorMissingScenes,recordSeniorIncident} from './career-seniority.js';
 import {CAREER_R1_SCENES} from './career-r1-scenes.js';
 import {CAREER_R2_SCENES} from './career-r2-scenes.js';
+import {PF09B_SCENES} from './career-pf09b-scenes.js';
 
 const O=(id,text,feedback,performance,energy,fun,axis,memory,skill=null)=>
   Object.freeze({id,text,feedback,performance,energy,fun,axis,memory,skill});
@@ -106,7 +107,8 @@ export const WORK_INCIDENT_CATALOG=Object.freeze(Object.fromEntries(
     S('legacy',WORK_INCIDENTS[careerId].title,WORK_INCIDENTS[careerId].text,
       'organization','pressure',WORK_INCIDENTS[careerId].options),...more,
     ...CAREER_R1_SCENES[careerId],
-    ...CAREER_R2_SCENES[careerId]
+    ...CAREER_R2_SCENES[careerId],
+    ...PF09B_SCENES[careerId]
   ])])
 ));
 export const INCIDENT_HISTORY_LIMIT=12;
@@ -142,7 +144,7 @@ export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?
   const actor=actorFor(root,id),axes=deriveAxes(actor?.personality);
   const mood=clip(actor?.mind?.mood?.value),energy=clip(actor?.needs?.energy);
   const recent=history.slice(-6);
-  const last=recent.at(-1)?.scenarioId;
+  const last=recent.filter(h=>h.careerId===shift.careerId).at(-1)?.scenarioId;
   const track=specializationDefinition(contract?.careerId,contract?.specialization?.id);
   const rankIndex=Number.isInteger(contract?.level)?contract.level:0;
   let available=bank.filter(scene=>rankIndex>=(scene.minRank??0)&&
@@ -151,19 +153,20 @@ export function selectWorkScenario(root,id,shift=root?.careerSystem?.byResident?
     const proof=available.filter(s=>plan.proofScenes.includes(s.id));
     const rarity=available.filter(s=>(s.rarity??'ordinary')===plan.rarity);
     if(proof.length)available=proof;else if(rarity.length)available=rarity;
+    if(!proof.length&&available.some(s=>s.id!==last))available=available.filter(s=>s.id!==last);
   }
   const scores=available.map((scene,index)=>{
     const variety=plan?incidentRoll(shift.id,id,'scene|'+scene.id)*5:(hash(shift.id+'|'+scene.id+'|'+id)%100)/20;
     const trait=(axes[scene.focus]-.5)*6;
     const condition=scene.tone==='pressure'?(energy>=55?1.5:-2)+(mood>=55?1:0):
       (mood>=65?2:0)+(energy<40?-1:1);
-    const rank=(contract?.level||0)*(index===0?-.5:1.3);
+    const rank=plan?((scene.minRank??0)>0?1:0):(contract?.level||0)*(index===0?-.5:1.3);
     const skill=scene.options.some(o=>o.skill&&currentSkillLevel(
       actor?.skills,HOBBY_SKILLS,o.skill)>=2)?1.5:0;
     // A bounded cooldown never blocks missing senior/focus promotion evidence.
     const lastEight=history.slice(-8);
     const repetition=lastEight.reduce((sum,h,index)=>sum+
-      (h.scenarioId===scene.id?(index>=lastEight.length-4?24:12):0),0);
+      (h.careerId===shift.careerId&&h.scenarioId===scene.id?(index>=lastEight.length-4?24:12):0),0);
     const continuity=workStoryFollowUp(root,id,scene)?12:0;
     const focus=track?.scenarioId===scene.id?
       (contract.specialization.focusReceiptId?3:100):0;
