@@ -175,3 +175,27 @@ test('resident picker selects immediately without implicit focus, other shortcut
   assert.match(game,/handleResidentPickerTap\(id,event\)/);
   assert.match(html,/micro-ux-r1-resident-double-tap/);
 });
+
+
+test('PF-08 live picker is read-only, covers all work phases and avoids unchanged DOM writes',async()=>{
+ const {syncResidentPickerWorkStatus}=await import('../src/resident-hud.js');
+ const root=newHousehold();
+ let writes=0;
+ const mock=()=>{const attrs={};return {
+   dataset:new Proxy({}, {set(o,k,v){writes++;o[k]=v;return true;}}),
+   getAttribute:k=>attrs[k]??null,setAttribute(k,v){writes++;attrs[k]=v;}
+ };};
+ const buttons={alex:mock(),mira:mock()};
+ const sync=()=>syncResidentPickerWorkStatus(root,id=>buttons[id]);
+ for(const [phase,away] of [[null,false],['pending',false],['departing',false],
+   ['waiting',true],['working',true],['returning',true],[null,false]]){
+   root.careerSystem.byResident.mira=phase?{currentShift:{phase}}:null;
+   const before=copy(root);sync();
+   assert.deepEqual(root,before);
+   assert.equal(buttons.alex.dataset.away,'false');
+   assert.equal(buttons.mira.dataset.away,String(away));
+   assert.equal(buttons.mira.getAttribute('aria-label'),'Выбрать Мира'+(away?' · на работе':''));
+   const previous=writes;sync();assert.equal(writes,previous,'stable HUD must not write attributes');
+ }
+ assert.equal(root.selectedSim,'alex');
+});

@@ -37,3 +37,20 @@ export function residentRoster(root,selectedId){
    queued:pendingActions(root.actionQueues,id).length});
  });
 }
+
+/** Update the existing picker buttons from canonical presence only. No selection,
+ * camera, focus, queue or save changes; unchanged attributes are not rewritten.
+ * Called by the existing HUD cadence, including when a non-selected resident
+ * returns (additional adults finish inside the simulation tick).
+ */
+export function syncResidentPickerWorkStatus(root,buttonFor){
+ for(const id of residentIdsForSimulation(root)){
+  const button=buttonFor(id);
+  if(!button)continue;
+  const away=residentAwayAtWork(root,id);
+  const value=String(away);
+  const label='Выбрать '+residentDisplayName(root,id)+(away?' · на работе':'');
+  if(button.dataset.away!==value)button.dataset.away=value;
+  if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);
+ }
+}

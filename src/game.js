@@ -188,7 +188,7 @@ import {TOILET_LAYOUT,createToiletTransition,advanceToiletTransition} from './to
 import {createPrivacyMosaicMaterial} from './privacy-mosaic.js';
 import {proposeFurnishedRoomMove,createHouseholdConstructionEditor} from './furnished-room.js';
 import {residentSegmentClear,residentIdsForSimulation,cancelAdditionalResidentAction} from './resident-activity-runtime.js';
-import {residentRoster,residentDisplayName,effectiveHudSelection,residentScenePose,CAS_ACTIONS} from './resident-hud.js';
+import {residentRoster,residentDisplayName,effectiveHudSelection,residentScenePose,CAS_ACTIONS,syncResidentPickerWorkStatus} from './resident-hud.js';
 import {addressedSocialPeers,queueAddressedSocial} from './resident-social-runtime.js';
 import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, getActorName,
   selectResident, furnitureAvailable, chooseResidentAction, setHouseholdAutonomy, tickHousehold,
@@ -2172,6 +2172,8 @@ function refreshIncidentNotifications(){
       'Открыть работу и график выбранного жителя');
 }
 function updateCareerHud(){
+  // Presence changes independently of the selected resident, including extra adults.
+  syncResidentPickerWorkStatus(game,id=>$('pick-'+id));
   const id=activeHudResident();
   const status=residentWorkStatus(game,id);
   workHud.hidden=!status;
@@ -2342,8 +2344,6 @@ function updateResidentPicker(){
    }
    button.textContent=row.name;
    button.setAttribute('aria-pressed',String(row.id===hudResidentId));
-   button.setAttribute('aria-label','Выбрать '+row.name+(row.away?' · на работе':''));
-   button.dataset.away=String(row.away);
    button.dataset.critical=String(row.priorityValue<30);
  }
  for(const [id,button] of casButtons)if(!rows.some(row=>row.id===id)){
