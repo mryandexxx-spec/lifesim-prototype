@@ -78,4 +78,5 @@ try{
 }finally {await browser.close();}
 
 // Reuse the existing career mobile CI route; no shared workflow changes.
+// PF-09/A+B: live rare-tier choice, journal, reload and no-event salary.
 await import('./pf-09a-browser-smoke.mjs');
