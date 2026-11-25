@@ -213,7 +213,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
         const live=personRoot();if(!live)return;
         const result=requestCareerDeparture(live,who,live.minutes);
         if(!result.ok){notify(result.reason);return;}
-        save(true);notify(NAMES[who]+' идёт к выходу');render();return;
+        save(true);notify(NAMES[who]+' идёт к выходу'+(result.canceledSocial?' · общение отменено ('+result.canceledSocial+')':''));render();return;
       }
       section='map';render();body.querySelector('#career-map-title')?.focus({preventScroll:true});
     },'career-phone-primary career-phone-hero-main'));
@@ -695,7 +695,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
         const live=personRoot();if(!live)return;
         const result=requestCareerDeparture(live,who,live.minutes);
         if(!result.ok){notify(result.reason);return;}
-        save(true);notify(NAMES[who]+' идёт к выходу');render();
+        save(true);notify(NAMES[who]+' идёт к выходу'+(result.canceledSocial?' · общение отменено ('+result.canceledSocial+')':''));render();
       },'career-phone-primary'));
     }
     if(['pending','departing'].includes(active?.phase)&&root.minutes>=active.start-15){
