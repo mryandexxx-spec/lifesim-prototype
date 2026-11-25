@@ -218,6 +218,7 @@ jobs:
           if-no-files-found: warn
 
   ossos-world-contact:
+    if: false # exact D-TOOLS/3 R2 evidence retained
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -273,5 +274,70 @@ jobs:
         with:
           name: cf-body-d-tools-world-contact-r2
           path: contact-out/
+          retention-days: 90
+          if-no-files-found: warn
+
+  ossos-world-reach:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sketchpunklabs/ossos
+          ref: d1325d878f4875d0eafe42f8861a853263d57081
+          path: upstream-ossos
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-world-contact-r2
+          run-id: 45685603326
+          github-token: ${{ github.token }}
+          path: prior-seat
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: cf-body-d-bpy-4.5.0-py311-linux-v1
+      - name: Prepare exact skin and contact input
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.15.3
+          python -m py_compile art-review/cf-body-d/dtools-reach.py art-review/cf-body-d/dtools-reach-render.py
+          python art-review/cf-body-d/dtools-reach.py prepare
+      - name: Solve fixed world fingertip goals and reject infeasible clips
+        run: |
+          test "$(git -C upstream-ossos rev-parse HEAD)" = d1325d878f4875d0eafe42f8861a853263d57081
+          npm install --prefix .dtools-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          ln -s "$PWD/.dtools-deps/node_modules" upstream-ossos/node_modules
+          python -c "from pathlib import Path; s=Path('art-review/cf-body-d/dtools-full.mjs').read_text().split('const results={};')[0].replace('full-input/poses.json','reach-input.json'); Path('upstream-ossos/reach.mjs').write_text(s+Path('art-review/cf-body-d/dtools-reach.mjs').read_text())"
+          .dtools-deps/node_modules/.bin/esbuild upstream-ossos/reach.mjs --bundle --platform=node --target=node22 --format=esm --outfile=dtools-reach-bundle.mjs
+          node dtools-reach-bundle.mjs
+          python art-review/cf-body-d/dtools-reach.py bake
+          cp upstream-ossos/LICENSE reach-out/OSSOS-LICENSE.txt
+          cp .dtools-deps/package-lock.json reach-out/dependency-lock.json
+      - name: Independent Blender landmark and foot-lock sampling and renders
+        run: python art-review/cf-body-d/dtools-reach-render.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-body-d-tools-world-reach
+          path: reach-out/
           retention-days: 90
           if-no-files-found: warn
