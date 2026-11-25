@@ -8,23 +8,27 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  of-01-distribution:
+  of-01-fix:
     if: github.event_name == 'pull_request' && github.head_ref == 'art/of-01-object-lab' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
       actions: read
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/download-artifact@v4
         with:
           name: of-01-object-lab-evidence
           run-id: 45637220167
           github-token: ${{ github.token }}
           path: reviewed
-      - name: Verify reviewed payload and publish isolated diagnostic branch
+      - name: Verify exact reviewed geometry and render payload
         run: |
           python - <<'PY'
           import pathlib,hashlib,json,shutil
@@ -33,26 +37,29 @@ jobs:
           m={str(x.relative_to(p)):hashlib.sha256(x.read_bytes()).hexdigest() for x in selected}
           assert len(m)==56
           assert hashlib.sha256(json.dumps(m,sort_keys=True,separators=(',',':')).encode()).hexdigest()=='9dd2d6f9b3dfc1e23b14f4f03dace2a8f6ca8d4ce96bf36ba937e4d1edcd3731'
-          out=pathlib.Path('published');shutil.copytree(p/'lab',out)
-          shutil.copytree(p/'blender',out/'blender')
-          for name in ['donors/tree/source.json','donors/tree/license.txt','donors/table/source.json']:
-              dst=out/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p/name,dst)
-          (out/'index.html').rename(out/'3d.html')
-          (out/'index.html').write_text(pathlib.Path('art-review/of-01/gallery.html').read_text())
-          m={str(x.relative_to(out)):hashlib.sha256(x.read_bytes()).hexdigest() for x in sorted(out.rglob('*')) if x.is_file()}
-          (out/'SHA256SUMS.json').write_text(json.dumps(m,indent=2))
-          print('56 exact reviewed source hashes verified; only gallery and filename added')
-          print('Published manifest SHA256:',hashlib.sha256((out/'SHA256SUMS.json').read_bytes()).hexdigest())
+          shutil.copytree(p/'lab',pathlib.Path('artifacts/of-01/lab'))
           PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          export GIT_INDEX_FILE="$(mktemp -u)"
-          git --work-tree="$PWD/published" read-tree --empty
-          git --work-tree="$PWD/published" add -A -- .
-          tree=$(git write-tree)
-          sha=$(git commit-tree "$tree" -m "OF-01 reviewed diagnostic payload run 45637220167")
-          git push origin "$sha:refs/heads/art/of-01-lab"
-          echo "Distribution SHA: $sha"
+          node art-review/of-01/verify.mjs
+          cp art-review/of-01/lab.mjs artifacts/of-01/lab/
+      - name: Install pinned browser tools
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1 pngjs@7.0.0
+          npx playwright install --with-deps chromium webkit
+      - name: Capture headless and headed WebKit under Xvfb
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 &
+          sleep 2
+          OF_MODE=headless node art-review/of-01/capture.mjs
+          OF_MODE=headed xvfb-run -a node art-review/of-01/capture.mjs
+          node art-review/of-01/fix-gate.mjs
+      - name: Archive diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: of-01-fix-evidence
+          path: artifacts/of-01/
+          if-no-files-found: error
 
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
