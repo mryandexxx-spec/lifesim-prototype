@@ -8,47 +8,52 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  of-01-object-lab:
+  of-01-distribution:
     if: github.event_name == 'pull_request' && github.head_ref == 'art/of-01-object-lab' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    permissions:
+      contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install pinned CPU Blender and browser tools
-        run: |
-          python -m pip install bpy==4.5.0
-          npm ci
-          npm install --no-save playwright@1.56.1 pngjs@7.0.0
-          npx playwright install --with-deps chromium webkit
-      - name: Extract actual catalog baseline and retrieve free CC0 comparison candidates
-        run: |
-          node art-review/of-01/baseline.mjs
-          python art-review/of-01/donors.py
-      - name: Author actual meshes and render matched Blender evidence
-        run: python art-review/of-01/build.py
-      - name: Verify GLBs and prepare standalone lab
-        run: |
-          node art-review/of-01/verify.mjs
-          cp art-review/of-01/{index.html,lab.mjs} artifacts/of-01/lab/
-          cp node_modules/playcanvas/build/playcanvas.mjs artifacts/of-01/lab/
-      - name: Capture real mobile-size PlayCanvas comparison
-        run: |
-          python -m http.server 8765 --bind 127.0.0.1 &
-          sleep 2
-          node art-review/of-01/capture.mjs
-      - name: Archive actual assets, editable sources and evidence
-        if: always()
-        uses: actions/upload-artifact@v4
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/download-artifact@v4
         with:
           name: of-01-object-lab-evidence
-          path: artifacts/of-01/
-          if-no-files-found: error
+          run-id: 45637220167
+          github-token: ${{ github.token }}
+          path: reviewed
+      - name: Verify reviewed payload and publish isolated diagnostic branch
+        run: |
+          python - <<'PY'
+          import pathlib,hashlib,json,shutil
+          p=pathlib.Path('reviewed')
+          selected=sorted(x for x in p.rglob('*') if x.is_file() and (str(x.relative_to(p)).startswith(('lab/','blender/')) or str(x.relative_to(p)) in ['donors/tree/source.json','donors/tree/license.txt','donors/table/source.json']))
+          m={str(x.relative_to(p)):hashlib.sha256(x.read_bytes()).hexdigest() for x in selected}
+          assert len(m)==56
+          assert hashlib.sha256(json.dumps(m,sort_keys=True,separators=(',',':')).encode()).hexdigest()=='9dd2d6f9b3dfc1e23b14f4f03dace2a8f6ca8d4ce96bf36ba937e4d1edcd3731'
+          out=pathlib.Path('published');shutil.copytree(p/'lab',out)
+          shutil.copytree(p/'blender',out/'blender')
+          for name in ['donors/tree/source.json','donors/tree/license.txt','donors/table/source.json']:
+              dst=out/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p/name,dst)
+          (out/'index.html').rename(out/'3d.html')
+          (out/'index.html').write_text(pathlib.Path('art-review/of-01/gallery.html').read_text())
+          m={str(x.relative_to(out)):hashlib.sha256(x.read_bytes()).hexdigest() for x in sorted(out.rglob('*')) if x.is_file()}
+          (out/'SHA256SUMS.json').write_text(json.dumps(m,indent=2))
+          print('56 exact reviewed source hashes verified; only gallery and filename added')
+          print('Published manifest SHA256:',hashlib.sha256((out/'SHA256SUMS.json').read_bytes()).hexdigest())
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_INDEX_FILE="$(mktemp -u)"
+          git --work-tree="$PWD/published" read-tree --empty
+          git --work-tree="$PWD/published" add -A -- .
+          tree=$(git write-tree)
+          sha=$(git commit-tree "$tree" -m "OF-01 reviewed diagnostic payload run 45637220167")
+          git push origin "$sha:refs/heads/art/of-01-lab"
+          echo "Distribution SHA: $sha"
+
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
