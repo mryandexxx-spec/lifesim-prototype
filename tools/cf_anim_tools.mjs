@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {vec3 as v,quat as q,mat3} from 'gl-matrix';
 import Armature from './src/armature/Armature';
 import Retarget from './src/animation/Retarget';
+import * as THREE from 'three';
+import { AnimationRetargeting } from '../upstream-upf/retargeting.js';
 import {IKChain} from './src/ikrig/rigs/IKChain';
 import LimbSolver from './src/ikrig/solvers/LimbSolver';
 const input=JSON.parse(fs.readFileSync('anim-tools-out/input.json'));
@@ -74,6 +76,45 @@ function solved(ret,s,t,f){
  return l;
 }
 function aim(t,l,a,b,want){let w=world(t,l);const now=norm(sub(w[b].p,w[a].p)),swing=q.rotationTo([],now,norm(want)),p=t.parents[a];l[a].r=q.normalize([],qr(p<0?I:inv(w[p].r),qr(swing,w[a].r)));}
+// Calibrate auxiliary bind by anatomy, not by per-profile angle tables.
+// Source is T-pose and target A-pose. Pose the target reference, without changing its actual skin bind.
+function palmFrame(r,w,side,source){
+ const suffix=source?'_'+side:'.'+side.toUpperCase(), names=source?['index_01','middle_01','pinky_01']:['finger2-1','finger3-1','finger5-1'];
+ const ids=names.map(n=>r.names.indexOf(n+suffix));assert(ids.every(i=>i>=0),JSON.stringify({names:r.names,ids}));
+ const wrist=w[r.roles.map['hand_'+side]].p;
+ const x=norm(sub(w[ids[0]].p,w[ids[2]].p)),y0=norm(sub(w[ids[1]].p,wrist)),z=norm(cross(x,y0)),y=norm(cross(z,x));
+ assert(len(z)>.9);return q.fromMat3([],mat3.fromValues(...x,...y,...z));
+}
+function commonReference(s,t){
+ const l=structuredClone(t.rest),sw=world(s,s.rest);
+ for(const side of ['l','r']){
+  for(const [ra,rb] of [['upperarm','forearm'],['forearm','hand'],['thigh','shin'],['shin','foot']]){
+   const a=t.roles.map[ra+'_'+side],b=t.roles.map[rb+'_'+side],sa=s.roles.map[ra+'_'+side],sb=s.roles.map[rb+'_'+side];
+   aim(t,l,a,b,sub(sw[sb].p,sw[sa].p));
+  }
+  const e=t.roles.map['hand_'+side],w=world(t,l),r=qr(palmFrame(s,sw,side,true),inv(palmFrame(t,w,side,false)));
+  l[e].r=q.normalize([],qr(inv(w[t.parents[e]].r),qr(r,w[e].r)));
+ }
+ return l;
+}
+function threeSkeleton(r,rest){
+ const bones=r.names.map(n=>{const b=new THREE.Bone();b.name=n;return b;});
+ rest.forEach((b,i)=>{bones[i].position.fromArray(b.p);bones[i].quaternion.fromArray(b.r);if(r.parents[i]>=0)bones[r.parents[i]].add(bones[i]);});
+ bones[0].updateWorldMatrix(false,true);return new THREE.Skeleton(bones);
+}
+function upfEngine(s,t,links,common){
+ const ref=common?commonReference(s,t):t.rest,src=threeSkeleton(s,s.rest),trg=threeSkeleton(t,ref);
+ const map=Object.fromEntries(Object.values(links).map(x=>[x.source,x.target]));
+ const ret=new AnimationRetargeting(src,trg,{srcPoseMode:1,trgPoseMode:1,boneNameMap:map});
+ for(const [sn,tn] of Object.entries(map))assert.equal(ret.boneMap.idxMap[s.names.indexOf(sn)],t.names.indexOf(tn));
+ return {ref,src,trg,ret};
+}
+function upfPose(e,s,t,f,baseline){
+ e.src.bones.forEach((b,i)=>{b.position.fromArray(f[i].p);b.quaternion.fromArray(f[i].r);});
+ e.trg.bones.forEach((b,i)=>{b.position.fromArray(e.ref[i].p);b.quaternion.fromArray(e.ref[i].r);});
+ e.ret.retargetPose();
+ return e.trg.bones.map((b,i)=>({p:[...baseline[i].p],r:b.quaternion.normalize().toArray()}));
+}
 function chainSolve(A,B,goal,pole){
  const d=len(goal);if(d<1e-8)return null;
  const dir=norm(goal),radius=Math.max(Math.abs(A-B)+1e-5,Math.min(A+B-1e-5,d)),g=mul(dir,radius);
@@ -105,20 +146,21 @@ const result={},summary={};for(const [key,t] of Object.entries(input.targets)){
  result[key]={};summary[key]={};
  for(const [sk,raw] of Object.entries(input.sources)){
   const s=align(raw,t),automatic=engine(s,t,false),semantic=engine(s,t,true);
-  const links=getLinks(semantic,s,t),rawLinks=getLinks(automatic,s,t);
+  const links=getLinks(semantic,s,t),rawLinks=getLinks(automatic,s,t),upfRaw=upfEngine(s,t,links,false),upfCommon=upfEngine(s,t,links,true);
   for(const role of required){assert.equal(links[role]?.target,t.names[t.roles.map[role]],role);assert.equal(links[role]?.source,s.names[s.roles.map[role]],role);}
   for(const [name,c] of Object.entries(s.clips)){
-   const variants={retarget:[],relative_ik:[]},rows=[];
+   const variants={retarget:[],relative_ik:[],upf_raw:[],upf_common:[],upf_common_ik:[]},rows=[];let rawDelta=0;
    const atRest=solved(semantic,s,t,s.rest);
    assert(atRest.every((b,i)=>dist(b.p,t.rest[i].p)<.0001&&Math.abs(q.dot(b.r,t.rest[i].r))>1-1e-5),'Rest replay');
-   for(const f of c.frames){const l=solved(semantic,s,t,f),ik=withIK(s,t,f,l);variants.retarget.push(l);variants.relative_ik.push(ik.out);rows.push(...ik.metrics);}
+   const refReplay=upfPose(upfCommon,s,t,s.rest,atRest);assert(refReplay.every((b,i)=>Math.abs(q.dot(b.r,upfCommon.ref[i].r))>1-1e-5),'UPF auxiliary reference replay');
+   for(const f of c.frames){const l=solved(semantic,s,t,f),ik=withIK(s,t,f,l),raw=upfPose(upfRaw,s,t,f,l),common=upfPose(upfCommon,s,t,f,l),ci=withIK(s,t,f,common);variants.retarget.push(l);variants.relative_ik.push(ik.out);variants.upf_raw.push(raw);variants.upf_common.push(common);variants.upf_common_ik.push(ci.out);rawDelta=Math.max(rawDelta,...raw.map((b,i)=>1-Math.abs(q.dot(b.r,l[i].r))));rows.push(...ik.metrics);}
    const valid=rows.filter(r=>!r.skipped);
    assert(variants.retarget.every(f=>f.every(b=>[...b.p,...b.r].every(Number.isFinite))));
    result[key][name]={duration:c.duration,variants};
    const motion=(f,i)=>Math.max(...f.map(x=>1-Math.abs(q.dot(x[i].r,f[0][i].r))));
-   summary[key][name]={source:sk,rawLinks,semanticLinks:links,frames:c.frames.length,unmappedTargetBones:t.names.filter(n=>!Object.values(links).some(b=>b.target===n)),ikSamples:valid.length,skipped:rows.length-valid.length,meanBefore:valid.reduce((a,b)=>a+b.before,0)/valid.length,meanAfter:valid.reduce((a,b)=>a+b.after,0)/valid.length,maxProjection:Math.max(...valid.map(r=>r.projection)),maxClamp:Math.max(...valid.map(r=>r.clamp)),armMotion:['upperarm_l','upperarm_r','forearm_l','forearm_r'].map(k=>motion(variants.retarget,t.roles.map[k]))};
+   summary[key][name]={source:sk,rawLinks,semanticLinks:links,upfRawMaxQuatDelta:rawDelta,frames:c.frames.length,unmappedTargetBones:t.names.filter(n=>!Object.values(links).some(b=>b.target===n)),ikSamples:valid.length,skipped:rows.length-valid.length,meanBefore:valid.reduce((a,b)=>a+b.before,0)/valid.length,meanAfter:valid.reduce((a,b)=>a+b.after,0)/valid.length,maxProjection:Math.max(...valid.map(r=>r.projection)),maxClamp:Math.max(...valid.map(r=>r.clamp)),armMotion:['upperarm_l','upperarm_r','forearm_l','forearm_r'].map(k=>motion(variants.retarget,t.roles.map[k]))};
   }
  }
 }
-fs.writeFileSync(dir+'solved.json',JSON.stringify(result));fs.writeFileSync(dir+'comparison.json',JSON.stringify({profiles:summary,scope:'Actual ossos raw mapping coverage vs semantic retarget, relative limb IK trial; no contact or finger certification; ART OPEN'},null,2));
+fs.writeFileSync(dir+'solved.json',JSON.stringify(result));fs.writeFileSync(dir+'comparison.json',JSON.stringify({profiles:summary,scope:'Actual ossos and UPF independent library comparison, shared mapping and auxiliary anatomical reference, relative IK trial; no contact or finger certification; ART OPEN'},null,2));
 console.log('Completed actual source retarget for',Object.keys(result).length,'diagnostic profiles');
