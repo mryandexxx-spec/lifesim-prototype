@@ -1,0 +1,36 @@
+name: CF-ANIM source intake
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  source-inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile and inspect pinned source bytes
+        run: |
+          python -m py_compile tools/cf_anim_source_intake.py tools/cf_anim_source_render.py
+          python tools/cf_anim_source_intake.py
+      - name: Real source animation sequence playback
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+          python -c 'import imageio_ffmpeg, subprocess; subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-version"], check=True)'
+          python tools/cf_anim_source_render.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-source-inventory
+          path: cf-anim-source-report/
+          if-no-files-found: warn
