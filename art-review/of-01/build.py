@@ -105,19 +105,41 @@ def sculpture():
     tube('Counterweight branch',[(.12,.67,0),(.23,.76,-.04),(.26,.85,-.06)],.05,bronze,5,12)
     orb('Bronze counterweight',(.26,.94,-.06),(.24,.24,.24),bronze,20,12)
 def tree():
-    bark=mat('Warm bark','#806348');greens=[mat('Leaf '+str(i),c) for i,c in enumerate(['#567b4d','#709458','#8ba765'])]
-    tube('Tapered trunk',[(0,0,0),(-.035,.42,0),(.015,.86,.025),(-.025,1.30,0),(.02,1.65,.02)],.105,bark,5,12)
+    bark=mat('Warm bark','#806348');greens=[mat('Leaf shade','#537849'),mat('Leaf sun','#769650')]
+    # Curved trunk, flared root collar, five branching stems.
+    lathe('Root collar',(0,0,0),[(0,.13),(.045,.12),(.18,.09),(.28,.085)],bark,16)
+    tube('Curved trunk',[(0,.09,0),(-.035,.42,0),(.015,.86,.025),(-.025,1.30,0),(.02,1.65,.02)],.085,bark,5,12)
     random.seed(1423)
-    crowns=[(0,1.65,0,.53),(-.35,1.50,.10,.36),(.35,1.49,-.12,.37),(.12,1.85,.19,.30),(-.16,1.78,-.24,.34)]
+    crowns=[(0,1.67,0,.50),(-.34,1.53,.10,.33),(.34,1.54,-.12,.35),(.12,1.86,.19,.29),(-.17,1.80,-.24,.31)]
     for j,(x,y,z,r) in enumerate(crowns):
-        if j:tube('Fork '+str(j),[(0,.65,0),(x*.48,1.05,z*.4),(x,y-.08,z)],.052,bark,4)
-        for i in range(7):
-            a=i*2*pi/7+j*.8
-            pos=(x+cos(a)*r*.46,y+random.uniform(-.11,.12),z+sin(a)*r*.46)
-            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=1,location=V(pos));o=bpy.context.object
-            o.scale=(r*.83,r*.77,r*.78)
-            for v in o.data.vertices:v.co*=random.uniform(.89,1.11)
-            finish(o,'Leaf cluster %d.%d'%(j,i),greens[(i+j)%3],True)
+        if j:tube('Fork '+str(j),[(0,.70,0),(x*.48,1.11,z*.4),(x,y-.07,z)],.041,bark,4)
+        # Small smooth shaded interior volumes, concealed by distinct outer foliage.
+        orb('Interior foliage '+str(j),(x,y,z),(r*1.28,r*1.10,r*1.24),greens[0],12,8)
+        for k in range(3):
+            a=2*pi*k/3+j
+            tube('Twig %d.%d'%(j,k),[(x,y-.09,z),(x+r*.45*cos(a),y+.02,z+r*.45*sin(a)),(x+r*.77*cos(a),y+r*.10,z+r*.77*sin(a))],.014,bark,3)
+    # Actual shaped, folded leaf meshes distributed across the outer crown.
+    # Shared two matte leaf materials, no transparent planes or expensive textures.
+    verts=[];faces=[];shade=[]
+    for j,(x,y,z,r) in enumerate(crowns):
+        for k in range(112):
+            a=k*2.3999632297+j*.71; u=1-2*(k+.5)/112
+            s=math.sqrt(1-u*u); n=Vector((s*cos(a),u,s*sin(a)))
+            center=Vector((x,y,z))+Vector((n.x*r*.88,n.y*r*.77,n.z*r*.87))
+            center+=n*random.uniform(-.035,.055)
+            tangent=n.cross(Vector((0,1,0)))
+            if tangent.length<.01:tangent=n.cross(Vector((1,0,0)))
+            tangent.normalize();bit=n.cross(tangent).normalized()
+            angle=random.uniform(-pi,pi);axis=tangent*cos(angle)+bit*sin(angle);side=n.cross(axis)
+            length=random.uniform(.095,.155);width=length*random.uniform(.38,.57)
+            v=[center-axis*length*.5,center-axis*length*.12+side*width*.5,center+axis*length*.5,center+axis*length*.12-side*width*.5,center+n*length*.16]
+            offset=len(verts);verts.extend(V(p) for p in v)
+            faces.extend(tuple(offset+a for a in face) for face in [(0,1,4),(1,2,4),(2,3,4),(3,0,4)])
+            shade.extend([int((n.y+random.uniform(-.6,.6))>.05)]*4)
+    mesh=bpy.data.meshes.new('Folded leaf crown');mesh.from_pydata(verts,[],faces);mesh.update()
+    o=bpy.data.objects.new('Folded leaves',mesh);bpy.context.collection.objects.link(o)
+    for m in greens:o.data.materials.append(m)
+    for poly,k in zip(mesh.polygons,shade):poly.material_index=k
 def ladder():
     steel=mat('Brushed marine stainless','#b5c3c5',.30,.72);grip=mat('Charcoal nonslip','#455b5d',.78)
     for x in (-.18,.18):

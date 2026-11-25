@@ -21,4 +21,5 @@ const light=new pc.Entity('Lamp light');light.addComponent('light',{type:'omni',
 function run(...args){show(...args).catch(e=>{document.querySelector('#status').textContent=String(e);window.labError=String(e)})}
 sku.onchange=()=>run(sku.value,'new');for(const v of ['old','new','donor'])document.querySelector('#'+v).onclick=()=>run(sku.value,v);document.querySelector('#angle').onclick=()=>run(sku.value,version,(angle+1)%3);document.querySelector('#light').onclick=()=>run(sku.value,version,angle,!night);
 async function settle(){app.renderNextFrame=true;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r))));app.render();await new Promise(r=>setTimeout(r,100));}
-window.ofLab={show,data,app,visibility:async visible=>{root.enabled=visible;await settle();}};resize();run();
+async function framebuffer(){return new Promise(resolve=>{app.once('postrender',()=>resolve(canvas.toDataURL('image/png')));app.renderNextFrame=true;});}
+window.ofLab={show,data,app,framebuffer,visibility:async visible=>{root.enabled=visible;await settle();}};resize();run();
