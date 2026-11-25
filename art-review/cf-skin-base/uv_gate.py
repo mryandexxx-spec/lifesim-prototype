@@ -42,19 +42,50 @@ def tri_area(v,tri):
     if v.shape[1]==3:return np.linalg.norm(np.cross(b-a,c-a),axis=1)*.5
     return np.abs((b[:,0]-a[:,0])*(c[:,1]-a[:,1])-(b[:,1]-a[:,1])*(c[:,0]-a[:,0]))*.5
 def corner_map(raw,faces,fuv):
+    # Allow only a proven local diagonal flip of the same four vertex IDs
+    # with continuous corner UV on the vendor pair.
     lookup={}
     for f,u in zip(faces,fuv):
         k=tuple(sorted(f.tolist()))
         assert k not in lookup,('duplicate native triangle',k)
         lookup[k]=dict(zip(f.tolist(),u.tolist()))
     assert len(lookup)==len(raw)
-    out=[]
-    for f in raw:
-        k=tuple(sorted(f.tolist())); assert k in lookup,('native face mismatch',k)
-        entry=lookup.pop(k)
-        out.append([entry[int(v)] for v in f])
-    assert not lookup
-    return np.asarray(out,dtype=np.int32)
+    direct={}; missing={}
+    for idx,f in enumerate(raw):
+        k=tuple(sorted(f.tolist()))
+        if k in lookup:direct[idx]=lookup.pop(k)
+        else:missing[idx]=k
+    print('direct triangle matches',len(direct),'unmatched raw/native',len(missing),len(lookup),flush=True)
+    assert len(missing)==len(lookup)
+    def quads(items):
+        from collections import defaultdict
+        edges=defaultdict(list)
+        for k,tri in items.items():
+            for a,b in itertools.combinations(tri,2):edges[tuple(sorted((a,b)))].append(k)
+        out=defaultdict(list)
+        for edge,pair in edges.items():
+            if len(pair)!=2:continue
+            u=tuple(sorted(set(items[pair[0]])|set(items[pair[1]])))
+            if len(u)==4:out[u].append((edge,pair))
+        return out
+    qraw=quads(missing); qnative=quads({k:k for k in lookup})
+    pending=set(missing); used=set(); flips=[]
+    for quad,rawpairs in qraw.items():
+        opts=[(re,rp,ne,npair) for re,rp in rawpairs for ne,npair in qnative.get(quad,[]) if set(re).isdisjoint(ne)]
+        if len(opts)!=1:continue
+        re,rp,ne,npair=opts[0]
+        if not all(i in pending for i in rp) or any(i in used for i in npair):continue
+        a,b=(lookup[x] for x in npair)
+        common=set(a)&set(b)
+        assert len(common)==2 and all(np.array_equal(uv[a[x]],uv[b[x]]) for x in common),('diagonal crosses UV seam',quad)
+        combined={**a,**b}; assert set(combined)==set(quad)
+        for i in rp:direct[i]=combined;pending.remove(i)
+        used.update(npair);flips.append({'vertices':quad,'raw_diagonal':re,'native_diagonal':ne})
+    print('proven diagonal flips',len(flips),'unresolved raw/native',len(pending),len(lookup)-len(used),flush=True)
+    if pending or len(used)!=len(lookup):
+        (ROOT/'unresolved-topology.json').write_text(json.dumps({'raw':[missing[i] for i in sorted(pending)],'native':[k for k in lookup if k not in used],'proven_flips':flips},indent=2))
+        raise AssertionError('Unresolved indexed topology; no UV inference allowed')
+    return np.asarray([[direct[i][int(v)] for v in f] for i,f in enumerate(raw)],dtype=np.int32),flips
 torch.set_num_threads(2)
 model=anny.Anny(topology='anny',rig='anny',local_changes='default',facial_actions='all').to(device='cpu',dtype=torch.float32)
 def npy(x):return x.detach().cpu().numpy() if hasattr(x,'detach') else np.asarray(x)
@@ -93,7 +124,7 @@ for sex,pin in PINS.items():
     pos=acc(j,b,prim['attributes']['POSITION'])
     assert pos.shape==(13718,3) and raw.shape==(27420,3)
     assert sha(raw.astype('<i8').tobytes())=='72a1d21fc87e04b194835769265008a4bcac5fdb5a1b1be4846d850960c5bca1'
-    mapped=corner_map(raw,faces,fuv)
+    mapped,flips=corner_map(raw,faces,fuv)
     # glTF uses top-left image coordinates; native Anny has bottom-left origin.
     top=uv.copy(); top[:,1]=1-top[:,1]
     pairs=np.stack([raw.ravel(),mapped.ravel()],axis=1)
@@ -148,7 +179,7 @@ for sex,pin in PINS.items():
     for t,qt in zip(prim['targets'],qp['targets']):
         for a,i in t.items():assert np.array_equal(acc(k,z,qt[a]),acc(j,b,i)[src]),a
     np.savez_compressed(ROOT/f'{sex}-uv-map.npz',source_vertex=src,source_uv=uidx,corner_uv=mapped,raw_faces=raw,export_faces=newtri,uv=tex)
-    report['sexes'][sex]={'source_sha':pin,'source_attributes':list(prim['attributes']),'vertices_before':len(pos),'vertices_after':len(src),'triangles':len(raw),'degenerate_uv_triangles':deg,'covered_pixels':int((coverage>0).sum()),'overlap_pixels':int((coverage>1).sum()),'region_counts':counts,'unclassified_faces':len(raw)-sum(counts.values()),'stress_area_ratio':stress,'corner_mapping_sha':sha(mapped.astype('<i4').tobytes()),'all_original_fields_exact_after_remap':True,'checker_sha':sha(dst.read_bytes())}
+    report['sexes'][sex]={'source_sha':pin,'source_attributes':list(prim['attributes']),'proven_diagonal_flips':flips,'vertices_before':len(pos),'vertices_after':len(src),'triangles':len(raw),'degenerate_uv_triangles':deg,'covered_pixels':int((coverage>0).sum()),'overlap_pixels':int((coverage>1).sum()),'region_counts':counts,'unclassified_faces':len(raw)-sum(counts.values()),'stress_area_ratio':stress,'corner_mapping_sha':sha(mapped.astype('<i4').tobytes()),'all_original_fields_exact_after_remap':True,'checker_sha':sha(dst.read_bytes())}
     save_report()
     # Real Blender evidence from the exported diagnostic GLB, not a generated illustration.
     bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.import_scene.gltf(filepath=str(dst.resolve()))
