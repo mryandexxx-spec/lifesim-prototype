@@ -57,3 +57,9 @@ test('PF-10/B contextual recovery across every topic and high charisma is not gu
  root.relationship.views.mira.trust=0;root.relationship.views.mira.tension=100;
  assert.equal(evaluateResponse(root,'alex','career','career.deep').accepted,false);
 });
+
+test('PF-10/B save validation rejects forged follow-up branches, preserves historical pilot',()=>{
+ assert.equal(restoreConversation({topic:'career',phase:'response',turns:[{id:'career.repair',accepted:true}],score:3}),null);
+ assert.equal(restoreConversation({topic:'career',phase:'response',turns:[{id:'career.ask',accepted:true},{id:'career.repair',accepted:true}],score:6}),null);
+ assert.ok(restoreConversation({topic:'daily',phase:'response',turns:[{id:'daily.inspire',accepted:true}],score:3}));
+});

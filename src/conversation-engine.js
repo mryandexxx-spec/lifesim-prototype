@@ -183,6 +183,8 @@ export function restoreConversation(raw){
   for(const turn of raw.turns){
     if(!isRecord(turn)||!inTopic(raw.topic,turn.id)||seen.has(turn.id)||
       typeof turn.accepted!=='boolean')return null;
+    const branch=act(turn.id).branch;
+    if(branch&&branch!=='any'&&(!turns.length||(branch==='accepted')!==turns.at(-1).accepted))return null;
     turns.push({id:turn.id,accepted:turn.accepted});seen.add(turn.id);
   }
   if((raw.phase==='opening'&&turns.length!==0)||
