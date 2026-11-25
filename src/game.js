@@ -58,7 +58,7 @@ import {POOL_FIXTURE_PRICES,poolHasExit} from './pool-equipment.js';
 import {previewPoolTiles,previewPoolFixture,previewRotatedPoolFixture,previewPoolHistory,
   poolEditorSnapshot,commitPoolPreviewPersisted} from './pool-editor.js';
 import {createPoolVisual,poolFixtureVisualPose} from './pool-visual.js';
-import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,
+import {outdoorBench,outdoorBenchApproach,outdoorBenchPose,outdoorBenchSurface,
   outdoorBenchAvailable,outdoorLightFactor,OUTDOOR_LIGHT_LIMIT} from './outdoor-interactions.js';
 import {GRILL_RECIPES,grillRecipe,grillApproach,grillAvailable,
   canGrillRecipe,chooseOutdoorDining} from './grill-r1.js';
@@ -4324,7 +4324,7 @@ function boot() {
   const animationStates={alex:createAnimationState(),mira:createAnimationState()};
   const sofaStates={alex:createSofaTransition(),mira:createSofaTransition()};
   const benchVisualTargets={alex:null,mira:null};
-  if(furnitureVisualMode==='qa')window.__LifeSimOutdoorSeatQA=()=>({progress:sofaStates.alex.progress,target:benchVisualTargets.alex,action:game.action?.id});
+  if(furnitureVisualMode==='qa')window.__LifeSimOutdoorSeatQA=(id='alex')=>({progress:sofaStates[id].progress,target:benchVisualTargets[id],action:getActor(game,id).action?.id,position:{...(id==='alex'?display:miraDisplay)}});
   // F4F.1: entirely cosmetic chair draw-out. Keep the selected table/seat
   // through the reverse stand-up animation, but never persist a moved chair.
   const diningVisual={alex:null,mira:null};
@@ -9822,7 +9822,8 @@ function boot() {
       paintingFrame:miraUseId==='paint'?{phase:'using',elapsed:game.otherSim.action?.elapsed||0}:null,
       sofaBusy:sofaStates.mira.progress>0,
       sofaWeight:miraSeatPose.sofaWeight,
-      seat:miraMeshSeatId&&meshyFurniture.hasModel(decorNodes.get(miraMeshSeatId))?miraSupport:null,
+      seat:gardenMiraPose&&seatContactEnabled?outdoorBenchSurface(game.world,benchVisualTargets.mira):
+        miraMeshSeatId&&meshyFurniture.hasModel(decorNodes.get(miraMeshSeatId))?miraSupport:null,
       bedBusy:bedStates.mira.progress>0,
       bedFrame:miraBedPose,
       platformBed:miraBedding&&meshyFurniture.hasModel(decorNodes.get(bedVisualTargets.mira)),
@@ -9874,7 +9875,7 @@ function boot() {
       paintingFrame:useId==='paint'?{phase:'using',elapsed:game.action?.elapsed||0}:null,
       sofaBusy:sofaStates.alex.progress>0,
       sofaWeight:seatPose.sofaWeight,
-      seat:seatContactEnabled?(alexDiningVisual&&
+      seat:seatContactEnabled?(gardenSeatPose?outdoorBenchSurface(game.world,benchVisualTargets.alex):alexDiningVisual&&
         alexDiningVisual.chairId===sofaVisualTargets.alex
         ?purchasedDiningSeatSurface(game.world,alexDiningVisual.chairId,
           diningChairPullOffset(sofaStates.alex.progress,alexDiningVisual.maxPull))

@@ -10,15 +10,15 @@ import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 import {outdoorBenchApproach} from '../src/outdoor-interactions.js';
 import {grillApproach} from '../src/grill-r1.js';
 const out='artifacts/of-d';mkdirSync(out,{recursive:true});const ids=Object.keys(OF_OUTDOOR_ASSETS),report=[];
-function fixture(night,active){const seed=newHousehold('2026-11-25');seed.minutes=6*1440+(night?0:720);seed.otherSim.minutes=seed.minutes;seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
+function fixture(night,active,swap=false){const seed=newHousehold('2026-11-25');seed.minutes=6*1440+(night?0:720);seed.otherSim.minutes=seed.minutes;seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
  const features=ids.map((sku,i)=>({instanceId:'out-'+(i+1),itemId:sku,x:15.5+i%4*2,z:-5+Math.floor(i/4)*2.5,yaw:i%4*90,purchasePriceCredits:OUTDOOR_CATALOG[sku].price}));
  seed.world.outdoors={...seed.world.outdoors,features,nextId:features.length+1};assert.deepEqual(restoreOutdoorsWorld(seed.world.outdoors,seed.world.construction).features,features);
- if(active){const bench=features[0],grill=features[2];seed.position=outdoorBenchApproach(seed.world,bench.instanceId);seed.action={id:'bench',phase:'using',elapsed:3,automatic:false,targetInstanceId:bench.instanceId};seed.otherSim.position=grillApproach(seed.world,grill.instanceId);seed.otherSim.action={id:'grill',phase:'using',elapsed:3,automatic:false,targetInstanceId:grill.instanceId,recipeId:'grill.vegetables',grillStage:'cooking'};const r=loadHousehold(structuredClone(seed));assert.equal(r.action?.id,'bench');assert.equal(r.otherSim.action?.id,'grill');}
+ if(active){const bench=features[0],grill=features[2];seed.position=outdoorBenchApproach(seed.world,bench.instanceId);seed.action={id:'bench',phase:'using',elapsed:3,automatic:false,targetInstanceId:bench.instanceId};seed.otherSim.position=grillApproach(seed.world,grill.instanceId);seed.otherSim.action={id:'grill',phase:'using',elapsed:3,automatic:false,targetInstanceId:grill.instanceId,recipeId:'grill.vegetables',grillStage:'cooking'};if(swap){[seed.position,seed.otherSim.position]=[seed.otherSim.position,seed.position];[seed.action,seed.otherSim.action]=[seed.otherSim.action,seed.action];}const r=loadHousehold(structuredClone(seed));assert.equal(r.action?.id,swap?'grill':'bench');assert.equal(r.otherSim.action?.id,swap?'bench':'grill');}
  return {seed,features};}
 for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
  const b=await engine.launch(name==='chromium'?{headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']}:{headless:true});
  try{for(const [width,height] of [[390,844],[320,568]])for(const night of [false,true]){
-  const {seed,features}=fixture(night,night);const ctx=await b.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
+  const swap=width===320,seatId=swap?'mira':'alex',grillId=swap?'alex':'mira';const {seed,features}=fixture(night,night,swap);const ctx=await b.newContext({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block'});
   try{await ctx.addInitScript(({key,tour,seed})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');},{key:SAVE_KEY,tour:UI_TOUR_STORAGE_KEY,seed});
    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));
    const url='http://127.0.0.1:8765/?furniture=qa&garden-start-paused=1';
@@ -43,13 +43,13 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    const label=name+'-'+width+'-'+(night?'night':'day');store(label+'-lot',await capture(null));
    if(night){
     const savedActors=await page.evaluate(()=>window.__LifeSimGardenSessionQA().actors);
-    assert.equal(savedActors.alex.action?.id,'bench');assert.equal(savedActors.mira.action?.id,'grill');
+    assert.equal(savedActors[seatId].action?.id,'bench');assert.equal(savedActors[grillId].action?.id,'grill');
     for(const [id,p] of [['alex',seed.position],['mira',seed.otherSim.position]])assert.ok(Math.hypot(savedActors[id].position.x-p.x,savedActors[id].position.z-p.z)<.45,'loaded outdoor contact '+id);
     await page.locator('#pause-btn').click();
     await page.waitForFunction(async()=>{const {Application}=await import('playcanvas');const g=Application.getApplication().root.findByName('LOT-B2 out-3 garden.grill');return g.children.filter(n=>n.name==='GRILL-R1 animated skewer').some(n=>Math.abs(n.getLocalEulerAngles().x)>4);},null,{timeout:15000});
-    await page.waitForFunction(()=>{const s=window.__LifeSimOutdoorSeatQA?.();return s?.target==='out-1'&&s.action==='bench'&&s.progress>=.999;},null,{timeout:30000});
+    await page.waitForFunction(id=>{const s=window.__LifeSimOutdoorSeatQA?.(id);return s?.target==='out-1'&&s.action==='bench'&&s.progress>=.999&&Math.abs(s.position.y-(-.53-.225+.64-.35))<.02;},seatId,{timeout:30000});
     await page.locator('#pause-btn').click();
-    const seated=await page.evaluate(()=>window.__LifeSimOutdoorSeatQA());assert.ok(seated.progress>=.999);s.seated=seated;
+    const seated=await page.evaluate(id=>window.__LifeSimOutdoorSeatQA(id),seatId);assert.ok(seated.progress>=.999);s.seated={...seated,resident:seatId};
     store(label+'-active-bench',await capture({...features[0],inPlace:true}));
     store(label+'-active-grill',await capture({...features[2],inPlace:true}));
    }

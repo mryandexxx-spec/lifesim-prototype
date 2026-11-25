@@ -2,6 +2,8 @@ import test from 'node:test';import assert from 'node:assert/strict';import {rea
 import {OF_OUTDOOR_ASSETS,outdoorModelSpec} from '../src/of-outdoor-assets.js';
 import {OUTDOOR_CATALOG} from '../src/outdoor-catalog.js';
 import {createOutdoorFurnitureVisual} from '../src/of-outdoor-visual.js';
+import {outdoorBenchSurface,outdoorBenchPose,OUTDOOR_BENCH_SEAT_HEIGHT} from '../src/outdoor-interactions.js';
+import {SOFA_LAYOUT,SOFA_POSE} from '../src/pose-config.js';
 const ids=['garden.bench','garden.table','garden.grill','light.path','light.standing','fence.wood','hedge.short'];
 function vertices(bytes,j,material){const p=[];for(const mesh of j.meshes)for(const prim of mesh.primitives){if(material&&j.materials[prim.material]?.name!==material)continue;const a=j.accessors[prim.attributes.POSITION],v=j.bufferViews[a.bufferView],start=20+bytes.readUInt32LE(12)+8+(v.byteOffset||0)+(a.byteOffset||0);assert.equal(a.componentType,5126);assert.equal(a.type,'VEC3');for(let i=0;i<a.count;i++){const offset=start+i*(v.byteStride||12);p.push([0,4,8].map(d=>bytes.readFloatLE(offset+d)));}}return p;}
 test('OF-D approved GLB bytes, native ground, real seats, grate and lamp contact vertices',()=>{
@@ -9,7 +11,7 @@ test('OF-D approved GLB bytes, native ground, real seats, grate and lamp contact
  for(const [sku,v] of Object.entries(OF_OUTDOOR_ASSETS)){
   assert.ok(OUTDOOR_CATALOG[sku]);const b=readFileSync('assets/furniture/of-r2/'+sku+'-new.glb');assert.equal(b.length,v.bytes);assert.equal(createHash('sha256').update(b).digest('hex'),v.sha256);assert.equal(b.toString('ascii',0,4),'glTF');assert.equal(b.readUInt32LE(8),b.length);
   const j=JSON.parse(b.toString('utf8',20,20+b.readUInt32LE(12)));assert.ok(j.meshes.length);const p=vertices(b,j);assert.ok(p.length>0&&p.every(x=>x.every(Number.isFinite)));assert.ok(Math.min(...p.map(x=>x[1]))>=-.002);assert.ok(Math.min(...p.map(x=>x[1]))<.025);
-  if(sku==='garden.bench'){const seat=vertices(b,j,'Honey oak').filter(x=>Math.abs(x[1]-.64)<.001&&Math.abs(x[2])<.315);assert.ok(seat.length>=6);assert.ok(Math.max(...seat.map(x=>x[0]))>.7);assert.ok(Math.min(...seat.map(x=>x[0]))<-.7);}
+  if(sku==='garden.bench'){const seat=vertices(b,j,'Honey oak').filter(x=>Math.abs(x[1]-OUTDOOR_BENCH_SEAT_HEIGHT)<.001&&Math.abs(x[2])<.315);assert.ok(seat.length>=6);assert.ok(Math.max(...seat.map(x=>x[0]))>.7);assert.ok(Math.min(...seat.map(x=>x[0]))<-.7);}
   if(sku==='garden.grill'){const grate=vertices(b,j,'Steel');assert.ok(grate.length>0);assert.ok(Math.abs(Math.max(...grate.map(x=>x[1]))-1.0375)<.002);}
   if(sku.startsWith('light.')){const lens=vertices(b,j,'Warm opal');assert.ok(lens.length>0);const y=lens.map(x=>x[1]),h=sku==='light.standing'?2.35:1.06;assert.ok(Math.min(...y)<h+.09&&Math.max(...y)>h+.09);}
  }
@@ -26,4 +28,8 @@ test('OF-D atomic replacement retains moving overlays, fallback on failed load o
 test('OF-D emitter budget, shared material isolation and glow lifecycle',async()=>{
  const f=fixture();let updates=0,disposals=0;const source={name:'Warm opal',emissiveIntensity:0,clone(){return {name:this.name,update(){updates++},destroy(){disposals++}}}};const mesh={material:source};f.pc.Color=class{};f.pivot.findComponents=()=>[{meshInstances:[mesh]}];const base=f.node.findComponents;f.node.findComponents=type=>type==='light'?[{}]:base();const v=createOutdoorFurnitureVisual(f);v.setBrightness(1);v.attach(f.node,'light.path');f.resolve();await flush();assert.notEqual(mesh.material,source);assert.equal(mesh.material.emissiveIntensity,1.25);assert.equal(source.emissiveIntensity,0);v.setBrightness(0);assert.equal(mesh.material.emissiveIntensity,0);v.setBrightness(0);assert.equal(updates,2);f.events.destroy();assert.equal(disposals,1);
  const n=fixture();const mesh2={material:source};n.pivot.findComponents=()=>[{meshInstances:[mesh2]}];const find=n.node.findComponents;n.node.findComponents=t=>t==='light'?[]:find();const off=createOutdoorFurnitureVisual(n);off.setBrightness(1);off.attach(n.node,'light.path');n.resolve();await flush();assert.equal(mesh2.material,source);assert.equal(off.stats().objects[0].glow,null);
+});
+
+test('OF-D outdoor seating uses physical slat contact, lot floor and rotated front for both renderers',()=>{
+ for(const yaw of [0,90,180,270]){const world={outdoors:{features:[{instanceId:'out-1',itemId:'garden.bench',x:19,z:8,yaw}]}};const seat=outdoorBenchSurface(world,'out-1'),pose=outdoorBenchPose(world,'out-1',1),free=outdoorBenchPose(world,'out-1',0);assert.ok(Math.abs(seat.contact.y-seat.floorY-OUTDOOR_BENCH_SEAT_HEIGHT)<1e-9);assert.equal(pose.yaw,seat.yaw);assert.equal(free.y,seat.floorY);assert.ok(Math.abs(pose.y-seat.floorY-SOFA_POSE.y-(OUTDOOR_BENCH_SEAT_HEIGHT-SOFA_LAYOUT.seatCenterY-SOFA_LAYOUT.seatHeight/2))<1e-9);assert.ok(Math.hypot(seat.approach.x-free.x,seat.approach.z-free.z)<.001);}
 });
