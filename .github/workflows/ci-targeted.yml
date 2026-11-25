@@ -8,6 +8,177 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-reset-c-lab-package:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-reset-c-fix-probe' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-reset-c-native-probe
+          path: verified-native
+          run-id: 45563179091
+          github-token: ${{ github.token }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          python -m pip install playwright==1.56.0 pillow numpy
+          python -m playwright install --with-deps chromium webkit
+      - run: python art-review/cf-reset-c-fix/package-lab.py
+      - name: Test the exact isolated static package
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+        run: |
+          python -m http.server 8765 --directory reset-fix-site > /tmp/reset-c-fix-http.log 2>&1 &
+          server=$!
+          trap 'kill "$server" || true' EXIT
+          xvfb-run -a python art-review/cf-reset-c-fix/smoke-lab.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-reset-c-fix-lab-qa
+          path: |
+            reset-fix-site/
+            reset-fix-smoke/
+          retention-days: 90
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cf-reset-c-fix-verified-source
+          path: verified-native/
+          retention-days: 90
+      - name: Preserve tested static candidate on isolated distribution ref
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          export GIT_INDEX_FILE="$RUNNER_TEMP/reset-fix-site-index"
+          git --work-tree="$PWD/reset-fix-site" add -A
+          tree=$(git write-tree)
+          commit=$(printf 'RESET-C-FIX tested isolated lab; source run 45563179091\n' | git commit-tree "$tree")
+          git ls-tree --name-only "$commit"
+          git push origin "$commit:refs/heads/art/cf-reset-c-fix-lab"
+          echo "LAB_COMMIT=$commit"
+  cf-reset-c-native:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-reset-c-fix-probe' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install 'anny @ git+https://github.com/naver/anny.git@8f35dc2df1c4062fd2fae86734f9705de50c0c2b' bpy==4.5.0 scipy==1.15.3
+          python -c 'import bpy,torch,anny; assert bpy.app.version==(4,5,0); assert torch.version.cuda is None'
+      - run: python art-review/cf-reset-c-fix/native-probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-reset-c-native-probe
+          path: reset-fix/
+          retention-days: 2
+          if-no-files-found: warn
+  cf-reset-c-browser:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-reset-c-fix-probe' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          python -m pip install playwright==1.56.0 pillow numpy
+          python -m playwright install --with-deps chromium webkit
+      - name: Inspect real public slider response
+        run: |
+          mkdir -p browser
+          python - <<'PY'
+          import asyncio, json, pathlib, numpy as np, re, urllib.request, urllib.parse, base64
+          from PIL import Image
+          from playwright.async_api import async_playwright
+          base='https://lifesim-cf-body-reset-c-lab.vercel.app/'
+          root=pathlib.Path('browser')
+          html=urllib.request.urlopen(base,timeout=20).read().decode()
+          (root/'index.html').write_text(html)
+          print('public HTML:',html[:20000])
+          for i,p in enumerate(re.findall(r'<script[^>]+src=["\x27]([^"\x27]+)',html,re.I)):
+              u=urllib.parse.urljoin(base,p)
+              if urllib.parse.urlsplit(u).netloc==urllib.parse.urlsplit(base).netloc:
+                  s=urllib.request.urlopen(u,timeout=20).read()
+                  if len(s)<500000: (root/f'script-{i}.js').write_bytes(s); print('script',p,s.decode(errors='replace')[:16000])
+          def diff(a,b):
+              x=np.asarray(Image.open(a).convert('RGB'),dtype=np.int16); y=np.asarray(Image.open(b).convert('RGB'),dtype=np.int16)
+              return dict(mean=float(np.abs(x-y).mean()),changed_fraction=float(np.any(np.abs(x-y)>8,axis=2).mean()))
+          async def instrument(route):
+              res=await route.fetch()
+              js=await res.text()
+              assert 'window.labState=' in js
+              js=js.replace('window.labState=', 'window.actualWeights=instances.map(mi=>Object.fromEntries(mi.morph.targets.map((t,i)=>[t.name,mi.getWeight(i)])));window.labState=')
+              await route.fulfill(response=res,body=js)
+          async def run():
+              report={}
+              async with async_playwright() as p:
+                  for engine in ['chromium','webkit']:
+                      browser=await getattr(p,engine).launch(headless=True,args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] if engine=='chromium' else [])
+                      page=await browser.new_page(viewport={'width':390,'height':844},device_scale_factor=1,is_mobile=True,has_touch=True)
+                      errors=[]
+                      page.on('pageerror',lambda error:errors.append(str(error)))
+                      await page.route('**/lab.js', lambda route: instrument(route))
+                      await page.goto(base,wait_until='networkidle',timeout=60000)
+                      await page.wait_for_function("window.labState?.ready === true",timeout=30000)
+                      await page.locator('canvas').first.wait_for(timeout=30000)
+                      await page.wait_for_timeout(2000)
+                      ranges=page.locator('input[type=range]')
+                      n=await ranges.count()
+                      assert n>=5,(n,await page.locator('body').inner_text())
+                      result=[]
+                      for i in range(n):
+                          slider=ranges.nth(i)
+                          info=await slider.evaluate("(e)=>({id:e.id,min:e.min,max:e.max,initial:e.value,html:e.outerHTML})")
+                          shots=[]
+                          states=[]
+                          for side in ['min','max']:
+                              await slider.evaluate("(e,s)=>{e.value=e[s];e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}",side)
+                              await page.wait_for_timeout(400)
+                              file=root/f'{engine}-{i}-{side}.png'
+                              state=await page.evaluate("()=>({state:window.labState,actual:window.actualWeights})")
+                              assert state['state']['ready'] and state['actual']
+                              key=info['id'][2:]+'_'+('neg' if side=='min' else 'pos')
+                              for weights in state['actual']:
+                                  assert abs(weights[key]-1)<1e-6,(engine,key,weights)
+                                  assert all(abs(v)<1e-6 for k,v in weights.items() if k!=key)
+                              states.append(state)
+                              # Direct WebGL framebuffer capture: distinguish blank screenshot from no morph.
+                              data=await page.locator('canvas').first.evaluate("(c)=>c.toDataURL('image/png')")
+                              file.write_bytes(base64.b64decode(data.split(',')[1]))
+                              shots.append(file)
+                          await slider.evaluate("(e,v)=>{e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}",info['initial'])
+                          result.append({'slider':info,'canvas_diff':diff(*shots),'states':states,'frame_std':[float(np.asarray(Image.open(f).convert('RGB')).std(axis=(0,1)).mean()) for f in shots]})
+                      report[engine]={'sliders':result,'errors':errors}
+                      await browser.close()
+              (root/'report.json').write_text(json.dumps(report,indent=2))
+              print(json.dumps(report))
+          asyncio.run(run())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-reset-c-browser-probe
+          path: browser/
+          retention-days: 2
+          if-no-files-found: warn
   cf-cpu-portability:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/cf-infra-01-cpu-pilot' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/cf-cpu-portability.yml
