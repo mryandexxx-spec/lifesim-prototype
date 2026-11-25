@@ -8,6 +8,12 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-body-d:
+    if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-d' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/cf-body-d.yml
   cf-body-c-opt:
     if: github.event_name == 'pull_request' && github.head_ref == 'art/cf-body-c-opt' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
