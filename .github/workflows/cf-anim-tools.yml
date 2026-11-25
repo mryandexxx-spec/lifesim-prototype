@@ -23,6 +23,12 @@ jobs:
           ref: d1325d878f4875d0eafe42f8861a853263d57081
           path: upstream-ossos
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: upf-gti/retargeting-threejs
+          ref: 82f1b8218813547224dd96df1638c950d241824d
+          path: upstream-upf
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: cf-body-d-tools-full-rig
@@ -44,8 +50,11 @@ jobs:
           python tools/cf_anim_tools.py prepare
       - name: Run unmodified upstream retarget and relative limb solver
         run: |
-          npm install --prefix .anim-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12
+          npm install --prefix .anim-deps --ignore-scripts --no-audit --no-fund --save-exact gl-matrix@3.4.3 esbuild@0.25.12 three@0.166.1
           ln -s "$PWD/.anim-deps/node_modules" upstream-ossos/node_modules
+          test "$(git -C upstream-upf rev-parse HEAD)" = 82f1b8218813547224dd96df1638c950d241824d
+          ln -s "$PWD/.anim-deps/node_modules" upstream-upf/node_modules
+          cp upstream-upf/LICENSE anim-tools-out/upf-LICENSE
           cp tools/cf_anim_tools.mjs upstream-ossos/anim-tools.mjs
           .anim-deps/node_modules/.bin/esbuild upstream-ossos/anim-tools.mjs --bundle --platform=node --target=node22 --format=esm --outfile=anim-tools-bundle.mjs
           cp upstream-ossos/LICENSE anim-tools-out/ossos-LICENSE
