@@ -10,7 +10,7 @@ const input=JSON.parse(fs.readFileSync('anim-tools-out/input.json'));
 const dir='anim-tools-out/';
 const I=[0,0,0,1],add=(a,b)=>v.add([],a,b),sub=(a,b)=>v.sub([],a,b),mul=(a,k)=>v.scale([],a,k),norm=a=>v.normalize([],a),cross=(a,b)=>v.cross([],a,b),rot=(a,b)=>v.transformQuat([],a,b),qr=(a,b)=>q.mul([],a,b),inv=a=>q.invert([],a),dist=v.distance,len=v.length,dot=v.dot;
 const required=['hip','head','upperarm_l','upperarm_r','forearm_l','forearm_r','hand_l','hand_r','thigh_l','thigh_r','shin_l','shin_r','foot_l','foot_r'];
-function roles(names){
+function roles(names,parents){
  const candidates={};
  for(const [i,raw] of names.entries()){
   let a=raw.toLowerCase().split(':').at(-1),side=/left|[._-]l$/.test(a)?'l':/right|[._-]r$/.test(a)?'r':'';
@@ -18,7 +18,7 @@ function roles(names){
   if(/twist|roll|end|tip|helper|ik|target/.test(n))continue;
   let k=null,rank=0;
   if(side){
-   if(/^(clavicle|collar|shoulder)(01|1)?$/.test(n))k='shoulder';
+   if(/^(clavicle|collar)(01|1)?$/.test(n))k='shoulder';
    else if(/^(upperarm|arm)(01|1)?$/.test(n))k='upperarm';
    else if(/^(lowerarm|forearm)(01|1)?$/.test(n))k='forearm';
    else if(/^(wrist|hand)(01|1)?$/.test(n))k='hand';
@@ -35,6 +35,14 @@ function roles(names){
   if(k)(candidates[k]??=[]).push({i,raw,rank});
  }
  const map={};for(const [k,c] of Object.entries(candidates))if(c.length===1)map[k]=c[0].i;
+ // Native D skeleton has a central pelvis at root, with bilateral pelvis branches and lumbar branch.
+ // UAL has an independent ground root and a central pelvis child. Validate topology, not name guesses.
+ if(map.hip===undefined){
+  const root=names.indexOf('root'),left=names.indexOf('pelvis.L'),right=names.indexOf('pelvis.R'),lumbar=names.indexOf('spine05');
+  if(root>=0&&parents[root]===-1&&[left,right,lumbar].every(i=>i>=0&&parents[i]===root)){
+   map.hip=root;candidates.hip=[{i:root,raw:names[root],evidence:'common parent of left/right pelvis and lumbar chain'}];
+  }
+ }
  return {map,candidates,missing:required.filter(k=>map[k]===undefined)};
 }
 function alias(r){return r.names.map((_,i)=>{
@@ -89,7 +97,7 @@ function withIK(s,t,f,l){
  }
  return {out,metrics};
 }
-const all=[...Object.values(input.sources),...Object.values(input.targets)];for(const r of all)r.roles=roles(r.names);
+const all=[...Object.values(input.sources),...Object.values(input.targets)];for(const r of all)r.roles=roles(r.names,r.parents);
 const inventory={sources:Object.fromEntries(Object.entries(input.sources).map(([k,r])=>[k,r.roles])),targets:Object.fromEntries(Object.entries(input.targets).map(([k,r])=>[k,r.roles]))};
 fs.writeFileSync(dir+'semantic-inventory.json',JSON.stringify(inventory,null,2));
 assert(all.every(r=>r.roles.missing.length===0),'Unmapped or ambiguous required semantic role; inspect inventory, no guessed matches.');
