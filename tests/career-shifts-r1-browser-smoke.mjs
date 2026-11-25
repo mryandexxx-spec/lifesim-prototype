@@ -76,3 +76,6 @@ try{
   }
   console.log('CAREER-SHIFTS-R1 PlayCanvas/WebGL 390x844 + 320x568 phone, calendar and save PASS; real Safari QA deferred');
 }finally {await browser.close();}
+
+// Reuse the existing career mobile CI route; no shared workflow changes.
+await import('./pf-09a-browser-smoke.mjs');
