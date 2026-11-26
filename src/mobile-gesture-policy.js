@@ -33,7 +33,7 @@ export function installWorldClickOwnership(root,canvas){
   const clear=()=>{owner=null;};
   const down=event=>{
     if(event.isPrimary===false)return;
-    owner=event.isTrusted&&event.button===0&&event.target===canvas
+    owner=event.isTrusted&&(event.pointerType==='touch'||event.button===0)&&event.target===canvas
       ?{id:event.pointerId,released:false}:null;
   };
   const up=event=>{
@@ -54,7 +54,11 @@ export function installWorldClickOwnership(root,canvas){
     event.stopImmediatePropagation();
   };
   const visibility=()=>{if(doc.hidden)clear();};
-  const handlers={pointerdown:down,pointerup:up,pointercancel:cancel,click,blur:clear};
+  // A capture listener on window also receives descendant blur when a UI
+  // button loses focus during the canvas tap. Only actual window blur
+  // ends the gesture; focus moving between controls must not retire it.
+  const blur=event=>{if(event.target===host)clear();};
+  const handlers={pointerdown:down,pointerup:up,pointercancel:cancel,click,blur};
   // Window capture runs before both the world pointerup dispatcher and any
   // document/DOM click listeners, including parcel capture handlers.
   for(const [type,fn] of Object.entries(handlers))host.addEventListener(type,fn,true);
