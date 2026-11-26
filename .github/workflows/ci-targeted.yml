@@ -8,6 +8,27 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-interact-01a:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Actual GLB seating geometry and existing shared anchors
+        run: |
+          node --test tests/cf-interact-01a.test.js tests/interaction-anchors.test.js tests/of-integration-d.test.js tests/lot-b3.test.js
+          node --input-type=module -e "import {runProbe} from './tools/cf-interact-geometry.mjs'; runProbe()"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01a-evidence
+          path: artifacts/cf-interact-01a/
+          if-no-files-found: warn
   pf-14-garden-care:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-14-garden-care' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
