@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import {contextualPlacement} from '../src/ui-layout.js';
 import {HUD_COMPACT_KEY,isHudCompact,createHudPanel} from '../src/hud-panel.js';
 
 function fakeButton(){
@@ -66,5 +68,23 @@ test('bottom-docked compact HUD retains both residents, all six actual needs and
   assert.doesNotMatch(css,/#dashboard\[data-collapsed="true"\] \.needs\s*\{[^}]*display\s*:\s*none/);
   assert.match(game,/from '\.\/hud-panel\.js'/);
   assert.match(game,/readPreference:\(\)=>localStorage\.getItem\(HUD_COMPACT_KEY\)/);
-  assert.match(game,/Math\.ceil\(\$\('dashboard'\)\.getBoundingClientRect\(\)\.height\)\+12/);
+  // Execute the current live layout binding: actual HUD top, not its height.
+  // This protects bottom navigation and dynamically growing compact/full HUDs.
+  const start=game.indexOf('function placeSocialPopover(panel){');
+  const end=game.indexOf('function relayoutSocialPanels()',start);
+  assert.ok(start>=0&&end>start,'missing live placement binding');
+  for(const [w,h,hudTop] of [[320,568,408],[390,844,676],[390,844,560]]){
+    const vars=new Map(),frame={left:0,top:0,width:w,height:h,bottom:h};
+    const panel={hidden:false,classList:{contains:()=>false,add(){},remove(){}},
+      offsetWidth:w-24,offsetHeight:320,scrollHeight:318,
+      style:{setProperty:(name,value)=>vars.set(name,parseFloat(value))}};
+    const $=id=>({getBoundingClientRect:()=>id==='dashboard'?{top:hudTop}:{bottom:88}});
+    runInNewContext(game.slice(start,end)+'\nplaceSocialPopover(panel);',{
+      panel,socialAnchor:{x:w/2,y:h*.65},document:{querySelector:()=>({getBoundingClientRect:()=>frame})},
+      $,contextualPlacement
+    });
+    const y=vars.get('--context-y'),height=vars.get('--context-max-height');
+    assert.ok(Number.isFinite(y)&&height>0,'missing panel bounds');
+    assert.ok(y+height<=hudTop-12,'panel must not overlap HUD or bottom navigation');
+  }
 });

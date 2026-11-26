@@ -334,3 +334,8 @@ test('game edits always route the fail-closed root-v1 writer contract',()=>{
   assert.ok(planChanges(['src/game.js']).tests.includes('tests/cas-01-population-save.test.js'));
   assert.equal(planChanges(['src/kitchen.js']).browser,false);
 });
+
+ test('live HUD layout contract runs in PR CI for each source it inspects',()=>{
+  for(const file of ['src/game.js','src/hud-panel.js','src/ui-layout.js','index.html','styles.css'])
+    assert.ok(planChanges([file]).tests.includes('tests/hud-panel.test.js'),file);
+});
