@@ -1,14 +1,14 @@
 name: CF-ANIM contact contract diagnostic
 on:
-  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: contact-contract-${{ github.event.pull_request.number }}
+  group: contact-contract-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   cf-anim-contact:
-    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-contact-contract' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'diagnostic/cf-anim-contact-contract'
     permissions:
       contents: read
       actions: read
@@ -22,11 +22,11 @@ jobs:
       OMP_NUM_THREADS: '2'
       OPENBLAS_NUM_THREADS: '1'
       MUJOCO_GL: disable
-      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
