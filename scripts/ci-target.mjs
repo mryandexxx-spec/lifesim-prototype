@@ -16,8 +16,9 @@ const normalize=f=>f.replace(/\\/g,'/').replace(/^\.\//,'');
 
 export function planChanges(files,root=ROOT){
   const changed=[...new Set(files.map(normalize))].sort();
-  const relevant=changed.some(f=>isCode(f)||f.startsWith('assets/'));
-  if(!relevant)return {tests:[],browser:false,cas_inventory:false,cas_baseline:false,cas_soak:false,cas_modular:false,cas_alex:false,cas_styles:false,cas_cc0:false,e5:false,integration_qa:false,fandom_tv:false,fandom_phone:false,fandom_r2a:false,fandom_r2b:false,fandom_r2c:false,changed};
+  const docsOnly=f=>f==='README.md'||f.startsWith('docs/')||/^[^/]+\.md$/i.test(f);
+  const relevant=changed.some(f=>!docsOnly(f));
+  if(!relevant)return {tests:[],release_gate:false,browser:false,cas_inventory:false,cas_baseline:false,cas_soak:false,cas_modular:false,cas_alex:false,cas_styles:false,cas_cc0:false,e5:false,integration_qa:false,fandom_tv:false,fandom_phone:false,fandom_r2a:false,fandom_r2b:false,fandom_r2c:false,changed};
   const allTests=readdirSync(path.join(root,'tests')).filter(f=>f.endsWith('.test.js')).map(f=>'tests/'+f);
   const selected=new Set(CORE);
   const changedSrc=changed.filter(f=>f.startsWith('src/')&&/\.(?:js|mjs)$/.test(f));
@@ -46,8 +47,23 @@ export function planChanges(files,root=ROOT){
     for(const dependency of importsOf(file))closure(dependency,seen);
     return seen;
   }
+  const covered=new Set();
   for(const file of allTests){
     const deps=closure(file);
+    // Legacy tests also read live source as text or run it through VM. Retain
+    // exact literal source references in every transitive test helper.
+    for(const dep of deps){
+      if(!existsSync(path.join(root,dep)))continue;
+      const source=readFileSync(path.join(root,dep),'utf8');
+      for(const changedPath of changedSrc){
+        if(source.includes(changedPath)||deps.has(changedPath)){
+          covered.add(changedPath);selected.add(file);
+        }
+      }
+      // Opaque readers may assemble paths dynamically. When not statically
+      // attributable, keep the suite in the conservative reader union.
+      if(changedSrc.length&&/\b(?:readFileSync|readFile|createReadStream|runInNewContext|runInContext|vm\.Script)\b/.test(source)&&!/(?:src\/)[\w.-]+\.(?:js|mjs)/.test(source))selected.add(file);
+    }
     if(changedSrc.some(source=>deps.has(source)))selected.add(file);
     for(const source of changedSrc){
       const stem=path.posix.basename(source).replace(/\.m?js$/,'').replace(/-(?:ui|visual|engine|runtime|state|core)$/,'');
@@ -93,6 +109,13 @@ export function planChanges(files,root=ROOT){
   // Structural game.js extraction can invalidate any legacy source contract.
   // Run every Node suite before merging this boundary, not only imported modules.
   if(changed.some(f=>f==='src/qsk-11-home-menu.js'||f==='src/qsk-11-tour-ui.js'||f==='src/qsk-11-time-ui.js'||f==='tests/pf-01.test.js'))for(const file of allTests)selected.add(file);
+  // Full release gate uses generated assets, not the pre-generation subset.
+  // Shared/unknown source and any deployment/build boundary fail closed.
+  const release_gate=changed.some(f=>!docsOnly(f)&&(
+    f==='src/game.js'||f==='src/household.js'||f==='src/simulation.js'||
+    /^(?:assets\/|scripts\/|\.github\/|[^/]+\.(?:html|css|json|webmanifest|svg)$|sw\.js$)/.test(f)||
+    (f.startsWith('src/')&&(!covered.has(f)||!existsSync(path.join(root,f))))||
+    (!f.startsWith('src/')&&!f.startsWith('tests/'))));
   const tests=[...selected].filter(f=>allTests.includes(f)).sort();
   const micro_ux=changed.some(f=>
     /^(?:src\/(?:micro-ux|camera-controls)\.js|tests\/micro-ux-r1-browser-smoke\.mjs)$/.test(f));
@@ -132,7 +155,7 @@ export function planChanges(files,root=ROOT){
   const cas_baseline=changed.includes('tests/cas-00-browser-baseline.mjs');
   const career_shifts=changed.some(f=>
     /^(?:src\/career-rank-schedules\.js|tests\/career-shifts-r1-browser-smoke\.mjs)$/.test(f));
-  return {tests,cas_inventory,cas_baseline,browser:changed.some(isUI)||qsk_02||cas_hud||cas_c3||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,qsk_02,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
+  return {tests,release_gate,cas_inventory,cas_baseline,browser:changed.some(isUI)||qsk_02||cas_hud||cas_c3||career_shifts||phone_platform||fandom_tv||fandom_phone||fandom_r2a||fandom_r2b||fandom_r2c||cas_soak,qsk_02,micro_ux,load_truth,fridge_ux,grill_r1,career_shifts,phone_platform,
     fandom_tv,fandom_phone,fandom_r2a,fandom_r2b,fandom_r2c,
     cas_modular,cas_alex,cas_styles,cas_cc0,cas_c3,e5:changed.includes('tests/lot-e5-browser-smoke.mjs'),
     integration_qa:changed.includes('tests/life-integration-qa-browser.mjs'),cas_hud,cas_soak,changed};
@@ -182,7 +205,7 @@ function main(){
   console.log('P4 Life Systems four-viewport integration:',plan.integration_qa?'required':'not needed');
   const fixtureMotion=changed.some(f=>/^(?:src\/(?:outdoor-character-motion|meshy-furniture-visual|pool-visual)\.js|tests\/fixture-motion-browser-smoke\.mjs|assets\/furniture\/meshy-room-v2\/(?:cream_fridge|glass_shower|bathroom_toilet)\.glb)$/.test(f));
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
-    'parcel_editor='+changed.some(f=>f==='src/qsk-11-home-menu.js'||f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
+    'release_gate='+Boolean(plan.release_gate)+'\n'+'parcel_editor='+changed.some(f=>f==='src/qsk-11-home-menu.js'||f.includes('parcel-editor')||f.includes('parcel-journal'))+'\n'+'fixture_motion='+fixtureMotion+'\n'+'browser='+(plan.browser?'true':'false')+'\n'+
     'cas_inventory='+(plan.cas_inventory?'true':'false')+'\n'+'cas_baseline='+(plan.cas_baseline?'true':'false')+'\n'+'cas_hud='+(plan.cas_hud?'true':'false')+'\n'+
     'cas_soak='+(plan.cas_soak?'true':'false')+'\n'+'cas_modular='+(plan.cas_modular?'true':'false')+'\n'+'cas_alex='+(plan.cas_alex?'true':'false')+'\n'+'cas_styles='+(plan.cas_styles?'true':'false')+'\n'+'cas_cc0='+(plan.cas_cc0?'true':'false')+'\n'+'cas_c3='+(plan.cas_c3?'true':'false')+'\n'+'e5='+(plan.e5?'true':'false')+'\n'+'integration_qa='+(plan.integration_qa?'true':'false')+'\n'+
     'qsk_02='+(plan.qsk_02?'true':'false')+'\n'+
