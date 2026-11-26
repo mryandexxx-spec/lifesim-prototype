@@ -95,7 +95,7 @@ jobs:
           cp tools/cf-anim-pilot-lab.html pilot-out/lab.html
           python -m http.server 8765 --bind 127.0.0.1 --directory pilot-out >/tmp/pilot-http.log 2>&1 &
           sleep 2
-          node tools/cf-anim-pilot-browser.mjs
+          xvfb-run -a node tools/cf-anim-pilot-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
