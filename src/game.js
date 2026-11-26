@@ -119,7 +119,7 @@ import {proceduralFurnitureModel} from './furniture-procedural-library.js';
 import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
 import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnailUrl} from './meshy-furniture-policy.js';
 import {ofInteriorDiningPlateY,ofInteriorOverlay} from './of-interior-assets.js';
-import {createOutdoorVegetationVisual} from './of-vegetation-visual.js';
+import {createOutdoorVegetationVisual} from './of-vegetation-visual.js?v=pf-12';
 import {createGardenVisual} from './of-garden-visual.js';
 import {createOutdoorFurnitureVisual} from './of-outdoor-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
@@ -3393,14 +3393,14 @@ function boot() {
   const setOutdoorVisualPose=(node,pose)=>{
     node.setLocalPosition(pose.x,-.53,pose.z);
     node.setLocalEulerAngles(0,-pose.yaw,0);
-    vegetation.invalidateTransforms();
+    vegetation.invalidateTransforms(node);
   };
   const clearOutdoorFeaturePreview=()=>{
     const staged=outdoorFeaturePreview;
     outdoorFeaturePreview=null;
     if(!staged)return;
     if(staged.owned)setOutdoorVisualPose(staged.node,staged.original);
-    else{staged.node.destroy();vegetation.invalidateTransforms();}
+    else{staged.node.destroy();if(staged.vegetation)vegetation.invalidateTransforms();}
   };
   const syncOutdoorFeaturePreview=(item,pose,owned)=>{
     const key=owned?item.instanceId:'new:'+item.itemId;
@@ -3409,7 +3409,7 @@ function boot() {
       const node=owned?outdoorNodesById.get(item.instanceId):
         createOutdoorFeatureNode({...item,...pose},{preview:true});
       if(!node)return;
-      outdoorFeaturePreview={key,node,owned,original:{x:item.x,z:item.z,yaw:item.yaw},pose:null};
+      outdoorFeaturePreview={key,node,owned,vegetation:['tree','shrub','flower'].includes(OUTDOOR_CATALOG[item.itemId]?.category),original:{x:item.x,z:item.z,yaw:item.yaw},pose:null};
     }
     const staged=outdoorFeaturePreview;
     if(staged.pose?.x===pose.x&&staged.pose?.z===pose.z&&staged.pose?.yaw===pose.yaw)return;
