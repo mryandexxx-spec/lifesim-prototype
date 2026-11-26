@@ -64,3 +64,41 @@ test('pause, modal and unresolved work choice suspend automatic boost',()=>{
   root.careerSystem.byResident.alex.currentShift.incident.choiceId='done';
   assert.equal(c.read(root),3);
 });
+
+import {newHousehold,chooseResidentAction,bedDestinationFor,tickHousehold,loadHousehold} from '../src/household.js';
+import {arrive} from '../src/simulation.js';
+import {hireCareer} from '../src/career-state.js';
+import {progressCareerWork,arriveCareerPortal} from '../src/career-work.js';
+
+test('actual household clock: first natural wake exits auto speed, remaining sleeper stays asleep',()=>{
+  const root=newHousehold('2026-11-16'),c=createHouseholdSpeedController();
+  for(const [id,actor,energy] of [['alex',root,99],['mira',root.otherSim,40]]){
+    assert.ok(chooseResidentAction(root,'bed',true,id));
+    actor.position=bedDestinationFor(root,id);actor.needs.energy=energy;arrive(actor);
+  }
+  const start=root.minutes;assert.equal(c.read(root),3);
+  for(let i=0;i<100&&root.action;i++){tickHousehold(root,.30);c.read(root);}
+  assert.equal(root.action,null);assert.equal(root.otherSim.action?.id,'bed');
+  assert.equal(c.read(root),1);assert.ok(root.minutes-start<10);
+  assert.equal(root.minutes,root.otherSim.minutes);
+});
+
+test('actual staggered shifts: first salary settles once and speed falls before other shift ends',()=>{
+  const root=newHousehold('2026-11-16'),c=createHouseholdSpeedController();
+  root.careerSystem=hireCareer(root.careerSystem,'alex','city-services',400);
+  root.careerSystem=hireCareer(root.careerSystem,'mira','editorial',400);
+  for(const [id,start] of [['alex',480],['mira',540]]){
+    root.minutes=start;root.otherSim.minutes=start;
+    progressCareerWork(root,start-1,start);
+    assert.ok(arriveCareerPortal(root,id,start));
+    root.careerSystem.byResident[id].currentShift.incidentPlan={version:1,status:'none',rarity:null,dueAt:null,proofScenes:[]};
+  }
+  root.minutes=959.4;root.otherSim.minutes=root.minutes;
+  assert.equal(c.read(root),3);
+  for(let i=0;i<5;i++){tickHousehold(root,.30);c.read(root);}
+  assert.equal(root.careerSystem.byResident.alex.currentShift.phase,'returning');
+  assert.equal(root.careerSystem.byResident.mira.currentShift.phase,'working');
+  assert.equal(c.read(root),1);assert.equal(root.careerSystem.settlementIds.length,1);
+  const restored=loadHousehold(JSON.parse(JSON.stringify(root)));
+  tickHousehold(restored,.30);assert.equal(restored.careerSystem.settlementIds.length,1);
+});

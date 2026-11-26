@@ -4586,6 +4586,17 @@ function boot() {
         receipts:game.financialHistory.entries.length};
     };
   }
+  // PF-15: read-only observation of the actual clock and resident state.
+  if(new URLSearchParams(location.search).get('pf-15')==='qa'){
+    window.__LifeSimSpeedQA=()=>({
+      minutes:game.minutes,paused:game.paused,manual:game.speed,
+      residents:residentIdsForSimulation(game).map(id=>({
+        id,action:getActor(game,id)?.action?.id??null,
+        phase:getActor(game,id)?.action?.phase??null,work:residentWorkPhase(game,id)
+      })),
+      settlements:[...game.careerSystem.settlementIds]
+    });
+  }
   // PF-04/B read-only QA, available solely in the explicit test URL.
   if(new URLSearchParams(location.search).get('pf-04b')==='qa'){
     window.__LifeSimManualCareQA=id=>{

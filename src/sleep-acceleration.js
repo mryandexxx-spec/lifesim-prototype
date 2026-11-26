@@ -9,23 +9,8 @@ export const SLEEP_FAST_FORWARD_SPEED=3;
 export const SLEEP_WORK_WARNING_MINUTES=60;
 export function effectiveSleepSpeed(root,{blocked=false}={}){
   const playerSpeed=root?.speed===3?3:1;
-  if(blocked||!root||root.paused||root.socialAction||!root.otherSim||
-     !root.actionQueues||!Number.isFinite(root.minutes))return playerSpeed;
-  for(const id of ['alex','mira']){
-    const actor=id==='alex'?root:root.otherSim;
-    if(actor?.action?.id!=='bed'||actor.action.phase!=='using'||
-       pendingActions(root.actionQueues,id).length>0)return playerSpeed;
-    const contract=root.careerSystem?.byResident?.[id];
-    const shift=contract?.currentShift;
-    // A pending work departure/choice must never race ahead at 3x.
-    if(shift?.phase)return playerSpeed;
-    if(shift?.incident&&!shift.incident.choiceId)return playerSpeed;
-    if(contract&&root.calendar){
-      const upcoming=nextCareerShift(root.calendar,contract,root.minutes);
-      if(upcoming&&upcoming.start-root.minutes<=SLEEP_WORK_WARNING_MINUTES)
-        return playerSpeed;
-    }
-  }
+  if(blocked||!root||root.paused||root.socialAction||root.additionalSocial||
+     householdIdleEpisode(root)!=='sleep'||sleepBoostBlocked(root))return playerSpeed;
   return SLEEP_FAST_FORWARD_SPEED;
 }
 
@@ -50,6 +35,16 @@ export function householdIdleEpisode(root){
   return modes[0]&&modes.every(mode=>mode===modes[0])?modes[0]:null;
 }
 
+function sleepBoostBlocked(root){
+  return residentIdsForSimulation(root).some(id=>{
+    if(root.actionQueues&&pendingActions(root.actionQueues,id).length>0)return true;
+    const contract=root.careerSystem?.byResident?.[id];
+    if(!contract||!root.calendar||!Number.isFinite(root.minutes))return false;
+    const upcoming=nextCareerShift(root.calendar,contract,root.minutes);
+    return Boolean(upcoming&&upcoming.start-root.minutes<=SLEEP_WORK_WARNING_MINUTES);
+  });
+}
+
 export function createHouseholdSpeedController(){
   const episodes=new WeakMap();
   function state(root){
@@ -66,7 +61,8 @@ export function createHouseholdSpeedController(){
     const current=state(root),manual=root.speed===3?3:1;
     if(!current.episode||current.override)return manual;
     if(blocked||root.paused||dialogueNeedsDecision(root)||root.socialAction||root.additionalSocial||
-      residentIdsForSimulation(root).some(id=>pendingWorkIncident(root,id)))return manual;
+      residentIdsForSimulation(root).some(id=>pendingWorkIncident(root,id))||
+      (current.episode==='sleep'&&sleepBoostBlocked(root)))return manual;
     current.owned=true;
     return SLEEP_FAST_FORWARD_SPEED;
   }
