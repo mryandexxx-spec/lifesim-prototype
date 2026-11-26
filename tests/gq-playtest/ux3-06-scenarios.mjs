@@ -42,10 +42,15 @@ export const scenarios=[
   await step('show-item-labels',async()=>{await pause(h);before=await snapshot();await tap('#view-toggle');await tap('#item-labels-btn');assert.equal(await page.locator('#item-labels-btn').getAttribute('aria-pressed'),'true');await tap('#view-close');await page.locator('#view-panel').waitFor({state:'hidden'});});
   await step('choose-easel',async()=>{
    const item=before.world.furniture.instances.find(i=>i.prefabId==='easel'&&i.location==='home');assert.ok(item,'purchased easel exists');
-   const label=page.locator('#hotspots button:has-text("Мольберт")');
+   const selector='#hotspots button[data-instance-id="'+item.instanceId+'"]';
+   const label=page.locator(selector);
+   await label.waitFor({state:'visible',timeout:4000});
    h.observe({easelInstance:item.instanceId,labelVisible:await label.isVisible()});
-   // The optional legacy hotspot does not necessarily cover a purchased instance.
-   // Select the real placed object by its live camera projection, no action injection.
+   await tap(selector);
+   await page.locator('#painting-theme-select').waitFor({state:'visible'});
+   assert.deepEqual((await snapshot()).actionQueues,before.actionQueues,'label selection must not enqueue');
+   await tap('#close-action');
+   // Also preserve selection by actual 3D geometry with labels disabled.
    await tap('#view-toggle');await tap('#item-labels-btn');await tap('#view-close');await page.locator('#view-panel').waitFor({state:'hidden'});
    for(const y of [1.15,.75,1.5]){
     const pt=await page.evaluate(async({x,z,y,instanceId})=>{const {Application,Vec3}=await import('playcanvas');const app=Application.getApplication();const node=app.root.findByName('F2 purchased / '+instanceId);if(!node?.enabled)throw Error('placed easel not rendered');const cam=app.root.findComponents('camera').find(c=>c.enabled);const p=cam.worldToScreen(new Vec3(x,y,z));const b=document.querySelector('#game-canvas').getBoundingClientRect();const px=Math.round(p.x+b.left),py=Math.round(p.y+b.top);return {x:px,y:py,hit:document.elementFromPoint(px,py)?.id};},{x:item.x,z:item.z,y,instanceId:item.instanceId});
