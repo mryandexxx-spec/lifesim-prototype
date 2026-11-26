@@ -50,7 +50,7 @@ def measure():
     return {"segmentsDeg":segments,"landmarks":{k:list(v) for k,v in p.items()},"vertices":len(vs),"floorM":min(v.z for v in vs),"heightM":max(v.z for v in vs)-min(v.z for v in vs)}
 def err(a,b):
     return {"posM":max((x.translation-y.translation).length for x,y in zip(a,b)),
-            "rotRad":max(x.to_quaternion().rotation_difference(y.to_quaternion()).angle for x,y in zip(a,b))}
+            "rotRad":max(2*math.acos(min(1.,abs(x.to_quaternion().normalized().dot(y.to_quaternion().normalized())))) for x,y in zip(a,b))}
 report={"stage":"RIG-CONTRACT/R2A","head":os.environ["EXPECTED_SHA"],"rig":key,"rigSha":pins[key],"addonPin":PIN,"blender":bpy.app.version_string,"mapping":mapping,"status":"PENDING","ART":"OPEN"}
 def save(): (OUT/(key+".json")).write_text(json.dumps(report,indent=2,allow_nan=False))
 report["mappingErrors"]=hb.error_messages();save()
@@ -60,7 +60,7 @@ report["neutral"]=measure();h,floor=setup(meshes);cam=bpy.context.scene.camera
 from mathutils import Vector
 center=Vector((0,0,floor+h*.50))
 def render(label):
-    for view,offset in (("front",(0,3,.1)),("quarter",(1.6,3,.5)),("side",(3,0,.2))):
+    for view,offset in (("front",(0,-3,.1)),("quarter",(1.6,-3,.5)),("side",(3,0,.2))):
         cam.location=center+Vector(offset)*h;cam.rotation_euler=(center-cam.location).to_track_quat("-Z","Y").to_euler();cam.data.ortho_scale=h*1.65
         p=OUT/f"{key}-{label}-{view}.png";bpy.context.scene.render.filepath=str(p);bpy.ops.render.render(write_still=True);assert p.stat().st_size>0
 render("native")
