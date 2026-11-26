@@ -8,6 +8,27 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  ci-cd-r1-b-source-pilot:
+    if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-b-pilot' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Existing source-audit unit controls
+        run: python3 -m unittest discover -s tests -p 'test_cas_c4_source_audit.py' -v
+      - name: Real cold importer, verified warm pack, tamper and offline controls
+        run: python3 scripts/ci-cd-r1-b.py
+      - name: Archive exact source proof and reusable diagnostic pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-cd-r1-b-source-pilot
+          path: artifacts/ci-cd-r1-b/
+          if-no-files-found: error
   ux3-06-input-ownership:
     if: github.event_name == 'pull_request' && github.head_ref == 'fix/ux3-06-world-gesture-ownership' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
