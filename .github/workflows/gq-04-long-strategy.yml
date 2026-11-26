@@ -1,22 +1,29 @@
 name: GQ-04 comparative and long session evidence
 on:
-  pull_request:
-    paths:
-      - 'tests/gq-strategy-probe.mjs'
-      - 'tests/gq-long-session.mjs'
-      - '.github/workflows/gq-04-long-strategy.yml'
   workflow_dispatch:
+    inputs:
+      full:
+        description: Run original 30 and 120 minute sessions instead of short diagnostic
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      full:
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   strategy:
-    if: github.event_name == 'workflow_dispatch' || (github.head_ref == 'audit/gq-04-long-strategy' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -24,7 +31,7 @@ jobs:
         run: node --test tests/life-integration-qa.test.js tests/gq-playtest-evidence.test.js
       - name: Six policy probes on identical initial save
         env:
-          GQ_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GQ_EXPECTED_SHA: ${{ inputs.ref || github.sha }}
         run: node tests/gq-strategy-probe.mjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -33,27 +40,22 @@ jobs:
           path: artifacts/gq-strategy/
           if-no-files-found: error
   long:
-    if: github.event_name == 'workflow_dispatch' || (github.head_ref == 'audit/gq-04-long-strategy' && github.event.pull_request.head.repo.full_name == github.repository)
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - engine: chromium
-            minutes: 30
-          - engine: webkit
-            minutes: 120
+        include: ${{ fromJSON(inputs.full && '[{"engine":"chromium","minutes":30},{"engine":"webkit","minutes":120}]' || '[{"engine":"chromium","minutes":5}]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 155
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Real touch and observed outcomes
         env:
-          GQ_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GQ_EXPECTED_SHA: ${{ inputs.ref || github.sha }}
           GQ_ENGINE: ${{ matrix.engine }}
           GQ_MINUTES: ${{ matrix.minutes }}
         run: |

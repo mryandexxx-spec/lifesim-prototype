@@ -14,7 +14,7 @@ import {SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 import {pngEvidence} from './gq-playtest/evidence.mjs';
 const duration=Number(process.env.GQ_MINUTES),engine=process.env.GQ_ENGINE;
-assert.ok([30,120].includes(duration)&&['chromium','webkit'].includes(engine));
+assert.ok([5,30,120].includes(duration)&&['chromium','webkit'].includes(engine));
 const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 if(process.env.GQ_EXPECTED_SHA)assert.equal(sha,process.env.GQ_EXPECTED_SHA);
 const dir='artifacts/gq-long';mkdirSync(dir,{recursive:true});
@@ -32,7 +32,8 @@ try{
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1,serviceWorkers:'block'});
  await context.addInitScript(({key,tour,seed})=>{
   if(!localStorage.getItem(key)){localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');}
-  window.__gqLongTouch=0;window.__gqLost=0;
+  window.__gqLongTouch=0;window.__gqLost=0;window.__gqTrace=[];
+  for(const type of ['pointerdown','pointerup','click'])document.addEventListener(type,e=>{window.__gqTrace.push({type,t:performance.now(),id:e.target?.closest?.('button')?.id||e.target?.id||'',trusted:e.isTrusted,x:e.clientX,y:e.clientY});if(window.__gqTrace.length>80)window.__gqTrace.shift();},{capture:true,passive:true});
   document.addEventListener('touchstart',e=>{if(e.isTrusted)window.__gqLongTouch++;},{capture:true,passive:true});
   document.addEventListener('webglcontextlost',()=>window.__gqLost++,true);
  },{key:SAVE_KEY,tour:UI_TOUR_STORAGE_KEY,seed});
@@ -66,7 +67,7 @@ try{
  await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});await ready();
  const gl=await page.evaluate(async()=>{const {Application}=await import('playcanvas');const canvas=Application.getApplication()?.graphicsDevice?.canvas;return {width:canvas?.width,height:canvas?.height,scroll:document.documentElement.scrollHeight,viewport:innerHeight};});
  assert.ok(gl.width>100&&gl.height>100&&gl.scroll<=gl.viewport+2);report.graphics=gl;
- const closeOptional=async()=>{for(const s of ['.career-shift-summary-done','.career-phone-x','#queue-close','#close-action','#ground-walk-close','#social-context-close','#view-close'])if(await visible(s))await touch(s);};
+ const closeOptional=async()=>{for(const s of ['.career-shift-summary-done','.career-phone-x','#queue-close','#close-action','#ground-walk-close','#social-menu-close','#social-context-close','#view-close'])if(await visible(s))await touch(s);};
  const unpause=async()=>{if(await page.locator('#pause-btn').getAttribute('aria-label')==='Продолжить')await touch('#pause-btn');};
  const pause=async()=>{if(await page.locator('#pause-btn').getAttribute('aria-label')!=='Продолжить')await touch('#pause-btn');};
  const project=async(x,z,y)=>page.evaluate(async({x,z,y})=>{
@@ -86,23 +87,41 @@ try{
   throw Error('No visible real easel action reached via scene picking');
  };
  const social=async()=>{
-  await closeOptional();await touch('#pick-alex');
-  const s=await snap();assert.ok(s.otherSim?.position);
-  for(const y of [1.4,.95,1.65]){
-   const p=await project(s.otherSim.position.x,s.otherSim.position.z,y);if(p.hit!=='game-canvas')continue;
-   await point(p.x,p.y);
-   await page.locator('#social-context').waitFor({state:'visible',timeout:1500}).catch(()=>{});
-   if(await visible('#social-context')){
-    await touch('#friendship-btn');
-    const opt='#social-menu-options button:not([disabled])';
-    await page.locator(opt).first().waitFor({state:'visible',timeout:4000});
-    const label=await page.locator(opt).first().innerText();report.steps.at(-1).decision=label;
-    await touch(opt);
-    return;
+  await closeOptional();await pause();
+  try{
+   await touch('#pick-alex');await page.waitForTimeout(300);
+   const s=await snap();assert.ok(s.otherSim?.position);
+   assert.ok(!s.careerSystem.byResident.mira?.currentShift,'partner not at home at decision');
+   const rec=report.steps.at(-1);rec.probes=[];
+   for(const y of [1.45,1.85,1.0]){
+    const p=await page.evaluate(async y=>{
+      const {Application,Vec3}=await import('playcanvas');const app=Application.getApplication(),avatar=app.root.findByName('Мира'),cam=app.root.findComponents('camera').find(c=>c.enabled);
+      if(!avatar||!cam)throw Error('resident or camera missing');
+      const q=cam.worldToScreen(avatar.getPosition().clone().add(new Vec3(0,y,0)));
+      const x=Math.round(q.x),py=Math.round(q.y);return {x,y:py,w:innerWidth,h:innerHeight,hit:document.elementFromPoint(x,py)?.id,visible:avatar.enabled};
+    },y);
+    rec.probes.push(p);if(!p.visible||p.x<0||p.x>=p.w||p.y<0||p.y>=p.h||p.hit!=='game-canvas')continue;
+    const before=await snap();
+    await point(p.x,p.y);await page.locator('#social-context').waitFor({state:'visible',timeout:1500}).catch(()=>{});
+    rec.inputTrace=await page.evaluate(()=>window.__gqTrace.slice());
+    assert.deepEqual((await snap()).actionQueues,before.actionQueues,'scene touch mutated queue');
+    if(await visible('#social-context')){
+     rec.categories=await page.locator('#social-context .social-controls button').evaluateAll(bs=>bs.map(b=>({id:b.id,text:b.textContent,disabled:b.disabled||b.getAttribute('aria-disabled')==='true'})));
+     assert.equal(await page.locator('#conversation-btn').getAttribute('aria-disabled')==='true',false,'basic conversation unexpectedly locked');
+     await touch('#conversation-btn');
+     await touch('#social-menu-options button:has-text("Поговорить")');
+     await touch('#social-menu-options button:has-text("В очередь · Поговорить")');
+     const after=await snap();
+     assert.equal(after.actionQueues.byResident.alex.length,before.actionQueues.byResident.alex.length+1,'explicit confirmation did not admit talk');
+     assert.ok(after.actionQueues.byResident.alex.some(q=>q.type==='social'&&q.targetId==='mira'&&q.actionId==='talk'),'wrong social command');
+     assert.deepEqual(after.actionQueues.byResident.mira,before.actionQueues.byResident.mira);
+     rec.decision='В очередь · Поговорить';rec.admission=true;return;
+    }
+    assert.equal(await visible('#social-menu-panel'),false,'unexpected category from scene-only touch');
+    await closeOptional();
    }
-   await closeOptional();
-  }
-  throw Error('No reachable partner interaction via real scene picking');
+   throw Error('No reachable partner interaction via real scene picking: '+JSON.stringify(rec.probes));
+  }finally{await unpause();}
  };
  const finance=async()=>{await closeOptional();await touch('#career-phone-toggle');await touch('#career-phone-panel [data-phone-app="finance"]');assert.ok(await visible('.finance-wallet'));await touch('.career-phone-x');};
  const queue=async()=>{await closeOptional();await touch('#plan-peek');await touch('#queue-mira');assert.ok(await visible('#queue-panel'));await touch('#queue-close');};
@@ -142,6 +161,8 @@ try{
  assert.ok(report.actualElapsedMs>=duration*60000);assert.equal(report.samples.length,duration);
  if(report.final.works<=report.initial.works)report.failures.push({name:'creative-completion',reason:'No completed artwork observed'});
  if(!socialAttempts)report.failures.push({name:'social-opportunity',reason:'No idle at-home pair at sampled decision opportunities'});
+ if(!report.steps.some(s=>s.admission))report.failures.push({name:'social-admission',reason:'No confirmed social command admitted'});
+ if(final.relationship.lastKind!=='talk'&&final.relationship.affinity===seed.relationship.affinity)report.failures.push({name:'social-completion',reason:'No observed completed talk or relationship change'});
  if(final.minutes<=initial.minutes)report.failures.push({name:'no-clock-progress'});
  report.status=report.failures.length||report.errors.length?'FAIL':'PASS';
  await context.close();
