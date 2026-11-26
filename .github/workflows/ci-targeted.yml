@@ -8,8 +8,49 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-interact-01c:
+  cf-interact-01c-qual:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cf-interact-01c-*
+          run-id: 45832720185
+          github-token: ${{ github.token }}
+          path: prior-r1
+          merge-multiple: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Independent source timing and continuous depth qualification
+        run: |
+          python -m pip install --only-binary=:all: numpy==1.26.4 scipy==1.17.1
+          python tools/cf_interact_qualify.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-qual-evidence
+          path: artifacts/cf-interact-01c-qual/
+          if-no-files-found: warn
+  cf-interact-01c:
+    # Full expensive bake is explicit/manual until the 01C-Q contract is integrated.
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'diagnostic/cf-interact-01a'
     permissions:
       contents: read
       actions: read
@@ -27,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
