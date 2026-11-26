@@ -8,7 +8,7 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-anim-contact-r6:
+  cf-anim-contact-r7:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-contact-contract' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -67,20 +67,27 @@ jobs:
           run-id: 45894570995
           github-token: ${{ github.token }}
           path: input-r2
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-contact-r6-Walk_Loop-evidence
+          run-id: 45902062311
+          github-token: ${{ github.token }}
+          path: input-r6
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Install exact frozen solver dependencies
         run: |
           python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
-          python -m py_compile tools/cf_anim_contact_r6_walk.py
+          python -m py_compile tools/cf_anim_contact_r7_walk.py tools/cf_anim_contact_temporal.py
+          python tools/cf_anim_contact_temporal.py
       - name: Contact phase pilot with exact native replay and all-frame renders
-        run: timeout --signal=TERM --kill-after=10s 660s python -u tools/cf_anim_contact_r6_walk.py ${{ matrix.clip }}
+        run: timeout --signal=TERM --kill-after=10s 660s python -u tools/cf_anim_contact_r7_walk.py ${{ matrix.clip }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cf-anim-contact-r6-${{ matrix.clip }}-evidence
-          path: artifacts/cf-anim-contact-r6/
+          name: cf-anim-contact-r7-${{ matrix.clip }}-evidence
+          path: artifacts/cf-anim-contact-r7/
           if-no-files-found: warn
 
   cf-anim-contact-source:
