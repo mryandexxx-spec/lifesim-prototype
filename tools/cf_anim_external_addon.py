@@ -55,7 +55,8 @@ with tempfile.TemporaryDirectory() as d:
     op=bpy.ops.mcp.load_and_retarget
     result=op(filepath=str(p),useAutoSource=True,useAutoTarget=True,useAutoScale=True,
               useDefaultSS=False,ssFactor=5,useAllFrames=True,useBendPositive=False,
-              useTimeScale=False,useSimplify=False)
+              useTimeScale=False,useSimplify=False,useCenterAnimation=False)
+    report["centerAnimation"]=False # optional origin shift; constant placement below already handles it
     report["operatorResult"]=sorted(result)
     report["operatorMessage"]=str(module.getErrorMessage())
     save()
