@@ -24,12 +24,12 @@ jobs:
       - name: Matched balance policy laboratory
         env:
           GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node tests/gc-02-balance-probe.mjs
+        run: node tests/gc-02-sensitivity-probe.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: gc-02-balance-evidence
-          path: artifacts/gc-02/
+          name: gc-02-r2-evidence
+          path: artifacts/gc-02-r2/
           if-no-files-found: warn
   pf-14-garden-care:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-14-garden-care' && github.event.pull_request.head.repo.full_name == github.repository
