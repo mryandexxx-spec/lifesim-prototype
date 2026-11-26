@@ -4,6 +4,7 @@ import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from '../src/outdoor-proposals.js';
 import {gardenApproach,gardenRequestStillValid,settleGardenAction,GARDEN_DURATION} from '../src/gardening.js';
 import {gardenActionSheet} from '../src/garden-presentation.js';
+import {enqueueAction,pendingActions} from '../src/action-queue.js';
 import {labelQueuedTask} from '../src/qsk-11-task-labels.js';
 import {NEED_DECAY_PER_MINUTE} from '../src/need-balance.js';
 import {socialNeedDecayRate} from '../src/social-need.js';
@@ -82,4 +83,23 @@ test('PF14 talk works at maturity; invalid resident cannot credit Alex',()=>{
   assert.equal(gardenRequestStillValid(root,'alex',id,'talk'),true);
   assert.equal(settleGardenAction(root,'unknown',id,'talk'),false);
   assert.equal(GARDEN_DURATION.talk,12);
+});
+
+test('PF14 persisted FIFO intent, cross-plot cooldown, stale command and competing reservation',()=>{
+ let {root,id}=fixture(types[0]);
+ const proposal=previewOutdoorFeatureEdit(root,{operation:'place',itemId:types[2],pose:{x:10,z:-7,yaw:0}});
+ assert.equal(proposal.ok,true,proposal.reason);
+ root=commitOutdoorFeatureEdit(root,proposal).root;
+ const second=root.world.outdoors.features.find(x=>x.itemId===types[2]).instanceId;
+ const cmd={type:'garden',instanceId:id,actionId:'talk'};
+ assert.ok(enqueueAction(root.actionQueues,'alex',cmd));
+ assert.equal(gardenActionSheet(root,'mira',id).actions.find(a=>a.actionId==='talk').available,false);
+ root=loadHousehold(structuredClone(root));
+ assert.equal(pendingActions(root.actionQueues,'alex')[0].actionId,'talk');
+ assert.ok(enqueueAction(root.actionQueues,'alex',{...cmd,instanceId:second}));
+ start(root,id,'alex','talk');tickHousehold(root,12);
+ assert.equal(gardenRequestStillValid(root,'alex',second,'talk'),false);
+ assert.equal(gardenRequestStillValid(root,'mira',second,'talk'),true);
+ root=loadHousehold(structuredClone(root));
+ assert.equal(pendingActions(root.actionQueues,'alex').filter(x=>x.actionId==='talk').length,0);
 });
