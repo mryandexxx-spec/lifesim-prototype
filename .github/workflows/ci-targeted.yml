@@ -8,6 +8,66 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-anim-rig-contract:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: input-rigs
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-male-grid_021-100-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-caches/male-grid_021-100
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-male-grid_021-90-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-caches/male-grid_021-90
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-female-grid_201-100-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-caches/female-grid_201-100
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-female-grid_201-110-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-caches/female-grid_201-110
+      - name: Pinned external humanoid implementation (isolated; no game dependencies)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/rig-contract" --ignore-scripts --no-audit --no-fund --save-exact three@0.177.0 @pixiv/three-vrm-core@3.4.2
+          cp tools/cf_anim_rig_contract.mjs "$RUNNER_TEMP/rig-contract/probe.mjs"
+          node --check "$RUNNER_TEMP/rig-contract/probe.mjs"
+          node "$RUNNER_TEMP/rig-contract/probe.mjs"
+          cp "$RUNNER_TEMP/rig-contract/package-lock.json" artifacts/cf-anim-rig-contract/dependency-lock.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r1-evidence
+          path: artifacts/cf-anim-rig-contract/
+          if-no-files-found: warn
   ux3-06-input-ownership:
     if: github.event_name == 'pull_request' && github.head_ref == 'fix/ux3-06-world-gesture-ownership' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
