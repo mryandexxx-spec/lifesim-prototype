@@ -1,14 +1,11 @@
 name: PF-13 flower quantity and placement
 on:
-  pull_request:
-    paths:
-      - 'tests/pf-13-browser-smoke.mjs'
+  workflow_call:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   real-preview:
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/pf-13-flower-batch'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
