@@ -12,6 +12,8 @@ OUT=pathlib.Path("pilot-out"); OUT.mkdir(exist_ok=True)
 BENCH=pathlib.Path("assets/furniture/of-r2/garden.bench-new.glb")
 BENCH_SHA="eb4407b9e6abc3ad42568f90e3a5d9242845dd7af81fa7f84714aeb4de7cd30b"
 FPS=24
+NATIVE_SEAT_TOP=.64
+SEAT_TOP=.45  # isolated ergonomic fixture candidate; original catalog unchanged
 
 def interpolate(a,b,u):
     return F.encode([F.transform(Vector(x["p"]).lerp(Vector(y["p"]),u),
@@ -51,17 +53,53 @@ def native_bench(t,pose,floor):
     bpy.ops.import_scene.gltf(filepath=str(BENCH.resolve()))
     objects=[o for o in bpy.context.scene.objects if o not in before]
     meshes=[o for o in objects if o.type=="MESH"]
-    points=[];back=[]
+    points=[];back=[];wood=[]
     for o in meshes:
         for poly in o.data.polygons:
             mat=o.data.materials[poly.material_index]
             if not mat or not mat.name.startswith("Honey oak"):continue
             pts=[F.Y@o.matrix_world@o.data.vertices[i].co for i in poly.vertices]
-            if all(abs(v.y-.64)<.001 for v in pts):points+=pts
+            wood.extend(pts)
+            if all(abs(v.y-NATIVE_SEAT_TOP)<.001 for v in pts):points+=pts
             back.extend(v for v in pts if v.y>.80)
     assert len(points)>=6,"Missing actual bench top geometry"
     lo=np.min(np.array(points),axis=0);hi=np.max(np.array(points),axis=0)
     assert hi[0]-lo[0]>1.4 and hi[2]-lo[2]>.15
+    # Shorten only below the lowest wooden seat surface; translate the seat/back/arms as one.
+    # This is a separate diagnostic fixture, not a changed asset in the game.
+    leg_top=min(v.y for v in wood)
+    assert abs(leg_top-.54)<.001
+    drop=NATIVE_SEAT_TOP-SEAT_TOP
+    before_min=min((F.Y@o.matrix_world@v.co).y for o in meshes for v in o.data.vertices)
+    assert abs(before_min)<.001
+    for o in meshes:
+        matrix=F.Y@o.matrix_world;inv=matrix.inverted()
+        for v in o.data.vertices:
+            point=matrix@v.co
+            point.y-=drop*min(1.,max(0.,point.y/leg_top))
+            v.co=inv@point
+        o.data.update()
+    bpy.context.view_layer.update()
+    adjusted_min=min((F.Y@o.matrix_world@v.co).y for o in meshes for v in o.data.vertices)
+    assert abs(adjusted_min-before_min)<.001
+    # Verify actual edited geometry and export the same native-space fixture for browser playback.
+    after_top=[]
+    for o in meshes:
+        for poly in o.data.polygons:
+            mat=o.data.materials[poly.material_index]
+            if not mat or not mat.name.startswith("Honey oak"):continue
+            pts=[F.Y@o.matrix_world@o.data.vertices[i].co for i in poly.vertices]
+            if all(abs(v.y-SEAT_TOP)<.001 for v in pts):after_top+=pts
+    assert len(after_top)==len(points),(len(after_top),len(points))
+    lower=np.min(np.array(after_top),axis=0);upper=np.max(np.array(after_top),axis=0)
+    assert np.max(np.abs(lower[[0,2]]-lo[[0,2]]))<.001 and np.max(np.abs(upper[[0,2]]-hi[[0,2]]))<.001
+    fixture=OUT/"bench.glb"
+    if not fixture.exists():
+        bpy.ops.object.select_all(action="DESELECT")
+        for o in objects:o.select_set(True)
+        bpy.context.view_layer.objects.active=meshes[0]
+        bpy.ops.export_scene.gltf(filepath=str(fixture.resolve()),export_format="GLB",use_selection=True,export_animations=False)
+    lo,hi=lower,upper
     w=F.world(t,pose);x,front=F.seat_axes(t,w)
     # Derive facing from native high backrest vertices; never assume a model axis.
     assert back and abs(float(np.mean(np.array(back)[:,2])))>.15
@@ -71,7 +109,7 @@ def native_bench(t,pose,floor):
     hip=F.pos(w,t["roles"]["hip"]);knees=[F.pos(w,t["roles"]["shin_"+s]) for s in ("l","r")]
     # Place the real front edge under the proximal/middle thigh, not under the knee.
     front_reach=float(np.mean([(k-hip).dot(front) for k in knees]));assert front_reach>.08
-    center=hip+front*(.55*front_reach-float(hi[2]-lo[2])/2);center.y=floor+.64-.05
+    center=hip+front*(.55*front_reach-float(hi[2]-lo[2])/2);center.y=floor+SEAT_TOP-.05
     native=Vector(((lo[0]+hi[0])/2,0,(lo[2]+hi[2])/2))
     rot=Matrix((x,Vector((0,1,0)),native_z)).transposed().to_4x4()
     assert (rot.to_3x3()@Vector((0,0,back_sign))).dot(front)<-.99
@@ -87,7 +125,7 @@ def native_bench(t,pose,floor):
         vertices.extend(F.Y@o.matrix_world@v.co for v in o.data.vertices)
         triangles.extend(tuple(off+i for i in tri.vertices) for tri in o.data.loop_triangles)
     bvh=BVHTree.FromPolygons(vertices,triangles,all_triangles=True)
-    return (center,x,front,float(hi[0]-lo[0]),float(hi[2]-lo[2]),floor+.64),bvh,{"origin":list(origin),"yaw":math.atan2(native_z.x,native_z.z)*180/math.pi,"back_sign":back_sign,"source_front":list(front),"surface_bounds":[lo.tolist(),hi.tolist()]}
+    return (center,x,front,float(hi[0]-lo[0]),float(hi[2]-lo[2]),floor+SEAT_TOP),bvh,{"origin":list(origin),"yaw":math.atan2(native_z.x,native_z.z)*180/math.pi,"back_sign":back_sign,"source_front":list(front),"surface_bounds":[lo.tolist(),hi.tolist()],"fixture":{"source_sha":BENCH_SHA,"sha":F.digest(fixture),"native_seat_top_m":NATIVE_SEAT_TOP,"seat_top_m":SEAT_TOP,"leg_top_m":leg_top,"drop_m":drop,"production_asset_unchanged":True}}
 
 def limb_region(meshes,t,side):
     name=t["names"][t["roles"]["thigh_"+side]]
@@ -233,10 +271,10 @@ def audit(t,f,g,arm,bones,rest,regs,meshes,pelvis,seat,bvh,weight,thighs,hands):
         for i,p in enumerate(thigh):tree.insert(p,i)
         tree.balance();ds=[tree.find(p)[2] for p in F.surface(hands[side])]
         hand_skin[side]={"min_m":min(ds),"p10_m":float(np.quantile(ds,.10)),"median_m":float(np.median(ds))}
-    return {"floor_min_m":min(F.sole(regs[s])-seat[-1]+.64 for s in regs),
+    return {"floor_min_m":min(F.sole(regs[s])-seat[-1]+SEAT_TOP for s in regs),
         "slab_vertices":F.seat_overlap(meshes,seat),"near_triangle_negative_count":penetration,
         "near_triangle_min_m":minimum,"pelvis_height_gap_m":support,"lap_marker_gap_m":lap,"palm_skin_unsigned_gap":hand_skin,
-        "seated_weight":weight,"support_patch_gap_m":support_signed,"sole_gaps_m":{s:F.sole(regs[s])-seat[-1]+.64 for s in regs},"targets":F.pose_error(t,f,g)}
+        "seated_weight":weight,"support_patch_gap_m":support_signed,"sole_gaps_m":{s:F.sole(regs[s])-seat[-1]+SEAT_TOP for s in regs},"targets":F.pose_error(t,f,g)}
 
 def verify_reimport(path,t,frames):
     arm,bones=F.import_rig(path)
@@ -263,7 +301,8 @@ def main():
     data=F.read("input.json");solved=F.read("solved.json");inv=F.read("semantic-inventory.json")
     for k,s in data["sources"].items():s["roles"]=inv["sources"][k]["map"]
     for k,t in data["targets"].items():t["roles"]=inv["targets"][k]["map"]
-    report={"scope":"bench sit/rest/stand pilot; exact frozen R12 solver, actual native bench; ART and DEVICE OPEN","profiles":{}}
+    report={"scope":"bench sit/rest/stand pilot; exact frozen R12 solver; isolated ergonomic geometry correction of native bench; original asset unchanged; ART and DEVICE OPEN","profiles":{}}
+    (OUT/"bench.glb").unlink(missing_ok=True)
     for sex in ("female","male"):
         key=min((k for k,v in data["targets"].items() if v["sex"]==sex),key=lambda k:abs(data["targets"][k]["scale"]-1))
         t=data["targets"][key];path=pathlib.Path("prior-full")/(key+".glb");assert F.digest(path)==t["sha256"]
@@ -272,6 +311,13 @@ def main():
         h,floor=F.setup(meshes);regs={s:F.regions(meshes,t,s) for s in ("l","r")}
         skin=F.WeightedSkin(t,meshes,arm,bones);F.apply(arm,bones,rest,t["rest"]);assert skin.actual_error(t["rest"])["max_m"]<.002
         pelvis=F.regions(meshes,t);thighs={s:limb_region(meshes,t,s) for s in regs};hands={s:palm_region(meshes,t,s) for s in regs}
+        # Geometry-based suitability check: a horizontal thigh needs its knee above the seat.
+        w=F.world(t,t["rest"]);fit={}
+        for side in regs:
+            k=F.pos(w,t["roles"]["shin_"+side]);ankle=F.pos(w,t["roles"]["foot_"+side])
+            shin=(k-ankle).length;max_knee=ankle.y-floor+shin
+            fit[side]={"shin_length_m":shin,"max_knee_height_m":max_knee,"original_seat_excess_m":NATIVE_SEAT_TOP-max_knee,"candidate_knee_clearance_m":max_knee-SEAT_TOP}
+            assert max_knee-SEAT_TOP>.03,fit[side]
         frames,weights,seams=timeline(data,solved,t,key)
         seat,bvh,bench=native_bench(t,frames[seams[0]],floor)
         staging,goals=stage_contacts(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor)
@@ -295,8 +341,8 @@ def main():
                 subprocess.run([F.get_ffmpeg_exe(),"-y","-loglevel","error","-framerate",str(FPS),"-i",tmp+"/%03d.png","-c:v","libx264","-pix_fmt","yuv420p",str(OUT/f"{sex}-{view}.mp4")],check=True)
         exported=bake(arm,bones,rest,meshes,corrected,OUT/f"{sex}.glb")
         replay=verify_reimport(OUT/f"{sex}.glb",t,corrected)
-        report["profiles"][sex]={"export_reimport":replay,"key":key,"rig_sha":t["sha256"],"bench":bench,"frames":len(corrected),"fps":FPS,"seams":seams,"solver":stats,"staging":staging,"export":exported,"samples":rows}
+        report["profiles"][sex]={"export_reimport":replay,"fixture_suitability":fit,"key":key,"rig_sha":t["sha256"],"bench":bench,"frames":len(corrected),"fps":FPS,"seams":seams,"solver":stats,"staging":staging,"export":exported,"samples":rows}
         (OUT/"report.json").write_text(json.dumps(report,indent=2))
-    shutil.copyfile(BENCH,OUT/"bench.glb")
+    shutil.copyfile(BENCH,OUT/"bench-original.glb")
     print("Pilot exported; independent artistic/contact gate OPEN")
 if __name__=="__main__":main()

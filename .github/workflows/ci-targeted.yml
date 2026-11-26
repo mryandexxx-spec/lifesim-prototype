@@ -703,4 +703,4 @@ jobs:
       actions: read
     uses: ./.github/workflows/cf-anim-pilot.yml
     with:
-      browser_only: true
+      browser_only: false
