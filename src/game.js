@@ -9114,7 +9114,7 @@ function boot() {
           ['alex',prevAlex,prevAlexGardenEvent],['mira',prevMira,prevMiraGardenEvent]]){
           const actor=getActor(game,id);
           if(previous==='garden'&&actor.action?.id!=='garden'&&actor.event!==oldEvent&&
-            /^(Полил|Осмотрел|Полюбовался)/.test(actor.event))
+            /^(Полил|Осмотрел|Полюбовался|Поговорил)/.test(actor.event))
             toast(getActorName(id)+': '+actor.event);
         }
         // A completed job frees its own resident; planned commands start only

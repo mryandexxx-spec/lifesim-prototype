@@ -8,12 +8,35 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-anim-pilot:
-    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-pilot' && github.event.pull_request.head.repo.full_name == github.repository
-    permissions:
-      contents: read
-      actions: read
-    uses: ./.github/workflows/cf-anim-pilot.yml
+  pf-14-garden-care:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-14-garden-care' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Garden care and existing garden contracts
+        run: node --test tests/pf-14-garden-care.test.js tests/lot-c1.test.js tests/lot-c2c-mobile.test.js tests/lot-c3c.test.js
+      - name: Real Chromium and WebKit garden menu, timed action and reload
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/pf-14-http.log 2>&1 &
+          sleep 3
+          node tests/pf-14-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pf-14-garden-evidence
+          path: artifacts/pf-14/
+          if-no-files-found: warn
   pf-13-flowers:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-13-flower-batch' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/pf-13-flower-batch.yml
@@ -672,3 +695,12 @@ jobs:
           name: cas-c4-female-source-evidence
           path: artifacts/cas-02-1-f2-c4/source-audit.json
           if-no-files-found: warn
+
+  cf-anim-pilot:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-pilot' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/cf-anim-pilot.yml
+    with:
+      browser_only: true

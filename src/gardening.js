@@ -11,8 +11,11 @@ export const GARDEN_LIMIT=8;
 export const GARDEN_MATURE_MINUTES=4320;
 export const GARDEN_HYDRATION_MINUTES=2160;
 export const GARDEN_CARE_COOLDOWN=1440;
-export const GARDEN_ACTIONS=Object.freeze(['water','admire','inspect','harvest','replant']);
-export const GARDEN_DURATION=Object.freeze({water:15,admire:8,inspect:8,harvest:12,replant:10});
+export const GARDEN_WATER_FUN=3;
+export const GARDEN_TALK_SOCIAL=4;
+export const GARDEN_TALK_COOLDOWN=360;
+export const GARDEN_ACTIONS=Object.freeze(['water','admire','inspect','harvest','replant','talk']);
+export const GARDEN_DURATION=Object.freeze({water:15,admire:8,inspect:8,harvest:12,replant:10,talk:12});
 export const GARDEN_REPLANT_PRICE=30;
 export const GARDEN_LABELS=Object.freeze(['Посажено','Росток','Подросло','Цветёт']);
 const validMinute=n=>Number.isFinite(n)&&n>=0&&n<=10000000;
@@ -102,7 +105,10 @@ export function gardenApproach(world,instanceId,from){
 export function restoreGardenRewards(raw){
   return {schema:1,
     alexLastAdmireAt:validMinute(raw?.alexLastAdmireAt)?raw.alexLastAdmireAt:null,
-    miraLastAdmireAt:validMinute(raw?.miraLastAdmireAt)?raw.miraLastAdmireAt:null};
+    miraLastAdmireAt:validMinute(raw?.miraLastAdmireAt)?raw.miraLastAdmireAt:null,
+    // Optional v1 watermarks: absence in existing saves means no prior talk.
+    ...(validMinute(raw?.alexLastTalkAt)?{alexLastTalkAt:raw.alexLastTalkAt}:{}),
+    ...(validMinute(raw?.miraLastTalkAt)?{miraLastTalkAt:raw.miraLastTalkAt}:{})};
 }
 export function gardenBusy(root,instanceId){
   return [root,root?.otherSim].some(a=>a?.action?.id==='garden'&&
@@ -112,7 +118,7 @@ export function gardenBusy(root,instanceId){
 }
 /** Validity is independent of current ownership: a FIFO request can go stale. */
 export function gardenRequestStillValid(root,residentId,instanceId,actionId){
-  if(!GARDEN_ACTIONS.includes(actionId)||!gardenFeature(root?.world,instanceId))return false;
+  if(!['alex','mira'].includes(residentId)||!GARDEN_ACTIONS.includes(actionId)||!gardenFeature(root?.world,instanceId))return false;
   const view=gardenView(root.world.outdoors,instanceId,root.minutes);
   if(!view)return false;
   const feature=gardenFeature(root.world,instanceId),herbs=root?.kitchen?.pantry?.herbs;
@@ -126,6 +132,10 @@ export function gardenRequestStillValid(root,residentId,instanceId,actionId){
   if(actionId==='water')return !view.mature&&
     (view.lastWateredAt===null||root.minutes-view.lastWateredAt>=GARDEN_CARE_COOLDOWN);
   const rewards=restoreGardenRewards(root.gardenRewards);
+  if(actionId==='talk'){
+    const last=rewards[residentId==='mira'?'miraLastTalkAt':'alexLastTalkAt'];
+    return last===undefined||root.minutes-last>=GARDEN_TALK_COOLDOWN;
+  }
   const last=residentId==='mira'?rewards.miraLastAdmireAt:rewards.alexLastAdmireAt;
   return view.mature&&(last===null||root.minutes-last>=GARDEN_CARE_COOLDOWN);
 }
@@ -170,7 +180,15 @@ export function settleGardenAction(root,residentId,instanceId,actionId){
       lastWateredAt:root.minutes,hydratedUntil:root.minutes+
         GARDEN_HYDRATION_MINUTES+gardenSkillBenefits(skillLevel).hydrationBonusMinutes};
     actor.needs.energy=Math.max(0,actor.needs.energy-2);
-    actor.event='Полил(а) грядку — растение растёт';
+    actor.needs.fun=Math.min(100,actor.needs.fun+GARDEN_WATER_FUN);
+    actor.event='Полил(а) грядку — растение растёт · досуг';
+  }else if(actionId==='talk'){
+    const rewards=restoreGardenRewards(root.gardenRewards);
+    rewards[residentId==='mira'?'miraLastTalkAt':'alexLastTalkAt']=root.minutes;
+    root.gardenRewards=rewards;
+    // A solitary activity, not a relationship or social graph receipt.
+    actor.needs.social=Math.min(100,actor.needs.social+GARDEN_TALK_SOCIAL);
+    actor.event='Поговорил(а) с растением · общение';
   }else if(actionId==='inspect'){
     actor.event='Осмотрел(а), как подросло растение';
   }else{

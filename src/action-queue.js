@@ -36,7 +36,7 @@ export function sanitizeQueueCommand(id,raw,persons){
   if(type==='outdoor')return validOutdoorId(raw.instanceId)
     ?{type:'outdoor',instanceId:raw.instanceId}:null;
   if(type==='garden')return validOutdoorId(raw.instanceId)&&
-    ['water','admire','inspect','harvest','replant'].includes(raw.actionId)
+    ['water','admire','inspect','harvest','replant','talk'].includes(raw.actionId)
     ?{type:'garden',instanceId:raw.instanceId,actionId:raw.actionId}:null;
   if(type==='pool'){
     if(!validPoolId(raw.poolId)||!['swim','jump'].includes(raw.actionId)||

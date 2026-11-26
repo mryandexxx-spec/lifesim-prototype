@@ -170,9 +170,14 @@ test('CAS-01.3 game boot/write paths are fail-closed on load errors',()=>{
   assert.match(source,/readV1Save\(localStorage,SAVE_KEY\)/,
     'root-v1 loads must use the protected storage boundary');
   const writes=[...source.matchAll(/writeV1Save\(localStorage,SAVE_KEY,/g)];
-  assert.equal(writes.length,4,'all four writers must use the guarded atomic v1 boundary');
+  assert.equal(writes.length,5,'all five writers must use the guarded atomic v1 boundary');
+  // PF-13: the fifth writer is short-circuit guarded and must persist before
+  // the live world, wallet, history or placement progress can be advanced.
+  const flower=source.slice(source.indexOf('// PF-13: persist each confirmed flower'),source.indexOf('outdoorTimeline=outdoorTimeline.slice',source.indexOf('// PF-13: persist each confirmed flower')));
+  assert.match(flower,/if\(quote\)\{[\s\S]*?let persisted=false;\s*try\{persisted=canWriteGameSave\(\)&&writeV1Save\(localStorage,SAVE_KEY,result\.root\)\.ok;\}catch\{\}\s*if\(!persisted\)\{[^\n]*return;\}\s*\}\s*game\.world\.outdoors=result\.root\.world\.outdoors;\s*game\.shop=result\.root\.shop;game\.financialHistory=result\.root\.financialHistory;/,
+    'flower payment and placement must be fail-closed before publishing the committed root');
   assert.doesNotMatch(source,/localStorage\.setItem\(SAVE_KEY,/,
     'bypassing protected save writer risks corruption or quota loss');
   assert.equal((source.match(/if\(!canWriteGameSave\(\)\)/g)||[]).length,4,
-    'manual, pool, undo writers all must be locked');
+    'four early-return guards plus the separately checked PF-13 short-circuit guard');
 });

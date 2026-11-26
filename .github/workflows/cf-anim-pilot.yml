@@ -2,11 +2,16 @@ name: CF-ANIM production pilot
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      browser_only:
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
 jobs:
   native-bench-pilot:
+    if: ${{ !inputs.browser_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 85
     env:
@@ -113,4 +118,50 @@ jobs:
           path: |
             pilot-out/
             fbik-out/
+          if-no-files-found: warn
+
+  browser-replay-r3:
+    if: ${{ inputs.browser_only }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '15117711405'
+          run-id: 45815763571
+          github-token: ${{ github.token }}
+          path: replay-r3
+      - name: Verify exact previously generated GLB and report bytes
+        run: |
+          mkdir -p pilot-out
+          cp replay-r3/pilot-out/{female.glb,male.glb,bench.glb,report.json} pilot-out/
+          cd pilot-out
+          sha256sum -c <<'EOF'
+          65a2e98db27caa029f87b8520509bd992d391b220c00cfbc2284f781bb995b17  female.glb
+          37dc88e16e452195810848ad0e6b8a06a723a9e0e8d0c3abe6a83651a5aff0a6  male.glb
+          eb4407b9e6abc3ad42568f90e3a5d9242845dd7af81fa7f84714aeb4de7cd30b  bench.glb
+          cc929e71f2de68f4ba44fe437dcee4d4ce9630f4fb71a353d583cc3bbf2b7b0b  report.json
+          EOF
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Browser-only replay with real pixel gate
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          cp node_modules/playcanvas/build/playcanvas.mjs pilot-out/playcanvas.mjs
+          cp tools/cf-anim-pilot-lab.html pilot-out/lab.html
+          python -m http.server 8765 --bind 127.0.0.1 --directory pilot-out >/tmp/pilot-http.log 2>&1 &
+          sleep 2
+          xvfb-run -a node tools/cf-anim-pilot-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-pilot-browser-replay-r3
+          path: pilot-out/
           if-no-files-found: warn

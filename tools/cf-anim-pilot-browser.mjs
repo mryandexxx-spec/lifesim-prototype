@@ -31,11 +31,11 @@ async function screenshotColors(page,png){
 try{
  for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
   // WebKit headless compositor returned UI-only images in R2; test real headed canvas as well.
-  const browser=await engine.launch(name==='chromium'?{headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']}:{headless:false});
+  const browser=await engine.launch(name==='chromium'?{headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']}:{headless:true});
   try{
    for(const [width,height] of [[390,844],[320,568]]){
     const ctx=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true,deviceScaleFactor:1});
-    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+    const page=await ctx.newPage(),errors=[],consoleMessages=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(consoleMessages.length<200)consoleMessages.push({type:m.type(),text:m.text()})});
     try{
       await page.goto('http://127.0.0.1:8765/lab.html');
       await page.waitForFunction(()=>window.pilot&&document.querySelector('#status').textContent.startsWith('Готово'),{},{timeout:60000});
@@ -51,10 +51,10 @@ try{
         samples.push({u,time:probe.time,sha256:hash(png),bones:probe.bones,path:base+'.png',canvasPath:base+'-canvas.png',canvasSha256:hash(canvasPng),canvasColors:actual.colors,compositeColors});
        }
        let delta=0;for(const [k,v] of Object.entries(samples[0].bones)){const w=samples[2].bones[k];if(w)delta=Math.max(delta,Math.hypot(...w.map((x,i)=>x-v[i])))}
-       results.push({name,width,height,sex,delta,samples,errors:[...errors]});
+       results.push({name,width,height,sex,delta,samples,errors:[...errors],device:await page.evaluate(()=>window.pilotDevice?.()),consoleMessages:[...consoleMessages]});
        assert.ok(delta>.01,'real bone motion');assert.deepEqual(errors,[]);assert.ok(samples.every(s=>s.compositeColors>=12),'blank actual composed scene; canvas readback retained');assert.ok(new Set(samples.map(s=>s.canvasSha256)).size>=4,'rendered scene must change');
       }
-    }catch(e){failures.push({name,width,height,error:String(e),errors});await page.screenshot({path:out+'/'+name+'-'+width+'-failure.png'}).catch(()=>{})}finally{await ctx.close()}
+    }catch(e){const device=await page.evaluate(()=>window.pilotDevice?.()).catch(()=>null);failures.push({name,width,height,error:String(e),errors,device,consoleMessages});await page.screenshot({path:out+'/'+name+'-'+width+'-failure.png'}).catch(()=>{})}finally{await ctx.close()}
    }
   }finally{await browser.close()}
  }
