@@ -339,3 +339,23 @@ test('game edits always route the fail-closed root-v1 writer contract',()=>{
   for(const file of ['src/game.js','src/hud-panel.js','src/ui-layout.js','index.html','styles.css'])
     assert.ok(planChanges([file]).tests.includes('tests/hud-panel.test.js'),file);
 });
+
+test('R1: every known missed release diff now requires generated-asset full premerge regression',()=>{
+  const examples=[
+    ['index.html','src/game.js','src/furniture-transform.js','styles.css'],
+    ['index.html','src/game.js','src/outdoor-proposals.js'],
+    ['index.html','src/game.js','src/sleep-acceleration.js'],
+    ['index.html','src/game.js','assets/furniture/of-r2/garden.flower.calendula-growing.glb'],
+    ['index.html','src/career-incidents.js','src/career-state.js','src/career-work.js'],
+  ];
+  for(const changed of examples)assert.equal(planChanges(changed).release_gate,true,changed.join(','));
+  for(const f of ['src/game.js','src/household.js','src/simulation.js','styles.css','sw.js','package-lock.json','cas-f2-c4b-lab.html','.github/workflows/pages.yml','scripts/cas-c4-mira-sources.py','src/nonexistent-unknown-source.js','assets/example.glb','unrecognized-entry'])
+    assert.equal(planChanges([f]).release_gate,true,f);
+  assert.equal(planChanges(['README.md','docs/notes.md']).release_gate,false);
+  assert.equal(planChanges(['src/kitchen.js']).release_gate,false);
+});
+test('R1: source-text readers are selected when their exact source dependency changes',()=>{
+  assert.ok(planChanges(['src/hud-panel.js']).tests.includes('tests/hud-panel.test.js'));
+  assert.ok(planChanges(['src/dialogue-decision.js']).tests.includes('tests/dialogue-decision.test.js'));
+  assert.ok(planChanges(['src/resident-hud.js']).tests.includes('tests/pf-01.test.js'));
+});
