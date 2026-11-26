@@ -1,0 +1,29 @@
+name: GC economy pilot A
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  market:
+    if: github.head_ref == 'diagnostic/gc-04-09-market-a' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/w4a-finance.test.js tests/w4c-bills.test.js tests/life-food-r1.test.js
+      - run: node tests/gc-04-09-market-probe.mjs
+        env:
+          GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-04-09-market-a
+          path: artifacts/gc-04-09-market-a/
+          if-no-files-found: warn
