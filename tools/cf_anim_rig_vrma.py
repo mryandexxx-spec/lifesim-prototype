@@ -46,6 +46,60 @@ def target_map():
         for i,f in enumerate(("thumb","index","middle","ring","little"),1):
             for j,part in enumerate(("metacarpal","proximal","distal") if i==1 else ("proximal","intermediate","distal"),1):m[s+"_"+f+"_"+part]=f"finger{i}-{j}.{p}"
     return m
+def audit_vrma(data,source):
+    """Independent GLB forward-kinematics on the exported channels, no importer.
+    Compare original source landmarks at exact 120Hz indices, not target anatomy.
+    """
+    import struct,re
+    from mathutils import Quaternion
+    assert data[:4]==b"glTF" and struct.unpack_from("<I",data,4)[0]==2
+    n,kind=struct.unpack_from("<II",data,12)
+    assert kind==0x4e4f534a
+    g=json.loads(data[20:20+n])
+    size,kind=struct.unpack_from("<II",data,20+n)
+    assert kind==0x004e4942
+    binary=data[28+n:28+n+size]
+    def accessor(i):
+        a=g["accessors"][i];v=g["bufferViews"][a["bufferView"]]
+        assert a["componentType"]==5126 and not a.get("sparse") and v.get("buffer",0)==0
+        width={"SCALAR":1,"VEC3":3,"VEC4":4}[a["type"]]
+        base=v.get("byteOffset",0)+a.get("byteOffset",0);stride=v.get("byteStride",4*width)
+        assert base+(a["count"]-1)*stride+4*width<=len(binary)
+        rows=[struct.unpack_from("<"+"f"*width,binary,base+j*stride) for j in range(a["count"])]
+        assert all(math.isfinite(x) for row in rows for x in row)
+        return rows
+    anim,=g["animations"];channels={}
+    for channel in anim["channels"]:
+        t=channel["target"];sampler=anim["samplers"][channel["sampler"]]
+        assert sampler.get("interpolation","LINEAR")=="LINEAR"
+        ts=accessor(sampler["input"]);values=accessor(sampler["output"])
+        assert len(ts)==len(values)==946
+        assert abs(ts[0][0])<1e-6 and abs(ts[-1][0]-945/120)<.002
+        channels[t["node"],t["path"]]=values
+    nodes=g["nodes"];parents={ch:i for i,node in enumerate(nodes) for ch in node.get("children",[])}
+    roles={re.sub(r"([A-Z])",lambda m:"_"+m[0].lower(),role):node["node"] for role,node in g["extensions"]["VRMC_vrm_animation"]["humanoid"]["humanBones"].items()}
+    assert set(roles)==set(source[0])
+    errors={k:[] for k in roles}
+    for j,reference in enumerate(source):
+        worlds={}
+        def world(i):
+            if i in worlds:return worlds[i]
+            node=nodes[i]
+            p=channels[i,"translation"][j*5] if (i,"translation") in channels else node.get("translation",[0,0,0])
+            r=channels[i,"rotation"][j*5] if (i,"rotation") in channels else node.get("rotation",[0,0,0,1])
+            s=node.get("scale",[1,1,1])
+            assert all(abs(v-1)<.0002 for v in s)
+            q=Quaternion((r[3],r[0],r[1],r[2])).normalized()
+            local=Matrix.Translation(Vector(p))@q.to_matrix().to_4x4()
+            worlds[i]=world(parents[i])@local if i in parents else local
+            return worlds[i]
+        for role,i in roles.items():
+            p=world(i).translation
+            blender=Vector((p.x,-p.z,p.y))
+            errors[role].append((blender-Vector(reference[role])).length)
+    result={role:{"meanM":sum(values)/len(values),"maxM":max(values)} for role,values in errors.items()}
+    failed=[k for k,v in result.items() if v["maxM"]>.02]
+    return {"head":os.environ["EXPECTED_SHA"],"frames":len(source),"sourceLandmarkMaxThresholdM":.02,"roles":result,"failures":failed,"status":"SOURCE_EXPORT_FAIL" if failed else "SOURCE_EXPORT_PASS"}
 def prepare():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable("io_anim_bvh",default_set=False,persistent=False)
@@ -128,6 +182,8 @@ def export():
     data=VRMA.read_bytes();assert data[:4]==b"glTF"
     n=int.from_bytes(data[12:16],"little");g=json.loads(data[20:20+n])
     assert "VRMC_vrm_animation" in g["extensions"] and g["animations"]
+    audit=audit_vrma(data,original);dump("source-vrma-audit.json",audit)
+    print("Independent source FK",audit["status"],audit["failures"],flush=True)
     print("VRMA exported",len(data),"bytes",flush=True);finish()
 def replay():
     sys.path.insert(0,str(pathlib.Path("prior-code/tools").resolve()))
@@ -176,12 +232,18 @@ def replay():
     p95=errors[math.ceil(.95*len(errors))-1]
     report.update({"targetCalHipHeightM":th,"sourceCalHipHeightM":sh,"hipTravelM":travel,"sourceTravelNormalized":sourceTravel/sh,"targetTravelNormalized":travel/th,"initialHipHeightErrorM":abs(ys[0]-th),"headShoulderMinM":min(q["headShoulderHeightM"] for q in samples),"floorMinM":min(q["floorGapM"] for q in samples),"segmentAngleP95Deg":p95,"maxLocalDriftM":max(q["nonrootTranslationDriftM"] for q in samples)})
     fails=[]
+    audit=json.loads((OUT/"source-vrma-audit.json").read_text())
+    assert audit["head"]==os.environ["EXPECTED_SHA"]
+    report["sourceExportAudit"]=audit["status"]
+    if audit["status"]!="SOURCE_EXPORT_PASS":fails.append("SOURCE_EXPORT_LANDMARKS")
     if travel<=.15 or abs(travel/th-sourceTravel/sh)>.15:fails.append("ROOT_TRAVEL")
     if abs(ys[0]-th)>.15:fails.append("INITIAL_HIP_HEIGHT")
     if report["headShoulderMinM"]<.05:fails.append("HEAD_COLLAPSE")
     if report["floorMinM"]<-.05:fails.append("GROSS_FLOOR_PENETRATION")
     if p95>35:fails.append("SEGMENT_DIRECTION")
     if report["maxLocalDriftM"]>.002:fails.append("LOCAL_LENGTH")
+    report["headGateFailedFrames"]=sum(q["headShoulderHeightM"]<.05 for q in samples)
+    report["floorGateFailedFrames"]=sum(q["floorGapM"]<-.05 for q in samples)
     report["failures"]=fails;report["status"]="MOTION_SCREEN_FAIL" if fails else "MOTION_SCREEN_PASS"
     dump("target-poses.json",{"names":[b.name for b in bones],"parents":[bones.index(b.parent) if b.parent else -1 for b in bones],"poses":frames});save()
     center=Vector((0,0,floor+h*.50))
