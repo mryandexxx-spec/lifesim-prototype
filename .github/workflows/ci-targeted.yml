@@ -8,8 +8,9 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  ci-cd-r1-c-release-rehearsal:
-    if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-c-release' && github.event.pull_request.head.repo.full_name == github.repository
+  full-release-regression:
+    needs: targeted
+    if: github.event_name == 'pull_request' && needs.targeted.outputs.release_gate == 'true'
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -17,12 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Full exact-head Pages assembly and all existing gates with pinned source pack
+      - name: Confirm exact PR merge-test commit
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Full exact-tree Pages assembly and all existing gates
         run: python3 scripts/ci-cd-r1-c-rehearsal.py
       - name: Archive site file hash passport (not a deployable artifact)
         uses: actions/upload-artifact@v4
@@ -273,6 +276,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     outputs:
+      release_gate: ${{ steps.impact.outputs.release_gate }}
       browser: ${{ steps.impact.outputs.browser }}
       parcel_editor: ${{ steps.impact.outputs.parcel_editor }}
       cas_inventory: ${{ steps.impact.outputs.cas_inventory }}
