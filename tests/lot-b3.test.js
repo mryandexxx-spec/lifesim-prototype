@@ -93,8 +93,10 @@ test('B3 restores malformed action without phantom bonus and old saves remain co
 
 test('B3 scene renderer includes owned garden furniture and lights',()=>{
   const source=readFileSync(new URL('../src/game.js',import.meta.url),'utf8');
-  const filter=source.match(/const renderOutdoorFeatures=\(\)=>\{[\s\S]*?for\(const item of game\.world\?\.outdoors\?\.features\|\|\[\]\)\{[\s\S]*?if\(!def\|\|!\[([^\]]+)\]\.includes\(def\.category\)\)continue;/);
-  assert.ok(filter,'renderer must iterate saved outdoor features with explicit category filter');
+  assert.match(source,/const renderOutdoorFeatures=\(\)=>\{[\s\S]*?for\(const item of game\.world\?\.outdoors\?\.features\|\|\[\]\)\{\s*const node=createOutdoorFeatureNode\(item\);/,
+    'committed renderer must iterate saved features through the common factory');
+  const filter=source.match(/const createOutdoorFeatureNode=\(item,\{preview=false\}=\{\}\)=>\{\s*const def=OUTDOOR_CATALOG\[item\.itemId\];\s*if\(!def\|\|!\[([^\]]+)\]\.includes\(def\.category\)\)return null;/);
+  assert.ok(filter,'shared model factory must explicitly reject unknown categories');
   for(const category of ['tree','shrub','flower','fence','furniture','light'])
     assert.ok(filter[1].includes("'"+category+"'"),'renderer skips '+category);
   for(const itemId of ['garden.bench','garden.table'])

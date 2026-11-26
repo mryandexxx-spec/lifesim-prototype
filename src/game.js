@@ -119,7 +119,7 @@ import {proceduralFurnitureModel} from './furniture-procedural-library.js';
 import {createMeshyFurnitureVisual} from './meshy-furniture-visual.js';
 import {meshyStarterFurnitureSku,meshyFurnitureDisplaySku,meshyFurnitureThumbnailUrl} from './meshy-furniture-policy.js';
 import {ofInteriorDiningPlateY,ofInteriorOverlay} from './of-interior-assets.js';
-import {createOutdoorVegetationVisual} from './of-vegetation-visual.js';
+import {createOutdoorVegetationVisual} from './of-vegetation-visual.js?v=pf-12';
 import {createGardenVisual} from './of-garden-visual.js';
 import {createOutdoorFurnitureVisual} from './of-outdoor-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
@@ -3252,17 +3252,18 @@ function boot() {
     metal:mat('#606975'),metalLight:mat('#aebbc7'),coal:mat('#2b3035'),
     ember:mat('#d56f40'),meat:mat('#995d43'),chicken:mat('#dbac73')
   };
-  const renderOutdoorFeatures=()=>{
-    vegetation.clear();
-    for(const node of outdoorFeatureNodes.splice(0))node.destroy();
-    outdoorLightNodes.length=0;grillAnimated.length=0;
-    for(const item of game.world?.outdoors?.features||[]){
+  // One visual factory for committed and unsaved placements. A candidate
+  // never owns simulation state, emitter budget or active cooking overlays.
+  const outdoorNodesById=new Map();
+  let outdoorFeaturePreview=null;
+  const createOutdoorFeatureNode=(item,{preview=false}={})=>{
       const def=OUTDOOR_CATALOG[item.itemId];
-      if(!def||!['tree','shrub','flower','fence','furniture','light','garden'].includes(def.category))continue;
-      const node=new pc.Entity('LOT-B2 '+item.instanceId+' '+item.itemId);
+      if(!def||!['tree','shrub','flower','fence','furniture','light','garden'].includes(def.category))return null;
+      const node=new pc.Entity(preview?'PF-12 outdoor placement '+item.itemId:'LOT-B2 '+item.instanceId+' '+item.itemId);
       node.setLocalPosition(item.x,-.53,item.z);
       node.setLocalEulerAngles(0,-item.yaw,0);
-      app.root.addChild(node);outdoorFeatureNodes.push(node);
+      app.root.addChild(node);
+      let grillOverlay=[];
       const part=(shape,name,x,y,z,sx,sy,sz,color)=>
         primitive(shape,name,x,y,z,sx,sy,sz,outdoorFeatureMaterials[color],node);
       if(def.category==='garden'){
@@ -3348,7 +3349,8 @@ function boot() {
           }
           skewers.push(pivot);
         }
-        grillAnimated.push({instanceId:item.instanceId,skewers,foodPieces});
+        grillOverlay=skewers;
+        if(!preview)grillAnimated.push({instanceId:item.instanceId,skewers,foodPieces});
       }else if(item.itemId==='garden.table'){
         part('cylinder','table stand',0,.43,0,.20,.80,.20,'woodDark');
         part('cylinder','garden tabletop',0,.86,0,1.06,.11,1.06,'wood');
@@ -3363,7 +3365,7 @@ function boot() {
         part('box','light cap',0,height+.27,0,tall?.51:.39,.09,tall?.51:.39,'woodDark');
         // Real omni emitter, not a glowing sprite. Fully removed with the
         // owned fixture, capped at 8 and never allowed to cast shadow maps.
-        if(outdoorLightNodes.length<OUTDOOR_LIGHT_LIMIT){
+        if(!preview&&outdoorLightNodes.length<OUTDOOR_LIGHT_LIMIT){
           const glow=new pc.Entity('LOT-B3 '+item.itemId+' emitter');
           glow.addComponent('light',{type:'omni',
             color:new pc.Color(1,.78,.51),intensity:0,
@@ -3385,7 +3387,44 @@ function boot() {
       if(def.category==='garden')gardenVisual.attach(node,item.itemId,gardenView(game.world.outdoors,item.instanceId,game.minutes));
       vegetation.attach(node,item.itemId);
       // The static grill never owns the existing articulated skewer/food overlay.
-      outdoorFurnitureVisual.attach(node,item.itemId,item.itemId==='garden.grill'?grillAnimated.at(-1).skewers:[]);
+      outdoorFurnitureVisual.attach(node,item.itemId,grillOverlay);
+      return node;
+  };
+  const setOutdoorVisualPose=(node,pose)=>{
+    node.setLocalPosition(pose.x,-.53,pose.z);
+    node.setLocalEulerAngles(0,-pose.yaw,0);
+    vegetation.invalidateTransforms(node);
+  };
+  const clearOutdoorFeaturePreview=()=>{
+    const staged=outdoorFeaturePreview;
+    outdoorFeaturePreview=null;
+    if(!staged)return;
+    if(staged.owned)setOutdoorVisualPose(staged.node,staged.original);
+    else{staged.node.destroy();if(staged.vegetation)vegetation.invalidateTransforms();}
+  };
+  const syncOutdoorFeaturePreview=(item,pose,owned)=>{
+    const key=owned?item.instanceId:'new:'+item.itemId;
+    if(outdoorFeaturePreview?.key!==key){
+      clearOutdoorFeaturePreview();
+      const node=owned?outdoorNodesById.get(item.instanceId):
+        createOutdoorFeatureNode({...item,...pose},{preview:true});
+      if(!node)return;
+      outdoorFeaturePreview={key,node,owned,vegetation:['tree','shrub','flower'].includes(OUTDOOR_CATALOG[item.itemId]?.category),original:{x:item.x,z:item.z,yaw:item.yaw},pose:null};
+    }
+    const staged=outdoorFeaturePreview;
+    if(staged.pose?.x===pose.x&&staged.pose?.z===pose.z&&staged.pose?.yaw===pose.yaw)return;
+    setOutdoorVisualPose(staged.node,pose);
+    staged.pose={...pose};
+  };
+  const renderOutdoorFeatures=()=>{
+    clearOutdoorFeaturePreview();
+    vegetation.clear();
+    for(const node of outdoorFeatureNodes.splice(0))node.destroy();
+    outdoorNodesById.clear();
+    outdoorLightNodes.length=0;grillAnimated.length=0;
+    for(const item of game.world?.outdoors?.features||[]){
+      const node=createOutdoorFeatureNode(item);
+      if(node){outdoorFeatureNodes.push(node);outdoorNodesById.set(item.instanceId,node);}
     }
     syncOutdoorLights(currentOutdoorDaylight);
     gardenStageSignature=currentGardenStageSignature();
@@ -7328,6 +7367,7 @@ function boot() {
   };
   const clearOutdoorPending=(quiet=false)=>{
     poolVisual.previewFixture();
+    clearOutdoorFeaturePreview();
     outdoorDrag=null;outdoorPending=null;outdoorPaintGhost.enabled=false;poolOutline.enabled=false;outdoorPose=null;
     if(!quiet)outdoorFeedback(poolMode()
       ?'Вода: коснись и протяни прямоугольник. Оборудование: коснись бортика.'
@@ -7463,14 +7503,15 @@ function boot() {
   const outdoorSnap=n=>Math.round(n*4)/4;
   const showOutdoorFeatureGhost=(pose,valid=true)=>{
     poolOutline.enabled=false;
-    if(!pose){outdoorPaintGhost.enabled=false;return;}
+    if(!pose){clearOutdoorFeaturePreview();outdoorPaintGhost.enabled=false;return;}
     const operation=$('outdoor-feature-operation').value;
     const chosen=operation==='place'
       ?{itemId:$('outdoor-feature-kind').value,...pose}
       :game.world.outdoors.features.find(i=>i.instanceId===$('outdoor-feature-owned').value);
-    if(!chosen){outdoorPaintGhost.enabled=false;return;}
+    if(!chosen){clearOutdoorFeaturePreview();outdoorPaintGhost.enabled=false;return;}
     const boxRect=outdoorFeatureRect({...chosen,...pose});
-    if(!boxRect){outdoorPaintGhost.enabled=false;return;}
+    if(!boxRect){clearOutdoorFeaturePreview();outdoorPaintGhost.enabled=false;return;}
+    syncOutdoorFeaturePreview(chosen,pose,operation==='move');
     outdoorPaintGhost.setPosition((boxRect.minX+boxRect.maxX)/2,-.505,
       (boxRect.minZ+boxRect.maxZ)/2);
     outdoorPaintGhost.setLocalScale(boxRect.maxX-boxRect.minX,.045,
@@ -7495,7 +7536,8 @@ function boot() {
         :'Место подходит · '+OUTDOOR_CATALOG[itemId].name+
           ' · поворот '+outdoorYaw+'° · стоимость '+proposal.cost+' кр. · подтверди');
     else outdoorFeedback(outdoorReason[proposal.reason]||'Нельзя разместить здесь объект',true);
-    if(operation!=='sell')showOutdoorFeatureGhost(pose,proposal.ok);
+    if(operation!=='sell')showOutdoorFeatureGhost(proposal.ok?proposal.pose:pose,proposal.ok);
+    else clearOutdoorFeaturePreview();
     updateOutdoorPanel();return proposal;
   };
   const exitOutdoor=()=>{

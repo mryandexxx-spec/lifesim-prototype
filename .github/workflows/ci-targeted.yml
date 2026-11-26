@@ -45,6 +45,9 @@ jobs:
             artifacts/of-e/
             artifacts/lot-d2c/
           if-no-files-found: warn
+  pf-12-rotation:
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/pf-12-outdoor-rotation-preview' && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/pf-12-rotation.yml
   of-integration-d:
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/of-integration-d' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
