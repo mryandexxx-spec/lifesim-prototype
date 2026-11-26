@@ -1,5 +1,5 @@
 """Production pilot, not a new solver experiment. Frozen R12 imported unmodified."""
-import pathlib, sys, json, math, shutil, subprocess, tempfile, struct
+import pathlib, sys, json, math, shutil, subprocess, tempfile, struct, ast
 import numpy as np
 import bpy
 from mathutils import Vector, Matrix, Quaternion
@@ -7,6 +7,7 @@ from mathutils.bvhtree import BVHTree
 from mathutils.kdtree import KDTree
 sys.path.insert(0,str(pathlib.Path("frozen-fbik/tools").resolve()))
 import cf_anim_fbik as F
+from cf_anim_contacts import setrot  # pinned prior-code helper, not exported by R12
 OUT=pathlib.Path("pilot-out"); OUT.mkdir(exist_ok=True)
 BENCH=pathlib.Path("assets/furniture/of-r2/garden.bench-new.glb")
 BENCH_SHA="eb4407b9e6abc3ad42568f90e3a5d9242845dd7af81fa7f84714aeb4de7cd30b"
@@ -137,7 +138,7 @@ def stage_contacts(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor
         for side,(v,q) in feet.items():
             ids=[t["roles"][a+"_"+side] for a in ("thigh","shin","foot")]
             err[side]=F.ik(t,f,ids,v,1.)
-            F.setrot(t,f,ids[-1],q)
+            setrot(t,f,ids[-1],q)
         F.apply(arm,bones,rest,f);w=F.world(t,f)
         # A second geometric support evaluation after leg posing; no changes to solver weights.
         patch=contact_patch(t,w,pelvis,thighs,seat)
@@ -148,7 +149,7 @@ def stage_contacts(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor
             for side,(v,q) in feet.items():
                 ids=[t["roles"][a+"_"+side] for a in ("thigh","shin","foot")]
                 err[side]=F.ik(t,f,ids,v,1.)
-                F.setrot(t,f,ids[-1],q)
+                setrot(t,f,ids[-1],q)
         F.apply(arm,bones,rest,f);w=F.world(t,f)
         hand_goals={};arm_errors={}
         for side in regs:
@@ -174,7 +175,7 @@ def stage_contacts(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor
             goal=v.lerp(desired_v,weight);goal_q=q.slerp(desired_q,weight)
             ids=[t["roles"][a+"_"+side] for a in ("upperarm","forearm","hand")]
             arm_errors[side]=F.ik(t,f,ids,goal,1.)
-            F.setrot(t,f,e,goal_q)
+            setrot(t,f,e,goal_q)
             hand_goals[e]=F.transform(goal,goal_q)
         F.apply(arm,bones,rest,f);w=F.world(t,f)
         g={t["roles"]["hip"]:F.transform(F.pos(w,t["roles"]["hip"]),w[t["roles"]["hip"]].to_quaternion())}
@@ -254,6 +255,11 @@ def verify_reimport(path,t,frames):
     return {"frame_range":[lo,hi],"frames":len(errors),"max_joint_position_error_m":max(errors),"p95_m":float(np.quantile(errors,.95)),"within_2mm":max(errors)<.002}
 
 def main():
+    # Fail before expensive solving if the pinned adapter API changes or is misused.
+    required={n.attr for n in ast.walk(ast.parse(pathlib.Path(__file__).read_text())) if isinstance(n,ast.Attribute) and isinstance(n.value,ast.Name) and n.value.id=="F"}
+    missing=sorted(n for n in required if not hasattr(F,n))
+    assert not missing,("pinned FBIK adapter API missing",missing)
+    assert callable(setrot)
     data=F.read("input.json");solved=F.read("solved.json");inv=F.read("semantic-inventory.json")
     for k,s in data["sources"].items():s["roles"]=inv["sources"][k]["map"]
     for k,t in data["targets"].items():t["roles"]=inv["targets"][k]["map"]
