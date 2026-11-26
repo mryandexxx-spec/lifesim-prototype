@@ -47,14 +47,37 @@ def native(arm,bones,rest,t,bf,goals):
 
 class WeightedSkin:
     """Linear blend skin reconstructed from the GLB bind and every vertex weight."""
-    def __init__(self,t,meshes):
+    def __init__(self,t,meshes,arm,bones):
         self.t=t;self.reg=[(o,list(range(len(o.data.vertices)))) for o in meshes]
         w=world(t,t["rest"]);inv=[m.inverted() for m in w]
-        records=[]
+        records=[];audit=[]
         for o in meshes:
+            mods=[m for m in o.modifiers if m.type=="ARMATURE" and m.object==arm]
+            assert len(mods)==1,(o.name,"armature modifier count")
+            mod=mods[0]
+            # glTF skinning is linear blend, not Blender's optional dual quaternion.
+            # Do not silently change the candidate or its render configuration.
+            assert not mod.use_deform_preserve_volume,(o.name,"dual quaternion modifier")
+            enabled=mod.show_viewport
+            assert enabled and mod.use_vertex_groups and not mod.vertex_group,(o.name,"unsupported modifier setup")
+            try:
+                mod.show_viewport=False
+                bpy.context.view_layer.update()
+                dep=bpy.context.evaluated_depsgraph_get();e=o.evaluated_get(dep);me=e.to_mesh()
+                try:
+                    assert len(me.vertices)==len(o.data.vertices),(o.name,"pre-skin topology changed")
+                    points=[Y@e.matrix_world@v.co for v in me.vertices]
+                finally:e.to_mesh_clear()
+            finally:
+                mod.show_viewport=enabled
+                bpy.context.view_layer.update()
+            raw=[Y@o.matrix_world@v.co for v in o.data.vertices]
+            audit.append({"mesh":o.name,"vertices":len(points),"pre_skin_vs_raw_max_m":max((p-q).length for p,q in zip(points,raw)),
+                "shape_keys":{k.name:float(k.value) for k in o.data.shape_keys.key_blocks} if o.data.shape_keys else {},
+                "modifiers":[m.type for m in o.modifiers]})
             mapping={g.index:t["names"].index(g.name) for g in o.vertex_groups if g.name in t["names"]}
             for v in o.data.vertices:
-                p=Y@o.matrix_world@v.co
+                p=points[v.index]
                 inf=[(mapping[g.group],float(g.weight)) for g in v.groups if g.group in mapping and g.weight>0.]
                 assert inf,("unweighted vertex",o.name,v.index)
                 total=sum(a for _,a in inf)
@@ -66,6 +89,7 @@ class WeightedSkin:
         for j,rec in enumerate(records):
             for z,(i,a,p) in enumerate(rec):
                 self.ids[j,z]=i;self.weights[j,z]=a;self.local[j,z]=p
+        (OUT/"skin-bind-audit.jsonl").open("a").write(json.dumps({"rig_sha256":t["sha256"],"meshes":audit})+"\n")
     def evaluate(self,rot,trans):
         parts=np.einsum("nkij,nkj->nki",rot[self.ids],self.local)+trans[self.ids]
         return np.einsum("nk,nki->ni",self.weights,parts),parts
@@ -190,8 +214,34 @@ def qp(t,bf,goals,weighted=None,diagnostic=None):
     return encode([w if p<0 else ws[p].inverted()@w for w,p in zip(ws,t["parents"])])
 
 def apply(arm,bones,rest,f):
-    for b,m,v in zip(bones,rest,f):b.matrix_basis=m.inverted()@matrix(v["p"],v["r"])
+    # Convert desired world poses with Blender's own bone-local convention,
+    # including local-location/inherit-scale flags and actual armature transform.
+    # Restore the uniform rest scale stripped by the rigid solver contract.
+    to_arm=(Y@arm.matrix_world).inverted()
+    poses=[]
+    for b,v in zip(bones,f):
+        m=matrix(v["p"],v["r"])
+        if b.parent is not None:m=poses[bones.index(b.parent)]@m
+        poses.append(m)
+    targets=[]
+    for b,m in zip(bones,poses):
+        rigid_rest=Y@arm.matrix_world@b.bone.matrix_local
+        scale=rigid_rest.to_scale()
+        assert max(scale)-min(scale)<.001*max(scale)
+        desired=to_arm@m@Matrix.Diagonal((*scale,1.))
+        if b.parent is None:
+            basis=b.bone.convert_local_to_pose(desired,b.bone.matrix_local,invert=True)
+        else:
+            idx=bones.index(b.parent)
+            basis=b.bone.convert_local_to_pose(desired,b.bone.matrix_local,
+                parent_matrix=targets[idx],parent_matrix_local=b.parent.bone.matrix_local,invert=True)
+        b.matrix_basis=basis
+        targets.append(desired)
     bpy.context.view_layer.update()
+    actual=locals_(arm,bones)
+    err=max((m.to_translation()-Vector(v["p"])).length for m,v in zip(actual,f))
+    rot=max(2*math.acos(min(1.,abs(m.to_quaternion().dot(matrix(v["p"],v["r"]).to_quaternion())))) for m,v in zip(actual,f))
+    assert err<.0002 and rot<.002,("pose replay",err,rot)
 def pose_error(t,f,goals):
     w=world(t,f)
     return {t["names"][i]:{"position_m":(w[i].translation-g.translation).length,
@@ -220,7 +270,11 @@ def main():
         arm,bones=import_rig(path);reset(arm,bones);rest=locals_(arm,bones,True)
         meshes=[o for o in bpy.context.scene.objects if o.type=="MESH" and any(m.type=="ARMATURE" and m.object==arm for m in o.modifiers)]
         h,floor=setup(meshes);regs={s:regions(meshes,t,s) for s in ("l","r")}
-        skin=WeightedSkin(t,meshes)
+        skin=WeightedSkin(t,meshes,arm,bones)
+        apply(arm,bones,rest,t["rest"])
+        bind_error=skin.actual_error(t["rest"])
+        print("Neutral skin replay",key,bind_error,flush=True)
+        assert bind_error["max_m"]<.002,("neutral skin replay",key,bind_error)
         pelvis=regions(meshes,t);ears=ear_candidates(meshes,t);hip=t["roles"]["hip"]
         report["profiles"][key]={}
         central=key==min((k for k,v in data["targets"].items() if v["sex"]==t["sex"]),key=lambda k:abs(data["targets"][k]["scale"]-1))
@@ -291,6 +345,8 @@ def main():
                         row["variants"][label]["infeasible"]=failure is not None
                         replay=skin.actual_error(f)
                         row["variants"][label]["skin_replay"]=replay
+                        if replay["max_m"]>=.002:
+                            (OUT/"skin-replay-failure.json").write_text(json.dumps({"profile":key,"clip":name,"frame":i,"variant":label,"replay":replay,"bind_error":bind_error},indent=2))
                         assert replay["max_m"]<.002,("LBS replay mismatch",key,name,i,label,replay)
                         if label=="mink_weighted":
                             row["variants"][label]["surface_constraint"]=diag.copy()
