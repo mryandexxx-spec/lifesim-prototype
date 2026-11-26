@@ -8,6 +8,305 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-anim-rig-floor:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 05ed73e1026e623037474f492c59116041aa9ec9
+          path: frozen-interact
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-rig-contract-r3-Sitting_Enter-evidence
+          run-id: 45891101036
+          github-token: ${{ github.token }}
+          path: input-r3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install exact frozen solver dependencies
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python -m py_compile tools/cf_anim_rig_floor.py
+      - name: Frozen R12 floor comparison with exact native replay and renders
+        run: timeout --signal=TERM --kill-after=10s 420s python -u tools/cf_anim_rig_floor.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r4-evidence
+          path: artifacts/cf-anim-rig-contract-r4/
+          if-no-files-found: warn
+
+  cf-anim-rig-ual:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-ual]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        clip: [Walk_Loop, Sitting_Enter]
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: saturday06/VRM-Addon-for-Blender
+          ref: 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          path: vrm-addon
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: input-rigs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned stock VRM dependencies
+        run: |
+          test "$(git -C vrm-addon rev-parse HEAD)" = 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          test -z "$(git -C vrm-addon status --porcelain)"
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+          python -m py_compile tools/cf_anim_rig_vrma.py tools/cf_anim_rig_ual.py
+      - name: Verify CC0 source and independent exported landmark fidelity
+        env:
+          CLIP: ${{ matrix.clip }}
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_ual.py source "$CLIP"
+      - name: Import eligible clip and inspect native motion
+        env:
+          CLIP: ${{ matrix.clip }}
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_ual.py replay "$CLIP"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r3-${{ matrix.clip }}-evidence
+          path: artifacts/cf-anim-rig-contract-r3/
+          if-no-files-found: warn
+  cf-anim-rig-vrma:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cmu]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: saturday06/VRM-Addon-for-Blender
+          ref: 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          path: vrm-addon
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: input-rigs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install stock BVH importer and pinned VRM dependencies
+        run: |
+          test "$(git -C vrm-addon rev-parse HEAD)" = 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          test -z "$(git -C vrm-addon status --porcelain)"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends blender
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+          python -m py_compile tools/cf_anim_rig_vrma.py
+      - name: Stock BVH import, preserve original motion
+        run: timeout --signal=TERM --kill-after=10s 120s blender -b --factory-startup --python-exit-code 1 --python tools/cf_anim_rig_vrma.py -- prepare
+      - name: Calibrated source and unchanged VRM Animation export
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_vrma.py export
+      - name: Stock VRM Animation import, native replay and evidence
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_vrma.py replay
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r2b-evidence
+          path: artifacts/cf-anim-rig-contract-r2b/
+          if-no-files-found: warn
+  cf-anim-rig-calibration:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-r2a]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        rig: [male-grid_021-100, male-grid_021-90, female-grid_201-100, female-grid_201-110]
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: saturday06/VRM-Addon-for-Blender
+          ref: 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          path: vrm-addon
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: input-rigs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned calibration dependencies
+        run: |
+          test "$(git -C vrm-addon rev-parse HEAD)" = 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          test -z "$(git -C vrm-addon status --porcelain)"
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+          python -m py_compile tools/cf_anim_rig_calibration.py
+      - name: Reversible native calibration and six evidence renders
+        env:
+          RIG: ${{ matrix.rig }}
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_calibration.py "$RIG"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r2a-evidence-${{ matrix.rig }}
+          path: artifacts/cf-anim-rig-contract-r2a/
+          if-no-files-found: warn
+  cf-anim-rig-contract:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-r2a]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: input-rigs
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-male-grid_021-100-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-caches/male-grid_021-100
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-male-grid_021-90-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-caches/male-grid_021-90
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-female-grid_201-100-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-caches/female-grid_201-100
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-female-grid_201-110-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-caches/female-grid_201-110
+      - name: Pinned external humanoid implementation (isolated; no game dependencies)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/rig-contract" --ignore-scripts --no-audit --no-fund --save-exact three@0.177.0 @pixiv/three-vrm-core@3.4.2
+          cp tools/cf_anim_rig_contract.mjs "$RUNNER_TEMP/rig-contract/probe.mjs"
+          node --check "$RUNNER_TEMP/rig-contract/probe.mjs"
+          node "$RUNNER_TEMP/rig-contract/probe.mjs"
+          cp "$RUNNER_TEMP/rig-contract/package-lock.json" artifacts/cf-anim-rig-contract/dependency-lock.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r1-evidence
+          path: artifacts/cf-anim-rig-contract/
+          if-no-files-found: warn
   ci-cd-r1-d-build:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-c-release' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
