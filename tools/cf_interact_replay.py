@@ -1,5 +1,5 @@
 """01C-REPLAY: frozen R12, output timing qualification, full native videos and bake replay."""
-import pathlib,sys,json,math,hashlib,collections,tempfile,subprocess,shutil
+import pathlib,sys,json,math,hashlib,collections,tempfile,subprocess,shutil,traceback
 import numpy as np
 import bpy
 from mathutils import Vector,Matrix
@@ -124,6 +124,7 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
         regs[s]=F.regions(meshes,t,s);regs["thigh_"+s]=region(meshes,t["names"][t["roles"]["thigh_"+s]])
     bvh,_=load_bench(c["fixture"],asset);floor=asset["floorY"];top=asset["seatY"]
     frames=c["path"]["frames"];assert len(frames)==76
+    replay_errors=[]
     def realize(row,dy,style):
         f=F.clone(base);w=F.world(t,f)
         target={}
@@ -152,7 +153,24 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
         w=F.world(t,f)
         try:
             F.apply(arm,bones,rest,f)
-        except AssertionError:
+        except AssertionError as ex:
+            # Retain exact frozen replay assertion plus independently normalized
+            # quaternion diagnostics. Never turn a rejected pose into a pass.
+            detail={"assertion":repr(ex)}
+            try:
+                actual=F.locals_(arm,bones)
+                errors=[]
+                for name,m,b in zip(t["names"],actual,f):
+                    q=np.array(m.to_quaternion(),dtype=np.float64)
+                    vq=np.array(F.matrix(b["p"],b["r"]).to_quaternion(),dtype=np.float64)
+                    q/=np.linalg.norm(q);vq/=np.linalg.norm(vq)
+                    err=2*math.acos(min(1.,abs(float(q@vq))))
+                    errors.append({"bone":name,"rotationRad":err,"positionM":(m.to_translation()-Vector(b["p"])).length})
+                detail["worstRotation"]=max(errors,key=lambda e:e["rotationRad"])
+                detail["worstPosition"]=max(errors,key=lambda e:e["positionM"])
+            except Exception as diagnostic_error:
+                detail["diagnosticError"]=repr(diagnostic_error)
+            replay_errors.append(detail)
             return None,"POSE_REPLAY"
         replay=skin.actual_error(f);assert replay["max_m"]<.002
         cloud=np.array([list(p) for p in F.surface(skin.reg)])
@@ -286,18 +304,24 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
         dy=delta*min(1.,max(0.,u))
         f=at_time(corrected,time);bf=at_time(bases,time)
         w=F.world(t,f);bw=F.world(t,bf)
+        bm=None;baseline_failure=None
         if abs(time-round(time))<1e-9:bm=baseline[int(round(time))]
         else:
-            checked,reason=measure(bf,0.);assert checked is not None,reason
-            _,_,bm=checked
+            checked,reason=measure(bf,0.)
+            if checked is None:
+                baseline_failure={"reason":reason,"details":replay_errors[-1] if replay_errors else None}
+                fails.add("BASELINE_"+reason)
+            else:_,_,bm=checked
         lower=["hip"]+[n+"_"+s for s in SIDES for n in ("thigh","shin","foot")]
         drift={name:(role(t,w,name)-role(t,bw,name)).length for name in lower}
         if max(drift.values())>.02:fails.add("LOWER_BODY_DRIFT")
         result,reason=measure(f,max(drift.values()))
         if result is None:
             fails.add(reason)
-            rows.append({"frame":i,"sourceFrame":time,"phase":phase,"heightDeltaM":dy,"failure":reason})
-            break
+            rows.append({"frame":i,"sourceFrame":time,"phase":phase,"heightDeltaM":dy,"failure":reason,
+                "replayError":replay_errors[-1] if replay_errors else None,"baselineFailure":baseline_failure})
+            prev=None
+            continue
         f,cloud,m=result
         error=m["targetMaxM"];replay=m["skinReplay"];floor_min=m["floorMinM"];sole=m["soleGapsM"]
         deep=m["slatInteriorVertices"];gap=m["supportGapM"];fraction=m["supportSampleFraction"]
@@ -327,9 +351,10 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
                 sd=(v(x)-hit).dot(n);signed=min(signed,sd);neg+=int(sd<-.005)
         rows.append({"frame":i,"sourceFrame":time,"phase":phase,"heightDeltaM":dy,"targetMaxM":error,"skinReplay":replay,
             "floorMinM":floor_min,"soleGapsM":sole,"slatInteriorVertices":deep,"supportGapM":gap,
-            "supportSampleFraction":fraction,"palmP10M":m["palmP10M"],"baselinePalmP10M":bm["palmP10M"],"lowerBodyDriftM":drift,"holdFootSlideM":slide,"maxJointStepRad":step,"nearTriangleSignedMinM":signed,"nearTriangleNegativeCount":neg})
+            "supportSampleFraction":fraction,"palmP10M":m["palmP10M"],"baselinePalmP10M":bm["palmP10M"] if bm is not None else None,"baselineFailure":baseline_failure,"lowerBodyDriftM":drift,"holdFootSlideM":slide,"maxJointStepRad":step,"nearTriangleSignedMinM":signed,"nearTriangleNegativeCount":neg})
         prev=f
-    # Full native videos on actual furniture, then bake/reimport only on measured pass.
+    # Full native videos only for complete reproducible poses. Keep partial
+    # diagnostic images for valid frames, not a misleading stitched clip.
     rendered=[]
     if len(poses)!=len(times):fails.add("INCOMPLETE_PATH")
     try:
@@ -343,7 +368,13 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
             cam.location=target+F.Y.inverted()@(sem@offset)*h
             cam.rotation_euler=(target-cam.location).to_track_quat("-Z","Y").to_euler()
             cam.data.ortho_scale=h*1.65
-            if len(poses)!=len(times):break
+            if len(poses)!=len(times):
+                for i in sorted(set(poses)&{0,19,38,50,62,len(times)-1}):
+                    F.apply(arm,bones,rest,poses[i])
+                    name=f"{key}-{view}-{i:03d}-partial.png"
+                    bpy.context.scene.render.filepath=str(OUT/name)
+                    bpy.ops.render.render(write_still=True);rendered.append(name)
+                continue
             with tempfile.TemporaryDirectory() as tmp:
                 for i,f in sorted(poses.items()):
                     F.apply(arm,bones,rest,f)
@@ -398,10 +429,22 @@ def main():
       "scope":["Exact STYLE baselines, frozen R12 weighted trajectory, semantic palm goals and lower body drift screen",
        "Phase output-rate qualification, actual skin screen, full native videos and conditional GLB reimport; no COM/anatomy/true obstacle containment/swept collision or device acceptance"]}
     for c in cases:
-        key=c["rig"];row=case(c,d["rigs"][key],data["targets"][key],source,solved,fixtures[c["fixture"]],report["profiles"][key],accepted[(key,c["fixture"],c["slot"])],styles[(key,c["fixture"],c["slot"])],old_cases.get((key,c["fixture"],c["slot"])));out["cases"].append(row)
+        key=c["rig"]
+        try:
+            row=case(c,d["rigs"][key],data["targets"][key],source,solved,fixtures[c["fixture"]],report["profiles"][key],accepted[(key,c["fixture"],c["slot"])],styles[(key,c["fixture"],c["slot"])],old_cases.get((key,c["fixture"],c["slot"])))
+        except Exception as ex:
+            row={"rig":key,"fixture":c["fixture"],"slot":c["slot"],"rigSha":c["rigSha"],"assetSha":c["assetSha"],
+                "status":"REPLAY_DIAGNOSTIC_ERROR","failures":["CASE_EXCEPTION"],"evaluatedFrames":0,
+                "samples":[],"rendered":[],"exception":repr(ex),"traceback":traceback.format_exc()}
+            print(row["traceback"],flush=True)
+        out["cases"].append(row)
         print(key,row["status"],row["failures"],row["evaluatedFrames"],flush=True)
         (OUT/"report.json").write_text(json.dumps(out,indent=2,allow_nan=False))
     out["counts"]=dict(collections.Counter(c["status"] for c in out["cases"]))
     (OUT/"report.json").write_text(json.dumps(out,indent=2,allow_nan=False))
     print("01C-REPLAY",out["counts"],"FULL 01C BLOCKED",flush=True)
+    # A diagnostic failure must still fail CI, but only after every case and
+    # evidence report have been retained. Physical screening failures are
+    # explicit in the report, as in previous experiments.
+    assert not any(c["status"]=="REPLAY_DIAGNOSTIC_ERROR" for c in out["cases"]), "case diagnostics failed; see report"
 if __name__=="__main__":main()
