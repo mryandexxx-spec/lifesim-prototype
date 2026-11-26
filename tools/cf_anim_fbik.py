@@ -49,29 +49,55 @@ def skin_samples(t,meshes,arm,bones,rest):
     # These are sparse proxies, not exact triangle collision or blended-skin certificates.
     reset(arm,bones)
     w=world(t,t["rest"]); roles=t["roles"]
-    selected={roles["hip"]}
+    # Use the same semantic support groups as the evaluated-skin contact audit.
+    # A vertex is classified by summed regional influence, then attached to its
+    # strongest actual bone within that region. Do not require a particular
+    # control bone to carry skin weights (pelvic helper bones are legitimate).
+    groups={"pelvis":{roles["hip"]}|{i for i,n in enumerate(t["names"]) if n.lower().startswith("pelvis")}}
     for side in ("l","r"):
-        selected.update(roles[x+"_"+side] for x in ("thigh","shin","foot"))
-    for i,p in enumerate(t["parents"]):
-        if p in (roles["foot_l"],roles["foot_r"]):selected.add(i)
+        foot={roles["foot_"+side]}
+        for i,p in enumerate(t["parents"]):
+            if p in foot:foot.add(i)
+        groups["foot_"+side]=foot
+        for part in ("thigh","shin"):
+            groups[part+"_"+side]={roles[part+"_"+side]}
+    selected=set().union(*groups.values())
     samples={i:[] for i in selected}
+    coverage={name:0 for name in groups}
     for o in meshes:
         mapping={g.index:t["names"].index(g.name) for g in o.vertex_groups if g.name in t["names"]}
         for v in o.data.vertices:
-            if not v.groups:continue
-            g=max(v.groups,key=lambda g:g.weight);i=mapping.get(g.group)
-            if i in samples and g.weight>.5:samples[i].append(w[i].inverted()@(Y@o.matrix_world@v.co))
+            weights={mapping[g.group]:g.weight for g in v.groups if g.group in mapping}
+            if not weights:continue
+            for name,ids in groups.items():
+                support=sum(weights.get(i,0.) for i in ids)
+                if support<=.50:continue
+                i=max(ids,key=lambda i:(weights.get(i,0.),-i))
+                samples[i].append(w[i].inverted()@(Y@o.matrix_world@v.co))
+                coverage[name]+=1
     out={}
     for i,pts in samples.items():
         if not pts:continue
         a=np.asarray([list(p) for p in pts]);center=a.mean(axis=0)
-        # Extremal and farthest-point sampling, identical procedure for every body.
-        chosen=[int(np.argmax(np.linalg.norm(a-center,axis=1)))]
-        for _ in range(min(11,len(a)-1)):
+        # Include the lowest rest surface point as well as spatial extremes.
+        # Bone-local coordinates need not align with world vertical.
+        heights=np.asarray([(w[i]@Vector(p)).y for p in a])
+        chosen=list(dict.fromkeys([int(np.argmin(heights)),int(np.argmax(np.linalg.norm(a-center,axis=1)))]))
+        while len(chosen)<min(12,len(a)):
             d=np.min(np.linalg.norm(a[:,None,:]-a[chosen][None,:,:],axis=2),axis=1)
-            chosen.append(int(np.argmax(d)))
-        out[i]=[a[j] for j in sorted(set(chosen))]
-    assert roles["hip"] in out and all(roles["foot_"+s] in out for s in ("l","r"))
+            d[chosen]=-1.
+            j=int(np.argmax(d))
+            if d[j]<1e-9:break
+            chosen.append(j)
+        out[i]=[a[j] for j in chosen]
+    audit={name:{"supported_vertices":coverage[name],
+        "proxy_count":sum(len(out.get(i,[])) for i in ids),
+        "bones":{t["names"][i]:len(out[i]) for i in sorted(ids) if i in out}}
+        for name,ids in groups.items()}
+    assert all(audit[name]["supported_vertices"]>0 and audit[name]["proxy_count"]>0
+        for name in ("pelvis","foot_l","foot_r")),audit
+    print("Skin proxy support:",json.dumps(audit),flush=True)
+    (OUT/"skin-proxy-coverage.jsonl").open("a").write(json.dumps({"rig_sha256":t["sha256"],"regions":audit})+"\n")
     return out
 
 def qp(t,bf,goals,collision=None):
