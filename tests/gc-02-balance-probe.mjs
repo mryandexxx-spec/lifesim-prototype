@@ -50,8 +50,10 @@ function run(block,policy,replay=false){
   if(bill.canPay){const r=payHouseholdBill(root);assert.ok(r.ok,r.reason);
     Object.assign(root,{shop:r.shop,financialHistory:r.financialHistory,householdBills:r.householdBills});
     note('pay-bill',r);
-    const duplicate=recordFinanceChange(root,{...root.shop,credits:root.shop.credits-r.amount},{kind:'bill-payment',sourceId:r.entry.sourceId,receiptId:r.entry.receiptId,atGameMinute:Math.round(root.minutes)});
-    assert.equal(duplicate.ok,false,'duplicate bill receipt accepted');p.negativeBills++;
+    if(root.shop.credits>=r.amount){
+      const duplicate=recordFinanceChange(root,{...root.shop,credits:root.shop.credits-r.amount},{kind:'bill-payment',sourceId:r.entry.sourceId,receiptId:r.entry.id,atGameMinute:Math.round(root.minutes)});
+      assert.equal(duplicate.reason,'duplicate-transaction','duplicate bill receipt accepted or invalid control');p.negativeBills++;
+    }
   }
   for(const id of ids){
     if(jobs[id]){
