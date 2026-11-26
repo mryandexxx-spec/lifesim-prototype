@@ -30,9 +30,19 @@ def save():
 save()
 # Checkout is in a directory named exactly like the Python add-on package.
 sys.path.insert(0,str(pathlib.Path("external-addons").resolve()))
-module=addon_utils.enable("retarget_bvh",default_set=False,persistent=False)
+# Register in the ephemeral Blender preferences before register() reads them.
+module=addon_utils.enable("retarget_bvh",default_set=True,persistent=False)
 assert module is not None, "add-on enable failed"
 assert tuple(module.bl_info["version"])==(4,4,0)
+prefs=bpy.context.preferences.addons.get("retarget_bvh")
+assert prefs is not None and prefs.preferences is not None, "add-on preferences unavailable"
+from retarget_bvh.bsettings import BD, BS
+BD.prefs=prefs.preferences
+assert BS() is not None
+# The UI invoke() normally initializes the rig definitions; headless execute() does not.
+BD.ensureInited(bpy.context.scene)
+report["addonPreferencesInitialized"]=True
+save()
 module.setSilentMode(True)
 bpy.ops.object.select_all(action="DESELECT")
 arm.select_set(True);bpy.context.view_layer.objects.active=arm
