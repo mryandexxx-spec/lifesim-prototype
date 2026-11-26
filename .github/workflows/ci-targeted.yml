@@ -8,6 +8,29 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  gc-04-economy:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/gc-04-economy' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Canonical finance and food regression
+        run: node --test tests/w4a-finance.test.js tests/w4c-bills.test.js tests/life-food-r1.test.js
+      - name: Matched economy policy trace
+        run: node tests/gc-04-policy-probe.mjs
+      - name: Independent basket and demand projections
+        run: node tests/gc-04-basket-probe.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-04-r1-evidence
+          path: artifacts/gc-04-r1/
+          if-no-files-found: warn
   pf-14-garden-care:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-14-garden-care' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
