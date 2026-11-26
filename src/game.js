@@ -5321,15 +5321,16 @@ function boot() {
   function setView(next){Object.assign(view,next);cameraUpdate();}
   let cameraFocus=null;
   cancelSelectedCameraFocus=()=>{cameraFocus=null;};
-  focusSelectedCamera=id=>{
-    if(!residentIdsForSimulation(game).includes(id)||buildMode||furnishMode||outdoorMode)return false;
+  focusSelectedCamera=(id,{reveal=false}={})=>{
+    if(!residentIdsForSimulation(game).includes(id)||buildMode||furnishMode||outdoorMode||
+      dialogueNeedsDecision(game)||document.querySelector('.app-shell').dataset.parcel)return false;
     if(residentAwayAtWork(game,id)){
       toast((residentDisplayName(game,id)||'Житель')+' сейчас на работе — камера осталась на участке');
       return false;
     }
     const point=getActor(game,id)?.position;
     if(!Number.isFinite(point?.x)||!Number.isFinite(point?.z))return false;
-    cameraFocus={id,remaining:1.35};
+    cameraFocus={id,remaining:1.35,revealDistance:reveal?Math.max(12,Math.min(view.distance,CAMERA_INITIAL.distance)):null};
     return true;
   };
   cameraUpdate();
@@ -5338,8 +5339,19 @@ function boot() {
     // Camera reset must not teleport a pending shop object.
     toast('Камера сброшена');
   });
+  $('menu-find-resident-btn').addEventListener('click',()=>{
+    if(dialogueNeedsDecision(game)||buildMode||furnishMode||outdoorMode||
+      document.querySelector('.app-shell').dataset.parcel)return;
+    cameraFocus=null;
+    residentDoubleTap.clear();
+    setViewOpen(false);
+    focusSelectedCamera(activeHudResident(),{reveal:true});
+  });
   $('menu-lot-camera-btn').addEventListener('click',()=>{
-    if(furnishMode||buildMode||outdoorMode)return;
+    if(furnishMode||buildMode||outdoorMode||dialogueNeedsDecision(game)||
+      document.querySelector('.app-shell').dataset.parcel)return;
+    cameraFocus=null;
+    residentDoubleTap.clear();
     setView({...view,centerX:7,centerZ:0,distance:44,pitch:61});
     setViewOpen(false);toast('Весь участок: коснись земли, чтобы отправить жителя');
   });
@@ -9018,8 +9030,8 @@ function boot() {
     dt=Math.min(dt,.06);
     syncCasFigures();
     if(cameraFocus){
-      if(buildMode||furnishMode||outdoorMode||cameraGesture.count()||
-        residentAwayAtWork(game,cameraFocus.id))cameraFocus=null;
+      if(buildMode||furnishMode||outdoorMode||parcel||cameraGesture.count()||
+        dialogueNeedsDecision(game)||residentAwayAtWork(game,cameraFocus.id))cameraFocus=null;
       else{
         const actor=getActor(game,cameraFocus.id);
         if(!Number.isFinite(actor?.position?.x)||!Number.isFinite(actor?.position?.z))
@@ -9027,11 +9039,18 @@ function boot() {
         else{
           // Rendered location differs from the path endpoint while asleep,
           // seated, swimming or in an authored physical action pose.
-          const rig=cameraFocus.id==='alex'?avatar:cameraFocus.id==='mira'?miraAvatar:null;
+          const rig=cameraFocus.id==='alex'?avatar:cameraFocus.id==='mira'?miraAvatar:casFigures.get(cameraFocus.id);
           const rendered=rig?.getPosition?.();
           const target=Number.isFinite(rendered?.x)&&Number.isFinite(rendered?.z)
             ?rendered:actor.position;
-          setView(stepCameraFocus(view,target,dt));
+          const next=stepCameraFocus(view,target,dt);
+          // Explicit recovery restores useful scale; the established portrait
+          // double-tap remains center-only and preserves the player's zoom.
+          if(cameraFocus.revealDistance!==null){
+            const w=1-Math.exp(-4.8*dt);
+            next.distance=view.distance+(cameraFocus.revealDistance-view.distance)*w;
+          }
+          setView(next);
           cameraFocus.remaining-=dt;
           if(cameraFocus.remaining<=0)cameraFocus=null;
         }
