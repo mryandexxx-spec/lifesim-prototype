@@ -114,11 +114,14 @@ def replay(raw,frames):
     skin=g["skins"][0];nodes=g["nodes"];anim=g["animations"][0];channels={};jumps=[]
     assert len(skin["joints"])==104
     for ch in anim["channels"]:
-        s=anim["samplers"][ch["sampler"]];assert s.get("interpolation","LINEAR")=="LINEAR"
+        s=anim["samplers"][ch["sampler"]];mode=s.get("interpolation","LINEAR");assert mode in ("LINEAR","STEP")
         o=acc(s["output"]);t=acc(s["input"]).ravel();assert len(t) in (2,frames) and len(o)==len(t)
         assert np.all(np.diff(t)>0)
         old=(t-t[0])/(t[-1]-t[0]);new=np.linspace(0,1,frames)
-        if ch["target"]["path"]=="rotation":
+        if mode=="STEP":
+            assert ch["target"]["path"]=="scale" and len(t)==2 and float(np.max(np.abs(o[-1]-o[0])))<1e-6,("unexpected nonconstant STEP channel",ch)
+            out=o[np.searchsorted(old,new,side="right")-1]
+        elif ch["target"]["path"]=="rotation":
             out=Slerp(old,Rotation.from_quat(o))(new).as_quat()
             d=angles(out);jumps.append((float(d.max()),nodes[ch["target"]["node"]]["name"],int(d.argmax()+1)))
         else:out=np.stack([np.interp(new,old,o[:,k]) for k in range(o.shape[1])],axis=1)
