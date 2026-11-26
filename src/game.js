@@ -46,7 +46,7 @@ import {workPresenceView} from './work-presence-ui.js';
 import { findPath, nearestWalkable, isWalkable } from './navigation.js';
 import {lotRaySurface,lotActorHeight,outdoorCellAt,OUTDOOR_GRID_WIDTH} from './lot-surface.js';
 import {previewOutdoorPaint,commitOutdoorPreview,
-  previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from './outdoor-proposals.js';
+  previewOutdoorFeatureEdit,commitOutdoorFeatureEdit,flowerBatchQuote} from './outdoor-proposals.js';
 import {OUTDOOR_PRODUCTS,OUTDOOR_CATALOG,outdoorFeatureRect} from './outdoor-catalog.js';
 import {poolBoundaryEdges,poolCellBounds} from './pool-topology.js';
 import {protectPoolFromWorldEdit} from './pool-cross-editor.js';
@@ -7659,8 +7659,20 @@ function boot() {
       pose:outdoorPending.pose
     }):previewOutdoorPaint(game,outdoorPending);
     if(!p.ok){clearOutdoorPending(true);outdoorFeedback(outdoorReason[p.reason]||p.reason,true);return;}
+    const batch=parcel?.flowerBatch;
+    const quote=batch&&feature&&p.operation==='place'&&p.itemId===batch.itemId?flowerBatchQuote(game,p.itemId):null;
+    if(quote&&batch.requested-batch.placed>quote.max){
+      clearOutdoorPending(true);outdoorFeedback('Недостаточно средств или лимита объектов',true);return;
+    }
     const result=feature?commitOutdoorFeatureEdit(game,p):commitOutdoorPreview(game,p);
     if(!result.ok){clearOutdoorPending(true);outdoorFeedback(outdoorReason[result.reason]||result.reason,true);return;}
+    // PF-13: persist each confirmed flower before publishing it to the live world.
+    // A failed write leaves the preview, credits, IDs and ledger unchanged.
+    if(quote){
+      let persisted=false;
+      try{persisted=canWriteGameSave()&&writeV1Save(localStorage,SAVE_KEY,result.root).ok;}catch{}
+      if(!persisted){outdoorFeedback(outdoorReason['save-failed'],true);return;}
+    }
     game.world.outdoors=result.root.world.outdoors;
     game.shop=result.root.shop;game.financialHistory=result.root.financialHistory;
     outdoorTimeline=outdoorTimeline.slice(0,outdoorHistoryIndex+1);
@@ -7669,7 +7681,7 @@ function boot() {
     if(outdoorTimeline.length>50){outdoorTimeline.shift();outdoorHistoryIndex--;}
     renderOutdoorGround();renderOutdoorFeatures();syncOutdoorOwned();updateFamilyBalance();
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
-    save(true);clearOutdoorPending(true);
+    if(!quote)save(true);clearOutdoorPending(true);
     outdoorFeedback(feature?(p.operation==='sell'
       ?'Объект продан · зачислено '+(-p.cost)+' кр.'
       :p.operation==='move'?'Объект перенесён бесплатно'
@@ -7991,7 +8003,7 @@ function boot() {
   }
   function idleParcel(){
     const p=parcel;
-    p.stage='browse';p.group=null;p.selected=null;p.first=null;p.tool=null;p.options=false;p.message='';
+    p.stage='browse';p.group=null;p.selected=null;p.first=null;p.tool=null;p.options=false;p.message='';p.flowerBatch=null;
     if(outdoorMode)clearOutdoorPending(true);
     if(buildMode){clearBuildPending();setBuildTool('camera');}
     if(furnishMode){setEditorView('edit');chooseFurniture(null);}
@@ -8124,7 +8136,24 @@ function boot() {
           disabled:poolMode()&&$('pool-fixture-rotate').disabled});
         m.wallet=balanceQuote(game.shop.credits,outdoorPending?.cost);
         const apply=sale?'Продать':area?(poolMode()?poolLabels[tool]:'Уложить'):p.selected?'Сохранить':'Установить';
-        m.actions.push(primary('apply',apply,!outdoorPending?.ok));
+        const batch=p.flowerBatch,quote=batch&&flowerBatchQuote(game,batch.itemId);
+        if(quote){
+          const remaining=batch.requested-batch.placed;
+          m.title+=' · '+(batch.placed+1)+' / '+batch.requested;
+          m.wallet='Всего '+(batch.requested*quote.price)+' кр. · осталось оплатить '+(remaining*quote.price)+' кр.';
+          m.hint=(m.hint?m.hint+' · ':'')+'Баланс '+game.shop.credits+' кр.';
+          if(!batch.placed){
+            m.choices=[
+              {...command('quantity-minus','− 1'),disabled:batch.requested<=1},
+              {...command('quantity-plus','+ 1'),disabled:batch.requested>=quote.max}
+            ];
+          }
+          if(remaining>quote.max){
+            m.hint='Недостаточно средств или лимита объектов для выбранного количества. Уменьши количество или отмени.';
+            m.invalid=true;
+          }
+          m.actions.push(primary('apply','Купить · '+quote.price+' кр.',!outdoorPending?.ok||remaining>quote.max));
+        }else m.actions.push(primary('apply',apply,!outdoorPending?.ok));
       }else if(buildMode){
         m.title=titleForBuild(buildTool);m.wallet='Без оплаты';
         m.hint=p.message||$('build-feedback').textContent;
@@ -8151,7 +8180,7 @@ function boot() {
     positionParcelViewport();
   }
   function pickedParcelItem(id){
-    const p=parcel;p.tool=id;p.stage='draft';p.first=null;p.options=false;p.message='';
+    const p=parcel;p.tool=id;p.stage='draft';p.first=null;p.options=false;p.message='';p.flowerBatch=null;
     if(buildMode){
       const selection=p.selected;
       setBuildTool(id);
@@ -8161,7 +8190,8 @@ function boot() {
     }else if(outdoorMode){
       if(poolMode()){selectValue('pool-tool',id);selectValue('pool-fixture-operation','fixture-add');}
       else if(outdoorCategory==='ground')selectValue('outdoor-ground-kind',id);
-      else{selectValue('outdoor-feature-operation','place');selectValue('outdoor-feature-kind',id);}
+      else{selectValue('outdoor-feature-operation','place');selectValue('outdoor-feature-kind',id);
+        if(flowerBatchQuote(game,id))p.flowerBatch={itemId:id,requested:1,placed:0};}
       p.message=outdoorCategory==='ground'||poolMode()&&['paint','erase'].includes(id)?
         'Коснись первой клетки.':'Коснись '+(poolMode()?'бортика у воды.':'свободного места во дворе.');
     }
@@ -8290,7 +8320,16 @@ function boot() {
     }
     if(action==='view'){p.plan=!p.plan;setView(parcelCamera(view,p.plan));}
     else if(action.startsWith('zoom-'))setView({...view,distance:Math.max(5.5,Math.min(100,view.distance*(action==='zoom-in'?.8:1.25)))});
-    else if(action==='back'||action==='cancel')idleParcel();
+    else if(action==='back'||action==='cancel'){
+      const batch=p.flowerBatch;idleParcel();
+      if(batch?.placed)p.message='Размещено '+batch.placed+' из '+batch.requested+' · остальные не оплачены.';
+    }else if(action==='quantity-minus'||action==='quantity-plus'){
+      const batch=p.flowerBatch,quote=batch&&flowerBatchQuote(game,batch.itemId);
+      if(p.stage==='draft'&&batch&&!batch.placed&&quote){
+        const next=batch.requested+(action==='quantity-plus'?1:-1);
+        if(next>=1&&(next<=quote.max||next<batch.requested))batch.requested=next;
+      }
+    }
     else if(verb==='group'){
       p.stage='list';p.group=value;p.message='';
       if(furnishMode)setEditorView(value==='shop'?'shop':'warehouse');
@@ -8327,7 +8366,16 @@ function boot() {
       $(id).click();
       if(p.journal.record(before,game,p.section)){
         const message=$(outdoorMode?'outdoor-preview-text':buildMode?'build-feedback':'furnish-feedback').textContent;
-        idleParcel();p.message=message;
+        const batch=p.flowerBatch;
+        if(batch&&outdoorMode){
+          batch.placed++;
+          if(batch.placed<batch.requested&&flowerBatchQuote(game,batch.itemId)?.max>0){
+            p.message='Размещено '+batch.placed+' из '+batch.requested+' · коснись следующего свободного места.';
+          }else{
+            idleParcel();p.message='Размещено '+batch.placed+' из '+batch.requested+' · '+message+
+              (batch.placed<batch.requested?' · остаток не оплачен':'');
+          }
+        }else{idleParcel();p.message=message;}
       }
     }else if(action==='undo'||action==='redo'){
       navigateParcelJournal(action==='undo'?-1:1);return;
