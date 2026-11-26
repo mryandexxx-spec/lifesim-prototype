@@ -8,8 +8,118 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-interact-01c-replay:
+  cf-interact-01c-balance:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        rig: [female-grid_201-100, male-grid_021-90, female-grid_201-110, male-grid_021-100]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-coupled-evidence
+          run-id: 45852237764
+          github-token: ${{ github.token }}
+          path: input-coupled
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-style-evidence
+          run-id: 45856215901
+          github-token: ${{ github.token }}
+          path: input-style
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-fbik-evidence
+          run-id: 45858075755
+          github-token: ${{ github.token }}
+          path: input-fbik
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-replay-evidence
+          run-id: 45868485383
+          github-token: ${{ github.token }}
+          path: input-replay
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reproduce one case and archive posture/support evidence and pose cache
+        run: |
+          python -m py_compile tools/cf_interact_balance.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_balance.py '${{ matrix.rig }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-balance-${{ matrix.rig }}-evidence
+          path: artifacts/cf-interact-01c-balance/
+          if-no-files-found: warn
+  cf-interact-01c-replay:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
     permissions:
       contents: read
       actions: read
