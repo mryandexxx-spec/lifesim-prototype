@@ -1,0 +1,157 @@
+name: TE-14 isolated stability and memory
+on:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Run 30-minute and 120-minute sessions after preflight
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: te14-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: chromium
+            residents: 2
+            width: 390
+          - engine: webkit
+            residents: 2
+            width: 390
+          - engine: webkit
+            residents: 4
+            width: 390
+          - engine: webkit
+            residents: 4
+            width: 320
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real-duration isolated soak
+        env:
+          TE_SHA: ${{ github.sha }}
+          TE_ENGINE: ${{ matrix.engine }}
+          TE_RESIDENTS: ${{ matrix.residents }}
+          TE_WIDTH: ${{ matrix.width }}
+          TE_MINUTES: '2'
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps "$TE_ENGINE"
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/te14-http.log 2>&1 &
+          for n in {1..20}; do curl -fsS http://127.0.0.1:8765/ >/dev/null && break; sleep 1; done
+          node --test tests/cas-01-8-soak.test.js tests/viewport-health.test.js
+          node tests/te-14-soak.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: te14-${{ matrix.engine }}-${{ matrix.residents }}-${{ matrix.width }}-2
+          path: artifacts/te-14/
+          if-no-files-found: warn
+  soak30:
+    needs: preflight
+    if: inputs.full
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: chromium
+            residents: 2
+            width: 390
+          - engine: webkit
+            residents: 2
+            width: 390
+          - engine: webkit
+            residents: 4
+            width: 390
+          - engine: webkit
+            residents: 4
+            width: 320
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real-duration isolated soak
+        env:
+          TE_SHA: ${{ github.sha }}
+          TE_ENGINE: ${{ matrix.engine }}
+          TE_RESIDENTS: ${{ matrix.residents }}
+          TE_WIDTH: ${{ matrix.width }}
+          TE_MINUTES: '30'
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps "$TE_ENGINE"
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/te14-http.log 2>&1 &
+          for n in {1..20}; do curl -fsS http://127.0.0.1:8765/ >/dev/null && break; sleep 1; done
+          node tests/te-14-soak.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: te14-${{ matrix.engine }}-${{ matrix.residents }}-${{ matrix.width }}-30
+          path: artifacts/te-14/
+          if-no-files-found: warn
+  soak120:
+    needs: soak30
+    if: inputs.full
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: webkit
+            residents: 4
+            width: 390
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real-duration isolated soak
+        env:
+          TE_SHA: ${{ github.sha }}
+          TE_ENGINE: ${{ matrix.engine }}
+          TE_RESIDENTS: ${{ matrix.residents }}
+          TE_WIDTH: ${{ matrix.width }}
+          TE_MINUTES: '120'
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps "$TE_ENGINE"
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/te14-http.log 2>&1 &
+          for n in {1..20}; do curl -fsS http://127.0.0.1:8765/ >/dev/null && break; sleep 1; done
+          node tests/te-14-soak.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: te14-${{ matrix.engine }}-${{ matrix.residents }}-${{ matrix.width }}-120
+          path: artifacts/te-14/
+          if-no-files-found: warn
