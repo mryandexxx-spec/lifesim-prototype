@@ -92,7 +92,16 @@ try{
    await touch('#pick-alex');await page.waitForTimeout(300);
    const s=await snap();assert.ok(s.otherSim?.position);
    assert.ok(!s.careerSystem.byResident.mira?.currentShift,'partner not at home at decision');
-   const rec=report.steps.at(-1);rec.probes=[];
+   const rec=report.steps.at(-1);rec.probes=[];rec.cameraRecovery=[];
+   for(const viewMode of ['initial','whole-lot']){
+    if(viewMode==='whole-lot'){
+     // Preserve the obstructed original view. Recovery uses the actual player menu, never camera state injection.
+     rec.cameraRecovery.push({reason:'initial scene picking did not reach partner',before:await capture('social-before-camera-recovery')});
+     await closeOptional();const prior=await snap();await touch('#view-toggle');await touch('#menu-lot-camera-btn');
+     await page.locator('#view-panel').waitFor({state:'hidden',timeout:4000});await page.waitForTimeout(500);
+     assert.deepEqual((await snap()).actionQueues,prior.actionQueues,'camera menu mutated queue');
+     rec.cameraRecovery.at(-1).after=await capture('social-whole-lot');
+    }
    for(const y of [1.45,1.85,1.0]){
     const p=await page.evaluate(async y=>{
       const {Application,Vec3}=await import('playcanvas');const app=Application.getApplication(),avatar=app.root.findByName('Мира'),cam=app.root.findComponents('camera').find(c=>c.enabled);
@@ -100,7 +109,7 @@ try{
       const q=cam.worldToScreen(avatar.getPosition().clone().add(new Vec3(0,y,0)));
       const x=Math.round(q.x),py=Math.round(q.y);return {x,y:py,w:innerWidth,h:innerHeight,hit:document.elementFromPoint(x,py)?.id,visible:avatar.enabled};
     },y);
-    rec.probes.push(p);if(!p.visible||p.x<0||p.x>=p.w||p.y<0||p.y>=p.h||p.hit!=='game-canvas')continue;
+    rec.probes.push({...p,viewMode});if(!p.visible||p.x<0||p.x>=p.w||p.y<0||p.y>=p.h||p.hit!=='game-canvas')continue;
     const before=await snap();
     await point(p.x,p.y);await page.locator('#social-context').waitFor({state:'visible',timeout:1500}).catch(()=>{});
     rec.inputTrace=await page.evaluate(()=>window.__gqTrace.slice());
@@ -120,7 +129,8 @@ try{
     assert.equal(await visible('#social-menu-panel'),false,'unexpected category from scene-only touch');
     await closeOptional();
    }
-   throw Error('No reachable partner interaction via real scene picking: '+JSON.stringify(rec.probes));
+   }
+   throw Error('No reachable partner interaction via real scene picking even after player camera recovery: '+JSON.stringify(rec.probes));
   }finally{await unpause();}
  };
  const finance=async()=>{await closeOptional();await touch('#career-phone-toggle');await touch('#career-phone-panel [data-phone-app="finance"]');assert.ok(await visible('.finance-wallet'));await touch('.career-phone-x');};
