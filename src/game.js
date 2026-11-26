@@ -1388,16 +1388,17 @@ function placeSocialPopover(panel){
     return;
   }
   panel.classList.add('context-popover');
-  const w=canvas.clientWidth||window.innerWidth,h=canvas.clientHeight||window.innerHeight;
-  const landscape=h<560;
-  const mobile=w<=700;
+  const frame=document.querySelector('.app-shell').getBoundingClientRect();
+  const topInset=Math.max(70,Math.ceil(
+    $('calendar-anchor-toggle').getBoundingClientRect().bottom-frame.top)+10);
+  // Like the ground context, reserve the entire HUD band including bottom navigation.
+  const bottomInset=Math.max(0,Math.ceil(frame.bottom-
+    $('dashboard').getBoundingClientRect().top))+12;
   const pos=contextualPlacement({
-    anchorX:socialAnchor.x,anchorY:socialAnchor.y,
-    viewportWidth:w,viewportHeight:h,
-    panelWidth:panel.offsetWidth||340,panelHeight:panel.offsetHeight||280,
-    topInset:landscape?72:mobile?116:102,
-    bottomInset:Math.max(landscape?122:mobile?170:144,
-      Math.ceil($('dashboard').getBoundingClientRect().height)+12)
+    anchorX:socialAnchor.x-frame.left,anchorY:socialAnchor.y-frame.top,
+    viewportWidth:frame.width,viewportHeight:frame.height,
+    panelWidth:panel.offsetWidth||340,panelHeight:panel.scrollHeight||280,
+    topInset,bottomInset,edge:12
   });
   panel.style.setProperty('--context-x',pos.x+'px');
   panel.style.setProperty('--context-y',pos.y+'px');
