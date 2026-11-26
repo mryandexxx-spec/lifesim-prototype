@@ -77,7 +77,16 @@ assert 150<=len(poses)<=210,("unexpected 24Hz output duration",len(poses))
 F.reset(arm,bones)
 nw=F.world(t,t["rest"]);sem=Matrix.Rotation(math.radians(asset["frontYaw"]),3,"Y");inv=sem.inverted()
 ys=[F.world(t,f)[r["hip"]].translation.y for f in poses];low=min(ys);high=max(ys);mid=ys.index(low)
-assert high-low>.15,("no meaningful seating motion",low,high)
+# Preserve the failed qualification; collect diagnostic evidence instead of aborting before renders.
+root_motion_pass=high-low>.15
+report["rootHeightRangeM"]=[low,high]
+report["rootTravelM"]=high-low
+report["rootTravelThresholdM"]=.15
+report["rootTravelPass"]=root_motion_pass
+report["status"]="STOCK_ADDON_SCREEN_FAIL" if not root_motion_pass else "MEASUREMENT_PENDING"
+save()
+(OUT/"raw-poses.json").write_text(json.dumps({"rig":key,"poses":poses,"frameRange":[lo,hi]},allow_nan=False,separators=(",",":")))
+assert high>low,("degenerate root motion",low,high)
 hold=[i for i,y in enumerate(ys) if y<=low+.10*(high-low)]
 # Same constant placement policy as R2. Global yaw inferred from the neutral hip axis.
 up=Vector((0,1,0));v=nw[r["thigh_l"]].translation-nw[r["thigh_r"]].translation;v.y=0
@@ -116,7 +125,7 @@ for i,f in enumerate(poses):
         if any(abs(v)>.02 for v in soles.values()):fail.append("HOLD_SOLE")
     rows.append({"frame":i+lo,"phase":"hold" if i in hold else "lower" if i<mid else "rise","floorMinM":fm,"slatInteriorVertices":deep,"supportGapM":gap,"supportSampleFraction":fraction,"soleGapsM":soles,"skinReplay":replay,"maxJointStepRad":step,"failures":fail})
 from collections import Counter
-report.update({"status":"STOCK_ADDON_SCREEN_PASS" if all(not x["failures"] for x in rows) else "STOCK_ADDON_SCREEN_FAIL","evaluatedFrames":len(rows),"holdFrames":len(hold),"placement":list(delta),"failures":dict(Counter(x for row in rows for x in row["failures"])),"samples":rows,"rendered":[]});save()
+report.update({"status":"STOCK_ADDON_SCREEN_PASS" if root_motion_pass and all(not x["failures"] for x in rows) else "STOCK_ADDON_SCREEN_FAIL","evaluatedFrames":len(rows),"holdFrames":len(hold),"placement":list(delta),"failures":dict(Counter(x for row in rows for x in row["failures"])),"globalFailures":[] if root_motion_pass else ["ROOT_TRAVEL"],"samples":rows,"rendered":[]});save()
 B.apply_checked(arm,bones,rest,t["rest"]);h,_=F.setup(meshes)
 fixture=pathlib.Path("input-01a")/(c["fixture"]+".glb");assert F.digest(fixture)==c["assetSha"]
 bpy.ops.import_scene.gltf(filepath=str(fixture.resolve()))
