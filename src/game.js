@@ -143,7 +143,7 @@ import {labelQueuedTask,labelActiveTask} from './qsk-11-task-labels.js';
 import {visibleActionPhase,queuedActionStatus,blockedActionMessage,
   interruptionQuestion,verifiedLastEvent} from './qsk-08-touch-ux.js';
 import {planButtonLabel,queueViewerResident,commandReceipt,offerForName} from './ux01-plan-ui.js';
-import {effectiveSleepSpeed} from './sleep-acceleration.js';
+import {createHouseholdSpeedController} from './sleep-acceleration.js?v=pf-15';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,sharedDuration} from './gifts-leisure.js';
 import {CONVERSATION_TOPICS,conversationOptions,conversationTranscript,
   CONVERSATION_MAX_TURNS,activeConversationAction} from './conversation-engine.js';
@@ -244,6 +244,7 @@ function suggestedGameDate(){
 }
 const calendarSuggestion=suggestedGameDate();
 let game;
+const householdSpeed=createHouseholdSpeedController();
 let calendarNeedsPersistence=false;
 let billsNeedsPersistence=false;
 // If loading any existing save fails (including future/invalid population),
@@ -2187,9 +2188,9 @@ function togglePause(){
 }
 function toggleSpeed(){
   if(furnishMode||buildMode||outdoorMode)return;
-  game.speed = game.speed === 1 ? 3 : 1;
-  timeUI.renderSpeed(game.speed);
-  toast(game.speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
+  const speed=householdSpeed.toggle(game,{blocked:dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()});
+  timeUI.renderSpeed(speed);
+  toast(speed === 3 ? 'Ускорение времени ×3' : 'Обычная скорость');
 }
 function updateAutoButton() {
   timeUI.renderAutonomy(game.autonomy.enabled);
@@ -8978,7 +8979,16 @@ function boot() {
     if(frameActive){
       accumulator+=dt;
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
-      while(accumulator>=.10){
+      // Keep a single .30-minute simulation quantum at both speeds. Each
+      // quantum resamples the household, so waking/returning stops x3
+      // before the next quantum, even during a long rendering frame.
+      while(accumulator>=.10/3){
+        if(dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||shiftSummary.isOpen()){
+          accumulator=0;break;
+        }
+        const speed=householdSpeed.read(game);
+        const quantumSeconds=.10/speed;
+        if(accumulator<quantumSeconds)break;
         const prevAlex=game.action?.id,prevMira=game.otherSim.action?.id;
         const prevAlexGardenEvent=game.event,prevMiraGardenEvent=game.otherSim.event;
         const mirrorCompletion=['alex','mira'].map(id=>[id,getActor(game,id).action])
@@ -8996,10 +9006,7 @@ function boot() {
         const priorHerbStock=game.kitchen?.pantry?.herbs??0;
         const priorGardenCredits=game.shop.credits;
         const priorDeliveries=game.kitchen?.deliveries?.length||0;
-        const careerEvents=tickHousehold(game,.30 * effectiveSleepSpeed(game,{
-          blocked:!frameActive||dialogueNeedsDecision(game)||careerPhone.interviewNeedsDecision()||
-            shiftSummary.isOpen()
-        }))||[];
+        const careerEvents=tickHousehold(game,.30)||[];
         if(priorDeliveries>(game.kitchen?.deliveries?.length||0)){
           // A paid order moved into the same physical fridge as cooked meals.
           save(true);careerPhone.refresh();
@@ -9068,7 +9075,8 @@ function boot() {
         toast(getActor(game,sharedBefore).event);
       if(branchBefore&&!game.socialAction)
         toast('Завершено: '+BRANCH_ACTIONS[branchBefore].label);
-        accumulator-=.10;
+        accumulator-=quantumSeconds;
+        householdSpeed.read(game);
         if(shiftSummary.isOpen()){accumulator=0;break;}
       }
       // On cancellation, finish closing before the former fridge user departs.
@@ -9123,7 +9131,7 @@ function boot() {
             const points=findPath(resident.position,goal,game.world);
             route=paths[residentId]={points:points||[],index:0,id:routeId};
           }
-          let remaining=dt*1.65*game.speed,hops=0;
+          let remaining=dt*1.65*householdSpeed.read(game),hops=0;
           while(route.index<route.points.length&&remaining>0&&hops++<12){
             const next=route.points[route.index];
             const dx=next.x-resident.position.x,dz=next.z-resident.position.z;
@@ -9186,7 +9194,7 @@ function boot() {
             p=paths[residentId];
           }
           if(p.points && (socialWalking?game.socialAction?.phase==='walking':resident.action?.phase==='walking')){
-            let remaining=dt*(socialWalking?1.65:mealRouteMetersPerSecond(resident.action))*game.speed,hops=0;
+            let remaining=dt*(socialWalking?1.65:mealRouteMetersPerSecond(resident.action))*householdSpeed.read(game),hops=0;
             while(remaining>0 && p.index<p.points.length && hops++<12){
               const next=p.points[p.index];
               const dx=next.x-resident.position.x,dz=next.z-resident.position.z;
@@ -9500,7 +9508,7 @@ function boot() {
     sofaStates.alex=advanceSofaTransition(sofaStates.alex,
       (useId==='sofa'||useId==='seat'||useId==='bench'||Boolean(alexWatchSeat)||alexDateSofa||alexReadingSeated||alexDining)&&
         bedStates.alex.progress===0&&!showerStates.alex.active,
-      alexReadingStage?frameAnimDt*game.speed:frameAnimDt);
+      alexReadingStage?frameAnimDt*householdSpeed.read(game):frameAnimDt);
     const alexSeatBase=sofaTransitionPose(sofaStates.alex);
     const gardenSeatPose=benchVisualTargets.alex&&sofaStates.alex.progress>0
       ?outdoorBenchPose(game.world,benchVisualTargets.alex,sofaStates.alex.progress):null;
@@ -9589,7 +9597,7 @@ function boot() {
       display.yaw=approachAngle(display.yaw,alexMotion.heading,13,frameAnimDt);
     avatar.setPosition(display.x,display.y,display.z);
     avatar.setEulerAngles(display.pitch,display.yaw,display.roll);
-    if(frameActive)effectTime+=dt*game.speed;
+    if(frameActive)effectTime+=dt*householdSpeed.read(game);
     animationStates.alex=stepAnimation(animationStates.alex,{
       id:'alex',walking:(walking||Boolean(alexShower?.stepWeight>.015))&&!seating&&!bedding,
       using:alexToilet?'toilet':alexShower?'shower':useId,
@@ -9692,7 +9700,7 @@ function boot() {
     sofaStates.mira=advanceSofaTransition(sofaStates.mira,
       (miraUseId==='sofa'||miraUseId==='seat'||miraUseId==='bench'||Boolean(miraWatchSeat)||miraDateSofa||miraReadingSeated||miraDining)&&
         bedStates.mira.progress===0&&!showerStates.mira.active,
-      miraReadingStage?frameAnimDt*game.speed:frameAnimDt);
+      miraReadingStage?frameAnimDt*householdSpeed.read(game):frameAnimDt);
     const miraSeatBase=sofaTransitionPose(sofaStates.mira);
     const gardenMiraPose=benchVisualTargets.mira&&sofaStates.mira.progress>0
       ?outdoorBenchPose(game.world,benchVisualTargets.mira,sofaStates.mira.progress):null;
@@ -10609,7 +10617,7 @@ function boot() {
         }
       }
       renderPauseButton(); // Includes the mandatory dialogue hold, not just manual pause.
-      timeUI.renderSpeed(game.speed);
+      timeUI.renderSpeed(householdSpeed.read(game,{blocked:!frameActive}));
       // Live plan is now the single source of HUD status, not a second stale label.
       renderPlanPeek();
       // Visible buttons are separate DOM controls: no hit-testing dependency on physics.

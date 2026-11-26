@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {createTimeUI} from '../src/qsk-11-time-ui.js';
+import {createHouseholdSpeedController} from '../src/sleep-acceleration.js';
 function fixture(callbacks={}){
   const elements=new Map(),calls=[];
   const element=id=>{
@@ -58,7 +59,7 @@ test('F actual game callbacks keep editor/decision guards and original mutations
   const els=new Map(),calls=[];
   const $=id=>{if(!els.has(id))els.set(id,{textContent:'',attrs:{},click(){this.fn();},setAttribute(k,v){this.attrs[k]=v;},addEventListener(type,fn){this.fn=fn;}});return els.get(id);};
   const state={paused:false,speed:1,autonomy:{enabled:false}};
-  const ctx={createTimeUI,$,game:state,furnishMode:false,buildMode:false,outdoorMode:false,blocked:false,interview:false,
+  const ctx={createTimeUI,householdSpeed:createHouseholdSpeedController(),$,game:state,furnishMode:false,buildMode:false,outdoorMode:false,blocked:false,interview:false,
     dialogueNeedsDecision:()=>ctx.blocked,careerPhone:{interviewNeedsDecision:()=>ctx.interview},
     setHouseholdAutonomy:(g,v)=>{g.autonomy.enabled=v;calls.push('set');return v;},
     restartAutonomyWait:()=>calls.push('restart'),save:v=>calls.push(['save',v]),toast:v=>calls.push(v)};
