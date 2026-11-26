@@ -46,7 +46,7 @@ def target_map():
         for i,f in enumerate(("thumb","index","middle","ring","little"),1):
             for j,part in enumerate(("metacarpal","proximal","distal") if i==1 else ("proximal","intermediate","distal"),1):m[s+"_"+f+"_"+part]=f"finger{i}-{j}.{p}"
     return m
-def audit_vrma(data,source):
+def audit_vrma(data,source,frame_count=946,fps=120,stride=5):
     """Independent GLB forward-kinematics on the exported channels, no importer.
     Compare original source landmarks at exact 120Hz indices, not target anatomy.
     """
@@ -73,8 +73,8 @@ def audit_vrma(data,source):
         t=channel["target"];sampler=anim["samplers"][channel["sampler"]]
         assert sampler.get("interpolation","LINEAR")=="LINEAR"
         ts=accessor(sampler["input"]);values=accessor(sampler["output"])
-        assert len(ts)==len(values)==946
-        assert abs(ts[0][0])<1e-6 and abs(ts[-1][0]-945/120)<.002
+        assert len(ts)==len(values)==frame_count
+        assert abs(ts[0][0])<1e-6 and abs(ts[-1][0]-(frame_count-1)/fps)<.002
         channels[t["node"],t["path"]]=values
     nodes=g["nodes"];parents={ch:i for i,node in enumerate(nodes) for ch in node.get("children",[])}
     roles={re.sub(r"([A-Z])",lambda m:"_"+m[0].lower(),role):node["node"] for role,node in g["extensions"]["VRMC_vrm_animation"]["humanoid"]["humanBones"].items()}
@@ -85,8 +85,8 @@ def audit_vrma(data,source):
         def world(i):
             if i in worlds:return worlds[i]
             node=nodes[i]
-            p=channels[i,"translation"][j*5] if (i,"translation") in channels else node.get("translation",[0,0,0])
-            r=channels[i,"rotation"][j*5] if (i,"rotation") in channels else node.get("rotation",[0,0,0,1])
+            p=channels[i,"translation"][j*stride] if (i,"translation") in channels else node.get("translation",[0,0,0])
+            r=channels[i,"rotation"][j*stride] if (i,"rotation") in channels else node.get("rotation",[0,0,0,1])
             s=node.get("scale",[1,1,1])
             assert all(abs(v-1)<.0002 for v in s)
             q=Quaternion((r[3],r[0],r[1],r[2])).normalized()
