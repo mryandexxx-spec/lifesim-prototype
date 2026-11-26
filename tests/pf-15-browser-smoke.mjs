@@ -48,19 +48,14 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
    await page.waitForFunction(()=>document.querySelector('#speed-btn').textContent==='3×');
    const boosted=await snap();assert.ok(matches(boosted));assert.equal(boosted.manual,1);
    await page.screenshot({path:dir+'/'+label+'-boost.png'});
-   if(mode==='sleep'){
-    await page.locator('#speed-btn').tap();
-    await page.waitForFunction(()=>document.querySelector('#speed-btn').textContent==='1×');
-    const manual=await snap();assert.ok(matches(manual));assert.equal(manual.manual,1);
-    await page.locator('#speed-btn').tap();
-    await page.waitForFunction(()=>document.querySelector('#speed-btn').textContent==='3×');
-    // Manual x3 remains a player choice; set 1 and reload the original seed in
-    // a new context is unnecessary for this case. Use fresh episode separately.
-    await page.locator('#speed-btn').tap();
-   }
    await page.waitForFunction(mode=>{const s=window.__LifeSimSpeedQA();return s.residents.some(r=>mode==='sleep'?r.action!=='bed':r.work!=='working')&&document.querySelector('#speed-btn').textContent==='1×';},mode,{timeout:90000});
    const end=await snap();assert.ok(!matches(end));assert.ok(end.minutes>initial.minutes);
    if(mode==='work')assert.equal(end.settlements.length,1);
+   if(mode==='sleep'){
+    await page.locator('#speed-btn').tap();await page.waitForFunction(()=>document.querySelector('#speed-btn').textContent==='3×');
+    assert.equal((await snap()).manual,3);
+    await page.locator('#speed-btn').tap();await page.waitForFunction(()=>document.querySelector('#speed-btn').textContent==='1×');
+   }
    await page.screenshot({path:dir+'/'+label+'-exit.png'});assert.deepEqual(errors,[]);
    Object.assign(result,{initial,boosted,end,passed:true});
   }catch(e){result.error=String(e.stack||e);throw e;}finally{writeFileSync(dir+'/report.json',JSON.stringify(report,null,2));await context.close();}
