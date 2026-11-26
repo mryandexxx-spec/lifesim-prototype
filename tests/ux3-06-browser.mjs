@@ -33,8 +33,8 @@ for(const [engine,launcher,width,height] of matrix){
    await ctx.addInitScript(({key,tour,seed})=>{
      if(seed&&!localStorage.getItem(key)){localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');}
      window.__gqTouch=0;window.__gqContextLost=0;window.__gqInput=[];
-     for(const type of ['pointerdown','pointerup','pointercancel','lostpointercapture','touchstart','touchend','touchcancel','focus','blur','click'])window.addEventListener(type,e=>{
-       const target=e.target?.closest?.('button')||e.target;const t={type,t:performance.now(),id:target?.id||'',text:target?.tagName==='BUTTON'?target.textContent?.trim().slice(0,80):'',trusted:e.isTrusted,pointerType:e.pointerType||null,pointerId:e.pointerId??null,isPrimary:e.isPrimary??null,button:e.button??null,windowTarget:e.target===window,detail:e.detail??null,x:e.clientX??e.changedTouches?.[0]?.clientX??null,y:e.clientY??e.changedTouches?.[0]?.clientY??null};
+     for(const type of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture','touchstart','touchmove','touchend','touchcancel','focus','blur','click'])window.addEventListener(type,e=>{
+       const target=e.target?.closest?.('button')||e.target;const t={type,t:performance.now(),id:target?.id||'',text:target?.tagName==='BUTTON'?target.textContent?.trim().slice(0,80):'',trusted:e.isTrusted,pointerType:e.pointerType||null,pointerId:e.pointerId??null,isPrimary:e.isPrimary??null,button:e.button??null,windowTarget:e.target===window,detail:e.detail??null,touches:e.touches?.length??null,x:e.clientX??e.changedTouches?.[0]?.clientX??null,y:e.clientY??e.changedTouches?.[0]?.clientY??null};
        queueMicrotask(()=>{t.defaultPrevented=e.defaultPrevented;});window.__gqInput.push(t);if(window.__gqInput.length>100)window.__gqInput.shift();
      },{capture:true,passive:true});
      document.addEventListener('touchstart',()=>window.__gqTouch++,{capture:true,passive:true});
@@ -70,6 +70,44 @@ for(const [engine,launcher,width,height] of matrix){
      current.input='touch';current.touchEvents+=after-before;
      current.targets.push({selector:'screen',rect:{x,y,width:1,height:1},hit44:null});
    };
+   // Chromium CDP and the pinned Playwright 1.56.1 WebKit page proxy
+   // send browser-native input. Neither dispatchEvent nor mouse emulation is
+   // evidence for a trusted multitouch/hold regression.
+   let touchProtocol;
+   const gesture=async(kind,frames)=>{
+     if(!touchProtocol){
+       if(engine==='chromium')touchProtocol=await ctx.newCDPSession(page);
+       else {
+         // Playwright's public WebKit touchscreen API exposes only tap().
+         // Pinned upstream protocol Input.dispatchTouchEvent accepts touch points.
+         const impl=page._connection?.toImpl?.(page);
+         touchProtocol=impl?.delegate?._pageProxySession;
+         assert.ok(touchProtocol?.send,'pinned WebKit touch protocol unavailable');
+       }
+     }
+     await page.evaluate(()=>{window.__gqInput.length=0;});
+     const before=await page.evaluate(()=>window.__gqTouch);
+     for(const frame of frames){
+       const points=frame.points.map((p,i)=>({x:Math.round(p.x),y:Math.round(p.y),id:i+1}));
+       const payload={type:frame.type,touchPoints:engine==='chromium'&&frame.type==='touchEnd'?[]:points};
+       await touchProtocol.send('Input.dispatchTouchEvent',payload);
+       if(frame.wait)await page.waitForTimeout(frame.wait);
+     }
+     await page.waitForTimeout(120);
+     const events=await inputTrace();
+     observe({gesture:kind,transport:engine==='chromium'?'CDP':'pinned WebKit page proxy',events});
+     const starts=events.filter(e=>e.type==='pointerdown'&&e.trusted&&e.pointerType==='touch'&&e.id==='game-canvas');
+     const expected=kind==='pinch'?2:1;
+     assert.equal(new Set(starts.map(e=>e.pointerId)).size,expected,'missing trusted world contacts for '+kind);
+     const ends=events.filter(e=>e.type==='pointerup'&&e.trusted&&e.pointerType==='touch');
+     assert.ok(starts.every(e=>ends.some(u=>u.pointerId===e.pointerId)),'contacts did not finish normally');
+     if(kind==='hold')assert.ok(ends[0].t-starts[0].t>=360,'not a real hold');
+     else assert.ok(starts.every(e=>events.some(m=>m.type==='pointermove'&&m.trusted&&m.pointerType==='touch'&&m.pointerId===e.pointerId&&Math.hypot(m.x-e.x,m.y-e.y)>10)),'no trusted movement for each contact');
+     if(kind==='pinch')assert.ok(events.some(e=>e.trusted&&e.touches===2),'no simultaneous touch contacts');
+     const after=await page.evaluate(()=>window.__gqTouch);
+     assert.ok(after>before,'no trusted touchstart received');
+     current.input='touch';current.touchEvents+=after-before;
+   };
    const doubleTap=async selector=>{const loc=page.locator(selector).first();await loc.waitFor({state:'visible'});const b=await loc.boundingBox();assert.ok(b);const x=b.x+b.width/2,y=b.y+b.height/2;
      const hit=await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.closest('button')?.id,{x,y});assert.equal(hit,selector.slice(1),'portrait not hit-testable');
      await page.evaluate(()=>{window.__gqInput.length=0;});await touchAt(x,y,2);};
@@ -90,7 +128,7 @@ for(const [engine,launcher,width,height] of matrix){
      assert.ok(gl.actual&&gl.width>100&&gl.height>100,'actual PlayCanvas device');assert.ok(gl.scrollWidth<=gl.viewport+2&&gl.scrollHeight<=gl.viewportHeight+2,'whole-page scroll');
      const frame=await page.locator('#game-canvas').screenshot({timeout:15000});assert.ok(frame.length>2000,'empty canvas screenshot');c.graphics=gl;
    });
-   await scenario.run({page,step,tap,tapPoint:touchAt,doubleTap,observe,inputTrace,snapshot,reload,seed,key:SAVE_KEY});
+   await scenario.run({page,step,tap,tapPoint:touchAt,doubleTap,gesture,observe,inputTrace,snapshot,reload,seed,key:SAVE_KEY});
    assert.deepEqual(c.errors,[]);c.status='PASS';
   }catch(e){c.status='FAIL';c.failure=e.stack||String(e);console.error('GQ CASE FAIL',id,c.failure,JSON.stringify(c.errors));}
   finally{c.durationMs=Math.max(1,Math.round(performance.now()-started));await ctx.close();flush();}

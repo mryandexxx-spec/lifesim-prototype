@@ -168,3 +168,75 @@ scenarios.push({id:'required-dialogue',goal:'Mandatory dialog cannot be dismisse
   assert.equal(dialogueNeedsDecision(await snapshot()),false);
  });
 }});
+
+/** Camera gesture recovery in the real renderer, separate from the optional
+ * social/yard interaction flow. No new gameplay or camera policy. */
+scenarios.push({id:'gesture-recovery',goal:'Trusted hold, swipe and two-contact pinch do not select or enqueue; next independent touch works',seed:yardSeed,async run(h){
+ const {page,step,tap,snapshot,gesture}=h;
+ const menu=page.locator('#ground-walk-menu');
+ const assertUnchanged=async(before)=>{
+  for(const id of ['#ground-walk-menu','#action-sheet','#social-context','#social-menu-panel'])
+    assert.equal(await page.locator(id).isVisible(),false,'gesture opened '+id);
+  const after=await snapshot();
+  assert.deepEqual(after.actionQueues,before.actionQueues);assert.equal(after.shop.credits,before.shop.credits);
+ };
+ const view=()=>page.evaluate(async()=>{
+  const {Application}=await import('playcanvas');
+  const app=Application.getApplication(),cam=app.root.findComponents('camera').find(c=>c.enabled);
+  const p=cam.entity.getPosition(),q=cam.entity.getRotation();
+  return [p.x,p.y,p.z,q.x,q.y,q.z,q.w];
+ });
+ const change=async(before)=>{
+  // Real camera frame must change, rather than only the input trace.
+  for(let i=0;i<20;i++){const a=await view();if(Math.hypot(...a.map((v,j)=>v-before[j]))>.01)return a;await page.waitForTimeout(100);}
+  assert.fail('camera did not respond to trusted gesture');
+ };
+ const free=()=>page.evaluate(()=>{
+  const canvas=document.querySelector('#game-canvas');
+  for(const dy of [0,-30,30,-60,60,-90,90]){
+   const y=Math.round(innerHeight*.44+dy);
+   for(const dx of [0,-20,20,-40,40]){
+    const x=Math.round(innerWidth/2+dx);
+    if([x-55,x-35,x-18,x,x+18,x+35,x+55].every(px=>document.elementFromPoint(px,y)===canvas))return {x,y};
+   }
+  }
+  return null;
+ });
+ await step('frame-lot',async()=>{await pause(h);await tap('#view-toggle');await tap('#menu-lot-camera-btn');await page.locator('#view-panel').waitFor({state:'hidden'});await page.waitForTimeout(500);});
+ await step('hold-no-selection',async()=>{
+  const before=await snapshot();
+  const candidates=await projectWorld(page,[{x:11,y:-.53,z:0},{x:13,y:-.53,z:-2},{x:7,y:-.53,z:4},{x:10,y:-.53,z:3}]);
+  let point;
+  // Establish that this real canvas point is selectable with a normal tap.
+  for(const p of candidates){
+   if(p.hit!=='game-canvas')continue;
+   await h.tapPoint(p.x,p.y);await page.waitForTimeout(150);
+   if(await menu.isVisible()){
+    const title=await page.locator('#ground-walk-title').textContent();
+    await tap('#ground-walk-close');
+    if(title==='Действия на земле'){point=p;break;}
+   }else if(await page.locator('#action-sheet').isVisible())await tap('#close-action');
+   else if(await page.locator('#social-context').isVisible())await tap('#social-context-close');
+  }
+  assert.ok(point,'no selectable land point for hold');
+  await gesture('hold',[{type:'touchStart',points:[point],wait:550},{type:'touchEnd',points:[point]}]);
+  await assertUnchanged(before);
+  await h.tapPoint(point.x,point.y);await menu.waitFor({state:'visible',timeout:3000});
+  assert.equal(await page.locator('#ground-walk-title').textContent(),'Действия на земле');
+  await tap('#ground-walk-close');await assertUnchanged(before);
+ });
+ await step('swipe-no-selection',async()=>{
+  const before=await snapshot(),camera=await view(),p=await free();assert.ok(p,'no unobscured camera drag lane');
+  const at=dx=>({x:p.x+dx,y:p.y});
+  await gesture('swipe',[{type:'touchStart',points:[at(-35)],wait:60},{type:'touchMove',points:[at(-12)],wait:60},{type:'touchMove',points:[at(20)],wait:60},{type:'touchEnd',points:[at(20)]}]);
+  h.observe({before:camera,after:await change(camera)});await assertUnchanged(before);
+  await tap('#view-toggle');await page.locator('#view-panel').waitFor({state:'visible'});await tap('#view-close');await assertUnchanged(before);
+ });
+ await step('pinch-no-selection',async()=>{
+  const before=await snapshot(),camera=await view(),p=await free();assert.ok(p,'no unobscured two-contact camera lane');
+  const pair=d=>[{x:p.x-d,y:p.y},{x:p.x+d,y:p.y}];
+  await gesture('pinch',[{type:'touchStart',points:pair(18),wait:70},{type:'touchMove',points:pair(35),wait:70},{type:'touchMove',points:pair(55),wait:70},{type:'touchEnd',points:pair(55)}]);
+  h.observe({before:camera,after:await change(camera)});await assertUnchanged(before);
+  await tap('#view-toggle');await page.locator('#view-panel').waitFor({state:'visible'});await tap('#view-close');await assertUnchanged(before);
+ });
+}});
