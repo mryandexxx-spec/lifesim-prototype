@@ -101,7 +101,7 @@ B.apply_checked(arm,bones,rest,pose(start,root0))
 floor=asset["floorY"];top=asset["seatY"];root0.y+=floor-min(v.y for v in F.surface(skin.reg))
 regs={"pelvis":F.regions(meshes,t)}
 for side in ("l","r"):
-    regs[side]=F.regions(meshes,t,side);regs["thigh_"+side]=B.region(meshes,t,t["names"][r["thigh_"+side]])
+    regs[side]=F.regions(meshes,t,side);regs["thigh_"+side]=B.region(meshes,t["names"][r["thigh_"+side]])
 rows=[];poses=[]
 for i in range(start,end+1):
     f=pose(i,root0);B.apply_checked(arm,bones,rest,f);w=F.world(t,f)
