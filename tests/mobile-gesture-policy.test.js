@@ -109,7 +109,7 @@ test('keyboard, programmatic click, cancel, blur, hidden tab and unrelated point
   assert.equal(f.fireClick().stopped,false);
   f.host.dispatch('pointercancel',f.pointer(f.canvas));
   assert.equal(f.fireClick().stopped,false);
-  f.world();f.host.dispatch('blur',{});assert.equal(f.fireClick().stopped,false);
+  f.world();f.host.dispatch('blur',{target:f.host});assert.equal(f.fireClick().stopped,false);
   f.world();f.doc.hidden=true;f.doc.dispatch('visibilitychange',{});assert.equal(f.fireClick().stopped,false);
   f.world();assert.equal(f.fireClick(f.outside).stopped,false);
 });
@@ -119,4 +119,16 @@ test('a secondary contact does not transfer primary world ownership',()=>{
   f.host.dispatch('pointerdown',f.pointer(f.button,2,{isPrimary:false}));
   f.host.dispatch('pointerup',f.pointer(f.canvas));
   assert.equal(f.fireClick().stopped,true);
+});
+
+test('descendant focus blur between down/up or after release does not relinquish world click',()=>{
+  const f=ownershipFixture();
+  f.host.dispatch('pointerdown',f.pointer(f.canvas,1,{pointerType:'touch',button:-1}));
+  f.host.dispatch('blur',{target:f.button});
+  f.host.dispatch('pointerup',f.pointer(f.canvas));
+  f.host.dispatch('blur',{target:f.button});
+  assert.equal(f.fireClick(f.button,{pointerType:'mouse'}).stopped,true);
+  f.world();
+  f.host.dispatch('blur',{target:f.host});
+  assert.equal(f.fireClick().stopped,false);
 });
