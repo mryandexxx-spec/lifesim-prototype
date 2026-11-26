@@ -1,6 +1,6 @@
 /** LOT-C2c: pure mobile garden sheet model, no DOM/renderer/save mutation. */
 import {OUTDOOR_CATALOG} from './outdoor-catalog.js';
-import {gardenFeature,gardenView,gardenApproach,gardenBusy,GARDEN_CARE_COOLDOWN,GARDEN_REPLANT_PRICE} from './gardening.js';
+import {gardenFeature,gardenView,gardenApproach,gardenBusy,GARDEN_CARE_COOLDOWN,GARDEN_REPLANT_PRICE,GARDEN_TALK_COOLDOWN,restoreGardenRewards} from './gardening.js';
 import {KITCHEN_HERB_LIMIT,KITCHEN_HARVEST_UNITS} from './kitchen.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
 import {currentSkillLevel} from './skills-engine.js';
@@ -8,9 +8,9 @@ import {GARDENING_SKILL_ID,gardenSkillBenefits,gardenHarvestUnits} from './garde
 import {playerMayClaimGarden} from './garden-autonomy.js';
 import {gardenWishEligible,GARDEN_WISHES} from './garden-psychology.js';
 import {WISHES} from './psychology.js';
-const LABELS={water:'💧 Полить · 15 мин',inspect:'🔎 Осмотреть · 8 мин',
+const LABELS={water:'💧 Полить · 15 мин · досуг',inspect:'🔎 Осмотреть · 8 мин',
   admire:'🌼 Полюбоваться · 8 мин',harvest:'🌿 Собрать травы · 12 мин',
-  replant:'🌱 Посадить заново · 10 мин · 30 кр.'};
+  replant:'🌱 Посадить заново · 10 мин · 30 кр.',talk:'💬 Поговорить с растением · 12 мин'};
 const hours=m=>Math.ceil(Math.max(0,m)/60);
 export function gardenActionSheet(root,residentId,instanceId){
   const feature=gardenFeature(root?.world,instanceId);
@@ -41,7 +41,9 @@ export function gardenActionSheet(root,residentId,instanceId){
   const ids=view.mature
     ?herb?[view.harvestedAt===null?'harvest':'replant','admire']:['admire']
     :view.stage>=1?['water','inspect']:['water'];
-  const actions=ids.map(actionId=>{
+  const lastTalk=restoreGardenRewards(root.gardenRewards)[residentId==='mira'?'miraLastTalkAt':'alexLastTalkAt'];
+  const talkRemaining=Number.isFinite(lastTalk)?Math.max(0,GARDEN_TALK_COOLDOWN-(root.minutes-lastTalk)):0;
+  const actions=[...ids,'talk'].map(actionId=>{
     const available=Boolean(route)&&playerMayClaimGarden(root,residentId,instanceId,actionId);
     const elapsed=Number.isFinite(view.lastWateredAt)?root.minutes-view.lastWateredAt:1e9;
     const reason=!route?'Нет свободного пути':
@@ -52,6 +54,7 @@ export function gardenActionSheet(root,residentId,instanceId){
          ?'Запас трав заполнен ('+stock+'/'+KITCHEN_HERB_LIMIT+')':
        actionId==='replant'&&root?.shop?.credits<GARDEN_REPLANT_PRICE
          ?'Недостаточно средств для посадки':
+       actionId==='talk'&&talkRemaining>0?'Разговор снова через '+hours(talkRemaining)+' ч':
        actionId==='admire'?'Любование уже было сегодня':'Пока недоступно';
     return {actionId,label:actionId==='harvest'
       ?'🌿 Собрать травы · +'+units+' · 12 мин':LABELS[actionId],

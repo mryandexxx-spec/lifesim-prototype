@@ -17,6 +17,7 @@ export function labelQueuedTask(game,task){
   if(task.type==='outdoor')return 'Отдохнуть на садовой скамейке';
   if(task.type==='grill')return 'Гриль: '+(grillRecipe(task.recipeId)?.label||'готовка');
   if(task.type==='garden')return task.actionId==='water'?'Полить грядку':
+    task.actionId==='talk'?'Поговорить с растением':
     task.actionId==='inspect'?'Осмотреть растение':
     task.actionId==='harvest'?'Собрать садовые травы':
     task.actionId==='replant'?'Посадить травы заново':'Полюбоваться садом';
@@ -47,6 +48,7 @@ export function labelActiveTask(game,id){
     return SOCIAL_ACTIONS[s.kind]?.label||'Общается';
   }
   const actor=getActor(game,id);
+  if(actor.action?.id==='garden')return labelQueuedTask(game,{type:'garden',actionId:actor.action.gardenActionId});
   if(actor.action?.id==='swim')return poolActivityLabel(actor.action);
   if(mirrorActionLabel(actor.action))return mirrorActionLabel(actor.action);
   return actor.action
