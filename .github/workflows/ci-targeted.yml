@@ -8,8 +8,69 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-anim-rig-vrma:
+  cf-anim-rig-ual:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        clip: [Walk_Loop, Sitting_Enter]
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: saturday06/VRM-Addon-for-Blender
+          ref: 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          path: vrm-addon
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: input-rigs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned stock VRM dependencies
+        run: |
+          test "$(git -C vrm-addon rev-parse HEAD)" = 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          test -z "$(git -C vrm-addon status --porcelain)"
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+          python -m py_compile tools/cf_anim_rig_vrma.py tools/cf_anim_rig_ual.py
+      - name: Verify CC0 source and independent exported landmark fidelity
+        env:
+          CLIP: ${{ matrix.clip }}
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_ual.py source "$CLIP"
+      - name: Import eligible clip and inspect native motion
+        env:
+          CLIP: ${{ matrix.clip }}
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_ual.py replay "$CLIP"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r3-${{ matrix.clip }}-evidence
+          path: artifacts/cf-anim-rig-contract-r3/
+          if-no-files-found: warn
+  cf-anim-rig-vrma:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cmu]')
     permissions:
       contents: read
       actions: read
