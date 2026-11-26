@@ -171,7 +171,7 @@ def trust_bounds(model):
             a=int(model.jnt_dofadr[j]);step[a:a+3]=.015;total[a:a+3]=.10
     return step,total
 
-def bounded_step(cfg,tasks,limit,q0,step,total,diag):
+def bounded_step(cfg,tasks,limit,q0,step,total,diag,lower,upper):
     model=cfg.model;n=model.nv
     problem=mink.build_ik(cfg,tasks,.05,damping=.001,limits=[mink.ConfigurationLimit(model)])
     collision=limit.compute_qp_inequalities(cfg,.05)
@@ -188,7 +188,7 @@ def bounded_step(cfg,tasks,limit,q0,step,total,diag):
         G.append(np.c_[collision.G,-np.eye(m)]);h.append(collision.h)
         G.append(np.c_[np.zeros((m,n)),-np.eye(m)]);h.append(np.zeros(m))
     d=tangent(model,q0,cfg.q)
-    lo=np.maximum(-step,-total-d);hi=np.minimum(step,total-d)
+    lo=np.maximum(-step,lower-d);hi=np.minimum(step,upper-d)
     G.extend([np.c_[np.eye(n),np.zeros((n,m))],np.c_[-np.eye(n),np.zeros((n,m))]])
     h.extend([hi,-lo])
     G=np.vstack(G);h=np.concatenate(h)
@@ -203,13 +203,13 @@ def bounded_step(cfg,tasks,limit,q0,step,total,diag):
     for a in (1.,.5,.25,.125,.0625):
         trial=current.copy();mujoco.mj_integratePos(model,trial,dq,a)
         delta=tangent(model,q0,trial)
-        if np.isfinite(trial).all() and np.all(np.abs(delta)<=total+1e-6):
+        if np.isfinite(trial).all() and np.all(delta>=lower-1e-6) and np.all(delta<=upper+1e-6):
             cfg.update(trial);diag["accepted_steps"]+=1
             return True
     diag["rejected_integration_steps"]+=1
     return False
 
-def qp(t,bf,goals,weighted=None,diagnostic=None):
+def qp(t,bf,goals,weighted=None,diagnostic=None,previous=None,frame_dt=None):
 
     # MJCF built from the actual sampled hierarchy, no robot or borrowed body.
     # The starting pose is the local reference; ball joints preserve segment length.
@@ -252,9 +252,29 @@ def qp(t,bf,goals,weighted=None,diagnostic=None):
     if weighted:
         step,total=trust_bounds(model)
         diagnostic.update({"accepted_steps":0,"rejected_qp_steps":0,"rejected_integration_steps":0,"max_slack_m":0.})
+        lower=-total.copy();upper=total.copy()
+        signature=[(model.joint(j).name,int(model.jnt_type[j]),int(model.jnt_dofadr[j])) for j in range(model.njnt)]
+        diagnostic["joint_layout"]=signature
+        if previous is not None:
+            assert previous["joint_layout"]==signature,("temporal joint layout changed",signature)
+            old=np.asarray(previous["final_tangent"]);assert old.shape==(model.nv,)
+            # Limit the rate of correction, not the source animation's own motion.
+            # Diagnostic rates; no anatomical joint limit claim.
+            rate=np.full(model.nv,1.5)
+            for j in range(model.njnt):
+                if model.jnt_type[j]==mujoco.mjtJoint.mjJNT_FREE:
+                    a=int(model.jnt_dofadr[j]);rate[a:a+3]=.25
+            frame_bound=rate*frame_dt
+            lower=np.maximum(lower,old-frame_bound);upper=np.minimum(upper,old+frame_bound)
+            assert np.all(lower<=upper+1e-8)
+            qref=q0.copy();mujoco.mj_integratePos(model,qref,old,1.)
+            temporal=mink.PostureTask(model,cost=.20);temporal.set_target(qref);tasks.append(temporal)
+            cfg.update(qref)
+            diagnostic["warm_start_replay_error"]=float(np.max(np.abs(tangent(model,q0,cfg.q)-old)))
+            assert diagnostic["warm_start_replay_error"]<1e-6
     for _ in range(24):
         if weighted:
-            if not bounded_step(cfg,tasks,surface_limit,q0,step,total,diagnostic):break
+            if not bounded_step(cfg,tasks,surface_limit,q0,step,total,diagnostic,lower,upper):break
         else:
             vel=mink.solve_ik(cfg,tasks,.05,"daqp",damping=.001,limits=limits)
             assert np.isfinite(vel).all()
@@ -263,6 +283,10 @@ def qp(t,bf,goals,weighted=None,diagnostic=None):
         delta=tangent(model,q0,cfg.q)
         assert np.all(np.abs(delta)<=total+1e-6),("trust region",delta)
         diagnostic["max_tangent_bound_ratio"]=float(np.max(np.abs(delta)/total))
+        diagnostic["final_tangent"]=delta.tolist()
+        assert np.all(delta>=lower-1e-6) and np.all(delta<=upper+1e-6)
+        if previous is not None:
+            diagnostic["max_temporal_bound_ratio"]=float(np.max(np.abs(delta-old)/frame_bound))
     if diagnostic is not None and surface_limit is not None:
         pts,_=surface_limit.points(cfg)
         diagnostic.update({"constraint_calls":surface_limit.calls,"max_constraint_rows":surface_limit.max_rows,
@@ -323,7 +347,7 @@ def main():
     for k,t in data["targets"].items():t["roles"]=inv["targets"][k]["map"]
     old=list(pathlib.Path("prior-contacts").rglob("report.json"));assert len(old)==1
     prior=json.loads(old[0].read_text());assert len(prior["profiles"])==6
-    report={"scope":"R8 trust-region and soft-contact QP: two central profiles, sitting enter/exit; full weighted candidate video; no anatomical/temporal certification","production":"BLOCKED","ART":"OPEN","profiles":{}}
+    report={"scope":"R9 matched independent vs causal temporal trust-region QP, two central rigs sit enter/exit; corrected finger-aware metric; no anatomical certification","production":"BLOCKED","ART":"OPEN","profiles":{}}
     for key,t in data["targets"].items():
         central=key==min((k for k,v in data["targets"].items() if v["sex"]==t["sex"]),key=lambda k:abs(data["targets"][k]["scale"]-1))
         if not central:continue
@@ -363,7 +387,7 @@ def main():
                 if "Phone" in name:
                     pside=min(regs,key=lambda side:np.median([(pos(w,s["roles"]["hand_"+side])-pos(w,s["roles"]["head"])).length for w in sw]))
                     phone=proxy("phone-proxy",(0,0,0),(.075,.145,.012),(.12,.12,.15))
-                pairs,_=finger_map(s,t);rows=[];variants={k:[] for k in ("baseline","mink","mink_weighted")};props=[]
+                pairs,_=finger_map(s,t);rows=[];variants={k:[] for k in ("baseline","mink","mink_weighted","mink_temporal")};props=[];prev_diag=None;prev_base=None
                 # All sampled source frames; same target definitions for both solvers.
                 for i,bf0 in enumerate(frames):
                     bf=clone(bf0);fingers(s,t,c["frames"][i],bf,pairs);apply(arm,bones,rest,bf)
@@ -391,14 +415,14 @@ def main():
                         goals[e]=transform(target,dq@w[e].to_quaternion())
                         phone_matrix=transform(ear+lateral*.012,dq@palmq)
                     row={"frame":i,"goal_count":len(goals),"variants":{}}
-                    diag={}
-                    for label,fn in (("baseline",lambda:bf),("mink",lambda:qp(t,bf,goals)),("mink_weighted",lambda:qp(t,bf,goals,(skin,floor,seat_info),diag))):
+                    diag={};temporal_diag={}
+                    for label,fn in (("baseline",lambda:bf),("mink",lambda:qp(t,bf,goals)),("mink_weighted",lambda:qp(t,bf,goals,(skin,floor,seat_info),diag)),("mink_temporal",lambda:qp(t,bf,goals,(skin,floor,seat_info),temporal_diag,prev_diag,dt))):
                         start=time.perf_counter()
                         failure=None
                         try:
-                            f=fn() if goals or label=="mink_weighted" else bf
+                            f=fn() if goals or label in ("mink_weighted","mink_temporal") else bf
                         except mink.NoSolutionFound as exc:
-                            if label!="mink_weighted":raise
+                            if label not in ("mink_weighted","mink_temporal"):raise
                             failure=str(exc);f=bf
                         assert all(math.isfinite(z) for b in f for z in b["p"]+b["r"])
                         row["variants"][label]=metrics(t,f,goals,arm,bones,rest,regs,meshes,seat_info,floor,bf)
@@ -409,15 +433,16 @@ def main():
                         if replay["max_m"]>=.002:
                             (OUT/"skin-replay-failure.json").write_text(json.dumps({"profile":key,"clip":name,"frame":i,"variant":label,"replay":replay,"bind_error":bind_error},indent=2))
                         assert replay["max_m"]<.002,("LBS replay mismatch",key,name,i,label,replay)
-                        if label=="mink_weighted":
-                            row["variants"][label]["surface_constraint"]=diag.copy()
+                        if label in ("mink_weighted","mink_temporal"):
+                            active_diag=temporal_diag if label=="mink_temporal" else diag
+                            row["variants"][label]["surface_constraint"]=active_diag.copy()
                             row["variants"][label]["failure"]=failure
                             ww=world(t,f);bw=world(t,bf)
                             shift=max((ww[j].translation-bw[j].translation).length for j,p in enumerate(t["parents"]) if p<0)
                             row["variants"][label]["root_shift_m"]=shift
                             assert shift<=.18,("root displacement",key,name,i,shift)
                             if i:
-                                prev=variants[label][-1];bp=frames[i-1]
+                                prev=variants[label][-1];bp=prev_base
                                 corrections=[]
                                 for v,u,pv,pu in zip(f,bf,prev,bp):
                                     q1=matrix(u["p"],u["r"]).to_quaternion().inverted()@matrix(v["p"],v["r"]).to_quaternion()
@@ -425,12 +450,13 @@ def main():
                                     corrections.append(2*math.acos(min(1.,abs(q0.dot(q1)))))
                                 row["variants"][label]["correction_frame_jump_rad"]=max(corrections)
                         variants[label].append(f)
+                    prev_base=clone(bf);prev_diag=temporal_diag.copy() if "final_tangent" in temporal_diag else None
                     props.append(phone_matrix);rows.append(row)
                 report["profiles"][key][name]={"samples":rows,"prior_r2_summary":prior["profiles"][key][name]["summary"],"comparison_note":"R2 historical targets differ; not a matched R2 solve."}
                 (OUT/"report.json").write_text(json.dumps(report,indent=2))
                 if central:
                     for label,fs in variants.items():
-                        n=len(fs) if label=="mink_weighted" else min(12,len(fs));prefix=f"{key}-{name}-{label}"
+                        n=len(fs) if label in ("mink_weighted","mink_temporal") else min(12,len(fs));prefix=f"{key}-{name}-{label}"
                         with tempfile.TemporaryDirectory() as tmp:
                             for j in range(n):
                                 idx=round((len(fs)-1)*j/(n-1));apply(arm,bones,rest,fs[idx])
@@ -442,6 +468,6 @@ def main():
                 for o in (seat,phone):
                     if o:bpy.data.objects.remove(o,do_unlink=True)
     assert len(report["profiles"])==2 and all(len(x)==2 for x in report["profiles"].values())
-    assert len(list(OUT.glob("*.mp4")))==12
-    print("R8 bounded weighted skin diagnostic complete; ART and contact acceptance OPEN")
+    assert len(list(OUT.glob("*.mp4")))==16
+    print("R9 temporal weighted skin diagnostic complete; ART and contact acceptance OPEN")
 if __name__=="__main__":main()
