@@ -88,5 +88,7 @@ export function createOutdoorVegetationVisual({pc,app,enabled=true,instancing=tr
    for(const c of r.pivots[r.visible].findComponents('render'))for(const mi of c.meshInstances){meshInstances++;meshes.add(mi.mesh);}
   }return {high,lod,far,fallback,triangles,meshInstances,uniqueMeshes:meshes.size,cachedVariants:cache.size,failures,instancingFailures,instancedGroups:batches.length,instancedCopies:batches.reduce((sum,b)=>sum+b.count,0)};
  }
- return Object.freeze({attach,update,setInstancing,clear:()=>{clearBatches();records.clear();dirty=true;},stats});
+ // Instanced matrices are snapshots; rebuild on an editor pose change.
+ function invalidateTransforms(node){if(node&&!records.has(node))return;dirty=true;rebuildBatches();}
+ return Object.freeze({attach,update,setInstancing,invalidateTransforms,clear:()=>{clearBatches();records.clear();dirty=true;},stats});
 }
