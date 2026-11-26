@@ -8,6 +8,100 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  ci-cd-r1-d-build:
+    if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-c-release' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [cold, warm-1, warm-2, warm-3]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm exact merge-test commit
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Full matched release build
+        env:
+          MODE: ${{ matrix.mode }}
+        run: python3 scripts/ci-cd-r1-d-benchmark.py "$MODE"
+      - name: Archive exact staged site passport
+        uses: actions/upload-artifact@v4
+        with:
+          name: r1d-${{ matrix.mode }}
+          path: artifacts/ci-cd-r1-c/site-passport.json
+          if-no-files-found: error
+      - name: Actual staged site Chromium PlayCanvas startup and existing save
+        if: matrix.mode == 'cold' || matrix.mode == 'warm-1'
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          python3 -m http.server 8765 --directory site --bind 127.0.0.1 >/tmp/r1d-http.log 2>&1 &
+          for n in {1..20}; do curl -fsS http://127.0.0.1:8765/ >/dev/null && break; sleep 1; done
+          node tests/ci-browser-boot.mjs
+      - name: Archive actual staged boot
+        if: always() && (matrix.mode == 'cold' || matrix.mode == 'warm-1')
+        uses: actions/upload-artifact@v4
+        with:
+          name: r1d-browser-${{ matrix.mode }}
+          path: artifacts/ci-boot/
+          if-no-files-found: warn
+  ci-cd-r1-d-parity:
+    needs: ci-cd-r1-d-build
+    if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-c-release' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r1d-*
+          path: benchmark
+      - name: Compare exact commit, tree, inventory and every staged byte hash
+        run: python3 scripts/ci-cd-r1-d-benchmark.py compare benchmark
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r1d-comparison
+          path: benchmark/comparison.json
+          if-no-files-found: warn
+  full-release-regression:
+    needs: targeted
+    if: github.event_name == 'pull_request' && needs.targeted.outputs.release_gate == 'true'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm exact PR merge-test commit
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Full exact-tree Pages assembly and all existing gates
+        run: python3 scripts/ci-cd-r1-c-rehearsal.py
+      - name: Archive site file hash passport (not a deployable artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-cd-r1-c-site-passport
+          path: artifacts/ci-cd-r1-c/site-passport.json
+          if-no-files-found: error
   ux3-06-input-ownership:
     if: github.event_name == 'pull_request' && github.head_ref == 'fix/ux3-06-world-gesture-ownership' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
@@ -251,6 +345,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     outputs:
+      release_gate: ${{ steps.impact.outputs.release_gate }}
       browser: ${{ steps.impact.outputs.browser }}
       parcel_editor: ${{ steps.impact.outputs.parcel_editor }}
       cas_inventory: ${{ steps.impact.outputs.cas_inventory }}
