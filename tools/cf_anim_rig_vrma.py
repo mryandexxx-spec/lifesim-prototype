@@ -35,7 +35,7 @@ def points(arm,m):
 def angle(v,w):
     return math.degrees(v.normalized().angle(w.normalized()))
 def source_map():
-    m={"hips":"Hips","spine":"LowerBack","chest":"Spine","upper_chest":"Spine1","neck":"Neck","head":"Head"}
+    m={"hips":"Hips","spine":"LowerBack","chest":"Spine","upper_chest":"Spine1","neck":"Neck1","head":"Head"}
     for s,p in (("left","Left"),("right","Right")):
         for role,n in (("upper_leg","UpLeg"),("lower_leg","Leg"),("foot","Foot"),("toes","ToeBase"),("shoulder","Shoulder"),("upper_arm","Arm"),("lower_arm","ForeArm"),("hand","Hand")):m[s+"_"+role]=p+n
     return m
@@ -87,6 +87,9 @@ def export():
         mat.translation+=arm.matrix_world.inverted_safe().to_3x3()@delta
         hip.matrix=mat;bpy.context.view_layer.update()
         calibration=points(arm,m)
+        # Neck is a zero-offset virtual joint at Spine1. Neck1 is the
+        # actual displaced anatomical neck pivot; preserve this as metadata.
+        assert (Vector(calibration["neck"])-Vector(calibration["upper_chest"])).length>.04
         basis={b.name:b.matrix_basis.copy() for b in arm.pose.bones}
     assert abs(calibration["hips"][2]-refz)<.0002
     # Validate positive reference height and both leg/arm directions.
@@ -187,6 +190,12 @@ def replay():
         cam.location=center+Vector(offset)*h;cam.rotation_euler=(center-cam.location).to_track_quat("-Z","Y").to_euler();cam.data.ortho_scale=h*1.65
         for i in indices:
             scene.frame_set(lo+i);bpy.context.view_layer.update()
+            # Follow horizontal root only; fixed camera angle and scale preserve
+            # full-body visibility while the captured character walks.
+            hip=Vector(samples[i]["hips"])
+            focus=Vector((hip.x,hip.y,center.z))
+            cam.location=focus+Vector(offset)*h
+            cam.rotation_euler=(focus-cam.location).to_track_quat("-Z","Y").to_euler()
             name=f"{label}-{i:03}.png";scene.render.filepath=str(OUT/name)
             bpy.ops.render.render(write_still=True);assert (OUT/name).stat().st_size>0
             report["renders"].append(name)
