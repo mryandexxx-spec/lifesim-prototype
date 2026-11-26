@@ -53,7 +53,18 @@ scenarios.push(
   const {page,step,tap,snapshot}=h;let before;
   await step('pause-and-reset',async()=>{await pause(h);await tap('#view-toggle');await tap('#menu-reset-camera-btn');await tap('#view-close');await page.locator('#view-panel').waitFor({state:'hidden'});await page.waitForTimeout(500);before=await cameraPose(page);});
   await step('single-select',async()=>{await tap('#pick-mira');await page.waitForTimeout(1500);assert.equal((await snapshot()).selectedSim,'mira');assert.ok(distance(await cameraPose(page),before)<.1,'single tap moved camera');});
-  await step('double-focus',async()=>{await h.doubleTap('#pick-mira');await page.waitForTimeout(1600);assert.ok(distance(await cameraPose(page),before)>.1,'double tap did not move actual camera');assert.equal((await snapshot()).selectedSim,'mira');});
+  await step('double-focus',async()=>{
+   const start=await cameraPose(page);await h.doubleTap('#pick-mira');
+   const events=await h.inputTrace();
+   const clicks=events.filter(e=>e.type==='click'&&e.id==='pick-mira');
+   const pair=clicks.slice(-2);const gap=pair.length===2?pair[1].t-pair[0].t:null;
+   const samples=[];for(let i=0;i<12;i++){await page.waitForTimeout(500);const pose=await cameraPose(page);samples.push({elapsedMs:(i+1)*500,pose,distance:distance(pose,start)});if(samples.at(-1).distance>.1)break;}
+   h.observe({gapMs:gap,clicks:pair,samples});
+   assert.equal(pair.length,2,'two actual portrait click events required');
+   assert.ok(gap<=350,'double tap exceeded 350ms recognition window: '+gap);
+   assert.ok(samples.some(x=>x.distance>.1),'valid double tap did not move actual camera');
+   assert.equal((await snapshot()).selectedSim,'mira');
+  });
  }},
  {id:'social-scene',goal:'Find the other resident on the 3D lot and enqueue talk with explicit confirmation in both directions',seed:auditSeed,async run(h){
   const {page,step,tap,snapshot}=h;
@@ -71,6 +82,7 @@ scenarios.push(
      if(hit.id!=='game-canvas')continue;
      const prior=await snapshot();
      await h.tapPoint(pt.x,pt.y);
+     h.observe({worldInput:await h.inputTrace()});
      // Canvas tap may be deferred until gesture recognition finishes.
      await page.locator('#social-context').waitFor({state:'visible',timeout:1500}).catch(()=>{});
      assert.deepEqual((await snapshot()).actionQueues,prior.actionQueues,'scene selection alone must not enqueue');
@@ -87,7 +99,25 @@ scenarios.push(
  {id:'creative-admission',goal:'Find a purchased easel, choose painting, admit a real creative action without spending again',seed:creativeSeed,async run(h){
   const {page,step,tap,snapshot}=h;let before;
   await step('show-item-labels',async()=>{await pause(h);before=await snapshot();await tap('#view-toggle');await tap('#item-labels-btn');assert.equal(await page.locator('#item-labels-btn').getAttribute('aria-pressed'),'true');await tap('#view-close');await page.locator('#view-panel').waitFor({state:'hidden'});});
-  await step('choose-easel',async()=>{await tap('#hotspots button:has-text("Мольберт")');await page.locator('#painting-theme-select').waitFor({state:'visible'});assert.ok(await page.locator('#painting-theme-select option:not([disabled])').count()>0);});
+  await step('choose-easel',async()=>{
+   const item=before.world.furniture.instances.find(i=>i.prefabId==='easel'&&i.location==='home');assert.ok(item,'purchased easel exists');
+   const label=page.locator('#hotspots button:has-text("Мольберт")');
+   h.observe({easelInstance:item.instanceId,labelVisible:await label.isVisible()});
+   // The optional legacy hotspot does not necessarily cover a purchased instance.
+   // Select the real placed object by its live camera projection, no action injection.
+   await tap('#view-toggle');await tap('#item-labels-btn');await tap('#view-close');await page.locator('#view-panel').waitFor({state:'hidden'});
+   for(const y of [1.15,.75,1.5]){
+    const pt=await page.evaluate(async({x,z,y,instanceId})=>{const {Application,Vec3}=await import('playcanvas');const app=Application.getApplication();const node=app.root.findByName('F2 purchased / '+instanceId);if(!node?.enabled)throw Error('placed easel not rendered');const cam=app.root.findComponents('camera').find(c=>c.enabled);const p=cam.worldToScreen(new Vec3(x,y,z));const b=document.querySelector('#game-canvas').getBoundingClientRect();const px=Math.round(p.x+b.left),py=Math.round(p.y+b.top);return {x:px,y:py,hit:document.elementFromPoint(px,py)?.id};},{x:item.x,z:item.z,y,instanceId:item.instanceId});
+    h.observe({easelProjection:pt});if(pt.hit!=='game-canvas')continue;
+    await h.tapPoint(pt.x,pt.y);await page.locator('#painting-theme-select').waitFor({state:'visible',timeout:1500}).catch(()=>{});
+    h.observe({worldInput:await h.inputTrace()});assert.deepEqual((await snapshot()).actionQueues,before.actionQueues,'selecting easel must not enqueue or start a different command');
+    if(await page.locator('#painting-theme-select').isVisible())break;
+    if(await page.locator('#ground-walk-menu').isVisible())await tap('#ground-walk-close');
+    if(await page.locator('#social-context').isVisible())await tap('#social-context-close');
+    if(await page.locator('#action-button').isVisible())await tap('#close-action');
+   }
+   await page.locator('#painting-theme-select').waitFor({state:'visible',timeout:2000});assert.ok(await page.locator('#painting-theme-select option:not([disabled])').count()>0);
+  });
   await step('queue-painting',async()=>{await tap('#action-button');const s=await snapshot();assert.equal(s.shop.credits,before.shop.credits);assert.equal(s.actionQueues.byResident.alex.length,before.actionQueues.byResident.alex.length+1);assert.ok(s.actionQueues.byResident.alex.some(q=>q.type==='activity'&&q.activityId===PAINT_ACTIVITY_ID));assert.deepEqual(s.actionQueues.byResident.mira,before.actionQueues.byResident.mira);});
  }},
  {id:'career-discovery',goal:'Find actual career vacancies and inspect a job before committing to a career',seed:auditSeed,async run(h){
