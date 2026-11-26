@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {newFurnitureWorld,FURNITURE_CATALOG,
   furnitureActionApproach} from '../src/furniture-catalog.js';
 import {createFurnitureEditor,F1_MOVEABLE_PREFABS} from '../src/furniture-editor.js';
-import {furniturePoint,furniturePose,inverseFurniturePose} from '../src/furniture-transform.js';
+import {furniturePoint,furniturePose,inverseFurniturePose,furnitureLabelTargets} from '../src/furniture-transform.js';
 import {BED_SLOTS} from '../src/bed-layout.js';
 import {SOFA_POSE} from '../src/pose-config.js';
 import {SHOWER_LAYOUT,showerSequence,showerPrivacyInvariant} from '../src/shower-interaction.js';
@@ -32,7 +32,18 @@ test('F1b all five physical appliances are scene grouped and registered for touc
   assert.match(scene,/fixtureType:decorDrawing\?\.origin\.prefabId\|\|null/);
   assert.match(scene,/furnitureBounds\(game\.world,volume\.fixtureType,/);
   assert.match(scene,/item\.instanceId===originalId&&item\.location==='home'/);
-  assert.match(scene,/const placed=furniturePoint\(game\.world,id,/);
+  assert.match(scene,/furnitureLabelTargets\(game\.world,META\)/);
+  // Preserve the actual F1b transform invariant rather than the old inline
+  // implementation: all installed physical appliances follow their own pose.
+  const world=newFurnitureWorld();
+  for(const id of ['bed','sofa','fridge','shower','toilet']){
+    const item=world.instances.find(i=>i.prefabId===id);
+    const anchor=[item.x+.12,1.3,item.z-.18];
+    item.x+=.25;item.yaw=90;
+    const label=furnitureLabelTargets(world,{[id]:{anchor}}).find(t=>t.instanceId===item.instanceId);
+    const p=furniturePoint(world,id,{x:anchor[0],z:anchor[2]},item.instanceId);
+    assert.deepEqual({x:label.x,z:label.z},p,id);
+  }
 });
 test('F1b bed two slots and available sleeping destination use current transformed instance',()=>{
   const root=newHousehold();
