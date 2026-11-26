@@ -5,6 +5,7 @@ import numpy as np
 import bpy
 import mujoco
 import mink
+import qpsolvers
 from mink.limits.limit import Limit, Constraint
 from mathutils import Vector, Matrix, Quaternion
 sys.path.insert(0,str(pathlib.Path("prior-code/tools").resolve()))
@@ -158,6 +159,56 @@ class WeightedSurfaceLimit(Limit):
         assert err<.002,("weighted point Jacobian replay",err)
         return err
 
+def tangent(model,q0,q):
+    d=np.zeros(model.nv);mujoco.mj_differentiatePos(model,d,1.,q0,q)
+    return d
+
+def trust_bounds(model):
+    # Diagnostic trust region around source pose, not anatomical joint limits.
+    step=np.full(model.nv,.06);total=np.full(model.nv,.38)
+    for j in range(model.njnt):
+        if model.jnt_type[j]==mujoco.mjtJoint.mjJNT_FREE:
+            a=int(model.jnt_dofadr[j]);step[a:a+3]=.015;total[a:a+3]=.10
+    return step,total
+
+def bounded_step(cfg,tasks,limit,q0,step,total,diag):
+    model=cfg.model;n=model.nv
+    problem=mink.build_ik(cfg,tasks,.05,damping=.001,limits=[mink.ConfigurationLimit(model)])
+    collision=limit.compute_qp_inequalities(cfg,.05)
+    m=0 if collision.inactive else len(collision.h)
+    # Collision rows are soft via nonnegative slack. All trust bounds remain hard.
+    # Penalizing slack in the QP avoids exploding steps when contact goals conflict.
+    P=np.zeros((n+m,n+m));P[:n,:n]=problem.P
+    if m:P[n:,n:]=np.eye(m)*200.
+    q=np.r_[problem.q,np.full(m,2.)]
+    G=[];h=[]
+    if problem.G is not None:
+        G.append(np.c_[problem.G,np.zeros((len(problem.h),m))]);h.append(problem.h)
+    if m:
+        G.append(np.c_[collision.G,-np.eye(m)]);h.append(collision.h)
+        G.append(np.c_[np.zeros((m,n)),-np.eye(m)]);h.append(np.zeros(m))
+    d=tangent(model,q0,cfg.q)
+    lo=np.maximum(-step,-total-d);hi=np.minimum(step,total-d)
+    G.extend([np.c_[np.eye(n),np.zeros((n,m))],np.c_[-np.eye(n),np.zeros((n,m))]])
+    h.extend([hi,-lo])
+    G=np.vstack(G);h=np.concatenate(h)
+    sol=qpsolvers.solve_qp(P,q,G,h,solver="daqp")
+    if sol is None or not np.isfinite(sol).all() or np.max(G@sol-h)>1e-5:
+        diag["rejected_qp_steps"]+=1
+        return False
+    dq=sol[:n];diag["max_slack_m"]=max(diag["max_slack_m"],float(max(0.,np.max(sol[n:]))) if m else 0.)
+    # A rotation increment is a tangent, so independently check actual integrated
+    # displacement instead of trusting the linear approximation to total bounds.
+    current=cfg.q.copy()
+    for a in (1.,.5,.25,.125,.0625):
+        trial=current.copy();mujoco.mj_integratePos(model,trial,dq,a)
+        delta=tangent(model,q0,trial)
+        if np.isfinite(trial).all() and np.all(np.abs(delta)<=total+1e-6):
+            cfg.update(trial);diag["accepted_steps"]+=1
+            return True
+    diag["rejected_integration_steps"]+=1
+    return False
+
 def qp(t,bf,goals,weighted=None,diagnostic=None):
 
     # MJCF built from the actual sampled hierarchy, no robot or borrowed body.
@@ -197,11 +248,21 @@ def qp(t,bf,goals,weighted=None,diagnostic=None):
         surface_limit=WeightedSurfaceLimit(model,skin,floor,seat_info)
         if diagnostic is not None:diagnostic["jacobian_error"]=surface_limit.derivative_check(cfg)
         limits=[mink.ConfigurationLimit(model),surface_limit]
+    q0=cfg.q.copy()
+    if weighted:
+        step,total=trust_bounds(model)
+        diagnostic.update({"accepted_steps":0,"rejected_qp_steps":0,"rejected_integration_steps":0,"max_slack_m":0.})
     for _ in range(24):
-        vel=mink.solve_ik(cfg,tasks,.05,"daqp",damping=.001,limits=limits)
-
-        assert np.isfinite(vel).all()
-        cfg.integrate_inplace(vel,.05)
+        if weighted:
+            if not bounded_step(cfg,tasks,surface_limit,q0,step,total,diagnostic):break
+        else:
+            vel=mink.solve_ik(cfg,tasks,.05,"daqp",damping=.001,limits=limits)
+            assert np.isfinite(vel).all()
+            cfg.integrate_inplace(vel,.05)
+    if weighted:
+        delta=tangent(model,q0,cfg.q)
+        assert np.all(np.abs(delta)<=total+1e-6),("trust region",delta)
+        diagnostic["max_tangent_bound_ratio"]=float(np.max(np.abs(delta)/total))
     if diagnostic is not None and surface_limit is not None:
         pts,_=surface_limit.points(cfg)
         diagnostic.update({"constraint_calls":surface_limit.calls,"max_constraint_rows":surface_limit.max_rows,
@@ -262,7 +323,7 @@ def main():
     for k,t in data["targets"].items():t["roles"]=inv["targets"][k]["map"]
     old=list(pathlib.Path("prior-contacts").rglob("report.json"));assert len(old)==1
     prior=json.loads(old[0].read_text());assert len(prior["profiles"])==6
-    report={"scope":"R6 bounded weighted-skin QP: two central profiles, sitting enter/exit; LBS replay against Blender; not full ART gate","production":"BLOCKED","ART":"OPEN","profiles":{}}
+    report={"scope":"R8 trust-region and soft-contact QP: two central profiles, sitting enter/exit; full weighted candidate video; no anatomical/temporal certification","production":"BLOCKED","ART":"OPEN","profiles":{}}
     for key,t in data["targets"].items():
         central=key==min((k for k,v in data["targets"].items() if v["sex"]==t["sex"]),key=lambda k:abs(data["targets"][k]["scale"]-1))
         if not central:continue
@@ -351,13 +412,25 @@ def main():
                         if label=="mink_weighted":
                             row["variants"][label]["surface_constraint"]=diag.copy()
                             row["variants"][label]["failure"]=failure
+                            ww=world(t,f);bw=world(t,bf)
+                            shift=max((ww[j].translation-bw[j].translation).length for j,p in enumerate(t["parents"]) if p<0)
+                            row["variants"][label]["root_shift_m"]=shift
+                            assert shift<=.18,("root displacement",key,name,i,shift)
+                            if i:
+                                prev=variants[label][-1];bp=frames[i-1]
+                                corrections=[]
+                                for v,u,pv,pu in zip(f,bf,prev,bp):
+                                    q1=matrix(u["p"],u["r"]).to_quaternion().inverted()@matrix(v["p"],v["r"]).to_quaternion()
+                                    q0=matrix(pu["p"],pu["r"]).to_quaternion().inverted()@matrix(pv["p"],pv["r"]).to_quaternion()
+                                    corrections.append(2*math.acos(min(1.,abs(q0.dot(q1)))))
+                                row["variants"][label]["correction_frame_jump_rad"]=max(corrections)
                         variants[label].append(f)
                     props.append(phone_matrix);rows.append(row)
                 report["profiles"][key][name]={"samples":rows,"prior_r2_summary":prior["profiles"][key][name]["summary"],"comparison_note":"R2 historical targets differ; not a matched R2 solve."}
                 (OUT/"report.json").write_text(json.dumps(report,indent=2))
                 if central:
                     for label,fs in variants.items():
-                        n=min(12,len(fs));prefix=f"{key}-{name}-{label}"
+                        n=len(fs) if label=="mink_weighted" else min(12,len(fs));prefix=f"{key}-{name}-{label}"
                         with tempfile.TemporaryDirectory() as tmp:
                             for j in range(n):
                                 idx=round((len(fs)-1)*j/(n-1));apply(arm,bones,rest,fs[idx])
@@ -370,5 +443,5 @@ def main():
                     if o:bpy.data.objects.remove(o,do_unlink=True)
     assert len(report["profiles"])==2 and all(len(x)==2 for x in report["profiles"].values())
     assert len(list(OUT.glob("*.mp4")))==12
-    print("R6 bounded weighted skin diagnostic complete; ART and contact acceptance OPEN")
+    print("R8 bounded weighted skin diagnostic complete; ART and contact acceptance OPEN")
 if __name__=="__main__":main()
