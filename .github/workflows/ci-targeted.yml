@@ -8,7 +8,7 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-anim-contact-r3:
+  cf-anim-contact-r4:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-contact-contract' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -79,8 +79,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cf-anim-contact-r3-${{ matrix.clip }}-evidence
-          path: artifacts/cf-anim-contact-r3/
+          name: cf-anim-contact-r4-${{ matrix.clip }}-evidence
+          path: artifacts/cf-anim-contact-r4/
           if-no-files-found: warn
 
   cf-anim-contact-source:
