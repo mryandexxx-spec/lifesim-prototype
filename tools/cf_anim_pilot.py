@@ -122,10 +122,11 @@ def bake(arm,bones,rest,meshes,frames,path):
         if o.animation_data:o.animation_data_clear()
     for action in list(bpy.data.actions):bpy.data.actions.remove(action)
     previous={}
+    for b in bones:b.rotation_mode="QUATERNION"
     for i,f in enumerate(frames):
         F.apply(arm,bones,rest,f)
         for b in bones:
-            b.rotation_mode="QUATERNION";q=b.rotation_quaternion.copy()
+            q=b.rotation_quaternion.copy()
             if b.name in previous and q.dot(previous[b.name])<0:q.negate()
             b.rotation_quaternion=q;previous[b.name]=q.copy()
             for prop in ("location","rotation_quaternion","scale"):b.keyframe_insert(prop,frame=i+1,group=b.name)
