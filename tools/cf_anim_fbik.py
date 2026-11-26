@@ -468,10 +468,10 @@ def main():
     for k,t in data["targets"].items():t["roles"]=inv["targets"][k]["map"]
     old=list(pathlib.Path("prior-contacts").rglob("report.json"));assert len(old)==1
     prior=json.loads(old[0].read_text());assert len(prior["profiles"])==6
-    report={"scope":"R11 full-clip sparse SQP with source-log Jacobian and independent solver fallback; same central sit cases and unchanged motion constraints","production":"BLOCKED","ART":"OPEN","profiles":{}}
+    report={"scope":"R12 frozen R11 full-clip SQP on four held-out profiles; same seat geometry, source clips and parameters; baseline and trajectory only","production":"BLOCKED","ART":"OPEN","profiles":{}}
     for key,t in data["targets"].items():
         central=key==min((k for k,v in data["targets"].items() if v["sex"]==t["sex"]),key=lambda k:abs(data["targets"][k]["scale"]-1))
-        if not central:continue
+        if central:continue
         path=pathlib.Path("prior-full")/(key+".glb");assert digest(path)==t["sha256"]
         arm,bones=import_rig(path);reset(arm,bones);rest=locals_(arm,bones,True)
         meshes=[o for o in bpy.context.scene.objects if o.type=="MESH" and any(m.type=="ARMATURE" and m.object==arm for m in o.modifiers)]
@@ -508,7 +508,7 @@ def main():
                 if "Phone" in name:
                     pside=min(regs,key=lambda side:np.median([(pos(w,s["roles"]["hand_"+side])-pos(w,s["roles"]["head"])).length for w in sw]))
                     phone=proxy("phone-proxy",(0,0,0),(.075,.145,.012),(.12,.12,.15))
-                pairs,_=finger_map(s,t);rows=[];variants={k:[] for k in ("baseline","mink","mink_weighted","mink_temporal")};props=[];prev_diag=None;prev_base=None;all_goals=[]
+                pairs,_=finger_map(s,t);rows=[];variants={"baseline":[]};props=[];prev_diag=None;prev_base=None;all_goals=[]
                 # All sampled source frames; same target definitions for both solvers.
                 for i,bf0 in enumerate(frames):
                     bf=clone(bf0);fingers(s,t,c["frames"][i],bf,pairs);apply(arm,bones,rest,bf)
@@ -538,7 +538,7 @@ def main():
                     all_goals.append(goals)
                     row={"frame":i,"goal_count":len(goals),"variants":{}}
                     diag={};temporal_diag={}
-                    for label,fn in (("baseline",lambda:bf),("mink",lambda:qp(t,bf,goals)),("mink_weighted",lambda:qp(t,bf,goals,(skin,floor,seat_info),diag)),("mink_temporal",lambda:qp(t,bf,goals,(skin,floor,seat_info),temporal_diag,prev_diag,dt))):
+                    for label,fn in (("baseline",lambda:bf),):
                         start=time.perf_counter()
                         failure=None
                         try:
@@ -595,7 +595,7 @@ def main():
                     rows[i]["variants"]["mink_trajectory"]=result
                 report["profiles"][key][name]={"trajectory_stats":trajectory_stats,"samples":rows,"prior_r2_summary":prior["profiles"][key][name]["summary"],"comparison_note":"R2 historical targets differ; not a matched R2 solve."}
                 (OUT/"report.json").write_text(json.dumps(report,indent=2))
-                if central:
+                if not central:
                     for label,fs in variants.items():
                         n=len(fs) if label in ("mink_weighted","mink_temporal","mink_trajectory") else min(12,len(fs));prefix=f"{key}-{name}-{label}"
                         with tempfile.TemporaryDirectory() as tmp:
@@ -608,8 +608,8 @@ def main():
                             subprocess.run([get_ffmpeg_exe(),"-y","-loglevel","error","-framerate",str((n-1)/c["duration"]),"-i",tmp+"/%03d.png","-c:v","libx264","-pix_fmt","yuv420p",str(OUT/(prefix+".mp4"))],check=True)
                 for o in (seat,phone):
                     if o:bpy.data.objects.remove(o,do_unlink=True)
-    assert len(report["profiles"])==2 and all(len(x)==2 for x in report["profiles"].values())
-    assert len(list(OUT.glob("*.mp4")))==20
+    assert len(report["profiles"])==4 and all(len(x)==2 for x in report["profiles"].values())
+    assert len(list(OUT.glob("*.mp4")))==16
     assert all(v["trajectory_stats"]["executed"] for p in report["profiles"].values() for v in p.values()),"trajectory failed to execute; see report and video evidence"
-    print("R11 full-clip weighted skin diagnostic complete; ART and contact acceptance OPEN")
+    print("R12 held-out full-clip weighted skin diagnostic complete; ART and contact acceptance OPEN")
 if __name__=="__main__":main()

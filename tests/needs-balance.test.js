@@ -106,8 +106,11 @@ test('published Pages uses one pure rate table, with original animation and save
   const rules=readFileSync(new URL('../src/simulation.js',import.meta.url),'utf8');
   const social=readFileSync(new URL('../src/social-need.js',import.meta.url),'utf8');
   const workflow=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
-  assert.match(scene,/tickHousehold\(game,\.30 \* effectiveSleepSpeed\(game,/);
-  assert.match(scene,/while\(accumulator>=\.10\)/);
+  // PF-15 changes wall-clock frequency, not game-minute step size or rates.
+  assert.match(scene,/while\(accumulator>=\.10\/3\)/);
+  assert.match(scene,/const speed=householdSpeed\.read\(game\);\s*const quantumSeconds=\.10\/speed;\s*if\(accumulator<quantumSeconds\)break;/);
+  assert.match(scene,/tickHousehold\(game,\.30\)/);
+  assert.match(scene,/accumulator-=quantumSeconds;\s*householdSpeed\.read\(game\);/);
   assert.match(rules,/NEED_DECAY_PER_MINUTE\[need\]/);
   assert.match(social,/NEED_DECAY_PER_MINUTE\.social/);
   assert.ok(workflow.includes('node --check src/need-balance.js'));
