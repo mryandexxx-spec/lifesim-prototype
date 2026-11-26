@@ -1,0 +1,41 @@
+name: GQ scripted game playtest
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  playtest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Negative controls and existing multi-week simulation
+        run: node --test tests/gq-playtest-evidence.test.js tests/life-integration-qa.test.js
+      - name: Real touch playtest on Chromium and WebKit
+        env:
+          GQ_EXPECTED_SHA: ${{ inputs.ref || github.sha }}
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/gq-http.log 2>&1 &
+          sleep 3
+          node tests/gq-playtest-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gq-playtest-evidence
+          path: artifacts/gq-playtest/
+          if-no-files-found: warn
