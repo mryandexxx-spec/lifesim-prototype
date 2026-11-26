@@ -54,8 +54,16 @@ def err(a,b):
 report={"stage":"RIG-CONTRACT/R2A","head":os.environ["EXPECTED_SHA"],"rig":key,"rigSha":pins[key],"addonPin":PIN,"blender":bpy.app.version_string,"mapping":mapping,"status":"PENDING","ART":"OPEN"}
 def save(): (OUT/(key+".json")).write_text(json.dumps(report,indent=2,allow_nan=False))
 report["mappingErrors"]=hb.error_messages();save()
+def finish():
+    # Embedded bpy + registered add-on can hang in interpreter teardown even
+    # after all work completed. This is a disposable worker; persist evidence,
+    # flush streams, then terminate without invoking the problematic teardown.
+    save()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
 if not hb.bones_are_correctly_assigned():
-    report["status"]="MAPPING_FAIL";save();sys.exit(0)
+    report["status"]="MAPPING_FAIL";finish()
 report["neutral"]=measure();h,floor=setup(meshes);cam=bpy.context.scene.camera
 from mathutils import Vector
 center=Vector((0,0,floor+h*.50))
@@ -87,3 +95,5 @@ if any(v["posM"]>.0002 or v["rotRad"]>.002 for v in (report["restoreError"],repo
 assert hashlib.sha256(path.read_bytes()).hexdigest()==pins[key]
 report["status"]="CALIBRATION_SCREEN_PASS" if not report["failures"] else "CALIBRATION_SCREEN_FAIL"
 save();print(key,report["status"],report["failures"],flush=True)
+assert all((OUT/f"{key}-{label}-{view}.png").stat().st_size>0 for label in ("native","calibrated") for view in ("front","quarter","side"))
+finish()
