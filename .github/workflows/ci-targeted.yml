@@ -8,6 +8,12 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-anim-pilot:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-pilot' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/cf-anim-pilot.yml
   pf-13-flowers:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-13-flower-batch' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/pf-13-flower-batch.yml
