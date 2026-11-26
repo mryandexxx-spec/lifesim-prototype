@@ -663,3 +663,10 @@ jobs:
           name: cas-c4-female-source-evidence
           path: artifacts/cas-02-1-f2-c4/source-audit.json
           if-no-files-found: warn
+
+  cf-anim-fbik:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-fbik' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/cf-anim-fbik.yml
