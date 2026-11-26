@@ -1395,26 +1395,40 @@ function placeSocialPopover(panel){
   const bottomInset=Math.max(0,Math.ceil(frame.bottom-
     $('dashboard').getBoundingClientRect().top))+12;
   const pos=contextualPlacement({
-    anchorX:socialAnchor.x-frame.left,anchorY:socialAnchor.y-frame.top,
+    anchorX:socialAnchor.x,anchorY:socialAnchor.y,
     viewportWidth:frame.width,viewportHeight:frame.height,
-    panelWidth:panel.offsetWidth||340,panelHeight:panel.scrollHeight||280,
+    panelWidth:panel.offsetWidth||340,
+    panelHeight:Math.max(panel.offsetHeight,panel.scrollHeight+2)||280,
     topInset,bottomInset,edge:12
   });
   panel.style.setProperty('--context-x',pos.x+'px');
   panel.style.setProperty('--context-y',pos.y+'px');
-  panel.style.setProperty('--context-max-height',pos.maxHeight+'px');
+  // The content may grow after placement (selected resident, translated text,
+  // wrapping or late font load). Cap the actual remaining band, not the whole
+  // available region measured from its top.
+  const remaining=Math.max(0,Math.floor(frame.height-bottomInset-pos.y));
+  panel.style.setProperty('--context-max-height',Math.min(pos.maxHeight,remaining)+'px');
 }
 function relayoutSocialPanels(){
   for(const id of ['social-context','social-menu-panel','shared-panel',
     'conversation-panel','branch-panel'])placeSocialPopover($(id));
 }
-const scheduleSocialPosition=()=>requestAnimationFrame(relayoutSocialPanels);
+let socialLayoutFrame=0;
+const scheduleSocialPosition=()=>{
+  if(socialLayoutFrame)return;
+  socialLayoutFrame=requestAnimationFrame(()=>{socialLayoutFrame=0;relayoutSocialPanels();});
+};
 window.addEventListener('resize',scheduleSocialPosition);
+// HUD and panel content can resize without a viewport resize.
+if(typeof ResizeObserver==='function'){
+  const observer=new ResizeObserver(()=>{if(socialAnchor)scheduleSocialPosition();});
+  for(const id of ['dashboard','social-context','social-menu-panel','shared-panel','conversation-panel','branch-panel'])observer.observe($(id));
+}
 function renderSocialContext(){
   const open=socialContextVisible&&!socialMenuCategory&&!conversationTopicPicker&&
     !sharedPicker&&!branchPicker&&!dialogueNeedsDecision(game);
   $('social-context').hidden=!open;
-  if(open)scheduleSocialPosition();
+  if(open){placeSocialPopover($('social-context'));scheduleSocialPosition();}
   else $('social-context').classList.remove('context-popover');
 }
 function closeSocialContext(){
