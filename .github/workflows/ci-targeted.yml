@@ -8,6 +8,28 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  ci-cd-r1-c-release-rehearsal:
+    if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-c-release' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Full exact-head Pages assembly and all existing gates with pinned source pack
+        run: python3 scripts/ci-cd-r1-c-rehearsal.py
+      - name: Archive site file hash passport (not a deployable artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-cd-r1-c-site-passport
+          path: artifacts/ci-cd-r1-c/site-passport.json
+          if-no-files-found: error
   ux3-06-input-ownership:
     if: github.event_name == 'pull_request' && github.head_ref == 'fix/ux3-06-world-gesture-ownership' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
