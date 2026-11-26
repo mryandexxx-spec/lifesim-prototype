@@ -41,7 +41,9 @@ for(const [engine,launcher,width,height] of matrix){
    const reload=async()=>{await page.reload({waitUntil:'domcontentloaded'});await ready();};
    let current=null;
    const tap=async selector=>{
-     const locator=page.locator(selector).first(),box=await locator.boundingBox();
+     const locator=page.locator(selector).first();
+     await locator.waitFor({state:'visible',timeout:10000});
+     const box=await locator.boundingBox();
      assert.ok(box&&box.width>0&&box.height>0,'no visible touch target '+selector);
      const before=await page.evaluate(()=>window.__gqTouch);
      await locator.tap({timeout:10000});
@@ -69,10 +71,11 @@ for(const [engine,launcher,width,height] of matrix){
    });
    await scenario.run({page,step,tap,snapshot,reload,seed,key:SAVE_KEY});
    assert.deepEqual(c.errors,[]);c.status='PASS';
-  }catch(e){c.status='FAIL';c.failure=e.stack||String(e);}
+  }catch(e){c.status='FAIL';c.failure=e.stack||String(e);console.error('GQ CASE FAIL',id,c.failure,JSON.stringify(c.errors));}
   finally{c.durationMs=Math.max(1,Math.round(performance.now()-started));await ctx.close();flush();}
  }}finally{await browser.close();}
 }
 report.finished=new Date().toISOString();flush();
+console.log('GQ matrix',JSON.stringify(report.cases.map(c=>({id:c.id,status:c.status,steps:c.steps.length,failed:c.steps.find(s=>s.status==='FAIL')?.name,durationMs:c.durationMs}))));
 assertEvidence(report,sha,expected);
 console.log('GQ scripted touch evidence PASS',report.cases.length,'cases; human/device/art OPEN');
