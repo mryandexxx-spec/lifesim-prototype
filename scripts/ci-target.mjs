@@ -66,6 +66,8 @@ export function planChanges(files,root=ROOT){
     [/^(?:index\.html|src\/game\.js)$/,['tests/ui4-integration.test.js','tests/ui7-integration.test.js','tests/qsk-11-toast-ui.test.js','tests/qsk-11-view-popover.test.js']],
     // Live storage boundary is inspected as source, not imported by the Node suite.
     [/^src\/game\.js$/,['tests/cas-01-population-save.test.js']],
+    // HUD layout contract executes a live source binding and inspects markup/CSS.
+    [/^(?:src\/(?:game|hud-panel|ui-layout)\.js|index\.html|styles\.css)$/,['tests/hud-panel.test.js']],
     // PF-01 extracts live game.js HUD and pool helpers rather than importing game.js.
     [/^(?:src\/(?:game|resident-hud|career-work)\.js|index\.html|styles\.css)$/,['tests/pf-01.test.js']],
     // Legacy source-level VM tests extract live UI functions, not ESM imports.
