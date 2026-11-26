@@ -49,22 +49,27 @@ def native_bench(t,pose,floor):
     bpy.ops.import_scene.gltf(filepath=str(BENCH.resolve()))
     objects=[o for o in bpy.context.scene.objects if o not in before]
     meshes=[o for o in objects if o.type=="MESH"]
-    points=[]
+    points=[];back=[]
     for o in meshes:
         for poly in o.data.polygons:
             mat=o.data.materials[poly.material_index]
             if not mat or not mat.name.startswith("Honey oak"):continue
             pts=[F.Y@o.matrix_world@o.data.vertices[i].co for i in poly.vertices]
             if all(abs(v.y-.64)<.001 for v in pts):points+=pts
+            back.extend(v for v in pts if v.y>.80)
     assert len(points)>=6,"Missing actual bench top geometry"
     lo=np.min(np.array(points),axis=0);hi=np.max(np.array(points),axis=0)
     assert hi[0]-lo[0]>1.4 and hi[2]-lo[2]>.15
     w=F.world(t,pose);x,front=F.seat_axes(t,w)
-    # Native game bench front is +Z. Ensure a proper rotation (no reflection).
-    x=Vector((front.z,0,-front.x))
+    # Derive facing from native high backrest vertices; never assume a model axis.
+    assert back and abs(float(np.mean(np.array(back)[:,2])))>.15
+    back_sign=math.copysign(1.,float(np.mean(np.array(back)[:,2])))
+    native_z=-back_sign*front
+    x=Vector((native_z.z,0,-native_z.x))
     center=F.pos(w,t["roles"]["hip"]);center.y=floor+.64-.05
     native=Vector(((lo[0]+hi[0])/2,0,(lo[2]+hi[2])/2))
-    rot=Matrix((x,Vector((0,1,0)),front)).transposed().to_4x4()
+    rot=Matrix((x,Vector((0,1,0)),native_z)).transposed().to_4x4()
+    assert (rot.to_3x3()@Vector((0,0,back_sign))).dot(front)<-.99
     assert rot.to_3x3().determinant()>.99
     origin=Vector((center.x,floor,center.z))-rot.to_3x3()@native
     m=Matrix.Translation(origin)@rot
@@ -77,7 +82,7 @@ def native_bench(t,pose,floor):
         vertices.extend(F.Y@o.matrix_world@v.co for v in o.data.vertices)
         triangles.extend(tuple(off+i for i in tri.vertices) for tri in o.data.loop_triangles)
     bvh=BVHTree.FromPolygons(vertices,triangles,all_triangles=True)
-    return (center,x,front,float(hi[0]-lo[0]),float(hi[2]-lo[2]),floor+.64),bvh,{"origin":list(origin),"yaw":math.atan2(front.x,front.z)*180/math.pi,"surface_bounds":[lo.tolist(),hi.tolist()]}
+    return (center,x,front,float(hi[0]-lo[0]),float(hi[2]-lo[2]),floor+.64),bvh,{"origin":list(origin),"yaw":math.atan2(native_z.x,native_z.z)*180/math.pi,"back_sign":back_sign,"source_front":list(front),"surface_bounds":[lo.tolist(),hi.tolist()]}
 
 def limb_region(meshes,t,side):
     name=t["names"][t["roles"]["thigh_"+side]]
@@ -88,6 +93,31 @@ def limb_region(meshes,t,side):
         if ix:out.append((o,ix))
     assert out
     return out
+
+def stage_height(t,frames,weights,arm,bones,rest,regs,pelvis,seat,floor):
+    """Adapt the source action to the actual seat height before bounded FBIK.
+    Keep source foot world positions and orientation; use existing limb IK with
+    source knee pole, no per-character angles and no changed solver coefficients."""
+    diagnostics=[]
+    for f,s in zip(frames,weights):
+        F.apply(arm,bones,rest,f);w=F.world(t,f)
+        shift=(seat[-1]+.002-min(p.y for p in F.surface(pelvis)))*s
+        # Only seated source needs a height adaptation; avoid dragging the standing pose.
+        if s<.02:shift=0.
+        feet={}
+        for side in regs:
+            e=t["roles"]["foot_"+side];v=F.pos(w,e)
+            # Do not force a source swing foot down; preserve above-ground clearance.
+            v.y+=max(0.,floor-F.sole(regs[side]))
+            feet[side]=v
+        F.move_root(t,f,t["roles"]["hip"],Vector((0,shift,0)))
+        errors={}
+        for side,v in feet.items():
+            ids=[t["roles"][a+"_"+side] for a in ("thigh","shin","foot")]
+            result=F.ik(t,f,ids,v,1.)
+            errors[side]=result
+        diagnostics.append({"root_lift_m":shift,"feet":errors})
+    return diagnostics
 
 def targets(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor):
     result=[]; anchors={}
@@ -108,7 +138,8 @@ def targets(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor):
             e=t["roles"]["hand_"+side];v=F.pos(w,e);q=w[e].to_quaternion()
             # Lap marker from actual thigh skin at the source palm's longitudinal position.
             pq,pc=F.palm(t,w,side,False)
-            pts=F.surface(thighs[side]);nearest=min(pts,key=lambda p:(p-pc).length)
+            pts=F.surface(thighs[side]);upper=[p for p in pts if p.y>=float(np.quantile([p.y for p in pts],.65))]
+            nearest=min(upper,key=lambda p:(p-pc).length)
             # Preserve source arm swing; request lap contact only in seated phase.
             weight=F.smooth((s-.75)/.25)
             v=v.lerp(nearest+(v-pc)+Vector((0,.015,0)),weight)
@@ -179,6 +210,7 @@ def main():
         pelvis=F.regions(meshes,t);thighs={s:limb_region(meshes,t,s) for s in regs}
         frames,weights,seams=timeline(data,solved,t,key)
         seat,bvh,bench=native_bench(t,frames[seams[0]],floor)
+        staging=stage_height(t,frames,weights,arm,bones,rest,regs,pelvis,seat,floor)
         goals=targets(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor)
         corrected,stats=F.trajectory(t,frames,goals,skin,floor,seat,1/FPS)
         assert stats["executed"],stats
@@ -199,7 +231,7 @@ def main():
                     if i in (0,*seams,len(corrected)-1):shutil.copyfile(scene.render.filepath,OUT/f"{sex}-{view}-{i:03d}.png")
                 subprocess.run([F.get_ffmpeg_exe(),"-y","-loglevel","error","-framerate",str(FPS),"-i",tmp+"/%03d.png","-c:v","libx264","-pix_fmt","yuv420p",str(OUT/f"{sex}-{view}.mp4")],check=True)
         exported=bake(arm,bones,rest,meshes,corrected,OUT/f"{sex}.glb")
-        report["profiles"][sex]={"key":key,"rig_sha":t["sha256"],"bench":bench,"frames":len(corrected),"fps":FPS,"seams":seams,"solver":stats,"export":exported,"samples":rows}
+        report["profiles"][sex]={"key":key,"rig_sha":t["sha256"],"bench":bench,"frames":len(corrected),"fps":FPS,"seams":seams,"solver":stats,"staging":staging,"export":exported,"samples":rows}
         (OUT/"report.json").write_text(json.dumps(report,indent=2))
     shutil.copyfile(BENCH,OUT/"bench.glb")
     print("Pilot exported; independent artistic/contact gate OPEN")
