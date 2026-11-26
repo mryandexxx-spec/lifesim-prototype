@@ -38,7 +38,7 @@ try{
   document.addEventListener('webglcontextlost',()=>window.__gqLost++,true);
  },{key:SAVE_KEY,tour:UI_TOUR_STORAGE_KEY,seed});
  const page=await context.newPage();
- page.on('pageerror',e=>report.errors.push(e.message));page.on('crash',()=>report.errors.push('renderer crash'));
+ page.on('pageerror',e=>{report.errors.push(e.message);(report.errorDetails??=[]).push({atMs:started===null?null:Math.round(performance.now()-started),step:report.steps.at(-1)?.name??null,stack:String(e.stack||e.message)});flush();});page.on('crash',()=>report.errors.push('renderer crash'));
  page.on('requestfailed',r=>{if(/\/(src|vendor)\//.test(r.url()))report.errors.push(r.url()+' '+r.failure()?.errorText);});
  page.on('response',r=>{if(r.status()>=400&&/\/(src|vendor)\//.test(r.url()))report.errors.push('HTTP '+r.status()+' '+r.url());});
  page.on('dialog',d=>{report.errors.push('Unexpected native dialog: '+d.message());d.dismiss().catch(()=>{});});
