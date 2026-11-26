@@ -8,6 +8,29 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  gc-08-milestones:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/gc-08-milestones' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Durable milestone probe and canonical regressions
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/gc-08-r1
+          git rev-parse HEAD > artifacts/gc-08-r1/head.txt
+          node --test tests/gc-08-milestones-probe.test.js tests/hobbies-h5.test.js tests/hobbies-h5b.test.js tests/w2a2-professional-goals.test.js tests/w4a-finance.test.js | tee artifacts/gc-08-r1/test.tap
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-08-r1-evidence
+          path: artifacts/gc-08-r1/
+          if-no-files-found: warn
   pf-14-garden-care:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-14-garden-care' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
