@@ -66,7 +66,10 @@ def native_bench(t,pose,floor):
     back_sign=math.copysign(1.,float(np.mean(np.array(back)[:,2])))
     native_z=-back_sign*front
     x=Vector((native_z.z,0,-native_z.x))
-    center=F.pos(w,t["roles"]["hip"]);center.y=floor+.64-.05
+    hip=F.pos(w,t["roles"]["hip"]);knees=[F.pos(w,t["roles"]["shin_"+s]) for s in ("l","r")]
+    # Place the real front edge under the proximal/middle thigh, not under the knee.
+    front_reach=float(np.mean([(k-hip).dot(front) for k in knees]));assert front_reach>.08
+    center=hip+front*(.55*front_reach-float(hi[2]-lo[2])/2);center.y=floor+.64-.05
     native=Vector(((lo[0]+hi[0])/2,0,(lo[2]+hi[2])/2))
     rot=Matrix((x,Vector((0,1,0)),native_z)).transposed().to_4x4()
     assert (rot.to_3x3()@Vector((0,0,back_sign))).dot(front)<-.99
@@ -94,58 +97,77 @@ def limb_region(meshes,t,side):
     assert out
     return out
 
-def stage_height(t,frames,weights,arm,bones,rest,regs,pelvis,seat,floor):
-    """Adapt the source action to the actual seat height before bounded FBIK.
-    Keep source foot world positions and orientation; use existing limb IK with
-    source knee pole, no per-character angles and no changed solver coefficients."""
-    diagnostics=[]
-    for f,s in zip(frames,weights):
-        F.apply(arm,bones,rest,f);w=F.world(t,f)
-        shift=(seat[-1]+.002-min(p.y for p in F.surface(pelvis)))*s
-        # Only seated source needs a height adaptation; avoid dragging the standing pose.
-        if s<.02:shift=0.
-        feet={}
-        for side in regs:
-            e=t["roles"]["foot_"+side];v=F.pos(w,e)
-            # Do not force a source swing foot down; preserve above-ground clearance.
-            v.y+=max(0.,floor-F.sole(regs[side]))
-            feet[side]=v
-        F.move_root(t,f,t["roles"]["hip"],Vector((0,shift,0)))
-        errors={}
-        for side,v in feet.items():
-            ids=[t["roles"][a+"_"+side] for a in ("thigh","shin","foot")]
-            result=F.ik(t,f,ids,v,1.)
-            errors[side]=result
-        diagnostics.append({"root_lift_m":shift,"feet":errors})
-    return diagnostics
+def contact_patch(t,w,pelvis,thighs,seat):
+    center,x,front,width,depth,top=seat
+    points=list(F.surface(pelvis))
+    for side in thighs:
+        a=F.pos(w,t["roles"]["thigh_"+side]);b=F.pos(w,t["roles"]["shin_"+side])
+        axis=b-a;den=axis.length_squared
+        points.extend(p for p in F.surface(thighs[side]) if -.25<=(p-a).dot(axis)/den<=.55)
+    # Only underside support vertices within actual seat footprint; not an arbitrary bone height.
+    patch=[p for p in points if abs((p-center).dot(x))<width/2 and abs((p-center).dot(front))<depth/2]
+    return patch
 
-def targets(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor):
-    result=[]; anchors={}
-    # Fixed joint set across the full clip is required by the frozen trajectory solver.
-    for i,(f,s) in enumerate(zip(frames,weights)):
-        F.apply(arm,bones,rest,f);w=F.world(t,f);g={}
-        for side in regs:
-            e=t["roles"]["foot_"+side];v=F.pos(w,e)
-            if F.sole(regs[side])-floor<.035:
-                if side not in anchors:anchors[side]=v.copy()
-                v.x=anchors[side].x;v.z=anchors[side].z;v.y+=floor-F.sole(regs[side])
-            else:anchors.pop(side,None)
-            g[e]=F.transform(v,w[e].to_quaternion())
-        hip=t["roles"]["hip"];v=F.pos(w,hip)
-        shift=(seat[-1]-min(p.y for p in F.surface(pelvis)))*s
-        g[hip]=F.transform(v+Vector((0,shift,0)),w[hip].to_quaternion())
+def stage_contacts(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor):
+    F.apply(arm,bones,rest,frames[0]);w=F.world(t,frames[0]);feet={}
+    for side in regs:
+        e=t["roles"]["foot_"+side];v=F.pos(w,e);v.y+=floor-F.sole(regs[side])
+        feet[side]=(v,w[e].to_quaternion())
+    # Stable foot anchors for this stationary action. No new steps are synthesized.
+    diagnostics=[];goals=[]
+    for f,s in zip(frames,weights):
+        F.apply(arm,bones,rest,f);w=F.world(t,f);patch=contact_patch(t,w,pelvis,thighs,seat)
+        lift=0.
+        if patch and s>.02:
+            lift=(seat[-1]+.002-float(np.quantile([p.y for p in patch],.02)))*s
+        F.move_root(t,f,t["roles"]["hip"],Vector((0,lift,0)))
+        err={}
+        for side,(v,q) in feet.items():
+            ids=[t["roles"][a+"_"+side] for a in ("thigh","shin","foot")]
+            err[side]=F.ik(t,f,ids,v,1.)
+            F.setrot(t,f,ids[-1],q)
+        F.apply(arm,bones,rest,f);w=F.world(t,f)
+        # A second geometric support evaluation after leg posing; no changes to solver weights.
+        patch=contact_patch(t,w,pelvis,thighs,seat)
+        extra=0.
+        if patch and s>.02:
+            extra=(seat[-1]+.002-float(np.quantile([p.y for p in patch],.02)))*s
+            F.move_root(t,f,t["roles"]["hip"],Vector((0,extra,0)))
+            for side,(v,q) in feet.items():
+                ids=[t["roles"][a+"_"+side] for a in ("thigh","shin","foot")]
+                err[side]=F.ik(t,f,ids,v,1.)
+                F.setrot(t,f,ids[-1],q)
+        F.apply(arm,bones,rest,f);w=F.world(t,f)
+        hand_goals={};arm_errors={}
         for side in regs:
             e=t["roles"]["hand_"+side];v=F.pos(w,e);q=w[e].to_quaternion()
-            # Lap marker from actual thigh skin at the source palm's longitudinal position.
+            a=F.pos(w,t["roles"]["thigh_"+side]);b=F.pos(w,t["roles"]["shin_"+side]);axis=b-a
+            pts=F.surface(thighs[side])
+            candidates=[p for p in pts if .35<=(p-a).dot(axis)/axis.length_squared<=.65]
+            assert candidates,"missing mid-thigh skin"
+            mid=a+axis*.5
+            upper=[p for p in candidates if p.y>=float(np.quantile([v.y for v in candidates],.8))]
+            contact=min(upper,key=lambda p:(p-mid).length)
             pq,pc=F.palm(t,w,side,False)
-            pts=F.surface(thighs[side]);upper=[p for p in pts if p.y>=float(np.quantile([p.y for p in pts],.65))]
-            nearest=min(upper,key=lambda p:(p-pc).length)
-            # Preserve source arm swing; request lap contact only in seated phase.
-            weight=F.smooth((s-.75)/.25)
-            v=v.lerp(nearest+(v-pc)+Vector((0,.015,0)),weight)
-            g[e]=F.transform(v,q)
-        result.append(g)
-    return result
+            # Orient fingers along thigh, palm plane parallel to local upper surface.
+            y=axis.normalized();up=Vector((0,1,0));z=(up-y*up.dot(y)).normalized()
+            if (pq@Vector((0,0,1))).dot(z)<0:z=-z
+            x=y.cross(z).normalized();z=x.cross(y).normalized()
+            want=Matrix((x,y,z)).transposed().to_quaternion()
+            dq=want@pq.inverted();desired_q=dq@q
+            desired_v=contact+up*.012+dq@(v-pc)
+            weight=F.smooth((s-.70)/.30)
+            goal=v.lerp(desired_v,weight);goal_q=q.slerp(desired_q,weight)
+            ids=[t["roles"][a+"_"+side] for a in ("upperarm","forearm","hand")]
+            arm_errors[side]=F.ik(t,f,ids,goal,1.)
+            F.setrot(t,f,e,goal_q)
+            hand_goals[e]=F.transform(goal,goal_q)
+        F.apply(arm,bones,rest,f);w=F.world(t,f)
+        g={t["roles"]["hip"]:F.transform(F.pos(w,t["roles"]["hip"]),w[t["roles"]["hip"]].to_quaternion())}
+        for side,(v,q) in feet.items():g[t["roles"]["foot_"+side]]=F.transform(v,q)
+        g.update(hand_goals);goals.append(g)
+        diagnostics.append({"root_lift_m":lift+extra,"feet":err,"arms":arm_errors,"support_vertex_count":len(patch)})
+    return diagnostics,goals
 
 def bake(arm,bones,rest,meshes,frames,path):
     scene=bpy.context.scene;scene.render.fps=FPS;scene.render.fps_base=1
@@ -186,6 +208,8 @@ def audit(t,f,g,arm,bones,rest,regs,meshes,pelvis,seat,bvh,weight,thighs):
             sd=(p-hit).dot(normal)
             if sd<-.005:penetration+=1;minimum=min(minimum,sd)
     support=min(abs(p.y-seat[-1]) for p in F.surface(pelvis))
+    patch=contact_patch(t,w,pelvis,thighs,seat)
+    support_signed=float(np.quantile([p.y-seat[-1] for p in patch],.02)) if patch else None
     lap={}
     for side in regs:
         _,pc=F.palm(t,w,side,False)
@@ -193,7 +217,23 @@ def audit(t,f,g,arm,bones,rest,regs,meshes,pelvis,seat,bvh,weight,thighs):
     return {"floor_min_m":min(F.sole(regs[s])-seat[-1]+.64 for s in regs),
         "slab_vertices":F.seat_overlap(meshes,seat),"near_triangle_negative_count":penetration,
         "near_triangle_min_m":minimum,"pelvis_height_gap_m":support,"lap_marker_gap_m":lap,
-        "seated_weight":weight,"targets":F.pose_error(t,f,g)}
+        "seated_weight":weight,"support_patch_gap_m":support_signed,"sole_gaps_m":{s:F.sole(regs[s])-seat[-1]+.64 for s in regs},"targets":F.pose_error(t,f,g)}
+
+def verify_reimport(path,t,frames):
+    arm,bones=F.import_rig(path)
+    actions=[a for a in bpy.data.actions if a.name.startswith("Bench_Sit_Rest_Stand")]
+    assert len(actions)==1,[a.name for a in bpy.data.actions]
+    a=actions[0];arm.animation_data_create();arm.animation_data.action=a
+    if len(a.slots):arm.animation_data.action_slot=a.slots[0]
+    by_name={b.name:b for b in bones};assert set(t["names"])<=set(by_name)
+    lo,hi=map(float,a.frame_range);errors=[]
+    for i,f in enumerate(frames):
+        frame=lo+(hi-lo)*i/(len(frames)-1)
+        bpy.context.scene.frame_set(int(frame),subframe=frame-int(frame))
+        bpy.context.view_layer.update()
+        expected=F.world(t,f)
+        errors.append(max((F.Y@arm.matrix_world@by_name[name].matrix.translation-expected[j].translation).length for j,name in enumerate(t["names"])))
+    return {"frame_range":[lo,hi],"frames":len(errors),"max_joint_position_error_m":max(errors),"p95_m":float(np.quantile(errors,.95)),"within_2mm":max(errors)<.002}
 
 def main():
     data=F.read("input.json");solved=F.read("solved.json");inv=F.read("semantic-inventory.json")
@@ -210,8 +250,7 @@ def main():
         pelvis=F.regions(meshes,t);thighs={s:limb_region(meshes,t,s) for s in regs}
         frames,weights,seams=timeline(data,solved,t,key)
         seat,bvh,bench=native_bench(t,frames[seams[0]],floor)
-        staging=stage_height(t,frames,weights,arm,bones,rest,regs,pelvis,seat,floor)
-        goals=targets(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor)
+        staging,goals=stage_contacts(t,frames,weights,arm,bones,rest,regs,pelvis,thighs,seat,floor)
         corrected,stats=F.trajectory(t,frames,goals,skin,floor,seat,1/FPS)
         assert stats["executed"],stats
         rows=[]
@@ -231,8 +270,10 @@ def main():
                     if i in (0,*seams,len(corrected)-1):shutil.copyfile(scene.render.filepath,OUT/f"{sex}-{view}-{i:03d}.png")
                 subprocess.run([F.get_ffmpeg_exe(),"-y","-loglevel","error","-framerate",str(FPS),"-i",tmp+"/%03d.png","-c:v","libx264","-pix_fmt","yuv420p",str(OUT/f"{sex}-{view}.mp4")],check=True)
         exported=bake(arm,bones,rest,meshes,corrected,OUT/f"{sex}.glb")
-        report["profiles"][sex]={"key":key,"rig_sha":t["sha256"],"bench":bench,"frames":len(corrected),"fps":FPS,"seams":seams,"solver":stats,"staging":staging,"export":exported,"samples":rows}
+        replay=verify_reimport(OUT/f"{sex}.glb",t,corrected)
+        report["profiles"][sex]={"export_reimport":replay,"key":key,"rig_sha":t["sha256"],"bench":bench,"frames":len(corrected),"fps":FPS,"seams":seams,"solver":stats,"staging":staging,"export":exported,"samples":rows}
         (OUT/"report.json").write_text(json.dumps(report,indent=2))
     shutil.copyfile(BENCH,OUT/"bench.glb")
+    assert all(v["export_reimport"]["within_2mm"] for v in report["profiles"].values()),"GLB reimport joint replay exceeds 2mm"
     print("Pilot exported; independent artistic/contact gate OPEN")
 if __name__=="__main__":main()
