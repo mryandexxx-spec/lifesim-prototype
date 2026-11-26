@@ -328,3 +328,9 @@ test('PF-07: F1 source-text release contract runs before merge on every inspecte
   for(const file of ['src/game.js','src/resident-hud.js','src/career-work.js','index.html','styles.css'])
     assert.ok(planChanges([file]).tests.includes('tests/pf-01.test.js'),file);
 });
+
+
+test('game edits always route the fail-closed root-v1 writer contract',()=>{
+  assert.ok(planChanges(['src/game.js']).tests.includes('tests/cas-01-population-save.test.js'));
+  assert.equal(planChanges(['src/kitchen.js']).browser,false);
+});
