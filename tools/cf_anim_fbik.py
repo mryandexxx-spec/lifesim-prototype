@@ -6,6 +6,8 @@ import bpy
 import mujoco
 import mink
 import qpsolvers
+import osqp
+from scipy import sparse
 from mink.limits.limit import Limit, Constraint
 from mathutils import Vector, Matrix, Quaternion
 sys.path.insert(0,str(pathlib.Path("prior-code/tools").resolve()))
@@ -209,7 +211,7 @@ def bounded_step(cfg,tasks,limit,q0,step,total,diag,lower,upper):
     diag["rejected_integration_steps"]+=1
     return False
 
-def qp(t,bf,goals,weighted=None,diagnostic=None,previous=None,frame_dt=None):
+def qp(t,bf,goals,weighted=None,diagnostic=None,previous=None,frame_dt=None,context_only=False):
 
     # MJCF built from the actual sampled hierarchy, no robot or borrowed body.
     # The starting pose is the local reference; ball joints preserve segment length.
@@ -249,6 +251,7 @@ def qp(t,bf,goals,weighted=None,diagnostic=None,previous=None,frame_dt=None):
         if diagnostic is not None:diagnostic["jacobian_error"]=surface_limit.derivative_check(cfg)
         limits=[mink.ConfigurationLimit(model),surface_limit]
     q0=cfg.q.copy()
+    if context_only:return cfg,tasks,surface_limit,q0
     if weighted:
         step,total=trust_bounds(model)
         diagnostic.update({"accepted_steps":0,"rejected_qp_steps":0,"rejected_integration_steps":0,"max_slack_m":0.})
@@ -297,6 +300,84 @@ def qp(t,bf,goals,weighted=None,diagnostic=None,previous=None,frame_dt=None):
         j=model.body(f"b{i}").id
         ws.append(transform(Vector(cfg.data.xpos[j]),Quaternion(cfg.data.xquat[j])))
     return encode([w if p<0 else ws[p].inverted()@w for w,p in zip(ws,t["parents"])])
+
+def trajectory(t,bases,goals,skin,floor,seat_info,dt):
+    """Offline simultaneous sequential QP across all source frames.
+    Constraints include two-sided correction rates, not post-filtered motion."""
+    ctx=[qp(t,b,g,(skin,floor,seat_info),context_only=True) for b,g in zip(bases,goals)]
+    N=len(ctx);n=ctx[0][0].model.nv
+    layout=lambda m:[(m.joint(j).name,int(m.jnt_type[j]),int(m.jnt_dofadr[j])) for j in range(m.njnt)]
+    signature=layout(ctx[0][0].model)
+    assert all(layout(cfg.model)==signature for cfg,_,_,_ in ctx)
+    step,total=trust_bounds(ctx[0][0].model)
+    rate=np.full(n,1.5)
+    for j in range(ctx[0][0].model.njnt):
+        if ctx[0][0].model.jnt_type[j]==mujoco.mjtJoint.mjJNT_FREE:
+            a=int(ctx[0][0].model.jnt_dofadr[j]);rate[a:a+3]=.25
+    rate*=dt
+    D1=sparse.kron(sparse.diags([-np.ones(N-1),np.ones(N-1)],[0,1],shape=(N-1,N)),sparse.eye(n),format="csc")
+    D2=sparse.kron(sparse.diags([np.ones(N-2),-2*np.ones(N-2),np.ones(N-2)],[0,1,2],shape=(N-2,N)),sparse.eye(n),format="csc")
+    W=(.12*(D1.T@D1)+.4*(D2.T@D2)).tocsc()
+    stats={"accepted_steps":0,"rejected_steps":0,"solver_status":[],"max_slack_m":0.}
+    for iteration in range(24):
+        current=np.concatenate([tangent(cfg.model,q0,cfg.q) for cfg,_,_,q0 in ctx])
+        blocks=[];lin=[];constraints=[];bounds=[];sizes=[]
+        for cfg,tasks,limit,q0 in ctx:
+            problem=mink.build_ik(cfg,tasks,.05,damping=.001,limits=[mink.ConfigurationLimit(cfg.model)])
+            col=limit.compute_qp_inequalities(cfg,.05)
+            m=0 if col.inactive else len(col.h)
+            P=sparse.block_diag((sparse.csc_matrix(problem.P),sparse.eye(m)*200.),format="csc")
+            blocks.append(P);lin.append(np.r_[problem.q,np.full(m,2.)]);sizes.append(n+m)
+            G=[];h=[]
+            if problem.G is not None:
+                G.append(np.c_[problem.G,np.zeros((len(problem.h),m))]);h.append(problem.h)
+            if m:
+                G.append(np.c_[col.G,-np.eye(m)]);h.append(col.h)
+                G.append(np.c_[np.zeros((m,n)),-np.eye(m)]);h.append(np.zeros(m))
+            d=tangent(cfg.model,q0,cfg.q)
+            lo=np.maximum(-step,-total-d);hi=np.minimum(step,total-d)
+            G.extend([np.c_[np.eye(n),np.zeros((n,m))],np.c_[-np.eye(n),np.zeros((n,m))]])
+            h.extend([hi,-lo]);constraints.append(sparse.csc_matrix(np.vstack(G)));bounds.append(np.concatenate(h))
+        offsets=np.r_[0,np.cumsum(sizes)]
+        cols=np.concatenate([np.arange(offsets[k],offsets[k]+n) for k in range(N)])
+        E=sparse.csc_matrix((np.ones(N*n),(np.arange(N*n),cols)),shape=(N*n,int(offsets[-1])))
+        P=sparse.block_diag(blocks,format="csc")+E.T@W@E
+        q=np.concatenate(lin)+np.asarray(E.T@(W@current)).ravel()
+        A=sparse.vstack([sparse.block_diag(constraints,format="csc"),D1@E,-D1@E],format="csc")
+        diff=D1@current;rb=np.tile(rate,N-1)
+        upper=np.r_[np.concatenate(bounds),rb-diff,rb+diff]
+        solver=osqp.OSQP()
+        solver.setup(P=sparse.triu(P,format="csc"),q=q,A=A,l=np.full(len(upper),-np.inf),u=upper,
+                     verbose=False,eps_abs=1e-7,eps_rel=1e-7,max_iter=12000,polishing=True)
+        result=solver.solve();stats["solver_status"].append(str(result.info.status))
+        sol=result.x
+        if result.info.status_val not in (1,2) or sol is None or not np.isfinite(sol).all() or np.max(A@sol-upper)>1e-5:
+            stats["rejected_steps"]+=1;break
+        dq=(E@sol).reshape(N,n)
+        slack=np.delete(sol,cols);stats["max_slack_m"]=max(stats["max_slack_m"],float(max(0.,slack.max())) if len(slack) else 0.)
+        accepted=False
+        for a in (1.,.5,.25,.125,.0625,.03125):
+            trials=[];deltas=[]
+            for k,(cfg,_,_,q0) in enumerate(ctx):
+                trial=cfg.q.copy();mujoco.mj_integratePos(cfg.model,trial,dq[k],a)
+                trials.append(trial);deltas.append(tangent(cfg.model,q0,trial))
+            d=np.asarray(deltas)
+            if np.isfinite(d).all() and np.all(np.abs(d)<=total+1e-6) and np.all(np.abs(np.diff(d,axis=0))<=rate+1e-6):
+                for (cfg,_,_,_),trial in zip(ctx,trials):cfg.update(trial)
+                stats["accepted_steps"]+=1;accepted=True;break
+        if not accepted:stats["rejected_steps"]+=1;break
+    final=np.asarray([tangent(cfg.model,q0,cfg.q) for cfg,_,_,q0 in ctx])
+    assert np.all(np.abs(final)<=total+1e-6) and np.all(np.abs(np.diff(final,axis=0))<=rate+1e-6)
+    stats["max_rate_ratio"]=float(np.max(np.abs(np.diff(final,axis=0))/rate))
+    stats["max_trust_ratio"]=float(np.max(np.abs(final)/total))
+    poses=[]
+    for cfg,_,_,_ in ctx:
+        ws=[]
+        for i in range(len(t["names"])):
+            j=cfg.model.body(f"b{i}").id
+            ws.append(transform(Vector(cfg.data.xpos[j]),Quaternion(cfg.data.xquat[j])))
+        poses.append(encode([w if p<0 else ws[p].inverted()@w for w,p in zip(ws,t["parents"])]))
+    return poses,stats
 
 def apply(arm,bones,rest,f):
     # Convert desired world poses with Blender's own bone-local convention,
@@ -347,7 +428,7 @@ def main():
     for k,t in data["targets"].items():t["roles"]=inv["targets"][k]["map"]
     old=list(pathlib.Path("prior-contacts").rglob("report.json"));assert len(old)==1
     prior=json.loads(old[0].read_text());assert len(prior["profiles"])==6
-    report={"scope":"R9 matched independent vs causal temporal trust-region QP, two central rigs sit enter/exit; corrected finger-aware metric; no anatomical certification","production":"BLOCKED","ART":"OPEN","profiles":{}}
+    report={"scope":"R10 full-clip sparse sequential QP versus R8/R9 controls; two central rigs sit enter/exit; no anatomical certification","production":"BLOCKED","ART":"OPEN","profiles":{}}
     for key,t in data["targets"].items():
         central=key==min((k for k,v in data["targets"].items() if v["sex"]==t["sex"]),key=lambda k:abs(data["targets"][k]["scale"]-1))
         if not central:continue
@@ -387,7 +468,7 @@ def main():
                 if "Phone" in name:
                     pside=min(regs,key=lambda side:np.median([(pos(w,s["roles"]["hand_"+side])-pos(w,s["roles"]["head"])).length for w in sw]))
                     phone=proxy("phone-proxy",(0,0,0),(.075,.145,.012),(.12,.12,.15))
-                pairs,_=finger_map(s,t);rows=[];variants={k:[] for k in ("baseline","mink","mink_weighted","mink_temporal")};props=[];prev_diag=None;prev_base=None
+                pairs,_=finger_map(s,t);rows=[];variants={k:[] for k in ("baseline","mink","mink_weighted","mink_temporal")};props=[];prev_diag=None;prev_base=None;all_goals=[]
                 # All sampled source frames; same target definitions for both solvers.
                 for i,bf0 in enumerate(frames):
                     bf=clone(bf0);fingers(s,t,c["frames"][i],bf,pairs);apply(arm,bones,rest,bf)
@@ -414,6 +495,7 @@ def main():
                         target=ear+lateral*.025-dq@(pc-pos(w,e))
                         goals[e]=transform(target,dq@w[e].to_quaternion())
                         phone_matrix=transform(ear+lateral*.012,dq@palmq)
+                    all_goals.append(goals)
                     row={"frame":i,"goal_count":len(goals),"variants":{}}
                     diag={};temporal_diag={}
                     for label,fn in (("baseline",lambda:bf),("mink",lambda:qp(t,bf,goals)),("mink_weighted",lambda:qp(t,bf,goals,(skin,floor,seat_info),diag)),("mink_temporal",lambda:qp(t,bf,goals,(skin,floor,seat_info),temporal_diag,prev_diag,dt))):
@@ -452,11 +534,30 @@ def main():
                         variants[label].append(f)
                     prev_base=clone(bf);prev_diag=temporal_diag.copy() if "final_tangent" in temporal_diag else None
                     props.append(phone_matrix);rows.append(row)
-                report["profiles"][key][name]={"samples":rows,"prior_r2_summary":prior["profiles"][key][name]["summary"],"comparison_note":"R2 historical targets differ; not a matched R2 solve."}
+                bases=variants["baseline"]
+                fs,trajectory_stats=trajectory(t,bases,all_goals,skin,floor,seat_info,dt)
+                variants["mink_trajectory"]=fs
+                for i,(f,bf,goals) in enumerate(zip(fs,bases,all_goals)):
+                    result=metrics(t,f,goals,arm,bones,rest,regs,meshes,seat_info,floor,bf)
+                    result["skin_replay"]=skin.actual_error(f)
+                    assert result["skin_replay"]["max_m"]<.002
+                    ww=world(t,f);bw=world(t,bf)
+                    shift=max((ww[j].translation-bw[j].translation).length for j,p in enumerate(t["parents"]) if p<0)
+                    result["root_shift_m"]=shift;assert shift<=.18
+                    result["infeasible"]=False
+                    if i:
+                        corrections=[]
+                        for v,u,pv,pu in zip(f,bf,fs[i-1],bases[i-1]):
+                            q1=matrix(u["p"],u["r"]).to_quaternion().inverted()@matrix(v["p"],v["r"]).to_quaternion()
+                            q0=matrix(pu["p"],pu["r"]).to_quaternion().inverted()@matrix(pv["p"],pv["r"]).to_quaternion()
+                            corrections.append(2*math.acos(min(1.,abs(q0.dot(q1)))))
+                        result["correction_frame_jump_rad"]=max(corrections)
+                    rows[i]["variants"]["mink_trajectory"]=result
+                report["profiles"][key][name]={"trajectory_stats":trajectory_stats,"samples":rows,"prior_r2_summary":prior["profiles"][key][name]["summary"],"comparison_note":"R2 historical targets differ; not a matched R2 solve."}
                 (OUT/"report.json").write_text(json.dumps(report,indent=2))
                 if central:
                     for label,fs in variants.items():
-                        n=len(fs) if label in ("mink_weighted","mink_temporal") else min(12,len(fs));prefix=f"{key}-{name}-{label}"
+                        n=len(fs) if label in ("mink_weighted","mink_temporal","mink_trajectory") else min(12,len(fs));prefix=f"{key}-{name}-{label}"
                         with tempfile.TemporaryDirectory() as tmp:
                             for j in range(n):
                                 idx=round((len(fs)-1)*j/(n-1));apply(arm,bones,rest,fs[idx])
@@ -468,6 +569,6 @@ def main():
                 for o in (seat,phone):
                     if o:bpy.data.objects.remove(o,do_unlink=True)
     assert len(report["profiles"])==2 and all(len(x)==2 for x in report["profiles"].values())
-    assert len(list(OUT.glob("*.mp4")))==16
-    print("R9 temporal weighted skin diagnostic complete; ART and contact acceptance OPEN")
+    assert len(list(OUT.glob("*.mp4")))==20
+    print("R10 full-clip weighted skin diagnostic complete; ART and contact acceptance OPEN")
 if __name__=="__main__":main()
