@@ -60,6 +60,19 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    assert.ok(await talk.isVisible());assert.equal(await talk.isDisabled(),false);
    const bounds=await menu.boundingBox(),hud=await page.locator('#dashboard').boundingBox();
    assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1&&bounds.y>=0&&bounds.y+bounds.height<=hud.y+1);
+   const checkSheet=async()=>{
+    const layout=await page.evaluate(()=>{
+     const panel=document.querySelector('#ground-walk-menu'),btn=panel.querySelector('[data-garden-action="talk"]'),note=btn.querySelector('small');
+     const r=panel.getBoundingClientRect(),n=note.getBoundingClientRect(),b=btn.getBoundingClientRect();
+     return {noteVisible:n.top>=r.top&&n.bottom<=r.bottom+1,hitHeight:b.height,
+      panelZ:Number(getComputedStyle(panel).zIndex),toastZ:Number(getComputedStyle(document.querySelector('#toast')).zIndex)};
+    });
+    assert.ok(layout.noteVisible,JSON.stringify(layout));
+    assert.ok(layout.hitHeight>=48,JSON.stringify(layout));
+    assert.ok(layout.toastZ<layout.panelZ,JSON.stringify(layout));
+    (result.layouts??=[]).push(layout);
+   };
+   await checkSheet();
    await page.screenshot({path:out+'/'+label+'-menu.png'});
    const initial=await read();
    assert.equal(initial.actionQueues.byResident.alex.length,0);
@@ -81,6 +94,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    // At a dry bed, watering is the available primary action, talk is disabled.
    assert.equal(await talk.isDisabled(),true);
    assert.match(await talk.textContent(),/Разговор снова через/);
+   await checkSheet();
    await page.screenshot({path:out+'/'+label+'-cooldown.png'});
    assert.deepEqual(errors,[]);Object.assign(result,{passed:true,initialSocial:initial.needs.social,finalSocial:saved.needs.social,lastTalk:saved.gardenRewards.alexLastTalkAt});
   }catch(e){result.error=String(e.stack||e);throw e;}finally{writeFileSync(out+'/report.json',JSON.stringify(report,null,2));await ctx.close();}
