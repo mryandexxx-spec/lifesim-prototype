@@ -3176,7 +3176,7 @@ function boot() {
   const automaticDoors=[];
   const lotGround=box('LOT-A lawn',7,-.59,0,32,.12,24,mat('#8fb78b'));
   lotGround.enabled=true;
-  const poolVisual=createPoolVisual({pc,app,mat,box,lotGround});
+  const poolVisual=createPoolVisual({pc,app,mat,box,lotGround,fixtureModels:new URLSearchParams(location.search).get('pool-fixtures')!=='legacy'&&new URLSearchParams(location.search).get('furniture')!=='legacy'});
   poolVisual.sync(game.world?.outdoors);
   if(new URLSearchParams(location.search).get('pool')==='qa')
     window.__LifeSimPoolVisualStats=()=>poolVisual.stats();

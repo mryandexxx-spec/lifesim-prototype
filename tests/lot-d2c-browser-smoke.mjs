@@ -7,21 +7,6 @@ import {outdoorCellAt} from '../src/lot-surface.js';
 import {SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 
-function projectGround(w,h,x,z,y=-.475){
-  const yaw=42*Math.PI/180,pitch=60*Math.PI/180,dist=43;
-  const cx=7,cy=.62,cz=0;
-  const px=cx+Math.sin(yaw)*Math.cos(pitch)*dist;
-  const py=cy+Math.sin(pitch)*dist;
-  const pz=cz+Math.cos(yaw)*Math.cos(pitch)*dist;
-  const rx=x-px,ry=y-py,rz=z-pz;
-  const right=rx*Math.cos(yaw)-rz*Math.sin(yaw);
-  const up=-rx*Math.sin(yaw)*Math.sin(pitch)+ry*Math.cos(pitch)-
-    rz*Math.cos(yaw)*Math.sin(pitch);
-  const forward=-rx*Math.sin(yaw)*Math.cos(pitch)-ry*Math.sin(pitch)-
-    rz*Math.cos(yaw)*Math.cos(pitch);
-  const size=forward*Math.tan(41*Math.PI/360);
-  return {x:w/2+right/(size*w/h)*w/2,y:h/2-up/size*h/2};
-}
 const cell=outdoorCellAt(7.25,-7.25);
 const seed=newHousehold('2026-11-21');
 seed.shop.credits=30000;
@@ -58,17 +43,16 @@ try{
     page.on('crash',()=>errors.push(w+'x'+h+': WebGL crashed'));
     await page.goto('http://127.0.0.1:8765/?pool=qa',{waitUntil:'domcontentloaded'});
     await page.locator('#loading').waitFor({state:'hidden',timeout:80000});
-    // The outdoor camera shows the complete shore; no construction is mutated.
-    await page.locator('#home-open').click();
-    await page.locator('#home-outdoors').click();
-    await page.locator('#outdoor-category').selectOption('pool');
-    await page.locator('#outdoor-exit').click();
+    // Current Life menu owns the lot overview; legacy editor controls are hidden.
+    await page.locator('#view-toggle').click();
+    await page.locator('#menu-lot-camera-btn').click();
+    await page.waitForFunction(()=>window.__LifeSimPoolVisualStats?.().fixtureModels.objects.some(o=>o.kind==='ladder'&&o.attached&&!o.fallbackVisible),null,{timeout:30000});
     await page.waitForFunction(()=>{
       const snap=window.__LifeSimSwimVisualQA?.().alex;
       return snap?.stage==='swimming'&&snap.pose&&
         Math.hypot(snap.avatar.x-snap.pose.x,snap.avatar.y-snap.pose.y,
           snap.avatar.z-snap.pose.z)<.15;
-    },{timeout:20000});
+    },null,{timeout:20000});
     await page.locator('#pause-btn').click();
     const visual=await page.evaluate(()=>window.__LifeSimSwimVisualQA());
     assert.equal(visual.alex.paused,true,'user pause holds swimming while inspecting WebGL');
@@ -88,7 +72,12 @@ try{
       const b=canvas.getBoundingClientRect();
       return {x:b.left,y:b.top,width:b.width,height:b.height};
     });
-    const pos=projectGround(rect.width,rect.height,8.1,-6.4);
+    const pos=await page.evaluate(async()=>{
+      const {Application,Vec3}=await import('playcanvas');
+      const cam=Application.getApplication().root.findComponent('camera');
+      const p=cam.worldToScreen(new Vec3(8.1,-.475,-6.4));
+      return {x:p.x,y:p.y};
+    });
     assert.ok(pos.x>8&&pos.x<rect.width-8&&pos.y>8&&pos.y<rect.height-8,
       'water point visible '+w+'x'+h);
     await page.evaluate(({pos,rect})=>{
