@@ -8,8 +8,73 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-anim-rig-ual:
+  cf-anim-rig-floor:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 05ed73e1026e623037474f492c59116041aa9ec9
+          path: frozen-interact
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-rig-contract-r3-Sitting_Enter-evidence
+          run-id: 45891101036
+          github-token: ${{ github.token }}
+          path: input-r3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install exact frozen solver dependencies
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python -m py_compile tools/cf_anim_rig_floor.py
+      - name: Frozen R12 floor comparison with exact native replay and renders
+        run: timeout --signal=TERM --kill-after=10s 420s python -u tools/cf_anim_rig_floor.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r4-evidence
+          path: artifacts/cf-anim-rig-contract-r4/
+          if-no-files-found: warn
+
+  cf-anim-rig-ual:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-ual]')
     permissions:
       contents: read
       actions: read
