@@ -28,7 +28,9 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    const ready=()=>page.locator('#loading').waitFor({state:'hidden',timeout:100000});
    await page.goto('http://127.0.0.1:8765/?furniture=qa&garden-start-paused=1',{waitUntil:'domcontentloaded'});await ready();
    const read=()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),SAVE_KEY);
-   const frameLot=async()=>{await page.locator('#home-open').tap();await page.locator('#home-outdoors').tap();await page.locator('[data-parcel-action="exit"]').tap();};
+   // Leaving the parcel editor restores the pre-editor camera. Use the actual
+   // gameplay lot-camera control, not the obsolete editor framing assumption.
+   const frameLot=async()=>{await page.locator('#view-toggle').tap();await page.locator('#menu-lot-camera-btn').tap();await page.locator('#view-panel').waitFor({state:'hidden'});};
    await frameLot();
    const menu=page.locator('#ground-walk-menu');
    const project=()=>page.evaluate(async beds=>{
@@ -40,14 +42,18 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
     });
    },beds);
    const openBed=async()=>{
-    for(const pt of await project()){
+    const points=await project();result.projected=points;
+    for(const pt of points){
      await page.touchscreen.tap(pt.x,pt.y);
+     await menu.waitFor({state:'visible',timeout:1500}).catch(()=>{});
      if(await menu.isVisible()){
-      if((await page.locator('#ground-walk-title').textContent()).includes('Календула'))return;
+      const title=await page.locator('#ground-walk-title').textContent();
+      (result.taps??=[]).push({pt,title});
+      if(title.includes('Календула'))return;
       await page.locator('#ground-walk-close').tap();
      }
     }
-    throw Error('No visible garden selected by actual touch');
+    throw Error('No visible garden selected by actual touch: '+JSON.stringify({points,taps:result.taps}));
    };
    await openBed();
    const talk=page.locator('#ground-walk-more [data-garden-action="talk"]');
