@@ -82,6 +82,7 @@ jobs:
           print("Blender and Mink native runtime preflight PASS")
           PY
       - name: Native bench contact, offline trajectory and baked GLB
+        id: native
         run: python tools/cf_anim_pilot.py
       - uses: actions/setup-node@v4
         with:
@@ -97,7 +98,7 @@ jobs:
           sleep 2
           xvfb-run -a node tools/cf-anim-pilot-browser.mjs
       - name: Independent GLB reimport joint replay gate
-        if: always()
+        if: ${{ always() && steps.native.outcome == 'success' }}
         run: |
           python - <<'PY'
           import json
