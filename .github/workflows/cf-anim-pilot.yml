@@ -96,6 +96,15 @@ jobs:
           python -m http.server 8765 --bind 127.0.0.1 --directory pilot-out >/tmp/pilot-http.log 2>&1 &
           sleep 2
           xvfb-run -a node tools/cf-anim-pilot-browser.mjs
+      - name: Independent GLB reimport joint replay gate
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('pilot-out/report.json'))
+          assert len(r['profiles'])==2
+          assert all(p['export_reimport']['within_2mm'] for p in r['profiles'].values()), {s:p['export_reimport'] for s,p in r['profiles'].items()}
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
