@@ -30,9 +30,9 @@ for(const [engine,launcher,width,height] of matrix){
    await ctx.addInitScript(({key,tour,seed})=>{
      if(seed&&!localStorage.getItem(key)){localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');}
      window.__gqTouch=0;window.__gqContextLost=0;window.__gqInput=[];
-     for(const type of ['pointerdown','pointerup','touchstart','touchend','click'])window.addEventListener(type,e=>{
-       const target=e.target?.closest?.('button')||e.target;const t={type,t:performance.now(),id:target?.id||'',text:target?.tagName==='BUTTON'?target.textContent?.trim().slice(0,80):'',trusted:e.isTrusted,pointerType:e.pointerType||null,detail:e.detail??null,x:e.clientX??e.changedTouches?.[0]?.clientX??null,y:e.clientY??e.changedTouches?.[0]?.clientY??null};
-       window.__gqInput.push(t);if(window.__gqInput.length>50)window.__gqInput.shift();
+     for(const type of ['pointerdown','pointerup','pointercancel','lostpointercapture','touchstart','touchend','touchcancel','focus','blur','click'])window.addEventListener(type,e=>{
+       const target=e.target?.closest?.('button')||e.target;const t={type,t:performance.now(),id:target?.id||'',text:target?.tagName==='BUTTON'?target.textContent?.trim().slice(0,80):'',trusted:e.isTrusted,pointerType:e.pointerType||null,pointerId:e.pointerId??null,isPrimary:e.isPrimary??null,button:e.button??null,windowTarget:e.target===window,detail:e.detail??null,x:e.clientX??e.changedTouches?.[0]?.clientX??null,y:e.clientY??e.changedTouches?.[0]?.clientY??null};
+       queueMicrotask(()=>{t.defaultPrevented=e.defaultPrevented;});window.__gqInput.push(t);if(window.__gqInput.length>100)window.__gqInput.shift();
      },{capture:true,passive:true});
      document.addEventListener('touchstart',()=>window.__gqTouch++,{capture:true,passive:true});
      document.addEventListener('webglcontextlost',()=>window.__gqContextLost++,true);
