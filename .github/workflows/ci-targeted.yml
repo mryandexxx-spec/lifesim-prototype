@@ -8,6 +8,103 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  ci-cd-r1-b-source-pilot:
+    if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-b-pilot' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked verifier dependencies
+        run: npm ci
+      - name: Restore exact prior successful run artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-cd-r1-b-source-pilot
+          run-id: 45882463443
+          github-token: ${{ github.token }}
+          path: incoming
+      - name: Independently pinned pack validation and restore (no source network)
+        run: |
+          python3 - <<'PY'
+          import sys, platform, subprocess, time, importlib.util
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('pilot','scripts/ci-cd-r1-b.py')
+          pilot=importlib.util.module_from_spec(spec); spec.loader.exec_module(pilot)
+          key='8258a1717ed58dfba4a4bf9596e8bcd1f21ad46b2de56d4cc66530bf5b75abe4'
+          inputs={f:pilot.sha((pilot.ROOT/f).read_bytes()) for f in pilot.INPUTS}
+          runtime={'python':sys.version,'platform':platform.platform(),'machine':platform.machine(),
+                   'node':subprocess.check_output(['node','--version'],text=True).strip()}
+          if pilot.identity(inputs,runtime)!=key:
+              raise RuntimeError('Pinned pilot input/runtime changed: '+str(inputs)+' '+str(runtime))
+          expected=dict(pilot.PINS, **{'c4-source-manifest.json':'bc03983b4632c84c66e8208b97321eb5c98888aad4e7710489a618a62009c0ef'})
+          start=time.monotonic()
+          pilot.verified_reuse(Path('incoming/pack'),Path('verified-pack'),key,expected)
+          for f in pilot.FILES:
+              target=pilot.FOLDER/f
+              if target.exists(): raise ValueError('not a clean runner '+f)
+              target.write_bytes((Path('verified-pack')/f).read_bytes())
+          subprocess.run(['node','scripts/cas-c4-source-verify.mjs'],check=True)
+          print('R1B_CROSS_RUN_VERIFIED seconds='+str(time.monotonic()-start)+' files='+str(expected),flush=True)
+          PY
+      - name: Save diagnostic exact-key cache
+        uses: actions/cache/save@v4
+        with:
+          path: incoming/pack
+          key: ci-cd-r1-b-pilot-${{ github.run_id }}-${{ github.run_attempt }}-8258a171
+  ci-cd-r1-b-cache-transfer:
+    needs: ci-cd-r1-b-source-pilot
+    if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-b-pilot' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked verifier dependencies
+        run: npm ci
+      - name: Restore exact cache on separate runner
+        id: restore
+        uses: actions/cache/restore@v4
+        with:
+          path: incoming/pack
+          key: ci-cd-r1-b-pilot-${{ github.run_id }}-${{ github.run_attempt }}-8258a171
+          fail-on-cache-miss: true
+      - name: Require exact cache hit
+        run: test "${{ steps.restore.outputs.cache-hit }}" = true
+      - name: Independently pinned pack validation and restore (no source network)
+        run: |
+          python3 - <<'PY'
+          import sys, platform, subprocess, time, importlib.util
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('pilot','scripts/ci-cd-r1-b.py')
+          pilot=importlib.util.module_from_spec(spec); spec.loader.exec_module(pilot)
+          key='8258a1717ed58dfba4a4bf9596e8bcd1f21ad46b2de56d4cc66530bf5b75abe4'
+          inputs={f:pilot.sha((pilot.ROOT/f).read_bytes()) for f in pilot.INPUTS}
+          runtime={'python':sys.version,'platform':platform.platform(),'machine':platform.machine(),
+                   'node':subprocess.check_output(['node','--version'],text=True).strip()}
+          if pilot.identity(inputs,runtime)!=key:
+              raise RuntimeError('Pinned pilot input/runtime changed: '+str(inputs)+' '+str(runtime))
+          expected=dict(pilot.PINS, **{'c4-source-manifest.json':'bc03983b4632c84c66e8208b97321eb5c98888aad4e7710489a618a62009c0ef'})
+          start=time.monotonic()
+          pilot.verified_reuse(Path('incoming/pack'),Path('verified-pack'),key,expected)
+          for f in pilot.FILES:
+              target=pilot.FOLDER/f
+              if target.exists(): raise ValueError('not a clean runner '+f)
+              target.write_bytes((Path('verified-pack')/f).read_bytes())
+          subprocess.run(['node','scripts/cas-c4-source-verify.mjs'],check=True)
+          print('R1B_CROSS_RUN_VERIFIED seconds='+str(time.monotonic()-start)+' files='+str(expected),flush=True)
+          PY
   ux3-06-input-ownership:
     if: github.event_name == 'pull_request' && github.head_ref == 'fix/ux3-06-world-gesture-ownership' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
