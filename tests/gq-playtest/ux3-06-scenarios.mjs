@@ -146,7 +146,7 @@ scenarios.push({id:'yard-contexts',goal:'Actual land, outdoor plant, pool water 
  }
 }});
 scenarios.push({id:'required-dialogue',goal:'Mandatory dialog cannot be dismissed by backdrop or activate a choice unintentionally',seed:()=>{
- const s=auditSeed();assert.equal(startConversation(s,'alex',{x:-.2,z:1.85},'daily'),true);assert.equal(arriveSocial(s),true);assert.ok(dialogueNeedsDecision(s));return s;
+ const s=auditSeed();s.paused=false;s.otherSim.paused=false;assert.equal(startConversation(s,'alex',{x:-.2,z:1.85},'daily'),true);assert.equal(arriveSocial(s),true);assert.ok(dialogueNeedsDecision(s));return s;
 },async run(h){
  const {page,step,tap,snapshot}=h;
  await step('required-backdrop',async()=>{
