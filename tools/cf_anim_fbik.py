@@ -44,12 +44,55 @@ def native(arm,bones,rest,t,bf,goals):
         bpy.context.view_layer.update()
     return actual
 
-def qp(t,bf,goals):
+def skin_samples(t,meshes,arm,bones,rest):
+    # Point proxies from actual neutral skinned surface with dominant bone support.
+    # These are sparse proxies, not exact triangle collision or blended-skin certificates.
+    reset(arm,bones)
+    w=world(t,t["rest"]); roles=t["roles"]
+    selected={roles["hip"]}
+    for side in ("l","r"):
+        selected.update(roles[x+"_"+side] for x in ("thigh","shin","foot"))
+    for i,p in enumerate(t["parents"]):
+        if p in (roles["foot_l"],roles["foot_r"]):selected.add(i)
+    samples={i:[] for i in selected}
+    for o in meshes:
+        mapping={g.index:t["names"].index(g.name) for g in o.vertex_groups if g.name in t["names"]}
+        for v in o.data.vertices:
+            if not v.groups:continue
+            g=max(v.groups,key=lambda g:g.weight);i=mapping.get(g.group)
+            if i in samples and g.weight>.5:samples[i].append(w[i].inverted()@(Y@o.matrix_world@v.co))
+    out={}
+    for i,pts in samples.items():
+        if not pts:continue
+        a=np.asarray([list(p) for p in pts]);center=a.mean(axis=0)
+        # Extremal and farthest-point sampling, identical procedure for every body.
+        chosen=[int(np.argmax(np.linalg.norm(a-center,axis=1)))]
+        for _ in range(min(11,len(a)-1)):
+            d=np.min(np.linalg.norm(a[:,None,:]-a[chosen][None,:,:],axis=2),axis=1)
+            chosen.append(int(np.argmax(d)))
+        out[i]=[a[j] for j in sorted(set(chosen))]
+    assert roles["hip"] in out and all(roles["foot_"+s] in out for s in ("l","r"))
+    return out
+
+def qp(t,bf,goals,collision=None):
+
     # MJCF built from the actual sampled hierarchy, no robot or borrowed body.
     # The starting pose is the local reference; ball joints preserve segment length.
     root=ET.Element("mujoco",model="LifeSim diagnostic");ET.SubElement(root,"compiler",angle="radian")
     scene=ET.SubElement(root,"worldbody")
     active=ancestor_set(t,goals); nodes=[]
+    if collision:
+        samples,floor,seat_info=collision
+        active|=ancestor_set(t,samples)
+        floorq=Quaternion((1,0,0),-math.pi/2)
+        ET.SubElement(scene,"geom",name="floor",type="plane",pos=nums((0,floor,0)),quat=nums(floorq),size="10 10 .01")
+        if seat_info:
+            center,x,front,width,depth,top=seat_info
+            up=Vector((0,1,0));z=unit(x.cross(up))
+            q=Matrix((x,up,z)).transposed().to_quaternion()
+            ET.SubElement(scene,"geom",name="seat",type="box",pos=nums(center),quat=nums(q),size=nums((width/2,.05,depth/2)))
+    proxy_names=[]
+
     for i,b in enumerate(bf):
         p=t["parents"][i];m=matrix(b["p"],b["r"]);q=m.to_quaternion()
         node=ET.SubElement(scene if p<0 else nodes[p],"body",name=f"b{i}",pos=nums(m.translation),quat=nums(q))
@@ -58,6 +101,11 @@ def qp(t,bf,goals):
             if p<0:ET.SubElement(node,"freejoint",name=f"j{i}")
             else:ET.SubElement(node,"joint",name=f"j{i}",type="ball")
             ET.SubElement(node,"inertial",pos="0 0 0",mass="1",diaginertia=".01 .01 .01")
+        if collision and i in samples:
+            for j,p in enumerate(samples[i]):
+                name=f"skin{i}_{j}";proxy_names.append(name)
+                ET.SubElement(node,"geom",name=name,type="sphere",pos=nums(p),size=".002",mass="0",contype="1",conaffinity="1")
+
     model=mujoco.MjModel.from_xml_string(ET.tostring(root,encoding="unicode"))
     cfg=mink.Configuration(model)
     # Validate the conversion before trusting solver numbers.
@@ -72,8 +120,15 @@ def qp(t,bf,goals):
         task=mink.FrameTask(f"b{i}","body",position_cost=1.,orientation_cost=.35,lm_damping=.01)
         task.set_target(mink.SE3.from_rotation_and_translation(mink.SO3(np.array(g.to_quaternion())),np.array(g.translation)))
         tasks.append(task)
+    limits=None
+    if collision:
+        pairs=[(proxy_names,["floor"])]
+        if seat_info:pairs.append((proxy_names,["seat"]))
+        limits=[mink.ConfigurationLimit(model),mink.CollisionAvoidanceLimit(model,geom_pairs=pairs,
+            minimum_distance_from_collisions=0.,collision_detection_distance=.06)]
     for _ in range(24):
-        vel=mink.solve_ik(cfg,tasks,.05,"daqp",damping=.001)
+        vel=mink.solve_ik(cfg,tasks,.05,"daqp",damping=.001,limits=limits)
+
         assert np.isfinite(vel).all()
         cfg.integrate_inplace(vel,.05)
     ws=[]
@@ -88,7 +143,7 @@ def apply(arm,bones,rest,f):
 def pose_error(t,f,goals):
     w=world(t,f)
     return {t["names"][i]:{"position_m":(w[i].translation-g.translation).length,
-        "orientation_rad":w[i].to_quaternion().rotation_difference(g.to_quaternion()).angle}
+        "orientation_rad":2*math.acos(min(1.,abs(w[i].to_quaternion().dot(g.to_quaternion()))))}
         for i,g in goals.items()}
 def metrics(t,f,goals,arm,bones,rest,regs,meshes,seat_info,floor,bf):
     apply(arm,bones,rest,f);actual=encode(locals_(arm,bones))
@@ -105,12 +160,13 @@ def main():
     for k,t in data["targets"].items():t["roles"]=inv["targets"][k]["map"]
     old=list(pathlib.Path("prior-contacts").rglob("report.json"));assert len(old)==1
     prior=json.loads(old[0].read_text());assert len(prior["profiles"])==6
-    report={"scope":"R1 capability comparison; shared proxy targets, not full contact/ART gate","production":"BLOCKED","ART":"OPEN","profiles":{}}
+    report={"scope":"R4: matched Mink with/without sparse skin-derived collision inequalities; iTaSC original reference; not full contact/ART gate","production":"BLOCKED","ART":"OPEN","profiles":{}}
     for key,t in data["targets"].items():
         path=pathlib.Path("prior-full")/(key+".glb");assert digest(path)==t["sha256"]
         arm,bones=import_rig(path);reset(arm,bones);rest=locals_(arm,bones,True)
         meshes=[o for o in bpy.context.scene.objects if o.type=="MESH" and any(m.type=="ARMATURE" and m.object==arm for m in o.modifiers)]
         h,floor=setup(meshes);regs={s:regions(meshes,t,s) for s in ("l","r")}
+        samples=skin_samples(t,meshes,arm,bones,rest)
         pelvis=regions(meshes,t);ears=ear_candidates(meshes,t);hip=t["roles"]["hip"]
         report["profiles"][key]={}
         central=key==min((k for k,v in data["targets"].items() if v["sex"]==t["sex"]),key=lambda k:abs(data["targets"][k]["scale"]-1))
@@ -137,7 +193,7 @@ def main():
                 if "Phone" in name:
                     pside=min(regs,key=lambda side:np.median([(pos(w,s["roles"]["hand_"+side])-pos(w,s["roles"]["head"])).length for w in sw]))
                     phone=proxy("phone-proxy",(0,0,0),(.075,.145,.012),(.12,.12,.15))
-                pairs,_=finger_map(s,t);rows=[];variants={k:[] for k in ("baseline","itasc","mink")};props=[]
+                pairs,_=finger_map(s,t);rows=[];variants={k:[] for k in ("baseline","itasc","mink","mink_collision")};props=[]
                 # All sampled source frames; same target definitions for both solvers.
                 for i,bf0 in enumerate(frames):
                     bf=clone(bf0);fingers(s,t,c["frames"][i],bf,pairs);apply(arm,bones,rest,bf)
@@ -165,12 +221,18 @@ def main():
                         goals[e]=transform(target,dq@w[e].to_quaternion())
                         phone_matrix=transform(ear+lateral*.012,dq@palmq)
                     row={"frame":i,"goal_count":len(goals),"variants":{}}
-                    for label,fn in (("baseline",lambda:bf),("itasc",lambda:native(arm,bones,rest,t,bf,goals)),("mink",lambda:qp(t,bf,goals))):
+                    for label,fn in (("baseline",lambda:bf),("itasc",lambda:native(arm,bones,rest,t,bf,goals)),("mink",lambda:qp(t,bf,goals)),("mink_collision",lambda:qp(t,bf,goals,(samples,floor,seat_info)))):
                         start=time.perf_counter()
-                        f=fn() if goals else bf
+                        failure=None
+                        try:
+                            f=fn() if goals or label=="mink_collision" else bf
+                        except mink.NoSolutionFound as exc:
+                            if label!="mink_collision":raise
+                            failure=str(exc);f=bf
                         assert all(math.isfinite(z) for b in f for z in b["p"]+b["r"])
                         row["variants"][label]=metrics(t,f,goals,arm,bones,rest,regs,meshes,seat_info,floor,bf)
                         row["variants"][label]["elapsed_s"]=time.perf_counter()-start
+                        row["variants"][label]["infeasible"]=failure is not None
                         variants[label].append(f)
                     props.append(phone_matrix);rows.append(row)
                 report["profiles"][key][name]={"samples":rows,"prior_r2_summary":prior["profiles"][key][name]["summary"],"comparison_note":"R2 historical targets differ; not a matched R2 solve."}
@@ -189,6 +251,6 @@ def main():
                 for o in (seat,phone):
                     if o:bpy.data.objects.remove(o,do_unlink=True)
     assert len(report["profiles"])==6 and all(len(x)==4 for x in report["profiles"].values())
-    assert len(list(OUT.glob("*.mp4")))==24
-    print("R1 diagnostic execution complete; ART and contact acceptance OPEN")
+    assert len(list(OUT.glob("*.mp4")))==32
+    print("R4 diagnostic execution complete; ART and contact acceptance OPEN")
 if __name__=="__main__":main()
