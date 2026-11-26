@@ -8,8 +8,99 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-anim-external-direct:
+  cf-anim-external-addon:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-external' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 05ed73e1026e623037474f492c59116041aa9ec9
+          path: frozen-interact
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-male-grid_021-100-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-balance
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-source-phase-male-grid_021-100-evidence
+          run-id: 45876462106
+          github-token: ${{ github.token }}
+          path: input-source
+      - uses: actions/checkout@v4
+        with:
+          repository: Diffeomorphic/retarget_bvh
+          ref: 8bbf2d44bccc5456d1ce3e3932e3e53812d71493
+          path: external-addons/retarget_bvh
+          persist-credentials: false
+      - name: Verify unchanged upstream checkout
+        run: |
+          test "$(git -C external-addons/retarget_bvh rev-parse HEAD)" = 8bbf2d44bccc5456d1ce3e3932e3e53812d71493
+          test -z "$(git -C external-addons/retarget_bvh status --porcelain)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Stock add-on retarget, native skin/contact measurements and real renders
+        run: |
+          python -m py_compile tools/cf_anim_external_addon.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_anim_external_addon.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-external-r3-evidence
+          path: artifacts/cf-anim-external-r3/
+          if-no-files-found: warn
+  cf-anim-external-direct:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-external' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-external-r2]')
     permissions:
       contents: read
       actions: read
