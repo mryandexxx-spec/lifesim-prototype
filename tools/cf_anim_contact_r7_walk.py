@@ -101,6 +101,9 @@ old_v=pose_seam(r6_pose["poses"])
 caps=limits_for(base_v[0])
 assert abs(norms(old_v)[0,0]-r6["loopSeam"]["rootVelocityJumpMps"])<1e-5
 report["temporalBaseline"]={"retargetBeforeSolve":norms(base_v).tolist(),"r6":norms(old_v).tolist(),"jointNames":["root_translation",*names],"limits":caps.tolist(),"r6ReportSha256":hashlib.sha256(r6_bytes).hexdigest(),"r6PosesSha256":hashlib.sha256(r6_pose_bytes).hexdigest(),"r6ArtifactId":15156133672,"r6ArtifactZipSha256":"47603349731deae8dd64ccd815e921d1cd73997c37bc900ef54ef67fb145b38d"}
+native_source=json.loads((OUT/"native-source-temporal.json").read_text())
+assert native_source["head"]==report["head"] and native_source["sourceSha"]==source["sourceGlbSha256"] and native_source["frames"]==len(bases)
+report["nativeSourceTemporal"]=native_source
 save()
 # Spatial relative rotations are expressed in the respective local parent axes.
 # Convert the actual MuJoCo FK into the same local convention independently of
@@ -153,7 +156,7 @@ def temporal_linearization(ctx):
         if np.max(np.abs(block))<1e-7:continue
         d=directions
         if np.linalg.norm(v)>1e-10:d=np.vstack([d,v/np.linalg.norm(v)])
-        G.extend(d@block);h.extend(caps[i%len(caps)]-d@v)
+        G.extend(d@block);h.extend(caps[i%len(caps)]-1e-4-d@v)
     return sparse.csc_matrix(np.asarray(G)),np.asarray(h)
 def temporal_ok(ctx,trials):
     a=norms(cfg_seam(ctx));b=norms(cfg_seam(ctx,trials))
