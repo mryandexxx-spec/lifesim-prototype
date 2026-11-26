@@ -33,7 +33,7 @@ jobs:
           python-version: '3.11'
       - name: Install pinned native source audit dependencies
         run: |
-          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.17.1
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.17.1 imageio-ffmpeg==0.6.0
           python -m py_compile tools/cf_anim_stock_walk.py
           python tools/cf_anim_contact_temporal.py
       - name: Compare unmodified ready-made walking clips at multiple sample rates
