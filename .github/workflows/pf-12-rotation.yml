@@ -1,14 +1,11 @@
 name: PF-12 outdoor rotation preview
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_call:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   real-preview:
-    if: github.event_name == 'workflow_dispatch' || (github.head_ref == 'fix/pf-12-outdoor-rotation-preview' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
