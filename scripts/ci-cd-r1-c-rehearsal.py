@@ -56,6 +56,32 @@ def restore():
     for name,bytes_ in data.items(): (FOLDER/name).write_bytes(bytes_)
     run('node scripts/cas-c4-source-verify.mjs')
     print('R1C_SOURCE_REUSE seconds='+str(time.monotonic()-start),flush=True)
+def prepare():
+    # Missing/mismatched transport or changed source recipe is never a cache hit.
+    # A cold build is permitted only with the original generator and exact
+    # audited source validator. Do not mask errors or publish partial output.
+    if any((FOLDER/f).exists() for f in FILES):
+        raise RuntimeError('not a clean output folder')
+    try:
+        restore()
+    except Exception as exc:
+        print('R1C_SOURCE_COLD_FALLBACK '+str(exc),flush=True)
+        for f in FILES:
+            (FOLDER/f).unlink(missing_ok=True)
+        run('python3 scripts/cas-c4-mira-sources.py')
+        run('node scripts/cas-c4-source-verify.mjs')
+        # When recipe is unchanged the cold result must match full reviewed
+        # provenance, allowing only selection of the other approved mirror.
+        if all(file_sha(ROOT/f)==pin for f,pin in INPUTS.items()):
+            for f,(pin,size) in FILES.items():
+                data=(FOLDER/f).read_bytes()
+                if f=='c4-source-manifest.json':
+                    m=json.loads(data)
+                    if m.get('sourceURL')=='https://files.makehumancommunity.org/asset_packs/shoes01/shoes01_cc0.zip':
+                        m['sourceURL']='https://files2.makehumancommunity.org/asset_packs/shoes01/shoes01_cc0.zip'
+                        data=(json.dumps(m,indent=2)+'\n').encode()
+                if len(data)!=size or sha(data)!=pin:
+                    raise RuntimeError('cold output differs from accepted source pack '+f)
 def release_steps():
     yaml=(ROOT/'.github/workflows/pages.yml').read_text()
     # Deliberately narrow parser for existing explicit literal shell blocks.
@@ -69,20 +95,22 @@ def release_steps():
     for name in names:
         cmd='\n'.join(line[10:] for line in blocks[name].splitlines())
         if name==names[0]:
-            old='python3 scripts/cas-c4-mira-sources.py'
-            if cmd.count(old)!=1 or cmd.count('npm test')!=1: raise RuntimeError('Pages import/test gate changed')
-            cmd=cmd.replace(old,'python3 scripts/ci-cd-r1-c-rehearsal.py --restore')
+            if cmd.count('python3 scripts/ci-cd-r1-c-rehearsal.py --prepare')!=1 or cmd.count('npm test')!=1: raise RuntimeError('Pages import/test gate changed')
         yield name,cmd
 def main():
     if len(sys.argv)>1:
-        if sys.argv[1]!='--restore': raise ValueError('unknown mode')
-        restore()
+        if sys.argv[1]=='--prepare': prepare()
+        elif sys.argv[1]=='--restore': restore()
+        elif sys.argv[1]=='--passport': passport(time.monotonic(),{})
+        else: raise ValueError('unknown mode')
         return
     run('node scripts/ci-guard.mjs')
     start=time.monotonic();timing={}
     for name,cmd in release_steps():
         print('R1C_STEP '+name,flush=True)
         t=time.monotonic();run(cmd);timing[name]=time.monotonic()-t
+    passport(start,timing)
+def passport(start,timing):
     site=ROOT/'site'
     files={}
     for path in sorted(site.rglob('*')):
