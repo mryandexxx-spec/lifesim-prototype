@@ -8,6 +8,70 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  cf-interact-01b:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Pinned native rig measurement dependencies (no solve)
+        run: |
+          python -m py_compile tools/cf_interact_passports.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          mkdir -p artifacts/cf-interact-01b
+          python -m pip freeze > artifacts/cf-interact-01b/dependency-freeze.txt
+          python -c "import bpy; assert bpy.app.version == (4,5,0)"
+      - name: Measure six exact real rigs and two authored seated samples per rig
+        run: python tools/cf_interact_passports.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Measured geometry and action compatibility matrix
+        run: |
+          node --input-type=module -e "import {runMeasuredMatrix} from './tools/cf-interact-measured.mjs'; runMeasuredMatrix()"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01b-evidence
+          path: |
+            artifacts/cf-interact-01b/
+            fbik-out/skin-bind-audit.jsonl
+          if-no-files-found: warn
   cf-interact-01a:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
