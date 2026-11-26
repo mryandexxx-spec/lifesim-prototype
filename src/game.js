@@ -18,7 +18,7 @@ import {registerModelCache} from './model-cache.js';
 import {CAMERA_INITIAL,CAMERA_LOT_BOUNDS,wheelCamera,setCameraBuildBounds,stepCameraFocus} from './camera-controls.js';
 import {createCameraGestureSession} from './camera-gestures.js';
 import {sleepZzzVisible,dismissOnCanvasTap,createResidentDoubleTap} from './micro-ux.js';
-import {installMobileGesturePolicy} from './mobile-gesture-policy.js';
+import {installMobileGesturePolicy} from './mobile-gesture-policy.js?v=ux3-06';
 import {createViewportHealth,viewportHealthLabel,viewportHealthReport} from './viewport-health.js';
 import {UI_TOUR_STORAGE_KEY,shouldShowTour} from './ui-onboarding.js';
 import {createTourUI} from './qsk-11-tour-ui.js';
@@ -124,7 +124,7 @@ import {createGardenVisual} from './of-garden-visual.js';
 import {createOutdoorFurnitureVisual} from './of-outdoor-visual.js';
 import {furnitureThumbnailFaces} from './furniture-thumbnails.js';
 import {furniturePoint,furniturePose,inverseFurniturePose,furnitureBounds,
-  fixtureContactLayout,furnitureInstance} from './furniture-transform.js';
+  fixtureContactLayout,furnitureInstance,furnitureLabelTargets} from './furniture-transform.js?v=ux3-06';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import { SOCIAL_ACTIONS, relationshipLabel, canStartSocial, startSocial,
   arriveSocial, cancelSocial, autonomousSocialChoice, startConversation,
@@ -1045,7 +1045,7 @@ function select(id,instanceId=null) {
   fridgeR2UI.show(id==='fridge',{reset:!wasFridge});
   selectedFurnitureInstanceId=['sofa','seat','dining','cook','prep','wash','bed','tv','hobby','music','paint',...UTILITY_ACTION_IDS].includes(id)&&typeof instanceId==='string'
     ?instanceId:null;
-  for (const [key, button] of Object.entries(markers)) button.classList.toggle('active', key === id);
+  for(const button of markers.values())updateMarkerSelection(button);
   $('action-sheet').hidden = !id;
   $('hint').hidden = Boolean(id);
   if (!id) return;
@@ -1237,13 +1237,31 @@ $('fridge-ready-buy-button').addEventListener('click',()=>{
   $('fridge-ready-select').value=id;renderReadyPurchase();
   toast('🥡 Куплено: '+q.meal.label+' · −'+q.price+' кр. Порция в холодильнике');
 });
-const markers = {};
-for (const id of Object.keys(META)) {
-  const el = document.createElement('button'); el.type = 'button';
-  el.className = 'hotspot';
-  el.innerHTML = `<span class="item-symbol">${META[id].icon}</span><span>${META[id].title}</span>`;
-  el.addEventListener('click', () => select(id));
-  $('hotspots').append(el); markers[id] = el;
+const markers=new Map();
+function updateMarkerSelection(button){
+  button.classList.toggle('active',button.dataset.actionId===selected&&
+    (!selectedFurnitureInstanceId||button.dataset.instanceId===selectedFurnitureInstanceId));
+}
+function syncFurnitureMarkers(targets){
+  const wanted=new Set(targets.map(t=>t.instanceId));
+  for(const [key,button] of markers)if(!wanted.has(key)){
+    button.remove();markers.delete(key);
+  }
+  for(const target of targets){
+    if(markers.has(target.instanceId))continue;
+    const el=document.createElement('button');el.type='button';el.className='hotspot';
+    el.dataset.instanceId=target.instanceId;el.dataset.actionId=target.actionId;
+    const icon=document.createElement('span');icon.className='item-symbol';
+    icon.textContent=META[target.actionId].icon;
+    const title=document.createElement('span');title.textContent=target.title;
+    el.append(icon,title);el.hidden=true;
+    el.addEventListener('click',()=>{
+      const current=game.world.furniture.instances.find(i=>i.instanceId===el.dataset.instanceId&&i.location==='home');
+      if(current&&FURNITURE_CATALOG[current.prefabId]?.actionId===el.dataset.actionId)
+        select(el.dataset.actionId,current.instanceId);
+    });
+    $('hotspots').append(el);markers.set(target.instanceId,el);updateMarkerSelection(el);
+  }
 }
 // Persist only the optional display preference, never the game/save schema.
 // Default is a clean room; projecting the 3D object still enables a canvas tap.
@@ -1370,32 +1388,47 @@ function placeSocialPopover(panel){
     return;
   }
   panel.classList.add('context-popover');
-  const w=canvas.clientWidth||window.innerWidth,h=canvas.clientHeight||window.innerHeight;
-  const landscape=h<560;
-  const mobile=w<=700;
+  const frame=document.querySelector('.app-shell').getBoundingClientRect();
+  const topInset=Math.max(70,Math.ceil(
+    $('calendar-anchor-toggle').getBoundingClientRect().bottom-frame.top)+10);
+  // Like the ground context, reserve the entire HUD band including bottom navigation.
+  const bottomInset=Math.max(0,Math.ceil(frame.bottom-
+    $('dashboard').getBoundingClientRect().top))+12;
   const pos=contextualPlacement({
     anchorX:socialAnchor.x,anchorY:socialAnchor.y,
-    viewportWidth:w,viewportHeight:h,
-    panelWidth:panel.offsetWidth||340,panelHeight:panel.offsetHeight||280,
-    topInset:landscape?72:mobile?116:102,
-    bottomInset:Math.max(landscape?122:mobile?170:144,
-      Math.ceil($('dashboard').getBoundingClientRect().height)+12)
+    viewportWidth:frame.width,viewportHeight:frame.height,
+    panelWidth:panel.offsetWidth||340,
+    panelHeight:Math.max(panel.offsetHeight,panel.scrollHeight+2)||280,
+    topInset,bottomInset,edge:12
   });
   panel.style.setProperty('--context-x',pos.x+'px');
   panel.style.setProperty('--context-y',pos.y+'px');
-  panel.style.setProperty('--context-max-height',pos.maxHeight+'px');
+  // The content may grow after placement (selected resident, translated text,
+  // wrapping or late font load). Cap the actual remaining band, not the whole
+  // available region measured from its top.
+  const remaining=Math.max(0,Math.floor(frame.height-bottomInset-pos.y));
+  panel.style.setProperty('--context-max-height',Math.min(pos.maxHeight,remaining)+'px');
 }
 function relayoutSocialPanels(){
   for(const id of ['social-context','social-menu-panel','shared-panel',
     'conversation-panel','branch-panel'])placeSocialPopover($(id));
 }
-const scheduleSocialPosition=()=>requestAnimationFrame(relayoutSocialPanels);
+let socialLayoutFrame=0;
+const scheduleSocialPosition=()=>{
+  if(socialLayoutFrame)return;
+  socialLayoutFrame=requestAnimationFrame(()=>{socialLayoutFrame=0;relayoutSocialPanels();});
+};
 window.addEventListener('resize',scheduleSocialPosition);
+// HUD and panel content can resize without a viewport resize.
+if(typeof ResizeObserver==='function'){
+  const observer=new ResizeObserver(()=>{if(socialAnchor)scheduleSocialPosition();});
+  for(const id of ['dashboard','social-context','social-menu-panel','shared-panel','conversation-panel','branch-panel'])observer.observe($(id));
+}
 function renderSocialContext(){
   const open=socialContextVisible&&!socialMenuCategory&&!conversationTopicPicker&&
     !sharedPicker&&!branchPicker&&!dialogueNeedsDecision(game);
   $('social-context').hidden=!open;
-  if(open)scheduleSocialPosition();
+  if(open){placeSocialPopover($('social-context'));scheduleSocialPosition();}
   else $('social-context').classList.remove('context-popover');
 }
 function closeSocialContext(){
@@ -10679,20 +10712,23 @@ function boot() {
       timeUI.renderSpeed(householdSpeed.read(game,{blocked:!frameActive}));
       // Live plan is now the single source of HUD status, not a second stale label.
       renderPlanPeek();
-      // Visible buttons are separate DOM controls: no hit-testing dependency on physics.
-      for(const [id,meta] of Object.entries(META)){
-        const placed=furniturePoint(game.world,id,
-          {x:meta.anchor[0],z:meta.anchor[2]});
-        const el=markers[id];
-        if(!placed){el.hidden=true;continue;}
-        el.hidden=false;
-        const p=camera.camera.worldToScreen(new pc.Vec3(placed.x,meta.anchor[1],placed.z));
-        const x=p.x;
-        const y=p.y; // PlayCanvas worldToScreen already returns CSS pixels.
-        el.style.left=x+'px';el.style.top=y+'px';
-        const pointInView=camera.camera.viewMatrix.transformPoint(
-          new pc.Vec3(placed.x,meta.anchor[1],placed.z));
-        el.hidden=pointInView.z>=0 || x<25 || x>canvas.clientWidth-30 || y<85 || y>canvas.clientHeight-116;
+      // Labels are optional and keyed by the exact installed instance.
+      // No DOM allocation or projection while the preference is disabled.
+      if(itemLabelsVisible){
+        const targets=furnitureLabelTargets(game.world,META);
+        syncFurnitureMarkers(targets);
+        for(const target of targets){
+          const el=markers.get(target.instanceId);
+          const worldPoint=new pc.Vec3(target.x,target.y,target.z);
+          const p=camera.camera.worldToScreen(worldPoint);
+          const pointInView=camera.camera.viewMatrix.transformPoint(worldPoint);
+          el.hidden=pointInView.z>=0||p.x<0||p.x>canvas.clientWidth||
+            p.y<85||p.y>canvas.clientHeight-116;
+          if(el.hidden)continue;
+          const half=Math.min(el.offsetWidth/2+4,canvas.clientWidth/2);
+          el.style.left=Math.max(half,Math.min(canvas.clientWidth-half,p.x))+'px';
+          el.style.top=p.y+'px';
+        }
       }
     }
     if(autosaveTime>8){autosaveTime=0;save(true);}

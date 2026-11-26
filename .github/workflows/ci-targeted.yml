@@ -8,6 +8,37 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  ux3-06-input-ownership:
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/ux3-06-world-gesture-ownership' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Gesture ownership and camera regression
+        run: node --test tests/mobile-gesture-policy.test.js tests/camera-gestures.test.js tests/camera-social-regression.test.js tests/ux3-06-furniture-labels.test.js tests/dialogue-decision.test.js
+      - name: Actual social and purchased-object touch regressions
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ux3-06-http.log 2>&1 &
+          sleep 3
+          node tests/ux3-06-browser.mjs
+        env:
+          GQ_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ux3-06-touch-evidence
+          path: artifacts/ux3-06/
+          if-no-files-found: warn
   pf-14-garden-care:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-14-garden-care' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

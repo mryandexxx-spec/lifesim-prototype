@@ -66,3 +66,20 @@ export function fixtureContactLayout(world,kind,template){
   const shelfTarget=furniturePoint(world,kind,template.shelfTarget);
   return {...template,handle,shelfTarget,hinge:furniturePoint(world,kind,template.hinge)};
 }
+
+/** Optional interaction labels follow installed instances, not action aliases.
+ * Authored starter offsets remain unchanged; purchased models use their own
+ * center and the existing action height. Never invent labels for inert decor.
+ */
+export function furnitureLabelTargets(world,metadata){
+  return (data(world)?.instances||[]).flatMap(item=>{
+    const def=FURNITURE_CATALOG[item.prefabId],meta=metadata[def?.actionId];
+    if(item.location!=='home'||!meta)return [];
+    const origin=origins.get(item.prefabId);
+    const authored=!def.templateOnly&&item.instanceId===origin?.instanceId;
+    const point=authored?furniturePoint(world,item.prefabId,
+      {x:meta.anchor[0],z:meta.anchor[2]},item.instanceId):{x:item.x,z:item.z};
+    return point?[{instanceId:item.instanceId,actionId:def.actionId,
+      title:def.name,x:point.x,y:meta.anchor[1],z:point.z}]:[];
+  });
+}
