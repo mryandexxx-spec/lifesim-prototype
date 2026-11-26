@@ -48,7 +48,7 @@ jobs:
         run: |
           mkdir -p fbik-out
           python -m py_compile tools/cf_anim_fbik.py
-          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
           python -m pip inspect > fbik-out/dependency-inspect.json
           python -m pip freeze > fbik-out/dependency-freeze.txt
           # pip can reject the bpy wheel tag even after installing it on Linux.

@@ -7,6 +7,7 @@ import mujoco
 import mink
 import qpsolvers
 import osqp
+import clarabel
 from scipy import sparse
 from mink.limits.limit import Limit, Constraint
 from mathutils import Vector, Matrix, Quaternion
@@ -301,6 +302,43 @@ def qp(t,bf,goals,weighted=None,diagnostic=None,previous=None,frame_dt=None,cont
         ws.append(transform(Vector(cfg.data.xpos[j]),Quaternion(cfg.data.xquat[j])))
     return encode([w if p<0 else ws[p].inverted()@w for w,p in zip(ws,t["parents"])])
 
+def correction_jacobian(cfg,q0):
+    # Derivative of source-relative log coordinates with respect to the actual
+    # MuJoCo tangent increment. Ball-joint corrections do not add linearly.
+    model=cfg.model;n=model.nv;J=np.zeros((n,n));eps=1e-6
+    for k in range(n):
+        v=np.zeros(n);v[k]=1.
+        a=cfg.q.copy();b=cfg.q.copy()
+        mujoco.mj_integratePos(model,a,v,eps)
+        mujoco.mj_integratePos(model,b,v,-eps)
+        J[:,k]=(tangent(model,q0,a)-tangent(model,q0,b))/(2*eps)
+    assert np.isfinite(J).all()
+    return J
+
+def solve_sparse_qp(P,q,A,upper,stats):
+    # Same objective and inequalities for both numerical backends.
+    def valid(x):
+        return x is not None and np.isfinite(x).all() and np.max(A@x-upper)<=1e-5
+    solver=osqp.OSQP()
+    solver.setup(P=sparse.triu(P,format="csc"),q=q,A=A,l=np.full(len(upper),-np.inf),u=upper,
+                 verbose=False,eps_abs=1e-6,eps_rel=1e-6,max_iter=20000,polishing=True)
+    result=solver.solve()
+    stats["solver_status"].append("OSQP: "+str(result.info.status))
+    if result.info.status_val in (1,2) and valid(result.x):
+        stats["osqp_accepted"]+=1
+        return result.x
+    # Independent sparse interior-point backend for difficult contact active sets.
+    settings=clarabel.DefaultSettings();settings.verbose=False;settings.max_iter=150
+    settings.tol_feas=1e-8;settings.tol_gap_abs=1e-8;settings.tol_gap_rel=1e-8
+    fallback=clarabel.DefaultSolver(sparse.triu(P,format="csc"),q,A,upper,
+                                  [clarabel.NonnegativeConeT(len(upper))],settings).solve()
+    stats["solver_status"].append("Clarabel: "+str(fallback.status))
+    x=np.asarray(fallback.x) if fallback.x is not None else None
+    if str(fallback.status) in ("Solved","AlmostSolved") and valid(x):
+        stats["clarabel_accepted"]+=1
+        return x
+    return None
+
 def trajectory(t,bases,goals,skin,floor,seat_info,dt):
     """Offline simultaneous sequential QP across all source frames.
     Constraints include two-sided correction rates, not post-filtered motion."""
@@ -318,10 +356,10 @@ def trajectory(t,bases,goals,skin,floor,seat_info,dt):
     D1=sparse.kron(sparse.diags([-np.ones(N-1),np.ones(N-1)],[0,1],shape=(N-1,N)),sparse.eye(n),format="csc")
     D2=sparse.kron(sparse.diags([np.ones(N-2),-2*np.ones(N-2),np.ones(N-2)],[0,1,2],shape=(N-2,N)),sparse.eye(n),format="csc")
     W=(.12*(D1.T@D1)+.4*(D2.T@D2)).tocsc()
-    stats={"accepted_steps":0,"rejected_steps":0,"solver_status":[],"max_slack_m":0.}
+    stats={"accepted_steps":0,"rejected_steps":0,"solver_status":[],"max_slack_m":0.,"osqp_accepted":0,"clarabel_accepted":0,"termination":"iteration_budget"}
     for iteration in range(24):
         current=np.concatenate([tangent(cfg.model,q0,cfg.q) for cfg,_,_,q0 in ctx])
-        blocks=[];lin=[];constraints=[];bounds=[];sizes=[]
+        blocks=[];lin=[];constraints=[];bounds=[];sizes=[];jacobians=[]
         for cfg,tasks,limit,q0 in ctx:
             problem=mink.build_ik(cfg,tasks,.05,damping=.001,limits=[mink.ConfigurationLimit(cfg.model)])
             col=limit.compute_qp_inequalities(cfg,.05)
@@ -335,24 +373,22 @@ def trajectory(t,bases,goals,skin,floor,seat_info,dt):
                 G.append(np.c_[col.G,-np.eye(m)]);h.append(col.h)
                 G.append(np.c_[np.zeros((m,n)),-np.eye(m)]);h.append(np.zeros(m))
             d=tangent(cfg.model,q0,cfg.q)
-            lo=np.maximum(-step,-total-d);hi=np.minimum(step,total-d)
-            G.extend([np.c_[np.eye(n),np.zeros((n,m))],np.c_[-np.eye(n),np.zeros((n,m))]])
-            h.extend([hi,-lo]);constraints.append(sparse.csc_matrix(np.vstack(G)));bounds.append(np.concatenate(h))
+            J=correction_jacobian(cfg,q0);jacobians.append(sparse.csc_matrix(J))
+            G.extend([np.c_[np.eye(n),np.zeros((n,m))],np.c_[-np.eye(n),np.zeros((n,m))],
+                      np.c_[J,np.zeros((n,m))],np.c_[-J,np.zeros((n,m))]])
+            h.extend([step,step,total-d,total+d]);constraints.append(sparse.csc_matrix(np.vstack(G)));bounds.append(np.concatenate(h))
         offsets=np.r_[0,np.cumsum(sizes)]
         cols=np.concatenate([np.arange(offsets[k],offsets[k]+n) for k in range(N)])
         E=sparse.csc_matrix((np.ones(N*n),(np.arange(N*n),cols)),shape=(N*n,int(offsets[-1])))
-        P=sparse.block_diag(blocks,format="csc")+E.T@W@E
-        q=np.concatenate(lin)+np.asarray(E.T@(W@current)).ravel()
-        A=sparse.vstack([sparse.block_diag(constraints,format="csc"),D1@E,-D1@E],format="csc")
+        B=sparse.block_diag(jacobians,format="csc")@E
+        P=sparse.block_diag(blocks,format="csc")+B.T@W@B
+        q=np.concatenate(lin)+np.asarray(B.T@(W@current)).ravel()
+        A=sparse.vstack([sparse.block_diag(constraints,format="csc"),D1@B,-D1@B],format="csc")
         diff=D1@current;rb=np.tile(rate,N-1)
         upper=np.r_[np.concatenate(bounds),rb-diff,rb+diff]
-        solver=osqp.OSQP()
-        solver.setup(P=sparse.triu(P,format="csc"),q=q,A=A,l=np.full(len(upper),-np.inf),u=upper,
-                     verbose=False,eps_abs=1e-7,eps_rel=1e-7,max_iter=12000,polishing=True)
-        result=solver.solve();stats["solver_status"].append(str(result.info.status))
-        sol=result.x
-        if result.info.status_val not in (1,2) or sol is None or not np.isfinite(sol).all() or np.max(A@sol-upper)>1e-5:
-            stats["rejected_steps"]+=1;break
+        sol=solve_sparse_qp(P,q,A,upper,stats)
+        if sol is None:
+            stats["rejected_steps"]+=1;stats["termination"]="qp_failure";break
         dq=(E@sol).reshape(N,n)
         slack=np.delete(sol,cols);stats["max_slack_m"]=max(stats["max_slack_m"],float(max(0.,slack.max())) if len(slack) else 0.)
         accepted=False
@@ -365,7 +401,11 @@ def trajectory(t,bases,goals,skin,floor,seat_info,dt):
             if np.isfinite(d).all() and np.all(np.abs(d)<=total+1e-6) and np.all(np.abs(np.diff(d,axis=0))<=rate+1e-6):
                 for (cfg,_,_,_),trial in zip(ctx,trials):cfg.update(trial)
                 stats["accepted_steps"]+=1;accepted=True;break
-        if not accepted:stats["rejected_steps"]+=1;break
+        if not accepted:
+            stats["rejected_steps"]+=1;stats["termination"]="integration_rejected";break
+        if np.max(np.abs(a*dq))<1e-6:
+            stats["termination"]="small_step";break
+    stats["executed"]=stats["accepted_steps"]>0
     final=np.asarray([tangent(cfg.model,q0,cfg.q) for cfg,_,_,q0 in ctx])
     assert np.all(np.abs(final)<=total+1e-6) and np.all(np.abs(np.diff(final,axis=0))<=rate+1e-6)
     stats["max_rate_ratio"]=float(np.max(np.abs(np.diff(final,axis=0))/rate))
@@ -428,7 +468,7 @@ def main():
     for k,t in data["targets"].items():t["roles"]=inv["targets"][k]["map"]
     old=list(pathlib.Path("prior-contacts").rglob("report.json"));assert len(old)==1
     prior=json.loads(old[0].read_text());assert len(prior["profiles"])==6
-    report={"scope":"R10 full-clip sparse sequential QP versus R8/R9 controls; two central rigs sit enter/exit; no anatomical certification","production":"BLOCKED","ART":"OPEN","profiles":{}}
+    report={"scope":"R11 full-clip sparse SQP with source-log Jacobian and independent solver fallback; same central sit cases and unchanged motion constraints","production":"BLOCKED","ART":"OPEN","profiles":{}}
     for key,t in data["targets"].items():
         central=key==min((k for k,v in data["targets"].items() if v["sex"]==t["sex"]),key=lambda k:abs(data["targets"][k]["scale"]-1))
         if not central:continue
@@ -544,7 +584,7 @@ def main():
                     ww=world(t,f);bw=world(t,bf)
                     shift=max((ww[j].translation-bw[j].translation).length for j,p in enumerate(t["parents"]) if p<0)
                     result["root_shift_m"]=shift;assert shift<=.18
-                    result["infeasible"]=False
+                    result["infeasible"]=not trajectory_stats["executed"]
                     if i:
                         corrections=[]
                         for v,u,pv,pu in zip(f,bf,fs[i-1],bases[i-1]):
@@ -570,5 +610,6 @@ def main():
                     if o:bpy.data.objects.remove(o,do_unlink=True)
     assert len(report["profiles"])==2 and all(len(x)==2 for x in report["profiles"].values())
     assert len(list(OUT.glob("*.mp4")))==20
-    print("R10 full-clip weighted skin diagnostic complete; ART and contact acceptance OPEN")
+    assert all(v["trajectory_stats"]["executed"] for p in report["profiles"].values() for v in p.values()),"trajectory failed to execute; see report and video evidence"
+    print("R11 full-clip weighted skin diagnostic complete; ART and contact acceptance OPEN")
 if __name__=="__main__":main()
