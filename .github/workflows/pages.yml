@@ -5,19 +5,30 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
   group: github-pages
   cancel-in-progress: true
 jobs:
-  validate-and-deploy:
+  validate-site:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      checked_sha: ${{ steps.identity.outputs.sha }}
+      checked_tree: ${{ steps.identity.outputs.tree }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Confirm exact main event commit and tree
+        id: identity
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -44,7 +55,8 @@ jobs:
           node --check scripts/cas-02-1-f2-real-source-audit.mjs
           node scripts/cas-02-1-f2-real-source-audit.mjs
           node scripts/cas-c3-shoes.mjs
-          python3 scripts/cas-c4-mira-sources.py
+          # Cold fallback retains python3 scripts/cas-c4-mira-sources.py and exact source verification.
+          python3 scripts/ci-cd-r1-c-rehearsal.py --prepare
           node scripts/cas-c4-mira-shoes.mjs
           node scripts/cas-c4c-heel-shoes.mjs
           node --check src/cas-f2-c4b-lab.js
@@ -463,10 +475,38 @@ jobs:
           name: qsk-04-pinned-asset-passport-pages
           path: artifacts/qsk-04/asset-passport.json
           if-no-files-found: warn
+      - name: Record exact site file SHA-256 passport
+        run: python3 scripts/ci-cd-r1-c-rehearsal.py --passport
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-cd-release-site-passport
+          path: artifacts/ci-cd-r1-c/site-passport.json
+          if-no-files-found: error
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
           path: ./site
+  validate-and-deploy:
+    needs: validate-site
+    if: github.ref == 'refs/heads/main' && needs.validate-site.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Confirm same-run verified main is still current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKED_SHA: ${{ needs.validate-site.outputs.checked_sha }}
+          CHECKED_TREE: ${{ needs.validate-site.outputs.checked_tree }}
+        run: |
+          test "$CHECKED_SHA" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')" = "$CHECKED_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/commits/$CHECKED_SHA" --jq '.tree.sha')" = "$CHECKED_TREE"
       # GitHub's upload API can report success before Pages registers the artifact.
       - name: Let Pages artifact metadata propagate
         run: sleep 20
