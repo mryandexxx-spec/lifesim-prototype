@@ -24,12 +24,17 @@ export function planChanges(files,root=ROOT){
   const changedSrc=changed.filter(f=>f.startsWith('src/')&&/\.(?:js|mjs)$/.test(f));
   for(const f of changed)if(allTests.includes(f))selected.add(f);
   const importsCache=new Map();
+  const textCache=new Map();
+  function sourceText(file){
+    if(!textCache.has(file))textCache.set(file,readFileSync(path.join(root,file),'utf8'));
+    return textCache.get(file);
+  }
   function importsOf(file){
     if(importsCache.has(file))return importsCache.get(file);
     const output=[];
     const abs=path.join(root,file);
     if(existsSync(abs)){
-      const source=readFileSync(abs,'utf8');
+      const source=sourceText(file);
       const expression=/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"](\.{1,2}\/[^'"]+)['"]/g;
       for(const match of source.matchAll(expression)){
         const item=match[1].split('?')[0];
@@ -53,8 +58,9 @@ export function planChanges(files,root=ROOT){
     // Legacy tests also read live source as text or run it through VM. Retain
     // exact literal source references in every transitive test helper.
     for(const dep of deps){
-      if(!existsSync(path.join(root,dep)))continue;
-      const source=readFileSync(path.join(root,dep),'utf8');
+      if(!changedSrc.length)break;
+      if(!/^(?:tests|scripts)\//.test(dep)||!existsSync(path.join(root,dep)))continue;
+      const source=sourceText(dep);
       for(const changedPath of changedSrc){
         if(source.includes(changedPath)||deps.has(changedPath)){
           covered.add(changedPath);selected.add(file);
