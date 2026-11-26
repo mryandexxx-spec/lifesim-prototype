@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {SOURCE,deriveHeight,measureBench,benchDescriptor} from './cf-interact-geometry.mjs';
+import {resolveMeasuredSeatInteraction} from './cf-interact-measured.mjs';
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const [rigId,fixture]=process.argv.slice(2);
+const dir='input-01b/artifacts/cf-interact-01b';
+function pinned(name,sha){const b=readFileSync(dir+'/'+name);assert.equal(hash(b),sha);return JSON.parse(b);}
+const d=pinned('rig-action-passports.json','298c13ca48cb650cd342afe245c21e3ea42174de07a52972261bf513e48fc70c');
+const m=pinned('eligibility-matrix.json','38452dfb5edb2f822ed942f56d2f3786c29fb23f3fdaeba70884eaed71842840');
+const rig=d.rigs[rigId],action=d.action;
+const height={candidate45:.45,heldout42:.42}[fixture];
+assert.ok(rig&&height);
+const source=readFileSync(SOURCE),bytes=deriveHeight(source,height),measurement=measureBench(bytes,height),asset=benchDescriptor(hash(bytes),height);
+assert.equal(asset.assetSha,m.fixtures.find(x=>x.name===fixture).asset.assetSha);
+const previous=m.cases.filter(c=>c.rig===rigId&&c.name===fixture);assert.equal(previous.length,6);assert.ok(previous.every(c=>c.result.ok));
+const instance={id:'bench',origin:{x:0,y:0,z:0},yaw:0};
+const result=resolveMeasuredSeatInteraction({asset,measurement,instance,rig,action,environment:{occupiedSlots:[],corridorClear:()=>true}});
+assert.equal(result.status,'MEASURED_PREFLIGHT_CANDIDATE');assert.equal(result.cacheKey,previous[0].result.cacheKey);
+mkdirSync('pilot-out',{recursive:true});writeFileSync('pilot-out/bench.glb',bytes);
+writeFileSync('pilot-out/plan.json',JSON.stringify({rig,action,fixture,asset,measurement,instance,result,previousYaws:previous.map(x=>x.yaw)},null,2));
