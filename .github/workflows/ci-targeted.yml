@@ -695,3 +695,25 @@ jobs:
           name: cas-c4-female-source-evidence
           path: artifacts/cas-02-1-f2-c4/source-audit.json
           if-no-files-found: warn
+
+  gc-09-strategies:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/gc-09-strategies' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Canonical finance and food regression
+        run: node --test tests/w4a-finance.test.js tests/w4c-bills.test.js tests/life-food-r1.test.js
+      - name: Matched strategy diversity trace
+        run: node tests/gc-09-strategy-probe.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-09-r1-evidence
+          path: artifacts/gc-09-r1/
+          if-no-files-found: warn
