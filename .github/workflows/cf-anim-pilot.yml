@@ -138,7 +138,10 @@ jobs:
       - name: Verify exact previously generated GLB and report bytes
         run: |
           mkdir -p pilot-out
-          cp replay-r3/pilot-out/{female.glb,male.glb,bench.glb,report.json} pilot-out/
+          # artifact-ids may unpack under the artifact name; require one exact source.
+          mapfile -t sources < <(find replay-r3 -type f -path '*/pilot-out/report.json' -printf '%h\n')
+          test "${#sources[@]}" -eq 1
+          cp "${sources[0]}"/{female.glb,male.glb,bench.glb,report.json} pilot-out/
           cd pilot-out
           sha256sum -c <<'EOF'
           65a2e98db27caa029f87b8520509bd992d391b220c00cfbc2284f781bb995b17  female.glb
