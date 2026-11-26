@@ -71,7 +71,7 @@ function ownershipFixture(){
   const uninstall=installWorldClickOwnership(root,canvas);
   const pointer=(target=canvas,id=1,extra={})=>({target,pointerId:id,isTrusted:true,isPrimary:true,button:0,...extra});
   const fireClick=(target=button,extra={})=>{
-    const e={...event(target),isTrusted:true,detail:1,stopped:false,...extra};
+    const e=Object.assign(event(target),{isTrusted:true,detail:1,stopped:false},extra);
     e.stopImmediatePropagation=()=>{e.stopped=true;};
     host.dispatch('click',e);return e;
   };
