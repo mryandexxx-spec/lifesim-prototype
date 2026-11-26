@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {newHousehold,loadHousehold} from '../src/household.js';
+import {flowerBatchQuote,previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from '../src/outdoor-proposals.js';
+const preview=(root,itemId,x,z)=>previewOutdoorFeatureEdit(root,{operation:'place',itemId,pose:{x,z,yaw:0}});
+test('PF-13 quantity is a quote only, bounded by credits and garden capacity',()=>{
+ const root=newHousehold(),snapshot=JSON.stringify(root);
+ assert.equal(flowerBatchQuote(root,'garden.bench'),null);
+ assert.equal(flowerBatchQuote(root,'garden.flower.calendula').max,8);
+ assert.equal(JSON.stringify(root),snapshot);
+ root.shop.credits=119;
+ assert.deepEqual(flowerBatchQuote(root,'garden.flower.calendula'),{price:120,max:0,reason:'insufficient-credits'});
+ assert.equal(flowerBatchQuote(root,'flower.daisy').max,2);
+});
+test('PF-13 each confirmed flower has a unique id and ledger receipt; invalid and stale previews cannot charge',()=>{
+ let root=newHousehold();const initial=root.shop.credits;
+ const id='garden.flower.calendula',first=preview(root,id,19,8);
+ assert.ok(first.ok,first.reason);
+ root=commitOutdoorFeatureEdit(root,first).root;
+ assert.equal(commitOutdoorFeatureEdit(root,first).ok,false);
+ assert.equal(preview(root,id,19,8).reason,'overlap-outdoor');
+ const second=preview(root,id,21,8);assert.ok(second.ok,second.reason);
+ root=commitOutdoorFeatureEdit(root,second).root;
+ assert.notEqual(first.instanceId,second.instanceId);
+ assert.equal(root.shop.credits,initial-240);
+ assert.equal(root.financialHistory.entries.length,2);
+ assert.equal(Object.keys(root.world.outdoors.gardens).length,2);
+ const loaded=loadHousehold(JSON.parse(JSON.stringify(root)));
+ assert.deepEqual(loaded.world.outdoors.gardens,root.world.outdoors.gardens);
+ assert.equal(loaded.shop.credits,root.shop.credits);
+ assert.equal(loaded.financialHistory.entries.length,2);
+ assert.equal(flowerBatchQuote(loaded,id).max,6);
+});
