@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: '22'
       - name: Gesture ownership and camera regression
-        run: node --test tests/mobile-gesture-policy.test.js tests/camera-gestures.test.js tests/camera-social-regression.test.js
+        run: node --test tests/mobile-gesture-policy.test.js tests/camera-gestures.test.js tests/camera-social-regression.test.js tests/ux3-06-furniture-labels.test.js tests/dialogue-decision.test.js
       - name: Actual social and purchased-object touch regressions
         run: |
           npm ci
