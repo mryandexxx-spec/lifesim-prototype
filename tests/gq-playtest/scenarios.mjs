@@ -51,7 +51,7 @@ const distance=(a,b)=>Math.hypot(...a.map((x,i)=>x-b[i]));
 scenarios.push(
  {id:'camera-focus',goal:'Single portrait tap switches; fast double tap focuses the actual camera',seed:auditSeed,async run(h){
   const {page,step,tap,snapshot}=h;let before;
-  await step('pause-and-reset',async()=>{await pause(h);await tap('#view-toggle');await tap('#menu-reset-camera-btn');await page.waitForTimeout(500);before=await cameraPose(page);});
+  await step('pause-and-reset',async()=>{await pause(h);await tap('#view-toggle');await tap('#menu-reset-camera-btn');await tap('#view-close');await page.locator('#view-panel').waitFor({state:'hidden'});await page.waitForTimeout(500);before=await cameraPose(page);});
   await step('single-select',async()=>{await tap('#pick-mira');await page.waitForTimeout(1500);assert.equal((await snapshot()).selectedSim,'mira');assert.ok(distance(await cameraPose(page),before)<.1,'single tap moved camera');});
   await step('double-focus',async()=>{await h.doubleTap('#pick-mira');await page.waitForTimeout(1600);assert.ok(distance(await cameraPose(page),before)>.1,'double tap did not move actual camera');assert.equal((await snapshot()).selectedSim,'mira');});
  }},
@@ -60,23 +60,33 @@ scenarios.push(
   await step('pause',()=>pause(h));
   for(const [actor,partner,name] of [['alex','mira','Мира'],['mira','alex','Алекс']]){
    await step(actor+'-find-partner',async()=>{
-    await tap('#pick-'+actor);await page.waitForTimeout(500);
+    await tap('#pick-'+actor);await page.waitForTimeout(500);const baseline=await snapshot();
     const probes=[];
     for(const y of [1.45,1.85,1.0]){
      const pt=await page.evaluate(async({name,y})=>{const {Application,Vec3}=await import('playcanvas');const app=Application.getApplication();const avatar=app.root.findByName(name);const camera=app.root.findComponents('camera').find(c=>c.enabled);if(!avatar||!camera)throw Error('resident or camera missing');const p=camera.worldToScreen(avatar.getPosition().clone().add(new Vec3(0,y,0)));return {x:Math.round(p.x),y:Math.round(p.y),w:innerWidth,h:innerHeight};},{name,y});
      if(pt.x<0||pt.x>=pt.w||pt.y<0||pt.y>=pt.h)continue;
-     probes.push(pt);await h.tapPoint(pt.x,pt.y);
+     const hit=await page.evaluate(({x,y})=>{const e=document.elementFromPoint(x,y);return {id:e?.id,tag:e?.tagName,cls:typeof e?.className==='string'?e.className:''};},pt);
+     probes.push({...pt,hit});h.observe({actor,partner,point:pt,hit});
+     // Never tap through a menu or an overlay to probe another world point.
+     if(hit.id!=='game-canvas')continue;
+     const prior=await snapshot();
+     await h.tapPoint(pt.x,pt.y);
+     // Canvas tap may be deferred until gesture recognition finishes.
+     await page.locator('#social-context').waitFor({state:'visible',timeout:1500}).catch(()=>{});
+     assert.deepEqual((await snapshot()).actionQueues,prior.actionQueues,'scene selection alone must not enqueue');
      if(await page.locator('#social-context').isVisible())break;
+     assert.equal(await page.locator('#social-menu-panel').isVisible(),false,'unexpected social menu after scene-only tap');
      if(await page.locator('#ground-walk-menu').isVisible())await tap('#ground-walk-close');
+     if(await page.locator('#action-button').isVisible())await tap('#close-action');
     }
-    assert.ok(await page.locator('#social-context').isVisible(),'resident not discoverable through projected touch '+JSON.stringify(probes));
+    assert.deepEqual((await snapshot()).actionQueues,baseline.actionQueues,'finding a resident must not enqueue');assert.ok(await page.locator('#social-context').isVisible(),'resident not discoverable through projected touch '+JSON.stringify(probes));
    });
    await step(actor+'-confirm-talk',async()=>{const b=await snapshot();await tap('#conversation-btn');await tap('#social-menu-options button:has-text("Поговорить")');await tap('#social-menu-options button:has-text("В очередь · Поговорить")');const a=await snapshot();assert.equal(a.actionQueues.byResident[actor].length,b.actionQueues.byResident[actor].length+1);assert.ok(a.actionQueues.byResident[actor].some(q=>q.type==='social'&&q.targetId===partner&&q.actionId==='talk'));assert.deepEqual(a.actionQueues.byResident[partner],b.actionQueues.byResident[partner]);});
   }
  }},
  {id:'creative-admission',goal:'Find a purchased easel, choose painting, admit a real creative action without spending again',seed:creativeSeed,async run(h){
   const {page,step,tap,snapshot}=h;let before;
-  await step('show-item-labels',async()=>{await pause(h);before=await snapshot();await tap('#item-labels-btn');assert.equal(await page.locator('#item-labels-btn').getAttribute('aria-pressed'),'true');});
+  await step('show-item-labels',async()=>{await pause(h);before=await snapshot();await tap('#view-toggle');await tap('#item-labels-btn');assert.equal(await page.locator('#item-labels-btn').getAttribute('aria-pressed'),'true');await tap('#view-close');await page.locator('#view-panel').waitFor({state:'hidden'});});
   await step('choose-easel',async()=>{await tap('#hotspots button:has-text("Мольберт")');await page.locator('#painting-theme-select').waitFor({state:'visible'});assert.ok(await page.locator('#painting-theme-select option:not([disabled])').count()>0);});
   await step('queue-painting',async()=>{await tap('#action-button');const s=await snapshot();assert.equal(s.shop.credits,before.shop.credits);assert.equal(s.actionQueues.byResident.alex.length,before.actionQueues.byResident.alex.length+1);assert.ok(s.actionQueues.byResident.alex.some(q=>q.type==='activity'&&q.activityId===PAINT_ACTIVITY_ID));assert.deepEqual(s.actionQueues.byResident.mira,before.actionQueues.byResident.mira);});
  }},
