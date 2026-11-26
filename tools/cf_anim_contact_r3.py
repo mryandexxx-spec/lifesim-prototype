@@ -132,7 +132,7 @@ class PatchLimit(F.WeightedSurfaceLimit):
             ids,p=d[self.k];delta=pts[ids].mean(axis=0)-p
             jac=sum((self.point_jac(cfg,int(j),parts) for j in ids))/len(ids)
             # Componentwise horizontal box lies inside 20mm Euclidean disk.
-            for axis,tol in enumerate((INTERNAL_CONTACT_M/math.sqrt(2),INTERNAL_CONTACT_M,INTERNAL_CONTACT_M)):
+            for axis,tol in enumerate((INTERNAL_CONTACT_M/math.sqrt(2),INTERNAL_CONTACT_M,INTERNAL_CONTACT_M/math.sqrt(2))):
                 G.extend([jac[axis],-jac[axis]])
                 H.extend([tol-delta[axis],tol+delta[axis]])
         return F.Constraint(np.asarray(G),np.asarray(H)) if G else F.Constraint()
@@ -154,7 +154,7 @@ def violations(ctx,trial=None):
             for key,d in anchors.items():
                 if k not in d:continue
                 ids,p=d[k];delta=pts[ids].mean(axis=0)-p
-                vals.extend(max(0.,abs(float(v))-tol) for v,tol in zip(delta,(INTERNAL_CONTACT_M/math.sqrt(2),INTERNAL_CONTACT_M,INTERNAL_CONTACT_M)))
+                vals.extend(max(0.,abs(float(v))-tol) for v,tol in zip(delta,(INTERNAL_CONTACT_M/math.sqrt(2),INTERNAL_CONTACT_M,INTERNAL_CONTACT_M/math.sqrt(2))))
         finally:
             if trial is not None:cfg.update(old)
     return np.asarray(vals)
