@@ -3,9 +3,9 @@ Uses validated pose caches, no R12 solve, no geometry search or rendering.
 """
 import json,pathlib,math,sys,hashlib
 import numpy as np
+import bpy  # Registers Blender's bundled mathutils module before import.
 from mathutils import Vector,Matrix
 from mathutils.kdtree import KDTree
-import bpy
 import cf_interact_balance as B
 F=B.F;P=B.P;A=B.A;Q=B.Q
 SIDES=B.SIDES
