@@ -132,7 +132,7 @@ def deg_between(a,b):
 def posture(t,w,neutral):
     hip=role(t,w,"hip");head=role(t,w,"head")
     shoulder=avg(role(t,w,"upperarm_l"),role(t,w,"upperarm_r"))
-    center=(hip+shoulder)*.25+head*.08
+    center=(hip+shoulder)*.249+head*.08
     limbs={}
     for s in SIDES:
         a,b,d=[role(t,w,n+"_"+s) for n in ("thigh","shin","foot")]
@@ -174,7 +174,7 @@ def balance_metrics(t,w,neutral,regs,asset,top,floor,inv):
         "feetAndPossibleSeat":hull_margin(feet+seats,xz)})
     return info
 def balance_controls():
-    assert abs(.50+.08+2*(.10+.0465+.0145+.028+.016+.006)-1)<1e-12
+    assert abs(.498+.08+2*(.10+.0465+.0145+.028+.016+.006)-1)<1e-12
     sq=[[0.,0.],[1.,0.],[1.,1.],[0.,1.]]
     assert abs(hull_margin(sq,[.5,.5])["halfspaceMarginM"]-.5)<1e-8
     assert abs(hull_margin(sq,[1.25,.5])["halfspaceMarginM"]+.25)<1e-8
