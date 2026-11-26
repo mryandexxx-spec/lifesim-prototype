@@ -1,0 +1,38 @@
+name: CF-ANIM EXTERNAL stock replay
+on:
+  pull_request:
+    paths:
+      - 'tools/cf_anim_external_stock.py'
+      - '.github/workflows/cf-anim-external-stock.yml'
+permissions:
+  contents: read
+concurrency:
+  group: cf-anim-external-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  stock-replay:
+    if: github.head_ref == 'diagnostic/cf-anim-external' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Install distribution Blender with stock BVH importer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends blender
+          blender --version
+      - name: Replay exact stock captures and preserve diagnostic preview
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 -m py_compile tools/cf_anim_external_stock.py
+          blender -b --factory-startup --python-exit-code 1 --python tools/cf_anim_external_stock.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-external-stock-evidence
+          path: artifacts/cf-anim-external-stock/
+          if-no-files-found: warn
