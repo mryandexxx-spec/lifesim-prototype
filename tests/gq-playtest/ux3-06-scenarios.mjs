@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import {findMarketPlacement,buyMarketItem} from '../../src/furniture-shop.js';
 import {PAINT_ACTIVITY_ID} from '../../src/painting.js';
+import {previewOutdoorFeatureEdit,commitOutdoorFeatureEdit} from '../../src/outdoor-proposals.js';
+import {outdoorCellAt} from '../../src/lot-surface.js';
+import {poolFixtureVisualPose} from '../../src/pool-visual.js';
+import {startConversation,arriveSocial} from '../../src/relationships.js';
+import {dialogueNeedsDecision} from '../../src/dialogue-decision.js';
 import {newHousehold} from '../../src/household.js';
 const auditSeed=()=>{const s=newHousehold('2026-11-26');s.calendar.anchorConfirmed=true;s.paused=true;s.otherSim.paused=true;s.autonomy.enabled=false;s.otherSim.autonomy.enabled=false;return s;};
 const creativeSeed=()=>{const s=auditSeed();const pose=findMarketPlacement(s.world.furniture,s.shop,'easel.starter');assert.ok(pose);const tx=buyMarketItem(s.world.furniture,s.shop,'easel.starter',pose);assert.ok(tx.ok,tx.reason);s.world.furniture=tx.world;s.shop=tx.shop;return s;};
@@ -33,6 +38,7 @@ export const scenarios=[
      if(await page.locator('#action-button').isVisible())await tap('#close-action');
     }
     assert.deepEqual((await snapshot()).actionQueues,baseline.actionQueues,'finding a resident must not enqueue');assert.ok(await page.locator('#social-context').isVisible(),'resident not discoverable through projected touch '+JSON.stringify(probes));
+    await checkLayout(h,'#social-context');
    });
    await step(actor+'-confirm-talk',async()=>{const b=await snapshot();await tap('#conversation-btn');await tap('#social-menu-options button:has-text("Поговорить")');await tap('#social-menu-options button:has-text("В очередь · Поговорить")');const a=await snapshot();assert.equal(a.actionQueues.byResident[actor].length,b.actionQueues.byResident[actor].length+1);assert.ok(a.actionQueues.byResident[actor].some(q=>q.type==='social'&&q.targetId===partner&&q.actionId==='talk'));assert.deepEqual(a.actionQueues.byResident[partner],b.actionQueues.byResident[partner]);});
   }
@@ -67,3 +73,98 @@ export const scenarios=[
   await step('queue-painting',async()=>{await tap('#action-button');const s=await snapshot();assert.equal(s.shop.credits,before.shop.credits);assert.equal(s.actionQueues.byResident.alex.length,before.actionQueues.byResident.alex.length+1);assert.ok(s.actionQueues.byResident.alex.some(q=>q.type==='activity'&&q.activityId===PAINT_ACTIVITY_ID));assert.deepEqual(s.actionQueues.byResident.mira,before.actionQueues.byResident.mira);});
  }}
 ];
+
+async function checkLayout(h,selector){
+ const layout=await h.page.evaluate(selector=>{
+  const panel=document.querySelector(selector),r=panel.getBoundingClientRect(),hud=document.querySelector('#dashboard').getBoundingClientRect();
+  const toast=document.querySelector('#toast'),style=getComputedStyle(panel);
+  const controls=[...panel.querySelectorAll('button:not([hidden])')].filter(e=>e.getClientRects().length).map(e=>({id:e.id,height:e.getBoundingClientRect().height,width:e.getBoundingClientRect().width}));
+  return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,hudTop:hud.top,width:innerWidth,height:innerHeight,panelZ:Number(style.zIndex),toastZ:Number(getComputedStyle(toast).zIndex),toastActionable:toast.classList.contains('toast-actionable'),controls,scroll:document.documentElement.scrollHeight};
+ },selector);
+ h.observe({layout,selector});
+ assert.ok(layout.x>=-1&&layout.right<=layout.width+1&&layout.y>=0&&layout.bottom<=layout.hudTop+1,'context overlaps HUD '+JSON.stringify(layout));
+ assert.ok(layout.scroll<=layout.height+2,'whole screen scroll');
+ if(!layout.toastActionable)assert.ok(layout.toastZ<layout.panelZ,'passive toast should be behind active menu');
+}
+function yardSeed(){
+ let s=auditSeed();s.shop.credits=30000;
+ const cell=outdoorCellAt(7.25,-7.25);
+ s.world.outdoors={...s.world.outdoors,revision:s.world.outdoors.revision+1,
+  pools:[{poolId:'pool-1',cells:Array.from({length:16},(_,i)=>cell+Math.floor(i/4)*64+i%4).sort((a,b)=>a-b)}],
+  poolFixtures:[{fixtureId:'fixture-1',poolId:'pool-1',kind:'ladder',edgeCell:cell,side:'west',purchasePriceCredits:120}]};
+ for(const [x,z] of [[15,-5],[19,-5],[19,7],[15,7],[8,7]]){
+  const proposal=previewOutdoorFeatureEdit(s,{operation:'place',itemId:'garden.flower.calendula',pose:{x,z,yaw:0}});
+  if(proposal.ok){const tx=commitOutdoorFeatureEdit(s,proposal);assert.ok(tx.ok);s=tx.root;}
+ }
+ assert.ok(s.world.outdoors.features.filter(f=>f.itemId==='garden.flower.calendula').length>=3);
+ return s;
+}
+async function projectWorld(page,points){
+ return page.evaluate(async points=>{
+  const {Application,Vec3}=await import('playcanvas');
+  const cam=Application.getApplication().root.findByName('Camera').camera;
+  const canvas=document.querySelector('#game-canvas'),rect=canvas.getBoundingClientRect();
+  return points.map(p=>{const v=cam.worldToScreen(new Vec3(p.x,p.y,p.z)),x=Math.round(v.x+rect.left),y=Math.round(v.y+rect.top);
+   return {...p,x,y,hit:document.elementFromPoint(x,y)?.id};});
+ },points);
+}
+scenarios.push({id:'yard-contexts',goal:'Actual land, outdoor plant, pool water and ladder selection never queues before explicit tap',seed:yardSeed,async run(h){
+ const {page,step,tap,snapshot,seed}=h;
+ const menu=page.locator('#ground-walk-menu');
+ await step('frame-lot',async()=>{await pause(h);await tap('#view-toggle');await tap('#menu-lot-camera-btn');await page.locator('#view-panel').waitFor({state:'hidden'});await page.waitForTimeout(500);});
+ const beds=seed.world.outdoors.features.filter(f=>f.itemId==='garden.flower.calendula');
+ const pose=poolFixtureVisualPose(seed.world.outdoors.poolFixtures[0]);assert.ok(pose);
+ for(const [name,points,title] of [
+  ['ground',[{x:11,y:-.53,z:0},{x:13,y:-.53,z:-2},{x:7,y:-.53,z:4},{x:10,y:-.53,z:3}],/Действия на земле/],
+  ['garden',beds.flatMap(f=>[0,-.25].map(y=>({x:f.x,z:f.z,y}))),/Календула/],
+  ['pool-water',[{x:8.1,y:-.475,z:-6.4},{x:8.6,y:-.475,z:-6.1}],/Бассейн · вода/],
+  ['pool-ladder',[{x:pose.x,y:0,z:pose.z},{x:pose.x,y:-.25,z:pose.z},{x:pose.x,y:.25,z:pose.z}],/Лестница бассейна/]
+ ]){
+  await step(name+'-select',async()=>{
+   const before=await snapshot(),probes=await projectWorld(page,points);h.observe({probes});
+   let found=false;
+   for(const p of probes){
+    if(p.hit!=='game-canvas')continue;
+    await h.tapPoint(p.x,p.y);
+    await page.waitForTimeout(150);
+    h.observe({trace:await h.inputTrace()});
+    const after=await snapshot();
+    assert.deepEqual(after.actionQueues,before.actionQueues,'scene selection must not enqueue');
+    assert.equal(after.shop.credits,before.shop.credits);
+    if(await menu.isVisible()){
+     const heading=await page.locator('#ground-walk-title').textContent();
+     h.observe({heading});
+     if(title.test(heading)){found=true;break;}
+     await tap('#ground-walk-close');
+    }else if(await page.locator('#action-sheet').isVisible())await tap('#close-action');
+    else if(await page.locator('#social-context').isVisible())await tap('#social-context-close');
+   }
+   assert.ok(found,'world context not discoverable: '+name);
+   await checkLayout(h,'#ground-walk-menu');
+  });
+  await step(name+'-dismiss',async()=>{const before=await snapshot();await tap('#ground-walk-close');assert.equal(await menu.isVisible(),false);assert.deepEqual((await snapshot()).actionQueues,before.actionQueues);});
+ }
+}});
+scenarios.push({id:'required-dialogue',goal:'Mandatory dialog cannot be dismissed by backdrop or activate a choice unintentionally',seed:()=>{
+ const s=auditSeed();assert.equal(startConversation(s,'alex',{x:-.2,z:1.85},'daily'),true);assert.equal(arriveSocial(s),true);assert.ok(dialogueNeedsDecision(s));return s;
+},async run(h){
+ const {page,step,tap,snapshot}=h;
+ await step('required-backdrop',async()=>{
+  await page.locator('#conversation-panel.dialogue-required').waitFor({state:'visible',timeout:15000});
+  const before=await snapshot();
+  const point=await page.evaluate(()=>{
+   for(const y of [20,40,80,innerHeight-30])for(const x of [10,innerWidth/2,innerWidth-10])if(document.elementFromPoint(x,y)?.id==='dialogue-backdrop')return {x,y};
+   return null;
+  });
+  assert.ok(point,'required backdrop must be reachable');
+  await h.tapPoint(point.x,point.y);await page.waitForTimeout(100);
+  assert.ok(await page.locator('#conversation-panel.dialogue-required').isVisible());
+  assert.deepEqual((await snapshot()).socialAction,before.socialAction);
+  assert.deepEqual((await snapshot()).actionQueues,before.actionQueues);
+ });
+ await step('explicit-end',async()=>{
+  await tap('#conversation-options button:has-text("Завершить разговор")');
+  await page.locator('#conversation-panel.dialogue-required').waitFor({state:'hidden'});
+  assert.equal(dialogueNeedsDecision(await snapshot()),false);
+ });
+}});
