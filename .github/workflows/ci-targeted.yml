@@ -8,8 +8,54 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-interact-01c-source-phase:
+  cf-interact-01c-stance:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        rig: [female-grid_201-100, male-grid_021-90, female-grid_201-110, male-grid_021-100]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-${{ matrix.rig }}-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-balance
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-source-phase-${{ matrix.rig }}-evidence
+          run-id: 45876462106
+          github-token: ${{ github.token }}
+          path: input-source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reproduce bounded stance feasibility and constraint residuals
+        run: |
+          python -m py_compile tools/cf_interact_stance.py
+          python -m pip install --only-binary=:all: numpy==1.26.4 scipy==1.17.1
+          python tools/cf_interact_stance.py '${{ matrix.rig }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-stance-${{ matrix.rig }}-evidence
+          path: artifacts/cf-interact-01c-stance/
+          if-no-files-found: warn
+  cf-interact-01c-source-phase:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
     permissions:
       contents: read
       actions: read
