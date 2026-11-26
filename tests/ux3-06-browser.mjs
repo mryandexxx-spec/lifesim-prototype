@@ -22,8 +22,11 @@ for(const [engine,launcher,width,height] of matrix){
  const browser=await launcher.launch(engine==='chromium'?{headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']}:{headless:true});
  try{for(const scenario of scenarios){
   if(scenario.only&&scenario.only!==engine+'-'+width)continue;
-  const id=engine+'-'+width+'-'+scenario.id,started=performance.now(),seed=scenario.seed?.()??null;
-  const c={id,engine,width,height,goal:scenario.goal,fixture:seed?'seeded':'fresh',status:'OPEN',errors:[],steps:[]};report.cases.push(c);flush();
+  const id=engine+'-'+width+'-'+scenario.id,started=performance.now();
+  const c={id,engine,width,height,goal:scenario.goal,fixture:'pending',status:'OPEN',errors:[],steps:[]};report.cases.push(c);flush();
+  let seed;
+  try{seed=scenario.seed?.()??null;c.fixture=seed?'seeded':'fresh';}
+  catch(e){c.status='FAIL';c.failure=e.stack||String(e);c.durationMs=Math.max(1,Math.round(performance.now()-started));console.error('GQ FIXTURE FAIL',id,c.failure);flush();continue;}
   const ctx=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true,deviceScaleFactor:1,serviceWorkers:'block'});
   let page;
   try{
