@@ -14,6 +14,36 @@ sys.path.insert(0,str(pathlib.Path("prior-pilot/tools").resolve()))
 import cf_anim_pilot as A
 OUT=pathlib.Path("artifacts/cf-interact-01c-replay");OUT.mkdir(parents=True,exist_ok=True)
 SIDES=("l","r");STEP=.35;EPS=.005
+FROZEN_APPLY=F.apply
+NORMALIZATION_RECOVERIES=[]
+def normalized_angle(q,r):
+    a=np.asarray(q,dtype=np.float64);b=np.asarray(r,dtype=np.float64)
+    assert np.isfinite(a).all() and np.isfinite(b).all()
+    na=np.linalg.norm(a);nb=np.linalg.norm(b)
+    assert na>0 and nb>0
+    return 2*math.acos(min(1.,abs(float((a/na)@(b/nb)))))
+def apply_checked(arm,bones,rest,f):
+    try:
+        FROZEN_APPLY(arm,bones,rest,f)
+    except AssertionError as ex:
+        # Only the frozen adapter's final "pose replay" assertion is eligible
+        # for independent recalculation. Geometry, solver and thresholds unchanged.
+        assert len(ex.args)==1 and isinstance(ex.args[0],tuple) and len(ex.args[0])==3 and ex.args[0][0]=="pose replay",ex
+        label,original_pos,original_rot=ex.args[0]
+        assert math.isfinite(original_pos) and math.isfinite(original_rot) and original_pos<.0002,ex
+        actual=F.locals_(arm,bones);assert len(actual)==len(f)
+        pos=max((m.to_translation()-Vector(b["p"])).length for m,b in zip(actual,f))
+        rot=max(normalized_angle(m.to_quaternion(),F.matrix(b["p"],b["r"]).to_quaternion()) for m,b in zip(actual,f))
+        assert math.isfinite(pos) and math.isfinite(rot) and pos<.0002 and rot<.002,("normalized pose replay",pos,rot)
+        NORMALIZATION_RECOVERIES.append({"originalPosM":original_pos,"originalRotRad":original_rot,"normalizedPosM":pos,"normalizedRotRad":rot})
+def normalization_controls():
+    # A finite, slightly non-unit quaternion is still the same rotation.
+    a=np.array([.999997,0.,0.,0.]);b=np.array([.999997,0.,0.,0.])
+    assert 2*math.acos(float(a@b))>.002
+    assert normalized_angle(a,b)<1e-10
+    q=np.array([math.cos(.003/2),math.sin(.003/2),0.,0.])
+    assert normalized_angle(a,q)>.002
+    print("Normalized pose replay controls PASS",flush=True)
 def read(path,sha):
     b=path.read_bytes();assert hashlib.sha256(b).hexdigest()==sha
     return json.loads(b)
@@ -95,17 +125,18 @@ def timing_controls():
     print("Output timing controls PASS",flush=True)
 
 def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
+    recovery_start=len(NORMALIZATION_RECOVERIES)
     key=c["rig"];path=pathlib.Path("prior-full")/(key+".glb");assert F.digest(path)==r["revision"]==c["rigSha"]
     arm,bones=F.import_rig(path);F.reset(arm,bones);rest=F.locals_(arm,bones,True)
     meshes=[o for o in bpy.context.scene.objects if o.type=="MESH" and any(m.type=="ARMATURE" and m.object==arm for m in o.modifiers)]
-    skin=F.WeightedSkin(t,meshes,arm,bones);F.apply(arm,bones,rest,t["rest"]);assert skin.actual_error(t["rest"])["max_m"]<.002
+    skin=F.WeightedSkin(t,meshes,arm,bones);apply_checked(arm,bones,rest,t["rest"]);assert skin.actual_error(t["rest"])["max_m"]<.002
     # A single authored seated pose provides pelvic orientation and twist;
     # all limb position targets come from the geometry plan. Upper body is
     # intentionally static during this proof, not an accepted animation.
     idx=r["poses"]["Sitting_Enter"]["index"]
     ref=F.clone(solved[key]["Sitting_Enter"]["variants"]["upf_common"][idx])
     pairs,_=F.finger_map(source,t);F.fingers(source,t,source["clips"]["Sitting_Enter"]["frames"][idx],ref,pairs)
-    F.apply(arm,bones,rest,ref);assert skin.actual_error(ref)["max_m"]<.002
+    apply_checked(arm,bones,rest,ref);assert skin.actual_error(ref)["max_m"]<.002
     rw=F.world(t,ref);_,front=F.seat_axes(t,rw)
     yaw=math.radians(asset["frontYaw"]);sem=Matrix.Rotation(yaw,3,"Y");inv=sem.inverted()
     rot=Matrix.Rotation(yaw-math.atan2(front.x,front.z),4,"Y")
@@ -152,7 +183,7 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
     def measure(f,error):
         w=F.world(t,f)
         try:
-            F.apply(arm,bones,rest,f)
+            apply_checked(arm,bones,rest,f)
         except AssertionError as ex:
             # Retain exact frozen replay assertion plus independently normalized
             # quaternion diagnostics. Never turn a rejected pose into a pass.
@@ -358,7 +389,7 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
     rendered=[]
     if len(poses)!=len(times):fails.add("INCOMPLETE_PATH")
     try:
-        F.apply(arm,bones,rest,t["rest"]);h,_=F.setup(meshes)
+        apply_checked(arm,bones,rest,t["rest"]);h,_=F.setup(meshes)
         fixture=pathlib.Path("input-01a")/(c["fixture"]+".glb")
         assert F.digest(fixture)==c["assetSha"]
         bpy.ops.import_scene.gltf(filepath=str(fixture.resolve()))
@@ -370,14 +401,14 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
             cam.data.ortho_scale=h*1.65
             if len(poses)!=len(times):
                 for i in sorted(set(poses)&{0,19,38,50,62,len(times)-1}):
-                    F.apply(arm,bones,rest,poses[i])
+                    apply_checked(arm,bones,rest,poses[i])
                     name=f"{key}-{view}-{i:03d}-partial.png"
                     bpy.context.scene.render.filepath=str(OUT/name)
                     bpy.ops.render.render(write_still=True);rendered.append(name)
                 continue
             with tempfile.TemporaryDirectory() as tmp:
                 for i,f in sorted(poses.items()):
-                    F.apply(arm,bones,rest,f)
+                    apply_checked(arm,bones,rest,f)
                     image=pathlib.Path(tmp)/f"{i:03d}.png"
                     bpy.context.scene.render.filepath=str(image)
                     bpy.ops.render.render(write_still=True);assert image.stat().st_size>0
@@ -392,15 +423,24 @@ def case(c,r,t,source,solved,asset,profile,accepted,style_report,prior_fbik):
     if not fails:
         try:
             ordered=[poses[i] for i in range(len(times))]
-            name=f"{key}-avatar.glb";common["export"]=A.bake(arm,bones,rest,meshes,ordered,OUT/name)
+            name=f"{key}-avatar.glb"
+            # Scope the compatibility adapter to the existing bake function only;
+            # never modify the frozen trajectory solver or its own source.
+            original_apply=A.F.apply
+            try:
+                A.F.apply=apply_checked
+                common["export"]=A.bake(arm,bones,rest,meshes,ordered,OUT/name)
+            finally:A.F.apply=original_apply
             common["exportReimport"]=A.verify_reimport(OUT/name,t,ordered)
             if not common["exportReimport"]["within_2mm"]:fails.add("EXPORT_REPLAY")
         except Exception as ex:
             common["exportError"]=str(ex);fails.add("EXPORT_FAIL")
+    common["normalizationRecoveries"]=NORMALIZATION_RECOVERIES[recovery_start:]
     return {**common,"selectedHoldDeltaM":delta,"evaluatedFrames":sum("skinReplay" in r for r in rows),
       "status":"REPLAY_SCREEN_PASS" if not fails else "REPLAY_SCREEN_FAIL","failures":sorted(fails),"samples":rows,"rendered":rendered}
 def main():
     timing_controls()
+    normalization_controls()
     report=read(pathlib.Path("input-path/report.json"),"7f71ed67b9244896a99300c75da465d4d58038a28eb96c31859b278f77f15630")
     assert report["counts"]=={"SEAT_TOO_HIGH":12,"PATH_CANDIDATE":24}
     baseline=read(pathlib.Path("input-coupled/report.json"),"8147117ceb184f5ae878d28e2ad95e110a57d4953739bafca0c7aa0f2570e5bb")
