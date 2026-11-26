@@ -1,14 +1,18 @@
 name: TE-14 isolated stability and memory
 on:
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Run 30-minute and 120-minute sessions after preflight
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: te14-${{ github.event.pull_request.number }}
+  group: te14-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   preflight:
-    if: github.event.pull_request.head.ref == 'diagnostic/te-14-stability-memory' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     strategy:
@@ -30,14 +34,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Real-duration isolated soak
         env:
-          TE_SHA: ${{ github.event.pull_request.head.sha }}
+          TE_SHA: ${{ github.sha }}
           TE_ENGINE: ${{ matrix.engine }}
           TE_RESIDENTS: ${{ matrix.residents }}
           TE_WIDTH: ${{ matrix.width }}
@@ -60,7 +64,7 @@ jobs:
           if-no-files-found: warn
   soak30:
     needs: preflight
-    if: github.event.pull_request.head.ref == 'diagnostic/te-14-stability-memory' && github.event.pull_request.head.repo.full_name == github.repository
+    if: inputs.full
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     strategy:
@@ -82,14 +86,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Real-duration isolated soak
         env:
-          TE_SHA: ${{ github.event.pull_request.head.sha }}
+          TE_SHA: ${{ github.sha }}
           TE_ENGINE: ${{ matrix.engine }}
           TE_RESIDENTS: ${{ matrix.residents }}
           TE_WIDTH: ${{ matrix.width }}
@@ -111,7 +115,7 @@ jobs:
           if-no-files-found: warn
   soak120:
     needs: soak30
-    if: github.event.pull_request.head.ref == 'diagnostic/te-14-stability-memory' && github.event.pull_request.head.repo.full_name == github.repository
+    if: inputs.full
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     strategy:
@@ -124,14 +128,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Real-duration isolated soak
         env:
-          TE_SHA: ${{ github.event.pull_request.head.sha }}
+          TE_SHA: ${{ github.sha }}
           TE_ENGINE: ${{ matrix.engine }}
           TE_RESIDENTS: ${{ matrix.residents }}
           TE_WIDTH: ${{ matrix.width }}
