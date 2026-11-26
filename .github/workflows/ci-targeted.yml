@@ -8,8 +8,64 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  cf-anim-rig-calibration:
+  cf-anim-rig-vrma:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: saturday06/VRM-Addon-for-Blender
+          ref: 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          path: vrm-addon
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: input-rigs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install stock BVH importer and pinned VRM dependencies
+        run: |
+          test "$(git -C vrm-addon rev-parse HEAD)" = 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          test -z "$(git -C vrm-addon status --porcelain)"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends blender
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+          python -m py_compile tools/cf_anim_rig_vrma.py
+      - name: Stock BVH import, preserve original motion
+        run: timeout --signal=TERM --kill-after=10s 120s blender -b --factory-startup --python-exit-code 1 --python tools/cf_anim_rig_vrma.py -- prepare
+      - name: Calibrated source and unchanged VRM Animation export
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_vrma.py export
+      - name: Stock VRM Animation import, native replay and evidence
+        run: timeout --signal=TERM --kill-after=10s 180s python -u tools/cf_anim_rig_vrma.py replay
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-rig-contract-r2b-evidence
+          path: artifacts/cf-anim-rig-contract-r2b/
+          if-no-files-found: warn
+  cf-anim-rig-calibration:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-r2a]')
     permissions:
       contents: read
       actions: read
@@ -66,7 +122,7 @@ jobs:
           path: artifacts/cf-anim-rig-contract-r2a/
           if-no-files-found: warn
   cf-anim-rig-contract:
-    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-rig-contract-r2a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-r2a]')
     permissions:
       contents: read
       actions: read
