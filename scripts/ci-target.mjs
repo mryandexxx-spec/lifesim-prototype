@@ -64,6 +64,8 @@ export function planChanges(files,root=ROOT){
     [/^src\/qsk-11-home-menu\.js$/,['tests/qsk-11-home-menu.test.js','tests/ui-nonblocking.test.js','tests/qsk-08-touch-ux.test.js','tests/ui4-integration.test.js','tests/ui7-integration.test.js','tests/q1-q4-regression.test.js','tests/parcel-editor.test.js']],
     // Legacy source-text UI assertions span menu entry, bootstrap and Safari cache.
     [/^(?:index\.html|src\/game\.js)$/,['tests/ui4-integration.test.js','tests/ui7-integration.test.js','tests/qsk-11-toast-ui.test.js','tests/qsk-11-view-popover.test.js']],
+    // Live storage boundary is inspected as source, not imported by the Node suite.
+    [/^src\/game\.js$/,['tests/cas-01-population-save.test.js']],
     // PF-01 extracts live game.js HUD and pool helpers rather than importing game.js.
     [/^(?:src\/(?:game|resident-hud|career-work)\.js|index\.html|styles\.css)$/,['tests/pf-01.test.js']],
     // Legacy source-level VM tests extract live UI functions, not ESM imports.
