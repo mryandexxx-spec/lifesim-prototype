@@ -325,3 +325,18 @@ export function commitOutdoorFeatureEdit(root,draft){
     shop:receipt.shop,financialHistory:receipt.financialHistory},
     cost:verified.cost,instanceId:verified.instanceId,recorded:receipt.recorded};
 }
+
+/** PF-13: transient quantity quote, never reserves money or creates objects.
+ * Exact geometry and routes are still validated for every individual placement.
+ */
+export function flowerBatchQuote(root,itemId){
+  const current=context(root),def=OUTDOOR_CATALOG[itemId];
+  if(!current||!def||!(def.category==='flower'||itemId.startsWith('garden.flower.')))
+    return null;
+  const budget=Math.floor(root.shop.credits/def.price);
+  const capacity=Math.max(0,Math.min(OUTDOOR_FEATURE_LIMIT-current.features.length,
+    100000000-current.revision,10000000-current.nextId,
+    isGardenItem(itemId)?GARDEN_LIMIT-current.features.filter(f=>isGardenItem(f.itemId)).length:OUTDOOR_FEATURE_LIMIT));
+  return {price:def.price,max:Math.max(0,Math.min(budget,capacity)),
+    reason:capacity===0?'feature-limit':budget===0?'insufficient-credits':null};
+}
