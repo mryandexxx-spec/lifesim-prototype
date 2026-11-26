@@ -39,6 +39,1231 @@ jobs:
           name: ux3-06-touch-evidence
           path: artifacts/ux3-06/
           if-no-files-found: warn
+  cf-interact-01c-transfer-keys:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        rig: [female-grid_201-100, male-grid_021-90, female-grid_201-110, male-grid_021-100]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-${{ matrix.rig }}-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-balance
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-source-phase-${{ matrix.rig }}-evidence
+          run-id: 45876462106
+          github-token: ${{ github.token }}
+          path: input-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Solve transfer key poses and verify actual rig and skin
+        run: |
+          python -m py_compile tools/cf_interact_transfer_keys.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_transfer_keys.py '${{ matrix.rig }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-transfer-keys-${{ matrix.rig }}-evidence
+          path: artifacts/cf-interact-01c-transfer-keys/
+          if-no-files-found: warn
+  cf-interact-01c-stance:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        rig: [female-grid_201-100, male-grid_021-90, female-grid_201-110, male-grid_021-100]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-${{ matrix.rig }}-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-balance
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-source-phase-${{ matrix.rig }}-evidence
+          run-id: 45876462106
+          github-token: ${{ github.token }}
+          path: input-source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reproduce bounded stance feasibility and constraint residuals
+        run: |
+          python -m py_compile tools/cf_interact_stance.py
+          python -m pip install --only-binary=:all: numpy==1.26.4 scipy==1.17.1
+          python tools/cf_interact_stance.py '${{ matrix.rig }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-stance-${{ matrix.rig }}-evidence
+          path: artifacts/cf-interact-01c-stance/
+          if-no-files-found: warn
+  cf-interact-01c-source-phase:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        rig: [female-grid_201-100, male-grid_021-90, female-grid_201-110, male-grid_021-100]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-balance-${{ matrix.rig }}-evidence
+          run-id: 45873763915
+          github-token: ${{ github.token }}
+          path: input-balance
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test source-guided transition on cached poses
+        run: |
+          python -m py_compile tools/cf_interact_source_phase.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_source_phase.py '${{ matrix.rig }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-source-phase-${{ matrix.rig }}-evidence
+          path: artifacts/cf-interact-01c-source-phase/
+          if-no-files-found: warn
+  cf-interact-01c-balance:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        rig: [female-grid_201-100, male-grid_021-90, female-grid_201-110, male-grid_021-100]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-coupled-evidence
+          run-id: 45852237764
+          github-token: ${{ github.token }}
+          path: input-coupled
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-style-evidence
+          run-id: 45856215901
+          github-token: ${{ github.token }}
+          path: input-style
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-fbik-evidence
+          run-id: 45858075755
+          github-token: ${{ github.token }}
+          path: input-fbik
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-replay-evidence
+          run-id: 45868485383
+          github-token: ${{ github.token }}
+          path: input-replay
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reproduce one case and archive posture/support evidence and pose cache
+        run: |
+          python -m py_compile tools/cf_interact_balance.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_balance.py '${{ matrix.rig }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-balance-${{ matrix.rig }}-evidence
+          path: artifacts/cf-interact-01c-balance/
+          if-no-files-found: warn
+  cf-interact-01c-replay:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-coupled-evidence
+          run-id: 45852237764
+          github-token: ${{ github.token }}
+          path: input-coupled
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-style-evidence
+          run-id: 45856215901
+          github-token: ${{ github.token }}
+          path: input-style
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-fbik-evidence
+          run-id: 45858075755
+          github-token: ${{ github.token }}
+          path: input-fbik
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Qualify frozen R12 output timing, render and bake four cases
+        run: |
+          python -m py_compile tools/cf_interact_replay.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_replay.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-replay-evidence
+          path: artifacts/cf-interact-01c-replay/
+          if-no-files-found: warn
+  cf-interact-01c-fbik:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-coupled-evidence
+          run-id: 45852237764
+          github-token: ${{ github.token }}
+          path: input-coupled
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-style-evidence
+          run-id: 45856215901
+          github-token: ${{ github.token }}
+          path: input-style
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Frozen R12 on pinned STYLE trajectory and semantic palm goals
+        run: |
+          python -m py_compile tools/cf_interact_fbik.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_fbik.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-fbik-evidence
+          path: artifacts/cf-interact-01c-fbik/
+          if-no-files-found: warn
+  cf-interact-01c-style:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-coupled-evidence
+          run-id: 45852237764
+          github-token: ${{ github.token }}
+          path: input-coupled
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Source upper-body motion, actual skin and matched fixture renders
+        run: |
+          python -m py_compile tools/cf_interact_style.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_style.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-style-evidence
+          path: artifacts/cf-interact-01c-style/
+          if-no-files-found: warn
+  cf-interact-01c-coupled:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Coupled seat depth and actual-skin contact feasibility
+        run: |
+          python -m py_compile tools/cf_interact_coupled.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_coupled.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-coupled-evidence
+          path: artifacts/cf-interact-01c-coupled/
+          if-no-files-found: warn
+  cf-interact-01c-contact:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Bounded actual skin hold feasibility and planted-foot path
+        run: |
+          python -m py_compile tools/cf_interact_contact.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_contact.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-contact-evidence
+          path: artifacts/cf-interact-01c-contact/
+          if-no-files-found: warn
+  cf-interact-01c-pose:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-path-evidence
+          run-id: 45843051763
+          github-token: ${{ github.token }}
+          path: input-path
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Real rig pose realization and actual skin screening
+        run: |
+          python -m py_compile tools/cf_interact_pose.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_pose.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-pose-evidence
+          path: artifacts/cf-interact-01c-pose/
+          if-no-files-found: warn
+  cf-interact-01c-path:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01a-evidence
+          run-id: 45830334558
+          github-token: ${{ github.token }}
+          path: input-01a
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Contact-first geometric planning on actual rigs and fixture bytes
+        run: |
+          python -m py_compile tools/cf_interact_path.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python tools/cf_interact_path.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-path-evidence
+          path: artifacts/cf-interact-01c-path/
+          if-no-files-found: warn
+  cf-interact-01c-qual:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cf-interact-01c-*
+          run-id: 45832720185
+          github-token: ${{ github.token }}
+          path: prior-r1
+          merge-multiple: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Independent source timing and continuous depth qualification
+        run: |
+          python -m pip install --only-binary=:all: numpy==1.26.4 scipy==1.17.1
+          python tools/cf_interact_qualify.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-qual-evidence
+          path: artifacts/cf-interact-01c-qual/
+          if-no-files-found: warn
+  cf-interact-01c:
+    # Full expensive bake is explicit/manual until the 01C-Q contract is integrated.
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'diagnostic/cf-interact-01a'
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        rig: [female-grid_201-90, male-grid_021-90, male-grid_021-100, male-grid_021-110]
+        fixture: [candidate45, heldout42]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact 01B evidence and shared resolver plan
+        run: node tools/cf-interact-bake-plan.mjs "${{ matrix.rig }}" "${{ matrix.fixture }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Pinned native dependencies and offline R12 bake
+        run: |
+          python -m py_compile tools/cf_interact_bake.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python -m pip freeze > pilot-out/dependency-freeze.txt
+          python tools/cf_interact_bake.py
+      - name: Actual PlayCanvas on Chromium and WebKit
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          cp node_modules/playcanvas/build/playcanvas.mjs pilot-out/playcanvas.mjs
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('prior-pilot/tools/cf-anim-pilot-lab.html').read_text()
+          s=s.replace('Animation Pilot · скамейка 45 см','Interaction Pilot · isolated fixture').replace('<option value="female">Женский</option><option value="male">Мужской</option>','<option value="avatar">Profile</option>').replace("await profile('female')","await profile('avatar')")
+          Path('pilot-out/lab.html').write_text(s)
+          s=Path('prior-pilot/tools/cf-anim-pilot-browser.mjs').read_text().replace("['female','male']","['avatar']").replace('assert.equal(results.length,8)','assert.equal(results.length,4)')
+          Path('tools/cf-interact-browser-generated.mjs').write_text(s)
+          PY
+          python -m http.server 8765 --bind 127.0.0.1 --directory pilot-out >/tmp/interact-http.log 2>&1 &
+          sleep 2
+          xvfb-run -a node tools/cf-interact-browser-generated.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-${{ matrix.rig }}-${{ matrix.fixture }}
+          path: |
+            pilot-out/
+            fbik-out/skin-bind-audit.jsonl
+          if-no-files-found: warn
+      - name: Explicit contact screening gate (not ART or device acceptance)
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('pilot-out/contact-report.json'))
+          assert r['export_reimport']['within_2mm']
+          assert r['contactGate']['status']=='SCREEN_PASS',r['contactGate']
+          PY
+  cf-interact-01c-r2:
+    # Historical failed R2 is retained; no automatic repeat of the rejected approach.
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'diagnostic/cf-interact-01a'
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rig: female-grid_201-90
+            fixture: candidate45
+          - rig: male-grid_021-100
+            fixture: heldout42
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 4d67a784ba8e9e97f40bef3b2cc05f294c905e3e
+          path: prior-pilot
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01b-evidence
+          run-id: 45831766927
+          github-token: ${{ github.token }}
+          path: input-01b
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-interact-01c-qual-evidence
+          run-id: 45838508064
+          github-token: ${{ github.token }}
+          path: input-q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact 01B evidence and shared resolver plan
+        run: node tools/cf-interact-bake-plan.mjs "${{ matrix.rig }}" "${{ matrix.fixture }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Pinned native dependencies and offline R12 bake
+        run: |
+          python -m py_compile tools/cf_interact_bake_r2.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          python -m pip freeze > pilot-out/dependency-freeze.txt
+          python tools/cf_interact_bake_r2.py
+      - name: Actual PlayCanvas on Chromium and WebKit
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          cp node_modules/playcanvas/build/playcanvas.mjs pilot-out/playcanvas.mjs
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('prior-pilot/tools/cf-anim-pilot-lab.html').read_text()
+          s=s.replace('Animation Pilot · скамейка 45 см','Interaction Pilot · isolated fixture').replace('<option value="female">Женский</option><option value="male">Мужской</option>','<option value="avatar">Profile</option>').replace("await profile('female')","await profile('avatar')")
+          Path('pilot-out/lab.html').write_text(s)
+          s=Path('prior-pilot/tools/cf-anim-pilot-browser.mjs').read_text().replace("['female','male']","['avatar']").replace('assert.equal(results.length,8)','assert.equal(results.length,4)')
+          Path('tools/cf-interact-browser-generated.mjs').write_text(s)
+          PY
+          python -m http.server 8765 --bind 127.0.0.1 --directory pilot-out >/tmp/interact-http.log 2>&1 &
+          sleep 2
+          xvfb-run -a node tools/cf-interact-browser-generated.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01c-r2-${{ matrix.rig }}-${{ matrix.fixture }}
+          path: |
+            pilot-out/
+            fbik-out/skin-bind-audit.jsonl
+          if-no-files-found: warn
+      - name: Explicit contact screening gate (not ART or device acceptance)
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('pilot-out/contact-report.json'))
+          assert r['export_reimport']['within_2mm']
+          assert r['contactGate']['status']=='SCREEN_PASS',r['contactGate']
+          PY
+  cf-interact-01b:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6974fc7e91ee2b089bde79c701eee946da142b51
+          path: frozen-fbik
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-body-d-tools-full-rig
+          run-id: 45681068614
+          github-token: ${{ github.token }}
+          path: prior-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-anim-tools-evidence
+          run-id: 45703401365
+          github-token: ${{ github.token }}
+          path: prior-tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Pinned native rig measurement dependencies (no solve)
+        run: |
+          python -m py_compile tools/cf_interact_passports.py
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 mink==0.0.13 mujoco==3.3.6 daqp==0.7.2 qpsolvers==4.11.0 scipy==1.17.1 osqp==1.0.4 clarabel==0.11.1
+          mkdir -p artifacts/cf-interact-01b
+          python -m pip freeze > artifacts/cf-interact-01b/dependency-freeze.txt
+          python -c "import bpy; assert bpy.app.version == (4,5,0)"
+      - name: Measure six exact real rigs and two authored seated samples per rig
+        run: python tools/cf_interact_passports.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Measured geometry and action compatibility matrix
+        run: |
+          node --input-type=module -e "import {runMeasuredMatrix} from './tools/cf-interact-measured.mjs'; runMeasuredMatrix()"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01b-evidence
+          path: |
+            artifacts/cf-interact-01b/
+            fbik-out/skin-bind-audit.jsonl
+          if-no-files-found: warn
+  cf-interact-01a:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-interact-01a' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-cf-interact]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Actual GLB seating geometry and existing shared anchors
+        run: |
+          node --test tests/cf-interact-01a.test.js tests/interaction-anchors.test.js tests/of-integration-d.test.js tests/lot-b3.test.js
+          node --input-type=module -e "import {runProbe} from './tools/cf-interact-geometry.mjs'; runProbe()"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-interact-01a-evidence
+          path: artifacts/cf-interact-01a/
+          if-no-files-found: warn
   pf-14-garden-care:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-14-garden-care' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

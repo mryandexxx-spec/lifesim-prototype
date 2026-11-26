@@ -221,3 +221,115 @@ export function seatGroundedAnkleTargets({seat,scale,halfStance=.17,
     };
   });
 }
+
+
+// CF-INTERACT: versioned asset-local seating preflight. Geometry is measured
+// offline; this module never loads a mesh or runs a native optimizer.
+export const INTERACTION_SCHEMA_VERSION=1;
+const sha256=s=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s);
+const nonempty=s=>typeof s==='string'&&s.trim().length>0;
+const rect=r=>r&&['minX','maxX','minZ','maxZ'].every(k=>Number.isFinite(r[k]))&&r.minX<r.maxX&&r.minZ<r.maxZ;
+const area=r=>(r.maxX-r.minX)*(r.maxZ-r.minZ);
+const intersection=(a,b)=>Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*Math.max(0,Math.min(a.maxZ,b.maxZ)-Math.max(a.minZ,b.minZ));
+const contains=(r,x,z)=>x>=r.minX&&x<=r.maxX&&z>=r.minZ&&z<=r.maxZ;
+const overlap=(a,b)=>intersection(a,b)>1e-10;
+const inside=(a,b)=>a.minX>=b.minX&&a.maxX<=b.maxX&&a.minZ>=b.minZ&&a.maxZ<=b.maxZ;
+const envelope=rs=>({minX:Math.min(...rs.map(r=>r.minX)),maxX:Math.max(...rs.map(r=>r.maxX)),minZ:Math.min(...rs.map(r=>r.minZ)),maxZ:Math.max(...rs.map(r=>r.maxZ))});
+const eqRect=(a,b,t)=>['minX','maxX','minZ','maxZ'].every(k=>Math.abs(a[k]-b[k])<=t);
+const yawDelta=(a,b)=>Math.abs(((a-b)%360+540)%360-180);
+const fail=(reason,detail)=>({ok:false,reason,detail});
+const cloneFreeze=o=>{if(o&&typeof o==='object'){const c=Array.isArray(o)?o.map(cloneFreeze):Object.fromEntries(Object.entries(o).map(([k,v])=>[k,cloneFreeze(v)]));return Object.freeze(c);}return o;};
+
+/** Contact regions in a semantic frame (metres, +Y up, +Z front).
+ * frontYaw maps that frame into the native GLB frame; asset origin is unchanged.
+ * Rectangles represent actual planar support pieces, NOT the catalog AABB.
+ * Evidence is extracted independently from the exact static GLB offline.
+ * This v1 validator covers planar horizontal seating only.
+ */
+export function validateSeatInteractionAsset(asset,measurement){
+  if(!asset||asset.version!==INTERACTION_SCHEMA_VERSION||asset.units!=='m'||asset.up!=='+Y'||
+    !nonempty(asset.sku)||!sha256(asset.assetSha)||!Number.isFinite(asset.frontYaw)||
+    !Number.isFinite(asset.floorY)||!Number.isFinite(asset.seatY)||asset.seatY<=asset.floorY||
+    !Array.isArray(asset.regions)||!asset.regions.length||!asset.regions.every(rect)||
+    !Array.isArray(asset.slots)||!asset.slots.length)
+    return fail('INVALID_ASSET','Invalid schema, units, geometry or revision');
+  const rs=asset.regions, bounds=envelope(rs);
+  if(rs.some((r,i)=>rs.slice(0,i).some(q=>overlap(q,r))))return fail('INVALID_ASSET','Overlapping support regions');
+  const ids=new Set();
+  for(const s of asset.slots){
+    if(!s||!nonempty(s.id)||ids.has(s.id)||!rect(s.region)||!inside(s.region,bounds)||
+      !Number.isFinite(s.anchorX)||!Number.isFinite(s.anchorZ)||s.anchorZ>(s.region.minZ+s.region.maxZ)/2||!contains(s.region,s.anchorX,s.anchorZ)||
+      !rs.some(r=>contains(r,s.anchorX,s.anchorZ)))
+      return fail('INVALID_ASSET','Invalid slot or anchor outside real support');
+    ids.add(s.id);
+  }
+  if(asset.slots.some((s,i)=>asset.slots.slice(0,i).some(q=>overlap(q.region,s.region))))
+    return fail('INVALID_ASSET','Overlapping occupancy slots');
+  if(!measurement||measurement.assetSha!==asset.assetSha)return fail('STALE_GEOMETRY','Exact geometry revision required');
+  const t=.001;
+  if(!Number.isFinite(measurement.floorY)||!Number.isFinite(measurement.seatY)||!Number.isFinite(measurement.frontYaw)||
+    Math.abs(asset.floorY-measurement.floorY)>t||Math.abs(asset.seatY-measurement.seatY)>t||
+    yawDelta(asset.frontYaw,measurement.frontYaw)>.1||
+    !Array.isArray(measurement.regions)||measurement.regions.length!==rs.length||!measurement.regions.every(rect))
+    return fail('GEOMETRY_MISMATCH','Measured plane, floor, axis or region count differs');
+  const unused=measurement.regions.slice();
+  for(const r of rs){const i=unused.findIndex(q=>eqRect(r,q,t));if(i<0)return fail('GEOMETRY_MISMATCH','Measured support edges differ');unused.splice(i,1);}
+  return {ok:true,asset:cloneFreeze(asset)};
+}
+
+export function interactionLocalToWorld(local,instance,frontYaw=0){
+  if(!instance||!nonempty(instance.id)||!Number.isFinite(instance.yaw)||
+    (instance.scale!==undefined&&instance.scale!==1))throw new TypeError('Rigid metric instance required');
+  return add(vec(instance.origin,'instance.origin'),rotateSeatVector(vec(local,'local'),instance.yaw+frontYaw));
+}
+
+/** Deterministic necessary-condition resolver, not an ART/IK certification.
+ * rig and action data are independent of SKU. No character scale or pose hack.
+ * Environment callback checks a world-space corridor; absent evidence fails closed.
+ * No reservations are mutated: the existing queue owns reservation lifecycle.
+ */
+export function resolveSeatInteraction({asset,measurement,instance,rig,action,environment}={}){
+  const valid=validateSeatInteractionAsset(asset,measurement);
+  if(!valid.ok)return valid;
+  if(!instance||!nonempty(instance.id)||!Number.isFinite(instance.yaw)||
+    (instance.scale!==undefined&&instance.scale!==1)||!instance.origin||
+    !['x','y','z'].every(k=>Number.isFinite(instance.origin[k])))return fail('INVALID_INSTANCE','Rigid metric instance required');
+  if(!rig||!nonempty(rig.id)||!nonempty(rig.revision)||!Number.isFinite(rig.maxFlatKneeHeight)||rig.maxFlatKneeHeight<=0||
+    !Number.isFinite(rig.supportWidth)||rig.supportWidth<=0||
+    !Number.isFinite(rig.supportDepth)||rig.supportDepth<=0)return fail('INVALID_RIG','Measured or explicitly diagnostic rig descriptor required');
+  if(!action||action.kind!=='sit.normal'||!nonempty(action.revision)||!nonempty(action.sourceClip)||
+    !Number.isFinite(action.approachGap)||action.approachGap<=0||
+    !Number.isFinite(action.minSupportFraction)||action.minSupportFraction<=0||action.minSupportFraction>1)
+    return fail('UNSUPPORTED_ACTION','No compatible ordinary-seat action contract');
+  const a=valid.asset,height=a.seatY-a.floorY;
+  if(height>rig.maxFlatKneeHeight)return fail('SEAT_TOO_HIGH','Above flat-foot knee ceiling for ordinary level-thigh seating');
+  if(!environment||!Array.isArray(environment.occupiedSlots)||!environment.occupiedSlots.every(nonempty)||
+    typeof environment.corridorClear!=='function')return fail('ENVIRONMENT_UNKNOWN','Reservation and corridor evidence required');
+  const yaw=instance.yaw+a.frontYaw,world=p=>interactionLocalToWorld(p,instance,a.frontYaw);
+  const blocked=[];
+  for(const slot of a.slots){
+    const id=instance.id+':'+slot.id;
+    if(environment.occupiedSlots.includes(id)){blocked.push('SLOT_OCCUPIED');continue;}
+    const r=slot.region, patch={minX:slot.anchorX-rig.supportWidth/2,maxX:slot.anchorX+rig.supportWidth/2,minZ:slot.anchorZ-rig.supportDepth/2,maxZ:slot.anchorZ+rig.supportDepth/2};
+    const fraction=a.regions.reduce((sum,q)=>sum+intersection(patch,q),0)/area(patch);
+    if(!inside(patch,r)||fraction+1e-9<action.minSupportFraction){blocked.push('INSUFFICIENT_SUPPORT');continue;}
+    // Existing seat surface/slot math remains the placement authority.
+    const center=world({x:slot.anchorX,y:a.floorY,z:(r.minZ+r.maxZ)/2});
+    const surface=createSeatSurface({id:instance.id,origin:center,yaw,width:r.maxX-r.minX,depth:r.maxZ-r.minZ,
+      seatHeight:instance.origin.y+a.seatY,floorY:instance.origin.y+a.floorY,
+      slots:1,sideMargin:0,backClearance:(r.minZ+r.maxZ)/2-slot.anchorZ,approachGap:action.approachGap});
+    const place=seatSlot(surface,0);
+    const corridor={from:place.front,to:place.approach,width:rig.supportWidth};
+    let clear=false;
+    try{clear=environment.corridorClear(corridor)===true;}catch{}
+    if(!clear){blocked.push('APPROACH_BLOCKED');continue;}
+    return cloneFreeze({ok:true,status:'PREFLIGHT_CANDIDATE',slotId:id,assetSha:a.assetSha,rigRevision:rig.revision,
+      actionRevision:action.revision,sourceClip:action.sourceClip,
+      contact:place.contact,front:place.front,approach:place.approach,exit:place.approach,
+      normal:{x:0,y:1,z:0},tangent:rotateSeatVector({x:1,y:0,z:0},yaw),
+      yaw,floorY:place.floorY,supportFraction:fraction,
+      cacheKey:JSON.stringify([a.assetSha,slot.id,rig.id,rig.revision,action.kind,action.revision,action.sourceClip]),
+      pending:['JOINT_LIMITS','DYNAMIC_CLEARANCE','ACTUAL_SKIN_CONTACT','FBIK_BAKE','ART']});
+  }
+  return fail(blocked.every(x=>x===blocked[0])?blocked[0]:'NO_COMPATIBLE_SLOT',blocked);
+}
