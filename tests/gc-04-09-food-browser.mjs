@@ -19,9 +19,19 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    await ctx.addInitScript(({key,seed,tour})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');localStorage.setItem('lifesim.ui.itemLabels.v1','hidden');},{key:SAVE_KEY,seed,tour:UI_TOUR_STORAGE_KEY});
    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));page.on('dialog',d=>d.accept());
    const ready=()=>page.locator('#loading').waitFor({state:'hidden',timeout:100000});
-   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});await ready();
+   // The live v1 loader intentionally resumes time. Use the existing deterministic
+   // QA pause fixture so this test isolates purchase effects, not need decay.
+   await page.goto('http://127.0.0.1:8765/?furniture=qa&garden-start-paused=1',{waitUntil:'domcontentloaded'});await ready();
    assert.ok(await page.evaluate(async()=>Boolean((await import('playcanvas')).Application.getApplication()?.graphicsDevice?.canvas)));
    const read=()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
+   const initial=await read();
+   assert.equal(initial.minutes,seed.minutes);
+   assert.deepEqual(initial.needs,seed.needs);
+   const assertNoTimeOrNeedChange=record=>{
+    assert.equal(record.minutes,initial.minutes,'game clock stays paused during checkout');
+    assert.deepEqual(record.needs,initial.needs,'buying food must not grant or change needs');
+    assert.deepEqual(record.otherSim.needs,initial.otherSim.needs,'shared purchase does not feed the other resident');
+   };
    const fridge=seed.world.furniture.instances.find(x=>x.prefabId==='fridge');
    assert.ok(fridge);
    await openFridgeByTouch(page,fridge,{captureFailure:async attempts=>{row.attempts=attempts;await page.screenshot({path:out+'/'+label+'-fridge-failed.png'});}});
@@ -39,6 +49,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    await page.locator('#fridge-r2-ready-button').tap();
    await page.waitForFunction(({k,cash})=>JSON.parse(localStorage.getItem(k)).shop.credits===cash-18,{k:SAVE_KEY,cash:seed.shop.credits});
    const bought=await read();assert.equal(bought.kitchen.prepared.find(x=>x.recipeId==='ready.sunny-grains').portions,1);
+   assertNoTimeOrNeedChange(bought);
    await page.locator('#career-phone-toggle').tap();
    const phone=page.locator('#career-phone-panel');await phone.waitFor({state:'visible'});
    await phone.locator('[data-phone-app="food"]').tap();
@@ -48,10 +59,12 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    await buy.scrollIntoViewIfNeeded();await page.screenshot({path:out+'/'+label+'-phone.png'});
    await buy.tap();
    await page.waitForFunction(({k,cash})=>JSON.parse(localStorage.getItem(k)).shop.credits===cash-47,{k:SAVE_KEY,cash:seed.shop.credits});
-   const ordered=await read();assert.equal(ordered.kitchen.deliveries.length,1);assert.equal(ordered.needs.fun,seed.needs.fun);
+   const ordered=await read();assert.equal(ordered.kitchen.deliveries.length,1);assertNoTimeOrNeedChange(ordered);
+   assert.equal(ordered.kitchen.deliveries[0].dueAt,Math.floor(initial.minutes)+18);
    await page.reload({waitUntil:'domcontentloaded'});await ready();
    const saved=await read();assert.equal(saved.version,1);assert.equal(saved.shop.credits,seed.shop.credits-47);assert.equal(saved.kitchen.deliveries.length,1);
    assert.equal(saved.kitchen.prepared.find(x=>x.recipeId==='ready.sunny-grains').portions,1);
+   assertNoTimeOrNeedChange(saved);
    assert.deepEqual(errors,[]);row.passed=true;
   }catch(e){row.error=String(e.stack||e);throw e;}finally{writeFileSync(out+'/report.json',JSON.stringify(report,null,2));await ctx.close();}
  }}finally{await browser.close();}
