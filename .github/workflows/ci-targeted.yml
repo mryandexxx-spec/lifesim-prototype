@@ -299,7 +299,7 @@ jobs:
           if-no-files-found: warn
   full-release-regression:
     needs: targeted
-    if: github.event_name == 'pull_request' && needs.targeted.outputs.release_gate == 'true'
+    if: github.event_name == 'pull_request' && needs.targeted.result == 'success' && (needs.targeted.outputs.release_gate == 'true' || (github.head_ref == 'feat/gc-08-biography' && github.event.pull_request.head.repo.full_name == github.repository))
     permissions:
       contents: read
     runs-on: ubuntu-latest
