@@ -1,3 +1,4 @@
+import {recordBiographyCareer} from './life-biography.js';
 /** W1-B.2b.3: saved applications, interview archive and safe retries.
  * Pure game data. One household clock; never touches salary, renderer or browser time.
  */
@@ -305,6 +306,7 @@ export function finishRecruitmentApplication(root,id,operation){
     root.careerSystem=accepted.careerSystem;
     addHistory(root,id,app,'hired');
     root.recruitmentSystem.byResident[id]=null;
+    recordBiographyCareer(root,id,'hire');
     return {ok:true,contract:accepted.contract,shift:accepted.shift};
   }
   if(operation==='dismiss'&&['rejected','offer_ready'].includes(app.phase)){

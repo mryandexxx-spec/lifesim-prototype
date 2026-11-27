@@ -1,3 +1,4 @@
+import {restoreLifeBiography,recordBiographyArtwork,biographySkillBefore,recordBiographySkills} from './life-biography.js';
 /** Two-person household without importing PlayCanvas, DOM or browser APIs.
  * Legacy root fields remain Alex's exact v1 state; otherSim is an optional extension.
  */
@@ -507,6 +508,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     reconcileArtMarket(root);
   }
   restoreLifeAspirations(root,raw.lifeAspirations);
+  restoreLifeBiography(root,raw.lifeBiography);
   restoreRecurringTasks(root,raw.recurringTasks);
   return root;
 }
@@ -1004,6 +1006,7 @@ function advancePainting(root,id,minutes){
 export function tickHousehold(root,minutes) {
   // A paused or invalid tick must be completely side-effect free, including Mira's fields.
   if (root.paused || dialogueNeedsDecision(root) || !Number.isFinite(minutes) || minutes<=0) return;
+  const biographySkills=biographySkillBefore(root,HOBBY_SKILLS,currentSkillLevel);
   reconcileArtMarket(root);
   // Preserve the actual verified TV-use window BEFORE the simulation action
   // expires during this tick. A score itself never grants an unobserved reward.
@@ -1303,7 +1306,7 @@ export function tickHousehold(root,minutes) {
         const result=projectArtCompletion(root,id);
         if(result.ok){
           root.artMarket=result.artMarket;actor.createdWorks=result.works;
-          if(result.work)recordAspirationArtwork(root,id,result.work);
+          if(result.work){recordAspirationArtwork(root,id,result.work);recordBiographyArtwork(root,id,result.work);}
           recordTaskOutcome(root,id,'paint',completed.session.sessionId);
           actor.event=result.work?'Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»':'Практика живописи завершена';
         }
@@ -1312,6 +1315,7 @@ export function tickHousehold(root,minutes) {
           world:root.world,at:root.minutes,registry:HOBBY_ACTIVITIES,skills:HOBBY_SKILLS});
         if(result){actor.createdWorks=result.works;
           recordAspirationArtwork(root,id,result.work);
+          recordBiographyArtwork(root,id,result.work);
           recordTaskOutcome(root,id,'paint',completed.session.sessionId);
           actor.event='Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»';}
       }
@@ -1425,6 +1429,7 @@ export function tickHousehold(root,minutes) {
   // One family calendar, one weekly bill cycle, never one charge per resident.
   const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
   if(gameDayIndex(previousSportMinute)!==gameDayIndex(root.minutes))syncRecurringTasks(root);
+  recordBiographySkills(root,biographySkills,HOBBY_SKILLS,currentSkillLevel);
   return [...careerEvents,...phoneEvents,...billEvents];
 }
 

@@ -1,3 +1,4 @@
+import {biographyPairBefore,recordBiographySocial} from './life-biography.js';
 /** G: optional root-v1 remote calls; one game clock, no A* or separate money. */
 import {pendingActions} from './action-queue.js';
 import {residentWorkPhase} from './career-work.js';
@@ -104,10 +105,12 @@ export function progressPhoneCalls(root,now=root?.minutes){
     return [id,{...view,friendship:clamp(
       (Number.isFinite(view.friendship)?view.friendship:50)+1)}];
   }));
+  const beforeBiography=biographyPairBefore(root,a.from,a.to);
   const receipt=applySocialEvent(root.socialGraph,{
     type:'phone.call',at:now,actorId:a.from,targetId:a.to,token:'phone.call.'+a.id
   },{observedViews:views});
   if(!receipt){cancelPhoneCall(root,'invalid-receipt');return [];}
+  recordBiographySocial(root,receipt,beforeBiography);
   creditCompletedSocialNeed({alex:root,mira:root.otherSim},receipt);
   root.relationship.affinity=clamp(root.relationship.affinity+1);
   for(const id of IDS){
