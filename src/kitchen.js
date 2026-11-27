@@ -51,6 +51,21 @@ export function kitchenQualityId(recipeId,quality){
 export function kitchenServingMultiplier(recipeId,quality){
   return KITCHEN_QUALITIES[kitchenQualityId(recipeId,quality)].hungerMultiplier;
 }
+// GC-04/09 FOOD B candidate: taste is distinct from nutritional value.
+// A single modest leisure contribution for verified prepared meals; the
+// purchase channel does not change the dish and legacy/free meals grant none.
+const MEAL_TASTE=Object.freeze({
+  'cook.soup':4,'cook.herb-soup':5,'cook.pancakes':5,'cook.pasta':6,
+  'cook.gratin':7,'cook.grain-bowl':4,'cook.herb-noodles':6,
+  'cook.roast-tray':7,'cook.festival-pie':8,
+  'grill.vegetables':5,'grill.chicken':7,'grill.steak':8,
+  'ready.sunny-grains':4,'ready.garden-wrap':6,'ready.gold-roast':8
+});
+const TASTE_QUALITY=Object.freeze({normal:0,good:1,excellent:2,chef:3});
+export function mealEnjoyment(recipeId,quality){
+  if(typeof recipeId!=='string'||!Object.hasOwn(MEAL_TASTE,recipeId))return 0;
+  return Math.min(10,MEAL_TASTE[recipeId]+TASTE_QUALITY[kitchenQualityId(recipeId,quality)]);
+}
 const own=(obj,key)=>Object.hasOwn(obj||{},key);
 const finiteInt=n=>Number.isSafeInteger(n)&&n>=0;
 export const kitchenRecipe=id=>typeof id==='string'
