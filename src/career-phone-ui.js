@@ -24,6 +24,7 @@ import {paintSportsTv} from './sports-tv.js';
 import {sportsCrest} from './sports-identity.js';
 import {phoneContactStatus,CALL_DURATION,CALL_COOLDOWN} from './phone-calls.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
+import {mealEnjoyment} from './kitchen.js';
 import {quoteReadyMeal} from './ready-food.js';
 import {KITCHEN_RESTOCK_LABELS,quotePantryDelivery} from './kitchen-market.js';
 import {homeMarketListing,quoteHomeDelivery} from './marketplace-home.js';
@@ -1205,6 +1206,7 @@ export function createCareerPhoneUI({host,trigger,financeTrigger=null,getRoot,se
       const item=element('article','career-phone-card ready-food-card');
       item.append(element('strong',null,meal.label));
       item.append(element('small',null,'Сытость ×'+meal.hungerFactor.toFixed(2)+
+        ' · Досуг до +'+mealEnjoyment(id)+
         ' · холодильник '+meal.fridgePrice+' кр. · доставка '+meal.deliveryPrice+' кр.'));
       const labels={'insufficient-credits':'Недостаточно средств',
         'storage-full':'Холодильник заполнен',

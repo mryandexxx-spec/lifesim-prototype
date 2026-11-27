@@ -193,6 +193,35 @@ jobs:
           name: ux3-15-touch-evidence
           path: artifacts/ux3-15/
           if-no-files-found: warn
+  gc-04-09-food-ui:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-04-09-food-taste' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Food taste and read-only UI contracts
+        run: node --test tests/gc-04-09-food-enjoyment.test.js tests/gc-04-09-food-ui.test.js tests/life-food-r1.test.js tests/fridge-ux-r2.test.js
+      - name: Real fridge and delivery touch in Chromium and WebKit
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/gc-food-http.log 2>&1 &
+          sleep 3
+          node tests/gc-04-09-food-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-04-09-food-ui
+          path: artifacts/gc-04-09-food-ui/
+          if-no-files-found: warn
   pf-14-garden-care:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-14-garden-care' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

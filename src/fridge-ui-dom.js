@@ -3,6 +3,7 @@
  * Tab/selection state is transient and never written into lifesim.room01.v1.
  */
 import {fridgeTab} from './fridge-ui.js';
+const taste=n=>n===null?'Досуг зависит от качества':'Досуг до +'+n;
 
 export function createFridgeR2UI({document,readModel,readName,onAction}){
   const get=id=>document.getElementById(id);
@@ -55,14 +56,13 @@ export function createFridgeR2UI({document,readModel,readName,onAction}){
       model.meals.map(meal=>card({
         id:meal.recipeId,label:meal.label,action:'eat',
         subtitle:meal.portions+' порц.'+
-          (meal.quality==='mixed'?' · разное качество':
-            meal.quality==='normal'?'':' · качество: '+meal.quality),
+          ' · '+taste(meal.enjoyment),
         mark:'Поесть ↗'
       })):[element('p','fridge-r2-empty',
         'Готовых порций пока нет. Можно приготовить блюдо или перейти в «Купить».')]);
     fill('fridge-r2-recipe-list',model.recipes.map(recipe=>card({
       id:recipe.id,label:recipe.label,action:'select-recipe',
-      subtitle:recipe.available?recipe.portions+' порц. · ингредиенты уже в запасе':recipe.reason,
+      subtitle:recipe.available?recipe.portions+' порц. · '+taste(recipe.enjoyment):recipe.reason,
       mark:recipe.available?(recipe.id===recipeId?'●':'○'):'🔒',
       active:recipe.id===recipeId,disabled:!recipe.available
     })));
@@ -71,8 +71,7 @@ export function createFridgeR2UI({document,readModel,readName,onAction}){
       label:item.label,subtitle:'Запас продуктов',mark:item.current+'/'+item.max,readonly:true
     }));
     const mealRows=model.meals.length?model.meals.map(item=>card({
-      label:item.label,subtitle:item.quality==='normal'?'Готовое блюдо':
-        'Качество: '+item.quality,mark:item.portions+' порц.',readonly:true
+      label:item.label,subtitle:taste(item.enjoyment),mark:item.portions+' порц.',readonly:true
     })):[element('p','fridge-r2-empty','Готовых порций нет')];
     fill('fridge-r2-stock-list',[
       ...mealRows,...pantryRows,
@@ -86,7 +85,7 @@ export function createFridgeR2UI({document,readModel,readName,onAction}){
       ' мест'+(model.reserved?' · ожидают доставку: '+model.reserved:''));
     fill('fridge-r2-ready-list',model.ready.map(item=>card({
       id:item.id,label:item.label,action:'select-ready',
-      subtitle:item.available?'Покупка в холодильник':item.reason,
+      subtitle:item.available?taste(item.enjoyment)+' · в холодильник':item.reason,
       mark:item.price+' кр.'+(item.id===readyId?' · ●':''),
       active:item.id===readyId,disabled:!item.available
     })));
