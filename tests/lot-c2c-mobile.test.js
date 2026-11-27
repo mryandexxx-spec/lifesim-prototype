@@ -41,7 +41,9 @@ test('C2c: stage, hydration, cooldown and available action choices are read-only
  root.gardenRewards.alexLastAdmireAt=root.minutes;
  root.gardenRewards.alexLastTalkAt=root.minutes;
  s=gardenActionSheet(root,'alex',id);
- assert.equal(s.actions[0].actionId,'approach');
+ assert.equal(s.actions[0].actionId,'talk');
+ assert.equal(s.actions[0].available,true);
+ assert.equal(s.actions[1].actionId,'admire');
  assert.equal(s.actions[1].available,false);
 });
 test('C2c: targeted desire identifies exact planted plot and never grants free memory',()=>{
