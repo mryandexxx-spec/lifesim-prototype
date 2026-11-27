@@ -2846,3 +2846,18 @@ button.time-card:active {transform:translateY(1px);}
 .gc-task-actions{display:flex;gap:6px;flex-wrap:wrap}
 .gc-task-actions button{flex:1;min-width:44px;min-height:44px;border:1px solid #c9d6cb;border-radius:8px;background:#fff;color:#294a3d;font-size:12px;font-weight:700;touch-action:manipulation;padding:5px 8px}
 .gc-task-actions button:focus-visible,.gc-task-details summary:focus-visible{outline:2px solid #217052;outline-offset:2px}
+
+/* GC-06 touch recovery: the collapsed HUD must not inherit the obsolete
+ * 63% resident-column width. The existing profile is a single reachable
+ * target, not a second camera hotspot inside a button. */
+#dashboard.dashboard .resident-column{width:100%;min-width:0}
+#dashboard.dashboard .character-tag{flex:1 1 0%;width:auto;min-width:64px;min-height:44px;touch-action:manipulation}
+#dashboard.dashboard .character-tag>div{flex:1 1 auto;width:auto;min-width:0}
+#dashboard.dashboard .character-tag .mind-indicator{display:block;flex:0 0 auto;margin-left:auto;font-size:16px;line-height:1}
+#dashboard.dashboard .character-tag[aria-expanded="true"]{background:#dff2e6}
+#dashboard.dashboard .character-tag:focus-visible{outline:2px solid #217052;outline-offset:2px}
+@media(max-width:370px){
+ #dashboard.dashboard .character-tag{gap:3px;padding:3px 4px;min-width:64px}
+ #dashboard.dashboard .character-tag #resident-name,#dashboard.dashboard .character-tag #mood-label{font-size:10px}
+ #dashboard.dashboard .character-tag .mind-indicator{font-size:13px}
+}

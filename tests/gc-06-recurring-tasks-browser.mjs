@@ -65,8 +65,12 @@ for(const [engine,launcher] of [['chromium',chromium],['webkit',webkit]]){
   async function screenshot(name){const path=row.id+'-'+name+'.png';const p=await page.screenshot({path:out+'/'+path});return {path,sha256:createHash('sha256').update(p).digest('hex'),bytes:p.length};}
   async function step(name,fn){const st={name,status:'OPEN'};row.steps.push(st);flush();try{await fn();st.image=await screenshot(name);st.status='PASS';}catch(e){st.status='FAIL';st.error=String(e.stack||e);try{st.image=await screenshot(name);}catch{}throw e;}finally{try{st.trace=await page.evaluate(()=>window.__gcTrace.slice(-100));}catch{}flush();}}
   async function layout(){const v=await page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight}));assert.ok(v.sw<=v.w+2&&v.sh<=v.h+2,'whole-page scroll '+JSON.stringify(v));}
-  async function open(){await tap('#plan-peek');await page.locator('#queue-panel').waitFor({state:'visible'});if(!(await page.locator('#queue-recurring').getAttribute('open')!==null))await tap('#queue-recurring summary');await page.locator(day).waitFor({state:'visible'});}
-  await step('boot',async()=>{await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});await ready();await pause();assert.ok((await page.locator('#game-canvas').screenshot()).length>2000);await layout();});
+  async function open(){await tap('#plan-peek');await page.locator('#queue-panel').waitFor({state:'visible'});if(!(await page.locator('#queue-recurring').getAttribute('open')!==null))await tap('#queue-recurring summary');await page.locator(day).waitFor({state:'visible'});
+   const bounds=await page.evaluate(()=>({plan:document.querySelector('#queue-panel').getBoundingClientRect().bottom,hud:document.querySelector('#dashboard').getBoundingClientRect().top}));
+   assert.ok(bounds.plan<=bounds.hud+1,'plan overlaps resident HUD '+JSON.stringify(bounds));}
+  await step('boot',async()=>{await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});await ready();await pause();assert.ok((await page.locator('#game-canvas').screenshot()).length>2000);
+   const target=await page.locator('#mind-toggle').boundingBox();assert.ok(target&&target.width>=44&&target.height>=44,'profile target clipped '+JSON.stringify(target));
+   await layout();});
   await step('open-and-skip',async()=>{await open();const before=await state();
    assert.match(await page.locator(day).innerText(),/Продать картину/);
    await tap(week+' [data-task-operation="dismiss"]');
@@ -82,8 +86,8 @@ for(const [engine,launcher] of [['chromium',chromium],['webkit',webkit]]){
   await step('reload',async()=>{const before=await state();await page.reload({waitUntil:'domcontentloaded'});await ready();await pause();await open();
    assert.equal(await page.locator(week).getAttribute('data-status'),'dismissed');
    assert.deepEqual((await state()).recurringTasks,before.recurringTasks);await tap('#queue-close');});
-  await step('actual-sale',async()=>{const before=await state();/* The resident name intentionally focuses the camera (PF-10). Touch the visible mood label instead of the parent button center. */
-   await tap('#mind-toggle #mood-label',false);await page.locator('#mind-panel').waitFor({state:'visible'});assert.equal(await page.locator('#mind-toggle').getAttribute('aria-expanded'),'true');await tap('#mind-tab-skills',false);
+  await step('actual-sale',async()=>{const before=await state();/* The entire existing profile button is a real 44px touch target. */
+   await tap('#mind-toggle');await page.locator('#mind-panel').waitFor({state:'visible',timeout:12000});assert.equal(await page.locator('#mind-toggle').getAttribute('aria-expanded'),'true');await tap('#mind-tab-skills',false);
    const sale='#mind-painting-works button:has-text("Продать · +")';
    page.once('dialog',d=>d.accept());await tap(sale,false);
    await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)).recurringTasks.byResident.alex.day.proofs.length===1,SAVE_KEY);

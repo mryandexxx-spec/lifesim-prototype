@@ -1837,7 +1837,15 @@ function renderQueuePanel(force=true){
       ?Math.floor(game.socialAction.elapsed/3):null]);
   $('queue-toggle').textContent=planButtonLabel(pendingActions(game.actionQueues,game.selectedSim).length)+
     (blockedActions(game.actionQueues,game.selectedSim).length?' · ⚠':'');
-  if(queueVisible)renderPersonalTaskCards($('queue-recurring-cards'),residentId);
+  if(queueVisible){
+    // Anchor above the measured HUD, including the extra resident row.
+    const hud=$('dashboard').getBoundingClientRect();
+    const panel=$('queue-panel'),shell=document.querySelector('.app-shell').getBoundingClientRect();
+    const bottom=Math.max(8,Math.ceil(shell.bottom-hud.top+8));
+    panel.style.bottom=bottom+'px';
+    panel.style.maxHeight='min(44dvh, 360px, '+Math.max(100,Math.floor(hud.top-shell.top-76))+'px)';
+    renderPersonalTaskCards($('queue-recurring-cards'),residentId);
+  }
   if(!force&&key===queueDisplayKey)return;
   queueDisplayKey=key;
   $('queue-panel').hidden=!queueVisible;
@@ -2581,6 +2589,7 @@ function updateResidentPicker(){
    button.remove();casButtons.delete(id);
  }
  $('resident-name').textContent=hudName();
+ $('mind-toggle').setAttribute('aria-label',(HOUSEHOLD_IDS.includes(hudResidentId)?'Профиль: ':'Найти жителя: ')+hudName());
  $('avatar-symbol').textContent=hudResidentId==='alex'?'☺':hudResidentId==='mira'?'✿':'●';
  updateCareerHud();updateFamilyBalance();refreshIncidentNotifications();
  if(HOUSEHOLD_IDS.includes(hudResidentId))renderMindIdentity();
@@ -2617,11 +2626,9 @@ document.addEventListener('pointerdown',event=>{
 },true);
 document.addEventListener('visibilitychange',()=>residentDoubleTap.clear());
 updateResidentPicker();
-// Tap the HUD name for focus; the containing mind button keeps its original behavior.
-$('resident-name').addEventListener('click',event=>{
-  event.preventDefault();event.stopPropagation();
-  focusSelectedCamera(activeHudResident());
-});
+// The complete profile button is one touch target, including its text.
+ // Camera focus remains on the resident picker's deliberate double tap and
+ // the explicit find-resident control; do not nest a second touch action.
 // W1-B.3a: the existing phone now shows live shift presence, pay and attendance.
 const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
