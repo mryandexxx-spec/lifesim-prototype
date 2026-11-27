@@ -4,6 +4,7 @@
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS,mirrorActionLabel } from './simulation.js';
 import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar,gameDayIndex} from './calendar-core.js';
 import {syncRecurringTasks,restoreRecurringTasks,recordTaskOutcome,captureTaskLeisure,settleTaskLeisure} from './recurring-tasks.js';
+import {restoreLifeAspirations,recordAspirationArtwork} from './life-aspirations.js';
 import {restoreEventRecords} from './calendar-events.js';
 import {holidayDefinitions,restoreWeekendDays} from './calendar-holidays.js';
 import {restoreReminderReceipts} from './calendar-reminders.js';
@@ -505,6 +506,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     root.artMarket=restored;
     reconcileArtMarket(root);
   }
+  restoreLifeAspirations(root,raw.lifeAspirations);
   restoreRecurringTasks(root,raw.recurringTasks);
   return root;
 }
@@ -1286,6 +1288,7 @@ export function tickHousehold(root,minutes) {
         const result=projectArtCompletion(root,id);
         if(result.ok){
           root.artMarket=result.artMarket;actor.createdWorks=result.works;
+          if(result.work)recordAspirationArtwork(root,id,result.work);
           recordTaskOutcome(root,id,'paint',completed.session.sessionId);
           actor.event=result.work?'Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»':'Практика живописи завершена';
         }
@@ -1293,6 +1296,7 @@ export function tickHousehold(root,minutes) {
         const result=finishPainting({session:completed.session,actor,actorId:id,
           world:root.world,at:root.minutes,registry:HOBBY_ACTIVITIES,skills:HOBBY_SKILLS});
         if(result){actor.createdWorks=result.works;
+          recordAspirationArtwork(root,id,result.work);
           recordTaskOutcome(root,id,'paint',completed.session.sessionId);
           actor.event='Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»';}
       }
