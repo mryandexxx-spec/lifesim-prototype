@@ -110,6 +110,122 @@ jobs:
             runtime-lab/evidence/
           if-no-files-found: warn
 
+  cf-anim-mocap-runtime:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'diagnostic/cf-anim-mocap-runtime'
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        profile: [male-grid_021-100, female-grid_201-100]
+    env:
+      PROFILE: ${{ matrix.profile }}
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 96bf70f880742028dbc91235c6a215703656a9bb
+          path: frozen-retarget
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: saturday06/VRM-Addon-for-Blender
+          ref: 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          path: vrm-addon
+          persist-credentials: false
+      - name: Fetch exact R8, original rig and verified neutral idle transport
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fetch() { curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$1/zip" -o "$3.zip"; echo "$2  $3.zip" | sha256sum -c; unzip -q "$3.zip" -d "$3"; }
+          if [ "$PROFILE" = male-grid_021-100 ]; then
+            fetch 15184801813 3f90eae3f6a50e328167bba944eca096feb2c1a2ab3e334888eb024149148e7f input-contact
+          else
+            fetch 15185060878 b21486b1c29d55420f913bdb3fcb615ec13790a752a0dab4d660ea0f36723511 input-contact
+          fi
+          fetch 15054212377 1e7ba4518b8efefc86206c7f02471e7230f0bf94c78d0831b5244d552380fead input-rigs
+          fetch 15179009080 c416e6be9ec0af08e6febbf888318c3195d3ce3f65e3d59b7fbc93a34e8b5213 input-idle-source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact native and runtime dependencies
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 playwright==1.56.0 Pillow==11.3.0
+          npm ci
+          # These optional vendor repositories are unrelated to Ubuntu's browser
+          # runtime libraries. Disable Microsoft-only lists for this ephemeral runner.
+          for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            [ -f "$f" ] || continue
+            if grep -q 'packages.microsoft.com' "$f" && ! grep -Eq 'https?://[^[:space:]]+' <(grep -v 'packages.microsoft.com' "$f" | grep -v '^#'); then
+              echo "Disabling optional Microsoft package source: $f"
+              sudo mv "$f" "$f.disabled"
+            fi
+          done
+          python -m playwright install --with-deps chromium webkit
+          python -m py_compile tools/cf_mocap_runtime_bake.py tools/cf_mocap_runtime_idle_bake.py tools/cf_mocap_runtime_idle_replay.py tools/cf_runtime_browser.py
+      - name: Bake immutable R8 poses and independently reimport
+        run: |
+          timeout 240s python -u tools/cf_mocap_runtime_bake.py
+      - name: Replay exact neutral idle with frozen closure, append and reimport
+        id: idle_native
+        run: |
+          test "$(git -C frozen-retarget rev-parse HEAD)" = 96bf70f880742028dbc91235c6a215703656a9bb
+          test "$(git -C vrm-addon rev-parse HEAD)" = 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          timeout 240s python -u tools/cf_mocap_runtime_idle_replay.py Neutral_ID
+          timeout 180s python -u tools/cf_mocap_runtime_idle_bake.py
+          cp tools/cf_mocap_runtime_lab.html runtime-lab/lab.html
+          cp node_modules/playcanvas/build/playcanvas.mjs runtime-lab/playcanvas.mjs
+      - name: Browser render and real-time start-stop playback
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 --directory runtime-lab > /tmp/runtime-http.log 2>&1 &
+          server=$!
+          sleep 2
+          trap 'kill "$server" || true' EXIT
+          set +e
+          xvfb-run -a python -u tools/cf_runtime_browser.py chromium
+          chromium=$?
+          xvfb-run -a python -u tools/cf_runtime_browser.py webkit
+          webkit=$?
+          set -e
+          test "$chromium" = 0 && test "$webkit" = 0
+      - name: Strict native floor/contact gates
+        if: ${{ always() && steps.idle_native.outcome == 'success' }}
+        run: |
+          python -c 'import json; d=json.load(open("runtime-lab/manifest.json"))["dense"]; print(d); assert d["contactSamples"]>0 and d["floorFailures"]==d["contactFailures"]==0; idle=json.load(open("runtime-lab/manifest.json"))["idle"]; print("idle",idle["worstFloorM"],idle["floorFailures"]); assert idle["floorFailures"]==idle["soleFailures"]==0'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-mocap-runtime-${{ matrix.profile }}-evidence
+          path: |
+            runtime-lab/bake.json
+            runtime-lab/manifest.json
+            runtime-lab/native-report.json
+            runtime-lab/idle-report.json
+            runtime-lab/ATTRIBUTION.txt
+            input-idle/
+            !input-idle/zero-probe.vrma
+            runtime-lab/evidence/
+          if-no-files-found: warn
+
+
   cf-anim-stock-walk-authored:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-contact-contract' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
