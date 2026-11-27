@@ -49,3 +49,29 @@ test('GC08 actual promotion and specialization transitions, not legacy rank',()=
  assert.equal(chooseCareerSpecialization(r,'alex',choice.id).ok,false);
  assert.equal(biographyRows(r,'mira').length,0);
 });
+
+import {newSocialGraph,setLifeStage,markAcquainted,observePairViews} from '../src/social-graph.js';
+import {submitCareerApplication,progressCareerRecruitment,startCareerInterview,answerCareerInterview,finishRecruitmentApplication} from '../src/career-recruitment.js';
+test('GC08 actual recruitment accepted contract only',()=>{
+ const r=newHousehold('2026-11-18');
+ assert.ok(submitCareerApplication(r,'alex','editorial').ok);
+ const app=r.recruitmentSystem.byResident.alex;
+ function advance(at){const before=r.minutes;r.minutes=at;r.otherSim.minutes=at;progressCareerRecruitment(r,before,at);}
+ advance(app.replyDueAt);assert.ok(startCareerInterview(r,'alex').ok);
+ for(const choice of ['verify','research','correct'])assert.ok(answerCareerInterview(r,'alex',choice).ok);
+ advance(app.decisionDueAt);assert.equal(r.recruitmentSystem.byResident.alex.phase,'offer_ready');
+ assert.equal(r.lifeBiography,undefined);assert.ok(finishRecruitmentApplication(r,'alex','accept').ok);
+ assert.equal(biographyRows(r,'alex').find(x=>x.key==='hire').proof,r.careerSystem.byResident.alex.employmentId);
+ assert.equal(finishRecruitmentApplication(r,'alex','accept').ok,false);
+});
+test('GC08 mutual committed romance, dating and care alone are not a serious milestone',()=>{
+ const r=setup(),g=newSocialGraph(['alex','mira']);r.socialGraph=g;
+ for(const id of ['alex','mira'])setLifeStage(g,id,'adult');
+ markAcquainted(g,'alex','mira',480);
+ observePairViews(g,'alex','mira',{alex:{friendship:88,trust:90,tension:0},mira:{friendship:88,trust:90,tension:0}});
+ function commit(actorId,targetId,type,at){r.minutes=r.otherSim.minutes=at;const before=biographyPairBefore(r,actorId,targetId);const receipt=applySocialEvent(g,{actorId,targetId,type,at});assert.ok(receipt,type);recordBiographySocial(r,receipt,before);}
+ for(const [a,b,t,at] of [['alex','mira','romance.flirt',900],['mira','alex','romance.flirt',2400],['alex','mira','romance.flirt',3900],['alex','mira','romance.confess',4200],['alex','mira','romance.date',4500],['alex','mira','romance.tender',6000],['mira','alex','romance.tender',6050],['alex','mira','romance.tender',7500],['mira','alex','romance.tender',7550]])commit(a,b,t,at);
+ assert.equal(biographyRows(r,'alex').some(x=>x.key==='romance'),false);
+ commit('alex','mira','romance.propose',9000);assert.equal(biographyRows(r,'alex').find(x=>x.key==='romance').context,'mira');assert.equal(biographyRows(r,'mira').find(x=>x.key==='romance').context,'alex');
+ const first=copy(r.lifeBiography.byResident.alex.romance);commit('mira','alex','romance.marry',10500);assert.deepEqual(r.lifeBiography.byResident.alex.romance,first);
+});

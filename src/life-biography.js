@@ -53,7 +53,7 @@ function append(root,id,key,proof,context,detail=null){
 export function biographyRows(root,id){
  if(!residents(root).includes(id))return [];
  const b=current(root),out=[];
- for(const k of personal){const f=b?.byResident?.[id]?.[k];if(f)out.push({...f,key,owner:id,title:BIOGRAPHY_DEFINITIONS[k]});}
+ for(const k of personal){const f=b?.byResident?.[id]?.[k];if(f)out.push({...f,key:k,owner:id,title:BIOGRAPHY_DEFINITIONS[k]});}
  if(b?.household?.home)out.push({...b.household.home,key:'home',owner:'household',title:BIOGRAPHY_DEFINITIONS.home});
  return out.sort((a,b)=>b.at-a.at||a.key.localeCompare(b.key));
 }
