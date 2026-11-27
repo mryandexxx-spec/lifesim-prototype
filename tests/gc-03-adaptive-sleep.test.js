@@ -4,7 +4,7 @@ import {newGame,loadGame,chooseAction,arrive,tick,ACTIONS} from '../src/simulati
 import {newHousehold,loadHousehold,chooseResidentAction,bedDestinationFor,tickHousehold} from '../src/household.js';
 import {NEED_DECAY_PER_MINUTE,adaptiveSleepRate,SLEEP_STANDARD_PROFILE,SLEEP_PREMIUM_PROFILE} from '../src/need-balance.js';
 const skus=['bed.platform','bed.canopy'];
-const id='sleep-bed-1';
+const id='home-bed-1';
 const world=sku=>({furniture:{instances:[{instanceId:id,prefabId:'bed',itemDefinitionId:sku,location:'home'}]}});
 const create=(start,sku,automatic=false)=>{
  const s=newGame();s.needs.energy=start;s.autonomy.enabled=false;
