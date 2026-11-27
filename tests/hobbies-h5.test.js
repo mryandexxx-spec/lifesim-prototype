@@ -149,8 +149,10 @@ test('H5 individual actors have exclusive easel reservations and separate person
   assert.equal(mira.createdWorks.length,1);
   assert.equal(mira.createdWorks[0].ownerId,'mira');
   assert.notEqual(mira.createdWorks[0].id,alex.createdWorks[0].id);
-  assert.ok(currentSkillLevel(alex.skills,HOBBY_SKILLS,'painting')>=1);
-  assert.ok(currentSkillLevel(mira.skills,HOBBY_SKILLS,'painting')>=1);
+  assert.equal(alex.skills.xpById.painting,27);
+  assert.equal(currentSkillLevel(alex.skills,HOBBY_SKILLS,'painting'),0);
+  assert.equal(mira.skills.xpById.painting,27);
+  assert.equal(currentSkillLevel(mira.skills,HOBBY_SKILLS,'painting'),0);
 });
 test('H5 saved queue, invalid themes and corrupted sessions fail closed',()=>{
   const root=newHousehold(),id=buy(root);

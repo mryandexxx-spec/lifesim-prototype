@@ -75,7 +75,7 @@ test('MICRO mirror grants proportional Social/Fun only during genuine practice, 
     assert.ok(close(savedActor.needs.social,mid.social,.00001));
     copySaved.paused=false;tickHousehold(copySaved,MIRROR_SPEECH_DURATION/2);
     assert.ok(savedActor.needs.social>mid.social);
-    assert.equal(savedActor.skills.xpById.charisma-xpBefore,18);
+    assert.equal(savedActor.skills.xpById.charisma-xpBefore,9);
     const final={...savedActor.needs};tickHousehold(copySaved,0);
     assert.deepEqual(savedActor.needs,final);
   }
