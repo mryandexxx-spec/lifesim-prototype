@@ -16,7 +16,7 @@ import {DISH_AUTO_WASH_THRESHOLD,COOKING_SKILL_ID,kitchenRecipe,newKitchen,resto
   canCookRecipe,chooseKitchenPlan,cookingSourceValid,finishKitchenRecipe,
   takeKitchenServingDetails,hasKitchenServing,shouldEatFreshKitchenMeal,
   recordDirtyDish,washKitchenDishes} from './kitchen.js';
-import {currentSkillLevel} from './skills-engine.js';
+import {currentSkillLevel,scaleSkillXP} from './skills-engine.js';
 import {creditGardenPractice} from './garden-skill.js';
 import {settleReadyMealDeliveries} from './ready-food.js';
 import {settlePantryDeliveries} from './kitchen-market.js';
@@ -1203,7 +1203,7 @@ export function tickHousehold(root,minutes) {
         const max=HOBBY_SKILLS.skills[COOKING_SKILL_ID].xpThresholds.at(-1);
         actor.skills.xpById[COOKING_SKILL_ID]=Math.min(max,
           Math.round(((actor.skills.xpById[COOKING_SKILL_ID]||0)+
-            before.cookingMinutes*1.05)*1000000)/1000000);
+            scaleSkillXP(before.cookingMinutes*1.05))*1000000)/1000000);
       }
       if(before.phase==='using'&&before.cookStage==='storing'&&
         !actor.action&&before.recipeId){
@@ -1226,7 +1226,7 @@ export function tickHousehold(root,minutes) {
         const max=HOBBY_SKILLS.skills[COOKING_SKILL_ID].xpThresholds.at(-1);
         actor.skills.xpById[COOKING_SKILL_ID]=Math.min(max,
           Math.round(((actor.skills.xpById[COOKING_SKILL_ID]||0)+
-            before.cookingMinutes*1.05)*1000000)/1000000);
+            scaleSkillXP(before.cookingMinutes*1.05))*1000000)/1000000);
       }
       if(before.phase==='using'&&before.grillStage==='storing'&&
         !actor.action&&before.recipeId){
@@ -1249,7 +1249,7 @@ export function tickHousehold(root,minutes) {
       if(point&&Math.hypot(actor.position.x-point.x,actor.position.z-point.z)<=.45){
         const cap=HOBBY_SKILLS.skills.charisma.xpThresholds.at(-1);
         const previous=actor.skills.xpById.charisma||0;
-        const next=Math.min(cap,previous+MIRROR_SPEECH_XP);
+        const next=Math.min(cap,previous+scaleSkillXP(MIRROR_SPEECH_XP));
         actor.skills.xpById.charisma=next;
         actor.event='Речь отрепетирована · харизма +'+(next-previous)+' XP';
       }
@@ -1336,7 +1336,7 @@ export function tickHousehold(root,minutes) {
           // Genuine synchronized reading, not XP for discussion alone.
           const max=HOBBY_SKILLS.skills?.[READING_SKILL_ID]?.xpThresholds?.at(-1)??1380;
           actor.skills.xpById[READING_SKILL_ID]=Math.min(max,
-            Math.round(((actor.skills.xpById[READING_SKILL_ID]||0)+credited)*1e6)/1e6);
+            Math.round(((actor.skills.xpById[READING_SKILL_ID]||0)+scaleSkillXP(credited))*1e6)/1e6);
         }
         refreshMind(actor,root.world);
       }

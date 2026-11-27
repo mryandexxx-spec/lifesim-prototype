@@ -110,7 +110,7 @@ test('F4G: true three-station path and cooked portions are only minted on comple
  h.position={...furnitureActionApproach(h.world,'cook','shop-stove-902')};
  arrive(h);h.action.cookStage='cooking';tickHousehold(h,12);
  const xp=h.skills.xpById.cooking;
- assert.ok(xp>10);
+ assert.equal(xp,9.45,'12 cooking minutes award 1.05 × 0.75 XP per minute');
  assert.equal(kitchenSummary(h.kitchen).prepared,0);
  h.paused=true;tickHousehold(h,100);
  assert.equal(h.skills.xpById.cooking,xp);

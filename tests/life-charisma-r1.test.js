@@ -62,10 +62,10 @@ test('CHARISMA: genuine purchased mirror, A* walking, exclusive occupancy, compl
   assert.ok(furnitureUseWeight(actor.action,id)>0);
   tickHousehold(root,1);
   assert.equal(actor.action,null);
-  assert.equal(actor.skills.xpById.charisma,MIRROR_SPEECH_XP);
-  assert.match(actor.event,/харизма \+18 XP/);
+  assert.equal(actor.skills.xpById.charisma,MIRROR_SPEECH_XP*.75);
+  assert.match(actor.event,/харизма \+13\.5 XP/);
   tickHousehold(root,100);
-  assert.equal(actor.skills.xpById.charisma,MIRROR_SPEECH_XP);
+  assert.equal(actor.skills.xpById.charisma,MIRROR_SPEECH_XP*.75);
 });
 test('CHARISMA: pause freezes, faster game clock gives no extra XP per practice',()=>{
   const {root,id,point}=householdWithMirror();
@@ -78,7 +78,7 @@ test('CHARISMA: pause freezes, faster game clock gives no extra XP per practice'
   root.paused=false;root.speed=3;
   tickHousehold(root,MIRROR_SPEECH_DURATION-9);
   assert.equal(root.action,null);
-  assert.equal(root.skills.xpById.charisma,MIRROR_SPEECH_XP);
+  assert.equal(root.skills.xpById.charisma,MIRROR_SPEECH_XP*.75);
 });
 test('CHARISMA: in-progress action saved at 12 minutes resumes safely, no replay on reload',()=>{
   const {root,id,point}=householdWithMirror();
@@ -92,10 +92,10 @@ test('CHARISMA: in-progress action saved at 12 minutes resumes safely, no replay
   tickHousehold(reloaded,11);
   assert.equal(reloaded.skills.xpById.charisma,undefined);
   tickHousehold(reloaded,1);
-  assert.equal(reloaded.skills.xpById.charisma,MIRROR_SPEECH_XP);
+  assert.equal(reloaded.skills.xpById.charisma,MIRROR_SPEECH_XP*.75);
   const twice=loadHousehold(copy(reloaded));
   tickHousehold(twice,20);
-  assert.equal(twice.skills.xpById.charisma,MIRROR_SPEECH_XP);
+  assert.equal(twice.skills.xpById.charisma,MIRROR_SPEECH_XP*.75);
 });
 test('CHARISMA: moved/removed object or teleported resident cancels reward',()=>{
   for(const type of ['stored','away']){
@@ -138,7 +138,7 @@ test('CHARISMA: Alex/Mira personal XP; grooming still XP-free; legacy saves acce
   const {root,id,point}=householdWithMirror();
   start(root,id,'mira');root.otherSim.position={...point};arrive(root.otherSim);
   tickHousehold(root,MIRROR_SPEECH_DURATION);
-  assert.equal(root.otherSim.skills.xpById.charisma,MIRROR_SPEECH_XP);
+  assert.equal(root.otherSim.skills.xpById.charisma,MIRROR_SPEECH_XP*.75);
   assert.equal(root.skills.xpById.charisma,undefined);
   assert.equal(chooseResidentAction(root,'mirror',false,'alex',id),true);
   root.position={...point};arrive(root);

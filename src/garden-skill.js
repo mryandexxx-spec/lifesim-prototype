@@ -3,6 +3,7 @@
  * Canonical watering cooldown, harvestedAt and paid replant are anti-farm guards.
  */
 import {getSkillDefinition} from './skill-registry.js';
+import {scaleSkillXP} from './skills-engine.js';
 export const GARDENING_SKILL_ID='gardening';
 export const GARDEN_PRACTICE_XP=Object.freeze({water:10,harvest:25,replant:12});
 export function gardenSkillBenefits(level=0){
@@ -26,7 +27,7 @@ export function creditGardenPractice(progress,registry,actionId,{automatic=false
     Array.isArray(progress.xpById))return null;
   const before=progress.xpById[GARDENING_SKILL_ID]??0;
   if(!Number.isFinite(before)||before<0)return null;
-  const after=Math.min(def.xpThresholds.at(-1),before+amount);
+  const after=Math.min(def.xpThresholds.at(-1),before+scaleSkillXP(amount));
   return {progress:{...progress,xpById:{...progress.xpById,
       [GARDENING_SKILL_ID]:after}},gained:after-before};
 }

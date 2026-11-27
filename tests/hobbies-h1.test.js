@@ -147,7 +147,7 @@ test('H1 only the real owner reading at real approach gains fun and skill experi
   assert.equal(r.action.elapsed,10);
   assert.equal(r.activitySession.elapsed,10);
   assert.equal(r.activitySession.awardedMinutes,10);
-  assert.equal(r.skills.xpById.literature,10);
+  assert.equal(r.skills.xpById.literature,7.5);
   assert.equal(currentSkillLevel(r.skills,HOBBY_SKILLS,'literature'),0);
   assert.ok(r.needs.fun>before);
   assert.ok(r.otherSim.needs.fun<miraBefore);
@@ -174,8 +174,8 @@ test('H1 finite time and 3x chunks account same per-resident XP and session prog
   finishReturn(a);finishReturn(b);
   assert.equal(a.action,null);
   assert.equal(b.action,null);
-  assert.equal(a.skills.xpById.literature,36);
-  assert.equal(b.skills.xpById.literature,36);
+  assert.equal(a.skills.xpById.literature,27);
+  assert.equal(b.skills.xpById.literature,27);
   assert.deepEqual(a.skills,b.skills);
 });
 test('H1 old v1 saves, book gifts and shop identities survive optional skill migrations',()=>{
@@ -200,11 +200,11 @@ test('H1 save/reload mid-reading does not duplicate previous XP award',()=>{
   assert.equal(loaded.action.id,'hobby');
   assert.equal(loaded.activitySession.elapsed,9);
   assert.equal(loaded.activitySession.awardedMinutes,9);
-  assert.equal(loaded.skills.xpById.literature,9);
+  assert.equal(loaded.skills.xpById.literature,6.75);
   tickHousehold(loaded,0);
-  assert.equal(loaded.skills.xpById.literature,9);
+  assert.equal(loaded.skills.xpById.literature,6.75);
   tickHousehold(loaded,3);
-  assert.equal(loaded.skills.xpById.literature,12);
+  assert.equal(loaded.skills.xpById.literature,9);
 });
 test('H1 pause freezes reading time, XP and all six existing needs',()=>{
   const r=newHousehold(),id=buy(r);
@@ -221,7 +221,7 @@ test('H1 manual cancellation never creates a completion receipt or new XP',()=>{
   tickHousehold(r,4);
   r.action=null;r.activitySession=null;
   tickHousehold(r,12);
-  assert.equal(r.skills.xpById.literature,4);
+  assert.equal(r.skills.xpById.literature,3);
   assert.equal(r.activitySession,null);
   assert.equal(r.needs.fun<100,true);
 });
@@ -259,7 +259,7 @@ test('H1 restore discards forged or mismatched activity without resetting skills
   const loaded=loadHousehold(saved);
   assert.equal(loaded.action,null);
   assert.equal(loaded.activitySession,null);
-  assert.equal(loaded.skills.xpById.literature,5);
+  assert.equal(loaded.skills.xpById.literature,3.75);
   assert.equal(loaded.world.furniture.instances.find(x=>x.instanceId===id).itemDefinitionId,
     'bookcase.starter');
 });

@@ -116,7 +116,7 @@ test('H5 genuine finishing creates exactly one personal bounded deterministic re
   reach(root,actor,id);
   tickHousehold(root,20);
   assert.equal(actor.createdWorks.length,0);
-  assert.ok(actor.skills.xpById.painting>=23);
+  assert.equal(actor.skills.xpById.painting,18);
   const partial=loadHousehold(copy(root));
   assert.equal(partial.action.contentId,PAINT_CONTENT_IDS[1]);
   assert.equal(partial.activitySession.awardedMinutes,20);
@@ -149,8 +149,10 @@ test('H5 individual actors have exclusive easel reservations and separate person
   assert.equal(mira.createdWorks.length,1);
   assert.equal(mira.createdWorks[0].ownerId,'mira');
   assert.notEqual(mira.createdWorks[0].id,alex.createdWorks[0].id);
-  assert.ok(currentSkillLevel(alex.skills,HOBBY_SKILLS,'painting')>=1);
-  assert.ok(currentSkillLevel(mira.skills,HOBBY_SKILLS,'painting')>=1);
+  assert.equal(alex.skills.xpById.painting,40.5);
+  assert.equal(currentSkillLevel(alex.skills,HOBBY_SKILLS,'painting'),1);
+  assert.equal(mira.skills.xpById.painting,40.5);
+  assert.equal(currentSkillLevel(mira.skills,HOBBY_SKILLS,'painting'),1);
 });
 test('H5 saved queue, invalid themes and corrupted sessions fail closed',()=>{
   const root=newHousehold(),id=buy(root);

@@ -55,12 +55,12 @@ test('GARDEN: manual water gets exactly 10 XP upon physical completion only once
   tickHousehold(root,7);
   assert.equal(root.skills.xpById.gardening,undefined);
   tickHousehold(root,8);
-  assert.equal(root.skills.xpById.gardening,10);
+  assert.equal(root.skills.xpById.gardening,7.5);
   assert.equal(root.world.outdoors.gardens[id].hydratedUntil,
     root.minutes+GARDEN_HYDRATION_MINUTES);
   const snapshot=loadHousehold(copy(root));
   tickHousehold(snapshot,10);
-  assert.equal(snapshot.skills.xpById.gardening,10);
+  assert.equal(snapshot.skills.xpById.gardening,7.5);
   assert.equal(snapshot.otherSim.skills.xpById.gardening,undefined);
   assert.equal(gardenActionAllowed(snapshot,'mira',id,'water'),false);
 });
@@ -84,7 +84,7 @@ test('GARDEN: real skill improves water duration, not rate or planted metadata',
   using(root,id,'water');tickHousehold(root,15);
   assert.equal(root.world.outdoors.gardens[id].hydratedUntil,
     root.minutes+GARDEN_HYDRATION_MINUTES+180);
-  assert.equal(root.skills.xpById.gardening,145);
+  assert.equal(root.skills.xpById.gardening,142.5);
   assert.equal(root.otherSim.skills.xpById.gardening,undefined);
   const restored=loadHousehold(copy(root));
   assert.equal(restored.world.outdoors.gardens[id].hydratedUntil,
@@ -97,12 +97,12 @@ test('GARDEN: harvest bonus clamped to pantry; no double harvest or credit',()=>
   root.skills.xpById.gardening=425; // level 6: base 2 + 1 herb
   using(root,id,'harvest');tickHousehold(root,GARDEN_DURATION.harvest);
   assert.equal(root.kitchen.pantry.herbs,3);
-  assert.equal(root.skills.xpById.gardening,450);
+  assert.equal(root.skills.xpById.gardening,443.75);
   assert.equal(root.world.outdoors.gardens[id].harvestedAt,root.minutes);
   const persisted=loadHousehold(copy(root));
   assert.equal(settleGardenAction(persisted,'alex',id,'harvest'),false);
   tickHousehold(persisted,12);
-  assert.equal(persisted.skills.xpById.gardening,450);
+  assert.equal(persisted.skills.xpById.gardening,443.75);
   assert.equal(gardenHarvestUnits(10,15,16,2),1);
   assert.equal(gardenHarvestUnits(10,14,16,2),2);
   assert.equal(gardenHarvestUnits(10,0,16,2),4);
@@ -114,12 +114,12 @@ test('GARDEN: manual replant paid once, credits XP once, new planting still comp
   using(root,id,'replant');tickHousehold(root,GARDEN_DURATION.replant);
   assert.equal(root.shop.credits,balance-30);
   assert.equal(root.financialHistory.entries.length,log+1);
-  assert.equal(root.skills.xpById.gardening,12);
+  assert.equal(root.skills.xpById.gardening,9);
   assert.equal(root.world.outdoors.gardens[id].harvestedAt,null);
   assert.equal(settleGardenAction(root,'alex',id,'replant'),false);
   const restored=loadHousehold(copy(root));
   assert.equal(restored.shop.credits,balance-30);
-  assert.equal(restored.skills.xpById.gardening,12);
+  assert.equal(restored.skills.xpById.gardening,9);
 });
 test('GARDEN: panel shows personal tier, actual projected harvest and stable caps',()=>{
   const {root,id}=plot();
@@ -133,7 +133,7 @@ test('GARDEN: panel shows personal tier, actual projected harvest and stable cap
   root.kitchen.pantry.herbs=15;
   sheet=gardenActionSheet(root,'alex',id);
   assert.equal(sheet.actions.find(a=>a.actionId==='harvest').available,false);
-  assert.equal(creditGardenPractice(root.skills,HOBBY_SKILLS,'water').gained,10);
+  assert.equal(creditGardenPractice(root.skills,HOBBY_SKILLS,'water').gained,7.5);
   const full=copy(root.skills);full.xpById.gardening=1190;
   const maxed=creditGardenPractice(full,HOBBY_SKILLS,'harvest');
   assert.equal(maxed.gained,0);assert.equal(maxed.progress.xpById.gardening,1190);

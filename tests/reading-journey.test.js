@@ -107,7 +107,7 @@ test('H1n all stages preserve shelf identity and only real seated time earns lit
   assert.equal(actor.action.elapsed,0,'opening does not credit its transition tick');
   assert.equal(actor.skills.xpById.literature,undefined);
   tickHousehold(r,9);
-  assert.equal(actor.skills.xpById.literature,9);
+  assert.equal(actor.skills.xpById.literature,6.75);
   assert.equal(actor.activitySession.awardedMinutes,9);
   assert.equal(actor.action.targetInstanceId,id);
   tickHousehold(r,27);
@@ -115,9 +115,9 @@ test('H1n all stages preserve shelf identity and only real seated time earns lit
   assert.equal(actor.action.phase,'walking');
   assert.equal(actor.action.elapsed,36);
   assert.equal(actor.activitySession.phase,'ready');
-  assert.equal(actor.skills.xpById.literature,36);
+  assert.equal(actor.skills.xpById.literature,27);
   returnBook(r);
-  assert.equal(actor.skills.xpById.literature,36);
+  assert.equal(actor.skills.xpById.literature,27);
   assert.equal(actor.event,'Книга возвращена в шкаф');
 });
 test('H1n pause and v1 reload of sitting, reading and returning cannot create extra XP',()=>{
@@ -132,22 +132,22 @@ test('H1n pause and v1 reload of sitting, reading and returning cannot create ex
   assert.deepEqual(loaded,frozen);
   loaded.paused=false;
   tickHousehold(loaded,2.4);tickHousehold(loaded,11);
-  assert.equal(loaded.skills.xpById.literature,11);
+  assert.equal(loaded.skills.xpById.literature,8.25);
   loaded=loadHousehold(copy(loaded));
   assert.equal(readingStage(loaded.action),'reading');
-  assert.equal(loaded.skills.xpById.literature,11);
+  assert.equal(loaded.skills.xpById.literature,8.25);
   tickHousehold(loaded,25);
   assert.equal(readingStage(loaded.action),'closing');
   loaded=loadHousehold(copy(loaded));
   assert.equal(readingStage(loaded.action),'closing');
   returnBook(loaded);
-  assert.equal(loaded.skills.xpById.literature,36);
+  assert.equal(loaded.skills.xpById.literature,27);
   assert.equal(loaded.action,null);
 });
 test('H1n lost/warehoused seat or shelf cannot become a ghost reading session',()=>{
   const r=newHousehold(),id=buyShelf(r);
   start(r,id);beginActualReading(r);tickHousehold(r,4);
-  assert.equal(r.skills.xpById.literature,4);
+  assert.equal(r.skills.xpById.literature,3);
   const saved=copy(r);
   saved.action.readingSeatInstanceId='home-toilet-1';
   assert.equal(loadHousehold(saved).action,null,'forged seat ID cannot inherit the session');
@@ -158,7 +158,7 @@ test('H1n lost/warehoused seat or shelf cannot become a ghost reading session',(
   r.world.furniture=moved.world;
   tickHousehold(r,6);
   assert.equal(actor.action,null);
-  assert.equal(actor.skills.xpById.literature,4);
+  assert.equal(actor.skills.xpById.literature,3);
 });
 test('H1n safe stage validation rejects forged time, bogus stage and eager use',()=>{
   const base={id:'hobby',phase:'walking',readingStage:'toShelf',
