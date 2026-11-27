@@ -24,7 +24,7 @@ for(const arm of ['baseline','adaptive']){
   if(arm==='baseline')for(const path of files)writeFileSync(join(scratch,path),execFileSync('git',['show',base+':'+path],{maxBuffer:10e6}));
   const hashes=Object.fromEntries(files.map(path=>[path,hash(readFileSync(join(scratch,path)))]));
   let failure=null;
-  try{execFileSync(process.execPath,['tests/gc-03-property-probe.mjs'],{cwd:scratch,stdio:'inherit',timeout:360000});}catch(e){failure=String(e);}
+  try{execFileSync(process.execPath,['tests/gc-03-property-probe.mjs'],{cwd:scratch,stdio:'inherit',timeout:480000});}catch(e){failure=String(e);}
   const data=JSON.parse(readFileSync(join(scratch,'artifacts/gc-03-adaptive/property/report.json'),'utf8'));
   writeFileSync(join(out,arm+'.json'),JSON.stringify({arm,source:arm==='baseline'?base:sha,hashes,failure,data},null,2));
   arms[arm]={data,failure,hashes};
@@ -34,7 +34,13 @@ const sum=(map,suffix)=>Object.entries(map).filter(([k])=>k.endsWith(':'+suffix)
 const rows=[],failures=[];
 for(const [arm,a] of Object.entries(arms)){
  if(a.failure||a.data.failures.length)failures.push({arm,error:a.failure,details:a.data.failures});
+ // A timeout may leave a readable but incomplete checkpoint; never accept it.
  assert.equal(a.data.policies.length,15);
+ if(!a.data.policies.every(p=>p.status==='PASS'&&p.daily.length===30)||
+    a.data.controls.replay!=='PASS'||a.data.checkpoints?.length!==28||
+    a.data.propertyComparisons?.length!==28)
+  failures.push({arm,error:'incomplete 30-day rows, replay or final checkpoints'});
+
 }
 for(const a of arms.baseline.data.policies.filter(p=>!p.replay)){
  const b=arms.adaptive.data.policies.find(p=>!p.replay&&p.block.date===a.block.date&&p.variant.name===a.variant.name);
@@ -51,6 +57,14 @@ for(const row of rows.filter(x=>x.variant.endsWith('-base'))){
  pairs.push({block:row.block,policy:row.variant,baselineSavedMinutes:row.baseline.sleepMinutes-p.baseline.sleepMinutes,adaptiveSavedMinutes:row.adaptive.sleepMinutes-p.adaptive.sleepMinutes,baselineCriticalDelta:p.baseline.criticalEnergy-row.baseline.criticalEnergy,adaptiveCriticalDelta:p.adaptive.criticalEnergy-row.adaptive.criticalEnergy});
 }
 assert.equal(pairs.length,6);
+if(nightAware){
+ for(const row of rows.filter(x=>x.variant!=='no-intervention')){
+  if(row.adaptive.criticalEnergy>row.baseline.criticalEnergy)
+   failures.push({block:row.block,variant:row.variant,error:'critical energy exceeds matched bedtime baseline'});
+ }
+ for(const pair of pairs)if(pair.adaptiveSavedMinutes<=0)
+  failures.push({block:pair.block,policy:pair.policy,error:'premium sleep benefit lost'});
+}
 writeFileSync(join(out,'comparison.json'),JSON.stringify({sha,base,nightAware,rows,pairs,failures},null,2));
 console.log(JSON.stringify({nightAware,rows,pairs,failures}));
 assert.deepEqual(failures,[]);
