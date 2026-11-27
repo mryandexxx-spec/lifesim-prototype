@@ -1,27 +1,20 @@
 name: LIFE-QOL-R1 A/B
 on:
-  pull_request:
-    paths:
-      - 'src/sleep-acceleration.js'
-      - 'src/gardening.js'
-      - 'src/garden-presentation.js'
-      - 'tests/pf-14-*'
-      - 'tests/pf-15-*'
-      - '.github/workflows/life-qol-r1-ab.yml'
+  workflow_call:
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: life-qol-r1-ab-${{ github.event.pull_request.number }}
+  group: life-qol-r1-ab-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   mobile-speed-garden:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'fix/life-qol-r1-ab'
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
