@@ -41,6 +41,7 @@ test('PF-05 grooming and speech keep distinct labels, duration, start and comple
     tickHousehold(root,speech?16:9);
     assert.equal(actor.action,null);assert.equal(actor.skills.xpById.charisma||0,speech?13.5:0);
     assert.match(actor.event,speech?/Речь отрепетирована/:/Причесаться у зеркала — готово/);
+    assert.equal(verifiedLastEvent(actor.event)?.code,'completed');
     assert.equal(actor.needs.social>25,speech);
   }
 });
@@ -70,6 +71,9 @@ test('PF-05 last event is a verified completion and not an active intent',()=>{
   assert.equal(verifiedLastEvent('Речь отрепетирована · харизма +18 XP')?.code,'completed');
   assert.equal(verifiedLastEvent('Речь отрепетирована · харизма +9 XP')?.code,'completed');
   assert.equal(verifiedLastEvent('Речь отрепетирована · харизма +13.5 XP')?.code,'completed');
+  assert.equal(verifiedLastEvent('Речь отрепетирована · харизма +0.125 XP')?.code,'completed');
+  assert.equal(verifiedLastEvent('Речь отрепетирована · харизма +13. XP'),null);
+  assert.equal(verifiedLastEvent('Речь отрепетирована · харизма +-1 XP'),null);
   assert.equal(verifiedLastEvent('Репетировать речь'),null);
   assert.equal(verifiedLastEvent('Практика речи прервана: зеркало недоступно')?.code,'interrupted');
 });
