@@ -72,7 +72,7 @@ for(const [engine,launcher] of [['chromium',chromium],['webkit',webkit]]){
   await step('boot',async()=>{await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});await ready();await pause();assert.ok((await page.locator('#game-canvas').screenshot()).length>2000);
    const target=await page.locator('#mind-toggle').boundingBox();assert.ok(target&&target.width>=44&&target.height>=44,'profile target clipped '+JSON.stringify(target));
    await layout();});
-  await step('empty-biography',async()=>{await tap('#mind-toggle');await tap('#mind-tab-biography');assert.match(await page.locator('#mind-biography-tab').innerText(),/Пока нет записанных/);await tap('#mind-tab-overview');await tap('#mind-close',false);await layout();});
+  await step('empty-biography',async()=>{await tap('#mind-toggle');await tap('#mind-tab-biography');assert.match(await page.locator('#mind-biography-tab').innerText(),/Пока нет записанных/);row.steps.at(-1).openBiographyImage=await screenshot('open-empty-biography');await tap('#mind-tab-overview');await tap('#mind-close',false);await layout();});
   await step('open-and-skip',async()=>{await open();const before=await state();
    assert.match(await page.locator(day).innerText(),/Продать картину/);
    await tap(week+' [data-task-operation="dismiss"]');
@@ -128,9 +128,9 @@ for(const [engine,launcher] of [['chromium',chromium],['webkit',webkit]]){
    assert.equal(after.shop.credits-before.shop.credits,receipt.delta);
    assert.equal(after.lifeBiography.byResident.alex.sale.proof,receipt.id);assert.equal(after.lifeBiography.byResident.mira,undefined);assert.equal(after.lifeAspirations.byResident.alex.earned,receipt.delta);assert.equal(after.lifeAspirations.byResident.mira.earned,0);
    await tap('#mind-close',false);await open();assert.equal(await page.locator(day).getAttribute('data-status'),'complete');await tap('#queue-close');});
-  await step('biography-reload-isolation',async()=>{const before=await state();await page.reload({waitUntil:'domcontentloaded'});await ready();await pause();assert.deepEqual((await state()).lifeBiography,before.lifeBiography);await tap('#mind-toggle');await tap('#mind-tab-biography');assert.match(await page.locator('#mind-biography-tab').innerText(),/продажа картины/i);await tap('#mind-view-mira',false);assert.match(await page.locator('#mind-biography-tab').innerText(),/Пока нет записанных/);await tap('#mind-tab-overview');await tap('#mind-close',false);await layout();});
+  await step('biography-reload-isolation',async()=>{const before=await state();await page.reload({waitUntil:'domcontentloaded'});await ready();await pause();assert.deepEqual((await state()).lifeBiography,before.lifeBiography);await tap('#mind-toggle');await tap('#mind-tab-biography');assert.match(await page.locator('#mind-biography-tab').innerText(),/продажа картины/i);row.steps.at(-1).openBiographyImage=await screenshot('open-filled-biography');await tap('#mind-view-mira',false);assert.match(await page.locator('#mind-biography-tab').innerText(),/Пока нет записанных/);await tap('#mind-tab-overview');await tap('#mind-close',false);await layout();});
   if(extra)await step('extra-resident',async()=>{await tap('#pick-resident_3');await page.locator('#cas-resident-details').waitFor({state:'visible'});
-   await tap('#cas-resident-details details:has(> #extra-biography) summary');assert.match(await page.locator('#extra-biography').innerText(),/Пока нет записанных/);
+   await tap('#cas-resident-details details:has(> #extra-biography) summary');assert.match(await page.locator('#extra-biography').innerText(),/Пока нет записанных/);row.steps.at(-1).openBiographyImage=await screenshot('open-extra-biography');
    const profile='#extra-aspiration-card';assert.match(await page.locator(profile).innerText(),/не выбрано/);
    await tap(profile+' .gc-aspiration-picker summary');assert.equal(await page.locator(profile+' [data-aspiration="creative"]').isDisabled(),true);
    await tap(profile+' [data-aspiration="career"]');
