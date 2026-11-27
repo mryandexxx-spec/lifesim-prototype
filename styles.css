@@ -1109,7 +1109,7 @@ button:focus-visible {outline:3px solid #4fa892; outline-offset:2px;}
 
 /* H5b: touch-size gallery actions, separate from the shared gift inventory. */
 .skill-work-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px;align-items:center}
-.skill-work-actions button,.skill-work-actions select{min-height:42px;border:1px solid #a5aa91;border-radius:10px;background:#fcf8e8;color:#28392e;padding:7px 10px;font:inherit;font-size:13px;max-width:100%}
+.skill-work-actions button,.skill-work-actions select{min-height:44px;border:1px solid #a5aa91;border-radius:10px;background:#fcf8e8;color:#28392e;padding:7px 10px;font:inherit;font-size:13px;max-width:100%}
 .skill-work-actions button:active{background:#dcebd8}
 
 /* F5-A touch-first construction mode: independent of Buy/Room and simulation. */
@@ -2802,4 +2802,26 @@ button.time-card:active {transform:translateY(1px);}
   #social-context .social-controls>div{gap:5px;}
   #social-context .social-controls button{min-height:44px;padding:7px 5px;font-size:12px;}
   #social-context .social-summary{padding-right:44px;}
+}
+
+/* GC-04/09: price, subject, goal and confirmation must be visible together.
+ * Scope this to the painting sheet; other object menus keep their layout. */
+#action-sheet:has(#painting-mode-field:not([hidden])) :is(#painting-theme-select,#painting-mode-select,#action-button){
+  min-height:44px;
+}
+#action-sheet:has(#painting-mode-field:not([hidden])) #painting-mode-note{
+  display:block;font-size:12px;line-height:1.3;
+}
+@media (max-height:650px) and (orientation:portrait){
+  #action-sheet:has(#painting-mode-field:not([hidden])){
+    padding:11px 12px;
+    max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 194px);
+  }
+  #action-sheet:has(#painting-mode-field:not([hidden])) #action-description{display:none;}
+  #action-sheet:has(#painting-mode-field:not([hidden])) #action-recipient{
+    margin:3px 0 7px;font-size:12px;line-height:1.25;
+  }
+  #action-sheet:has(#painting-mode-field:not([hidden])) :is(#painting-theme-field,#painting-mode-field){
+    gap:4px;margin-bottom:8px;
+  }
 }

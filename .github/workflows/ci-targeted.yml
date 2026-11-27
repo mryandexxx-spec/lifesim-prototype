@@ -8,6 +8,35 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  gc-04-09-c4-ux:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/gc-04-09-art-market-core' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/gc-c4-http.log 2>&1 &
+          sleep 3
+          node tests/gc-04-09-c4-browser.mjs
+        env:
+          GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-04-09-c4-ux
+          path: artifacts/gc-04-09-c4/
+          if-no-files-found: warn
   ci-cd-r1-d-build:
     if: github.event_name == 'pull_request' && github.head_ref == 'infra/ci-cd-r1-c-release' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
@@ -481,6 +510,16 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: GC-04/09 art market UI touch and v1 persistence
+        if: ${{ contains(github.event.pull_request.title, 'GC-04/09') }}
+        run: node tests/gc-04-09-art-market-browser.mjs
+      - name: Archive GC-04/09 art market UI evidence
+        if: ${{ always() && contains(github.event.pull_request.title, 'GC-04/09') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gc-04-09-art-market-ui
+          path: artifacts/gc-04-09-ui/
+          if-no-files-found: warn
       - name: QSK-05 real original rig movement in 390x844 and 320x568 PlayCanvas
         if: ${{ contains(github.event.pull_request.title, 'QSK-05') }}
         run: node tests/qsk-05-browser-contacts.mjs

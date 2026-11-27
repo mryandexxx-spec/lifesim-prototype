@@ -25,6 +25,8 @@ export function labelQueuedTask(game,task){
   if(task.type==='object')return task.tvTalk===true?'Поговорить с телевизором':
     task.mirrorPractice===true?'Репетировать речь':
       ACTIONS[task.actionId]?.label||'Предмет';
+  if(task.type==='activity'&&task.paintMode)return task.paintMode==='practice'?'Практика живописи · бесплатно':
+    (task.paintMode==='commission'?'Заказ на картину':'Написать картину')+' · '+task.paintExpectedPrice+' кр. при начале';
   if(task.type==='activity')return task.inventoryItemId?'Читать подаренную книгу':
     getActivityDefinition(HOBBY_ACTIVITIES,task.activityId)?.label||'Хобби';
   if(task.type==='social')return SOCIAL_ACTIONS[task.actionId]?.label||'Общение';
@@ -48,6 +50,10 @@ export function labelActiveTask(game,id){
     return SOCIAL_ACTIONS[s.kind]?.label||'Общается';
   }
   const actor=getActor(game,id);
+  if(actor.action?.id==='paint'&&game.artMarket?.byResident?.[id]?.active){
+    const mode=game.artMarket.byResident[id].active.mode;
+    return mode==='practice'?'Практика живописи':mode==='commission'?'Пишет заказную картину':'Пишет картину';
+  }
   if(actor.action?.id==='garden')return labelQueuedTask(game,{type:'garden',actionId:actor.action.gardenActionId});
   if(actor.action?.id==='swim')return poolActivityLabel(actor.action);
   if(mirrorActionLabel(actor.action))return mirrorActionLabel(actor.action);
