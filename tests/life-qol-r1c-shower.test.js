@@ -43,7 +43,7 @@ test('LIFE-QOL shower pause, reload, cancellation and remote target',()=>{
  assert.equal(xp(distant),0);assert.equal(distant.action,null);
 });
 test('LIFE-QOL short shower remains short and scales fun/XP',()=>{
- const s=seed('alex',true,90),n=seed('alex',false,90);
+ const s=seed('alex',true,96),n=seed('alex',false,96);
  const duration=actionDuration(s.action);assert.equal(duration,16);
  tickHousehold(s,duration);tickHousehold(n,duration);
  close(s.needs.fun-n.needs.fun,SHOWER_SINGING_FUN/2);
