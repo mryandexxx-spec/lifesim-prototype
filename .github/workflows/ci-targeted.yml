@@ -447,6 +447,41 @@ jobs:
             !artifacts/cf-anim-calibration-heldout/${{ matrix.profile }}/${{ matrix.clip }}/video-frames/
           if-no-files-found: warn
 
+  cf-anim-mocap-cycle:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-mocap-cycle' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned source audit dependencies
+        run: |
+          python -m pip install --only-binary=:all: numpy==1.26.4 scipy==1.17.1 imageio-ffmpeg==0.6.0 Pillow==11.3.0
+          python -m py_compile tools/cf_anim_mocap_cycle.py
+      - name: Select natural source boundary and capture repeated original motion
+        run: |
+          timeout 450s python -u tools/cf_anim_mocap_cycle.py
+          python -c 'import json; r=json.load(open("artifacts/cf-anim-mocap-cycle/report.json")); print(r["status"]); assert r["status"]=="SOURCE_CYCLE_SCREEN_PASS"'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-mocap-cycle-evidence
+          path: |
+            artifacts/cf-anim-mocap-cycle/
+            !artifacts/cf-anim-mocap-cycle/**/frames/
+          if-no-files-found: error
+
   cf-anim-contact-source:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-contact-contract' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-source]')
     permissions:
