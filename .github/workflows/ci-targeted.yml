@@ -170,6 +170,15 @@ jobs:
         run: |
           python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 playwright==1.56.0 Pillow==11.3.0
           npm ci
+          # These optional vendor repositories are unrelated to Ubuntu's browser
+          # runtime libraries. Disable Microsoft-only lists for this ephemeral runner.
+          for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            [ -f "$f" ] || continue
+            if grep -q 'packages.microsoft.com' "$f" && ! grep -Eq 'https?://[^[:space:]]+' <(grep -v 'packages.microsoft.com' "$f" | grep -v '^#'); then
+              echo "Disabling optional Microsoft package source: $f"
+              sudo mv "$f" "$f.disabled"
+            fi
+          done
           python -m playwright install --with-deps chromium webkit
           python -m py_compile tools/cf_mocap_runtime_bake.py tools/cf_mocap_runtime_idle_bake.py tools/cf_mocap_runtime_idle_replay.py tools/cf_runtime_browser.py
       - name: Bake immutable R8 poses and independently reimport
@@ -200,7 +209,7 @@ jobs:
       - name: Strict native floor/contact gates
         if: ${{ always() && steps.idle_native.outcome == 'success' }}
         run: |
-          python -c 'import json; d=json.load(open("runtime-lab/manifest.json"))["dense"]; print(d); assert d["contactSamples"]>0 and d["floorFailures"]==d["contactFailures"]==0; idle=json.load(open("runtime-lab/manifest.json"))["idle"]; print("idle",idle["worstFloorM"],idle["floorFailures"]); assert idle["floorFailures"]==0'
+          python -c 'import json; d=json.load(open("runtime-lab/manifest.json"))["dense"]; print(d); assert d["contactSamples"]>0 and d["floorFailures"]==d["contactFailures"]==0; idle=json.load(open("runtime-lab/manifest.json"))["idle"]; print("idle",idle["worstFloorM"],idle["floorFailures"]); assert idle["floorFailures"]==idle["soleFailures"]==0'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
