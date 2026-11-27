@@ -31,7 +31,8 @@ import {readingStage,readingRouteId,arriveReadingJourney} from '../src/reading-j
 const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 if(process.env.GC_EXPECTED_SHA)assert.equal(sha,process.env.GC_EXPECTED_SHA);
 const autonomyDiagnostic=process.env.GC_AUTONOMY_DIAGNOSTIC==='1';
-const ids=['alex','mira'],days=autonomyDiagnostic?7:30;
+const careerDiagnostic=process.env.GC05_CAREER_DIAGNOSTIC==='1';
+const ids=['alex','mira'],days=careerDiagnostic?45:autonomyDiagnostic?7:30;
 const nightAware=process.env.GC_NIGHT_POLICY==='1';
 const MATERIAL=ART_MARKET_PILOT.materials;
 const dir='artifacts/gc-03-adaptive/property';mkdirSync(dir,{recursive:true});
@@ -55,7 +56,12 @@ const shelf=base.world.furniture.instances.find(i=>i.prefabId==='bookcase'&&i.lo
 return {base,easel,shelf};}
 const urgent=[['bladder','toilet',50],['hunger','fridge',55],['energy','bed',45],['hygiene','shower',55],['fun','sofa',50]];
 const count=(map,key,n=1)=>map[key]=(map[key]||0)+n;
-const variants=(autonomyDiagnostic?[
+const variants=(careerDiagnostic?[
+ {name:'editorial-none',policy:'career',food:'home',job:'editorial',social:true},
+ {name:'editorial-trained',policy:'career',food:'home',job:'editorial',train:true,social:true},
+ {name:'art-trained',policy:'career',food:'home',job:'art-studio',artTraining:true,cap:2,social:true},
+ {name:'kitchen-trained',policy:'career',food:'home',job:'kitchen-studio',cookTraining:true,social:true}
+]:autonomyDiagnostic?[
  {name:'auto-career',policy:'core-autonomy',food:'snack',upgrade:false,career:true},
  {name:'auto-free',policy:'core-autonomy',food:'snack',upgrade:false}
 ]:[
@@ -94,7 +100,7 @@ const totalPrepared=h=>h.kitchen.prepared.reduce((n,x)=>n+x.portions,0);
 const totalStock=h=>totalPrepared(h)+h.kitchen.deliveries.length;
 function run(block,variant,replay=false){
  const {policy,dt,arrival,cap}=variant;
- const paintAdmissions={};const startedWalk=new WeakMap();
+ const paintAdmissions={},cookAdmissions={};const startedWalk=new WeakMap();
  const {base,easel,shelf}=fixture(block.date);if(variant.market)assert.ok(enableArtMarketPilot(base));
  const beforeUpgrade=base.shop.credits,upgrade=variant.upgrade?upgradeHouse(base):null;
  const value=placedValue(base),property={beforeUpgrade,upgrade,value,tariffs:tariffs(value),premiumBedMinutes:0,premiumAdmissions:0,premiumCompleted:0,premiumNonFullCompleted:0,premiumWakeMin:null};
@@ -103,7 +109,7 @@ function run(block,variant,replay=false){
  p.sleepEpisodes=[];p.criticalEnergyByPhase={};p.materialCost=0;p.marketOffers=[];p.orderEvents=[];p.declinedOffers=0;let root=structuredClone(base),lastWallet=root.shop.credits,seen=new Set(root.financialHistory.entries.map(e=>e.id)),socialGoal=null;p.socialCompletions=0;
  const automatic=policy==='core-autonomy';
  root.autonomy.enabled=automatic;root.otherSim.autonomy.enabled=automatic;
- const jobs=policy==='career'||variant.career?{[lead]:'editorial',[partner]:'business-center'}:['mixed','single-career'].includes(policy)?{[lead]:'editorial'}:{};
+ const jobs=policy==='career'||variant.career?{[lead]:variant.job||'editorial',[partner]:'business-center'}:['mixed','single-career'].includes(policy)?{[lead]:'editorial'}:{};
  const nextApplication={};
  const note=(kind,result)=>{if(result?.ok){count(p.actions,kind);p.decisions++;}else count(p.rejected,kind+':'+(result?.reason||'unknown'));return result?.ok;};
  const bedtimeEligible=a=>{
@@ -136,7 +142,7 @@ function run(block,variant,replay=false){
         else if(app?.phase==='rejected')note('dismiss-rejected',finishRecruitmentApplication(root,id,'dismiss'));
       }else if(!contract.currentShift&&promotionReadiness(root,id)?.ready)note('promote',promoteCareer(root,id));
     }
-    if(policy==='creative'||(policy==='mixed'&&id===partner)){
+    if(policy==='creative'||(policy==='mixed'&&id===partner)||(variant.artTraining&&id===lead)){
       const actor=getActor(root,id),order=root.artMarket?.byResident[id]?.order,work=(variant.market&&order?.status==='ready'?actor.createdWorks?.find(w=>w.id===order.workId):null)||actor.createdWorks?.[0];
       if(!work)continue;
       if(work.location!=='inventory'){
@@ -166,6 +172,7 @@ function run(block,variant,replay=false){
  }
  function launchFood(id,action,recipe=null){
    const ok=chooseResidentAction(root,action,false,id,action==='cook'?'food-stove-902':'food-table-904',null,null,null,null,recipe);
+   if(ok&&action==='cook')count(cookAdmissions,id+':'+Math.floor((root.minutes-base.minutes)/1440));
    return note(action,{ok});
  }
  function purchase(tx,kind){
@@ -239,7 +246,11 @@ function run(block,variant,replay=false){
      if(needs.length){for(const [key,action] of needs)if(key==='hunger'?chooseFood(id):launch(id,action))break;}
      else if(root.kitchen.dirtyDishes>=6&&launch(id,'wash')){}
      else if(variant.train&&id===lead&&currentSkillLevel(a.skills,HOBBY_SKILLS,'literature')<10&&a.needs.energy>=55&&a.needs.hunger>=55)launch(id,'hobby');
-     else if((policy==='creative'||(policy==='mixed'&&id===partner))&&(variant.adaptive||(a.createdWorks?.length||0)<24)&&a.needs.energy>=55&&a.needs.hunger>=55&&(!cap||(paintAdmissions[id+':'+Math.floor((root.minutes-base.minutes)/1440)]||0)<cap))launch(id,'paint');
+     else if(variant.cookTraining&&id===lead&&currentSkillLevel(a.skills,HOBBY_SKILLS,'cooking')<5&&totalPrepared(root)<=3&&!ids.some(other=>getActor(root,other).action?.id==='cook')&&!(cookAdmissions[id+':'+Math.floor((root.minutes-base.minutes)/1440)]||0)){
+       if(root.kitchen.pantry.vegetables<2)purchase(proposeKitchenRestock(root,'vegetables',id),'restock');
+       if(canCookRecipe(root.kitchen,'cook.soup',0))launchFood(id,'cook','cook.soup');
+     }
+     else if((policy==='creative'||(policy==='mixed'&&id===partner)||(variant.artTraining&&id===lead&&currentSkillLevel(a.skills,HOBBY_SKILLS,'painting')<5))&&(variant.adaptive||(a.createdWorks?.length||0)<24)&&a.needs.energy>=55&&a.needs.hunger>=55&&(!cap||(paintAdmissions[id+':'+Math.floor((root.minutes-base.minutes)/1440)]||0)<cap))launch(id,'paint');
     }
    }
    const walking=ids.map(id=>{const a=getActor(root,id).action;return [id,a,routeOf(a)];}).filter(([,a,route])=>a?.phase==='walking'&&route);
@@ -319,6 +330,28 @@ function run(block,variant,replay=false){
  flush();return p;
 }
 for(const block of report.blocks)for(const variant of variants)run(block,variant);
+if(careerDiagnostic){
+ try{
+  assert.equal(report.policies.length,8);
+  for(const p of report.policies){
+   assert.equal(p.status,'PASS');assert.equal(p.daily.length,45);
+   assert.equal(p.travelFailures,0,'career travel failure');
+   const lead=p.block.swap?'mira':'alex',last=p.daily.at(-1),a=last.actors.find(x=>x.id===lead);
+   assert.ok(a.career?.workedShifts>=20,'career not exercised');
+   assert.equal(a.career.missedShifts,0);
+   assert.equal(last.debt,0);
+   assert.ok(p.food.batches>0&&p.food.servings>0);
+   if(p.variant.name==='editorial-none'){assert.equal(a.career.level,0,'untrained career bypass');assert.equal(a.skills.xpById.literature||0,0);}
+   else {
+    const skill=p.variant.job==='art-studio'?'painting':p.variant.job==='kitchen-studio'?'cooking':'literature';
+    assert.ok((a.skills.xpById[skill]||0)>0,'training absent '+skill);
+   }
+  }
+  report.controls.career='PASS';
+ }catch(e){report.failures.push({control:e.stack||String(e)});}
+ flush();assert.deepEqual(report.failures,[],'career diagnostic harness failed');
+ process.exit(0);
+}
 if(autonomyDiagnostic){
  const first=report.policies[0],again=run(report.blocks[0],variants[0],true);
  try{
