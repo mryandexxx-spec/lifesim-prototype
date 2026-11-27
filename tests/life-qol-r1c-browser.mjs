@@ -23,7 +23,10 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
    if(id==='mira')await page.locator('#pick-mira').tap();
    // Existing labeled world interaction opens the ordinary fixture sheet.
    // The singing action itself is a genuine mobile touch, not a synthetic dispatch.
-   await page.evaluate(()=>{const el=[...document.querySelectorAll('#hotspots .hotspot')].find(x=>x.textContent.includes('Душевая'));if(!el)throw Error('Shower hotspot missing');el.click();});
+   const marker=page.locator('#hotspots .hotspot[data-action-id="shower"]').first();
+   await marker.waitFor({state:'attached',timeout:15000});
+   result.marker={instance:await marker.getAttribute('data-instance-id'),text:await marker.textContent()};
+   await marker.evaluate(el=>el.click());
    const button=page.locator('#shower-sing-button');
    assert.ok(await button.isVisible());assert.ok(await page.locator('#action-button').isVisible());
    const box=await button.boundingBox();assert.ok(box&&box.height>=44&&box.x>=0&&box.y>=0&&box.y+box.height<=height);

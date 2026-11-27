@@ -18,7 +18,7 @@ jobs:
           node-version: '22'
       - run: npm ci
       - name: Shower, skills, queues and existing music regression
-        run: node --test tests/life-qol-r1c-shower.test.js tests/shower.test.js tests/meshy-shower-runtime.test.js tests/action-queue.test.js tests/hobbies-h4.test.js tests/gc-05-skill-pacing.test.js tests/h2b-music-dance.test.js tests/life-charisma-r1.test.js
+        run: node --test tests/life-qol-r1c-shower.test.js tests/shower.test.js tests/meshy-shower-runtime.test.js tests/action-queue.test.js tests/hobbies-h4.test.js tests/gc-05-skill-pacing.test.js tests/hobbies-h2.test.js tests/h2b-music-dance.test.js tests/life-charisma-r1.test.js
       - name: Mobile action, actual usage and saved music XP
         run: |
           npm install --no-save playwright@1.56.1

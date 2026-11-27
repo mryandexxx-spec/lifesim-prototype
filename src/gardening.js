@@ -13,7 +13,7 @@ export const GARDEN_HYDRATION_MINUTES=2160;
 export const GARDEN_CARE_COOLDOWN=1440;
 export const GARDEN_WATER_FUN=3;
 export const GARDEN_TALK_SOCIAL=4;
-export const GARDEN_TALK_COOLDOWN=360;
+export const GARDEN_TALK_SOCIAL_CAP=45;
 export const GARDEN_ACTIONS=Object.freeze(['water','admire','inspect','harvest','replant','talk']);
 export const GARDEN_DURATION=Object.freeze({water:15,admire:8,inspect:8,harvest:12,replant:10,talk:12});
 export const GARDEN_REPLANT_PRICE=30;
@@ -131,11 +131,8 @@ export function gardenRequestStillValid(root,residentId,instanceId,actionId){
   if(actionId==='inspect')return !view.mature&&view.stage>=1;
   if(actionId==='water')return !view.mature&&
     (view.lastWateredAt===null||root.minutes-view.lastWateredAt>=GARDEN_CARE_COOLDOWN);
+  if(actionId==='talk')return true;
   const rewards=restoreGardenRewards(root.gardenRewards);
-  if(actionId==='talk'){
-    const last=rewards[residentId==='mira'?'miraLastTalkAt':'alexLastTalkAt'];
-    return last===undefined||root.minutes-last>=GARDEN_TALK_COOLDOWN;
-  }
   const last=residentId==='mira'?rewards.miraLastAdmireAt:rewards.alexLastAdmireAt;
   return view.mature&&(last===null||root.minutes-last>=GARDEN_CARE_COOLDOWN);
 }
@@ -184,11 +181,15 @@ export function settleGardenAction(root,residentId,instanceId,actionId){
     actor.event='Полил(а) грядку — растение растёт · досуг';
   }else if(actionId==='talk'){
     const rewards=restoreGardenRewards(root.gardenRewards);
-    rewards[residentId==='mira'?'miraLastTalkAt':'alexLastTalkAt']=root.minutes;
+    const key=residentId==='mira'?'miraLastTalkAt':'alexLastTalkAt';
+    // Retain the v1 watermark to reject replay of a settlement at the same tick.
+    if(rewards[key]===root.minutes)return false;
+    rewards[key]=root.minutes;
     root.gardenRewards=rewards;
-    // A solitary activity, not a relationship or social graph receipt.
-    actor.needs.social=Math.min(100,actor.needs.social+GARDEN_TALK_SOCIAL);
-    actor.event='Поговорил(а) с растением · общение';
+    // The benefit is bounded, not access to the action. Never reduce existing social.
+    const gain=Math.max(0,Math.min(GARDEN_TALK_SOCIAL,GARDEN_TALK_SOCIAL_CAP-actor.needs.social));
+    actor.needs.social+=gain;
+    actor.event=gain>0?'Поговорил(а) с растением · общение':'Поговорил(а) с растением';
   }else if(actionId==='inspect'){
     actor.event='Осмотрел(а), как подросло растение';
   }else{

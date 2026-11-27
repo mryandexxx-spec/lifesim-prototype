@@ -5,6 +5,7 @@ import {newHousehold,chooseResidentAction,bedDestinationFor} from '../src/househ
 import {arrive,SAVE_KEY} from '../src/simulation.js';
 import {hireCareer} from '../src/career-state.js';
 import {progressCareerWork,arriveCareerPortal} from '../src/career-work.js';
+import {startWorkIncident,pendingWorkIncident} from '../src/career-incidents.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 function seedFor(mode){
  const root=newHousehold('2026-11-16');
@@ -26,6 +27,8 @@ function seedFor(mode){
    root.careerSystem.byResident[id].currentShift.incidentPlan={version:1,status:'none',rarity:null,dueAt:null,proofScenes:[]};
   }
   root.minutes=954;root.otherSim.minutes=954;
+  assert.ok(startWorkIncident(root,'alex',root.minutes));
+  assert.ok(pendingWorkIncident(root,'alex'));
  }
  return root;
 }

@@ -8,10 +8,14 @@ import {HOBBY_SKILLS,MUSIC_SKILL_ID} from './hobby-reading.js';
 export const MUSIC_STYLE_NOTES=Object.freeze({
   'music.calm':Object.freeze([261.63,329.63,392,329.63,293.66,261.63,220,293.66]),
   'music.rhythmic':Object.freeze([220,330,440,330,293.66,440,392,330]),
-  'music.dreamy':Object.freeze([349.23,523.25,493.88,392,440,587.33,523.25,392]),
+  'music.dreamy':Object.freeze([349.23,523.25,493.88,392,440,587.33,523.25,392])
+});
+// Shower cues are not selectable stereo tracks.
+export const SHOWER_SINGING_NOTES=Object.freeze({
   'shower.beginner':Object.freeze([262,318,403,327,287,267,223,285]),
   'shower.confident':Object.freeze([261.63,329.63,392,329.63,293.66,261.63,220,293.66])
 });
+const AUDIO_CUES=Object.freeze({...MUSIC_STYLE_NOTES,...SHOWER_SINGING_NOTES});
 export function audibleMusicStyle(actors,{paused=false,hidden=false,editing=false}={}){
   if(paused||hidden||editing||!Array.isArray(actors))return null;
   const actor=actors.find(a=>a?.action?.id==='music'&&a.action.phase==='using'&&
@@ -73,11 +77,11 @@ export function createMusicAudio({contextFactory=null}={}){
   }
   function update(requested){
     const allowed=enabled&&!muted&&context?.state==='running'&&
-      Object.hasOwn(MUSIC_STYLE_NOTES,requested||'');
+      Object.hasOwn(AUDIO_CUES,requested||'');
     if(!allowed){style=null;volume(0);return false;}
     if(requested!==style){style=requested;index=0;nextTime=context.currentTime+.035;}
     volume(style.startsWith('shower.')?.028:.045);
-    const notes=MUSIC_STYLE_NOTES[style],step=style==='music.rhythmic'?.23:.38;
+    const notes=AUDIO_CUES[style],step=style==='music.rhythmic'?.23:.38;
     nextTime=Math.max(nextTime,context.currentTime);
     for(let count=0;count<3&&nextTime<context.currentTime+.32;count++){
       note(notes[index%notes.length],nextTime,step*.85,
