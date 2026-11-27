@@ -31,9 +31,10 @@ import {readingStage,readingRouteId,arriveReadingJourney} from '../src/reading-j
 const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 if(process.env.GC_EXPECTED_SHA)assert.equal(sha,process.env.GC_EXPECTED_SHA);
 const ids=['alex','mira'],days=30;
+const nightAware=process.env.GC_NIGHT_POLICY==='1';
 const MATERIAL=ART_MARKET_PILOT.materials;
 const dir='artifacts/gc-03-adaptive/property';mkdirSync(dir,{recursive:true});
-const report={sha,model:'GC04/09 PROPERTY R2-FIX explicit premium sleep target; actual current bill, food, career, art and furniture transactions; optional extra premium bed; common endowed kitchen and purchased easel/bookcase setup; alternative tariffs are shadow accounting only, not behavioral feedback; modeled A* arrival; 1 minute ticks, 5 minute policy cadence, 30 minute admin, no real UI/traversal',policies:[],failures:[],controls:{},blocks:[{date:'2026-11-26',swap:false},{date:'2026-12-01',swap:true,heldOut:true}]};
+const report={sha,nightAware,model:'GC04/09 PROPERTY R2-FIX explicit premium sleep target; actual current bill, food, career, art and furniture transactions; optional extra premium bed; common endowed kitchen and purchased easel/bookcase setup; alternative tariffs are shadow accounting only, not behavioral feedback; modeled A* arrival; 1 minute ticks, 5 minute policy cadence, 30 minute admin, no real UI/traversal',policies:[],failures:[],controls:{},blocks:[{date:'2026-11-26',swap:false},{date:'2026-12-01',swap:true,heldOut:true}]};
 const flush=()=>writeFileSync(dir+'/report.json',JSON.stringify(report,null,2)+'\n');
 function fixture(date){const base=newHousehold(date);base.calendar.anchorConfirmed=true;
 base.world.furniture.instances.push(
@@ -95,12 +96,17 @@ function run(block,variant,replay=false){
  const value=placedValue(base),property={beforeUpgrade,upgrade,value,tariffs:tariffs(value),premiumBedMinutes:0,premiumAdmissions:0,premiumCompleted:0,premiumNonFullCompleted:0,premiumWakeMin:null};
  const lead=block.swap?'mira':'alex',partner=block.swap?'alex':'mira';
  const p={block,variant,policy,replay,paintAdmissions,property,status:'OPEN',initial:{wallet:base.shop.credits,minutes:base.minutes,needs:ids.map(id=>structuredClone(getActor(base,id).needs))},daily:[],actions:{},minutesByAction:{},timeClasses:{},rejected:{},criticalNeedMinutes:{},decisions:0,receipts:{},cashByKind:{},events:{},travelFailures:0,sales:0,negativeSales:0,negativeBills:0,readingReturns:0,readingRoutes:{},artReceipts:[],food:{purchases:0,readyOrders:0,restocks:0,batches:0,servings:0,delivered:0,escapeSnacks:0,cost:0,routes:{}}};report.policies.push(p);
- p.materialCost=0;p.marketOffers=[];p.orderEvents=[];p.declinedOffers=0;let root=structuredClone(base),lastWallet=root.shop.credits,seen=new Set(root.financialHistory.entries.map(e=>e.id)),socialGoal=null;p.socialCompletions=0;
+ p.sleepEpisodes=[];p.criticalEnergyByPhase={};p.materialCost=0;p.marketOffers=[];p.orderEvents=[];p.declinedOffers=0;let root=structuredClone(base),lastWallet=root.shop.credits,seen=new Set(root.financialHistory.entries.map(e=>e.id)),socialGoal=null;p.socialCompletions=0;
  const automatic=policy==='core-autonomy';
  root.autonomy.enabled=automatic;root.otherSim.autonomy.enabled=automatic;
  const jobs=policy==='career'?{[lead]:'editorial',[partner]:'business-center'}:['mixed','single-career'].includes(policy)?{[lead]:'editorial'}:{};
  const nextApplication={};
  const note=(kind,result)=>{if(result?.ok){count(p.actions,kind);p.decisions++;}else count(p.rejected,kind+':'+(result?.reason||'unknown'));return result?.ok;};
+ const bedtimeEligible=a=>{
+  const hour=(root.minutes%1440)/60;
+  return nightAware&&(hour>=21||hour<6)&&a.needs.energy<70&&
+    !urgent.some(([k])=>k!=='energy'&&a.needs[k]<24);
+ };
  function administration(){
   if(policy==='no-intervention')return;
   const bill=householdBillView(root);
@@ -209,7 +215,7 @@ function run(block,variant,replay=false){
     if(t*dt%5===0&&shift?.phase==='returning')finishCareerReturn(root,id);
    }
    if(t*dt%5===0&&policy!=='no-intervention'&&!root.socialAction){
-    if(variant.social&&ids.every(id=>!getActor(root,id).action&&!residentUnavailableForHome(root,id))&&root.minutes>=(socialGoal??base.minutes)&&ids.every(id=>Math.min(...urgent.map(([key])=>getActor(root,id).needs[key]))>=40)){
+    if(variant.social&&ids.every(id=>!getActor(root,id).action&&!residentUnavailableForHome(root,id)&&!bedtimeEligible(getActor(root,id)))&&root.minutes>=(socialGoal??base.minutes)&&ids.every(id=>Math.min(...urgent.map(([key])=>getActor(root,id).needs[key]))>=40)){
      const a=getActor(root,lead),b=getActor(root,partner);
      const target=nearestWalkable({x:b.position.x+.4,z:b.position.z},root.world);
      if(findPath(a.position,target,root.world)&&startSocial(root,'talk',lead,target)){
@@ -224,6 +230,7 @@ function run(block,variant,replay=false){
       else if(choice)count(p.rejected,'unsupported:'+choice);
       continue;
      }
+     if(bedtimeEligible(a)&&launch(id,'bed'))continue;
      const needs=urgent.filter(([k,,limit])=>a.needs[k]<limit).sort((x,y)=>a.needs[x[0]]/x[2]-a.needs[y[0]]/y[2]);
      if(needs.length){for(const [key,action] of needs)if(key==='hunger'?chooseFood(id):launch(id,action))break;}
      else if(root.kitchen.dirtyDishes>=6&&launch(id,'wash')){}
@@ -238,6 +245,7 @@ function run(block,variant,replay=false){
    if(walkingSocial&&!startedWalk.has(walkingSocial))startedWalk.set(walkingSocial,root.minutes);
    for(const id of ids){
     const a=getActor(root,id),phase=root.careerSystem.byResident[id]?.currentShift?.phase;
+    if(a.needs.energy<20)count(p.criticalEnergyByPhase,id+':'+(phase||a.action?.id||'idle'),dt);
     if(upgrade&&a.action?.id==='bed'&&a.action.phase==='using'&&a.action.targetInstanceId===upgrade.id)p.property.premiumBedMinutes+=dt;
     count(p.minutesByAction,id+':'+(phase==='working'?'work':root.socialAction?'social':a.action?.id||'idle'),dt);
     const kind=phase==='working'?'work':phase&&['departing','returning','waiting'].includes(phase)?'work-transit-wait':(a.action?.phase==='walking'&&(a.action.id!=='hobby'||readingRouteId(a.action)))||root.socialAction?.phase==='walking'?'travel':root.socialAction?'social':a.action?.id==='bed'?'sleep':['fridge','toilet','shower','wash','dining','cook'].includes(a.action?.id)?'care':['paint','hobby','music'].includes(a.action?.id)?'hobby':a.action?'other-leisure':'idle';
@@ -246,8 +254,17 @@ function run(block,variant,replay=false){
    }
    const beforeStock=totalStock(root),beforeVegetables=root.kitchen.pantry.vegetables,beforePending=root.kitchen.deliveries.length;
    const seated=ids.filter(id=>{const a=getActor(root,id).action;return a?.id==='dining'&&a.phase==='using'&&a.diningStage==='eating'&&!a.portionTaken&&a.selectedRecipeId;}).length;
+   const sleepBefore=ids.flatMap(id=>{const a=getActor(root,id);return a.action?.id==='bed'&&a.action.phase==='using'?[{id,action:a.action,elapsed:a.action.elapsed}]:[];});
    const sleeping=upgrade?ids.filter(id=>{const a=getActor(root,id).action;return a?.id==='bed'&&a.phase==='using'&&a.targetInstanceId===upgrade.id;}):[];
    const before=root.minutes, priorSocialAt=root.relationship.nextSocialAt, events=tickHousehold(root,dt)||[];
+   for(const entry of sleepBefore){
+    const a=getActor(root,entry.id);
+    if(a.action===entry.action&&a.action.phase==='using')continue;
+    const phase=root.careerSystem.byResident[entry.id]?.currentShift?.phase;
+    const outcome=fullWake(a,dt)?'full':bedCompleted(a)?'nonfull-natural':phase&&['departing','working','waiting'].includes(phase)?'work-interrupt':'other-interrupt';
+    p.sleepEpisodes.push({kind:'end',id:entry.id,at:root.minutes,elapsed:entry.action.elapsed,energy:a.needs.energy,bed:entry.action.targetInstanceId,outcome,phase:phase||null});
+    assert.notEqual(outcome,'nonfull-natural','natural wake before full');
+   }
    for(const id of sleeping){const a=getActor(root,id);if(bedCompleted(a)){if(fullWake(a,dt)){p.property.premiumCompleted++;p.property.premiumWakeMin=Math.min(p.property.premiumWakeMin??100,a.needs.energy);}else p.property.premiumNonFullCompleted++;}}
    if(root.relationship.nextSocialAt>priorSocialAt)p.socialCompletions++;
    const newBatches=(beforeVegetables-root.kitchen.pantry.vegetables)/2;
@@ -266,7 +283,7 @@ function run(block,variant,replay=false){
       action.id==='tv'&&action.watchSeatInstanceId?furnitureActionApproach(root.world,'sofa',action.watchSeatInstanceId):
       furnitureActionApproach(root.world,action.id,action.targetInstanceId);
     if(!goal||!findPath(a.position,goal,root.world)){p.travelFailures++;continue;}
-    a.position={x:goal.x,z:goal.z};if(action.id==='hobby'){assert.ok(arriveReadingJourney(action));count(p.readingRoutes,route);}else {arrive(a);if(action.id==='cook'){action.cookStage={toFridge:'taking',toPrep:'preparing',toStove:'cooking',toFridgeStore:'storing'}[action.cookStage];assert.ok(action.cookStage);count(p.food.routes,route);}else if(action.id==='dining'){action.diningStage={toFridge:'taking',toSeat:'eating'}[action.diningStage];assert.ok(action.diningStage);count(p.food.routes,route);}}
+    a.position={x:goal.x,z:goal.z};if(action.id==='hobby'){assert.ok(arriveReadingJourney(action));count(p.readingRoutes,route);}else {arrive(a);if(action.id==='bed')p.sleepEpisodes.push({kind:'start',id,at:root.minutes,energy:a.needs.energy,bed:action.targetInstanceId});if(action.id==='cook'){action.cookStage={toFridge:'taking',toPrep:'preparing',toStove:'cooking',toFridgeStore:'storing'}[action.cookStage];assert.ok(action.cookStage);count(p.food.routes,route);}else if(action.id==='dining'){action.diningStage={toFridge:'taking',toSeat:'eating'}[action.diningStage];assert.ok(action.diningStage);count(p.food.routes,route);}}
    }
    if(walkingSocial&&root.socialAction===walkingSocial&&root.minutes-startedWalk.get(walkingSocial)>=arrival){
     const a=getActor(root,walkingSocial.initiator),goal=walkingSocial.target;
