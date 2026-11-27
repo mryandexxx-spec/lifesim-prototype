@@ -9,7 +9,7 @@ import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './na
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {MIRROR_SPEECH_DURATION,MIRROR_SPEECH_XP} from './furniture-interactions.js';
 import {HOBBY_SKILLS} from './hobby-reading.js';
-import {restoreSkillProgress} from './skills-engine.js';
+import {restoreSkillProgress,scaleSkillXP} from './skills-engine.js';
 import {BED_SLOT_IDS,BED_SLOTS,validBedSlot} from './bed-layout.js';
 import {furniturePoint} from './furniture-transform.js';
 import {dispatchActionQueues,pendingActions,queueHeads,parkQueuedHead,
@@ -551,7 +551,7 @@ export function tickAdditionalResidents(root,minutes){
       actor.skills=restoreSkillProgress(actor.skills,HOBBY_SKILLS);
       const cap=HOBBY_SKILLS.skills.charisma.xpThresholds.at(-1);
       const previous=actor.skills.xpById.charisma||0;
-      const next=Math.min(cap,previous+MIRROR_SPEECH_XP);
+      const next=Math.min(cap,previous+scaleSkillXP(MIRROR_SPEECH_XP));
       actor.skills.xpById.charisma=next;
       actor.event='Речь отрепетирована · харизма +'+(next-previous)+' XP';
     }

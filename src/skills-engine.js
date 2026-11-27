@@ -3,6 +3,9 @@ import {getSkillDefinition,deriveSkillLevel} from './skill-registry.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {restoreActivitySession} from './activity-session.js';
 export const SKILL_PROGRESS_SCHEMA=1;
+/** Prospective practice only. Saved XP, thresholds and career rules are unchanged. */
+export const SKILL_XP_RATE=0.5;
+export const scaleSkillXP=raw=>raw*SKILL_XP_RATE;
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const round=v=>Math.round(v*1000000)/1000000;
 export function newSkillProgress(){
@@ -44,7 +47,7 @@ export function creditActivityPractice(progress,skillRegistry,activityRegistry,s
     if(!def)return null;
     const cap=def.xpThresholds.at(-1);
     const before=next.xpById[line.skillId]??0;
-    const xp=round(Math.min(cap,before+minutes*line.xpPerMinute));
+    const xp=round(Math.min(cap,before+scaleSkillXP(minutes*line.xpPerMinute)));
     next.xpById[line.skillId]=xp;
     changes.push(Object.freeze({skillId:line.skillId,
       delta:round(xp-before),xp,level:deriveSkillLevel(skillRegistry,line.skillId,xp)}));
