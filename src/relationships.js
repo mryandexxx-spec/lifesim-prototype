@@ -2,6 +2,7 @@
 import { refreshMind } from './psychology.js';
 import {charismaSocialBonus} from './hobby-reading.js';
 import {creditCompletedSocialNeed} from './social-need.js';
+import {recordSocialTaskOutcome} from './recurring-tasks.js';
 import {feelMemory} from './emotion-engine.js';
 import {sportsConversationReady,recordSportsDiscussion} from './sports-fandom.js';
 import {evaluateSocialReaction} from './social-reactions.js';
@@ -174,6 +175,7 @@ function recordPairCompletion(root,session,type,token=null){
   // never queued, walked-to, refused, cancelled, reloaded or replayed.
   // Household is only a two-resident adapter; the need function itself
   // accepts arbitrary person IDs without referring to Alex or Mira.
+  if(committed)recordSocialTaskOutcome(root,committed);
   if(committed&&creditCompletedSocialNeed({[a]:get(root,a),[b]:get(root,b)},committed)){
     refreshMind(get(root,a));
     refreshMind(get(root,b));
