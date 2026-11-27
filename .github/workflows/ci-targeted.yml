@@ -8,6 +8,30 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  gc-04-09-food-a:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/gc-04-09-food' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Existing food, cooking, fridge, ledger and art market regressions
+        run: node --test tests/life-food-r1.test.js tests/life-cook-r1.test.js tests/fridge-ux-r2.test.js tests/w4a-finance.test.js tests/gc-04-09-art-market-household.test.js
+      - name: Paired 30-day food strategy comparison
+        run: node tests/gc-04-09-food-a-probe.mjs
+        env:
+          GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-04-09-food-a
+          path: artifacts/gc-04-09-food-a/
+          if-no-files-found: warn
   gc-04-09-c4-ux:
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/gc-04-09-art-market-core' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
