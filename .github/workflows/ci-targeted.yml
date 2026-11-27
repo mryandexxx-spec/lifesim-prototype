@@ -369,6 +369,84 @@ jobs:
             !artifacts/cf-anim-calibration-closure/${{ matrix.clip }}/video-frames/
           if-no-files-found: warn
 
+  cf-anim-calibration-heldout:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-calibration-heldout' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        clip: [Neutral_ID, Neutral_FW]
+        profile: [male-grid_021-90, female-grid_201-100, female-grid_201-110]
+    env:
+      PROFILE: ${{ matrix.profile }}
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 96bf70f880742028dbc91235c6a215703656a9bb
+          path: frozen-retarget
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: saturday06/VRM-Addon-for-Blender
+          ref: 0428e04fe0a7916cba257ad7876c8cc5268cf316
+          path: vrm-addon
+          persist-credentials: false
+      - name: Fetch exact frozen rig
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/15054212377/zip" -o rig.zip
+          echo '1e7ba4518b8efefc86206c7f02471e7230f0bf94c78d0831b5244d552380fead  rig.zip' | sha256sum -c
+          unzip -q rig.zip -d input-rigs
+      - name: Fetch exact transport evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLIP: ${{ matrix.clip }}
+        run: |
+          if [ "$CLIP" = Neutral_ID ]; then id=15179009080; sha=c416e6be9ec0af08e6febbf888318c3195d3ce3f65e3d59b7fbc93a34e8b5213; else id=15179034236; sha=f41539259f09b30da850d4297f53fa3d17b569277f896528ddf615b6dcc8dc04; fi
+          curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o transport.zip
+          echo "$sha  transport.zip" | sha256sum -c
+          unzip -q transport.zip -d input-transport
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install exact native transport dependencies
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0
+          python -m py_compile tools/cf_anim_calibration_heldout.py
+          test "$(git -C frozen-retarget rev-parse HEAD)" = 96bf70f880742028dbc91235c6a215703656a9bb
+          test "$(git -C vrm-addon rev-parse HEAD)" = 0428e04fe0a7916cba257ad7876c8cc5268cf316
+      - name: Zero delta and original motion paired comparison
+        run: |
+          timeout 450s python -u tools/cf_anim_calibration_heldout.py ${{ matrix.clip }}
+          python -c 'import json,sys; r=json.load(open("artifacts/cf-anim-calibration-heldout/"+__import__("os").environ["PROFILE"]+"/"+sys.argv[1]+"/report.json")); print(r["status"],r["failures"]); assert r["status"]=="CLOSURE_SCREEN_PASS"' ${{ matrix.clip }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-calibration-heldout-${{ matrix.profile }}-${{ matrix.clip }}-evidence
+          path: |
+            artifacts/cf-anim-calibration-heldout/${{ matrix.profile }}/${{ matrix.clip }}/
+            !artifacts/cf-anim-calibration-heldout/${{ matrix.profile }}/${{ matrix.clip }}/native-input.bvh
+            !artifacts/cf-anim-calibration-heldout/${{ matrix.profile }}/${{ matrix.clip }}/video-frames/
+          if-no-files-found: warn
+
   cf-anim-contact-source:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-contact-contract' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-source]')
     permissions:
