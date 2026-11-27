@@ -2861,3 +2861,18 @@ button.time-card:active {transform:translateY(1px);}
  #dashboard.dashboard .character-tag #resident-name,#dashboard.dashboard .character-tag #mood-label{font-size:10px}
  #dashboard.dashboard .character-tag .mind-indicator{font-size:13px}
 }
+
+/* GC-07: compact profile disclosure, scroll inside the existing panel. */
+.gc-aspiration-card{margin:6px 0;color:#263c35}
+.gc-aspiration-progress{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin:0;color:#294a3d;overflow-wrap:anywhere}
+.gc-aspiration-requirements{margin:2px 0;padding:0;list-style:none;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.gc-aspiration-requirements li[data-met="true"]{color:#246749}
+.gc-aspiration-picker{min-width:0;width:100%}
+.gc-aspiration-picker summary{min-height:44px;display:flex;align-items:center;padding:0 6px;font-size:13px;font-weight:700;color:#294a3d;cursor:pointer;touch-action:manipulation}
+.gc-aspiration-picker summary::before{content:'›';font-size:20px;margin-right:8px}
+.gc-aspiration-picker[open] summary::before{transform:rotate(90deg)}
+.gc-aspiration-picker summary::-webkit-details-marker{display:none}
+.gc-aspiration-choice{display:grid;gap:4px;padding:8px 0;border-top:1px solid #d5e0d4;margin-top:6px}
+.gc-aspiration-choice button{min-height:44px;min-width:44px;border:1px solid #c9d6cb;border-radius:8px;background:#fff;color:#294a3d;font-size:12px;font-weight:700;touch-action:manipulation}
+.gc-aspiration-choice button:disabled{opacity:.55}
+.gc-aspiration-choice button:focus-visible,.gc-aspiration-picker summary:focus-visible{outline:2px solid #217052;outline-offset:2px}
