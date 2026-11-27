@@ -1,0 +1,30 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Блин’С · Runtime Pilot</title><style>*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;background:#d6dedb;color:#1b332f;font:14px system-ui}canvas{display:block;width:100%;height:100%}header{position:absolute;top:8px;left:8px;padding:8px 12px;border-radius:8px;background:#fffE;pointer-events:none}</style><canvas id="canvas"></canvas><header>CF Runtime Pilot · UAL1 CC0<br><span id="status">Loading</span></header><script type="module">
+import * as pc from './playcanvas.mjs';
+const m=await fetch('./manifest.json').then(r=>r.json());
+const canvas=document.querySelector('canvas'),status=document.querySelector('#status');
+const app=new pc.Application(canvas,{graphicsDeviceOptions:{antialias:true,alpha:false,preserveDrawingBuffer:true,preferWebGl2:true}});
+app.graphicsDevice.maxPixelRatio=1;app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);app.setCanvasResolution(pc.RESOLUTION_AUTO);app.resizeCanvas();
+app.scene.ambientLight=new pc.Color(.55,.55,.55);
+const cam=new pc.Entity('Camera');cam.addComponent('camera',{clearColor:new pc.Color(.83,.88,.86),projection:pc.PROJECTION_ORTHOGRAPHIC,orthoHeight:1.55,nearClip:.01,farClip:50});app.root.addChild(cam);
+for(const [ang,intensity] of [[[45,40,0],2],[[35,-125,0],.65]]){const light=new pc.Entity('Light');light.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.92),intensity});light.setEulerAngles(...ang);app.root.addChild(light)}
+function mesh(type,scale,pos,color){const e=new pc.Entity(type);e.addComponent('render',{type});e.setLocalScale(...scale);e.setPosition(...pos);const mat=new pc.StandardMaterial();mat.diffuse=new pc.Color(...color);mat.update();e.render.material=mat;app.root.addChild(e)}
+mesh('plane',[30,1,30],[0,m.floor,0],[.60,.67,.61]);for(let i=-8;i<12;i++)mesh('box',[9,.001,.012],[0,m.floor+.002,i],[.42,.51,.47]);
+const a=new pc.Asset('pilot','container',{url:'./walk.glb'});app.assets.add(a);await new Promise((ok,no)=>{a.ready(ok);a.once('error',no);app.assets.load(a)});
+const nav=new pc.Entity('navigation');app.root.addChild(nav);const model=a.resource.instantiateRenderEntity();nav.addChild(model);model.addComponent('anim',{activate:true});
+const tracks=a.resource.animations.map(a=>a.resource),walk=tracks.find(t=>t.name==='Walk_R8_InPlace'),idleTracks=tracks.filter(t=>m.originalAnimationNames.includes(t.name)&&/idle/i.test(t.name));
+if(!walk||idleTracks.length!==1)throw Error('Missing/ambiguous idle or walk: '+tracks.map(t=>t.name));
+const idle=idleTracks[0];for(const [name,track] of [['Idle',idle],['Walk',walk]])model.anim.assignAnimation(name,track,undefined,1,true);
+const layer=model.anim.baseLayer;model.anim.playing=true;model.anim.speed=0;layer.play('Walk');
+let angle='side',running=false,elapsed=0,rows=[],events=[],actualStart=0,actualStop=0,stage='seek';
+const names=Object.keys(m.ref[0].positions);
+function camera(){const p=nav.getPosition(),o=angle==='side'?[4,.25,0]:angle==='front'?[0,.3,4]:[3,.7,4];cam.setPosition(p.x+o[0],.85+m.floor+o[1],p.z+o[2]);cam.lookAt(p.x,.85+m.floor,p.z)}
+function travel(t){nav.setPosition(...m.speed.map(v=>v*t));camera()}
+function probe(){const w=nav.getPosition(),positions={};for(const n of names){const b=model.findByName(n);if(!b)throw Error(n);const p=b.getPosition();positions[n]=[p.x-w.x,p.y-w.y,p.z-w.z]}const gl=app.graphicsDevice.gl;return {elapsed,stage,state:layer.activeState,transitioning:layer.transitioning,phase:layer.activeStateCurrentTime,wrapper:[w.x,w.y,w.z],positions,glLost:gl.isContextLost(),glError:gl.getError(),width:canvas.width,height:canvas.height}}
+function seek(t){running=false;model.anim.speed=0;layer.play('Walk');layer.activeStateCurrentTime=t%walk.duration;elapsed=t;stage='seek';travel(t)}
+const blend=.25,stop=3.8;
+function start(){running=true;elapsed=0;rows=[];events=[];stage='idle';actualStart=actualStop=0;model.anim.speed=1;layer.play('Idle');travel(0)}
+function distanceTime(t){if(!actualStart)return 0;const u=Math.max(0,t-actualStart);if(u<blend)return u*u/(2*blend);if(!actualStop)return u-blend/2;const s=Math.max(0,t-actualStop),before=actualStop-actualStart-blend/2;return before+Math.min(s,blend)-Math.min(s,blend)**2/(2*blend)}
+app.on('update',dt=>{if(!running)return;elapsed+=dt;if(stage==='idle'&&elapsed>=.6){actualStart=elapsed;layer.transition('Walk',blend,0);stage='start';events.push({event:'start',t:elapsed})}if(stage==='start'&&elapsed>=actualStart+blend){stage='walk'}if(stage==='walk'&&elapsed>=stop){actualStop=elapsed;layer.transition('Idle',blend,0);stage='stop';events.push({event:'stop',t:elapsed})}if(stage==='stop'&&elapsed>=actualStop+blend)stage='settled';travel(distanceTime(elapsed));status.textContent=stage+' '+elapsed.toFixed(2)+' s';rows.push({...probe(),dt,travelTime:distanceTime(elapsed)});if(elapsed>=4.8){running=false;model.anim.speed=0}});
+app.start();seek(0);
+window.lab={seek,probe,start,view(v){angle=v;camera()},visible(v){model.enabled=v},result(){return {engine:pc.version,tracks:tracks.map(t=>t.name),walkDuration:walk.duration,idle:idle.name,events,rows,running,blend,meshCount:model.findComponents('render').reduce((n,c)=>n+c.meshInstances.length,0)}},ready:true};
+</script></html>
