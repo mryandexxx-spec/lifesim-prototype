@@ -25,8 +25,8 @@ export const NEED_DECAY_PER_MINUTE=Object.freeze({
   social:.016    // R2: 23.04 points / 24 game h before temperament
 });
 export const SOCIAL_DECAY_PERSONALITY_SPREAD=.008;
-// NEEDS-FIX-R1: default sleep lasts 8–9 game hours; only a verified premium
-// bed reduces the minimum/maximum. No second need clock or persisted multiplier.
+// Sleep budgets and original maximum recovery rates. The adaptive floor
+// depends on the verified bed quality; no new clock or persisted multiplier.
 export const SLEEP_MIN_MINUTES=480;
 export const SLEEP_MAX_MINUTES=540;
 export const SLEEP_WAKE_ENERGY=100;
@@ -46,6 +46,16 @@ export function sleepBedProfile(world,targetInstanceId=null){
   const product=bed?compatibleFurnitureProduct('bed',bed.itemDefinitionId):null;
   return product?.sleepQuality==='premium'
     ?SLEEP_PREMIUM_PROFILE:SLEEP_STANDARD_PROFILE;
+}
+// GC-03: use a gentle floor for light deficits, but recover a severely
+// depleted resident within the normal bed budget. A legacy/changed-bed
+// action with too little time left may extend only at the original rate cap.
+export function adaptiveSleepRate(profile,energy,elapsed){
+  const deficit=Math.max(0,SLEEP_WAKE_ENERGY-energy);
+  const floor=profile===SLEEP_PREMIUM_PROFILE?.095:.068;
+  const remaining=Math.max(0,profile.maxMinutes-elapsed);
+  if(remaining===0)return profile.recoveryPerMinute;
+  return Math.min(profile.recoveryPerMinute,Math.max(floor,deficit/remaining));
 }
 export const SELF_CARE_WISH_MAX_NEED=72;
 export const SELF_CARE_REPEAT_COOLDOWN_MINUTES=180;

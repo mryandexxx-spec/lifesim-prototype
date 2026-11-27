@@ -21,6 +21,6 @@ test('food UI is a pure projection of canonical taste, quality and prices',()=>{
  for(const name of ['kitchen','simulation','fridge-ui','fridge-ui-dom','career-phone-ui']){
   const prefix='"./src/'+name+'.js":"./src/'+name+'.js?v=';
   const lines=html.split('\n').filter(l=>l.includes(prefix));
-  assert.ok(lines.length&&lines.every(l=>l.includes('-gc-04-09-food"')),name);
+  assert.ok(lines.length&&lines.every(l=>/-gc-04-09-food(?:-[a-z0-9]+)*"/.test(l)),name);
  }
 });

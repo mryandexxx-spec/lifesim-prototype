@@ -8,6 +8,60 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  gc-03-adaptive-sleep:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-03-adaptive-sleep' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Adaptive sleep, quality, reload and acceleration contracts
+        run: node --test tests/gc-03-adaptive-sleep.test.js tests/needs-balance.test.js tests/q3b-life-balance.test.js tests/pf-15-household-speed.test.js tests/qsk-11-time-ui.test.js
+      - name: Matched baseline and adaptive property policies
+        run: |
+          git fetch --no-tags --depth=1 origin 881c17e31ebaf30340bb1ea930cfd639b79a5924
+          node tests/gc-03-adaptive-compare.mjs
+        env:
+          GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+          GC_NIGHT_POLICY: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-03-adaptive-sleep
+          path: artifacts/gc-03-adaptive/
+          if-no-files-found: warn
+  gc-03-actual-autonomy:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-03-adaptive-sleep' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          git fetch --no-tags --depth=1 origin 881c17e31ebaf30340bb1ea930cfd639b79a5924
+          node tests/gc-03-adaptive-compare.mjs
+        env:
+          GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+          GC_AUTONOMY_DIAGNOSTIC: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-03-actual-autonomy
+          path: artifacts/gc-03-autonomy/
+          if-no-files-found: warn
+  gc-03-real-speed:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-03-adaptive-sleep' && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/pf-15-speed.yml
   gc-04-09-c4-ux:
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/gc-04-09-art-market-core' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

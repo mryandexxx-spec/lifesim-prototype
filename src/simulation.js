@@ -10,7 +10,7 @@ import {TOILET_LAYOUT,TOILET_RELIEF_START,TOILET_RELIEF_END} from './toilet-inte
 import {validFurnitureInstanceId} from './furniture-catalog.js';
 import {validOutdoorId} from './outdoor-catalog.js';
 import {NEED_DECAY_PER_MINUTE,SLEEP_MIN_MINUTES,SLEEP_MAX_MINUTES,SLEEP_WAKE_ENERGY,
-  SLEEP_RECOVERY_PER_MINUTE,sleepBedProfile,
+  SLEEP_RECOVERY_PER_MINUTE,sleepBedProfile,adaptiveSleepRate,
   SELF_CARE_WISH_MAX_NEED,SELF_CARE_REPEAT_COOLDOWN_MINUTES} from './need-balance.js';
 import {insideLot} from './lot-surface.js';
 import {sanitizeSwimAction} from './pool-swim-runtime.js';
@@ -329,7 +329,7 @@ export function tick(state, minutes,world=state?.world??null) {
     :0;
   // NEEDS-FIX-R1: real installed bed SKU determines a pure, bounded sleep
   // profile; the core clock, queue and save-v1 schema are unchanged.
-  // Standard 8–9h; premium canopy 6–7.5h; no awake decay during sleep.
+  // Adaptive recovery preserves normal 9h/7.5h budgets and full wake.
   const sleeping=state.action?.id==='bed'&&state.action.phase==='using';
   const profile=sleeping?sleepBedProfile(world,state.action.targetInstanceId):null;
   const sleepElapsed=sleeping?state.action.elapsed:0;
@@ -337,15 +337,16 @@ export function tick(state, minutes,world=state?.world??null) {
   // even when the former minimum bed duration has not elapsed.
   const manualSleepRemaining=sleeping&&state.action.automatic===false&&
     state.action.manualSleepMinimum===true?Math.max(0,MANUAL_SLEEP_MIN_MINUTES-sleepElapsed):0;
-  const untilWake=sleeping?Math.max(0,Math.min(profile.maxMinutes-sleepElapsed,
-    Math.max(manualSleepRemaining,(SLEEP_WAKE_ENERGY-state.needs.energy)/profile.recoveryPerMinute))):0;
+  const recoveryRate=sleeping?adaptiveSleepRate(profile,state.needs.energy,sleepElapsed):0;
+  const untilWake=sleeping?Math.max(0,manualSleepRemaining,
+    (SLEEP_WAKE_ENERGY-state.needs.energy)/recoveryRate):0;
   const sleepMinutes=Math.min(minutes,untilWake);
   for(const need of PHYSICAL_NEEDS){
     const elapsed=need==='energy'?Math.max(0,minutes-sofaRestMinutes-sleepMinutes):minutes;
     if(need==='energy'&&sleeping){
       // Credit sleep first, then spend ONLY genuinely awake leftover minutes.
       // Capping after the combined amount would create free Energy on big ticks.
-      const restored=clamp(state.needs.energy+profile.recoveryPerMinute*sleepMinutes);
+      const restored=clamp(state.needs.energy+recoveryRate*sleepMinutes);
       state.needs.energy=clamp(restored-NEED_DECAY_PER_MINUTE.energy*elapsed);
     }else state.needs[need]=clamp(state.needs[need]-NEED_DECAY_PER_MINUTE[need]*elapsed);
   }
@@ -496,7 +497,7 @@ export function tick(state, minutes,world=state?.world??null) {
     refreshMind(state,world);
     state.action.elapsed += amount;
     const sleepWoke=sleeping&&sleepMinutes>=untilWake-1e-8;
-    if (state.action.elapsed >= duration || sleepWoke ||
+    if ((state.action.id!=='bed'&&state.action.elapsed >= duration) || sleepWoke ||
         (!(state.action.automatic===false&&state.action.manualFullLeisure===true&&
           ['sofa','tv'].includes(state.action.id))&&!['bed','seat','bench','dining','cook','prep','wash','lamp','mirror','dresser','wardrobe','fridge','shower','toilet','hobby','music','paint','garden'].includes(state.action.id) &&
           !(state.action.id==='tv'&&state.action.tvTalk===true)&&

@@ -120,13 +120,18 @@ test('M2: sofa experience changes fun gain but never movement or fixed action du
   assert.equal(low.s.action.id,'sofa');
 });
 
-test('M2: essential sleeping gets exactly original benefit regardless of bad mood',()=>{
-  const s=allLow();s.needs.energy=25;refreshMind(s);
-  assert.equal(chooseAction(s,'bed'),true);arrive(s);
-  const before=s.needs.energy;
-  tick(s,5);
-  assert.ok(Math.abs(s.needs.energy-(before+5*ACTIONS.bed.benefitPerMinute))<1e-6);
-  assert.equal(s.action.elapsed,5);
+test('M2: essential sleeping gets exactly adaptive benefit regardless of bad mood',()=>{
+  const low=allLow(),high=newGame();
+  for(const key of Object.keys(high.needs))high.needs[key]=95;
+  for(const s of [low,high]){
+    s.needs.energy=25;refreshMind(s);
+    assert.equal(chooseAction(s,'bed'),true);arrive(s);
+    tick(s,5);
+    // Severe deficit must recover within the standard bed budget, independently of mood.
+    assert.ok(Math.abs(s.needs.energy-(25+5*75/540))<1e-6);
+    assert.equal(s.action.elapsed,5);
+  }
+  assert.ok(Math.abs(low.needs.energy-high.needs.energy)<1e-6);
 });
 
 test('M2: queue refusal consumes ONLY a startable head, then later task waits its turn',()=>{
