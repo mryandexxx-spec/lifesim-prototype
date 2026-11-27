@@ -18,7 +18,7 @@ import {GARDEN_ACTIONS,GARDEN_DURATION} from './gardening.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
 import {MIRROR_SPEECH_DURATION} from './furniture-interactions.js';
-import {kitchenRecipe,kitchenQualityId,kitchenServingMultiplier} from './kitchen.js';
+import {kitchenRecipe,kitchenQualityId,kitchenServingMultiplier,mealEnjoyment} from './kitchen.js';
 import {grillRecipe} from './grill-catalog.js';
 import {validReadingJourneyAction,finishReadingMinutes} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
@@ -440,6 +440,10 @@ export function tick(state, minutes,world=state?.world??null) {
         // ready meal. Better recipes and real cooking quality remain useful.
         const fullPortion=Math.min(50,definition.duration*definition.benefitPerMinute*factor);
         gained=fullPortion*amount/definition.duration;
+        if(state.action.diningStage==='eating'&&food){
+          state.needs.fun=clamp(state.needs.fun+
+            mealEnjoyment(food.id,state.action.cookedQuality)*amount/definition.duration);
+        }
       }
     }
     if(state.action.id==='fridge'){
