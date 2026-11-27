@@ -59,7 +59,7 @@ jobs:
           node-version: '22'
       - name: Install exact native and runtime dependencies
         run: |
-          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 playwright==1.56.1 Pillow==11.3.0
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 playwright==1.56.0 Pillow==11.3.0
           npm ci
           python -m playwright install --with-deps chromium webkit
           python -m py_compile tools/cf_runtime_bake.py tools/cf_runtime_idle_bake.py tools/cf_runtime_browser.py tools/cf_runtime_idle_source.py
@@ -67,6 +67,7 @@ jobs:
         run: |
           timeout 240s python -u tools/cf_runtime_bake.py
       - name: Qualify actual CC0 Idle_Loop using frozen R3 retarget mapping
+        id: idle_native
         run: |
           test "$(git -C frozen-retarget rev-parse HEAD)" = 96bf70f880742028dbc91235c6a215703656a9bb
           test "$(git -C vrm-addon rev-parse HEAD)" = 0428e04fe0a7916cba257ad7876c8cc5268cf316
@@ -93,7 +94,7 @@ jobs:
           set -e
           test "$chromium" = 0 && test "$webkit" = 0
       - name: Strict native floor/contact gates
-        if: always()
+        if: ${{ always() && steps.idle_native.outcome == 'success' }}
         run: |
           python -c 'import json; d=json.load(open("runtime-lab/manifest.json"))["dense"]; print(d); assert d["contactSamples"]>0 and d["floorFailures"]==d["contactFailures"]==0; idle=json.load(open("runtime-lab/manifest.json"))["idle"]; print("idle",idle["worstFloorM"],idle["floorFailures"]); assert idle["floorFailures"]==0'
       - uses: actions/upload-artifact@v4
