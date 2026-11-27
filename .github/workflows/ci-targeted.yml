@@ -386,6 +386,9 @@ jobs:
   pf-13-flowers:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/pf-13-flower-batch' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/pf-13-flower-batch.yml
+  life-qol-r1-ab:
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/life-qol-r1-ab' && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/life-qol-r1-ab.yml
   pf-15-speed:
     if: github.event_name == 'pull_request' && github.head_ref == 'fix/pf-15-household-auto-speed' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/pf-15-speed.yml

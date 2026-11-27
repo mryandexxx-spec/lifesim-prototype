@@ -17,7 +17,6 @@ export function effectiveSleepSpeed(root,{blocked=false}={}){
 /** PF-15: transient, episode-scoped household speed. The saved speed is
  * the player's preference; automatic x3 is never serialized. */
 import {residentIdsForSimulation,savedAdditionalActor} from './resident-activity-runtime.js';
-import {pendingWorkIncident} from './career-incidents.js';
 import {dialogueNeedsDecision} from './dialogue-decision.js';
 
 export function householdIdleEpisode(root){
@@ -29,14 +28,17 @@ export function householdIdleEpisode(root){
     if(!actor)return null;
     const phase=root.careerSystem?.byResident?.[id]?.currentShift?.phase;
     if(phase==='working')return 'work';
-    if(phase)return null;
+    if(phase&&phase!=='pending')return null;
     return actor.action?.id==='bed'&&actor.action.phase==='using'?'sleep':null;
   });
-  return modes[0]&&modes.every(mode=>mode===modes[0])?modes[0]:null;
+  return modes.every(Boolean)?(modes.every(mode=>mode===modes[0])?modes[0]:'mixed'):null;
 }
 
 function sleepBoostBlocked(root){
   return residentIdsForSimulation(root).some(id=>{
+    const actor=id==='alex'?root:id==='mira'?root.otherSim:savedAdditionalActor(root,id);
+    if(actor?.action?.id!=='bed'||actor.action.phase!=='using'||
+      root.careerSystem?.byResident?.[id]?.currentShift?.phase==='working')return false;
     if(root.actionQueues&&pendingActions(root.actionQueues,id).length>0)return true;
     const contract=root.careerSystem?.byResident?.[id];
     if(!contract||!root.calendar||!Number.isFinite(root.minutes))return false;
@@ -51,18 +53,20 @@ export function createHouseholdSpeedController(){
     let previous=episodes.get(root);
     const episode=householdIdleEpisode(root);
     if(!previous){previous={episode:null,override:false,owned:false};episodes.set(root,previous);}
-    if(previous.episode!==episode){
+    if(Boolean(previous.episode)!==Boolean(episode)){
       if(previous.owned&&!previous.override)root.speed=1;
-      previous.episode=episode;previous.override=false;previous.owned=false;
+      previous.override=false;previous.owned=false;
     }
+    previous.episode=episode;
     return previous;
   }
   function read(root,{blocked=false}={}){
     const current=state(root),manual=root.speed===3?3:1;
     if(!current.episode||current.override)return manual;
+    // Work incidents are optional phone choices with automatic end-of-shift resolution.
+    // Mandatory dialogue/modal decisions still stop fast-forward.
     if(blocked||root.paused||dialogueNeedsDecision(root)||root.socialAction||root.additionalSocial||
-      residentIdsForSimulation(root).some(id=>pendingWorkIncident(root,id))||
-      (current.episode==='sleep'&&sleepBoostBlocked(root)))return manual;
+      (current.episode!=='work'&&sleepBoostBlocked(root)))return manual;
     current.owned=true;
     return SLEEP_FAST_FORWARD_SPEED;
   }

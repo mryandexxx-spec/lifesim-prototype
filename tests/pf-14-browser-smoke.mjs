@@ -9,7 +9,7 @@ import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 const out='artifacts/pf-14';mkdirSync(out,{recursive:true});
 let seed=newHousehold('2026-11-26');
 seed.autonomy.enabled=false;seed.otherSim.autonomy.enabled=false;
-seed.shop.credits=4000;seed.needs.social=50;seed.paused=true;seed.otherSim.paused=true;
+seed.shop.credits=4000;seed.needs.social=30;seed.paused=true;seed.otherSim.paused=true;
 for(const [x,z] of [[8,-7],[15,-5],[19,-5],[19,7],[15,7],[8,7]]){
  const proposal=previewOutdoorFeatureEdit(seed,{operation:'place',itemId:'garden.flower.calendula',pose:{x,z,yaw:0}});
  if(proposal.ok){const r=commitOutdoorFeatureEdit(seed,proposal);assert.ok(r.ok);seed=r.root;}
@@ -91,11 +91,12 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    assert.equal(saved.shop.credits,initial.shop.credits);
    assert.equal(saved.actionQueues.byResident.alex.filter(a=>a.actionId==='talk').length,0);
    await frameLot();await openBed();
-   // At a dry bed, watering is the available primary action, talk is disabled.
-   assert.equal(await talk.isDisabled(),true);
-   assert.match(await talk.textContent(),/Разговор снова через/);
+   // Reopening immediately after settlement/reload must not hide repeatable talk.
+   assert.equal(await talk.isDisabled(),false);
+   assert.match(await talk.textContent(),/общение до 45%/);
+   assert.ok(saved.needs.social<=45);
    await checkSheet();
-   await page.screenshot({path:out+'/'+label+'-cooldown.png'});
+   await page.screenshot({path:out+'/'+label+'-repeatable.png'});
    assert.deepEqual(errors,[]);Object.assign(result,{passed:true,initialSocial:initial.needs.social,finalSocial:saved.needs.social,lastTalk:saved.gardenRewards.alexLastTalkAt});
   }catch(e){result.error=String(e.stack||e);throw e;}finally{writeFileSync(out+'/report.json',JSON.stringify(report,null,2));await ctx.close();}
  }}finally{await browser.close();}
