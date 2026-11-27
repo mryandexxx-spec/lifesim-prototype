@@ -14,10 +14,10 @@ with sync_playwright() as p:
  browser=getattr(p,engine).launch(**opts)
  for w,h in [(390,844),(844,390)]:
   tag=f"{w}x{h}";ctx=browser.new_context(viewport={"width":w,"height":h},device_scale_factor=1,has_touch=True,is_mobile=True,record_video_dir=str(O/tag),record_video_size={"width":w,"height":h})
-  page=ctx.new_page();page.on("pageerror",lambda e:report["errors"].append(str(e)))
+  page=ctx.new_page();page.on("pageerror",lambda e:(report["errors"].append(str(e)),print("PAGE ERROR",engine,tag,str(e),flush=True)))
   case={"viewport":[w,h],"keys":[],"views":[],"scenarios":[]};report["cases"].append(case)
   try:
-   page.goto("http://127.0.0.1:8765/lab.html",wait_until="load");page.wait_for_function("window.lab?.ready===true",timeout=60000)
+   page.goto("http://127.0.0.1:8765/lab.html",wait_until="load");page.wait_for_function("window.lab?.ready===true",timeout=15000)
    def raf():page.evaluate("()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
    for ref in m["ref"][:-1]:
     t=ref["time"];page.evaluate("t=>lab.seek(t)",t);raf();a=page.evaluate("()=>lab.probe()")
@@ -26,6 +26,13 @@ with sync_playwright() as p:
    gate(max(x["poseErrorM"] for x in case["keys"])<.002,tag+":pose")
    gate(max(x["navErrorM"] for x in case["keys"])<.0002,tag+":navigation")
    gate(not any(x["glError"] for x in case["keys"]),tag+":keyGL")
+   case["idleKeys"]=[]
+   for ref in m["idle"]["ref"][:-1]:
+    t=ref["time"];page.evaluate("t=>lab.seek(t,'Idle')",t);raf();a=page.evaluate("()=>lab.probe()")
+    pe=max(math.dist(a["positions"][n],v) for n,v in ref["positions"].items())
+    case["idleKeys"].append({"t":t,"poseErrorM":pe,"glError":a["glError"]})
+   gate(max(x["poseErrorM"] for x in case["idleKeys"])<.002,tag+":idlePose")
+   gate(not any(x["glError"] for x in case["idleKeys"]),tag+":idleGL")
    # Actual character contribution, not color diversity of the floor.
    for view in ["side","quarter","front"]:
     page.evaluate("v=>lab.view(v)",view);page.evaluate("()=>lab.seek(.3)");raf()
@@ -47,7 +54,7 @@ with sync_playwright() as p:
     gate(not any(x["glLost"] or x["glError"] for x in rows),tag+":GL")
     gate(max(math.dist(x["wrapper"],[v*x["travelTime"] for v in m["speed"]]) for x in rows)<.0002,tag+":travel")
     # Actual loaded weighted skin, with the original active body morph retained.
-    for stage in ["start","stop","walk","settled"]:
+    for stage in ["idle","start","stop","walk","settled"]:
      sampled=[x["floorGapM"] for x in rows if x["stage"]==stage and x["floorGapM"] is not None]
      gate(bool(sampled),tag+":"+stage+":skinCoverage")
      if sampled:gate(min(sampled)>=-.005,tag+":"+stage+":floor")
