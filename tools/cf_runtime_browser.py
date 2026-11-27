@@ -46,6 +46,13 @@ with sync_playwright() as p:
     gate(rows[-1]["state"]=="Idle" and not rows[-1]["transitioning"],tag+":settled")
     gate(not any(x["glLost"] or x["glError"] for x in rows),tag+":GL")
     gate(max(math.dist(x["wrapper"],[v*x["travelTime"] for v in m["speed"]]) for x in rows)<.0002,tag+":travel")
+    # Actual loaded weighted skin, with the original active body morph retained.
+    for stage in ["start","stop","walk","settled"]:
+     sampled=[x["floorGapM"] for x in rows if x["stage"]==stage and x["floorGapM"] is not None]
+     gate(bool(sampled),tag+":"+stage+":skinCoverage")
+     if sampled:gate(min(sampled)>=-.005,tag+":"+stage+":floor")
+    case["scenarios"][-1]["sampledFloorMinM"]=min(x["floorGapM"] for x in rows if x["floorGapM"] is not None)
+    case["scenarios"][-1]["wallSeconds"]=(rows[-1]["wallMs"]-rows[0]["wallMs"])/1000
     # Report world joint speeds at each transition; not a new solver or anatomical gate.
     jumps=[]
     for a,b in zip(rows,rows[1:]):
