@@ -9275,8 +9275,8 @@ function boot() {
       paused:!frameActive,hidden:document.hidden,editing:furnishMode||buildMode||outdoorMode})||sharedSound);
     const animDt=active?dt:0;
     const frameAnimDt=buildMode||outdoorMode?0:animDt;
+    const legacyCareFrameStart=game.minutes;
     if(frameActive){
-      const legacyCareFrameStart=game.minutes;
       accumulator+=dt;
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       // Keep a single .30-minute simulation quantum at both speeds. Each
