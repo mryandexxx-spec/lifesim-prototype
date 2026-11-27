@@ -239,6 +239,8 @@ jobs:
           node --check src/dialogue-decision.js
           node --check src/world-interactions.js
           node --check src/plan-preview.js
+          node --check src/recurring-tasks.js
+          node --check src/recurring-tasks-ui.js
           node --check src/ux01-plan-ui.js
           node --check src/ui-layout.js
           node --check src/insight-presentation.js
@@ -316,6 +318,7 @@ jobs:
           cp index.html character-lab.html character-lab-mira.html cas-modular-lab.html cas-alex-wardrobe-lab.html cas-resident-footwear-lab.html cas-cc0-shoe-fit-lab.html cas-cc0-shoe-rig-lab.html cas-f2-footwear-lab.html cas-f2-c3-lab.html cas-f2-c4b-lab.html cas-02-2-lab.html styles.css favicon.svg manifest.webmanifest sw.js .nojekyll site/
           mkdir -p site/src
           cp src/plan-preview.js src/work-presence-ui.js src/ui-layout.js src/required-choice-focus.js site/src/
+          cp src/recurring-tasks.js src/recurring-tasks-ui.js site/src/
           cp src/cas-f2-c4b-lab.js src/cas-f2-c3-lab.js src/cas-f2-footwear-lab.js src/cas-footwear-standard.js src/cas-footwear-layers.js site/src/
           cp src/ux01-plan-ui.js site/src/
           cp src/queue-rescue.js site/src/

@@ -124,7 +124,7 @@ export function restoreRecurringTasks(root,raw){
 }
 /** Internal adapters call this only after real domain success. Returns whether saved state changed. */
 export function recordTaskOutcome(root,id,kind,receiptId,at=root.minutes){
-  if(!own(DEFINITIONS,kind)||!validProofId(receiptId)||!validTime(at)||
+  if(!own(DEFINITIONS,kind)||!validProofId(receiptId)||!validTime(at)||at+1e-8<root.minutes||
     !residentIdsForSimulation(root).includes(id)||!actorFor(root,id))return false;
   syncRecurringTasks(root,at);
   let changed=false;
