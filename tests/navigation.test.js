@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {newHousehold} from '../src/household.js';
+import {resolveActionFurniture,furnitureActionApproach} from '../src/furniture-catalog.js';
 import { ACTIONS, newGame } from '../src/simulation.js';
 import { findPath, isClearLine, isWalkable, nearestWalkable, FURNITURE } from '../src/navigation.js';
 
@@ -47,4 +49,32 @@ test('repairs an old save position that intersects furniture', () => {
   const route=findPath(point,destinations.sofa);
   assert.ok(route?.length);
   assert.equal(findPath({x:0,z:0},{x:-2.62,z:-1.42}),null);
+});
+
+test('short furniture corner intersection cannot disappear when a segment is sampled at a different length',()=>{
+  const world=newHousehold('2026-11-27').world;
+  const hot={x:-.82254,z:.76341},corner={x:.02,z:.54};
+  const item=resolveActionFurniture(world,'sofa',null);
+  const goal=furnitureActionApproach(world,'sofa',item.instanceId);
+  assert.ok(isWalkable(hot.x,hot.z,world));
+  assert.ok(isWalkable(corner.x,corner.z,world));
+  const dist=Math.hypot(corner.x-hot.x,corner.z-hot.z);
+  const prefix={x:hot.x+(corner.x-hot.x)*.66/dist,z:hot.z+(corner.z-hot.z)*.66/dist};
+  assert.ok(isWalkable(prefix.x,prefix.z,world));
+  assert.equal(isClearLine(hot,corner,world),false,'full corner-crossing segment');
+  assert.equal(isClearLine(corner,hot,world),false,'reverse segment');
+  assert.equal(isClearLine(hot,prefix,world),false,'actual movement prefix');
+  const route=findPath(hot,goal,world);
+  assert.ok(route?.length,'safe alternative to the sofa');
+  let prev=hot;
+  for(const next of route){
+    assert.ok(isClearLine(prev,next,world));
+    for(let i=0;i<=100;i++){
+      const t=i/100,p={x:prev.x+(next.x-prev.x)*t,z:prev.z+(next.z-prev.z)*t};
+      assert.ok(isWalkable(p.x,p.z,world),'fine path sample');
+      assert.ok(isClearLine(prev,p,world),'every prefix must remain valid');
+    }
+    prev=next;
+  }
+  assert.deepEqual(prev,goal);
 });
