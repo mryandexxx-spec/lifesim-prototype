@@ -127,20 +127,24 @@ const segmentDistance=(p,a,b)=>{
     ((p.x-a.x)*dx+(p.z-a.z)*dz)/scale));
   return distance(p,{x:a.x+dx*t,z:a.z+dz*t});
 };
+const peerPresent=(root,id)=>!['working','waiting'].includes(
+  root?.careerSystem?.byResident?.[id]?.currentShift?.phase);
+function snapshotPeerClear(root,id){
+  const positions=others(root,id).filter(([other])=>peerPresent(root,other))
+    .map(([,actor])=>({...actor.position}));
+  return (from,to)=>positions.every(p=>segmentDistance(p,from,to)>=gap);
+}
 export function residentCollisionFree(root,id,point){
   if(!Number.isFinite(point?.x)||!Number.isFinite(point?.z))return false;
   return others(root,id).every(([other,actor])=>{
-    const phase=root?.careerSystem?.byResident?.[other]?.currentShift?.phase;
-    return ['working','waiting'].includes(phase)||distance(actor.position,point)>=gap;
+    return !peerPresent(root,other)||distance(actor.position,point)>=gap;
   });
 }
 export function residentSegmentClear(root,id,from,to,{additionalOnly=false}={}){
   if(!Number.isFinite(from?.x)||!Number.isFinite(to?.x))return false;
   return others(root,id).every(([other,actor])=>{
     if(additionalOnly&&!extraPattern.test(other))return true;
-    const phase=root?.careerSystem?.byResident?.[other]?.currentShift?.phase;
-    return ['working','waiting'].includes(phase)||
-      segmentDistance(actor.position,from,to)>=gap;
+    return !peerPresent(root,other)||segmentDistance(actor.position,from,to)>=gap;
   });
 }
 /** A legacy action cannot steal an additional resident's occupied resource. */
@@ -156,7 +160,7 @@ export function extraReservesFurniture(root,itemId,instanceId){
   return false;
 }
 /** Lookup is independent of player selection; no assignment by list index. */
-export function chosenAdditionalBedSlot(root,id,instanceId){
+export function chosenAdditionalBedSlot(root,id,instanceId,{avoidOccupiedApproach=false}={}){
   const actor=savedAdditionalActor(root,id);
   if(!actor)return null;
   const taken=new Set();
@@ -176,6 +180,7 @@ export function chosenAdditionalBedSlot(root,id,instanceId){
   for(const slot of BED_SLOT_IDS){
     if(taken.has(slot))continue;
     const goal=furniturePoint(root.world,'bed',BED_SLOTS[slot].approach,instanceId);
+    if(avoidOccupiedApproach&&goal&&!residentCollisionFree(root,id,goal))continue;
     const path=goal&&findPath(origin,goal,root.world);
     if(!path)continue;
     let length=0,last=origin;
@@ -232,7 +237,7 @@ function furnitureFree(root,id,actionId,instanceId,bedSlot=null){
   }
   return true;
 }
-function prepareCommand(root,id,command){
+function prepareCommand(root,id,command,{automatic=false}={}){
   const actor=savedAdditionalActor(root,id);
   if(!actor||actor.action)return null;
   if(command.type==='move'){
@@ -247,7 +252,7 @@ function prepareCommand(root,id,command){
     command.targetInstanceId||null);
   if(!item)return null;
   const slot=command.actionId==='bed'
-    ?chosenAdditionalBedSlot(root,id,item.instanceId):null;
+    ?chosenAdditionalBedSlot(root,id,item.instanceId,{avoidOccupiedApproach:automatic}):null;
   if(command.actionId==='bed'&&!slot)return null;
   if(!furnitureFree(root,id,command.actionId,item.instanceId,slot))return null;
   const candidate={id:command.actionId,targetInstanceId:item.instanceId,
@@ -255,6 +260,9 @@ function prepareCommand(root,id,command){
     ...(command.actionId==='mirror'&&command.mirrorPractice===true?{mirrorPractice:true}:{}),
     ...(command.actionId==='shower'&&command.showerSinging===true?{showerSinging:true}:{})};
   const goal=actionGoal(root,candidate);
+  // A physically occupied approach is not a feasible autonomous intent.
+  // Manual FIFO still uses its existing wait/park guard; never drop a command.
+  if(automatic&&goal&&!residentCollisionFree(root,id,goal))return null;
   return goal&&findPath(actor.position,goal,root.world)?candidate:null;
 }
 /** Manual FIFO always has priority. An automatic action never consumes a
@@ -264,6 +272,7 @@ function startPlannedObject(root,id,plan,automatic){
   const actor=savedAdditionalActor(root,id);
   if(!actor||actor.action||!furnitureFree(root,id,plan.id,
     plan.targetInstanceId,plan.bedSlot||null))return false;
+  if(automatic&&!residentCollisionFree(root,id,actionGoal(root,plan)))return false;
   if(!chooseAction(actor,plan.id,automatic))return false;
   Object.assign(actor.action,{targetInstanceId:plan.targetInstanceId,
     ...(plan.bedSlot?{bedSlot:plan.bedSlot}:{}),
@@ -324,34 +333,35 @@ export function dispatchAdditionalResidentQueues(root){
  */
 function advanceExtraPosition(root,id,actor,goal,minutes){
   if(!isWalkable(goal?.x,goal?.z,root.world))return false;
-  const path=findPath(actor.position,goal,root.world);
+  let path=findPath(actor.position,goal,root.world);
   if(!path)return false;
+  const peerClear=snapshotPeerClear(root,id);
+  // Use the ordinary static route unless a present peer intersects it.
+  // A single query reuses existing A* and its static grid; no second planner,
+  // saved path, forced peer movement or clearance reduction.
+  let previous=actor.position;
+  const obstructed=path.some(point=>{
+    const blocked=!peerClear(previous,point);
+    previous=point;return blocked;
+  });
+  if(obstructed&&peerClear(goal,goal)){
+    const around=findPath(actor.position,goal,root.world,peerClear);
+    if(around)path=around;
+  }
   const budget=Math.min(2,Math.max(0,minutes*2.2));
-  let remaining=budget;
   for(const next of path){
-    if(remaining<=.0001)break;
+    if(budget<=.0001)break;
     const d=distance(actor.position,next);
     if(d<.0001)continue;
-    const step=Math.min(d,remaining);
+    const step=Math.min(d,budget);
     const point={x:actor.position.x+(next.x-actor.position.x)*step/d,
       z:actor.position.z+(next.z-actor.position.z)*step/d};
     if(!isClearLine(actor.position,point,root.world))return false;
-    if(!residentSegmentClear(root,id,actor.position,point)){
-      // Choose a safe perpendicular bypass only if A* still reaches the goal.
-      const ux=(next.x-actor.position.x)/d,uz=(next.z-actor.position.z)/d;
-      const alternatives=[1,-1].map(side=>({
-        x:actor.position.x-uz*side*step,z:actor.position.z+ux*side*step}));
-      const detour=alternatives.find(p=>isWalkable(p.x,p.z,root.world)&&
-        isClearLine(actor.position,p,root.world)&&
-        residentSegmentClear(root,id,actor.position,p)&&
-        findPath(p,goal,root.world));
-      if(detour){actor.position=detour;remaining-=step;}
-      break;
-    }
+    // No collision-free bypass (including a blocked destination): wait at a
+    // safe position and let the existing bounded walking guard recover.
+    if(!peerClear(actor.position,point))break;
     actor.position=point;
-    remaining-=step;
-    // Never jump across an unverified A* corner inside one simulation tick.
-    // The next step replans from this precise collision-free location.
+    // Only one verified A* edge per simulation tick.
     break;
   }
   return true;
@@ -450,10 +460,10 @@ export function explainAdditionalResidentAutonomy(root,id){
   for(const candidate of evaluation.candidates){
     if(candidate.score<=0)continue;
     if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(candidate.id))continue;
-    let plan=prepareCommand(root,id,{type:'object',actionId:candidate.id});
+    let plan=prepareCommand(root,id,{type:'object',actionId:candidate.id},{automatic:true});
     // Real TV is only an alternate reachable device for leisure.
     if(!plan&&candidate.id==='sofa')
-      plan=prepareCommand(root,id,{type:'object',actionId:'tv'});
+      plan=prepareCommand(root,id,{type:'object',actionId:'tv'},{automatic:true});
     attempts.push({id:candidate.id,score:candidate.score,
       reason:candidate.reason,factors:candidate.factors,
       availability:plan?'free-and-reachable':'unavailable-or-unreachable',
@@ -462,7 +472,7 @@ export function explainAdditionalResidentAutonomy(root,id){
   }
   if(evaluation.selected===null&&Number.isFinite(actor.needs.social)&&
     actor.needs.social<35){
-    const mirror=prepareCommand(root,id,{type:'object',actionId:'mirror'});
+    const mirror=prepareCommand(root,id,{type:'object',actionId:'mirror'},{automatic:true});
     attempts.push({id:'mirror',score:null,reason:'low-social-real-mirror',
       availability:mirror?'free-and-reachable':'unavailable-or-unreachable',
       plannedAction:mirror?.id||null});
@@ -539,7 +549,8 @@ export function tickAdditionalResidents(root,minutes){
       if(outcome==='exhausted'||outcome==='invalid-position'){
         if(!interruptAdditionalAction(root,id,actor,'unreachable-route'))
           actor.event='Маршрут заблокирован: освободи отложенные задания';
-      }else if(routeValid&&goal&&distance(actor.position,goal)<.065){
+      }else if(routeValid&&goal&&distance(actor.position,goal)<.065&&
+        isClearLine(actor.position,goal,root.world)&&residentSegmentClear(root,id,actor.position,goal)){
         actor.position={x:goal.x,z:goal.z};
         if(current.id==='move'){actor.action=null;actor.event='Пришёл в выбранное место';}
         else arrive(actor);

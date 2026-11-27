@@ -78,3 +78,39 @@ test('short furniture corner intersection cannot disappear when a segment is sam
   }
   assert.deepEqual(prev,goal);
 });
+
+// Deterministic open three-metre lane with clearance on both sides. Fixture
+// selection uses only static walkability, never the candidate avoidance result.
+function openLane(world){
+  for(let x=4;x<=10;x+=.5)for(let z=-2;z<=2;z+=.5){
+    const from={x,z},goal={x:x+2.6,z},peer={x:x+1.3,z};
+    if(![-.9,0,.9].every(d=>isClearLine({x,z:z+d},{x:x+2.6,z:z+d},world)))continue;
+    if(![x,x+1.3,x+2.6].every(xx=>isClearLine({x:xx,z:z-.9},{x:xx,z:z+.9},world)))continue;
+    return {from,goal,peer};
+  }
+  throw Error('starter lot has no open lane fixture');
+}
+
+test('A* transient segment constraint bypasses a peer without poisoning static grid',()=>{
+  const world=newHousehold('2026-11-27').world;
+  for(const layout of [null,world]){
+    const {from,goal,peer}=openLane(layout);
+    const clear=(a,b)=>{
+      const dx=b.x-a.x,dz=b.z-a.z,n=dx*dx+dz*dz;
+      const t=n?Math.max(0,Math.min(1,((peer.x-a.x)*dx+(peer.z-a.z)*dz)/n)):0;
+      return Math.hypot(a.x+dx*t-peer.x,a.z+dz*t-peer.z)>=.505;
+    };
+    assert.deepEqual(findPath(from,goal,layout),[goal]);
+    assert.equal(clear(from,goal),false);
+    const route=findPath(from,goal,layout,clear);
+    assert.ok(route?.length>1,'existing A* must find an actual bypass');
+    let prev=from;
+    for(const next of route){
+      assert.ok(isClearLine(prev,next,layout)&&clear(prev,next),'every edge respects both constraints');
+      prev=next;
+    }
+    assert.deepEqual(prev,goal);
+    assert.equal(findPath(from,peer,layout,clear),null,'occupied endpoint is not a reachable route');
+    assert.deepEqual(findPath(from,goal,layout),[goal],'transient peer cannot contaminate the static cache');
+  }
+});
