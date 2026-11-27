@@ -9,6 +9,9 @@ import {careerTimeOffForShift} from './career-timeoff.js';
 import {quoteArtSale} from './art-market.js';
 import {residentIdsForSimulation,savedAdditionalActor} from './resident-activity-runtime.js';
 import {ACTIONS} from './simulation.js';
+import {aspirationTaskPreferences} from './life-aspirations.js';
+import {getPair} from './social-graph.js';
+import {SOCIAL_NEED_REWARDS} from './social-need.js';
 
 const PERIODS=['day','week'];
 const DEFINITIONS=Object.freeze({
@@ -17,7 +20,8 @@ const DEFINITIONS=Object.freeze({
   speech:{label:'Репетировать речь',weekly:'Развивать харизму',action:'mirror',weeklyTarget:3,detail:'Выбери репетицию речи у зеркала, а не причёску.'},
   paint:{label:'Заняться живописью',weekly:'Продолжить творческую практику',action:'paint',weeklyTarget:2,detail:'Заверши занятие живописью на мольберте.'},
   work:{label:'Завершить рабочую смену',weekly:'Уделить время карьере',weeklyTarget:2,detail:'Отработай запланированную смену.'},
-  sale:{label:'Продать картину',weekly:'Получить доход от творчества',weeklyTarget:1,detail:'Продай свою картину из личного инвентаря.'}
+  sale:{label:'Продать картину',weekly:'Получить доход от творчества',weeklyTarget:1,detail:'Продай свою картину из личного инвентаря.'},
+  social:{label:'Пообщаться с другим жителем',weekly:'Уделить время близким',weeklyTarget:3,detail:'Начни общение и получи положительный отклик. Отказ или ссора не засчитываются.'}
 });
 const KINDS=Object.keys(DEFINITIONS);
 const own=(o,k)=>Object.hasOwn(o||{},k);
@@ -42,6 +46,7 @@ function eligible(root,id,kind,at,window,period,remaining=null){
   if(!actorFor(root,id)||!own(DEFINITIONS,kind))return false;
   if((kind==='paint'||kind==='sale')&&!['alex','mira'].includes(id))return false;
   if(kind==='sale')return saleAvailable(root,id);
+  if(kind==='social')return residentIdsForSimulation(root).some(other=>other!==id&&actorFor(root,other)&&root.socialGraph?.persons?.includes(other));
   if(kind==='work'){
     const c=root.careerSystem?.byResident?.[id];
     if(!c||c.discipline?.pendingDismissal)return false;
@@ -54,14 +59,17 @@ function eligible(root,id,kind,at,window,period,remaining=null){
   return !!resolveActionFurniture(root.world,DEFINITIONS[kind].action);
 }
 function options(root,id,period,at,window){
-  return KINDS.filter(k=>eligible(root,id,k,at,window,period));
+  const prefs=aspirationTaskPreferences(root,id);
+  return KINDS.filter(k=>(k!=='social'||prefs.includes('social'))&&eligible(root,id,k,at,window,period));
 }
 function makeSlot(root,id,period,at,window,exclude=null,previous=null){
   const kinds=options(root,id,period,at,window);
   const preferred=kinds.filter(k=>k!==exclude&&k!==previous);
   const choices=preferred.length?preferred:kinds.filter(k=>k!==previous);
+  const related=choices.filter(k=>aspirationTaskPreferences(root,id).includes(k));
+  const pool=related.length?related:choices;
   const seed=Math.floor(window.start/DAY)+[...id].reduce((n,c)=>n+c.charCodeAt(0),0)+(period==='week'?1:0);
-  const kind=choices.length?choices[seed%choices.length]:null;
+  const kind=pool.length?pool[seed%pool.length]:null;
   const target=kind?(period==='day'?1:Math.min(DEFINITIONS[kind].weeklyTarget,maxDays(at,window.end))):0;
   return {key:window.key,startedAt:at,kind,target,proofs:[],dismissed:false};
 }
@@ -137,6 +145,15 @@ export function recordTaskOutcome(root,id,kind,receiptId,at=root.minutes){
   }
   return changed;
 }
+/** Only newly committed positive graph receipts, attributed to the initiator. */
+export function recordSocialTaskOutcome(root,receipt){
+  const id=receipt?.actorId;
+  if(!id||receipt.type==='sports.disagree'||!own(SOCIAL_NEED_REWARDS,receipt.type)||
+    !Number.isSafeInteger(receipt.seq)||receipt.seq<1||
+    !getPair(root.socialGraph,id,receipt.targetId)?.events.some(e=>e.seq===receipt.seq&&e.type===receipt.type&&e.actorId===id&&e.at===receipt.at))return false;
+  if(!aspirationTaskPreferences(root,id).includes('social')&&!PERIODS.some(p=>slotFor(root,id,p)?.kind==='social'))return false;
+  return recordTaskOutcome(root,id,'social','social:'+receipt.seq,receipt.at);
+}
 /** Capture a normal leisure completion from the actual tick, with exact object and physical position.
  * A queued/walking/canceled/deleted action, early no-op, or TV conversation is not a goal receipt.
  */
@@ -195,8 +212,10 @@ export function changeRecurringTask(root,id,period,operation){
   if(slot.dismissed&&available.includes(slot.kind)){
     withSlot(root,id,period,{...slot,dismissed:false});return true;
   }
-  const start=KINDS.indexOf(slot.kind);
-  const ordered=Array.from({length:KINDS.length},(_,i)=>KINDS[(start+1+i)%KINDS.length]);
+  const prefs=aspirationTaskPreferences(root,id);
+  const order=prefs.length?[...prefs,...KINDS.filter(k=>!prefs.includes(k))]:KINDS;
+  const start=order.indexOf(slot.kind);
+  const ordered=Array.from({length:order.length},(_,i)=>order[(start+1+i)%order.length]);
   const kind=ordered.find(k=>k!==slot.kind&&available.includes(k));
   if(!kind)return false;
   const target=period==='day'?1:Math.min(DEFINITIONS[kind].weeklyTarget,maxDays(root.minutes,window.end));

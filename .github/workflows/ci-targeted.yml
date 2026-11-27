@@ -8,6 +8,35 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  gc-07-life-aspirations:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-07-life-aspirations' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/gc07-http.log 2>&1 &
+          sleep 3
+          node tests/gc-07-life-aspirations-browser.mjs
+        env:
+          GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-07-life-aspirations-ui
+          path: artifacts/gc-07-aspirations/
+          if-no-files-found: warn
   gc-06-recurring-tasks:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-06-recurring-tasks' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

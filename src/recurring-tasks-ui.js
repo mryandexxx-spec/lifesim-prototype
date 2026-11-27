@@ -1,17 +1,19 @@
 /** GC-06 opt-in personal plan cards. Render only facts; no queue or reward. */
 import {taskView} from './recurring-tasks.js';
+import {ASPIRATIONS} from './life-aspirations.js';
 const keys=new WeakMap();
 const statuses={active:'В процессе',complete:'Выполнено',dismissed:'Пропущено',unavailable:'Сейчас недоступно',empty:'Нет подходящего занятия'};
 export function renderRecurringTaskCards(host,root,id,onChange){
   if(!host)return;
   const view=taskView(root,id);
-  const key=JSON.stringify([id,view]);
+  const aspiration=root.lifeAspirations?.byResident?.[id]?.definitionId;
+  const key=JSON.stringify([id,view,aspiration]);
   if(keys.get(host)===key)return;
   keys.set(host,key);
   const doc=host.ownerDocument,body=doc.createElement('div');
   body.className='gc-task-cards';
   const note=doc.createElement('p');note.className='gc-task-note';
-  note.textContent='Необязательные задания. Без наград и штрафов.';
+  note.textContent='Необязательные задания. Без наград и штрафов.'+(Object.hasOwn(ASPIRATIONS,aspiration)?' Приоритет: '+ASPIRATIONS[aspiration].title+'.':'');
   body.append(note);
   for(const item of view){
     const card=doc.createElement('article');

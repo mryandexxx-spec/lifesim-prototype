@@ -4,6 +4,7 @@
  */
 import {nextCareerShift} from './career-scheduler.js';
 import {recordTaskOutcome} from './recurring-tasks.js';
+import {recordAspirationIncome} from './life-aspirations.js';
 import {CAREER_RESIDENT_IDS,separateCareer} from './career-state.js';
 import {residentIdsForSimulation,savedAdditionalActor} from './resident-activity-runtime.js';
 import {recordCareerDiscipline,DISCIPLINE_REHIRE_MINUTES} from './career-discipline.js';
@@ -162,6 +163,7 @@ function settle(root,contract,id,at){
     if(!payment.ok)return {salary:0,result:null,badges:[],failed:true};
     root.shop=payment.shop;
     root.financialHistory=payment.financialHistory;
+    if(payment.recorded)recordAspirationIncome(root,payment.entry);
     ledger.push(shift.id);
     if(ledger.length>256)ledger.splice(0,ledger.length-256);
     // Salary, performance, fatigue and receipt belong to ONE saved snapshot.

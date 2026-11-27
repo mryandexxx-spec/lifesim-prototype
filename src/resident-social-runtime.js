@@ -11,6 +11,7 @@ import {registerPerson,setLifeStage,addFamilyLink,restoreSocialGraph,
   getDirectedView,relationSummary} from './social-graph.js';
 import {evaluateSocialReaction} from './social-reactions.js';
 import {creditCompletedSocialNeed} from './social-need.js';
+import {recordSocialTaskOutcome} from './recurring-tasks.js';
 import {feelMemory} from './emotion-engine.js';
 import {refreshMind} from './psychology.js';
 import {createConversation,restoreConversation,conversationOutcome,CONVERSATION_TOPICS} from './conversation-engine.js';
@@ -275,6 +276,7 @@ function settleAddressedSocial(root,s,outcome){
     token:'cas-social:'+s.seq
   });
   if(receipt){
+    recordSocialTaskOutcome(root,receipt);
     creditCompletedSocialNeed(allActors(root),receipt);
     if(s.conversation)for(const turn of s.conversation.turns){
       const tag=CONVERSATION_DISCOVERY_TAGS[turn.id];
