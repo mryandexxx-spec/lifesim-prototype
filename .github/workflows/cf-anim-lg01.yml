@@ -1,0 +1,47 @@
+name: LG-01 ACCAD source acquisition
+on:
+  pull_request:
+    branches: ['diagnostic/cf-anim-mocap-transitions']
+permissions:
+  contents: read
+jobs:
+  accad-source:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-lg01-source-ports' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Acquire original CC BY 3.0 Male 1 BVH family
+        run: |
+          mkdir -p evidence
+          curl -fL --retry 1 --max-time 120 --max-filesize 150000000 'https://accad.ohio-state.edu/sites/accad.osu.edu/files/Male1_bvh.zip' -o source.zip
+          python3 - <<'PY'
+          import zipfile,pathlib,hashlib,re,json,os
+          P=pathlib.Path
+          raw=P("source.zip").read_bytes()
+          z=zipfile.ZipFile("source.zip")
+          assert z.testzip() is None
+          names=[n for n in z.namelist() if n.lower().endswith(".bvh") and not n.startswith("__MACOSX/")]
+          report={"head":os.environ["GITHUB_SHA"],"sourceUrl":"https://accad.ohio-state.edu/sites/accad.osu.edu/files/Male1_bvh.zip","archiveSha256":hashlib.sha256(raw).hexdigest(),"archiveBytes":len(raw),"credit":"ACCAD/The Ohio State University, Open Motion Project, CC BY 3.0 https://creativecommons.org/licenses/by/3.0/","catalog":"https://accad.ohio-state.edu/sites/accad.osu.edu/files/ACCAD_mocap_Data_Male_1.pdf","members":names,"selected":{}}
+          O=P("evidence")
+          (O/"ATTRIBUTION.txt").write_text(report["credit"]+"\n"+report["sourceUrl"]+"\n")
+          def label(n):
+              return re.sub(r"^[A-Za-z]+\d+\s*[-_. ]+","",P(n).stem).strip().lower().replace("_"," ")
+          for role,want in {"idle":"stand","start":"stand to walk","walk":"walk","stop":"walk to stand"}.items():
+              matches=[n for n in names if label(n)==want]
+              report["selected"][role]={"matches":matches}
+              if len(matches)==1:
+                  data=z.read(matches[0])
+                  assert data.lstrip().startswith(b"HIERARCHY") and len(data)<30000000
+                  (O/(role+".bvh")).write_bytes(data)
+                  report["selected"][role].update(sha256=hashlib.sha256(data).hexdigest(),bytes=len(data))
+          (O/"report.json").write_text(json.dumps(report,indent=2))
+          print(json.dumps(report["selected"]),flush=True)
+          # Retain exact original archive for native local screening if naming differs.
+          (O/"Male1_bvh.zip").write_bytes(raw)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-lg01-accad-source
+          path: evidence/
+          if-no-files-found: error
