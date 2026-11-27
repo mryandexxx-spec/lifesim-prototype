@@ -147,6 +147,48 @@ jobs:
           path: artifacts/cf-anim-stock-walk-authored/
           if-no-files-found: warn
 
+  cf-anim-source-quality:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-source-quality' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        family: [mesh2motion]
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9a4d8adaccbf55572346904750e252565d30d924
+          path: prior-code
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned native source audit dependencies
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.17.1 imageio-ffmpeg==0.6.0
+          python -m py_compile tools/cf_anim_source_quality.py
+          python tools/cf_anim_contact_temporal.py
+      - name: Capture native CC0 source quality and repeated video
+        run: timeout --signal=TERM --kill-after=10s 660s python -u tools/cf_anim_source_quality.py ${{ matrix.family }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-source-quality-${{ matrix.family }}-evidence
+          path: artifacts/cf-anim-source-quality/${{ matrix.family }}/
+          if-no-files-found: error
+
   cf-anim-contact-source:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-contact-contract' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-source]')
     permissions:
