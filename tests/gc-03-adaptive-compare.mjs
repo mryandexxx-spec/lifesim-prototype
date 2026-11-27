@@ -14,6 +14,7 @@ if(process.env.GC_EXPECTED_SHA)assert.equal(sha,process.env.GC_EXPECTED_SHA);
 const files=['src/need-balance.js','src/simulation.js'];
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const arms={};
+const nightAware=process.env.GC_NIGHT_POLICY==='1';
 for(const arm of ['baseline','adaptive']){
  const scratch=mkdtempSync(join(root,'.gc03-'));
  try{
@@ -37,7 +38,7 @@ for(const [arm,a] of Object.entries(arms)){
 }
 for(const a of arms.baseline.data.policies.filter(p=>!p.replay)){
  const b=arms.adaptive.data.policies.find(p=>!p.replay&&p.block.date===a.block.date&&p.variant.name===a.variant.name);
- assert.ok(b);const metrics=p=>({sleepMinutes:sum(p.timeClasses,'sleep'),criticalEnergy:sum(p.criticalNeedMinutes,'energy'),criticalHunger:sum(p.criticalNeedMinutes,'hunger'),idle:sum(p.timeClasses,'idle'),socialMinutes:sum(p.timeClasses,'social'),hobbyMinutes:sum(p.timeClasses,'hobby'),sales:p.sales,decisions:p.decisions,social:p.socialCompletions,wallet:p.daily.at(-1)?.wallet,debt:p.daily.at(-1)?.debt,missed:p.daily.at(-1)?.actors.reduce((n,x)=>n+(x.career?.missedShifts||0),0),travelFailures:p.travelFailures,premiumWake:p.property.premiumCompleted,premiumNonFull:p.property.premiumNonFullCompleted});
+ assert.ok(b);const metrics=p=>({sleepMinutes:sum(p.timeClasses,'sleep'),criticalEnergy:sum(p.criticalNeedMinutes,'energy'),criticalHunger:sum(p.criticalNeedMinutes,'hunger'),idle:sum(p.timeClasses,'idle'),socialMinutes:sum(p.timeClasses,'social'),hobbyMinutes:sum(p.timeClasses,'hobby'),sales:p.sales,decisions:p.decisions,social:p.socialCompletions,wallet:p.daily.at(-1)?.wallet,debt:p.daily.at(-1)?.debt,missed:p.daily.at(-1)?.actors.reduce((n,x)=>n+(x.career?.missedShifts||0),0),travelFailures:p.travelFailures,premiumWake:p.property.premiumCompleted,premiumNonFull:p.property.premiumNonFullCompleted,sleepStarts:p.sleepEpisodes.filter(e=>e.kind==='start').length,workInterruptions:p.sleepEpisodes.filter(e=>e.outcome==='work-interrupt').length,fullWakes:p.sleepEpisodes.filter(e=>e.outcome==='full').length});
  const baseline=metrics(a),adaptive=metrics(b);
  rows.push({block:a.block.date,variant:a.variant.name,baseline,adaptive,delta:Object.fromEntries(Object.keys(baseline).map(k=>[k,adaptive[k]-baseline[k]]))});
  if(b.property.premiumNonFullCompleted>0)failures.push({variant:b.variant.name,block:b.block.date,error:'non-full premium completion'});
@@ -50,6 +51,6 @@ for(const row of rows.filter(x=>x.variant.endsWith('-base'))){
  pairs.push({block:row.block,policy:row.variant,baselineSavedMinutes:row.baseline.sleepMinutes-p.baseline.sleepMinutes,adaptiveSavedMinutes:row.adaptive.sleepMinutes-p.adaptive.sleepMinutes,baselineCriticalDelta:p.baseline.criticalEnergy-row.baseline.criticalEnergy,adaptiveCriticalDelta:p.adaptive.criticalEnergy-row.adaptive.criticalEnergy});
 }
 assert.equal(pairs.length,6);
-writeFileSync(join(out,'comparison.json'),JSON.stringify({sha,base,rows,pairs,failures},null,2));
-console.log(JSON.stringify({rows,pairs,failures}));
+writeFileSync(join(out,'comparison.json'),JSON.stringify({sha,base,nightAware,rows,pairs,failures},null,2));
+console.log(JSON.stringify({nightAware,rows,pairs,failures}));
 assert.deepEqual(failures,[]);
