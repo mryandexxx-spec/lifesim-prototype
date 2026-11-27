@@ -1,6 +1,6 @@
 // QSK-11 stage A: read-only labels for the existing 2–4-resident plan UI.
 // No DOM, localStorage, queue writes, or separate game truth.
-import {ACTIONS,mirrorActionLabel} from './simulation.js';
+import {ACTIONS,mirrorActionLabel,showerActionLabel} from './simulation.js';
 import {grillRecipe} from './grill-r1.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {HOBBY_ACTIVITIES} from './hobby-reading.js';
@@ -22,7 +22,7 @@ export function labelQueuedTask(game,task){
     task.actionId==='harvest'?'Собрать садовые травы':
     task.actionId==='replant'?'Посадить травы заново':'Полюбоваться садом';
   if(task.type==='pool')return task.actionId==='jump'?'Прыгнуть и поплавать':'Плавать';
-  if(task.type==='object')return task.tvTalk===true?'Поговорить с телевизором':
+  if(task.type==='object')return task.showerSinging===true?'Петь в душе':task.tvTalk===true?'Поговорить с телевизором':
     task.mirrorPractice===true?'Репетировать речь':
       ACTIONS[task.actionId]?.label||'Предмет';
   if(task.type==='activity'&&task.paintMode)return task.paintMode==='practice'?'Практика живописи · бесплатно':
@@ -56,6 +56,7 @@ export function labelActiveTask(game,id){
   }
   if(actor.action?.id==='garden')return labelQueuedTask(game,{type:'garden',actionId:actor.action.gardenActionId});
   if(actor.action?.id==='swim')return poolActivityLabel(actor.action);
+  if(showerActionLabel(actor.action))return showerActionLabel(actor.action);
   if(mirrorActionLabel(actor.action))return mirrorActionLabel(actor.action);
   return actor.action
     ?(actor.action.id==='music'

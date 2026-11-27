@@ -1,0 +1,36 @@
+name: LIFE-QOL-R1 C shower singing
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shower-singing-mobile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Shower, skills, queues and existing music regression
+        run: node --test tests/life-qol-r1c-shower.test.js tests/shower.test.js tests/meshy-shower-runtime.test.js tests/action-queue.test.js tests/hobbies-h4.test.js tests/gc-05-skill-pacing.test.js tests/hobbies-h2.test.js tests/h2b-music-dance.test.js tests/life-charisma-r1.test.js
+      - name: Mobile action, actual usage and saved music XP
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/life-qol-r1c-http.log 2>&1 &
+          sleep 3
+          node tests/life-qol-r1c-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: life-qol-r1c-evidence
+          path: artifacts/life-qol-r1c/
+          if-no-files-found: warn
