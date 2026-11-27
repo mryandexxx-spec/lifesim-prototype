@@ -95,8 +95,15 @@ export function sanitizeQueueCommand(id,raw,persons){
       definition.id!=='hobby.read.fiction'||
       typeof raw.inventoryItemId!=='string'||
       !/^[am][0-9]{1,8}$/.test(raw.inventoryItemId)))return null;
+    const marketIntent=raw.paintMode!==undefined||raw.paintExpectedPrice!==undefined;
+    if(marketIntent&&(definition.id!=='hobby.paint.picture'||
+      !['practice','speculative','commission'].includes(raw.paintMode)||
+      !Number.isSafeInteger(raw.paintExpectedPrice)||raw.paintExpectedPrice<0||
+      raw.paintExpectedPrice>1000000||
+      (raw.paintMode==='practice'?raw.paintExpectedPrice!==0:raw.paintExpectedPrice===0)))return null;
     return {type,activityId:definition.id,targetInstanceId:raw.targetInstanceId,
       contentId:content?.id||null,
+      ...(marketIntent?{paintMode:raw.paintMode,paintExpectedPrice:raw.paintExpectedPrice}:{}),
       ...(raw.inventoryItemId?{inventoryItemId:raw.inventoryItemId}:{})};
   }
   if(type==='object'||!pair(id,raw.targetId)||!persons.includes(raw.targetId))return null;

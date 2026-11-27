@@ -18,7 +18,11 @@ function fixture(){
  return {root,easel:buy.instanceId};
 }
 function begin(root,easel,id='alex',mode='speculative'){
- assert.ok(chooseResidentAction(root,'paint',false,id,easel,PAINT_ACTIVITY_ID,'painting.hills'));
+ // C1 projection isolation: create the canonical session on an unactivated
+ // clone; C2 tests separately exercise the integrated actual admission.
+ const canonical=copy(root);delete canonical.artMarket;
+ assert.ok(chooseResidentAction(canonical,'paint',false,id,easel,PAINT_ACTIVITY_ID,'painting.hills'));
+ const a=getActor(root,id),b=getActor(canonical,id);a.action=b.action;a.activitySession=b.activitySession;
  const q=artAdmissionQuote(root,id,mode,'painting.hills');assert.ok(q.ok,q.reason);
  const result=projectArtAdmission(root,id,mode,q.price);assert.ok(result.ok,result.reason);
  Object.assign(root,{artMarket:result.artMarket,shop:result.shop,financialHistory:result.financialHistory});

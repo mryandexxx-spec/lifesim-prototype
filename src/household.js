@@ -85,6 +85,7 @@ import {furnitureActionApproach} from './furniture-catalog.js';
 import {chooseMusicListeningSpot,validMusicListeningSpot} from './music-listening.js';
 import {switchLampAtArrival,MIRROR_SPEECH_DURATION,MIRROR_SPEECH_XP} from './furniture-interactions.js';
 import {PAINT_ACTIVITY_ID,PAINT_CONTENT_IDS,PAINT_WORKS_LIMIT,canPaintContent,restoreCreatedWorks,finishPainting} from './painting.js';
+import {newArtMarket,restoreArtMarket,artAdmissionQuote,projectArtAdmission,projectArtCancellation,projectArtCompletion} from './art-market.js';
 import {chooseDiningSeat,diningSeatApproach} from './dining.js';
 import {grillApproach,grillAvailable,canGrillRecipe,finishGrillRecipe,
   outdoorGrill} from './grill-r1.js';
@@ -319,6 +320,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
         !validPaintingSource(root,actor)||
         Math.abs(session.elapsed-actor.action.elapsed)>.00001||
         !((session.phase==='walking'&&actor.action.phase==='walking')||
+          (session.phase==='walking'&&actor.action.phase==='using'&&actor.action.elapsed===0)||
           (session.phase==='using'&&actor.action.phase==='using'))||
         (actor.action.phase==='using'&&(!target||
           Math.hypot(actor.position.x-target.x,actor.position.z-target.z)>.35)))
@@ -495,9 +497,39 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     }else resident.action=null;
   }
   refreshGardenWishes(root);
+  if(Object.hasOwn(raw,'artMarket')){
+    const restored=restoreArtMarket(raw.artMarket,root.minutes);
+    if(!restored)throw new Error('Invalid saved art market');
+    root.artMarket=restored;
+    reconcileArtMarket(root);
+  }
   return root;
 }
 
+/** Candidate is opt-in until the user-facing migration and queue UI are ready.
+ * Existing unfinished/queued painting stays on the legacy route, not billed retroactively. */
+export function enableArtMarketPilot(root){
+  if(Object.hasOwn(root,'artMarket'))return Boolean(restoreArtMarket(root.artMarket,root.minutes));
+  if(HOUSEHOLD_IDS.some(id=>getActor(root,id)?.action?.id==='paint'||
+    pendingActions(root.actionQueues,id).some(c=>c.activityId===PAINT_ACTIVITY_ID||c.actionId==='paint')))return false;
+  const market=newArtMarket(root.minutes);if(!market)return false;
+  root.artMarket=market;return true;
+}
+export function reconcileArtMarket(root){
+  if(!Object.hasOwn(root,'artMarket'))return;
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),a=root.artMarket?.byResident?.[id]?.active;
+    const matches=actor?.action?.id==='paint'&&actor.activitySession?.sessionId===a?.sessionId&&
+      actor.activitySession?.contentId===a?.contentId&&a?.sessionId;
+    if(a&&!matches){
+      const cancelled=projectArtCancellation(root,id,a.sessionId);
+      if(cancelled.ok)root.artMarket=cancelled.artMarket;
+    }
+    if(actor?.action?.id==='paint'&&!matches){
+      actor.action=null;actor.activitySession=null;actor.event='Действие живописи отменено';
+    }
+  }
+}
 export function getActor(root,id='alex') {
   return strictLegacyActor(root,id)??savedAdditionalActor(root,id);
 }
@@ -670,7 +702,7 @@ function validMusicSource(root,actor){
 }
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
   activityId=null,contentId=null,musicPlan=null,inventoryItemId=null,recipeId=null,
-  mirrorPractice=false,tvTalk=false) {
+  mirrorPractice=false,tvTalk=false,paintMode=null,paintExpectedPrice=null) {
   const item=itemId==='dining'
     ?((root.world?.outdoors?.features||[]).find(x=>x.instanceId===targetInstanceId&&
       x.itemId==='garden.table')||resolveActionFurniture(root.world,itemId,targetInstanceId))
@@ -706,10 +738,16 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     readingSeat=chooseReadingSeat(root,residentId,item.instanceId);
     if(!readingSeat)return false;
   }
+  const marketPainting=itemId==='paint'&&Object.hasOwn(root,'artMarket');
+  if(marketPainting){
+    reconcileArtMarket(root);
+    const quote=artAdmissionQuote(root,residentId,paintMode,contentId);
+    if(!quote.ok||quote.price!==paintExpectedPrice||(automatic&&paintMode!=='practice'))return false;
+  }else if(paintMode!==null||paintExpectedPrice!==null)return false;
   if(itemId==='paint'){
     // H5b: a full collection is NOT a ring buffer. Finished works, including
     // those on a wall or in inventory, must not disappear on a 25th painting.
-    if((resident.createdWorks?.length||0)>=PAINT_WORKS_LIMIT)return false;
+    if(!(marketPainting&&paintMode==='practice')&&(resident.createdWorks?.length||0)>=PAINT_WORKS_LIMIT)return false;
     const activity=getActivityDefinition(HOBBY_ACTIVITIES,activityId);
     if(activity?.id!==PAINT_ACTIVITY_ID||!canPaintContent(resident.skills,HOBBY_SKILLS,contentId)||
       !activityFitsItem(activity,getObjectItem(objectRegistry,item.itemDefinitionId)))return false;
@@ -730,6 +768,7 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     additionalSocialEngaged(root,residentId) ||
     (automatic && (root.paused||pendingActions(root.actionQueues,residentId).length)))return false;
   const slot=itemId==='bed'?bedSlotFor(root,residentId,item.instanceId):null;
+  const previousEvent=resident.event,previousSession=resident.activitySession;
   const chosen=chooseAction(resident,itemId,automatic);
   if(chosen)resident.action.targetInstanceId=item.instanceId;
   if(chosen&&itemId==='mirror'&&mirrorPractice===true&&!automatic){
@@ -761,6 +800,15 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
     resident.action.activityId=activityId;
     resident.action.contentId=contentId;
     resident.activitySession=session;
+    if(marketPainting){
+      const transaction=projectArtAdmission(root,residentId,paintMode,paintExpectedPrice);
+      if(!transaction.ok){
+        resident.action=null;resident.activitySession=previousSession;resident.event=previousEvent;
+        return false;
+      }
+      root.artMarket=transaction.artMarket;root.shop=transaction.shop;
+      root.financialHistory=transaction.financialHistory;
+    }
   }
   if(chosen&&itemId==='music'){
     const session=createActivitySession(HOBBY_ACTIVITIES,{
@@ -947,6 +995,7 @@ function advancePainting(root,id,minutes){
 export function tickHousehold(root,minutes) {
   // A paused or invalid tick must be completely side-effect free, including Mira's fields.
   if (root.paused || dialogueNeedsDecision(root) || !Number.isFinite(minutes) || minutes<=0) return;
+  reconcileArtMarket(root);
   // Preserve the actual verified TV-use window BEFORE the simulation action
   // expires during this tick. A score itself never grants an unobserved reward.
   const previousSportMinute=root.minutes;
@@ -1226,10 +1275,18 @@ export function tickHousehold(root,minutes) {
   for(const id of HOUSEHOLD_IDS){
     const actor=getActor(root,id),completed=readyPaint[id];
     if(completed&&!actor.action&&actor.activitySession===completed.session){
-      const result=finishPainting({session:completed.session,actor,actorId:id,
-        world:root.world,at:root.minutes,registry:HOBBY_ACTIVITIES,skills:HOBBY_SKILLS});
-      if(result){actor.createdWorks=result.works;
-        actor.event='Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»';}
+      if(Object.hasOwn(root,'artMarket')){
+        const result=projectArtCompletion(root,id);
+        if(result.ok){
+          root.artMarket=result.artMarket;actor.createdWorks=result.works;
+          actor.event=result.work?'Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»':'Практика живописи завершена';
+        }
+      }else{
+        const result=finishPainting({session:completed.session,actor,actorId:id,
+          world:root.world,at:root.minutes,registry:HOBBY_ACTIVITIES,skills:HOBBY_SKILLS});
+        if(result){actor.createdWorks=result.works;
+          actor.event='Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»';}
+      }
       actor.activitySession=null;
     }
   }
@@ -1251,6 +1308,7 @@ export function tickHousehold(root,minutes) {
     const person=getActor(root,id);
     if(!['hobby','music','paint'].includes(person.action?.id))person.activitySession=null;
   }
+  reconcileArtMarket(root);
   if(watchMinutes>0){
     // Fun reflects REAL time in front of a running screen. Only the final
     // canonically accepted leisure receipt later grants the SOCIAL benefit.
