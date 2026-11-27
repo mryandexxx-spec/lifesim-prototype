@@ -59,7 +59,7 @@ jobs:
           node-version: '22'
       - name: Install exact native and runtime dependencies
         run: |
-          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 playwright==1.57.0 Pillow==11.3.0
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 imageio-ffmpeg==0.6.0 playwright==1.56.1 Pillow==11.3.0
           npm ci
           python -m playwright install --with-deps chromium webkit
           python -m py_compile tools/cf_runtime_bake.py tools/cf_runtime_idle_bake.py tools/cf_runtime_browser.py tools/cf_runtime_idle_source.py
@@ -83,6 +83,7 @@ jobs:
         run: |
           python -m http.server 8765 --bind 127.0.0.1 --directory runtime-lab > /tmp/runtime-http.log 2>&1 &
           server=$!
+          sleep 2
           trap 'kill "$server" || true' EXIT
           set +e
           xvfb-run -a python -u tools/cf_runtime_browser.py chromium

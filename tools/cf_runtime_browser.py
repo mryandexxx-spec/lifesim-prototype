@@ -1,5 +1,5 @@
 """Actual browser and pixel acceptance; preserve raw evidence even on failed gates."""
-import json, math, pathlib, sys, traceback
+import base64, json, math, pathlib, sys, traceback
 from PIL import Image,ImageChops
 from playwright.sync_api import sync_playwright
 P=pathlib.Path;engine=sys.argv[1];B=P("runtime-lab");m=json.loads((B/"manifest.json").read_text())
@@ -9,16 +9,20 @@ def save(): (O/"report.json").write_text(json.dumps(report,indent=2))
 def gate(ok,reason):
  if not ok: report["failures"].append(reason)
 with sync_playwright() as p:
- opts={"headless":False}
- if engine=="chromium":opts.update(args=["--enable-unsafe-swiftshader","--use-angle=swiftshader","--no-sandbox"])
+ opts={"headless":True}
+ if engine=="chromium":opts.update(args=["--enable-webgl","--use-gl=angle","--use-angle=swiftshader","--enable-unsafe-swiftshader","--disable-dev-shm-usage","--no-sandbox"])
  browser=getattr(p,engine).launch(**opts)
  for w,h in [(390,844),(844,390)]:
   tag=f"{w}x{h}";ctx=browser.new_context(viewport={"width":w,"height":h},device_scale_factor=1,has_touch=True,is_mobile=True,record_video_dir=str(O/tag),record_video_size={"width":w,"height":h})
   page=ctx.new_page();page.on("pageerror",lambda e:(report["errors"].append(str(e)),print("PAGE ERROR",engine,tag,str(e),flush=True)))
-  case={"viewport":[w,h],"keys":[],"views":[],"scenarios":[]};report["cases"].append(case)
+  case={"viewport":[w,h],"keys":[],"views":[],"scenarios":[],"console":[]};report["cases"].append(case)
+  page.on("console",lambda msg:case["console"].append({"type":msg.type,"text":msg.text[:1000]}) if len(case["console"])<200 else None)
   try:
    page.goto("http://127.0.0.1:8765/lab.html",wait_until="load");page.wait_for_function("window.lab?.ready===true",timeout=15000)
    def raf():page.evaluate("()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
+   def capture(path):
+    frame=page.evaluate("()=>lab.capture()");path.write_bytes(base64.b64decode(frame["png"].split(",",1)[1]));return frame["device"]
+   case["device"]=page.evaluate("()=>lab.device()")
    for ref in m["ref"][:-1]:
     t=ref["time"];page.evaluate("t=>lab.seek(t)",t);raf();a=page.evaluate("()=>lab.probe()")
     pe=max(math.dist(a["positions"][n],v) for n,v in ref["positions"].items());nav=math.dist(a["wrapper"],[v*t for v in m["speed"]])
@@ -36,12 +40,14 @@ with sync_playwright() as p:
    # Actual character contribution, not color diversity of the floor.
    for view in ["side","quarter","front"]:
     page.evaluate("v=>lab.view(v)",view);page.evaluate("()=>lab.seek(.3)");raf()
-    path=O/f"{tag}-{view}.png";page.locator("canvas").screenshot(path=str(path))
-    page.evaluate("()=>lab.visible(false)");raf();bg=O/f"{tag}-{view}-hidden.png";page.locator("canvas").screenshot(path=str(bg))
+    path=O/f"{tag}-{view}.png";raw=O/f"{tag}-{view}-canvas.png";dev=capture(raw);page.locator("canvas").screenshot(path=str(path))
+    page.evaluate("()=>lab.visible(false)");raf();bg=O/f"{tag}-{view}-hidden.png";rawbg=O/f"{tag}-{view}-canvas-hidden.png";devbg=capture(rawbg);page.locator("canvas").screenshot(path=str(bg))
     page.evaluate("()=>lab.visible(true)");raf()
-    a=Image.open(path).convert("RGB");b=Image.open(bg).convert("RGB");d=ImageChops.difference(a,b)
-    count=sum(max(px)>12 for px in d.getdata());case["views"].append({"view":view,"visiblePixels":count})
-    gate(count>w*h*.002,tag+":"+view+":actor-visible")
+    def diff(a,b):
+     d=ImageChops.difference(Image.open(a).convert("RGB"),Image.open(b).convert("RGB"));return sum(max(px)>12 for px in d.getdata())
+    count=diff(path,bg);rawcount=diff(raw,rawbg);case["views"].append({"view":view,"visiblePixels":count,"canvasVisiblePixels":rawcount,"device":dev,"hiddenDevice":devbg})
+    gate(count>w*h*.002 and rawcount>w*h*.002,tag+":"+view+":actor-visible")
+    gate(not dev["glError"] and not devbg["glError"] and not dev["lost"] and not devbg["lost"],tag+":"+view+":captureGL")
    for view in ["side","quarter"]:
     page.evaluate("v=>lab.view(v)",view);page.evaluate("()=>lab.start()")
     page.wait_for_function("lab.result().rows.length>0 && !lab.result().running",timeout=60000);raf()
@@ -68,6 +74,8 @@ with sync_playwright() as p:
       jumps.append({"t":b["elapsed"],"stage":b["stage"],"maxJointSpeedMps":max(math.dist([a["positions"][n][i]+a["wrapper"][i] for i in range(3)],[b["positions"][n][i]+b["wrapper"][i] for i in range(3)])/dt for n in a["positions"])})
     case["scenarios"][-1]["jointSpeeds"]=jumps
     page.screenshot(path=str(O/f"{tag}-{view}-settled.png"))
+    case["scenarios"][-1]["finalDevice"]=capture(O/f"{tag}-{view}-settled-canvas.png")
+    gate(case["scenarios"][-1]["finalDevice"]["glError"]==0 and not case["scenarios"][-1]["finalDevice"]["lost"],tag+":finalGL")
   except Exception as e:
    report["failures"].append(tag+":"+repr(e));traceback.print_exc()
   finally:
