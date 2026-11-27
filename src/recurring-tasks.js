@@ -38,7 +38,7 @@ function saleAvailable(root,id){
   return (actorFor(root,id)?.createdWorks||[]).some(w=>w.ownerId===id&&w.kind==='artwork'&&w.location==='inventory'&&
     (!root.artMarket||quoteArtSale(root,id,w.id).ok));
 }
-function eligible(root,id,kind,at,window,period){
+function eligible(root,id,kind,at,window,period,remaining=null){
   if(!actorFor(root,id)||!own(DEFINITIONS,kind))return false;
   if((kind==='paint'||kind==='sale')&&!['alex','mira'].includes(id))return false;
   if(kind==='sale')return saleAvailable(root,id);
@@ -49,7 +49,7 @@ function eligible(root,id,kind,at,window,period){
       .filter(s=>s.end>at&&s.end<window.end&&!root.careerSystem.settlementIds?.includes(s.id)&&
         !careerTimeOffForShift(c,s.id)&&c.lastShift?.id!==s.id);
     // A cross-midnight shift belongs to the period containing its completion.
-    return new Set(available.map(s=>Math.floor(s.end/DAY))).size>=(period==='week'?2:1);
+    return new Set(available.map(s=>Math.floor(s.end/DAY))).size>=(remaining??(period==='week'?2:1));
   }
   return !!resolveActionFurniture(root.world,DEFINITIONS[kind].action);
 }
@@ -70,7 +70,7 @@ function validSlot(slot,window,at,period){
     slot.startedAt>at||slot.startedAt>=window.end||typeof slot.dismissed!=='boolean'||!Array.isArray(slot.proofs))return false;
   if(slot.kind===null)return slot.target===0&&slot.proofs.length===0;
   if(!own(DEFINITIONS,slot.kind)||!Number.isInteger(slot.target)||slot.target<1||
-    slot.target>(period==='day'?1:Math.min(DEFINITIONS[slot.kind].weeklyTarget,maxDays(slot.startedAt,window.end)))||
+    slot.target!==(period==='day'?1:Math.min(DEFINITIONS[slot.kind].weeklyTarget,maxDays(slot.startedAt,window.end)))||
     slot.proofs.length>slot.target)return false;
   const ids=new Set(),days=new Set();
   for(const proof of slot.proofs){
@@ -108,10 +108,8 @@ export function syncRecurringTasks(root,at=root.minutes,{restore=false}={}){
       if(good)next[period]=restore?cleanSlot(slot):slot;
       else{
         const exclude=next.day?.kind??row?.day?.kind??null;
-        const activated=slot&&slot.key!==window.key&&validTime(slot.startedAt)&&slot.startedAt<=at
-          ?Math.max(window.start,slot.startedAt):at;
         // A reanchored calendar or malformed field must not grant historical proof.
-        next[period]=makeSlot(root,id,period,Math.min(at,activated),window,period==='week'?exclude:row?.week?.kind);
+        next[period]=makeSlot(root,id,period,at,window,period==='week'?exclude:row?.week?.kind);
         changed=true;
       }
     }
@@ -151,6 +149,7 @@ export function captureTaskLeisure(root,actor){
   // Seated TV uses the couch approach, not the standing TV anchor.
   const seat=a.id==='tv'&&a.watchSeatInstanceId
     ?furnitureActionApproach(root.world,'sofa',a.watchSeatInstanceId):null;
+  if(a.watchSeatInstanceId&&!seat)return null;
   if(!point||Math.hypot(actor.position.x-(seat||point).x,actor.position.z-(seat||point).z)>.65)return null;
   return {action:a,elapsed:a.elapsed,at:actor.minutes};
 }
@@ -175,7 +174,7 @@ export function taskView(root,id){
     return {period,kind,title:d?(period==='week'?d.weekly:d.label):'Нет доступного задания',
       detail:d?.detail??'Задания появятся при наличии подходящих занятий.',
       status:slot.dismissed?'dismissed':complete?'complete':!kind?'empty':
-        available.includes(kind)?'active':'unavailable',
+        eligible(root,id,kind,at,window,period,slot.target-slot.proofs.length)?'active':'unavailable',
       progress:slot.proofs.length,target:slot.target,
       canReplace:!complete&&available.some(k=>k!==kind||slot.dismissed),
       canDismiss:!complete&&!!kind&&!slot.dismissed};
