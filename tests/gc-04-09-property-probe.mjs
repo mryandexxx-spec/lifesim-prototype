@@ -32,7 +32,7 @@ if(process.env.GC_EXPECTED_SHA)assert.equal(sha,process.env.GC_EXPECTED_SHA);
 const ids=['alex','mira'],days=30;
 const MATERIAL=ART_MARKET_PILOT.materials;
 const dir='artifacts/gc-04-09-property';mkdirSync(dir,{recursive:true});
-const report={sha,model:'GC04/09 PROPERTY R1; actual current bill, food, career, art and furniture transactions; optional extra premium bed; common endowed kitchen and purchased easel/bookcase setup; alternative tariffs are shadow accounting only, not behavioral feedback; modeled A* arrival; 1 minute ticks, 5 minute policy cadence, 30 minute admin, no real UI/traversal',policies:[],failures:[],controls:{},blocks:[{date:'2026-11-26',swap:false},{date:'2026-12-01',swap:true,heldOut:true}]};
+const report={sha,model:'GC04/09 PROPERTY R2 explicit premium sleep target; actual current bill, food, career, art and furniture transactions; optional extra premium bed; common endowed kitchen and purchased easel/bookcase setup; alternative tariffs are shadow accounting only, not behavioral feedback; modeled A* arrival; 1 minute ticks, 5 minute policy cadence, 30 minute admin, no real UI/traversal',policies:[],failures:[],controls:{},blocks:[{date:'2026-11-26',swap:false},{date:'2026-12-01',swap:true,heldOut:true}]};
 const flush=()=>writeFileSync(dir+'/report.json',JSON.stringify(report,null,2)+'\n');
 function fixture(date){const base=newHousehold(date);base.calendar.anchorConfirmed=true;
 base.world.furniture.instances.push(
@@ -89,7 +89,7 @@ function run(block,variant,replay=false){
  const paintAdmissions={};const startedWalk=new WeakMap();
  const {base,easel,shelf}=fixture(block.date);if(variant.market)assert.ok(enableArtMarketPilot(base));
  const beforeUpgrade=base.shop.credits,upgrade=variant.upgrade?upgradeHouse(base):null;
- const value=placedValue(base),property={beforeUpgrade,upgrade,value,tariffs:tariffs(value),premiumBedMinutes:0};
+ const value=placedValue(base),property={beforeUpgrade,upgrade,value,tariffs:tariffs(value),premiumBedMinutes:0,premiumAdmissions:0,premiumCompleted:0};
  const lead=block.swap?'mira':'alex',partner=block.swap?'alex':'mira';
  const p={block,variant,policy,replay,paintAdmissions,property,status:'OPEN',initial:{wallet:base.shop.credits,minutes:base.minutes,needs:ids.map(id=>structuredClone(getActor(base,id).needs))},daily:[],actions:{},minutesByAction:{},timeClasses:{},rejected:{},criticalNeedMinutes:{},decisions:0,receipts:{},cashByKind:{},events:{},travelFailures:0,sales:0,negativeSales:0,negativeBills:0,readingReturns:0,readingRoutes:{},artReceipts:[],food:{purchases:0,readyOrders:0,restocks:0,batches:0,servings:0,delivered:0,escapeSnacks:0,cost:0,routes:{}}};report.policies.push(p);
  p.materialCost=0;p.marketOffers=[];p.orderEvents=[];p.declinedOffers=0;let root=structuredClone(base),lastWallet=root.shop.credits,seen=new Set(root.financialHistory.entries.map(e=>e.id)),socialGoal=null;p.socialCompletions=0;
@@ -191,9 +191,9 @@ function run(block,variant,replay=false){
      mode=q.mode;price=q.price;
    }
    const beforeCash=root.shop.credits;
-   const ok=chooseResidentAction(root,action,automatic,id,action==='paint'?easel.instanceId:action==='hobby'?shelf.instanceId:null,action==='paint'?PAINT_ACTIVITY_ID:action==='hobby'?READING_ACTIVITY_ID:null,action==='paint'?'painting.hills':action==='hobby'?READING_CONTENT_ID:null,null,null,null,false,false,mode,price);
+   const ok=chooseResidentAction(root,action,automatic,id,action==='paint'?easel.instanceId:action==='hobby'?shelf.instanceId:action==='bed'&&upgrade?upgrade.id:null,action==='paint'?PAINT_ACTIVITY_ID:action==='hobby'?READING_ACTIVITY_ID:null,action==='paint'?'painting.hills':action==='hobby'?READING_CONTENT_ID:null,null,null,null,false,false,mode,price);
    assert.equal(root.shop.credits,beforeCash-(ok&&paid?price:0),'canonical admission debit must be exact');
-   if(ok){if(paid){p.materialCost+=price;count(p.actions,'paint-mode:'+mode);if(mode==='commission'){const order=root.artMarket.byResident[id].order;p.orderEvents.push({kind:'accepted',owner:id,window:order.window,at:root.minutes});}}
+   if(ok){if(action==='bed'&&upgrade){assert.equal(actor.action.targetInstanceId,upgrade.id);p.property.premiumAdmissions++;}if(paid){p.materialCost+=price;count(p.actions,'paint-mode:'+mode);if(mode==='commission'){const order=root.artMarket.byResident[id].order;p.orderEvents.push({kind:'accepted',owner:id,window:order.window,at:root.minutes});}}
    count(p.actions,action);p.decisions++;if(action==='paint'){const k=id+':'+Math.floor((root.minutes-base.minutes)/1440);count(paintAdmissions,k);if(cap)assert.ok(paintAdmissions[k]<=cap,'policy cap exceeded');}return true;}
    count(p.rejected,action);return false;
  };
@@ -243,7 +243,9 @@ function run(block,variant,replay=false){
    }
    const beforeStock=totalStock(root),beforeVegetables=root.kitchen.pantry.vegetables,beforePending=root.kitchen.deliveries.length;
    const seated=ids.filter(id=>{const a=getActor(root,id).action;return a?.id==='dining'&&a.phase==='using'&&a.diningStage==='eating'&&!a.portionTaken&&a.selectedRecipeId;}).length;
+   const sleeping=upgrade?ids.filter(id=>{const a=getActor(root,id).action;return a?.id==='bed'&&a.phase==='using'&&a.targetInstanceId===upgrade.id;}):[];
    const before=root.minutes, priorSocialAt=root.relationship.nextSocialAt, events=tickHousehold(root,dt)||[];
+   for(const id of sleeping){const a=getActor(root,id);if(!a.action&&a.needs.energy>=99.999)p.property.premiumCompleted++;}
    if(root.relationship.nextSocialAt>priorSocialAt)p.socialCompletions++;
    const newBatches=(beforeVegetables-root.kitchen.pantry.vegetables)/2;
    assert.ok(Number.isInteger(newBatches)&&newBatches>=0,'unexpected pantry consumption');
@@ -276,7 +278,7 @@ function run(block,variant,replay=false){
    if((t+1)%(1440/dt)===0){
     const day=(t+1)*dt/1440;
     for(const id of ids)assert.equal(Object.entries(p.timeClasses).filter(([k])=>k.startsWith(id+':')).reduce((n,[,v])=>n+v,0),day*1440,'time partition');
-    p.daily.push({premiumBedMinutes:p.property.premiumBedMinutes,food:structuredClone(p.food),materialCost:p.materialCost,market:variant.market?structuredClone(root.artMarket):null,declinedOffers:p.declinedOffers,fulfilledOrders:p.orderEvents.filter(e=>e.kind==='fulfilled').length,stock:totalStock(root),day,minutes:root.minutes,wallet:root.shop.credits,debt:householdBillView(root).totalDue,issued:householdBillView(root).issuedCycle,timeClasses:{...p.timeClasses},cashByKind:{...p.cashByKind},sales:p.sales,relationship:structuredClone(root.relationship),actors:ids.map(id=>{const a=getActor(root,id),c=root.careerSystem.byResident[id];return {id,needs:structuredClone(a.needs),skills:structuredClone(a.skills),works:a.createdWorks?.length||0,career:c?{level:c.level,workedShifts:c.workedShifts,missedShifts:c.missedShifts,performance:c.performance}:null};}),socialCompletions:p.socialCompletions,decisions:p.decisions,actions:{...p.actions},criticalNeedMinutes:{...p.criticalNeedMinutes},minutesByAction:{...p.minutesByAction},rejected:{...p.rejected},events:{...p.events}});
+    p.daily.push({premiumBedMinutes:p.property.premiumBedMinutes,premiumAdmissions:p.property.premiumAdmissions,premiumCompleted:p.property.premiumCompleted,food:structuredClone(p.food),materialCost:p.materialCost,market:variant.market?structuredClone(root.artMarket):null,declinedOffers:p.declinedOffers,fulfilledOrders:p.orderEvents.filter(e=>e.kind==='fulfilled').length,stock:totalStock(root),day,minutes:root.minutes,wallet:root.shop.credits,debt:householdBillView(root).totalDue,issued:householdBillView(root).issuedCycle,timeClasses:{...p.timeClasses},cashByKind:{...p.cashByKind},sales:p.sales,relationship:structuredClone(root.relationship),actors:ids.map(id=>{const a=getActor(root,id),c=root.careerSystem.byResident[id];return {id,needs:structuredClone(a.needs),skills:structuredClone(a.skills),works:a.createdWorks?.length||0,career:c?{level:c.level,workedShifts:c.workedShifts,missedShifts:c.missedShifts,performance:c.performance}:null};}),socialCompletions:p.socialCompletions,decisions:p.decisions,actions:{...p.actions},criticalNeedMinutes:{...p.criticalNeedMinutes},minutesByAction:{...p.minutesByAction},rejected:{...p.rejected},events:{...p.events}});
     const restored=loadHousehold(structuredClone(root));
     if(upgrade){assert.deepEqual(restored.world.furniture.instances.find(x=>x.instanceId===upgrade.id),root.world.furniture.instances.find(x=>x.instanceId===upgrade.id));assert.equal(placedValue(restored),value);}
     assert.equal(restored.shop.credits,root.shop.credits);assert.equal(restored.minutes,root.minutes);assert.deepEqual(restored.financialHistory,root.financialHistory);assert.equal(totalStock(restored),totalStock(root));assert.equal(restored.kitchen.pantry.vegetables,root.kitchen.pantry.vegetables);assert.equal(p.food.cost+p.materialCost+(p.cashByKind.purchase||0),0,'purchase ledger reconciliation');if(variant.market){assert.deepEqual(restored.artMarket,root.artMarket,'canonical saved market roundtrip');for(const id of ids)assert.deepEqual(getActor(restored,id).createdWorks,getActor(root,id).createdWorks,'canonical works roundtrip');}
@@ -293,7 +295,7 @@ function run(block,variant,replay=false){
  flush();return p;
 }
 for(const block of report.blocks)for(const variant of variants)run(block,variant);
-const cv=variants.find(v=>v.name==='mixed-base');
+const cv=variants.find(v=>v.name==='mixed-premium-bed');
 const original=report.policies.find(p=>p.variant===cv&&p.block===report.blocks[0]);
 const replay=run(report.blocks[0],cv,true);
 try{
@@ -360,7 +362,7 @@ for(const row of report.policies.filter(p=>p.status==='PASS'&&!p.replay)){
    const minimumReserve=Math.min(row.initial.wallet,...row.daily.slice(0,day).map(netAfterDue));
    return [name,{tariff,increment:snap.issued*(tariff-180),walletAfterDue,netFromCommon:walletAfterDue-property.beforeUpgrade,minimumReserve,belowCurrentWeeklyReserve:minimumReserve<180}];
   }));
-  report.propertyComparisons.push({block:row.block.date,variant:row.variant.name,day,property:{...structuredClone(property),premiumBedMinutes:snap.premiumBedMinutes},actualWallet:snap.wallet,actualDebt:snap.debt,alternatives,criticalNeedMinutes:snap.criticalNeedMinutes,missed:snap.actors.reduce((a,b)=>a+(b.career?.missedShifts||0),0),sales:snap.sales,social:snap.socialCompletions,decisions:snap.decisions});
+  report.propertyComparisons.push({block:row.block.date,variant:row.variant.name,day,property:{...structuredClone(property),premiumBedMinutes:snap.premiumBedMinutes,premiumAdmissions:snap.premiumAdmissions,premiumCompleted:snap.premiumCompleted},actualWallet:snap.wallet,actualDebt:snap.debt,alternatives,criticalNeedMinutes:snap.criticalNeedMinutes,missed:snap.actors.reduce((a,b)=>a+(b.career?.missedShifts||0),0),sales:snap.sales,social:snap.socialCompletions,decisions:snap.decisions});
  }
 }
 if(report.checkpoints.length!==28||report.propertyComparisons.length!==28)report.failures.push({control:'incomplete checkpoint/comparison coverage'});
@@ -368,7 +370,7 @@ for(const d of report.checkpoints.filter(d=>d.variant!=='no-intervention')){
  if(d.criticalHungerMinutes!==0||d.missed!==0||d.debt!==0||(d.day===30&&d.travelFailures!==0))report.failures.push({control:'active policy safety screen',row:d.variant,block:d.block,day:d.day});
 }
 for(const row of report.policies.filter(p=>p.status==='PASS'&&p.variant.upgrade)){
- if(!row.property.upgrade||row.property.beforeUpgrade-row.initial.wallet!==1100)report.failures.push({control:'purchase debit',variant:row.variant.name});
+ if(!row.property.upgrade||row.property.beforeUpgrade-row.initial.wallet!==1100||row.property.premiumBedMinutes<=0||row.property.premiumAdmissions<=0||row.property.premiumCompleted<=0)report.failures.push({control:'purchase debit',variant:row.variant.name});
 }
-console.log('PROPERTY R1',JSON.stringify(report.propertyComparisons.map(({block,variant,day,alternatives,property})=>({block,variant,day,alternatives,bedMinutes:property.premiumBedMinutes}))));
+console.log('PROPERTY R2',JSON.stringify(report.propertyComparisons.map(({block,variant,day,alternatives,property})=>({block,variant,day,alternatives,bedMinutes:property.premiumBedMinutes}))));
 flush();assert.deepEqual(report.failures,[],'property diagnostics contain failures');
