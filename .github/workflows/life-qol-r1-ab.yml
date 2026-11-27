@@ -1,0 +1,49 @@
+name: LIFE-QOL-R1 A/B
+on:
+  pull_request:
+    paths:
+      - 'src/sleep-acceleration.js'
+      - 'src/gardening.js'
+      - 'src/garden-presentation.js'
+      - 'tests/pf-14-*'
+      - 'tests/pf-15-*'
+      - '.github/workflows/life-qol-r1-ab.yml'
+permissions:
+  contents: read
+concurrency:
+  group: life-qol-r1-ab-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  mobile-speed-garden:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'fix/life-qol-r1-ab'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Time, garden and legacy-save regressions
+        run: node --test tests/pf-15-household-speed.test.js tests/q3b-life-balance.test.js tests/qsk-11-time-ui.test.js tests/pf-14-garden-care.test.js tests/lot-c1.test.js tests/lot-c2c-mobile.test.js tests/lot-c3c.test.js tests/needs-balance.test.js
+      - name: Existing real mobile browser fixtures with incident and repeatable plant talk
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          mkdir -p vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/life-qol-http.log 2>&1 &
+          sleep 3
+          node tests/pf-15-browser-smoke.mjs
+          node tests/pf-14-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: life-qol-r1-ab-evidence
+          path: |
+            artifacts/pf-15/
+            artifacts/pf-14/
+          if-no-files-found: warn
