@@ -116,7 +116,7 @@ test('H5 genuine finishing creates exactly one personal bounded deterministic re
   reach(root,actor,id);
   tickHousehold(root,20);
   assert.equal(actor.createdWorks.length,0);
-  assert.ok(actor.skills.xpById.painting>=23);
+  assert.equal(actor.skills.xpById.painting,12);
   const partial=loadHousehold(copy(root));
   assert.equal(partial.action.contentId,PAINT_CONTENT_IDS[1]);
   assert.equal(partial.activitySession.awardedMinutes,20);

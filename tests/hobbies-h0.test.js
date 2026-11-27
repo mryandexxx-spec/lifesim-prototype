@@ -199,17 +199,17 @@ test('H0 XP is awarded only for elapsed authorized active reading; same checkpoi
   assert.equal(creditActivityPractice(newSkillProgress(),r,a,p.session,{content:content()}),null);
   const gained=creditActivityPractice(newSkillProgress(),r,a,p.session,
     {...auth,content:content()});
-  assert.equal(gained.progress.xpById.literature,16);
+  assert.equal(gained.progress.xpById.literature,8);
   assert.equal(gained.usedMinutes,8);
   assert.equal(gained.session.awardedMinutes,8);
-  assert.equal(gained.changes[0].level,1);
+  assert.equal(gained.changes[0].level,0);
   assert.equal(creditActivityPractice(gained.progress,r,a,gained.session,
     {...auth,content:content()}),null);
   const next=advanceActivitySession(a,gained.session,7,auth).session;
   const gain2=creditActivityPractice(gained.progress,r,a,next,{...auth,content:content()});
-  assert.equal(gain2.progress.xpById.literature,30);
-  assert.equal(gain2.changes[0].level,2);
-  assert.equal(gained.progress.xpById.literature,16);
+  assert.equal(gain2.progress.xpById.literature,15);
+  assert.equal(gain2.changes[0].level,1);
+  assert.equal(gained.progress.xpById.literature,8);
 });
 test('H0 XP is bounded and split clocks and larger game-minute steps produce identical result',()=>{
   const a=activities(),r=skills(),start=arriveActivitySession(newRead(a),auth);
@@ -222,7 +222,7 @@ test('H0 XP is bounded and split clocks and larger game-minute steps produce ide
     progress=gain.progress;session=gain.session;
   }
   assert.deepEqual(progress,whole.progress);
-  assert.equal(whole.progress.xpById.literature,60);
+  assert.equal(whole.progress.xpById.literature,30);
   assert.equal(whole.session.awardedMinutes,30);
   const highProgress={schema:1,xpById:{literature:99}};
   const capped=creditActivityPractice(highProgress,r,a,completed,{...auth,content:content()});
@@ -242,7 +242,7 @@ test('H0 XP does not leak between residents; listening gives no instrument XP',(
   assert.deepEqual(noSkills.changes,[]);
   assert.deepEqual(noSkills.progress.xpById,{});
   assert.equal(noSkills.session.awardedMinutes,12);
-  assert.equal(gained.progress.xpById.literature,20);
+  assert.equal(gained.progress.xpById.literature,10);
 });
 test('H0 does not change existing household saves, catalog, inventory or runtime wiring',()=>{
   const before=newHousehold(),saved=JSON.parse(JSON.stringify(before));
