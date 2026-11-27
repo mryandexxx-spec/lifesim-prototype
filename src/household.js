@@ -2,7 +2,8 @@
  * Legacy root fields remain Alex's exact v1 state; otherSim is an optional extension.
  */
 import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS,mirrorActionLabel } from './simulation.js';
-import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar} from './calendar-core.js';
+import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar,gameDayIndex} from './calendar-core.js';
+import {syncRecurringTasks,restoreRecurringTasks,recordTaskOutcome,captureTaskLeisure,settleTaskLeisure} from './recurring-tasks.js';
 import {restoreEventRecords} from './calendar-events.js';
 import {holidayDefinitions,restoreWeekendDays} from './calendar-holidays.js';
 import {restoreReminderReceipts} from './calendar-reminders.js';
@@ -152,6 +153,7 @@ export function newHousehold(suggestedDate=DEFAULT_CIVIL_DATE) {
   state.sportsFan=newSportsFan();
   state.otherSim.sportsFan=newSportsFan();
   applyWorkMoodContext(state);
+  syncRecurringTasks(state);
   return state;
 }
 
@@ -503,6 +505,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     root.artMarket=restored;
     reconcileArtMarket(root);
   }
+  restoreRecurringTasks(root,raw.recurringTasks);
   return root;
 }
 
@@ -1161,6 +1164,7 @@ export function tickHousehold(root,minutes) {
   switchLampAtArrival(root.world,root);
   switchLampAtArrival(root.world,other);
   const alexUse=captureObjectUse(root),miraUse=captureObjectUse(other);
+  const alexLeisure=captureTaskLeisure(root,root),miraLeisure=captureTaskLeisure(root,other);
   const kitchenBefore=Object.fromEntries(HOUSEHOLD_IDS.map(id=>{
     const actor=getActor(root,id),a=actor.action;
     if(!a)return [id,null];
@@ -1180,6 +1184,8 @@ export function tickHousehold(root,minutes) {
   else tick(root,minutes,root.world);
   if(residentAwayAtWork(root,'mira'))other.minutes+=minutes;
   else tick(other,minutes,root.world);
+  if(!residentAwayAtWork(root,'alex'))settleTaskLeisure(root,'alex',root,alexLeisure);
+  if(!residentAwayAtWork(root,'mira'))settleTaskLeisure(root,'mira',other,miraLeisure);
   // Pool movement and rewards run exactly once after natural need decay,
   // never on UI frames, queue dispatch or inside the PlayCanvas renderer.
   for(const id of HOUSEHOLD_IDS){
@@ -1252,6 +1258,7 @@ export function tickHousehold(root,minutes) {
         const next=Math.min(cap,previous+scaleSkillXP(MIRROR_SPEECH_XP));
         actor.skills.xpById.charisma=next;
         actor.event='Речь отрепетирована · харизма +'+(next-previous)+' XP';
+        recordTaskOutcome(root,id,'speech','speech:'+before.action.targetInstanceId+':'+Math.round(root.minutes*1e6));
       }
     }
     if(before.id==='dining'&&before.phase==='using'&&
@@ -1279,12 +1286,14 @@ export function tickHousehold(root,minutes) {
         const result=projectArtCompletion(root,id);
         if(result.ok){
           root.artMarket=result.artMarket;actor.createdWorks=result.works;
+          recordTaskOutcome(root,id,'paint',completed.session.sessionId);
           actor.event=result.work?'Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»':'Практика живописи завершена';
         }
       }else{
         const result=finishPainting({session:completed.session,actor,actorId:id,
           world:root.world,at:root.minutes,registry:HOBBY_ACTIVITIES,skills:HOBBY_SKILLS});
         if(result){actor.createdWorks=result.works;
+          recordTaskOutcome(root,id,'paint',completed.session.sessionId);
           actor.event='Готова картина «'+HOBBY_CONTENT.entries[result.work.contentId].label+'»';}
       }
       actor.activitySession=null;
@@ -1396,6 +1405,7 @@ export function tickHousehold(root,minutes) {
   refreshGardenWishes(root);
   // One family calendar, one weekly bill cycle, never one charge per resident.
   const billEvents=progressHouseholdBills(root,root.minutes-minutes,root.minutes);
+  if(gameDayIndex(previousSportMinute)!==gameDayIndex(root.minutes))syncRecurringTasks(root);
   return [...careerEvents,...phoneEvents,...billEvents];
 }
 

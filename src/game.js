@@ -5,6 +5,8 @@ import * as pc from 'playcanvas';
 import {dialogueNeedsDecision,applyDialogueDecision} from './dialogue-decision.js';
 import {pickWorldRayTarget} from './world-interactions.js';
 import {planPreview,planTaskIcon} from './plan-preview.js';
+import {syncRecurringTasks,changeRecurringTask,recordTaskOutcome} from './recurring-tasks.js';
+import {renderRecurringTaskCards} from './recurring-tasks-ui.js';
 import {residentMoodInsight,socialReactionInsight,insightLayerPolicy} from './insight-presentation.js';
 import {contextualPlacement} from './ui-layout.js';
 import {createViewPopover} from './qsk-11-view-popover.js';
@@ -583,7 +585,7 @@ $('calendar-anchor-close').addEventListener('click',closeCalendarAnchorPanel);
 $('calendar-anchor-apply').addEventListener('click',()=>{
   try{
     game.calendar=setCurrentCalendarDate(game.calendar,game.minutes,$('calendar-anchor-date').value);
-    save(true);closeCalendarAnchorPanel();calendarUI.refresh();
+    syncRecurringTasks(game);save(true);closeCalendarAnchorPanel();calendarUI.refresh();
     toast('Игровая дата: '+formatCalendarDay(calendarAt(game.calendar,game.minutes),{includeYear:true}));
   }catch{toast('Дату нельзя менять после планирования событий.');}
 });
@@ -937,10 +939,11 @@ function renderSkillsTab(force=false){
             offer.amount+' кр.?'+(offer.belowMaterialCost?' Цена ниже стоимости материалов.':'')))return;
           const tx=projectArtSale(game,owner,work.id,offer);
           if(!tx.ok){toast(artReason(tx.reason));renderSkillsTab(true);return;}
-          const a=getActor(game,owner),old={shop:game.shop,financialHistory:game.financialHistory,artMarket:game.artMarket,works:a.createdWorks};
+          const a=getActor(game,owner),old={shop:game.shop,financialHistory:game.financialHistory,artMarket:game.artMarket,works:a.createdWorks,tasks:game.recurringTasks};
           game.shop=tx.shop;game.financialHistory=tx.financialHistory;game.artMarket=tx.artMarket;a.createdWorks=tx.works;
+          recordTaskOutcome(game,owner,'sale',tx.entry.id);
           if(!save(true)){
-            game.shop=old.shop;game.financialHistory=old.financialHistory;game.artMarket=old.artMarket;a.createdWorks=old.works;
+            game.shop=old.shop;game.financialHistory=old.financialHistory;game.artMarket=old.artMarket;a.createdWorks=old.works;game.recurringTasks=old.tasks;
             renderSkillsTab(true);return;
           }
           updateFamilyBalance();renderSkillsTab(true);toast('Картина продана · +'+tx.amount+' кр.');return;
@@ -957,10 +960,18 @@ function renderSkillsTab(force=false){
             receiptId:'art:'+game.selectedSim+':'+work.id})
           :null;
         if(finance&&!finance.ok){toast('Не удалось записать доход от картины');return;}
-        selectedActor().createdWorks=result.works;
+        const person=selectedActor(),old={works:person.createdWorks,shop:game.shop,history:game.financialHistory,tasks:game.recurringTasks};
+        person.createdWorks=result.works;
         if(result.shop)game.shop=finance?.shop||result.shop;
-        if(finance)game.financialHistory=finance.financialHistory;
-        updateFamilyBalance();save(true);renderSkillsTab(true);
+        if(finance){
+          game.financialHistory=finance.financialHistory;
+          if(finance.recorded)recordTaskOutcome(game,game.selectedSim,'sale',finance.entry.id);
+        }
+        if(!save(true)){
+          person.createdWorks=old.works;game.shop=old.shop;game.financialHistory=old.history;game.recurringTasks=old.tasks;
+          renderSkillsTab(true);return;
+        }
+        updateFamilyBalance();renderSkillsTab(true);
         toast(operation==='sell'?'Картина продана · +'+result.amount+' кредитов':
           operation==='hang'?'Картина на стене':
           'Картина в личном инвентаре');
@@ -1795,6 +1806,17 @@ $('plan-peek').addEventListener('click',()=>{
   queueVisible=!queueVisible;
   renderQueuePanel(true);
 });
+function renderPersonalTaskCards(host,id){
+  renderRecurringTaskCards(host,game,id,(residentId,period,operation)=>{
+    if(dialogueNeedsDecision(game)||!residentIdsForSimulation(game).includes(residentId))return;
+    const old=game.recurringTasks;
+    if(!changeRecurringTask(game,residentId,period,operation))return;
+    if(!save(true))game.recurringTasks=old;
+    renderPersonalTaskCards(host,residentId);
+    // Keep focus inside the current plan; don't dispatch a world gesture.
+    host.parentElement?.querySelector('summary')?.focus({preventScroll:true});
+  });
+}
 function renderQueuePanel(force=true){
   renderPlanPeek();
   const residentId=queueViewerResident(game.selectedSim,queueInspectResident);
@@ -1815,6 +1837,15 @@ function renderQueuePanel(force=true){
       ?Math.floor(game.socialAction.elapsed/3):null]);
   $('queue-toggle').textContent=planButtonLabel(pendingActions(game.actionQueues,game.selectedSim).length)+
     (blockedActions(game.actionQueues,game.selectedSim).length?' · ⚠':'');
+  if(queueVisible){
+    // Anchor above the measured HUD, including the extra resident row.
+    const hud=$('dashboard').getBoundingClientRect();
+    const panel=$('queue-panel'),shell=document.querySelector('.app-shell').getBoundingClientRect();
+    const bottom=Math.max(8,Math.ceil(shell.bottom-hud.top+8));
+    panel.style.bottom=bottom+'px';
+    panel.style.maxHeight='min(44dvh, 360px, '+Math.max(100,Math.floor(hud.top-shell.top-76))+'px)';
+    renderPersonalTaskCards($('queue-recurring-cards'),residentId);
+  }
   if(!force&&key===queueDisplayKey)return;
   queueDisplayKey=key;
   $('queue-panel').hidden=!queueVisible;
@@ -2358,6 +2389,10 @@ function updateCareerHud(){
 }
 const residentSwitch=$('dashboard').querySelector('.resident-switch');
 const casDetails=document.createElement('section');
+const extraTaskDetails=document.createElement('details');extraTaskDetails.className='gc-task-details';
+const extraTaskSummary=document.createElement('summary');extraTaskSummary.textContent='Задания · сегодня и неделя';
+const extraTaskCards=document.createElement('div');extraTaskCards.id='extra-recurring-cards';
+extraTaskDetails.append(extraTaskSummary,extraTaskCards);
 casDetails.id='cas-resident-details';casDetails.className='cas-resident-details';
 casDetails.hidden=true;casDetails.setAttribute('aria-label','Личное управление жителем');
 $('dashboard').insertAdjacentElement('beforebegin',casDetails);
@@ -2402,6 +2437,7 @@ function renderCasDetails(force=false){
  const id=activeHudResident(),row=residentRoster(game,id).find(x=>x.id===id);
  casDetails.hidden=!row||row.legacy;
  if(casDetails.hidden){lastCasDetailsKey='';return;}
+ renderPersonalTaskCards(extraTaskCards,id);
  const pending=pendingActions(game.actionQueues,id);
  const blockedTasks=blockedActions(game.actionQueues,id);
  const currentActor=getActor(game,id);
@@ -2531,7 +2567,7 @@ function renderCasDetails(force=false){
    });
    item.append(label,retry,remove);list.append(item);
  }
- casDetails.replaceChildren(heading,job,actions,list);
+ casDetails.replaceChildren(heading,job,extraTaskDetails,actions,list);
 }
 function updateResidentPicker(){
  const rows=residentRoster(game,hudResidentId);
@@ -2553,6 +2589,7 @@ function updateResidentPicker(){
    button.remove();casButtons.delete(id);
  }
  $('resident-name').textContent=hudName();
+ $('mind-toggle').setAttribute('aria-label',(HOUSEHOLD_IDS.includes(hudResidentId)?'Профиль: ':'Найти жителя: ')+hudName());
  $('avatar-symbol').textContent=hudResidentId==='alex'?'☺':hudResidentId==='mira'?'✿':'●';
  updateCareerHud();updateFamilyBalance();refreshIncidentNotifications();
  if(HOUSEHOLD_IDS.includes(hudResidentId))renderMindIdentity();
@@ -2589,11 +2626,9 @@ document.addEventListener('pointerdown',event=>{
 },true);
 document.addEventListener('visibilitychange',()=>residentDoubleTap.clear());
 updateResidentPicker();
-// Tap the HUD name for focus; the containing mind button keeps its original behavior.
-$('resident-name').addEventListener('click',event=>{
-  event.preventDefault();event.stopPropagation();
-  focusSelectedCamera(activeHudResident());
-});
+// The complete profile button is one touch target, including its text.
+ // Camera focus remains on the resident picker's deliberate double tap and
+ // the explicit find-resident control; do not nest a second touch action.
 // W1-B.3a: the existing phone now shows live shift presence, pay and attendance.
 const careerPhone=createCareerPhoneUI({
   host:document.querySelector('.app-shell'),trigger:$('career-phone-toggle'),
@@ -9201,7 +9236,9 @@ function boot() {
         const priorHerbStock=game.kitchen?.pantry?.herbs??0;
         const priorGardenCredits=game.shop.credits;
         const priorDeliveries=game.kitchen?.deliveries?.length||0;
+        const priorRecurringTasks=game.recurringTasks;
         const careerEvents=tickHousehold(game,.30)||[];
+        if(game.recurringTasks!==priorRecurringTasks&&!careerEvents.length)save(true);
         if(priorDeliveries>(game.kitchen?.deliveries?.length||0)){
           // A paid order moved into the same physical fridge as cooked meals.
           save(true);careerPhone.refresh();

@@ -3,6 +3,7 @@
  * The household root owns the sole clock and authoritative shop credits.
  */
 import {nextCareerShift} from './career-scheduler.js';
+import {recordTaskOutcome} from './recurring-tasks.js';
 import {CAREER_RESIDENT_IDS,separateCareer} from './career-state.js';
 import {residentIdsForSimulation,savedAdditionalActor} from './resident-activity-runtime.js';
 import {recordCareerDiscipline,DISCIPLINE_REHIRE_MINUTES} from './career-discipline.js';
@@ -169,6 +170,7 @@ function settle(root,contract,id,at){
     creditCareerPaidLeave(contract);
     badges=recordProfessionalShift(root,id,shift);
     discipline=recordCareerDiscipline(contract,shift,'worked',lateMinutes,at);
+    if(worked>0)recordTaskOutcome(root,id,'work','shift:'+shift.id,at);
   }
   contract.lastShift={id:shift.id,start:shift.start,end:shift.end,
     workMode:cleanWorkMode(shift.workMode),workReport:workNeedsReport(shift),

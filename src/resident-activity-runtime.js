@@ -5,6 +5,7 @@
  * use the same root clock, typed persistent FIFO and world A* geometry.
  */
 import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy,mirrorActionLabel} from './simulation.js';
+import {recordTaskOutcome,captureTaskLeisure,settleTaskLeisure} from './recurring-tasks.js';
 import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './navigation.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
 import {MIRROR_SPEECH_DURATION,MIRROR_SPEECH_XP} from './furniture-interactions.js';
@@ -544,7 +545,9 @@ export function tickAdditionalResidents(root,minutes){
     const practice=actor.action;
     const manualSpeech=practice?.id==='mirror'&&practice.mirrorPractice===true&&
       practice.automatic===false&&practice.phase==='using'&&practice.elapsed<MIRROR_SPEECH_DURATION;
+    const leisure=captureTaskLeisure(root,actor);
     tick(actor,minutes,root.world);
+    settleTaskLeisure(root,id,actor,leisure);
     if(manualSpeech&&!actor.action&&practice.elapsed>=MIRROR_SPEECH_DURATION&&
       actor.event===mirrorActionLabel(practice)+' — готово'){
       // The exact reserved mirror and physical position were checked above.
@@ -554,6 +557,7 @@ export function tickAdditionalResidents(root,minutes){
       const next=Math.min(cap,previous+scaleSkillXP(MIRROR_SPEECH_XP));
       actor.skills.xpById.charisma=next;
       actor.event='Речь отрепетирована · харизма +'+(next-previous)+' XP';
+      recordTaskOutcome(root,id,'speech','speech:'+practice.targetInstanceId+':'+Math.round(root.minutes*1e6));
     }
     actor.minutes=root.minutes;
   }
