@@ -2825,3 +2825,24 @@ button.time-card:active {transform:translateY(1px);}
     gap:4px;margin-bottom:8px;
   }
 }
+
+/* GC-06: optional personal tasks inside existing scrollable plan surfaces. */
+.gc-task-details{min-width:0;width:100%;margin:4px 0;color:#263c35}
+.gc-task-details summary{display:flex;align-items:center;gap:8px;min-height:44px;
+  padding:6px 10px;border:1px solid #c9d6cb;border-radius:10px;background:#eef5ed;
+  font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;list-style:none}
+.gc-task-details summary::-webkit-details-marker{display:none}
+.gc-task-details summary::before{content:'›';font-size:20px;line-height:1}
+.gc-task-details[open] summary::before{transform:rotate(90deg)}
+.gc-task-cards{display:grid;gap:6px;padding:4px 0 6px}
+.gc-task-note,.gc-task-detail{font-size:11px;line-height:1.35;margin:0;color:#506659;overflow-wrap:anywhere}
+.gc-task-card{display:grid;gap:4px;background:#f5f8f2;border:1px solid #d5e0d4;border-radius:10px;padding:8px;min-width:0}
+.gc-task-card strong{font-size:13px;overflow-wrap:anywhere;line-height:1.35}
+.gc-task-period{font-size:10px;font-weight:700;color:#53735f}
+.gc-task-line{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px}
+.gc-task-status{font-weight:700;color:#53735f}.gc-task-card[data-status="complete"] .gc-task-status{color:#246749}
+.gc-task-card[data-status="unavailable"] .gc-task-status{color:#8b6541}
+.gc-task-progress{font-variant-numeric:tabular-nums;white-space:nowrap}
+.gc-task-actions{display:flex;gap:6px;flex-wrap:wrap}
+.gc-task-actions button{flex:1;min-width:44px;min-height:44px;border:1px solid #c9d6cb;border-radius:8px;background:#fff;color:#294a3d;font-size:12px;font-weight:700;touch-action:manipulation;padding:5px 8px}
+.gc-task-actions button:focus-visible,.gc-task-details summary:focus-visible{outline:2px solid #217052;outline-offset:2px}

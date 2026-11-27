@@ -191,8 +191,14 @@ export function changeRecurringTask(root,id,period,operation){
     withSlot(root,id,period,{...slot,dismissed:true});return true;
   }
   const window=taskPeriod(root.calendar,root.minutes,period);
-  const other=slotFor(root,id,period==='day'?'week':'day')?.kind;
-  const next=makeSlot(root,id,period,root.minutes,window,other,slot.dismissed?null:slot.kind);
-  if(!next.kind)return false;
-  withSlot(root,id,period,next);return true;
+  const available=options(root,id,period,root.minutes,window);
+  if(slot.dismissed&&available.includes(slot.kind)){
+    withSlot(root,id,period,{...slot,dismissed:false});return true;
+  }
+  const start=KINDS.indexOf(slot.kind);
+  const ordered=Array.from({length:KINDS.length},(_,i)=>KINDS[(start+1+i)%KINDS.length]);
+  const kind=ordered.find(k=>k!==slot.kind&&available.includes(k));
+  if(!kind)return false;
+  const target=period==='day'?1:Math.min(DEFINITIONS[kind].weeklyTarget,maxDays(root.minutes,window.end));
+  withSlot(root,id,period,{key:window.key,startedAt:root.minutes,kind,target,proofs:[],dismissed:false});return true;
 }
