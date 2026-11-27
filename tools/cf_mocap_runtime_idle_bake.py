@@ -5,6 +5,7 @@ import numpy as np
 from mathutils import Quaternion, Vector
 sys.path.insert(0,"prior-code/tools")
 from cf_anim_tools import import_rig, reset, locals_, matrix, vertices, Y
+from cf_anim_contacts import regions, sole
 P=pathlib.Path; O=P("runtime-lab"); D=P("input-idle"); SRC=P("input-idle-source")
 path=O/"walk.glb"; meta=json.loads((O/"manifest.json").read_text())
 def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
@@ -18,7 +19,15 @@ seq=copy.deepcopy(d["poses"]); fps=source["fps"]; n=len(seq)-1; T=n/fps
 assert 2.9<T<3.1 and len(seq)==len(report["samples"])==181
 root_index=d["names"].index("root")
 origin=np.array(seq[0][root_index]["p"]);origin[1]=0
-for f in seq:f[root_index]["p"]=(np.array(f[root_index]["p"])-origin).tolist()
+# One geometric support-plane calibration from the first recorded stance.
+# It is not a framewise floor clamp, does not alter joint rotations or
+# horizontal motion, and must independently pass the full clip afterwards.
+ground_shift=-float(report["samples"][0]["floorGapM"])
+assert math.isfinite(ground_shift) and abs(ground_shift)<=.05
+for f in seq:
+    p=np.array(f[root_index]["p"])-origin
+    p[1]+=ground_shift
+    f[root_index]["p"]=p.tolist()
 def load(p):
  b=p.read_bytes()
  assert struct.unpack_from("<4sII",b)==(b"glTF",2,len(b))
@@ -86,15 +95,20 @@ for i,f in enumerate(seq):
   expect=matrix(f[j]["p"],f[j]["r"]);err=(m.translation-expect.translation).length
   angle=2*math.acos(min(1,abs(m.to_quaternion().normalized().dot(expect.to_quaternion().normalized()))))
   errors.append([err,angle])
- assert abs(gap()-report["samples"][i]["floorGapM"])<.002
+ assert abs(gap()-report["samples"][i]["floorGapM"]-ground_shift)<.002
  w=[]
  for j,m in enumerate(local):w.append(m if d["parents"][j]<0 else w[d["parents"][j]]@m)
  ref.append({"time":i/fps,"positions":{name:list(w[d["names"].index(name)].translation) for name in meta["ref"][0]["positions"]}})
 pe,re=np.max(errors,axis=0);assert pe<.0002 and re<.002,(pe,re)
 rows=[]
+rig_map={"names":d["names"],"parents":d["parents"],"roles":{"foot_l":d["names"].index("foot.L"),"foot_r":d["names"].index("foot.R")}}
+feet={s:regions(meshes,rig_map,s) for s in ("l","r")}
 for i in range(math.ceil(T*120)+1):
- time=min(T,i/120);at(time);rows.append({"time":time,"floor":gap()})
-res={"clip":"Neutral_ID","track":"Idle_MOCAP","license":"CC-BY-4.0","sourceSha":source["sourceSha256"],"horizontalOriginM":origin.tolist(),"contactStatus":"UNCORRECTED_DIAGNOSTIC","poseSha":digest(D/"target-poses.json"),"originalWalkGlbSha":meta["glbSha"],"outputSha":digest(out),"duration":T,"fps":fps,"keys":len(seq),"samples":len(rows),"floorFailures":sum(x["floor"]<-.005 for x in rows),"worstFloorM":min(x["floor"] for x in rows),"maxKeyPositionErrorM":float(pe),"maxKeyRotationErrorRad":float(re),"rootHorizontalRangeM":float(np.linalg.norm(np.ptp(world[:,[0,2]],axis=0))),"originalWalkPreserved":True,"ref":ref}
+ time=min(T,i/120);at(time)
+ rows.append({"time":time,"floor":gap(),"soleGapsM":{s:sole(reg)-floor for s,reg in feet.items()}})
+sole_failures=sum(any(v<-.005 or v>.02 for v in x["soleGapsM"].values()) for x in rows)
+sole_range={s:[min(x["soleGapsM"][s] for x in rows),max(x["soleGapsM"][s] for x in rows)] for s in feet}
+res={"clip":"Neutral_ID","track":"Idle_MOCAP","license":"CC-BY-4.0","sourceSha":source["sourceSha256"],"horizontalOriginM":origin.tolist(),"contactStatus":"CONSTANT_SUPPORT_PLANE_DIAGNOSTIC","groundShiftM":ground_shift,"supportReferenceFrame":0,"soleFailures":sole_failures,"soleGapRangesM":sole_range,"poseSha":digest(D/"target-poses.json"),"originalWalkGlbSha":meta["glbSha"],"outputSha":digest(out),"duration":T,"fps":fps,"keys":len(seq),"samples":len(rows),"floorFailures":sum(x["floor"]<-.005 for x in rows),"worstFloorM":min(x["floor"] for x in rows),"maxKeyPositionErrorM":float(pe),"maxKeyRotationErrorRad":float(re),"rootHorizontalRangeM":float(np.linalg.norm(np.ptp(world[:,[0,2]],axis=0))),"originalWalkPreserved":True,"ref":ref}
 (O/"idle-report.json").write_text(json.dumps({"idle":res,"rows":rows},indent=2));meta["idle"]=res;meta["glbSha"]=res["outputSha"];(O/"manifest.json").write_text(json.dumps(meta,indent=2))
 out.replace(path)
 print("IDLE REIMPORT",{k:v for k,v in res.items() if k!="ref"},flush=True)
