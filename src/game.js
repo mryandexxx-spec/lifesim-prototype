@@ -7,6 +7,8 @@ import {pickWorldRayTarget} from './world-interactions.js';
 import {planPreview,planTaskIcon} from './plan-preview.js';
 import {syncRecurringTasks,changeRecurringTask,recordTaskOutcome} from './recurring-tasks.js';
 import {renderRecurringTaskCards} from './recurring-tasks-ui.js';
+import {chooseAspiration,recordAspirationIncome} from './life-aspirations.js';
+import {renderAspirationCard} from './life-aspirations-ui.js';
 import {residentMoodInsight,socialReactionInsight,insightLayerPolicy} from './insight-presentation.js';
 import {contextualPlacement} from './ui-layout.js';
 import {createViewPopover} from './qsk-11-view-popover.js';
@@ -841,6 +843,7 @@ document.addEventListener('keydown',event=>{
 let mindTab='overview',skillProfileKey='',mindInspectResident=game.selectedSim;
 function renderMindIdentity(){
  const actor=getActor(game,mindInspectResident),id=mindInspectResident;
+ renderPersonalAspiration($('mind-aspiration-card'),id);
  $('mind-person').textContent=getActorName(id).toUpperCase()+' / ЛИЧНОСТЬ';
  $('mind-panel').setAttribute('aria-label','Карточка персонажа: '+getActorName(id));
  $('mind-view-note').textContent=id===game.selectedSim
@@ -939,11 +942,13 @@ function renderSkillsTab(force=false){
             offer.amount+' кр.?'+(offer.belowMaterialCost?' Цена ниже стоимости материалов.':'')))return;
           const tx=projectArtSale(game,owner,work.id,offer);
           if(!tx.ok){toast(artReason(tx.reason));renderSkillsTab(true);return;}
-          const a=getActor(game,owner),old={shop:game.shop,financialHistory:game.financialHistory,artMarket:game.artMarket,works:a.createdWorks,tasks:game.recurringTasks};
+          const a=getActor(game,owner),old={shop:game.shop,financialHistory:game.financialHistory,artMarket:game.artMarket,works:a.createdWorks,tasks:game.recurringTasks,aspirations:game.lifeAspirations};
           game.shop=tx.shop;game.financialHistory=tx.financialHistory;game.artMarket=tx.artMarket;a.createdWorks=tx.works;
+          recordAspirationIncome(game,tx.entry,work);
           recordTaskOutcome(game,owner,'sale',tx.entry.id);
           if(!save(true)){
             game.shop=old.shop;game.financialHistory=old.financialHistory;game.artMarket=old.artMarket;a.createdWorks=old.works;game.recurringTasks=old.tasks;
+            if(old.aspirations)game.lifeAspirations=old.aspirations;else delete game.lifeAspirations;
             renderSkillsTab(true);return;
           }
           updateFamilyBalance();renderSkillsTab(true);toast('Картина продана · +'+tx.amount+' кр.');return;
@@ -960,15 +965,16 @@ function renderSkillsTab(force=false){
             receiptId:'art:'+game.selectedSim+':'+work.id})
           :null;
         if(finance&&!finance.ok){toast('Не удалось записать доход от картины');return;}
-        const person=selectedActor(),old={works:person.createdWorks,shop:game.shop,history:game.financialHistory,tasks:game.recurringTasks};
+        const person=selectedActor(),old={works:person.createdWorks,shop:game.shop,history:game.financialHistory,tasks:game.recurringTasks,aspirations:game.lifeAspirations};
         person.createdWorks=result.works;
         if(result.shop)game.shop=finance?.shop||result.shop;
         if(finance){
           game.financialHistory=finance.financialHistory;
-          if(finance.recorded)recordTaskOutcome(game,game.selectedSim,'sale',finance.entry.id);
+          if(finance.recorded){recordAspirationIncome(game,finance.entry,work);recordTaskOutcome(game,game.selectedSim,'sale',finance.entry.id);}
         }
         if(!save(true)){
           person.createdWorks=old.works;game.shop=old.shop;game.financialHistory=old.history;game.recurringTasks=old.tasks;
+          if(old.aspirations)game.lifeAspirations=old.aspirations;else delete game.lifeAspirations;
           renderSkillsTab(true);return;
         }
         updateFamilyBalance();renderSkillsTab(true);
@@ -1806,6 +1812,17 @@ $('plan-peek').addEventListener('click',()=>{
   queueVisible=!queueVisible;
   renderQueuePanel(true);
 });
+function renderPersonalAspiration(host,id){
+  renderAspirationCard(host,game,id,(residentId,choice)=>{
+    if(dialogueNeedsDecision(game)||!residentIdsForSimulation(game).includes(residentId))return;
+    const old=game.lifeAspirations;
+    if(old?.byResident?.[residentId]&&!window.confirm('Сменить жизненное стремление? Прогресс прежней цели не переносится.'))return;
+    if(!chooseAspiration(game,residentId,choice))return;
+    if(!save(true)){if(old)game.lifeAspirations=old;else delete game.lifeAspirations;}
+    renderPersonalAspiration(host,residentId);
+    renderQueuePanel(true);
+  });
+}
 function renderPersonalTaskCards(host,id){
   renderRecurringTaskCards(host,game,id,(residentId,period,operation)=>{
     if(dialogueNeedsDecision(game)||!residentIdsForSimulation(game).includes(residentId))return;
@@ -2389,6 +2406,7 @@ function updateCareerHud(){
 }
 const residentSwitch=$('dashboard').querySelector('.resident-switch');
 const casDetails=document.createElement('section');
+const extraAspirationCards=document.createElement('div');extraAspirationCards.id='extra-aspiration-card';
 const extraTaskDetails=document.createElement('details');extraTaskDetails.className='gc-task-details';
 const extraTaskSummary=document.createElement('summary');extraTaskSummary.textContent='Задания · сегодня и неделя';
 const extraTaskCards=document.createElement('div');extraTaskCards.id='extra-recurring-cards';
@@ -2437,6 +2455,7 @@ function renderCasDetails(force=false){
  const id=activeHudResident(),row=residentRoster(game,id).find(x=>x.id===id);
  casDetails.hidden=!row||row.legacy;
  if(casDetails.hidden){lastCasDetailsKey='';return;}
+ renderPersonalAspiration(extraAspirationCards,id);
  renderPersonalTaskCards(extraTaskCards,id);
  const pending=pendingActions(game.actionQueues,id);
  const blockedTasks=blockedActions(game.actionQueues,id);
@@ -2567,7 +2586,7 @@ function renderCasDetails(force=false){
    });
    item.append(label,retry,remove);list.append(item);
  }
- casDetails.replaceChildren(heading,job,extraTaskDetails,actions,list);
+ casDetails.replaceChildren(heading,job,extraAspirationCards,extraTaskDetails,actions,list);
 }
 function updateResidentPicker(){
  const rows=residentRoster(game,hudResidentId);
@@ -9236,9 +9255,9 @@ function boot() {
         const priorHerbStock=game.kitchen?.pantry?.herbs??0;
         const priorGardenCredits=game.shop.credits;
         const priorDeliveries=game.kitchen?.deliveries?.length||0;
-        const priorRecurringTasks=game.recurringTasks;
+        const priorRecurringTasks=game.recurringTasks,priorAspirations=game.lifeAspirations;
         const careerEvents=tickHousehold(game,.30)||[];
-        if(game.recurringTasks!==priorRecurringTasks&&!careerEvents.length)save(true);
+        if((game.recurringTasks!==priorRecurringTasks||game.lifeAspirations!==priorAspirations)&&!careerEvents.length)save(true);
         if(priorDeliveries>(game.kitchen?.deliveries?.length||0)){
           // A paid order moved into the same physical fridge as cooked meals.
           save(true);careerPhone.refresh();
@@ -10682,6 +10701,7 @@ function boot() {
         (readingActor.action?.id==='hobby'&&readingActor.action.phase==='using'?' · 📖 читает':'');
       if(!$('reading-content-field').hidden)updateReadingContentChoice();
       renderSkillsTab(false);
+      if(!$('mind-panel').hidden&&mindTab==='overview')renderPersonalAspiration($('mind-aspiration-card'),mindInspectResident);
       const relation=game.relationship;
       $('relationship-value').textContent=Math.round(relation.affinity)+'/100';
       $('relationship-label').textContent=relationshipLabel(relation.affinity);
