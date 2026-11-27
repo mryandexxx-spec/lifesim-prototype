@@ -256,3 +256,47 @@ test('CAS-01.4 running action survives v1 save/reload; malformed action fails cl
   assert.throws(()=>loadHousehold(invalid),PopulationSaveError);
   assert.equal(SAVE_KEY,'lifesim.room01.v1');
 });
+
+// Deterministic open three-metre lane with clearance on both sides. Fixture
+// selection uses only static walkability, never the candidate avoidance result.
+function openLane(world){
+  for(let x=4;x<=10;x+=.5)for(let z=-2;z<=2;z+=.5){
+    const from={x,z},goal={x:x+2.6,z},peer={x:x+1.3,z};
+    if(![-.9,0,.9].every(d=>isClearLine({x,z:z+d},{x:x+2.6,z:z+d},world)))continue;
+    if(![x,x+1.3,x+2.6].every(xx=>isClearLine({x:xx,z:z-.9},{x:xx,z:z+.9},world)))continue;
+    return {from,goal,peer};
+  }
+  throw Error('starter lot has no open lane fixture');
+}
+
+test('extra resident walks around a stationary peer in a real household tick, preserving player intent',()=>{
+  const root=withPopulation(),id='resident_3',actor=getActor(root,id),peer=getActor(root,'resident_4');
+  const lane=openLane(root.world);
+  actor.position={...lane.from};peer.position={...lane.peer};
+  const placed=[lane.from,lane.goal,lane.peer];
+  for(const legacy of [root,root.otherSim]){
+    let point=null;
+    for(let x=-4;x<4&&!point;x+=.5)for(let z=-3;z<3&&!point;z+=.5){
+      const p={x,z};if(isWalkable(x,z,root.world)&&placed.every(q=>dist(p,q)>2))point=p;
+    }
+    assert.ok(point);legacy.position=point;legacy.action=null;placed.push(point);
+  }
+  const command=enqueueAction(root.actionQueues,id,{type:'move',x:lane.goal.x,z:lane.goal.z});
+  assert.ok(command);
+  const destination={x:command.x,z:command.z};
+  let movedAround=false;
+  for(let n=0;n<100;n++){
+    const before={...actor.position};
+    tickHousehold(root,.3);
+    assert.ok(isClearLine(before,actor.position,root.world));
+    assert.ok(residentSegmentClear(root,id,before,actor.position),'no peer tunneling or snap');
+    assert.ok(residentCollisionFree(root,id,actor.position));
+    if(Math.abs(actor.position.z-lane.from.z)>.4)movedAround=true;
+    if(!actor.action&&!pendingActions(root.actionQueues,id).length)break;
+  }
+  assert.ok(movedAround,'must bypass, not pass through or give up');
+  assert.ok(dist(actor.position,destination)<.065,'exact manual destination reached');
+  assert.deepEqual(peer.position,lane.peer,'no forced movement of blocker');
+  assert.deepEqual(blockedActions(root.actionQueues,id),[]);
+  assert.equal(root.version,1);
+});

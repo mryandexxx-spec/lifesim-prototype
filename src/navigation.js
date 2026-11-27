@@ -116,13 +116,13 @@ function gridFor(layout){
   entry.grid=grid;
   return grid;
 }
-const nearestNode = (point,layout) => {
+const nearestNode = (point,layout,connect=null) => {
   const gridWalkable=gridFor(layout);
   let best=-1, d=Infinity;
   for (let idx=0; idx<gridWalkable.length; idx++) {
     if (!gridWalkable[idx]) continue;
     const p=node(idx), dx=p.x-point.x, dz=p.z-point.z, dd=dx*dx+dz*dz;
-    if (dd<d) { d=dd; best=idx; }
+    if (dd<d&&(!connect||connect(point,p))) { d=dd; best=idx; }
   }
   return best;
 };
@@ -139,32 +139,38 @@ export function nearestWalkable(point,layout=null) {
   return index<0 ? {x:0,z:0} : node(index);
 }
 
-function simplify(start, points,layout) {
+function simplify(start,points,clear) {
   if (!points.length) return [];
   const route=[];
   let origin=start, i=0;
   while (i<points.length) {
     let furthest=i;
     for(let j=i; j<points.length; j++) {
-      if (isClearLine(origin,points[j],layout)) furthest=j;
+      if (clear(origin,points[j])) furthest=j;
       else break;
     }
     // Some grid edges can be valid while the exact starting point is near a corner.
     // For those cases, use the next available waypoint rather than entering an obstacle.
-    if (!isClearLine(origin,points[furthest],layout)) return null;
+    if (!clear(origin,points[furthest])) return null;
     route.push(points[furthest]); origin=points[furthest]; i=furthest+1;
   }
   return route;
 }
 
-/** Returns safe world waypoints (without the origin), or null when no route exists. */
-export function findPath(from,to,layout=null){
-  if(dynamicConstruction(layout))return dynamicFindPath(from,to,layout);
+/** Returns safe world waypoints (without the origin), or null when no route exists.
+ * Optional synchronous segment predicate constrains this one query (e.g. live
+ * resident discs). Never mutate or cache transient occupancy in the static grid.
+ */
+export function findPath(from,to,layout=null,canTraverse=null){
+  if(dynamicConstruction(layout))return dynamicFindPath(from,to,layout,canTraverse);
+  const clear=(a,b)=>isClearLine(a,b,layout)&&(!canTraverse||canTraverse(a,b));
   const gridWalkable=gridFor(layout);
   if(!isWalkable(to.x,to.z,layout))return null;
   const start=nearestWalkable(from,layout);
-  if(isClearLine(start,to,layout))return [to];
-  const initial=nearestNode(start,layout), dest=nearestNode(to,layout);
+  if(canTraverse&&(!canTraverse(start,start)||!canTraverse(to,to)))return null;
+  if(clear(start,to))return [to];
+  const connect=canTraverse?clear:null;
+  const initial=nearestNode(start,layout,connect), dest=nearestNode(to,layout,connect);
   if (initial<0 || dest<0) return null;
   const count=GRID.nx*GRID.nz;
   const scores=new Float64Array(count).fill(Infinity), back=new Int32Array(count).fill(-1);
@@ -180,10 +186,12 @@ export function findPath(from,to,layout=null){
       const points=[];
       let iter=dest;
       while(iter!==initial && iter!==-1){points.push(node(iter)); iter=back[iter];}
-      points.reverse(); points.push(to);
+      points.reverse();
+      if(canTraverse&&Math.hypot(node(initial).x-start.x,node(initial).z-start.z)>1e-9)points.unshift(node(initial));
+      points.push(to);
       // Ensure link from precise start to first grid waypoint is collision-free.
       // Near-grid-boundary starts can use a nearby free node instead.
-      const route=simplify(start,points,layout);
+      const route=simplify(start,points,clear);
       if(route) return route;
       return null;
     }
@@ -196,7 +204,7 @@ export function findPath(from,to,layout=null){
       const next=indexOf(x,z);
       if(!gridWalkable[next]||closed[next]) continue;
       if(dx && dz && (!gridWalkable[indexOf(cx+dx,cz)] || !gridWalkable[indexOf(cx,cz+dz)])) continue;
-      if(!isClearLine(node(current),node(next),layout))continue;
+      if(!clear(node(current),node(next)))continue;
       const cost=Math.hypot(dx,dz)*STEP;
       if(scores[current]+cost < scores[next]){
         scores[next]=scores[current]+cost;back[next]=current;
@@ -230,20 +238,23 @@ function dynamicGrid(layout){
   topologyGrids.set(construction,{revision,grid});
   return grid;
 }
-function dynamicNearest(p,g){
+function dynamicNearest(p,g,connect=null){
   let best=-1,d=Infinity;
   for(let i=0;i<g.walk.length;i++)if(g.walk[i]){
     const q=g.point(i),v=(q.x-p.x)**2+(q.z-p.z)**2;
-    if(v<d){d=v;best=i;}
+    if(v<d&&(!connect||connect(p,q))){d=v;best=i;}
   }
   return best;
 }
-function dynamicFindPath(from,to,layout){
+function dynamicFindPath(from,to,layout,canTraverse){
+  const clear=(a,b)=>isClearLine(a,b,layout)&&(!canTraverse||canTraverse(a,b));
   if(!Number.isFinite(from?.x)||!Number.isFinite(from?.z)||
     !isWalkable(to?.x,to?.z,layout))return null;
   const start=nearestWalkable(from,layout);
-  if(isClearLine(start,to,layout))return [to];
-  const grid=dynamicGrid(layout),origin=dynamicNearest(start,grid),dest=dynamicNearest(to,grid);
+  if(canTraverse&&(!canTraverse(start,start)||!canTraverse(to,to)))return null;
+  if(clear(start,to))return [to];
+  const grid=dynamicGrid(layout),connect=canTraverse?clear:null;
+  const origin=dynamicNearest(start,grid,connect),dest=dynamicNearest(to,grid,connect);
   if(origin<0||dest<0)return null;
   const scores=new Float64Array(grid.walk.length).fill(Infinity);
   const parent=new Int32Array(grid.walk.length).fill(-1);
@@ -264,8 +275,10 @@ function dynamicFindPath(from,to,layout){
       const route=[];let cursor=dest;
       while(cursor!==origin&&cursor!==-1){route.push(grid.point(cursor));cursor=parent[cursor];}
       if(cursor!==origin)return null;
-      route.reverse();route.push(to);
-      return simplify(start,route,layout);
+      route.reverse();
+      if(canTraverse&&Math.hypot(grid.point(origin).x-start.x,grid.point(origin).z-start.z)>1e-9)route.unshift(grid.point(origin));
+      route.push(to);
+      return simplify(start,route,clear);
     }
     closed[current]=1;
     const x=current%grid.nx,z=Math.floor(current/grid.nx);
@@ -275,7 +288,7 @@ function dynamicFindPath(from,to,layout){
       const next=zz*grid.nx+xx;
       if(!grid.walk[next]||closed[next])continue;
       if(dx&&dz&&(!grid.walk[z*grid.nx+xx]||!grid.walk[zz*grid.nx+x]))continue;
-      if(!isClearLine(grid.point(current),grid.point(next),layout))continue;
+      if(!clear(grid.point(current),grid.point(next)))continue;
       const candidate=scores[current]+Math.hypot(dx,dz)*DSTEP;
       if(candidate<scores[next]){scores[next]=candidate;parent[next]=current;push(next);}
     }

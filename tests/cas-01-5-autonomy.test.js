@@ -8,7 +8,7 @@ import {nearestWalkable} from '../src/navigation.js';
 import {resolveActionFurniture,furnitureActionApproach} from '../src/furniture-catalog.js';
 import {isWalkable,findPath} from '../src/navigation.js';
 import {ADDITIONAL_AUTONOMOUS_ACTIONS,validAdditionalAction,
-  residentIdsForSimulation} from '../src/resident-activity-runtime.js';
+  residentIdsForSimulation,explainAdditionalResidentAutonomy} from '../src/resident-activity-runtime.js';
 import {restorePopulation,PopulationSaveError,
   proposePopulationSave} from '../src/resident-population.js';
 
@@ -247,4 +247,34 @@ test('CAS-01.5 occupied sofa can fall back to physical standalone television',()
   tickHousehold(root,.1);
   assert.equal(actor.action?.id,'tv');
   assert.equal(actor.action?.automatic,true);
+});
+
+test('autonomous intent treats a physically occupied approach as unavailable until released',()=>{
+  const root=household(),id='resident_3',a=getActor(root,id),peer=getActor(root,'resident_4');
+  const goal=furnitureActionApproach(root.world,'sofa');
+  assert.ok(goal);
+  a.position={x:2.05,z:.52};peer.position={...goal};
+  const placed=[a.position,peer.position];
+  for(const legacy of [root,root.otherSim]){
+    let p=null;
+    for(let x=-4;x<12&&!p;x+=.5)for(let z=-3.5;z<3.8&&!p;z+=.5){
+      if(isWalkable(x,z,root.world)&&placed.every(q=>Math.hypot(q.x-x,q.z-z)>2))p={x,z};
+    }
+    assert.ok(p);legacy.position=p;legacy.action=null;legacy.autonomy.nextAt=100000;placed.push(p);
+  }
+  for(const k of Object.keys(a.needs))a.needs[k]=95;
+  a.needs.fun=8;a.autonomy.nextAt=0;peer.autonomy.nextAt=100000;
+  const before=clone(root.actionQueues),explanation=explainAdditionalResidentAutonomy(root,id);
+  assert.notEqual(explanation.selected,'sofa','cannot repeatedly admit an impossible destination');
+  assert.ok(explanation.attempts.some(x=>x.id==='sofa'));
+  assert.deepEqual(root.actionQueues,before,'feasibility does not write player queues');
+  let free=null;
+  for(let x=5;x<12&&!free;x+=.5)for(let z=-3;z<3&&!free;z+=.5){
+    if(isWalkable(x,z,root.world)&&placed.every(q=>Math.hypot(q.x-x,q.z-z)>2))free={x,z};
+  }
+  assert.ok(free);peer.position=free;
+  assert.equal(explainAdditionalResidentAutonomy(root,id).selected,'sofa','released approach immediately feasible');
+  tickHousehold(root,.1);
+  assert.equal(a.action?.id,'sofa');assert.equal(a.action?.automatic,true);
+  assert.equal(pendingActions(root.actionQueues,id).length,0);
 });
