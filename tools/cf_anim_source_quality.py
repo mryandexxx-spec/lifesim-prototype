@@ -133,15 +133,12 @@ def inventory(data,label,member):
     row={"source":label,"member":member,"sha256":hashlib.sha256(data).hexdigest(),"bytes":len(data),"names":names,"durations":durations,"skins":len(d.get("skins",[])),"meshes":len(d.get("meshes",[])),"asset":d["asset"],"extras":d.get("extras"),"clipExtras":{a["name"]:a.get("extras") for a in d["animations"]}}
     REPORT["sources"].append(row);save();return row
 def rank(name,role):
-    # Names are a shortlist filter, never proof of neutral posture or provenance.
-    x=re.sub(r"[^a-z0-9]+"," ",re.sub(r"([a-z])([A-Z])",r"\1 \2",name)).lower().strip()
-    if any(w in x for w in ("combat","fight","attack","weapon","sword","shield","pistol","rifle","bow","aim","crouch","run","sprint","jog","zombie","skeleton","tired","hurt","hit","death","sleep","sit","lay","lie","jump","fall","swim","dance","talk","gesture","wave","cheer","back","left","right","side","turn","strafe","sneak","crawl","walk to","idle to","to idle","look around","phone","angry","block","victory","formal")):return None
-    if role=="idle":
-        if not re.search(r"\bidl(e|ing)\b|\bstanding\b|\bstand\b",x):return None
-        if not re.search(r"\bidle\b",x) and not re.search(r"\bstanding\b|\bstand\b",x):return None
-        return 0 if any(w in x for w in ("neutral","relaxed","casual")) else 1 if x in ("idle","idle loop","standing idle","idle standing","stand idle") else 2
-    if not re.search(r"\bwalk(ing)?\b",x):return None
-    return 0 if any(w in x for w in ("neutral","relaxed","casual","normal")) else 1 if x in ("walk","walking","walk loop","walking loop","walk forward","walking forward") else 2
+    # Explicit, inventory-reviewed add-on candidates; reject same-named UAL base
+    # clips rather than accidentally re-evaluating the negative controls.
+    normalized=re.sub(r"[^a-z0-9]+"," ",re.sub(r"([a-z])([A-Z])",r"\1 \2",name).lower()).strip()
+    return 0 if normalized=={"idle":"idle subtle","walk":"walk female"}[role] else None
+assert rank("Idle_Subtle","idle")==0 and rank("Walk_Female","walk")==0
+assert rank("Idle_Loop","idle") is None and rank("Walk_Loop","walk") is None
 if FAMILY=="ual-control":
     pin=next(p for p in PINS if p[0]=="ual1");raw=download(pin[1],pin[2],pin[3],pin[4])
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
@@ -168,13 +165,13 @@ else:
         for i,(label,path,data,info) in enumerate(sources):
             for name in info["names"]:
                 value=rank(name,role)
-                if value is not None and .25<info["durations"][name]<8 and info["skins"]==1 and info["meshes"]>0:
+                if label=="addon" and value is not None and .25<info["durations"][name]<8 and info["skins"]==1 and info["meshes"]>0:
                     choices.append((value,0 if label=="addon" else 1,name,i))
         if choices:
             _,_,name,i=min(choices);selected.append((role,name,i))
     REPORT["selection"]=[{"role":role,"name":name,"member":sources[i][1]} for role,name,i in selected];save()
     if len(selected)!=2:
-        REPORT["status"]="NO_ELIGIBLE_PAIR";save();print(REPORT["status"],flush=True);sys.stdout.flush();sys.stderr.flush();os._exit(0)
+        REPORT["status"]="NO_ELIGIBLE_PAIR";save();raise AssertionError("inventory-pinned candidate pair missing")
     for role,name,i in selected:
         label,path,data,info=sources[i];audit(data,label,path,name,role)
 assert len(REPORT["clips"])==2 and all(len(x["renders"])>=12 and len(x["videos"])==2 and len(x["landmarks"])==len(x["renders"]) for x in REPORT["clips"])
