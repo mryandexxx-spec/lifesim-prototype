@@ -147,6 +147,8 @@ import {enqueueAction,pendingActions,removeQueuedAction,dispatchActionQueues,MAX
   MAX_BLOCKED_QUEUE} from './action-queue.js';
 import {newSocialWalkGuard,inspectSocialWalk,recoverableSocialCommand} from './queue-rescue.js';
 import {newQueuedHeadGuard,inspectQueuedHead} from './qsk-07-fairness.js';
+import {newWalkGuard,resetWalkGuard,walkingRetryAllowed} from './qsk-07-fairness.js';
+import {isLegacyCareWalk,legacyCareArrivalClear,recoverLegacyCareWalk} from './legacy-care-walk.js';
 import {labelQueuedTask,labelActiveTask} from './qsk-11-task-labels.js';
 import {visibleActionPhase,queuedActionStatus,blockedActionMessage,
   interruptionQuestion,verifiedLastEvent} from './qsk-08-touch-ux.js';
@@ -4844,6 +4846,8 @@ function boot() {
     alex:{points:null,index:0,id:null},
     mira:{points:null,index:0,id:null}
   };
+  const legacyCareGuards={alex:newWalkGuard(),mira:newWalkGuard()};
+  const legacyCareOverflow=new Set();
   const autonomyWaitSeconds={alex:0,mira:0};
   restartAutonomyWait=(id=null)=>{
     if (id) autonomyWaitSeconds[id]=0;
@@ -5441,7 +5445,8 @@ function boot() {
     socialMenuDisplayKey='';queueDisplayKey='';
     renderConversationPanel();renderSharedPanel();renderBranchPanel();
     renderSocialMenu();renderQueuePanel();
-    for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
+    for(const id of HOUSEHOLD_IDS){paths[id]={points:null,index:0,id:null};resetWalkGuard(legacyCareGuards[id]);}
+    legacyCareOverflow.clear();
     socialWalkGuard=newSocialWalkGuard();lastRescueOverflowSeq=null;
     benchVisualTargets.alex=null;benchVisualTargets.mira=null;
     facing=0;gait=0;miraFacing=0;miraGait=0;fridgeOpen=0;
@@ -9271,6 +9276,7 @@ function boot() {
     const animDt=active?dt:0;
     const frameAnimDt=buildMode||outdoorMode?0:animDt;
     if(frameActive){
+      const legacyCareFrameStart=game.minutes;
       accumulator+=dt;
       // Fixed timestep: simulation speed cannot depend on rendering FPS.
       // Keep a single .30-minute simulation quantum at both speeds. Each
@@ -9386,9 +9392,11 @@ function boot() {
         if(fridgeLeaving[residentId]&&fridgeOpen<=.015)fridgeLeaving[residentId]=false;
         fridgeWasUsing[residentId]=Boolean(stillUsing);
       }
+      const legacyCareMinutes=Math.max(0,game.minutes-legacyCareFrameStart);
       // Run two independent route followers with one shared room and item reservation.
       for(const residentId of HOUSEHOLD_IDS){
-        const resident=getActor(game,residentId);
+        const resident=getActor(game,residentId),careGuard=legacyCareGuards[residentId];
+        if(!isLegacyCareWalk(resident.action)){resetWalkGuard(careGuard);legacyCareOverflow.delete(residentId);}
         // Career return has priority over stale visual exit gates. A worker
         // may depart while a non-action seat/shower/door transition still owns
         // the scene; its old transient controller must not trap the worker in
@@ -9474,6 +9482,8 @@ function boot() {
             ?(resident.action.id==='hobby'?readingRouteId(resident.action):resident.action.id)
             :null;
         if(jobId){
+          const recoverable=!socialWalking&&isLegacyCareWalk(resident.action);
+          if(recoverable&&!walkingRetryAllowed(careGuard,resident.action,game.minutes))continue;
           let p=paths[residentId];
           if(p.id!==jobId || !p.points){
             const available=socialWalking
@@ -9482,7 +9492,7 @@ function boot() {
                   resident.action?.watchSeatInstanceId)?paths[residentId].points:null);
             if(!available){
               if(socialWalking)cancelSocial(game);
-              else {resident.action=null;resident.activitySession=null;resident.event='Путь недоступен';}
+              else if(!recoverable){resident.action=null;resident.activitySession=null;resident.event='Путь недоступен';}
               paths[residentId]={points:null,index:0,id:null};
             } else if(socialWalking){
               paths[residentId]={points:available,index:0,id:jobId};
@@ -9507,7 +9517,12 @@ function boot() {
               remaining-=step;
               if(dist-step<.0001){resident.position.x=next.x;resident.position.z=next.z;p.index++;}
             }
-            if(p.index>=p.points.length){
+            if(recoverable&&p.index>=p.points.length&&!legacyCareArrivalClear(game,residentId,resident,
+              destination(jobId,residentId,resident.action?.targetInstanceId,resident.action?.watchSeatInstanceId))){
+              // A moving peer or changed target can invalidate the final snap.
+              p=paths[residentId]={points:null,index:0,id:null};
+            }
+            if(p.points&&p.index>=p.points.length){
               resident.position=socialWalking?{...socialGoal}:
                 destination(jobId,residentId,resident.action?.targetInstanceId,
                    resident.action?.watchSeatInstanceId);
@@ -9571,6 +9586,23 @@ function boot() {
               }else if(resident.action?.id==='swim')arrivePoolApproach(game,residentId);
               else arrive(resident);
               paths[residentId]={points:null,index:0,id:null};
+            }
+          }
+          if(recoverable){
+            const goal=resident.action?destination(jobId,residentId,resident.action.targetInstanceId,resident.action.watchSeatInstanceId):null;
+            const recovery=recoverLegacyCareWalk(game,residentId,resident,careGuard,goal,legacyCareMinutes,
+              {routeValid:Boolean(p.points)});
+            if(recovery.status==='rerouted')paths[residentId]={points:recovery.points,index:0,id:jobId};
+            if(recovery.status==='parked'||recovery.status==='cancelled'){
+              paths[residentId]={points:null,index:0,id:null};restartAutonomyWait(residentId);
+              legacyCareOverflow.delete(residentId);
+              const notice=getActorName(residentId)+': '+resident.event;
+              $('queue-feedback').textContent=notice;
+              renderQueuePanel(true);save(true);toast(notice);
+            }else if(recovery.status==='retained'&&!legacyCareOverflow.has(residentId)){
+              legacyCareOverflow.add(residentId);
+              const notice=getActorName(residentId)+': маршрут заблокирован. Освободи место в «Отложено» или отмени действие.';
+              $('queue-feedback').textContent=notice;toast(notice);
             }
           }
         }
