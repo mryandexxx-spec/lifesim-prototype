@@ -1,7 +1,7 @@
 /** FRIDGE-UX-R2: read-only adapter for the existing kitchen and wallet.
  * No DOM, commands, inventory changes or persistence. */
 import {preparedKitchenMeals,KITCHEN_PREPARED_LIMIT,KITCHEN_HERB_LIMIT,
-  KITCHEN_RECIPES,canCookRecipe} from './kitchen.js';
+  KITCHEN_RECIPES,canCookRecipe,mealEnjoyment,cookingQuality} from './kitchen.js';
 import {quoteReadyMeal} from './ready-food.js';
 import {READY_MEAL_IDS,readyMeal} from './ready-meal-catalog.js';
 import {KITCHEN_RESTOCK_LABELS,KITCHEN_RESTOCK_PRICE,
@@ -21,7 +21,8 @@ const reasons={
 };
 export function fridgeViewModel(root,skillLevel=0){
   const kitchen=root?.kitchen;
-  const meals=preparedKitchenMeals(kitchen).map(meal=>({...meal}));
+  const meals=preparedKitchenMeals(kitchen).map(meal=>({...meal,
+    enjoyment:meal.quality==='mixed'?null:mealEnjoyment(meal.recipeId,meal.quality)}));
   const stored=meals.reduce((sum,meal)=>sum+meal.portions,0);
   const reserved=Array.isArray(kitchen?.deliveries)?kitchen.deliveries.length:0;
   const capacity=KITCHEN_PREPARED_LIMIT;
@@ -32,6 +33,7 @@ export function fridgeViewModel(root,skillLevel=0){
       safe(kitchen?.pantry?.[id])<n).map(([id,n])=>id+' ×'+n);
     return {id:recipe.id,label:recipe.label,portions:recipe.portions,
       available,requires:recipe.requires,
+      enjoyment:mealEnjoyment(recipe.id,cookingQuality(level).id),
       reason:available?'Доступно':
         level<recipe.minLevel?'Нужен уровень '+recipe.minLevel:
         stored+reserved+recipe.portions>capacity?'Недостаточно места для '+recipe.portions+' порций':
@@ -39,7 +41,7 @@ export function fridgeViewModel(root,skillLevel=0){
   });
   const ready=READY_MEAL_IDS.map(id=>{
     const meal=readyMeal(id),quote=quoteReadyMeal(root,id,'fridge');
-    return {id,label:meal.label,price:meal.fridgePrice,
+    return {id,label:meal.label,price:meal.fridgePrice,enjoyment:mealEnjoyment(id),
       available:quote.ok,reason:quote.ok?'Доступно':
         reasons[quote.reason]||'Покупка недоступна'};
   });
