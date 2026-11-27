@@ -59,6 +59,7 @@ const MEAL_TASTE=Object.freeze({
   'cook.gratin':7,'cook.grain-bowl':4,'cook.herb-noodles':6,
   'cook.roast-tray':7,'cook.festival-pie':8,
   'grill.vegetables':5,'grill.chicken':7,'grill.steak':8,
+  'grill.shashlik':8,'grill.platter':8,
   'ready.sunny-grains':4,'ready.garden-wrap':6,'ready.gold-roast':8
 });
 const TASTE_QUALITY=Object.freeze({normal:0,good:1,excellent:2,chef:3});
