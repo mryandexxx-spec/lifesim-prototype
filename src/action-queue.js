@@ -78,11 +78,14 @@ export function sanitizeQueueCommand(id,raw,persons){
       (raw.mirrorPractice!==undefined&&
         (raw.actionId!=='mirror'||raw.mirrorPractice!==true))||
       (raw.tvTalk!==undefined&&
-        (raw.actionId!=='tv'||raw.tvTalk!==true)))return null;
+        (raw.actionId!=='tv'||raw.tvTalk!==true))||
+      (raw.showerSinging!==undefined&&
+        (raw.actionId!=='shower'||raw.showerSinging!==true)))return null;
     return {type,actionId:raw.actionId,
       ...(raw.targetInstanceId?{targetInstanceId:raw.targetInstanceId}:{}),
       ...(raw.mirrorPractice===true?{mirrorPractice:true}:{}),
-      ...(raw.tvTalk===true?{tvTalk:true}:{})};
+      ...(raw.tvTalk===true?{tvTalk:true}:{}),
+      ...(raw.showerSinging===true?{showerSinging:true}:{})};
   }
   // Solo physical hobby queue commands do not have a social target.
   if(type==='activity'){

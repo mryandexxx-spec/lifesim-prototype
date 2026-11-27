@@ -50,7 +50,8 @@ function interruptedManualCommand(action){
   if(ADDITIONAL_OBJECT_ACTIONS.includes(action.id)&&
     typeof action.targetInstanceId==='string')
     return {type:'object',actionId:action.id,targetInstanceId:action.targetInstanceId,
-      ...(action.id==='mirror'&&action.mirrorPractice===true?{mirrorPractice:true}:{})};
+      ...(action.id==='mirror'&&action.mirrorPractice===true?{mirrorPractice:true}:{}),
+      ...(action.id==='shower'&&action.showerSinging===true?{showerSinging:true}:{})};
   return null;
 }
 /** Once accepted, player intent is parked in saved explicit-retry tray.
@@ -251,7 +252,8 @@ function prepareCommand(root,id,command){
   if(!furnitureFree(root,id,command.actionId,item.instanceId,slot))return null;
   const candidate={id:command.actionId,targetInstanceId:item.instanceId,
     ...(slot?{bedSlot:slot}:{}),
-    ...(command.actionId==='mirror'&&command.mirrorPractice===true?{mirrorPractice:true}:{})};
+    ...(command.actionId==='mirror'&&command.mirrorPractice===true?{mirrorPractice:true}:{}),
+    ...(command.actionId==='shower'&&command.showerSinging===true?{showerSinging:true}:{})};
   const goal=actionGoal(root,candidate);
   return goal&&findPath(actor.position,goal,root.world)?candidate:null;
 }
@@ -265,7 +267,9 @@ function startPlannedObject(root,id,plan,automatic){
   if(!chooseAction(actor,plan.id,automatic))return false;
   Object.assign(actor.action,{targetInstanceId:plan.targetInstanceId,
     ...(plan.bedSlot?{bedSlot:plan.bedSlot}:{}),
-    ...(plan.id==='mirror'&&(automatic||plan.mirrorPractice===true)?{mirrorPractice:true}:{})});
+    ...(plan.id==='mirror'&&(automatic||plan.mirrorPractice===true)?{mirrorPractice:true}:{}),
+    ...(plan.id==='shower'&&!automatic&&plan.showerSinging===true?{showerSinging:true}:{})});
+  if(actor.action.showerSinging===true)actor.event='Петь в душе';
   if(mirrorActionLabel(actor.action))actor.event=mirrorActionLabel(actor.action);
   return true;
 }
