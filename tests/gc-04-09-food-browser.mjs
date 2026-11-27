@@ -4,6 +4,7 @@ import {chromium,webkit} from 'playwright';
 import {newHousehold} from '../src/household.js';
 import {SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
+import {openFridgeByTouch} from './helpers/fridge-browser-touch.mjs';
 const out='artifacts/gc-04-09-food-ui';mkdirSync(out,{recursive:true});
 const seed=newHousehold('2026-11-26');
 seed.paused=seed.otherSim.paused=true;seed.autonomy.enabled=seed.otherSim.autonomy.enabled=false;
@@ -15,13 +16,15 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
   const label=name+'-'+width,row={label};report.push(row);
   const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,hasTouch:true,isMobile:true,serviceWorkers:'block'});
   try{
-   await ctx.addInitScript(({key,seed,tour})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');localStorage.setItem('lifesim.ui.itemLabels.v1','visible');},{key:SAVE_KEY,seed,tour:UI_TOUR_STORAGE_KEY});
+   await ctx.addInitScript(({key,seed,tour})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(tour,'done');localStorage.setItem('lifesim.ui.itemLabels.v1','hidden');},{key:SAVE_KEY,seed,tour:UI_TOUR_STORAGE_KEY});
    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));page.on('dialog',d=>d.accept());
    const ready=()=>page.locator('#loading').waitFor({state:'hidden',timeout:100000});
    await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});await ready();
    assert.ok(await page.evaluate(async()=>Boolean((await import('playcanvas')).Application.getApplication()?.graphicsDevice?.canvas)));
    const read=()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)),SAVE_KEY);
-   await page.locator('#hotspots [data-action-id="fridge"]').first().tap({timeout:15000});
+   const fridge=seed.world.furniture.instances.find(x=>x.prefabId==='fridge');
+   assert.ok(fridge);
+   await openFridgeByTouch(page,fridge,{captureFailure:async attempts=>{row.attempts=attempts;await page.screenshot({path:out+'/'+label+'-fridge-failed.png'});}});
    const panel=page.locator('#fridge-r2');await panel.waitFor({state:'visible'});
    const soup=panel.locator('[data-fridge-action="eat"][data-id="cook.soup"]');
    assert.ok((await soup.innerText()).includes('Досуг до +5'));

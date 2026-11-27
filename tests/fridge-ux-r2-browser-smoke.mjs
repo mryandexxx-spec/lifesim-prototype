@@ -7,6 +7,7 @@ import {chromium} from 'playwright';
 import {newHousehold} from '../src/household.js';
 import {SAVE_KEY} from '../src/simulation.js';
 import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
+import {openFridgeByTouch} from './helpers/fridge-browser-touch.mjs';
 
 const seed=newHousehold('2026-11-22');
 seed.paused=true;seed.otherSim.paused=true;
@@ -36,17 +37,9 @@ try{
       return Boolean(Application.getApplication()?.graphicsDevice?.canvas);
     });
     assert.equal(graphics,true,'real PlayCanvas WebGL graphics required');
-    async function openFridge(){
-      await page.evaluate(()=>{
-        const layer=document.getElementById('hotspots');
-        layer.hidden=false;
-        const item=[...layer.querySelectorAll('button')].find(
-          b=>b.textContent.includes('Холодильник'));
-        if(!item)throw new Error('Real fridge hotspot not found');
-        item.click();
-      });
-      await page.locator('#fridge-r2').waitFor({state:'visible',timeout:10000});
-    }
+    const fridge=seed.world.furniture.instances.find(x=>x.prefabId==='fridge');
+    assert.ok(fridge);
+    const openFridge=()=>openFridgeByTouch(page,fridge,{captureFailure:()=>page.screenshot({path:'artifacts/fridge-ux-r2/fridge-failed-'+width+'.png'})});
     await openFridge();
     assert.equal(await page.locator('.fridge-r2-tabs [role="tab"]').count(),3);
     assert.equal(await page.locator('#fridge-r2-tab-eat').getAttribute('aria-selected'),'true');
@@ -95,7 +88,7 @@ try{
     assert.ok(bounds.bottom<=bounds.hudTop+2,'sheet must not obscure lower HUD');
     // Resident switching closes the optional sheet; the next fridge tap
     // targets Mira and resets to the default «Поесть» tab.
-    await page.evaluate(()=>document.getElementById('pick-mira').click());
+    await page.locator('#pick-mira').tap();
     await openFridge();
     assert.match(await page.locator('#fridge-r2-summary').textContent(),/Мира/);
     assert.equal(await page.locator('#fridge-r2-tab-eat').getAttribute('aria-selected'),'true');
