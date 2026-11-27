@@ -39,7 +39,7 @@ function quote(m,at,base){const next=demandAt(m,at);return {amount:Math.min(base
 function settle(q){return {...q.next,units:Math.max(0,q.next.units-q.amount*UNIT)};}
 function windowAt(at,start){return Math.floor((at-start)/WEEK);}
 function eligibleOrder(order,work,at,start){
- return !!order&&!order.fulfilled&&order.window===windowAt(at,start)&&work.ownerId===order.owner&&work.contentId===order.subject&&work.createdAt>=order.acceptedAt;
+ return !!order&&!order.fulfilled&&order.window===windowAt(at,start)&&work.ownerId===order.owner&&work.contentId===order.subject&&work.createdAt>order.acceptedAt;
 }
 function materials(root,id){
  if(root.shop.credits<MATERIAL)return {ok:false,reason:'insufficient-credits'};
@@ -300,7 +300,7 @@ try{
  for(const row of report.policies.filter(p=>p.variant.market)){assert.ok(row.materialCost>0&&row.sales>0);assert.ok(row.marketOffers.every(o=>o.offer>=1&&o.offer<=o.base));}
  const ord={owner:'alex',subject:'painting.hills',window:0,acceptedAt:500,fulfilled:false};
  const w={ownerId:'alex',contentId:'painting.hills',createdAt:501};
- assert.ok(eligibleOrder(ord,w,501,480));assert.ok(!eligibleOrder(ord,{...w,createdAt:499},501,480));
+ assert.ok(eligibleOrder(ord,w,501,480));assert.ok(!eligibleOrder(ord,{...w,createdAt:499},501,480));assert.ok(!eligibleOrder(ord,{...w,createdAt:500},501,480));
  assert.ok(!eligibleOrder(ord,{...w,ownerId:'mira'},501,480));assert.ok(!eligibleOrder(ord,{...w,contentId:'painting.city'},501,480));
  assert.ok(!eligibleOrder({...ord,fulfilled:true},w,501,480));assert.ok(!eligibleOrder(ord,w,480+WEEK,480));
  for(const row of report.policies.filter(p=>p.variant.market)){
