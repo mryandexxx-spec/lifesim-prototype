@@ -13,7 +13,7 @@ import {UI_TOUR_STORAGE_KEY} from '../src/ui-onboarding.js';
 const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 if(process.env.GC_EXPECTED_SHA)assert.equal(sha,process.env.GC_EXPECTED_SHA);
 const out='artifacts/gc-04-09-c4';mkdirSync(out,{recursive:true});
-const report={sha,base:'d75bb3c46d81c6c34f1d1f69969038351525d004',revision:'C4-R2',cases:[],limitations:['native select via selectOption, confirm dialog accepted/dismissed via Playwright; no claim trusted picker/dialog selection','scripted fixture, no human or physical device acceptance','limited touched path, not full gesture suite']};
+const report={sha,base:'d75bb3c46d81c6c34f1d1f69969038351525d004',revision:'C4-POLISH',cases:[],limitations:['native select via selectOption, confirm dialog accepted/dismissed via Playwright; no claim trusted picker/dialog selection','scripted fixture, no human or physical device acceptance','limited touched path, not full gesture suite']};
 const flush=()=>writeFileSync(out+'/report.json',JSON.stringify(report,null,2)+'\n');
 function fixture(){
  const seed=newHousehold('2026-11-26');seed.calendar.anchorConfirmed=true;
@@ -64,15 +64,38 @@ for(const [engine,launcher] of [['chromium',chromium],['webkit',webkit]]){
   }
   async function pause(){if(await page.locator('#pause-btn').getAttribute('aria-label')!=='Продолжить')await tap('#pause-btn');assert.equal(await page.locator('#pause-btn').getAttribute('aria-label'),'Продолжить');}
   async function layout(){const d=await page.evaluate(()=>({w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight}));assert.ok(d.sw<=d.w+2&&d.sh<=d.h+2,'whole-page scroll');}
+  async function paintingLayout(st){
+    const measured=await page.evaluate(()=>{
+      const sheet=document.querySelector('#action-sheet');
+      const r=sheet.getBoundingClientRect();
+      const bounds={top:r.top+sheet.clientTop,bottom:r.top+sheet.clientTop+sheet.clientHeight,left:r.left+sheet.clientLeft,right:r.left+sheet.clientLeft+sheet.clientWidth};
+      const controls=['#painting-theme-select','#painting-mode-select','#painting-mode-note','#action-button'].map(selector=>{
+        const el=document.querySelector(selector),b=el.getBoundingClientRect();
+        const hit=document.elementFromPoint((b.left+b.right)/2,(b.top+b.bottom)/2);
+        return {selector,rect:{left:b.left,top:b.top,right:b.right,bottom:b.bottom,width:b.width,height:b.height},
+          contained:b.width>0&&b.height>0&&b.top>=Math.max(0,bounds.top)-1&&b.bottom<=Math.min(innerHeight,bounds.bottom)+1&&b.left>=Math.max(0,bounds.left)-1&&b.right<=Math.min(innerWidth,bounds.right)+1,
+          hit:hit===el||el.contains(hit)};
+      });
+      return {bounds,scrollTop:sheet.scrollTop,controls};
+    });
+    st.paintingLayout=measured;
+    for(const c of measured.controls){
+      assert.ok(c.contained,c.selector+' must be fully inside the visible painting sheet before scrolling');
+      if(c.selector!=='#painting-mode-note'){
+        assert.ok(c.hit,c.selector+' is obscured');
+        assert.ok(c.rect.width>=44&&c.rect.height>=44,c.selector+' target too small');
+      }
+    }
+  }
   await step('boot',async()=>{await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});await ready();await pause();assert.ok((await state()).artMarket);await layout();});
   const sale='#mind-painting-works button:has-text("Продать · +175 кр.")';
   await step('portfolio-cancel',async()=>{await tap('#mind-toggle');await tap('#mind-tab-skills');await tap(sale,true);assert.equal((await state()).shop.credits,cash);assert.equal((await state()).createdWorks.length,1);await layout();});
   await step('portfolio-confirm',async()=>{answer='accept';await tap(sale,true);await page.waitForFunction(({k,cash})=>JSON.parse(localStorage.getItem(k)).shop.credits===cash+175,{k:SAVE_KEY,cash});const s=await state();assert.equal(s.createdWorks.length,0);assert.equal(s.financialHistory.entries.filter(e=>e.kind==='art-sale').length,1);await tap('#mind-close');});
   await step('focus-easel',async()=>{await tap('#view-toggle');await tap('#item-labels-btn');assert.equal(await page.locator('#item-labels-btn').getAttribute('aria-pressed'),'true');await tap('#menu-find-resident-btn');await page.locator('#view-panel').waitFor({state:'hidden'});await page.waitForTimeout(1700);});
   const marker='#hotspots button[data-instance-id="'+item.instanceId+'"]';
-  await step('easel-touch',async()=>{const before=await state();await tap(marker);await page.locator('#painting-mode-select').waitFor({state:'visible'});assert.deepEqual((await state()).actionQueues,before.actionQueues);assert.equal(await page.locator('#painting-mode-select').inputValue(),'practice');assert.match(await page.locator('#painting-mode-note').innerText(),/Без расходов/);await layout();});
+  await step('easel-touch',async(st)=>{const before=await state();await tap(marker);await page.locator('#painting-mode-select').waitFor({state:'visible'});assert.deepEqual((await state()).actionQueues,before.actionQueues);assert.equal(await page.locator('#painting-mode-select').inputValue(),'practice');assert.match(await page.locator('#painting-mode-note').innerText(),/Без расходов/);await layout();await paintingLayout(st);});
   await step('dismiss-practice',async()=>{await tap('#close-action');assert.deepEqual((await state()).actionQueues.byResident.alex,[]);await tap(marker);await page.locator('#painting-mode-select').waitFor({state:'visible'});});
-  await step('commission-picker-functional',async(st)=>{st.nativePicker='programmatic selection, not trusted touch evidence';await page.locator('#painting-mode-select').selectOption('commission');assert.match(await page.locator('#painting-mode-note').innerText(),/20 кр./);await layout();});
+  await step('commission-picker-functional',async(st)=>{st.nativePicker='programmatic selection, not trusted touch evidence';await page.locator('#painting-mode-select').selectOption('commission');assert.match(await page.locator('#painting-mode-note').innerText(),/20 кр./);await layout();await paintingLayout(st);});
   await step('queue-commission',async()=>{await tap('#action-button',true);await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)).actionQueues.byResident.alex.some(c=>c.paintMode==='commission'),SAVE_KEY);const q=await state();assert.equal(q.shop.credits,cash+175);assert.equal(q.actionQueues.byResident.alex[0].targetInstanceId,item.instanceId);assert.equal(q.actionQueues.byResident.alex[0].paintExpectedPrice,20);assert.deepEqual(q.actionQueues.byResident.mira,[]);});
   function assertAdmission(s){
     const row=s.artMarket.byResident.alex;
