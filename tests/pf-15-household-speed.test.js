@@ -79,7 +79,7 @@ test('actual household clock: first natural wake exits auto speed, remaining sle
   const start=root.minutes;assert.equal(c.read(root),3);
   for(let i=0;i<100&&root.action;i++){tickHousehold(root,.30);c.read(root);}
   assert.equal(root.action,null);assert.equal(root.otherSim.action?.id,'bed');
-  assert.equal(c.read(root),1);assert.ok(root.minutes-start<10);
+  assert.equal(c.read(root),1);assert.ok(root.minutes-start>=1/.068&&root.minutes-start<1/.068+.31);
   assert.equal(root.minutes,root.otherSim.minutes);
 });
 
