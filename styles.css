@@ -2876,3 +2876,40 @@ button.time-card:active {transform:translateY(1px);}
 .gc-aspiration-choice button{min-height:44px;min-width:44px;border:1px solid #c9d6cb;border-radius:8px;background:#fff;color:#294a3d;font-size:12px;font-weight:700;touch-action:manipulation}
 .gc-aspiration-choice button:disabled{opacity:.55}
 .gc-aspiration-choice button:focus-visible,.gc-aspiration-picker summary:focus-visible{outline:2px solid #217052;outline-offset:2px}
+
+/* GC-08: chronological, completed-only personal biography. */
+.mind-tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+#mind-biography-tab[hidden]{display:none!important}
+.gc-biography-note,.gc-biography-empty{font-size:13px;line-height:1.45;color:#526b60;margin:6px 0 12px}
+.gc-biography-list{list-style:none;padding:0 0 0 12px;margin:0 0 6px;border-left:2px solid #cce1d2;display:grid;gap:12px}
+.gc-biography-list li{position:relative;display:grid;gap:3px;overflow-wrap:anywhere;padding:10px 12px;border:1px solid #d5e6da;border-radius:12px;background:#f4f8f3;color:#294a3d}
+.gc-biography-list li::before{content:'';position:absolute;left:-18px;top:15px;width:9px;height:9px;background:#43866a;border-radius:50%;border:2px solid #fff}
+.gc-biography-list time,.gc-biography-list span{font-size:12px;line-height:1.3;color:#526b60}
+.gc-biography-list strong{font-size:14px;line-height:1.3}
+
+/* GC-08 visual acceptance: anchor the biography above the real HUD, keep
+ * identity and close controls visible, and scroll only the timeline. */
+#mind-panel:has(#mind-biography-tab:not([hidden])){
+ bottom:var(--resident-panel-bottom,175px);
+ max-height:min(67dvh,570px,calc(100dvh - var(--resident-panel-bottom,175px) - env(safe-area-inset-top) - 62px));
+ display:flex;flex-direction:column;overflow:hidden;
+}
+#mind-panel[hidden]{display:none!important}
+#mind-panel:has(#mind-biography-tab:not([hidden])) > :not([hidden]){flex-shrink:0}
+#mind-panel:has(#mind-biography-tab:not([hidden])) > #mind-biography-tab{
+ flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+}
+#cas-resident-details:has(details[open] > #extra-biography){
+ max-height:min(55dvh,calc(100dvh - var(--resident-panel-bottom,175px) - env(safe-area-inset-top) - 62px));
+}
+#cas-resident-details:has(details[open] > #extra-biography) > *{flex-shrink:0}
+.app-shell:has(#mind-panel:not([hidden]) #mind-biography-tab:not([hidden]),#cas-resident-details:not([hidden]) details[open] > #extra-biography) .toast:not(.toast-actionable){z-index:8}
+@media(max-height:650px) and (orientation:portrait){
+ #mind-panel:has(#mind-biography-tab:not([hidden])){padding:10px 12px}
+ #mind-panel:has(#mind-biography-tab:not([hidden])) .mind-panel-head{margin-bottom:4px}
+ #mind-panel:has(#mind-biography-tab:not([hidden])) .mind-panel-head h2{font-size:17px}
+ #mind-panel:has(#mind-biography-tab:not([hidden])) .mind-view-note{margin-bottom:5px}
+ #mind-panel:has(#mind-biography-tab:not([hidden])) .mind-tabs{margin-bottom:5px}
+ #mind-biography-tab .gc-biography-note,#mind-biography-tab .gc-biography-empty{margin:3px 0 7px;line-height:1.35}
+ #mind-biography-tab .gc-biography-list li{padding:7px 9px}
+}

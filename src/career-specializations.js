@@ -1,3 +1,4 @@
+import {recordBiographyCareer} from './life-biography.js';
 /** W2-A.3: genuine branch choice after the original five ranks.
  * Stable catalog and pure career rules: no DOM, PlayCanvas, salary or extra XP.
  */
@@ -126,6 +127,7 @@ export function chooseCareerSpecialization(root,residentId,trackId){
   if(contract.level>=5)contract.seniorProofs=resetSeniorProof(contract,root.minutes);
   const actor=residentActor(root,residentId);
   if(actor)actor.event='Новый профессиональный путь: '+target.title;
+  recordBiographyCareer(root,residentId,'specialization');
   return {ok:true,track:target,rank:careerRankForContract(contract)};
 }
 /** Called only from the canonical once-only incident resolution after its

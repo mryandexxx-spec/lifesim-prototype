@@ -1,3 +1,4 @@
+import {biographyPairBefore,recordBiographySocial} from './life-biography.js';
 /** Headless two-person social relationship simulation. */
 import { refreshMind } from './psychology.js';
 import {charismaSocialBonus} from './hobby-reading.js';
@@ -167,6 +168,7 @@ function recordPairCompletion(root,session,type,token=null){
   if(!graph||!root.relationship?.views?.[a]||!root.relationship.views[b])return false;
   const views={[a]:root.relationship.views[a],[b]:root.relationship.views[b]};
   observePairViews(graph,a,b,views);
+  const beforeBiography=biographyPairBefore(root,a,b);
   const committed=applySocialEvent(graph,{
     actorId:a,targetId:b,type,at:root.minutes,
     ...(typeof token==='string'?{token}:{})
@@ -175,6 +177,7 @@ function recordPairCompletion(root,session,type,token=null){
   // never queued, walked-to, refused, cancelled, reloaded or replayed.
   // Household is only a two-resident adapter; the need function itself
   // accepts arbitrary person IDs without referring to Alex or Mira.
+  if(committed)recordBiographySocial(root,committed,beforeBiography);
   if(committed)recordSocialTaskOutcome(root,committed);
   if(committed&&creditCompletedSocialNeed({[a]:get(root,a),[b]:get(root,b)},committed)){
     refreshMind(get(root,a));

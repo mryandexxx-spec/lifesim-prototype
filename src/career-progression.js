@@ -1,3 +1,4 @@
+import {recordBiographyCareer} from './life-biography.js';
 /** W2-A.1: append-only promotion gates built on original real work and skills.
  * Pure domain rules only: no real-world clock, DOM, currency mint or second XP.
  */
@@ -96,6 +97,7 @@ export function promoteCareer(root,residentId){
   if(actor)actor.event='Повышение: '+goal.rank;
   recordWorkLifePromotion(root,residentId,contract);
   applyWorkMoodContext(root);
+  recordBiographyCareer(root,residentId,'promotion');
   return {ok:true,rank:goal.rank,rate:careerRankForContract(contract).hourlyCredits};
 }
 /** Called ONCE from idempotent salary settlement, never from presentation. */

@@ -1,3 +1,4 @@
+import {biographyPairBefore,recordBiographySocial} from './life-biography.js';
 /**
  * CAS-01.5-social — headless N-resident social rendezvous.
  * One existing household clock/queue/graph. No visual actors, new wallets,
@@ -271,11 +272,13 @@ export function tickAddressedSocial(root,minutes){
 }
 function settleAddressedSocial(root,s,outcome){
   const a=actor(root,s.initiator),b=actor(root,s.partner);
+  const beforeBiography=biographyPairBefore(root,s.initiator,s.partner);
   const receipt=outcome&&applySocialEvent(root.socialGraph,{
     actorId:s.initiator,targetId:s.partner,type:outcome.type,at:root.minutes,
     token:'cas-social:'+s.seq
   });
   if(receipt){
+    recordBiographySocial(root,receipt,beforeBiography);
     recordSocialTaskOutcome(root,receipt);
     creditCompletedSocialNeed(allActors(root),receipt);
     if(s.conversation)for(const turn of s.conversation.turns){
