@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   gc-08-life-biography:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-08-life-biography' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-08-biography' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:

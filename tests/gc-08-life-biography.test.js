@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
+import {newHousehold,loadHousehold,tickHousehold,chooseResidentAction,enableArtMarketPilot} from '../src/household.js';
 import {BIOGRAPHY_DEFINITIONS,biographyRows,recordBiographyArtwork,recordBiographySale,recordBiographyDisplay,recordBiographyCareer,recordBiographySocial,biographyPairBefore,biographySkillBefore,recordBiographySkills,recordBiographyHome} from '../src/life-biography.js';
 import {recordFinanceChange} from '../src/finance-ledger.js';
 import {transactPainting} from '../src/painting-gallery.js';
@@ -24,3 +24,28 @@ test('GC08 shared installed purchase once, same state and no reward',()=>{let r=
 test('GC08 one root snapshot survives storage quota failure and reload',()=>{let r=setup(),bytes=null;const storage={getItem:()=>bytes,setItem:(k,v)=>bytes=v};assert.ok(writeV1Save(storage,'save',r).ok);const old=bytes,w=work(r);r.createdWorks=[w];recordBiographyArtwork(r,'alex',w);const blocked={getItem:()=>bytes,setItem:()=>{throw Object.assign(new Error('quota'),{name:'QuotaExceededError'});}};assert.equal(writeV1Save(blocked,'save',r).ok,false);assert.equal(bytes,old);assert.ok(writeV1Save(storage,'save',r).ok);assert.deepEqual(loadHousehold(readV1Save(storage,'save').value).lifeBiography,r.lifeBiography);});
 test('GC08 cancelled and paused tick cannot create facts',()=>{let r=setup();r.paused=true;tickHousehold(r,60);assert.equal(r.lifeBiography,undefined);assert.equal(recordBiographySocial(r,null,biographyPairBefore(r,'alex','mira')),false);});
 test('GC08 real social receipts only, mutual close milestone persists after loss',()=>{let r=setup();let seq=0;for(let day=0;day<8;day++){r.minutes+=1440;for(const type of ['talk','conversation.talk','friend.confide']){let before=biographyPairBefore(r,'alex','mira');let receipt=applySocialEvent(r.socialGraph,{type,actorId:'alex',targetId:'mira',at:r.minutes,token:'gc08-'+seq++});assert.ok(receipt);recordBiographySocial(r,receipt,before);}}assert.equal(getPair(r.socialGraph,'alex','mira').friendship,'close');assert.equal(biographyRows(r,'alex').find(x=>x.key==='friendship').context,'mira');assert.equal(biographyRows(r,'mira').find(x=>x.key==='friendship').context,'alex');let old=copy(r.lifeBiography);for(let i=0;i<8;i++){let before=biographyPairBefore(r,'alex','mira');let receipt=applySocialEvent(r.socialGraph,{type:'argue',actorId:'alex',targetId:'mira',at:r.minutes,token:'gc08-argue-'+i});recordBiographySocial(r,receipt,before);}assert.deepEqual(r.lifeBiography,old);});
+
+import {arrive} from '../src/simulation.js';
+import {furnitureActionApproach} from '../src/furniture-catalog.js';
+import {PAINT_ACTIVITY_ID} from '../src/painting.js';
+import {promoteCareer,careerPromotionRule} from '../src/career-progression.js';
+import {chooseCareerSpecialization,specializationReadiness} from '../src/career-specializations.js';
+test('GC08 real household painting completion, practice cannot create a work milestone',()=>{
+ const r=setup(),pose=findMarketPlacement(r.world.furniture,r.shop,'easel.starter');assert.ok(pose);
+ const b=buyMarketItem(r.world.furniture,r.shop,'easel.starter',pose);assert.ok(b.ok);r.world.furniture=b.world;r.shop=b.shop;assert.ok(enableArtMarketPilot(r));
+ function paint(mode){assert.ok(chooseResidentAction(r,'paint',false,'alex',b.instanceId,PAINT_ACTIVITY_ID,'painting.hills',null,null,null,false,false,mode,mode==='practice'?0:20));r.position=furnitureActionApproach(r.world,'paint',b.instanceId);arrive(r);for(let i=0;i<45;i++)tickHousehold(r,1);}
+ paint('practice');assert.equal(biographyRows(r,'alex').some(x=>x.key==='artwork'),false);paint('speculative');
+ assert.ok(r.createdWorks.at(-1));assert.equal(biographyRows(r,'alex').find(x=>x.key==='artwork').proof,r.createdWorks.at(-1).id);assert.deepEqual(loadHousehold(copy(r)).lifeBiography,r.lifeBiography);
+});
+test('GC08 actual promotion and specialization transitions, not legacy rank',()=>{
+ const r=setup();r.careerSystem=hireCareer(r.careerSystem,'alex','city-services',r.minutes);
+ assert.equal(promoteCareer(r,'alex').ok,false);assert.equal(r.lifeBiography,undefined);
+ const c=r.careerSystem.byResident.alex,rule=careerPromotionRule(c.careerId,c.level);
+ c.rankShifts=rule.shifts;c.workedShifts=rule.shifts;c.performance=100;
+ const promoted=promoteCareer(r,'alex');assert.ok(promoted.ok);assert.ok(biographyRows(r,'alex').some(x=>x.key==='promotion'));
+ c.level=4;const choice=specializationReadiness(r,'alex').tracks[0];
+ assert.ok(choice);assert.ok(chooseCareerSpecialization(r,'alex',choice.id).ok);
+ assert.ok(biographyRows(r,'alex').some(x=>x.key==='specialization'));
+ assert.equal(chooseCareerSpecialization(r,'alex',choice.id).ok,false);
+ assert.equal(biographyRows(r,'mira').length,0);
+});
