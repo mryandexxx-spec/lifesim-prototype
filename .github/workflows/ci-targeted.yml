@@ -35,6 +35,30 @@ jobs:
           name: gc-03-adaptive-sleep
           path: artifacts/gc-03-adaptive/
           if-no-files-found: warn
+  gc-03-actual-autonomy:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-03-adaptive-sleep' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          git fetch --no-tags --depth=1 origin 881c17e31ebaf30340bb1ea930cfd639b79a5924
+          node tests/gc-03-adaptive-compare.mjs
+        env:
+          GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+          GC_AUTONOMY_DIAGNOSTIC: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-03-actual-autonomy
+          path: artifacts/gc-03-autonomy/
+          if-no-files-found: warn
   gc-03-real-speed:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-03-adaptive-sleep' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/pf-15-speed.yml
