@@ -30,11 +30,12 @@ import {currentSkillLevel} from '../src/skills-engine.js';
 import {readingStage,readingRouteId,arriveReadingJourney} from '../src/reading-journey.js';
 const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 if(process.env.GC_EXPECTED_SHA)assert.equal(sha,process.env.GC_EXPECTED_SHA);
-const ids=['alex','mira'],days=30;
+const autonomyDiagnostic=process.env.GC_AUTONOMY_DIAGNOSTIC==='1';
+const ids=['alex','mira'],days=autonomyDiagnostic?7:30;
 const nightAware=process.env.GC_NIGHT_POLICY==='1';
 const MATERIAL=ART_MARKET_PILOT.materials;
 const dir='artifacts/gc-03-adaptive/property';mkdirSync(dir,{recursive:true});
-const report={sha,nightAware,model:'GC04/09 PROPERTY R2-FIX explicit premium sleep target; actual current bill, food, career, art and furniture transactions; optional extra premium bed; common endowed kitchen and purchased easel/bookcase setup; alternative tariffs are shadow accounting only, not behavioral feedback; modeled A* arrival; 1 minute ticks, 5 minute policy cadence, 30 minute admin, no real UI/traversal',policies:[],failures:[],controls:{},blocks:[{date:'2026-11-26',swap:false},{date:'2026-12-01',swap:true,heldOut:true}]};
+const report={sha,nightAware,autonomyDiagnostic,model:'GC04/09 PROPERTY R2-FIX explicit premium sleep target; actual current bill, food, career, art and furniture transactions; optional extra premium bed; common endowed kitchen and purchased easel/bookcase setup; alternative tariffs are shadow accounting only, not behavioral feedback; modeled A* arrival; 1 minute ticks, 5 minute policy cadence, 30 minute admin, no real UI/traversal',policies:[],failures:[],controls:{},blocks:[{date:'2026-11-26',swap:false},{date:'2026-12-01',swap:true,heldOut:true}]};
 const flush=()=>writeFileSync(dir+'/report.json',JSON.stringify(report,null,2)+'\n');
 function fixture(date){const base=newHousehold(date);base.calendar.anchorConfirmed=true;
 base.world.furniture.instances.push(
@@ -54,12 +55,15 @@ const shelf=base.world.furniture.instances.find(i=>i.prefabId==='bookcase'&&i.lo
 return {base,easel,shelf};}
 const urgent=[['bladder','toilet',50],['hunger','fridge',55],['energy','bed',45],['hygiene','shower',55],['fun','sofa',50]];
 const count=(map,key,n=1)=>map[key]=(map[key]||0)+n;
-const variants=[
+const variants=(autonomyDiagnostic?[
+ {name:'auto-career',policy:'core-autonomy',food:'snack',upgrade:false,career:true},
+ {name:'auto-free',policy:'core-autonomy',food:'snack',upgrade:false}
+]:[
  {name:'no-intervention',policy:'no-intervention',food:'snack',upgrade:false},
  ...['career','mixed','creative'].flatMap(policy=>[false,true].map(upgrade=>({
   name:policy+'-'+(upgrade?'premium-bed':'base'),policy,food:'home',upgrade,train:policy!=='creative',social:true,...(policy!=='career'?{cap:1}:{})
  })))
-].map(v=>({...v,market:true,dt:1,arrival:5}));
+]).map(v=>({...v,market:!autonomyDiagnostic,dt:1,arrival:5}));
 function upgradeHouse(base){
  const before=structuredClone(base);
  const opts={construction:base.world.construction,outdoors:base.world.outdoors,residents:ids.map(id=>getActor(base,id).position)};
@@ -99,7 +103,7 @@ function run(block,variant,replay=false){
  p.sleepEpisodes=[];p.criticalEnergyByPhase={};p.materialCost=0;p.marketOffers=[];p.orderEvents=[];p.declinedOffers=0;let root=structuredClone(base),lastWallet=root.shop.credits,seen=new Set(root.financialHistory.entries.map(e=>e.id)),socialGoal=null;p.socialCompletions=0;
  const automatic=policy==='core-autonomy';
  root.autonomy.enabled=automatic;root.otherSim.autonomy.enabled=automatic;
- const jobs=policy==='career'?{[lead]:'editorial',[partner]:'business-center'}:['mixed','single-career'].includes(policy)?{[lead]:'editorial'}:{};
+ const jobs=policy==='career'||variant.career?{[lead]:'editorial',[partner]:'business-center'}:['mixed','single-career'].includes(policy)?{[lead]:'editorial'}:{};
  const nextApplication={};
  const note=(kind,result)=>{if(result?.ok){count(p.actions,kind);p.decisions++;}else count(p.rejected,kind+':'+(result?.reason||'unknown'));return result?.ok;};
  const bedtimeEligible=a=>{
@@ -315,6 +319,24 @@ function run(block,variant,replay=false){
  flush();return p;
 }
 for(const block of report.blocks)for(const variant of variants)run(block,variant);
+if(autonomyDiagnostic){
+ const first=report.policies[0],again=run(report.blocks[0],variants[0],true);
+ try{
+  const {replay:ra,...a}=first,{replay:rb,...b}=again;
+  assert.deepEqual(a,b,'actual autonomy repeat diverged');
+  report.controls.replay='PASS';
+  assert.equal(report.policies.length,5);
+  for(const p of report.policies){
+   assert.equal(p.status,'PASS');assert.equal(p.daily.length,7);
+   assert.equal(p.travelFailures,0,'autonomy A* failure');
+   assert.ok(p.sleepEpisodes.some(e=>e.outcome==='full'),'sleep not exercised');
+   assert.equal(p.daily.at(-1).actors.reduce((n,x)=>n+(x.career?.missedShifts||0),0),0);
+   if(p.variant.career)assert.ok(p.daily.at(-1).actors.every(x=>x.career?.workedShifts>0),'work not exercised');
+  }
+ }catch(e){report.failures.push({control:e.stack||String(e)});}
+ flush();assert.deepEqual(report.failures,[],'actual autonomy diagnostic failure');
+ process.exit(0);
+}
 const cv=variants.find(v=>v.name==='mixed-premium-bed');
 const original=report.policies.find(p=>p.variant===cv&&p.block===report.blocks[0]);
 const replay=run(report.blocks[0],cv,true);
