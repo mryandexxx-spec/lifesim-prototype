@@ -641,7 +641,7 @@ function scheduleCommand(command,residentId=game.selectedSim){
     }
   }
   if(command.type==='object'||command.type==='activity'){
-    if(command.activityId===PAINT_ACTIVITY_ID&&game.artMarket){
+    if(game.artMarket&&command.type==='activity'&&command.activityId===PAINT_ACTIVITY_ID){
       const quote=artAdmissionQuote(game,residentId,command.paintMode,command.contentId);
       if(!quote.ok||quote.price!==command.paintExpectedPrice){
         toast(artReason(quote.reason||'stale-quote'));return false;
@@ -10869,8 +10869,8 @@ function boot() {
     clearTimeout(loadingWatchdog);
     if(loadingAborted||!loadingProgress.requiredReady())return;
     bootReadyToSave=true;
-    tryEnableArtMarket();
     if(saveStorageLocked)toast('Сейв не удалось загрузить — запись заблокирована для защиты данных');
+    else tryEnableArtMarket();
     if(calendarNeedsPersistence||billsNeedsPersistence)save(true);
     $('loading').hidden=true;
     let seen='done';
