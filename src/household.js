@@ -41,7 +41,7 @@ import {DEMO_PROFILES} from './trait-catalog.js';
 import {starterInventory,restoreInventory,sharedDuration,inventoryFor} from './gifts-leisure.js';
 import {voluntaryMoodEfficiency} from './mood-action-policy.js';
 import {NEED_DECAY_PER_MINUTE} from './need-balance.js';
-import {newActionQueues,restoreActionQueues,pendingActions} from './action-queue.js';
+import {newActionQueues,restoreActionQueues,pendingActions,blockedActions} from './action-queue.js';
 import {newOutdoorsWorld,restoreOutdoorsWorld} from './lot-surface.js';
 import {validateRestoredPoolSwim,advancePoolSwim,requestPoolExit,
   interruptPoolSwimForWork} from './pool-swim-runtime.js';
@@ -511,7 +511,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
 export function enableArtMarketPilot(root){
   if(Object.hasOwn(root,'artMarket'))return Boolean(restoreArtMarket(root.artMarket,root.minutes));
   if(HOUSEHOLD_IDS.some(id=>getActor(root,id)?.action?.id==='paint'||
-    pendingActions(root.actionQueues,id).some(c=>c.activityId===PAINT_ACTIVITY_ID||c.actionId==='paint')))return false;
+    [...pendingActions(root.actionQueues,id),...blockedActions(root.actionQueues,id)].some(c=>c.activityId===PAINT_ACTIVITY_ID||c.actionId==='paint')))return false;
   const market=newArtMarket(root.minutes);if(!market)return false;
   root.artMarket=market;return true;
 }

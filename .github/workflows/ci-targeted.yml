@@ -481,6 +481,16 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/ci-target-http.log 2>&1 &
           sleep 3
           node tests/ci-browser-boot.mjs
+      - name: GC-04/09 art market UI touch and v1 persistence
+        if: ${{ contains(github.event.pull_request.title, 'GC-04/09') }}
+        run: node tests/gc-04-09-art-market-browser.mjs
+      - name: Archive GC-04/09 art market UI evidence
+        if: ${{ always() && contains(github.event.pull_request.title, 'GC-04/09') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gc-04-09-art-market-ui
+          path: artifacts/gc-04-09-ui/
+          if-no-files-found: warn
       - name: QSK-05 real original rig movement in 390x844 and 320x568 PlayCanvas
         if: ${{ contains(github.event.pull_request.title, 'QSK-05') }}
         run: node tests/qsk-05-browser-contacts.mjs

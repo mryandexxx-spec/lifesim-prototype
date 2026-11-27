@@ -101,6 +101,7 @@ import {dirtyDishVisualPlan,DISH_VISUAL_CAP} from './dirty-dishes-visual.js';
 import {easelPaintingPose,studioArtworkPose} from './painting-visual.js';
 import {PAINT_WALL_SLOTS,availablePaintingWallSlots,artworkDisplayPose,
   paintingResaleCredits,transactPainting} from './painting-gallery.js';
+import {ART_MARKET_PILOT,artAdmissionQuote,quoteArtSale,projectArtSale} from './art-market.js';
 import {readingStage,readingIsSeated,readingHasBook,readingRouteId,arriveReadingJourney} from './reading-journey.js';
 import {getActivityDefinition} from './activity-registry.js';
 import {getSkillDefinition} from './skill-registry.js';
@@ -199,7 +200,7 @@ import { HOUSEHOLD_IDS, RESIDENT_NAMES, newHousehold, loadHousehold, getActor, g
   residentAutonomousChoice,residentGardenOpportunity,recordResidentGardenStart,
   residentPoolOpportunity,recordResidentPoolStart,
   bedDestinationFor,preemptAutomaticForManual,
-  nearestAvailableDiningTable } from './household.js';
+  nearestAvailableDiningTable, enableArtMarketPilot, reconcileArtMarket } from './household.js';
 
 // A fully code-authored room: no PlayCanvas Editor or 3D asset pipeline required.
 const $ = id => document.getElementById(id);
@@ -488,6 +489,24 @@ function save(silent = false) {
   saveFailureNotified=true;
   return false;
 }
+// GC-04/09: do not retrofit charges onto already queued or unfinished legacy art.
+function tryEnableArtMarket(){
+  if(game.artMarket)return true;
+  if(!canWriteGameSave()||!enableArtMarketPilot(game))return false;
+  if(!save(true)){delete game.artMarket;return false;}
+  return true;
+}
+const ART_REASON={
+ 'active-painting':'Сначала закончите текущую картину',
+ 'order-unavailable':'Заказ сейчас недоступен',
+ 'collection-full':'Коллекция заполнена — доступна бесплатная практика',
+ 'insufficient-credits':'Недостаточно средств на материалы',
+ 'no-demand':'Покупателей пока нет',
+ 'wallet-limit':'Кошелёк заполнен',
+ 'stale-quote':'Цена изменилась — проверьте предложение',
+ 'invalid-market':'Рынок пока недоступен'
+};
+const artReason=reason=>ART_REASON[reason]||'Условия изменились — выберите действие заново';
 // FOOD-R1: both checkout channels share one snapshot commit. Failed storage
 // restores all three parts, so no meal or debit can survive alone.
 let readyFoodPurchaseLocked=false;
@@ -622,6 +641,12 @@ function scheduleCommand(command,residentId=game.selectedSim){
     }
   }
   if(command.type==='object'||command.type==='activity'){
+    if(command.activityId===PAINT_ACTIVITY_ID&&game.artMarket){
+      const quote=artAdmissionQuote(game,residentId,command.paintMode,command.contentId);
+      if(!quote.ok||quote.price!==command.paintExpectedPrice){
+        toast(artReason(quote.reason||'stale-quote'));return false;
+      }
+    }
     const definition=command.type==='activity'
       ?getActivityDefinition(HOBBY_ACTIVITIES,command.activityId):null;
     const actionId=command.type==='activity'
@@ -839,7 +864,11 @@ for(const id of HOUSEHOLD_IDS)$('mind-view-'+id).addEventListener('click',()=>{
 function renderSkillsTab(force=false){
   if(mindTab!=='skills'||$('mind-panel').hidden)return;
   const actor=getActor(game,mindInspectResident),rows=skillProfileRows(actor.skills,HOBBY_SKILLS);
-  const key=JSON.stringify([mindInspectResident,rows,actor.action?.phase,game.socialAction?.phase,actor.createdWorks]);
+  const offers=game.artMarket?(actor.createdWorks||[]).map(work=>{
+    const q=quoteArtSale(game,mindInspectResident,work.id);
+    return q.ok?[q.kind,q.amount]:q.reason;
+  }):null;
+  const key=JSON.stringify([mindInspectResident,rows,actor.action?.phase,game.socialAction?.phase,actor.createdWorks,offers]);
   if(!force&&skillProfileKey===key)return;
   skillProfileKey=key;
   const list=$('mind-skills-list');list.replaceChildren();
@@ -897,10 +926,25 @@ function renderSkillsTab(force=false){
     item.append(name);
     if(mindInspectResident!==game.selectedSim){portfolio.append(item);continue;}
     const actions=document.createElement('div');actions.className='skill-work-actions';
-    const command=(label,operation,slot=null)=>{
+    const command=(label,operation,slot=null,offer=null)=>{
       const button=document.createElement('button');
       button.type='button';button.textContent=label;
       button.addEventListener('click',()=>{
+        if(operation==='sell'&&game.artMarket){
+          const owner=game.selectedSim;
+          if(owner!==work.ownerId||!offer?.ok)return;
+          if(!window.confirm((offer.kind==='commission'?'Выполнить заказ за ':'Продать картину за ')+
+            offer.amount+' кр.?'+(offer.belowMaterialCost?' Цена ниже стоимости материалов.':'')))return;
+          const tx=projectArtSale(game,owner,work.id,offer);
+          if(!tx.ok){toast(artReason(tx.reason));renderSkillsTab(true);return;}
+          const a=getActor(game,owner),old={shop:game.shop,financialHistory:game.financialHistory,artMarket:game.artMarket,works:a.createdWorks};
+          game.shop=tx.shop;game.financialHistory=tx.financialHistory;game.artMarket=tx.artMarket;a.createdWorks=tx.works;
+          if(!save(true)){
+            game.shop=old.shop;game.financialHistory=old.financialHistory;game.artMarket=old.artMarket;a.createdWorks=old.works;
+            renderSkillsTab(true);return;
+          }
+          updateFamilyBalance();renderSkillsTab(true);toast('Картина продана · +'+tx.amount+' кр.');return;
+        }
         if(operation==='sell'&&!window.confirm('Продать картину за '+
           paintingResaleCredits(work)+' пробных кредитов?'))return;
         const result=transactPainting(game,game.selectedSim,work.id,operation,slot===null
@@ -935,12 +979,17 @@ function renderSkillsTab(force=false){
       if(free.length){actions.append(slots);command('Повесить','hang',slots);}
       else{const note=document.createElement('small');note.textContent='Свободных мест нет';
         actions.append(note);}
-      command('Продать · +'+paintingResaleCredits(work),'sell');
+      if(game.artMarket){
+        const q=quoteArtSale(game,game.selectedSim,work.id);
+        const button=command(q.ok?(q.kind==='commission'?'Сдать заказ':'Продать')+' · +'+q.amount+' кр.':artReason(q.reason),'sell',null,q);
+        button.disabled=!q.ok;
+      }else command('Продать · +'+paintingResaleCredits(work),'sell');
     }
     item.append(actions);portfolio.append(item);
   }
 }
 function setMindTab(tab){
+  if(tab==='skills')tryEnableArtMarket();
   mindTab=tab==='skills'?'skills':'overview';
   for(const name of ['overview','skills']){
     const chosen=mindTab===name,b=$('mind-tab-'+name);
@@ -1111,7 +1160,9 @@ function select(id,instanceId=null) {
   $('music-style-field').hidden=id!=='music';
   $('reading-content-field').hidden=id!=='hobby';
   $('painting-theme-field').hidden=id!=='paint';
+  $('painting-mode-field').hidden=id!=='paint';
   if(id==='paint'){
+    tryEnableArtMarket();
     const menu=$('painting-theme-select');menu.replaceChildren();
     for(const contentId of PAINT_CONTENT_IDS){
       const theme=PAINT_SUBJECTS[contentId],allowed=canPaintContent(
@@ -1123,6 +1174,7 @@ function select(id,instanceId=null) {
       menu.append(option);
     }
     menu.value=PAINT_CONTENT_IDS[0];
+    $('painting-mode-select').value='practice';
   }
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
@@ -1137,6 +1189,7 @@ function select(id,instanceId=null) {
   $('action-button').innerHTML=id==='wash'
     ?'Помыть до '+Math.min(3,game.kitchen?.dirtyDishes||0)+' тарелок <span>↗</span>'
     :`${lampLabel} <span>↗</span>`;
+  if(id==='paint')renderArtMode();
   if(id==='fridge')renderFridgeR2();
 }
 $('dish-alert').addEventListener('click',()=>{
@@ -1296,12 +1349,35 @@ $('tv-talk-button').addEventListener('click',()=>{
     ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}))
     select(null);
 });
+function renderArtMode(){
+  if(selected!=='paint')return;
+  const menu=$('painting-mode-select'),theme=$('painting-theme-select');
+  menu.hidden=!game.artMarket;
+  if(!game.artMarket){
+    $('painting-mode-note').textContent='Рынок включится после завершения или удаления прежних заданий живописи.';
+    return;
+  }
+  const mode=menu.value;
+  if(mode==='commission')theme.value=PAINT_CONTENT_IDS[0];
+  theme.disabled=mode==='commission';
+  const q=artAdmissionQuote(game,game.selectedSim,mode,theme.value);
+  $('painting-mode-note').textContent=q.ok?(mode==='practice'?'Без расходов · навык и досуг, без товара':
+    mode==='commission'?'Материалы '+q.price+' кр. · заказ на выбранную тему · выплата после сдачи':
+    'Материалы '+q.price+' кр. · цена продажи зависит от спроса') :artReason(q.reason);
+  $('action-button').disabled=!q.ok;
+  $('action-button').textContent=mode==='practice'?'Практиковаться':mode==='commission'?'Взять заказ':'Написать картину';
+}
+$('painting-mode-select').addEventListener('change',renderArtMode);
+$('painting-theme-select').addEventListener('change',renderArtMode);
 $('action-button').addEventListener('click', () => {
   if (!selected) return;
   if(selected==='paint'&&!canPaintContent(selectedActor().skills,HOBBY_SKILLS,
     $('painting-theme-select').value)){
     toast('Тема картины ещё не открыта · практикуй живопись');return;
   }
+  const artMode=selected==='paint'&&game.artMarket?$('painting-mode-select').value:null;
+  const artQuote=artMode?artAdmissionQuote(game,game.selectedSim,artMode,$('painting-theme-select').value):null;
+  if(artQuote&&!artQuote.ok){toast(artReason(artQuote.reason));renderArtMode();return;}
   const command=selected==='hobby'
     ?{type:'activity',activityId:READING_ACTIVITY_ID,
       contentId:canReadHobbyContent(selectedActor().skills,$('reading-content-select').value)
@@ -1316,6 +1392,7 @@ $('action-button').addEventListener('click', () => {
         ?{type:'activity',activityId:PAINT_ACTIVITY_ID,
           contentId:PAINT_CONTENT_IDS.includes($('painting-theme-select').value)
             ?$('painting-theme-select').value:PAINT_CONTENT_IDS[0],
+          ...(artQuote?{paintMode:artMode,paintExpectedPrice:artQuote.price}:{}),
           ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}
       :selected==='cook'
         ?{type:'object',actionId:'cook',recipeId:$('cooking-recipe-select').value,
@@ -2690,6 +2767,7 @@ $('reset-btn').addEventListener('click', () => {
   const fresh=newHousehold();
   setHouseholdAutonomy(fresh,enabled);
   game=fresh;hudResidentId='alex';
+  enableArtMarketPilot(game);
   if(!save(true)){
     game=previous;
     toast('Новая игра не начата: сохранение недоступно');
@@ -4792,7 +4870,7 @@ function boot() {
   }
   beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null,
     activityId=null,contentId=null,inventoryItemId=null,recipeId=null,mirrorPractice=false,
-    tvTalk=false)=>{
+    tvTalk=false,paintMode=null,paintExpectedPrice=null)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
@@ -4824,7 +4902,7 @@ function boot() {
       return false;
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
-      activityId,contentId,musicPlan,inventoryItemId,recipeId,mirrorPractice,tvTalk);
+      activityId,contentId,musicPlan,inventoryItemId,recipeId,mirrorPractice,tvTalk,paintMode,paintExpectedPrice);
     if(started&&fanIntent)recordSportsAutoStart(game,actorId,fanIntent.matchId,
       actor.action?.targetInstanceId);
     if(started)restartAutonomyWait(actorId);
@@ -5145,6 +5223,11 @@ function boot() {
       // This callback runs only for a startable HEAD, never on enqueue or on
       // an action already walking/using. Partner's consent stays separate.
       beforeStart(residentId,command){
+        if(command.activityId===PAINT_ACTIVITY_ID&&game.artMarket){
+          reconcileArtMarket(game);
+          const q=artAdmissionQuote(game,residentId,command.paintMode,command.contentId);
+          if(!q.ok||q.price!==command.paintExpectedPrice)return artReason(q.reason||'stale-quote');
+        }
         const policy=moodActionPolicy(getActor(game,residentId),command);
         return policy.willing?null:policy.reason;
       },
@@ -5170,7 +5253,8 @@ function boot() {
           const actionId=activity?.requiredCapabilities.includes('music.playback')?'music':
             activity?.requiredCapabilities.includes('art.paint')?'paint':'hobby';
           started=beginAction(actionId,false,residentId,true,command.targetInstanceId,
-            command.activityId,command.contentId,command.inventoryItemId||null);
+            command.activityId,command.contentId,command.inventoryItemId||null,null,false,false,
+            command.paintMode??null,command.paintExpectedPrice??null);
         }
         else if(command.type==='outdoor')
           started=beginOutdoorBench(residentId,command.instanceId,true);
@@ -10785,6 +10869,7 @@ function boot() {
     clearTimeout(loadingWatchdog);
     if(loadingAborted||!loadingProgress.requiredReady())return;
     bootReadyToSave=true;
+    tryEnableArtMarket();
     if(saveStorageLocked)toast('Сейв не удалось загрузить — запись заблокирована для защиты данных');
     if(calendarNeedsPersistence||billsNeedsPersistence)save(true);
     $('loading').hidden=true;
