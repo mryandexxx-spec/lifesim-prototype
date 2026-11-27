@@ -52,9 +52,34 @@ export function isWalkable(x,z,layout=null){
   return canWalk(x,z,obstaclesFor(layout));
 }
 
-/** Conservative segment test; the walkable character never cuts through inflated furniture. */
+// Exact segment/AABB clipping for the same closed, radius-inflated rectangles
+// used by isWalkable. A uniform point sample can miss a short corner crossing,
+// so a route accepted at full length can otherwise fail at its movement prefix.
+function segmentHitsObstacle(from,to,rect){
+  const minX=rect.minX-ACTOR_RADIUS,maxX=rect.maxX+ACTOR_RADIUS;
+  const minZ=rect.minZ-ACTOR_RADIUS,maxZ=rect.maxZ+ACTOR_RADIUS;
+  if(Math.max(from.x,to.x)<minX||Math.min(from.x,to.x)>maxX||
+    Math.max(from.z,to.z)<minZ||Math.min(from.z,to.z)>maxZ)return false;
+  let enter=0,exit=1;
+  for(const [a,b,min,max] of [[from.x,to.x,minX,maxX],[from.z,to.z,minZ,maxZ]]){
+    const delta=b-a;
+    if(delta===0){if(a<min||a>max)return false;continue;}
+    const t0=(min-a)/delta,t1=(max-a)/delta;
+    enter=Math.max(enter,Math.min(t0,t1));
+    exit=Math.min(exit,Math.max(t0,t1));
+    if(enter>exit)return false;
+  }
+  return true;
+}
+
+/** Conservative segment test; rectangular obstacles use continuous clipping.
+ * Existing point checks remain for construction, pool and surface geometry.
+ */
 export function isClearLine(from,to,layout=null){
   if (!isWalkable(from.x, from.z,layout) || !isWalkable(to.x, to.z,layout)) return false;
+  if(obstaclesFor(layout).some(rect=>segmentHitsObstacle(from,to,rect)))return false;
+  if(layout?.outdoors?.schema===OUTDOORS_SCHEMA&&layout?.construction?.schema===1&&
+    outdoorFeatureObstacles(layout).some(rect=>segmentHitsObstacle(from,to,rect)))return false;
   const dist = Math.hypot(to.x-from.x, to.z-from.z);
   const samples = Math.max(1, Math.ceil(dist / 0.075));
   for (let s = 1; s < samples; s++) {
@@ -171,6 +196,7 @@ export function findPath(from,to,layout=null){
       const next=indexOf(x,z);
       if(!gridWalkable[next]||closed[next]) continue;
       if(dx && dz && (!gridWalkable[indexOf(cx+dx,cz)] || !gridWalkable[indexOf(cx,cz+dz)])) continue;
+      if(!isClearLine(node(current),node(next),layout))continue;
       const cost=Math.hypot(dx,dz)*STEP;
       if(scores[current]+cost < scores[next]){
         scores[next]=scores[current]+cost;back[next]=current;
