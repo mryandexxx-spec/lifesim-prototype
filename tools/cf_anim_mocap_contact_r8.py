@@ -199,7 +199,36 @@ report["externalContactM"]=.02
 from cf_anim_mocap_contact_phase import phase_hypotheses
 src=phase_hypotheses(F,B,arm,bones,rest,t,skin,meshes,regs,bases,roles,names,floor,dt,loop,stride)
 report["phaseEvidence"]=src
-assert r6["phaseEvidence"]==src, "same inputs must produce same phase hypotheses"
+save()
+# Independent Blender processes may differ at floating point precision.
+# Require exact discrete evidence (patch IDs, flags, intervals and status)
+# and strictly bounded numeric replay; never permit a changed phase plan.
+def compare_phase(a,b,path="phase"):
+    if isinstance(a,dict):
+        assert isinstance(b,dict) and a.keys()==b.keys(),path
+        for k in a:compare_phase(a[k],b[k],path+"."+k)
+    elif isinstance(a,list):
+        assert isinstance(b,list) and len(a)==len(b),path
+        for i,(x,y) in enumerate(zip(a,b)):compare_phase(x,y,path+"["+str(i)+"]")
+    elif isinstance(a,float):
+        assert isinstance(b,(float,int)) and not isinstance(b,bool) and math.isfinite(a) and math.isfinite(b),path
+        # 2 micrometres in position; 0.0002 m/s in finite differences.
+        # These are replay tolerances only, not contact acceptance limits.
+        tol=2e-4 if ".patchSpeedMps" in path else 2e-6 if any(k in path for k in (".centroidM",".heightResidualM",".wholeSkinFloorMinM")) else 0.
+        err=abs(a-b)
+        bucket="speedMps" if ".patchSpeedMps" in path else "positionM" if tol else "other"
+        phase_diff[bucket]=max(phase_diff[bucket],err)
+        assert err<=tol,(path,a,b,err,tol)
+    else:
+        assert type(a)==type(b) and a==b,(path,a,b)
+phase_diff={"positionM":0.,"speedMps":0.,"other":0.}
+try:
+    compare_phase(r6["phaseEvidence"],src)
+except AssertionError as ex:
+    report["phaseReplay"]={"status":"HOLD","maxDifferences":phase_diff,"mismatch":str(ex)}
+    report["status"]="PHASE_REPLAY_HOLD";report["failures"]=["PHASE_REPLAY"];save()
+    raise
+report["phaseReplay"]={"status":"PASS","maxDifferences":phase_diff,"discreteEvidenceExact":True}
 save()
 if src["status"]!="PHASE_INPUT_PASS":
     report["status"]="PHASE_INPUT_HOLD";report["failures"]=src["failures"];save()
