@@ -12,7 +12,7 @@ const root=process.cwd(),out=resolve(career?'artifacts/gc-05-career-pacing':'art
 mkdirSync(out,{recursive:true});
 const base='2d1d93a3a9352b2796747fa925f336ef0f405e2b',sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 if(process.env.GC_EXPECTED_SHA)assert.equal(sha,process.env.GC_EXPECTED_SHA);
-assert.equal(SKILL_XP_RATE,.5);
+assert.equal(SKILL_XP_RATE,.75);
 const files=['src/skills-engine.js','src/household.js','src/resident-activity-runtime.js','src/garden-skill.js'];
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const arms={},failures=[];

@@ -4,7 +4,7 @@ import {getActivityDefinition} from './activity-registry.js';
 import {restoreActivitySession} from './activity-session.js';
 export const SKILL_PROGRESS_SCHEMA=1;
 /** Prospective practice only. Saved XP, thresholds and career rules are unchanged. */
-export const SKILL_XP_RATE=0.5;
+export const SKILL_XP_RATE=0.75;
 export const scaleSkillXP=raw=>raw*SKILL_XP_RATE;
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const round=v=>Math.round(v*1000000)/1000000;

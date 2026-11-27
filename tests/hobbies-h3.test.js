@@ -65,15 +65,15 @@ test('H3 shared books give personal literature XP only for physical reading time
   assert.equal(root.skills.xpById[READING_SKILL_ID]||0,0);
   arrivePair(root,plan);
   tickHousehold(root,7);
-  assert.equal(root.skills.xpById[READING_SKILL_ID],3.5);
-  assert.equal(root.otherSim.skills.xpById[READING_SKILL_ID],3.5);
+  assert.equal(root.skills.xpById[READING_SKILL_ID],5.25);
+  assert.equal(root.otherSim.skills.xpById[READING_SKILL_ID],5.25);
   const loaded=loadHousehold(copy(root));
   assert.equal(loaded.socialAction.shared.creditedMinutes,7);
   tickHousehold(loaded,3);
-  assert.equal(loaded.skills.xpById[READING_SKILL_ID],5);
+  assert.equal(loaded.skills.xpById[READING_SKILL_ID],7.5);
   cancelSocial(loaded);
   tickHousehold(loaded,20);
-  assert.equal(loaded.skills.xpById[READING_SKILL_ID],5);
+  assert.equal(loaded.skills.xpById[READING_SKILL_ID],7.5);
 });
 test('H3 removed station cancels active leisure and cannot create social receipt',()=>{
   const root=newHousehold(),id=buy(root,'music.starter'),plan=pair(root,'music',id);

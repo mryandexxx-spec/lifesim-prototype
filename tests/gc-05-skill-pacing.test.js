@@ -5,8 +5,8 @@ import {SKILL_XP_RATE,scaleSkillXP,restoreSkillProgress,currentSkillLevel} from 
 import {skillUnlocksAtLevel} from '../src/skill-registry.js';
 import {newHousehold,loadHousehold} from '../src/household.js';
 test('GC05 prospective rate is uniform; legacy levels and unlocks survive reload',()=>{
- assert.equal(SKILL_XP_RATE,.5);
- for(const amount of [1,1.05,1.2,10,12,18,25,36,45])assert.equal(scaleSkillXP(amount),amount*.5);
+ assert.equal(SKILL_XP_RATE,.75);
+ for(const amount of [1,1.05,1.2,10,12,18,25,36,45])assert.equal(scaleSkillXP(amount),amount*.75);
  const root=newHousehold();
  for(const actor of [root,root.otherSim]){
   for(const [id,def] of Object.entries(HOBBY_SKILLS.skills)) actor.skills.xpById[id]=def.xpThresholds[4]+.125;
