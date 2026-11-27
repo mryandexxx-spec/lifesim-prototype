@@ -35,12 +35,12 @@ for(const n of [1,2,3,4]){
     }
   });
 }
-test('walking to bed, mixed state and remote extra cannot trigger false acceleration',()=>{
+test('walking to bed blocks acceleration; mixed sleep/work and remote extra handled correctly',()=>{
   const {root,actors,controller:c}=fixture(3);
   actors[0].action=bed();actors[1].action=bed();actors[2].action={id:'bed',phase:'walking'};
   assert.equal(c.read(root),1);
   root.careerSystem.byResident.resident_3={currentShift:{phase:'working'}};
-  assert.equal(c.read(root),1);
+  assert.equal(householdIdleEpisode(root),'mixed');assert.equal(c.read(root),3);
   root.population.linksByResident.resident_3.dwellingId='elsewhere';
   assert.equal(c.read(root),3);
 });
@@ -54,13 +54,13 @@ test('manual toggle overrides this episode only; new episode restores auto',()=>
   const restored=JSON.parse(JSON.stringify(root));
   assert.equal(createHouseholdSpeedController().read(restored),3);
 });
-test('pause, modal and unresolved work choice suspend automatic boost',()=>{
+test('pause and mandatory modal suspend boost; optional work incident does not stall whole shift',()=>{
   const {root,ids,controller:c}=fixture();
   ids.forEach(id=>root.careerSystem.byResident[id]={currentShift:{phase:'working'}});
   assert.equal(c.read(root),3);root.paused=true;assert.equal(c.read(root),1);
   root.paused=false;assert.equal(c.read(root,{blocked:true}),1);
   root.careerSystem.byResident.alex.currentShift.incident={choiceId:null};
-  assert.equal(c.read(root),1);
+  assert.equal(c.read(root),3);
   root.careerSystem.byResident.alex.currentShift.incident.choiceId='done';
   assert.equal(c.read(root),3);
 });
@@ -101,4 +101,24 @@ test('actual staggered shifts: first salary settles once and speed falls before 
   assert.equal(c.read(root),1);assert.equal(root.careerSystem.settlementIds.length,1);
   const restored=loadHousehold(JSON.parse(JSON.stringify(root)));
   tickHousehold(restored,.30);assert.equal(restored.careerSystem.settlementIds.length,1);
+});
+
+test('LIFE-QOL: sleeping resident with future pending shift counts as asleep',()=>{
+ const {root,actors,controller:c}=fixture();
+ actors[0].action=bed();root.careerSystem.byResident.alex={currentShift:{phase:'pending'}};
+ root.careerSystem.byResident.mira={currentShift:{phase:'working'}};
+ assert.equal(householdIdleEpisode(root),'mixed');assert.equal(c.read(root),3);
+ actors[0].action=null;assert.equal(c.read(root),1);
+});
+test('LIFE-QOL: optional incident does not prevent actual overlapping shifts from accelerating',()=>{
+ const root=newHousehold('2026-11-16'),c=createHouseholdSpeedController();
+ root.careerSystem=hireCareer(root.careerSystem,'alex','city-services',400);
+ root.careerSystem=hireCareer(root.careerSystem,'mira','editorial',400);
+ for(const [id,start] of [['alex',480],['mira',540]]){
+   root.minutes=start;root.otherSim.minutes=start;
+   progressCareerWork(root,start-1,start);assert.ok(arriveCareerPortal(root,id,start));
+ }
+ root.careerSystem.byResident.alex.currentShift.incident={choiceId:null};
+ assert.equal(c.read(root),3);assert.equal(c.read(root,{blocked:true}),1);
+ assert.equal(c.toggle(root),1);assert.equal(c.read(root),1);
 });
