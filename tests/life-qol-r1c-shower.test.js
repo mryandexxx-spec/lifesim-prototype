@@ -53,7 +53,7 @@ test('LIFE-QOL queue flag is type-safe and survives v1 save',()=>{
  let root=newHousehold();assert.ok(enqueueAction(root.actionQueues,'alex',{type:'object',actionId:'shower',showerSinging:true}));
  root=loadHousehold(structuredClone(root));let task=pendingActions(root.actionQueues,'alex')[0];
  assert.equal(task.showerSinging,true);assert.equal(labelQueuedTask(root,task),'Петь в душе');
- assert.equal(enqueueAction(root.actionQueues,'mira',{type:'object',actionId:'bed',showerSinging:true}),false);
+ assert.equal(enqueueAction(root.actionQueues,'mira',{type:'object',actionId:'bed',showerSinging:true}),null);
 });
 test('LIFE-QOL sound is gated to private active wash and changes with skill',()=>{
  const root=seed('alex');assert.equal(audibleMusicStyle([root]),null);
