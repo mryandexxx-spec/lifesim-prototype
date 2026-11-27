@@ -56,11 +56,18 @@ cuts=acquire("Frame_Cuts.csv",2_000_000)
 dialect=csv.Sniffer().sniff(cuts.decode("utf-8-sig")[:8192],delimiters=",;\t")
 rows=list(csv.reader(io.StringIO(cuts.decode("utf-8-sig")),dialect))
 R["cutHeader"]=rows[:3];save()
-matched=[r for r in rows if any(x.strip().lower().removesuffix(".bvh")=="neutral_tr1" for x in r)]
-assert len(matched)==1,("missing/ambiguous metadata",matched)
-row=matched[0]; nums=[int(x.strip()) for x in row if re.fullmatch(r"\d+",x.strip())]
-assert len(nums)==2,("unexpected metadata",row)
-a,b=nums;assert 0<=a<b<=len(full[2]) and b-a>120,(row,len(full[2]))
+header=rows[0]
+assert len(set(header))==len(header) and all(k in header for k in ("STYLE_NAME","TR1_START","TR1_STOP"))
+matched=[r for r in rows[1:] if len(r)==len(header) and r[header.index("STYLE_NAME")].strip()=="Neutral"]
+assert len(matched)==1,("missing/ambiguous Neutral row",matched)
+row=matched[0]
+a,b=(int(row[header.index(k)]) for k in ("TR1_START","TR1_STOP"))
+assert 0<=a<b<=len(full[2]) and b-a>120,(row,len(full[2]))
+assert hashlib.sha256(fw_raw).hexdigest()=="11e5f654daae97e3cc80432a7a89965749337b32571cad6ad71a1d1e6e8ff746"
+assert hashlib.sha256(cuts).hexdigest()=="e3c1d2beab6486e083622cef6a5402fe9b20edc75a9963ea30675c67ec29ee82"
+for key in ("Neutral_TR1.bvh","Frame_Cuts.csv"):R["sources"][key]["pin"]="exact verified first-acquisition digest"
+(O/"Neutral_TR1.bvh").write_bytes(fw_raw)
+(O/"Frame_Cuts.csv").write_bytes(cuts)
 lo,hi=a+1,b-1
 fw=(full[0],full[1],full[2][lo:hi],full[3][lo:hi])
 R.update(trim={"authorRow":row,"fullFrames":len(full[2]),"originalFirst":lo,"originalLast":hi-1,"policy":"conservative interior margin"});save()
@@ -103,7 +110,13 @@ speed=np.linalg.norm(np.gradient(xyz[:,root][:,[0,2]],dt,axis=0),axis=-1)
 window=round(SEARCH["windowS"]/dt)
 smooth=uniform_filter1d(speed,size=window,mode="nearest")
 still=smooth<=SEARCH["stationarySpeedMps"]
-moving=(smooth>=SEARCH["steadyWalkMinMps"])&(smooth<=SEARCH["steadyWalkMaxMps"])
+# Resolve heading sign against the known accepted forward walk, not TR1 candidates.
+control_forward=float(np.median(np.einsum("fi,fi->f",np.gradient(walk[2][:,root],dt,axis=0),W["heading"])))
+assert abs(control_forward)>.3,("control heading ambiguous",control_forward)
+heading_sign=1 if control_forward>0 else -1
+forward=(heading_sign*np.einsum("fi,fi->f",np.gradient(xyz[:,root],dt,axis=0),F["heading"])>=.6)
+moving=(smooth>=SEARCH["steadyWalkMinMps"])&(smooth<=SEARCH["steadyWalkMaxMps"])&forward
+R["controlForwardMps"]=control_forward;R["headingSign"]=heading_sign;save()
 def sustained(mask,i,direction):
     a,b=(i-window+1,i+1) if direction<0 else (i,i+window)
     return a>=0 and b<=len(mask) and bool(mask[a:b].all())
@@ -194,7 +207,7 @@ def runs(mask):
 stationary=[(int(a),int(b-1)) for a,b in runs(still) if b-a>=window]
 trip_rows=[]; cycle_rows=[]; ncycle=0
 # Signed direction: reject backward and sideways locomotion.
-forward=(np.einsum("fi,fi->f",np.gradient(xyz[:,root],dt,axis=0),F["heading"])>=.6)
+assert len(forward)==len(xyz)
 for (sa,a),(b,sb) in zip(stationary,stationary[1:]):
     if not (.5<= (b-a)*dt<=12):continue
     ids=np.arange(a,b+1)
@@ -203,7 +216,7 @@ for (sa,a),(b,sb) in zip(stationary,stationary[1:]):
     bouts=[(max(a,int(c)),min(b+1,int(d))) for c,d in runs(moving_forward) if c<=b and d>a]
     bouts=[(c,d) for c,d in bouts if d-c>=window]
     if not bouts:continue
-    delta=xyz[b,root]-xyz[a,root];travel=float(delta@F["heading"][a])
+    delta=xyz[b,root]-xyz[a,root];travel=float(delta@F["heading"][a])*heading_sign
     if travel<.3:continue
     trip={"a":a,"b":b,"originalA":lo+a,"originalB":lo+b,"distanceM":travel,"steadyBouts":bouts,"startStill":[sa,a],"endStill":[b,sb]}
     # Same native boundary method as previous cycle audit, with yaw not normalized
