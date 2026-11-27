@@ -1025,6 +1025,7 @@ function setMindTab(tab){
     b.setAttribute('aria-selected',String(chosen));b.tabIndex=chosen?0:-1;
     $(name==='overview'?'mind-overview':'mind-'+name+'-tab').hidden=!chosen;
   }
+  if(mindTab==='biography')$('mind-panel').scrollTop=0;
   renderSkillsTab(true);
   renderBiography($('mind-biography-tab'),game,mindInspectResident);
 }
@@ -2431,6 +2432,15 @@ const extraAspirationCards=document.createElement('div');extraAspirationCards.id
 const extraBiography=document.createElement('details');extraBiography.className='gc-task-details';
 const extraBiographySummary=document.createElement('summary');extraBiographySummary.textContent='Биография';
 const extraBiographyBody=document.createElement('div');extraBiographyBody.id='extra-biography';extraBiography.append(extraBiographySummary,extraBiographyBody);
+extraBiography.addEventListener('toggle',()=>{
+ if(!extraBiography.open)return;
+ requestAnimationFrame(()=>{
+  if(!extraBiography.open||casDetails.hidden)return;
+  const panel=casDetails.getBoundingClientRect(),section=extraBiography.getBoundingClientRect();
+  const delta=section.height+16<=panel.height?Math.max(0,section.bottom-panel.bottom+9):section.top-panel.top-9;
+  casDetails.scrollTop+=delta;
+ });
+});
 const extraTaskDetails=document.createElement('details');extraTaskDetails.className='gc-task-details';
 const extraTaskSummary=document.createElement('summary');extraTaskSummary.textContent='Задания · сегодня и неделя';
 const extraTaskCards=document.createElement('div');extraTaskCards.id='extra-recurring-cards';
@@ -2448,7 +2458,10 @@ let lastCasDetailsKey='';
 function alignCasDetails(){
  const shell=document.querySelector('.app-shell').getBoundingClientRect();
  const hud=$('dashboard').getBoundingClientRect();
- casDetails.style.bottom=Math.max(8,Math.ceil(shell.bottom-hud.top+8))+'px';
+ const bottom=Math.max(8,Math.ceil(shell.bottom-hud.top+8))+'px';
+ casDetails.style.bottom=bottom;
+ const host=document.querySelector('.app-shell');
+ if(host.style.getPropertyValue('--resident-panel-bottom')!==bottom)host.style.setProperty('--resident-panel-bottom',bottom);
 }
 window.addEventListener('resize',alignCasDetails);
 function appendAddressedTopicPicker(host,id,peers,existingPeer=null){

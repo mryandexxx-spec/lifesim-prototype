@@ -2886,3 +2886,30 @@ button.time-card:active {transform:translateY(1px);}
 .gc-biography-list li::before{content:'';position:absolute;left:-18px;top:15px;width:9px;height:9px;background:#43866a;border-radius:50%;border:2px solid #fff}
 .gc-biography-list time,.gc-biography-list span{font-size:12px;line-height:1.3;color:#526b60}
 .gc-biography-list strong{font-size:14px;line-height:1.3}
+
+/* GC-08 visual acceptance: anchor the biography above the real HUD, keep
+ * identity and close controls visible, and scroll only the timeline. */
+#mind-panel:has(#mind-biography-tab:not([hidden])){
+ bottom:var(--resident-panel-bottom,175px);
+ max-height:min(67dvh,570px,calc(100dvh - var(--resident-panel-bottom,175px) - env(safe-area-inset-top) - 62px));
+ display:flex;flex-direction:column;overflow:hidden;
+}
+#mind-panel[hidden]{display:none!important}
+#mind-panel:has(#mind-biography-tab:not([hidden])) > :not([hidden]){flex-shrink:0}
+#mind-panel:has(#mind-biography-tab:not([hidden])) > #mind-biography-tab{
+ flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+}
+#cas-resident-details:has(details[open] > #extra-biography){
+ max-height:min(55dvh,calc(100dvh - var(--resident-panel-bottom,175px) - env(safe-area-inset-top) - 62px));
+}
+#cas-resident-details:has(details[open] > #extra-biography) > *{flex-shrink:0}
+.app-shell:has(#mind-panel:not([hidden]) #mind-biography-tab:not([hidden]),#cas-resident-details:not([hidden]) details[open] > #extra-biography) .toast:not(.toast-actionable){z-index:8}
+@media(max-height:650px) and (orientation:portrait){
+ #mind-panel:has(#mind-biography-tab:not([hidden])){padding:10px 12px}
+ #mind-panel:has(#mind-biography-tab:not([hidden])) .mind-panel-head{margin-bottom:4px}
+ #mind-panel:has(#mind-biography-tab:not([hidden])) .mind-panel-head h2{font-size:17px}
+ #mind-panel:has(#mind-biography-tab:not([hidden])) .mind-view-note{margin-bottom:5px}
+ #mind-panel:has(#mind-biography-tab:not([hidden])) .mind-tabs{margin-bottom:5px}
+ #mind-biography-tab .gc-biography-note,#mind-biography-tab .gc-biography-empty{margin:3px 0 7px;line-height:1.35}
+ #mind-biography-tab .gc-biography-list li{padding:7px 9px}
+}
