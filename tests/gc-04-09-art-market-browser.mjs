@@ -32,11 +32,17 @@ try{
  assert.equal((await state()).financialHistory.entries.filter(e=>e.kind==='art-sale').length,1);
  mkdirSync('artifacts/gc-04-09-ui',{recursive:true});await page.screenshot({path:'artifacts/gc-04-09-ui/portfolio.png'});
  await page.locator('#mind-close').tap();
+ // Furniture label nodes are deliberately not created until this setting is enabled.
+ await page.locator('#view-toggle').tap();
+ await page.locator('#item-labels-btn').tap();
+ assert.equal(await page.locator('#item-labels-btn').getAttribute('aria-pressed'),'true');
+ await page.locator('#view-close').tap();
  const marker=page.locator('[data-action-id="paint"][data-instance-id="'+bought.instanceId+'"]');
  // Real DOM button, not a direct domain invocation. Its visibility may depend
  // on scene camera, so the first action is a DOM dispatch; mode/action use touch.
  await marker.waitFor({state:'attached'});
- await marker.dispatchEvent('click');
+ if(await marker.isVisible())await marker.tap();
+ else await marker.dispatchEvent('click');
  await page.locator('#painting-mode-select').selectOption('commission');
  assert.match(await page.locator('#painting-mode-note').innerText(),/20 кр./);
  await page.screenshot({path:'artifacts/gc-04-09-ui/commission.png'});
