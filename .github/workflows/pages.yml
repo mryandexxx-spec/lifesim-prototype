@@ -243,6 +243,8 @@ jobs:
           node --check src/recurring-tasks-ui.js
           node --check src/life-aspirations.js
           node --check src/life-aspirations-ui.js
+          node --check src/life-biography.js
+          node --check src/life-biography-ui.js
           node --check src/ux01-plan-ui.js
           node --check src/ui-layout.js
           node --check src/insight-presentation.js
@@ -322,6 +324,7 @@ jobs:
           cp src/plan-preview.js src/work-presence-ui.js src/ui-layout.js src/required-choice-focus.js site/src/
           cp src/recurring-tasks.js src/recurring-tasks-ui.js site/src/
           cp src/life-aspirations.js src/life-aspirations-ui.js site/src/
+          cp src/life-biography.js src/life-biography-ui.js site/src/
           cp src/cas-f2-c4b-lab.js src/cas-f2-c3-lab.js src/cas-f2-footwear-lab.js src/cas-footwear-standard.js src/cas-footwear-layers.js site/src/
           cp src/ux01-plan-ui.js site/src/
           cp src/queue-rescue.js site/src/

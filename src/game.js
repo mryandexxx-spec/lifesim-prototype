@@ -1,3 +1,6 @@
+import {compatibleFurnitureProduct} from './furniture-products.js';
+import {recordBiographySale,recordBiographyDisplay,recordBiographyHome,biographyFactKeys,BIOGRAPHY_DEFINITIONS} from './life-biography.js';
+import {renderBiography} from './life-biography-ui.js';
 import {PARCEL_SECTIONS,areaBuildTool,parcelCamera,balanceQuote,outdoorSectionFor,installParcelTray} from './parcel-editor-ui.js';
 import {createParcelJournal} from './parcel-journal.js';
 import {wateringFrame} from './outdoor-character-motion.js';
@@ -276,6 +279,7 @@ try {
     new URLSearchParams(location.search).get('garden-start-paused')==='1'){
    game.paused=true;game.otherSim.paused=true;
  }
+let savedBiographyKeys=new Set(biographyFactKeys(game));
 const musicAudio=createMusicAudio();
 let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
 const audioButton=$('music-audio-toggle');
@@ -481,6 +485,9 @@ function save(silent = false) {
   catch {result={ok:false,reason:'unavailable'};}
   if(result.ok){
     saveFailureNotified=false;
+    const nextKeys=new Set(biographyFactKeys(game));
+    const added=[...nextKeys].filter(k=>!savedBiographyKeys.has(k));savedBiographyKeys=nextKeys;
+    if(added.length)toast('Биография · '+BIOGRAPHY_DEFINITIONS[added[0].split(':').at(-1)]+(added.length>1?' и ещё '+(added.length-1):''));
     if(!silent)toast('Игра сохранена на этом устройстве');
     return true;
   }
@@ -844,6 +851,7 @@ let mindTab='overview',skillProfileKey='',mindInspectResident=game.selectedSim;
 function renderMindIdentity(){
  const actor=getActor(game,mindInspectResident),id=mindInspectResident;
  renderPersonalAspiration($('mind-aspiration-card'),id);
+  renderBiography($('mind-biography-tab'),game,id);
  $('mind-person').textContent=getActorName(id).toUpperCase()+' / ЛИЧНОСТЬ';
  $('mind-panel').setAttribute('aria-label','Карточка персонажа: '+getActorName(id));
  $('mind-view-note').textContent=id===game.selectedSim
@@ -942,13 +950,15 @@ function renderSkillsTab(force=false){
             offer.amount+' кр.?'+(offer.belowMaterialCost?' Цена ниже стоимости материалов.':'')))return;
           const tx=projectArtSale(game,owner,work.id,offer);
           if(!tx.ok){toast(artReason(tx.reason));renderSkillsTab(true);return;}
-          const a=getActor(game,owner),old={shop:game.shop,financialHistory:game.financialHistory,artMarket:game.artMarket,works:a.createdWorks,tasks:game.recurringTasks,aspirations:game.lifeAspirations};
+          const a=getActor(game,owner),old={shop:game.shop,financialHistory:game.financialHistory,artMarket:game.artMarket,works:a.createdWorks,tasks:game.recurringTasks,aspirations:game.lifeAspirations,biography:game.lifeBiography};
           game.shop=tx.shop;game.financialHistory=tx.financialHistory;game.artMarket=tx.artMarket;a.createdWorks=tx.works;
           recordAspirationIncome(game,tx.entry,work);
+          recordBiographySale(game,tx.entry,work);
           recordTaskOutcome(game,owner,'sale',tx.entry.id);
           if(!save(true)){
             game.shop=old.shop;game.financialHistory=old.financialHistory;game.artMarket=old.artMarket;a.createdWorks=old.works;game.recurringTasks=old.tasks;
             if(old.aspirations)game.lifeAspirations=old.aspirations;else delete game.lifeAspirations;
+            if(old.biography)game.lifeBiography=old.biography;else delete game.lifeBiography;
             renderSkillsTab(true);return;
           }
           updateFamilyBalance();renderSkillsTab(true);toast('Картина продана · +'+tx.amount+' кр.');return;
@@ -965,16 +975,18 @@ function renderSkillsTab(force=false){
             receiptId:'art:'+game.selectedSim+':'+work.id})
           :null;
         if(finance&&!finance.ok){toast('Не удалось записать доход от картины');return;}
-        const person=selectedActor(),old={works:person.createdWorks,shop:game.shop,history:game.financialHistory,tasks:game.recurringTasks,aspirations:game.lifeAspirations};
+        const person=selectedActor(),old={works:person.createdWorks,shop:game.shop,history:game.financialHistory,tasks:game.recurringTasks,aspirations:game.lifeAspirations,biography:game.lifeBiography};
         person.createdWorks=result.works;
         if(result.shop)game.shop=finance?.shop||result.shop;
         if(finance){
           game.financialHistory=finance.financialHistory;
-          if(finance.recorded){recordAspirationIncome(game,finance.entry,work);recordTaskOutcome(game,game.selectedSim,'sale',finance.entry.id);}
+          if(finance.recorded){recordAspirationIncome(game,finance.entry,work);recordBiographySale(game,finance.entry,work);recordTaskOutcome(game,game.selectedSim,'sale',finance.entry.id);}
         }
+        if(operation==='hang')recordBiographyDisplay(game,game.selectedSim,work);
         if(!save(true)){
           person.createdWorks=old.works;game.shop=old.shop;game.financialHistory=old.history;game.recurringTasks=old.tasks;
           if(old.aspirations)game.lifeAspirations=old.aspirations;else delete game.lifeAspirations;
+            if(old.biography)game.lifeBiography=old.biography;else delete game.lifeBiography;
           renderSkillsTab(true);return;
         }
         updateFamilyBalance();renderSkillsTab(true);
@@ -1007,15 +1019,16 @@ function renderSkillsTab(force=false){
 }
 function setMindTab(tab){
   if(tab==='skills')tryEnableArtMarket();
-  mindTab=tab==='skills'?'skills':'overview';
-  for(const name of ['overview','skills']){
+  mindTab=['skills','biography'].includes(tab)?tab:'overview';
+  for(const name of ['overview','skills','biography']){
     const chosen=mindTab===name,b=$('mind-tab-'+name);
     b.setAttribute('aria-selected',String(chosen));b.tabIndex=chosen?0:-1;
-    $(name==='overview'?'mind-overview':'mind-skills-tab').hidden=!chosen;
+    $(name==='overview'?'mind-overview':'mind-'+name+'-tab').hidden=!chosen;
   }
   renderSkillsTab(true);
+  renderBiography($('mind-biography-tab'),game,mindInspectResident);
 }
-for(const tab of ['overview','skills'])
+for(const tab of ['overview','skills','biography'])
   $('mind-tab-'+tab).addEventListener('click',()=>setMindTab(tab));
 /** Keep existing option nodes stable while Safari's native picker is open. */
 function updateReadingContentChoice(){
@@ -2415,6 +2428,9 @@ function updateCareerHud(){
 const residentSwitch=$('dashboard').querySelector('.resident-switch');
 const casDetails=document.createElement('section');
 const extraAspirationCards=document.createElement('div');extraAspirationCards.id='extra-aspiration-card';
+const extraBiography=document.createElement('details');extraBiography.className='gc-task-details';
+const extraBiographySummary=document.createElement('summary');extraBiographySummary.textContent='Биография';
+const extraBiographyBody=document.createElement('div');extraBiographyBody.id='extra-biography';extraBiography.append(extraBiographySummary,extraBiographyBody);
 const extraTaskDetails=document.createElement('details');extraTaskDetails.className='gc-task-details';
 const extraTaskSummary=document.createElement('summary');extraTaskSummary.textContent='Задания · сегодня и неделя';
 const extraTaskCards=document.createElement('div');extraTaskCards.id='extra-recurring-cards';
@@ -2464,6 +2480,7 @@ function renderCasDetails(force=false){
  casDetails.hidden=!row||row.legacy;
  if(casDetails.hidden){lastCasDetailsKey='';return;}
  renderPersonalAspiration(extraAspirationCards,id);
+ renderBiography(extraBiographyBody,game,id);
  renderPersonalTaskCards(extraTaskCards,id);
  const pending=pendingActions(game.actionQueues,id);
  const blockedTasks=blockedActions(game.actionQueues,id);
@@ -2599,7 +2616,7 @@ function renderCasDetails(force=false){
    });
    item.append(label,retry,remove);list.append(item);
  }
- casDetails.replaceChildren(heading,job,extraAspirationCards,extraTaskDetails,actions,list);
+ casDetails.replaceChildren(heading,job,extraAspirationCards,extraTaskDetails,extraBiography,actions,list);
 }
 function updateResidentPicker(){
  const rows=residentRoster(game,hudResidentId);
@@ -6285,6 +6302,8 @@ function boot() {
     if(!result.ok){editorFeedback(editorMessage(result.reason),true);return false;}
     game.world.furniture=result.world;game.shop=finance.shop;
     game.financialHistory=finance.financialHistory;
+    if(finance.recorded&&transaction.amount<0){const item=result.world.instances.find(i=>i.instanceId===result.instanceId);
+      if(item)recordBiographyHome(game,item,compatibleFurnitureProduct(item.prefabId,item.itemDefinitionId),finance.entry);}
     updateFamilyBalance();refreshMind(game,game.world);refreshMind(game.otherSim,game.world);
     for(const id of HOUSEHOLD_IDS)paths[id]={points:null,index:0,id:null};
     updateDecorNodes();renderWarehouse();
@@ -9268,9 +9287,9 @@ function boot() {
         const priorHerbStock=game.kitchen?.pantry?.herbs??0;
         const priorGardenCredits=game.shop.credits;
         const priorDeliveries=game.kitchen?.deliveries?.length||0;
-        const priorRecurringTasks=game.recurringTasks,priorAspirations=game.lifeAspirations;
+        const priorRecurringTasks=game.recurringTasks,priorAspirations=game.lifeAspirations,priorBiography=game.lifeBiography;
         const careerEvents=tickHousehold(game,.30)||[];
-        if((game.recurringTasks!==priorRecurringTasks||game.lifeAspirations!==priorAspirations)&&!careerEvents.length)save(true);
+        if((game.recurringTasks!==priorRecurringTasks||game.lifeAspirations!==priorAspirations||game.lifeBiography!==priorBiography)&&!careerEvents.length)save(true);
         if(priorDeliveries>(game.kitchen?.deliveries?.length||0)){
           // A paid order moved into the same physical fridge as cooked meals.
           save(true);careerPhone.refresh();
@@ -10715,6 +10734,7 @@ function boot() {
       if(!$('reading-content-field').hidden)updateReadingContentChoice();
       renderSkillsTab(false);
       if(!$('mind-panel').hidden&&mindTab==='overview')renderPersonalAspiration($('mind-aspiration-card'),mindInspectResident);
+      if(!$('mind-panel').hidden&&mindTab==='biography')renderBiography($('mind-biography-tab'),game,mindInspectResident);
       const relation=game.relationship;
       $('relationship-value').textContent=Math.round(relation.affinity)+'/100';
       $('relationship-label').textContent=relationshipLabel(relation.affinity);
