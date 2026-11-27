@@ -8,6 +8,30 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  gc-04-09-property:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/gc-04-09-property' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Canonical bill, furniture and finance regression
+        run: node --test tests/w4c-bills.test.js tests/w4a-finance.test.js tests/furniture-shop.test.js tests/furniture-sku-f4b2.test.js
+      - name: Matched household property affordability and shadow tariffs
+        run: node tests/gc-04-09-property-probe.mjs
+        env:
+          GC_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gc-04-09-property-evidence
+          path: artifacts/gc-04-09-property/
+          if-no-files-found: warn
   gc-04-09-c4-ux:
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/gc-04-09-art-market-core' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
