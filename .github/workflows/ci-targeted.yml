@@ -189,6 +189,39 @@ jobs:
           path: artifacts/cf-anim-source-quality/${{ matrix.family }}/
           if-no-files-found: error
 
+  cf-anim-mocap-source:
+    if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-mocap-source' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned native audit dependencies
+        run: |
+          python -m pip install --only-binary=:all: bpy==4.5.0 numpy==1.26.4 scipy==1.17.1 imageio-ffmpeg==0.6.0 Pillow==11.3.0
+          python -m py_compile tools/cf_anim_mocap_source.py
+      - name: Capture unedited 100STYLE neutral motion and compare independent native import
+        run: timeout --signal=TERM --kill-after=10s 600s python -u tools/cf_anim_mocap_source.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf-anim-mocap-source-evidence
+          path: |
+            artifacts/cf-anim-mocap-source/
+            !artifacts/cf-anim-mocap-source/native-input.bvh
+          if-no-files-found: error
+
   cf-anim-contact-source:
     if: github.event_name == 'pull_request' && github.head_ref == 'diagnostic/cf-anim-contact-contract' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.title, '[replay-source]')
     permissions:
