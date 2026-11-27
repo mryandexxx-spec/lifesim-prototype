@@ -1,10 +1,16 @@
 /** Three original musical motifs, generated on demand. No third-party audio or streams.
  * Web Audio exists ONLY after a direct click; render/update is autoplay-safe.
  */
+import {actionDuration} from './simulation.js';
+import {SHOWER_WASH_START,SHOWER_WASH_END} from './shower-interaction.js';
+import {currentSkillLevel} from './skills-engine.js';
+import {HOBBY_SKILLS,MUSIC_SKILL_ID} from './hobby-reading.js';
 export const MUSIC_STYLE_NOTES=Object.freeze({
   'music.calm':Object.freeze([261.63,329.63,392,329.63,293.66,261.63,220,293.66]),
   'music.rhythmic':Object.freeze([220,330,440,330,293.66,440,392,330]),
-  'music.dreamy':Object.freeze([349.23,523.25,493.88,392,440,587.33,523.25,392])
+  'music.dreamy':Object.freeze([349.23,523.25,493.88,392,440,587.33,523.25,392]),
+  'shower.beginner':Object.freeze([262,318,403,327,287,267,223,285]),
+  'shower.confident':Object.freeze([261.63,329.63,392,329.63,293.66,261.63,220,293.66])
 });
 export function audibleMusicStyle(actors,{paused=false,hidden=false,editing=false}={}){
   if(paused||hidden||editing||!Array.isArray(actors))return null;
@@ -12,7 +18,15 @@ export function audibleMusicStyle(actors,{paused=false,hidden=false,editing=fals
     Object.hasOwn(MUSIC_STYLE_NOTES,a.action.contentId)&&
     a.activitySession?.phase==='using'&&
     a.activitySession.targetInstanceId===a.action.targetInstanceId);
-  return actor?.action?.contentId||null;
+  if(actor)return actor.action.contentId;
+  const singer=actors.find(a=>{
+    const action=a?.action,duration=actionDuration(action);
+    return action?.id==='shower'&&action.phase==='using'&&action.showerSinging===true&&
+      action.automatic===false&&duration>0&&action.elapsed>=duration*SHOWER_WASH_START&&
+      action.elapsed<duration*SHOWER_WASH_END;
+  });
+  return singer?(currentSkillLevel(singer.skills,HOBBY_SKILLS,MUSIC_SKILL_ID)>=3?
+    'shower.confident':'shower.beginner'):null;
 }
 export function createMusicAudio({contextFactory=null}={}){
   let context=null,master=null,enabled=false,muted=true,style=null;
@@ -62,7 +76,7 @@ export function createMusicAudio({contextFactory=null}={}){
       Object.hasOwn(MUSIC_STYLE_NOTES,requested||'');
     if(!allowed){style=null;volume(0);return false;}
     if(requested!==style){style=requested;index=0;nextTime=context.currentTime+.035;}
-    volume(.045);
+    volume(style.startsWith('shower.')?.028:.045);
     const notes=MUSIC_STYLE_NOTES[style],step=style==='music.rhythmic'?.23:.38;
     nextTime=Math.max(nextTime,context.currentTime);
     for(let count=0;count<3&&nextTime<context.currentTime+.32;count++){

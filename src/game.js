@@ -31,7 +31,7 @@ import {validateV1BackupText,exportV1BackupText,commitV1Backup,backupSummary,MAX
 import {createNeedTrendTracker} from './need-trends.js';
 import {appendNotification} from './notification-history.js';
 import {createToastUI} from './qsk-11-toast-ui.js';
-import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, actionDuration, mirrorActionLabel, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
+import { ACTIONS, NEEDS, SAVE_KEY, AUTONOMY_WAIT_SECONDS, newGame, loadGame, chooseAction, arrive, actionDuration, mirrorActionLabel, showerActionLabel, tick, autonomousChoice, setAutonomyEnabled, advanceAutonomyWait, readableTime } from './simulation.js';
 import {calendarAt,formatCalendarDay,setCurrentCalendarDate,toISODate,parseCivilDate,DEFAULT_CIVIL_DATE} from './calendar-core.js';
 import {createDayNightRenderer} from './day-night-render.js';
 import {createCalendarUI} from './calendar-ui.js';
@@ -1190,6 +1190,7 @@ function select(id,instanceId=null) {
   if(id==='hobby'){$('reading-content-select').value=READING_CONTENT_ID;updateReadingContentChoice();}
   $('music-dance-button').hidden=id!=='music';
   $('mirror-speech-button').hidden=id!=='mirror';
+  $('shower-sing-button').hidden=id!=='shower';
   $('tv-talk-button').hidden=id!=='tv';
   $('fridge-lunch-button').hidden=id!=='fridge';
   $('fridge-cook-button').hidden=id!=='fridge';
@@ -1353,6 +1354,13 @@ $('mirror-speech-button').addEventListener('click',()=>{
   if(scheduleCommand({type:'object',actionId:'mirror',mirrorPractice:true,
     ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}))
     select(null);
+});
+$('shower-sing-button').addEventListener('click',()=>{
+  if(selected!=='shower')return;
+  if(!musicMutedByPlayer&&(!musicAudio.status().enabled||!musicAudio.status().running))
+    void musicAudio.enable().then(()=>refreshMusicAudioButton());
+  if(scheduleCommand({type:'object',actionId:'shower',showerSinging:true,
+    ...(selectedFurnitureInstanceId?{targetInstanceId:selectedFurnitureInstanceId}:{})}))select(null);
 });
 $('tv-talk-button').addEventListener('click',()=>{
   if(selected!=='tv')return;
@@ -2454,7 +2462,7 @@ function renderCasDetails(force=false){
  const status=document.createElement('span');
  const activeExtra=currentActor?.action;
  const extraLabel=activeExtra
-   ?(mirrorActionLabel(activeExtra)||CAS_ACTIONS.find(([actionId])=>actionId===activeExtra.id)?.[1]||
+   ?(showerActionLabel(activeExtra)||mirrorActionLabel(activeExtra)||CAS_ACTIONS.find(([actionId])=>actionId===activeExtra.id)?.[1]||
      (activeExtra.id==='move'?'Идти':'Занятие')):null;
  const currentStatus=visibleActionPhase(extraLabel,activeExtra?.phase,{paused:game.paused});
  status.textContent=row.workLabel||(row.away?'На работе':
@@ -2487,6 +2495,11 @@ function renderCasDetails(force=false){
      if(scheduleCommand({type:'object',actionId:'mirror',...(speech?{mirrorPractice:true}:{})},id))
        renderCasDetails(true);
    },blocked,unavailableReason);
+ add('♪ Петь в душе',()=>{
+   if(!musicMutedByPlayer&&(!musicAudio.status().enabled||!musicAudio.status().running))
+     void musicAudio.enable().then(()=>refreshMusicAudioButton());
+   if(scheduleCommand({type:'object',actionId:'shower',showerSinging:true},id))renderCasDetails(true);
+ },blocked,unavailableReason);
  const peers=addressedSocialPeers(game,id);
  if(peers.length){
    const peer=document.createElement('select');peer.className='cas-peer-select';
@@ -4905,7 +4918,7 @@ function boot() {
   }
   beginAction=(id,automatic=false,actorId=game.selectedSim,fromQueue=false,targetInstanceId=null,
     activityId=null,contentId=null,inventoryItemId=null,recipeId=null,mirrorPractice=false,
-    tvTalk=false,paintMode=null,paintExpectedPrice=null)=>{
+    tvTalk=false,paintMode=null,paintExpectedPrice=null,showerSinging=false)=>{
     const actor=getActor(game,actorId);
     if(!ACTIONS[id] || (automatic && !game.autonomy.enabled))return false;
     // Releasing the headless shower action does not immediately clear the
@@ -4937,7 +4950,7 @@ function boot() {
       return false;
     }
     const started=chooseResidentAction(game,id,automatic,actorId,targetInstanceId,
-      activityId,contentId,musicPlan,inventoryItemId,recipeId,mirrorPractice,tvTalk,paintMode,paintExpectedPrice);
+      activityId,contentId,musicPlan,inventoryItemId,recipeId,mirrorPractice,tvTalk,paintMode,paintExpectedPrice,showerSinging);
     if(started&&fanIntent)recordSportsAutoStart(game,actorId,fanIntent.matchId,
       actor.action?.targetInstanceId);
     if(started)restartAutonomyWait(actorId);
@@ -5281,7 +5294,7 @@ function boot() {
           if(target||command.autoTable!==true)
             started=beginAction(command.actionId,false,residentId,true,target,
               null,null,null,command.recipeId||null,command.mirrorPractice===true,
-              command.tvTalk===true);
+              command.tvTalk===true,null,null,command.showerSinging===true);
         }
         else if(command.type==='activity'){
           const activity=getActivityDefinition(HOBBY_ACTIVITIES,command.activityId);
@@ -9202,7 +9215,7 @@ function boot() {
     const frameActive=active&&!buildMode&&!outdoorMode;
     const sharedSound=frameActive&&game.socialAction?.phase==='using'&&
       livePairedHobby(game)?.choiceId==='music'?'music.calm':null;
-    musicAudio.update(audibleMusicStyle([game,game.otherSim],{
+    musicAudio.update(audibleMusicStyle(residentIdsForSimulation(game).map(id=>getActor(game,id)),{
       paused:!frameActive,hidden:document.hidden,editing:furnishMode||buildMode||outdoorMode})||sharedSound);
     const animDt=active?dt:0;
     const frameAnimDt=buildMode||outdoorMode?0:animDt;
@@ -9223,10 +9236,10 @@ function boot() {
         const prevAlexGardenEvent=game.event,prevMiraGardenEvent=game.otherSim.event;
         const mirrorCompletion=['alex','mira'].map(id=>[id,getActor(game,id).action])
           .filter(([,action])=>action?.id==='mirror'&&action.phase==='using');
-        const prevAlexLabel=game.action?.activityId
-          ?getActivityDefinition(HOBBY_ACTIVITIES,game.action.activityId)?.label:null;
-        const prevMiraLabel=game.otherSim.action?.activityId
-          ?getActivityDefinition(HOBBY_ACTIVITIES,game.otherSim.action.activityId)?.label:null;
+        const prevAlexLabel=showerActionLabel(game.action)||(game.action?.activityId
+          ?getActivityDefinition(HOBBY_ACTIVITIES,game.action.activityId)?.label:null);
+        const prevMiraLabel=showerActionLabel(game.otherSim.action)||(game.otherSim.action?.activityId
+          ?getActivityDefinition(HOBBY_ACTIVITIES,game.otherSim.action.activityId)?.label:null);
         const sharedBefore=game.socialAction?.shared?game.socialAction.initiator:null;
         const branchBefore=game.socialAction?.branchAction?.id||null;
         const socialBefore=game.socialAction?.conversation||

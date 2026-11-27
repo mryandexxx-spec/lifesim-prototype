@@ -16,7 +16,8 @@ import {insideLot} from './lot-surface.js';
 import {sanitizeSwimAction} from './pool-swim-runtime.js';
 import {GARDEN_ACTIONS,GARDEN_DURATION} from './gardening.js';
 import {TV_APPROACH,TV_WATCH_DURATION} from './tv-interaction.js';
-import {HOBBY_ACTIVITIES} from './hobby-reading.js';
+import {HOBBY_ACTIVITIES,HOBBY_SKILLS,MUSIC_SKILL_ID} from './hobby-reading.js';
+import {scaleSkillXP,restoreSkillProgress} from './skills-engine.js';
 import {MIRROR_SPEECH_DURATION} from './furniture-interactions.js';
 import {kitchenRecipe,kitchenQualityId,kitchenServingMultiplier,mealEnjoyment} from './kitchen.js';
 import {grillRecipe} from './grill-catalog.js';
@@ -78,6 +79,11 @@ export const MANUAL_SLEEP_MIN_MINUTES=30;
 export function mirrorActionLabel(action){
   return action?.id==='mirror'
     ?(action.mirrorPractice===true?'Репетировать речь':ACTIONS.mirror.label):null;
+}
+export const SHOWER_SINGING_XP_PER_MINUTE=.25;
+export const SHOWER_SINGING_FUN=8;
+export function showerActionLabel(action){
+  return action?.id==='shower'&&action.showerSinging===true?'Петь в душе':null;
 }
 export function actionDuration(action){
   if(action?.id==='mirror'&&action.mirrorPractice===true)return MIRROR_SPEECH_DURATION;
@@ -251,6 +257,9 @@ export function loadGame(data,profileFallback=DEMO_PROFILES.first) {
     // Optional F3b reservation. Older v1 TV saves remain standing.
     if(data.action.id==='tv'&&validFurnitureInstanceId(data.action.watchSeatInstanceId))
       next.action.watchSeatInstanceId=data.action.watchSeatInstanceId;
+    if(next.action&&data.action.id==='shower'&&data.action.showerSinging===true&&
+      data.action.automatic===false&&next.action.elapsed<actionDuration(next.action))
+      next.action.showerSinging=true;
     // Optional schema-v1 flag: continue only the remaining genuine TV response.
     if(next.action&&data.action.id==='tv'&&data.action.tvTalk===true&&
       data.action.automatic===false)next.action.tvTalk=true;
@@ -459,6 +468,18 @@ export function tick(state, minutes,world=state?.world??null) {
       const overlap=Math.max(0,Math.min(state.action.elapsed+amount,to)
         -Math.max(state.action.elapsed,from));
       gained=definition.benefitPerMinute*overlap/(SHOWER_WASH_END-SHOWER_WASH_START);
+      // Credit only the same active, privacy-enclosed washing interval. A short
+      // shower gives proportionally less practice; no reward during entry/exit.
+      if(state.action.showerSinging===true&&state.action.automatic===false&&overlap>0){
+        state.needs.fun=clamp(state.needs.fun+SHOWER_SINGING_FUN*overlap/
+          (ACTIONS.shower.duration*(SHOWER_WASH_END-SHOWER_WASH_START)));
+        if(state.skills?.schema!==1||!state.skills.xpById)
+          state.skills=restoreSkillProgress(state.skills,HOBBY_SKILLS);
+        const cap=HOBBY_SKILLS.skills[MUSIC_SKILL_ID].xpThresholds.at(-1);
+        const xp=state.skills.xpById[MUSIC_SKILL_ID]||0;
+        state.skills.xpById[MUSIC_SKILL_ID]=Math.min(cap,
+          Math.round((xp+scaleSkillXP(overlap*SHOWER_SINGING_XP_PER_MINUTE))*1e6)/1e6);
+      }
     }else if(state.action.id==='toilet'){
       // Real relief only during the privacy-enclosed seated window.
       const from=duration*TOILET_RELIEF_START;
@@ -512,7 +533,7 @@ export function tick(state, minutes,world=state?.world??null) {
       // closes the book, rises and returns it to the original shelf.
       const returning=state.action.id==='hobby'&&
         validReadingJourneyAction(state.action)&&finishReadingMinutes(state.action);
-      state.event=returning?'Закрывает книгу':(hobby?.label||mirrorActionLabel(state.action)||definition.label)+' — готово';
+      state.event=returning?'Закрывает книгу':(hobby?.label||mirrorActionLabel(state.action)||showerActionLabel(state.action)||definition.label)+' — готово';
       rememberAction(state, state.action.id);
       state.autonomy.nextAt = state.minutes + 7;
       if(!returning)state.action=null;

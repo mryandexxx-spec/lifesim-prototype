@@ -705,7 +705,7 @@ function validMusicSource(root,actor){
 }
 export function chooseResidentAction(root,itemId,automatic=false,residentId='alex',targetInstanceId=null,
   activityId=null,contentId=null,musicPlan=null,inventoryItemId=null,recipeId=null,
-  mirrorPractice=false,tvTalk=false,paintMode=null,paintExpectedPrice=null) {
+  mirrorPractice=false,tvTalk=false,paintMode=null,paintExpectedPrice=null,showerSinging=false) {
   const item=itemId==='dining'
     ?((root.world?.outdoors?.features||[]).find(x=>x.instanceId===targetInstanceId&&
       x.itemId==='garden.table')||resolveActionFurniture(root.world,itemId,targetInstanceId))
@@ -780,6 +780,10 @@ export function chooseResidentAction(root,itemId,automatic=false,residentId='ale
   }
   if(chosen&&itemId==='tv'&&tvTalk===true&&!automatic)
     resident.action.tvTalk=true;
+  if(chosen&&itemId==='shower'&&showerSinging===true&&!automatic){
+    resident.action.showerSinging=true;
+    resident.event='Петь в душе';
+  }
   if(chosen&&itemId==='hobby'){
     const session=createActivitySession(HOBBY_ACTIVITIES,{
       sessionId:'reading:'+residentId+':'+root.actionQueues.nextSeq+':'+Math.round(root.minutes*1000),
@@ -1026,6 +1030,17 @@ export function tickHousehold(root,minutes) {
       Math.hypot(actor.position.x-point.x,actor.position.z-point.z)>.45)||
       (a.phase==='walking'&&!findPath(actor.position,point,root.world))){
       actor.action=null;actor.event='Практика речи прервана: зеркало недоступно';
+    }
+  }
+  // Singing is a manual shower variant, not remotely trainable practice.
+  for(const id of HOUSEHOLD_IDS){
+    const actor=getActor(root,id),a=actor?.action;
+    if(a?.id!=='shower'||a.showerSinging!==true)continue;
+    const point=furnitureActionApproach(root.world,'shower',a.targetInstanceId);
+    if(!point||!furnitureAvailable(root,'shower',id,a.targetInstanceId)||
+      (a.phase==='using'&&Math.hypot(actor.position.x-point.x,actor.position.z-point.z)>.45)||
+      (a.phase==='walking'&&!findPath(actor.position,point,root.world))){
+      actor.action=null;actor.event='Пение прервано: душ недоступен';
     }
   }
   // A removed/moved sink cannot clean dishes from afar or from storage.
