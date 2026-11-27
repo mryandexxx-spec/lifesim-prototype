@@ -43,7 +43,7 @@ for(const [engine,launcher] of [['chromium',chromium],['webkit',webkit]]){
    localStorage.setItem(tour,'done');window.__gcTrace=[];
    for(const type of ['pointerdown','pointerup','pointercancel','touchstart','touchend','click'])window.addEventListener(type,e=>{
     const t=e.target?.closest?.('button,summary')||e.target;
-    window.__gcTrace.push({type,trusted:e.isTrusted,pointerType:e.pointerType||null,id:t?.id||'',text:t?.textContent?.trim().slice(0,80)||'',at:performance.now()});
+    window.__gcTrace.push({type,trusted:e.isTrusted,pointerType:e.pointerType||null,id:t?.id||'',targetId:e.target?.id||'',text:t?.textContent?.trim().slice(0,80)||'',at:performance.now()});
    },{capture:true,passive:true});
   },{key:SAVE_KEY,record:seed,tour:UI_TOUR_STORAGE_KEY});
   page=await ctx.newPage();page.on('pageerror',e=>row.errors.push(e.message));page.on('crash',()=>row.errors.push('renderer crash'));
@@ -82,7 +82,8 @@ for(const [engine,launcher] of [['chromium',chromium],['webkit',webkit]]){
   await step('reload',async()=>{const before=await state();await page.reload({waitUntil:'domcontentloaded'});await ready();await pause();await open();
    assert.equal(await page.locator(week).getAttribute('data-status'),'dismissed');
    assert.deepEqual((await state()).recurringTasks,before.recurringTasks);await tap('#queue-close');});
-  await step('actual-sale',async()=>{const before=await state();await tap('#mind-toggle',false);await tap('#mind-tab-skills',false);
+  await step('actual-sale',async()=>{const before=await state();/* The resident name intentionally focuses the camera (PF-10). Touch the visible mood label instead of the parent button center. */
+   await tap('#mind-toggle #mood-label',false);await page.locator('#mind-panel').waitFor({state:'visible'});assert.equal(await page.locator('#mind-toggle').getAttribute('aria-expanded'),'true');await tap('#mind-tab-skills',false);
    const sale='#mind-painting-works button:has-text("Продать · +")';
    page.once('dialog',d=>d.accept());await tap(sale,false);
    await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)).recurringTasks.byResident.alex.day.proofs.length===1,SAVE_KEY);
