@@ -279,8 +279,8 @@ try {
     new URLSearchParams(location.search).get('garden-start-paused')==='1'){
    game.paused=true;game.otherSim.paused=true;
  }
-let savedBiographyKeys=new Set(biographyFactKeys(game));
 const musicAudio=createMusicAudio();
+let savedBiographyKeys=new Set(biographyFactKeys(game));
 let musicMutedByPlayer=false; // explicit silence wins over future Listen taps
 const audioButton=$('music-audio-toggle');
 function refreshMusicAudioButton(){
