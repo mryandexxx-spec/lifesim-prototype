@@ -246,8 +246,12 @@ function pendingFixture(id,career,scene,after=0){
   for(let day=after;day<after+15&&!shift;day++)shift=plannedCareerShift(root.calendar,c,day);
   assert.ok(shift);
   root.minutes=root.otherSim.minutes=shift.start;
-  progressCareerWork(root,shift.start-.01,shift.start);assert.ok(arriveCareerPortal(root,id,shift.start));
+  progressCareerWork(root,shift.start-.01,shift.start);
+  // Additional residents reach work inside progressCareerWork; legacy actors use the portal callback.
+  if(c.currentShift?.phase==='departing')assert.ok(arriveCareerPortal(root,id,shift.start));
+  assert.equal(c.currentShift?.phase,'working');
   root.minutes=root.otherSim.minutes=shift.start+shift.duration/2+1;
+  if(id.startsWith('resident_'))getActor(root,id).minutes=root.minutes;
   assert.ok(startWorkIncident(root,id,root.minutes));c.currentShift.incident.scenarioId=scene;
   const a=getActor(root,id);a.personality=createProfile(neutralTraits);
   Object.assign(a.needs,{hunger:80,bladder:80,hygiene:80,energy:80,fun:80,social:80});
