@@ -451,3 +451,67 @@ test('LP-02D4 compatible communication traits and ambition/balance preserve cont
     assert.equal(chooseAutonomousWorkOption(work,id),balanced);
   }
 });
+
+
+test('LP-02D5 every compatible pair of new traits composes without stacking or overriding urgent care',()=>{
+  const ids=['alex','mira','resident_3','resident_4'];
+  const fresh=['novelty.curious','novelty.familiar','motivation.ambitious','motivation.balanced','pace.patient','pace.impatient','communication.diplomatic','communication.direct','tone.playful','tone.serious'];
+  const pairs=fresh.flatMap((a,i)=>fresh.slice(i+1).map(b=>[a,b]).filter(xs=>validateSelection(xs).valid));
+  assert.equal(pairs.length,42);
+  const old='habits.neat',neutral=createProfile([old,'tone.serious']);
+  const scenes=[['city-services','pf09b-city-services-map'],['kitchen-studio','pf09b-kitchen-studio-texture'],
+    ['editorial','editorial-ethics'],['business-center','pf09b-business-center-version'],
+    ['art-studio','art-collection'],['civic-service','pf09b-civic-service-language']];
+  let choices=0,receipts=0;
+  for(const id of ids){
+    for(let i=0;i<scenes.length;i++){
+      const [career,scene]=scenes[i],{root}=pendingFixture(id,career,scene),a=getActor(root,id);
+      const def=workScenario(career,scene);
+      for(const [x,y] of pairs){
+        for(const energy of [35,55,65,85]){
+          a.needs.energy=energy;
+          const choose=profile=>{a.personality=profile;return chooseAutonomousWorkOption(root,id);};
+          const base=choose(neutral),singleX=choose(createProfile([old,x])),singleY=choose(createProfile([old,y]));
+          const combined=createProfile([old,x,y]),selected=choose(combined);
+          assert.equal(choose(createProfile([y,old,x])),selected);
+          assert.ok([base,singleX,singleY].includes(selected),'unexpected stacked result '+[id,scene,x,y,energy]);
+          assert.ok(def.options.some(o=>o.id===selected));
+          a.needs.hunger=10;
+          assert.equal(choose(combined),choose(neutral),'urgent veto '+[id,scene,x,y]);
+          a.needs.hunger=80;choices++;
+          // Settle and roundtrip one genuine native decision per pair and actor,
+          // without contaminating the reusable matched fixture.
+          if(i===0&&energy===65){
+            const candidate=structuredClone(root),actor=getActor(candidate,id);
+            actor.personality=combined;
+            const n=candidate.careerSystem.incidentIds.length,credits=candidate.shop.credits;
+            const receipt=automaticWorkIncident(candidate,id);
+            assert.ok(receipt.ok);assert.equal(receipt.option.id,selected);
+            assert.equal(candidate.shop.credits,credits);
+            assert.equal(candidate.careerSystem.incidentIds.length,n+1);
+            assert.equal(automaticWorkIncident(candidate,id).ok,false);
+            const restored=loadHousehold(structuredClone(candidate));
+            assert.deepEqual(getActor(restored,id).personality,combined);
+            assert.deepEqual(restored.careerSystem.incidentHistory[id],candidate.careerSystem.incidentHistory[id]);
+            receipts++;
+          }
+        }
+      }
+    }
+  }
+  assert.equal(choices,4032);assert.equal(receipts,168);
+  // All combinations preserve pre-existing nonzero disposition and the +3
+  // ceiling on the actual authored response function, including unrelated/sharp lines.
+  const lines=['daily.news','daily.critic','conflict.explain','conflict.apologize','conflict.blame','family.share','relationships.share','humor.joke','philosophy.share','money.ask','plans.idea','support.help'];
+  let responses=0;
+  for(const oldTrait of oldTraitGroups.flat())for(const [x,y] of pairs)for(const line of lines){
+    const base=boundaryDisposition({traitIds:[oldTrait]},line);
+    const a=boundaryDisposition(createProfile([oldTrait,x]),line);
+    const b=boundaryDisposition(createProfile([oldTrait,y]),line);
+    const both=boundaryDisposition(createProfile([oldTrait,x,y]),line);
+    assert.equal(both,base!==0?base:Math.max(a,b));
+    assert.equal(boundaryDisposition(createProfile([y,x,oldTrait]),line),both);
+    responses++;
+  }
+  console.log('LP-02D5 composition '+JSON.stringify({pairs:pairs.length,choices,receipts,responses}));
+});
