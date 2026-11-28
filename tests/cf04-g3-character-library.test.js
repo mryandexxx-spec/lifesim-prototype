@@ -14,7 +14,7 @@ function full(){
  const root=newHousehold();
  const extra=id=>({id,identity:{firstName:id,lastName:'',lifeStage:'adult'},actor:newGame()});
  root.population={schema:1,nextResidentSerial:5,residentsById:{resident_3:extra('resident_3'),resident_4:extra('resident_4')},
- linksByResident:{resident_3:{familyId:'family_1',dwellingId:'dwelling_1'},resident_4:{familyId:'family_1',dwellingId:'dwelling_1'}},kinship:[]};
+ linksByResident:Object.fromEntries(['alex','mira','resident_3','resident_4'].map(id=>[id,{familyId:'family_1',dwellingId:'dwelling_1'}])),kinship:[]};
  return loadHousehold(clone(root));
 }
 test('legacy saves keep original optional shape',()=>{
