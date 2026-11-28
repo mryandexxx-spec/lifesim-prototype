@@ -4,7 +4,7 @@
  * Alex/Mira keep their established visual/social pipelines; additional actors
  * use the same root clock, typed persistent FIFO and world A* geometry.
  */
-import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy,mirrorActionLabel} from './simulation.js';
+import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy,createCareContext,mirrorActionLabel} from './simulation.js';
 import {recordTaskOutcome,captureTaskLeisure,settleTaskLeisure} from './recurring-tasks.js';
 import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './navigation.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -451,8 +451,9 @@ export function explainAdditionalResidentAutonomy(root,id){
   const blocked=additionalAutonomyBlock(root,id);
   if(blocked)return {blocked,selected:null,plan:null,attempts:[]};
   const actor=savedAdditionalActor(root,id);
-  const projected={...actor,minutes:root.minutes,paused:root.paused,
-    autonomy:{...actor.autonomy,enabled:root.autonomy.enabled}};
+  const projected=createCareContext(actor,{
+    residentId:id,minutes:root.minutes,paused:root.paused,enabled:root.autonomy.enabled
+  });
   const evaluation=evaluateAutonomy(projected);
   if(evaluation.blocked)return {
     blocked:evaluation.blocked,selected:null,plan:null,attempts:[]};

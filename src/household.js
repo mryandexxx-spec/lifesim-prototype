@@ -2,7 +2,7 @@ import {restoreLifeBiography,recordBiographyArtwork,biographySkillBefore,recordB
 /** Two-person household without importing PlayCanvas, DOM or browser APIs.
  * Legacy root fields remain Alex's exact v1 state; otherSim is an optional extension.
  */
-import { newGame, loadGame, tick, chooseAction, autonomousChoice, setAutonomyEnabled,ACTIONS,mirrorActionLabel } from './simulation.js';
+import { newGame, loadGame, tick, chooseAction, autonomousChoice, createCareContext, setAutonomyEnabled,ACTIONS,mirrorActionLabel } from './simulation.js';
 import {DEFAULT_CIVIL_DATE,createCalendar,restoreCalendar,gameDayIndex} from './calendar-core.js';
 import {syncRecurringTasks,restoreRecurringTasks,recordTaskOutcome,captureTaskLeisure,settleTaskLeisure} from './recurring-tasks.js';
 import {restoreLifeAspirations,recordAspirationArtwork} from './life-aspirations.js';
@@ -1470,6 +1470,8 @@ export function residentAutonomousChoice(root,id='alex') {
   // Bounded original-football fandom may suggest a normal real-TV action.
   // Never preempt work, critical needs, a call or the owner's manual FIFO.
   if(!urgent&&sportsAutoIntent(root,id)&&furnitureAvailable(root,'tv',id))return 'tv';
-  const proposal=autonomousChoice(resident);
+  const proposal=autonomousChoice(createCareContext(resident,{
+    residentId:id,minutes:root.minutes,paused:root.paused,enabled:root.autonomy.enabled
+  }));
   return proposal && furnitureAvailable(root,proposal,id) ? proposal : null;
 }
