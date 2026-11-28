@@ -34,6 +34,7 @@ import {refreshMind,completePoolSwimMind,restorePoolFirstSwimAt} from './psychol
 import {restorePoolAutoRoutine,considerAutonomousPool,recordAutonomousPoolStart} from './pool-autonomy.js';
 import {strictLegacyActor} from './resident-registry.js';
 import {restorePopulation} from './resident-population.js';
+import {restoreCharacterLibrary} from './character-library.js';
 import {dialogueNeedsDecision} from './dialogue-decision.js';
 import {residentIdsForSimulation,savedAdditionalActor,extraReservesFurniture,
   tickAdditionalResidents} from './resident-activity-runtime.js';
@@ -168,6 +169,7 @@ export function loadHousehold(raw,suggestedDate=DEFAULT_CIVIL_DATE) {
     ?restorePopulation(raw.population):null;
   const root=loadGame(raw,DEMO_PROFILES.first);
   if(population)root.population=population;
+  if(Object.hasOwn(raw,'characterLibrary'))root.characterLibrary=restoreCharacterLibrary(raw.characterLibrary,population);
   // Missing old v1 calendar: align the SUGGESTED date to the current game day.
   // This adds one optional field without touching minutes, money, people or possessions.
   root.calendar={...restoreCalendar(raw.calendar,root.minutes,suggestedDate),
