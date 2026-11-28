@@ -443,6 +443,31 @@ function additionalAutonomyBlock(root,id){
   return null;
 }
 
+/** Capability of the existing additional-resident automatic care adapter.
+ * A supported action is not necessarily currently possible. No new action is
+ * admitted by this classification. Manual-only objects remain manual-only. */
+function probeAdditionalCare(root,id,actionId,targetInstanceId=null){
+  if(typeof actionId!=='string'||!Object.hasOwn(ACTIONS,actionId))
+    return {status:'unknown',reason:'unknown-action',plan:null};
+  if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(actionId))
+    return {status:ADDITIONAL_OBJECT_ACTIONS.includes(actionId)?'forbidden':'unsupported',
+      reason:ADDITIONAL_OBJECT_ACTIONS.includes(actionId)?'manual-only':'no-automatic-care-adapter',
+      plan:null};
+  const plan=prepareCommand(root,id,{type:'object',actionId,
+    ...(targetInstanceId!==null?{targetInstanceId}:{})},{automatic:true});
+  return plan?{status:'supported',reason:null,plan}:
+    {status:'blocked',reason:'unavailable-or-unreachable',plan:null};
+}
+export function additionalCareCapability(root,id,actionId){
+  // Classify unsupported action independently of temporary actor blockers.
+  if(typeof actionId!=='string'||!Object.hasOwn(ACTIONS,actionId)||
+    !ADDITIONAL_AUTONOMOUS_ACTIONS.includes(actionId))
+    return probeAdditionalCare(root,id,actionId);
+  const blocked=additionalAutonomyBlock(root,id);
+  if(blocked)return {status:'blocked',reason:blocked,plan:null};
+  return probeAdditionalCare(root,id,actionId);
+}
+
 /** Read-only resource-aware explanation of a resident's *actual* feasible
  * next action. This is not serialized or shown as a reward. It uses precisely
  * the same exclusive furniture reservations and A* tests as action dispatch.
@@ -461,10 +486,10 @@ export function explainAdditionalResidentAutonomy(root,id){
   for(const candidate of evaluation.candidates){
     if(candidate.score<=0)continue;
     if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(candidate.id))continue;
-    let plan=prepareCommand(root,id,{type:'object',actionId:candidate.id},{automatic:true});
+    let plan=probeAdditionalCare(root,id,candidate.id).plan;
     // Real TV is only an alternate reachable device for leisure.
     if(!plan&&candidate.id==='sofa')
-      plan=prepareCommand(root,id,{type:'object',actionId:'tv'},{automatic:true});
+      plan=probeAdditionalCare(root,id,'tv').plan;
     attempts.push({id:candidate.id,score:candidate.score,
       reason:candidate.reason,factors:candidate.factors,
       availability:plan?'free-and-reachable':'unavailable-or-unreachable',
@@ -473,7 +498,7 @@ export function explainAdditionalResidentAutonomy(root,id){
   }
   if(evaluation.selected===null&&Number.isFinite(actor.needs.social)&&
     actor.needs.social<35){
-    const mirror=prepareCommand(root,id,{type:'object',actionId:'mirror'},{automatic:true});
+    const mirror=probeAdditionalCare(root,id,'mirror').plan;
     attempts.push({id:'mirror',score:null,reason:'low-social-real-mirror',
       availability:mirror?'free-and-reachable':'unavailable-or-unreachable',
       plannedAction:mirror?.id||null});
