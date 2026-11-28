@@ -8,6 +8,27 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  care-seam-parity:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/lp-01h-care-seam' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: bbd752a22ae08df6ff2c538891c723eefc244d42
+          path: frozen-care-baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          test "$(git -C frozen-care-baseline rev-parse HEAD)" = bbd752a22ae08df6ff2c538891c723eefc244d42
+          CARE_BASELINE_PATH="$PWD/frozen-care-baseline" node --test tests/care-baseline-parity.test.js
+          node --test tests/qsk-06-utility-autonomy.test.js tests/cas-01-5-autonomy.test.js
   gc-08-life-biography:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-08-biography' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

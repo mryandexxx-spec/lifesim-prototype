@@ -507,13 +507,51 @@ export function explainAdditionalResidentAutonomy(root,id){
   return {blocked:null,selected:null,plan:null,attempts};
 }
 
+/** Transient intent, not an accepted command, reservation or saved event. */
+function careProposal(id,minutes,plan){
+  return plan?Object.freeze({type:'additional-care',residentId:id,
+    at:minutes,actionId:plan.id,targetInstanceId:plan.targetInstanceId,
+    bedSlot:plan.bedSlot??null}):null;
+}
+export function proposeAdditionalCare(root,id){
+  const explanation=explainAdditionalResidentAutonomy(root,id);
+  return careProposal(id,root?.minutes,explanation.plan);
+}
+/** Reuse the real care adapter at the current clock and exact target. The
+ * returned result describes admission only; the existing tick owns effects.
+ * No pending intent, result or reservation is serialized by this function. */
+export function admitAdditionalCareProposal(root,id,proposal){
+  const rejected=reason=>({status:'rejected',reason});
+  if(!proposal||proposal.type!=='additional-care'||proposal.residentId!==id||
+    typeof proposal.targetInstanceId!=='string'||
+    !ADDITIONAL_AUTONOMOUS_ACTIONS.includes(proposal.actionId))
+    return rejected('invalid-proposal');
+  if(!Number.isFinite(root?.minutes)||proposal.at!==root.minutes)
+    return rejected('stale-clock');
+  const blocked=additionalAutonomyBlock(root,id);
+  if(blocked)return rejected(blocked);
+  const actor=savedAdditionalActor(root,id);
+  if(!actor||root.minutes<actor.autonomy.nextAt)return rejected('cooldown');
+  const capability=probeAdditionalCare(root,id,proposal.actionId,proposal.targetInstanceId);
+  if(capability.status!=='supported')return rejected(capability.reason);
+  const plan=capability.plan;
+  if(plan.targetInstanceId!==proposal.targetInstanceId||
+    (plan.bedSlot??null)!==proposal.bedSlot)return rejected('changed-resource');
+  actor.autonomy.enabled=root.autonomy.enabled;
+  actor.minutes=root.minutes;
+  if(!startPlannedObject(root,id,plan,true))return rejected('admission-failed');
+  return {status:'admitted',residentId:id,actionId:actor.action.id,
+    targetInstanceId:actor.action.targetInstanceId,phase:actor.action.phase};
+}
+
 export function startAdditionalResidentAutonomy(root,id){
   const explanation=explainAdditionalResidentAutonomy(root,id);
   if(explanation.blocked)return false;
   const actor=savedAdditionalActor(root,id);
   actor.autonomy.enabled=root.autonomy.enabled;
   actor.minutes=root.minutes;
-  if(explanation.plan&&startPlannedObject(root,id,explanation.plan,true))
+  const proposal=careProposal(id,root.minutes,explanation.plan);
+  if(proposal&&admitAdditionalCareProposal(root,id,proposal).status==='admitted')
     return true;
   // No eligible need: do not repeatedly postpone a future need merely
   // because this resident is presently healthy and content.
