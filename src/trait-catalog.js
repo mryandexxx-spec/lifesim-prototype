@@ -16,8 +16,24 @@ export const TRAIT_CATALOG=Object.freeze({
   'approach.creative':entry('approach.creative','approach','Творческий','Любит воображать и экспериментировать',{creativity:.30}),
   'approach.pragmatic':entry('approach.pragmatic','approach','Практичный','Ценит понятный результат',{practicality:.30}),
   'values.empathetic':entry('values.empathetic','values','Чуткий','Учитывает переживания других',{empathy:.30}),
-  'values.independent':entry('values.independent','values','Независимый','Предпочитает принимать решения сам',{independence:.30})
+  'values.independent':entry('values.independent','values','Независимый','Предпочитает принимать решения сам',{independence:.30}),
+  "novelty.curious":entry("novelty.curious","novelty","Любознательный","При наличии удачного знакомого решения на работе охотнее пробует другое.",{}),
+  "novelty.familiar":entry("novelty.familiar","novelty","Приверженец привычного","На работе предпочитает уже успешно испытанные решения.",{}),
+  "motivation.ambitious":entry("motivation.ambitious","motivation.ambitious","Амбициозный","При хорошем запасе сил стремится к более заметным рабочим результатам.",{}),
+  "motivation.balanced":entry("motivation.balanced","motivation.balanced","Ценит равновесие","При умеренной усталости выбирает более щадящий успешный рабочий подход.",{}),
+  "pace.patient":entry("pace.patient","pace","Терпеливый","В некоторых рабочих ситуациях предпочитает обстоятельный подход.",{}),
+  "pace.impatient":entry("pace.impatient","pace","Нетерпеливый","В некоторых рабочих ситуациях предпочитает прямой и быстрый подход.",{}),
+  "communication.diplomatic":entry("communication.diplomatic","communication.diplomatic","Дипломатичный","Лучше откликается на примирительные и деликатные реплики.",{}),
+  "communication.direct":entry("communication.direct","communication.direct","Прямолинейный","Ценит ясные объяснения и откровенные разговоры.",{}),
+  "tone.playful":entry("tone.playful","tone","Игривый","Лучше откликается на добрые шутки и лёгкую беседу.",{}),
+  "tone.serious":entry("tone.serious","tone","Серьёзный","Ценит содержательные разговоры о взглядах и деньгах.",{})
 });
+/** Explicit symmetric exclusions, including all historical same-facet pairs. */
+export const TRAIT_CONFLICTS=Object.freeze([["temperament.cheerful","temperament.melancholic"],["temperament.cheerful","temperament.calm"],["temperament.cheerful","temperament.hotheaded"],["temperament.melancholic","temperament.calm"],["temperament.melancholic","temperament.hotheaded"],["temperament.calm","temperament.hotheaded"],["habits.neat","habits.untidy"],["coordination.clumsy","coordination.agile"],["social.outgoing","social.reserved"],["approach.creative","approach.pragmatic"],["values.empathetic","values.independent"],["novelty.curious","novelty.familiar"],["pace.patient","pace.impatient"],["tone.playful","tone.serious"]].map(Object.freeze));
+export function traitsConflict(a,b,catalog=TRAIT_CATALOG){
+  const x=getTrait(a,catalog),y=getTrait(b,catalog);
+  return !!(x&&y&&a!==b&&(TRAIT_CONFLICTS.some(([p,q])=>(a===p&&b===q)||(a===q&&b===p))||x.facet===y.facet));
+}
 export const AXES=Object.freeze([
   'optimism','emotionalReactivity','resilience','organization','coordination',
   'sociability','creativity','practicality','empathy','independence'
@@ -44,13 +60,13 @@ export function getTrait(id,catalog=TRAIT_CATALOG){
 }
 export function validateSelection(ids,{catalog=TRAIT_CATALOG,min=PROFILE_RULES.minTraits,max=PROFILE_RULES.maxTraits}={}){
   if(!Array.isArray(ids)||ids.length<min||ids.length>max)return {valid:false,error:'trait_count'};
-  const seen=new Set(),facets=new Set();
+  const seen=new Set();
   for(const id of ids){
     const def=getTrait(id,catalog);
     if(!def)return {valid:false,error:'unknown_trait'};
     if(seen.has(id))return {valid:false,error:'duplicate_trait'};
-    if(facets.has(def.facet))return {valid:false,error:'facet_conflict'};
-    seen.add(id);facets.add(def.facet);
+    if([...seen].some(other=>traitsConflict(other,id,catalog)))return {valid:false,error:'facet_conflict'};
+    seen.add(id);
   }
   return {valid:true,error:null};
 }

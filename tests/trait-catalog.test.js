@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {TRAIT_CATALOG,DEMO_PROFILES,PROFILE_RULES,AXES,PREFERENCE_CATALOG,
-  getTrait,listTraits,validateSelection,validatePreferences,createProfile,
+  getTrait,listTraits,validateSelection,validatePreferences,createProfile,TRAIT_CONFLICTS,traitsConflict,
   restoreProfile,deriveAxes,preferenceAffinity,traitLabels,interestLabels} from '../src/trait-catalog.js';
 import {activityReceipt,isSimEvent} from '../src/sim-events.js';
 import {newGame,loadGame,SAVE_KEY,autonomousChoice} from '../src/simulation.js';
@@ -9,10 +9,10 @@ import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {selectWish,calculateMood,psychologyScore} from '../src/psychology.js';
 const thinker=['temperament.melancholic','habits.neat'];
 const joyful=['temperament.cheerful','coordination.clumsy'];
-test('registry exposes 14 stable unique trait definitions over six facets',()=>{
-  assert.equal(listTraits().length,14);
-  assert.equal(new Set(listTraits().map(t=>t.id)).size,14);
-  assert.equal(new Set(listTraits().map(t=>t.facet)).size,6);
+test('registry exposes 24 stable unique trait definitions',()=>{
+  assert.equal(listTraits().length,24);
+  assert.equal(new Set(listTraits().map(t=>t.id)).size,24);
+  assert.equal(TRAIT_CONFLICTS.length,14);
   assert.ok(AXES.length>=10);assert.equal(PROFILE_RULES.schema,1);
   assert.equal(getTrait('coordination.clumsy').label,'Растяпа');
   assert.equal(getTrait('__proto__'),null);
@@ -144,7 +144,7 @@ const oldTraitGroups=[
 ];
 test('LP-02A: exhaustive old profile pair/triple compatibility in every order',()=>{
   const ids=oldTraitGroups.flat();
-  assert.deepEqual([...Object.keys(TRAIT_CATALOG)].sort(),[...ids].sort());
+  assert.ok(ids.every(id=>Object.hasOwn(TRAIT_CATALOG,id)));
   const groupOf=id=>oldTraitGroups.findIndex(g=>g.includes(id));
   const totals={2:{valid:0,invalid:0},3:{valid:0,invalid:0}};
   const inspect=selection=>{
@@ -173,4 +173,33 @@ test('LP-02A: exhaustive old profile pair/triple compatibility in every order',(
     assert.equal(validateSelection([id,'not.registered']).valid,false);
   }
   assert.equal(validateSelection([ids[0],ids[4],ids[6],ids[8]]).valid,false);
+});
+
+test('LP-02C: all ordered 24-trait pairs and triples against independent groups, old axes unchanged',()=>{
+  const groups=[...oldTraitGroups,['novelty.curious','novelty.familiar'],['pace.patient','pace.impatient'],['tone.playful','tone.serious'],['motivation.ambitious'],['motivation.balanced'],['communication.diplomatic'],['communication.direct']];
+  const ids=groups.flat(),old=oldTraitGroups.flat();
+  assert.deepEqual(Object.keys(TRAIT_CATALOG).sort(),[...ids].sort());
+  const group=id=>groups.findIndex(g=>g.includes(id));
+  let checked=0,restored=0;
+  function verify(xs){
+    const valid=new Set(xs.map(group)).size===xs.length;
+    const [a,b,c]=xs;
+    for(const order of c?[[a,b,c],[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]]:[[a,b],[b,a]]){
+      assert.equal(validateSelection(order).valid,valid,order.join(','));
+      checked++;
+      if(valid)assert.deepEqual(deriveAxes(createProfile(order)),deriveAxes({traitIds:order.filter(id=>old.includes(id))}));
+    }
+    if(valid){
+      const root=newHousehold();root.personality=createProfile(xs);root.otherSim.personality=createProfile([...xs].reverse());
+      const loaded=loadHousehold(JSON.parse(JSON.stringify(root)));
+      assert.deepEqual(loaded.personality,root.personality);assert.deepEqual(loaded.otherSim.personality,root.otherSim.personality);restored++;
+    }
+  }
+  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+    assert.equal(traitsConflict(ids[i],ids[j]),group(ids[i])===group(ids[j]));
+    assert.equal(traitsConflict(ids[i],ids[j]),traitsConflict(ids[j],ids[i]));
+    verify([ids[i],ids[j]]);
+    for(let k=j+1;k<ids.length;k++)verify([ids[i],ids[j],ids[k]]);
+  }
+  assert.equal(checked,12696);assert.equal(restored,1986);
 });

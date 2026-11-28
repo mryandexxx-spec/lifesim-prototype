@@ -103,7 +103,7 @@ export function socialCueNotes(pair,viewerId,limit=3){
 /** Stable disposition affects the recipient whether or not the initiator
  * knows it. A transient bad day may still override this small coefficient.
  */
-export function boundaryDisposition(profile,actionId){
+function baselineDisposition(profile,actionId){
   if(!validRecord(profile)||!Array.isArray(profile.traitIds)||typeof actionId!=='string')return 0;
   const axes=deriveAxes(profile);
   if(sharp.has(actionId))return axes.emotionalReactivity>=.66?-6:axes.empathy>=.70?-4:0;
@@ -119,6 +119,18 @@ export function boundaryDisposition(profile,actionId){
   if(imaginative.has(actionId)&&axes.creativity>=.70)return 4;
   if(concrete.has(actionId)&&axes.practicality>=.72)return 4;
   return 0;
+}
+const traitStyles=Object.freeze({
+  'communication.diplomatic':['conflict.apologize','family.share','money.reflect'],
+  'communication.direct':['conflict.explain','gossip.share','relationships.reflect'],
+  'tone.playful':['humor.joke','career.tact','family.tact'],
+  'tone.serious':['philosophy.share','money.deep']
+});
+export function boundaryDisposition(profile,actionId){
+  const old=baselineDisposition(profile,actionId);
+  if(old!==0)return old;
+  if(!Array.isArray(profile?.traitIds)||typeof actionId!=='string')return 0;
+  return profile.traitIds.some(id=>Object.hasOwn(traitStyles,id)&&traitStyles[id].includes(actionId))?3:0;
 }
 /** Learned expectations modify contextual conversation choices, not the
  * person's personality, friendship, guaranteed legacy acts or save scores.
