@@ -10,7 +10,8 @@ import {evaluateSocialReaction} from './social-reactions.js';
 import {emitSocialReaction} from './social-feedback.js';
 import {socialCompatibility,CONVERSATION_DISCOVERY_TAGS} from './social-compatibility.js';
 import {cueFromAnswer} from './social-boundaries.js';
-import {proposeAutonomousSocial,AUTONOMOUS_FRIEND_BRANCHES,autonomousLeisureToken} from './social-dynamics.js';
+import {proposeAutonomousSocial,AUTONOMOUS_FRIEND_BRANCHES,autonomousLeisureToken,pairSocialHabits} from './social-dynamics.js';
+import {moodActionPolicy} from './mood-action-policy.js';
 import {GIFT_CATALOG,LEISURE_CATALOG,inventoryFor,evaluateLeisure} from './gifts-leisure.js';
 import {newPerspective,restorePerspective,applySocialPerspective,getPerspective} from './social-perspective.js';
 import {createConversation,restoreConversation,chooseConversationTurn,continueConversation,conversationOutcome} from './conversation-engine.js';
@@ -18,7 +19,7 @@ import {createSharedSession,restoreSharedSession,sharedDuration,completeSharedSe
 import {validSharedTvPlan} from './tv-together.js';
 import {validPairedHobbyPlan,livePairedHobby} from './paired-hobby.js';
 import {availableSocialActions,resolveBranchResponse,observePairViews,
-  applySocialEvent,learnSocialPreference,learnSocialCue} from './social-graph.js';
+  applySocialEvent,learnSocialPreference,learnSocialCue,getPair} from './social-graph.js';
 import {romanceAvailability} from './romance.js';
 import {validRomanticEveningStage} from './romantic-evening-stage.js';
 import {validRomanticEveningSofa} from './romantic-sofa-stage.js';
@@ -593,5 +594,30 @@ export function autonomousSocialChoice(root,id='alex') {
     reconcileTargetId:canReconcile(root)&&lastSocialMemory(get(root,id))?.id==='regret'
       ?otherId(id):null
   });
-  return idea?.action?{kind:idea.kind,...idea.action}:idea?.kind??null;
+  const base=idea?.action?{kind:idea.kind,...idea.action}:idea?.kind??null;
+  // LP-02D: refine only an already offered friend branch. Legacy adapter
+  // owns actual admission and consent; no new target, conflict or dialogue.
+  if(base?.type!=='branch'||!['friend.tease','friend.confide'].includes(base.actionId))return base;
+  const peer=otherId(id),a=get(root,id),b=get(root,peer),traits=a.personality?.traitIds;
+  if(!Array.isArray(traits))return base;
+  const actionId=traits.includes('tone.playful')?'friend.tease':
+    traits.includes('tone.serious')?'friend.confide':null;
+  if(!actionId||actionId===base.actionId)return base;
+  const pair=getPair(root.socialGraph,id,peer),view=root.relationship?.views?.[id],
+    other=root.relationship?.views?.[peer];
+  if(!pair||!view||!other||view.trust<65||other.trust<65||
+    pair.views[id].trust<65||pair.views[peer].trust<65||
+    Math.max(view.tension,other.tension,pair.views[id].tension,pair.views[peer].tension)>=20||
+    a.mind?.mood?.value<55||b.mind?.mood?.value<55)return base;
+  const habits=pairSocialHabits(pair,id,root.minutes);
+  if(pair.events.at(-1)?.type===actionId||
+    habits.recent.filter(x=>x==='branch.'+actionId).length>=2)return base;
+  if(!availableSocialActions(root.socialGraph,id,peer,root.minutes)
+    .some(x=>x.id===actionId&&x.enabled)||
+    !moodActionPolicy(a,{type:'branch',actionId},{automatic:true}).willing||
+    resolveBranchResponse(root.socialGraph,id,peer,actionId,{
+      recipient:b,minutes:root.minutes,
+      compatibilityBias:socialCompatibility(b.personality,a.personality).bias
+    })?.accepted!==true)return base;
+  return {kind:'talk',type:'branch',actionId};
 }

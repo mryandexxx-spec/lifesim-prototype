@@ -25,8 +25,8 @@ export const TRAIT_CATALOG=Object.freeze({
   "pace.impatient":entry("pace.impatient","pace","Нетерпеливый","В некоторых рабочих ситуациях предпочитает прямой и быстрый подход.",{}),
   "communication.diplomatic":entry("communication.diplomatic","communication.diplomatic","Дипломатичный","Лучше откликается на примирительные и деликатные реплики.",{}),
   "communication.direct":entry("communication.direct","communication.direct","Прямолинейный","Ценит ясные объяснения и откровенные разговоры.",{}),
-  "tone.playful":entry("tone.playful","tone","Игривый","Лучше откликается на добрые шутки и лёгкую беседу.",{}),
-  "tone.serious":entry("tone.serious","tone","Серьёзный","Ценит содержательные разговоры о взглядах и деньгах.",{})
+  "tone.playful":entry("tone.playful","tone","Игривый","Лучше откликается на добрые шутки и при подходящем общении может сам пошутить.",{}),
+  "tone.serious":entry("tone.serious","tone","Серьёзный","Ценит содержательные разговоры о взглядах и деньгах, может предпочесть доверительную беседу.",{})
 });
 /** Explicit symmetric exclusions, including all historical same-facet pairs. */
 export const TRAIT_CONFLICTS=Object.freeze([["temperament.cheerful","temperament.melancholic"],["temperament.cheerful","temperament.calm"],["temperament.cheerful","temperament.hotheaded"],["temperament.melancholic","temperament.calm"],["temperament.melancholic","temperament.hotheaded"],["temperament.calm","temperament.hotheaded"],["habits.neat","habits.untidy"],["coordination.clumsy","coordination.agile"],["social.outgoing","social.reserved"],["approach.creative","approach.pragmatic"],["values.empathetic","values.independent"],["novelty.curious","novelty.familiar"],["pace.patient","pace.impatient"],["tone.playful","tone.serious"]].map(Object.freeze));

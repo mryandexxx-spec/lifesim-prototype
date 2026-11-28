@@ -346,23 +346,7 @@ function styleFixture(id,style){
   assert.notEqual(getPair(g,id,peer).friendship,'none');
   return s;
 }
-function trialStyleChoice(root,id){
-  const base=autonomousSocialChoice(root,id),peer=id==='alex'?'mira':'alex';
-  if(base?.type!=='branch'||!['friend.tease','friend.confide'].includes(base.actionId))return base;
-  const a=id==='alex'?root:root.otherSim,b=peer==='alex'?root:root.otherSim;
-  const trait=a.personality.traitIds;
-  const proposed=trait.includes('tone.playful')?'friend.tease':trait.includes('tone.serious')?'friend.confide':null;
-  if(!proposed||proposed===base.actionId)return base;
-  const pair=getPair(root.socialGraph,id,peer),view=pair.views[id],other=pair.views[peer];
-  const habits=pairSocialHabits(pair,id,root.minutes);
-  if(pair.events.at(-1)?.type===proposed||habits.recent.filter(x=>x==='branch.'+proposed).length>=2||
-    view.trust<65||other.trust<65||view.tension>=20||other.tension>=20||
-    a.mind.mood.value<55||b.mind.mood.value<55||
-    !availableSocialActions(root.socialGraph,id,peer,root.minutes).some(x=>x.id===proposed&&x.enabled)||
-    !moodActionPolicy(a,{type:'branch',actionId:proposed},{automatic:true}).willing)return base;
-  return {kind:'talk',type:'branch',actionId:proposed};
-}
-test('LP-02D2 exploratory tone choices: real voluntary friend branch admission, completion and vetoes',()=>{
+test('LP-02D3 native tone choices: real voluntary friend branch admission, completion and vetoes',()=>{
  const results=[];
  for(const id of ['alex','mira'])for(const [style,trait,expected] of [
    ['supportive','tone.playful','friend.tease'],['playful','tone.serious','friend.confide']]){
@@ -371,7 +355,7 @@ test('LP-02D2 exploratory tone choices: real voluntary friend branch admission, 
    const base=autonomousSocialChoice(s,id);
    assert.equal(base?.actionId,style==='supportive'?'friend.confide':'friend.tease');
    a.personality=createProfile(['habits.neat','coordination.agile',trait]);
-   const before=JSON.stringify(s),candidate=trialStyleChoice(s,id);
+   const before=JSON.stringify(s),candidate=autonomousSocialChoice(s,id);
    assert.equal(candidate?.actionId,expected);assert.equal(JSON.stringify(s),before);
    const paired=[];
    for(const plan of [base,candidate]){
@@ -391,13 +375,19 @@ test('LP-02D2 exploratory tone choices: real voluntary friend branch admission, 
      paired.push({action:plan.actionId,admitted:true,receipt:receipt.type});
    }
    assert.ok(paired.every(x=>x.admitted&&x.receipt===x.action),JSON.stringify(paired));
-   const control=copy(s);control.paused=true;assert.equal(trialStyleChoice(control,id),null);
-   b.needs.hunger=10;assert.equal(trialStyleChoice(s,id),null);b.needs.hunger=85;
+   const control=copy(s);control.paused=true;assert.equal(autonomousSocialChoice(control,id),null);
+   // Heldout: directed trust is enough for the native base proposal, but
+   // too low to switch. A tone must never turn a fragile pair into a joke.
+   const restrained=copy(s);
+   restrained.relationship.views[peer].trust=64;
+   getPair(restrained.socialGraph,id,peer).views[peer].trust=64;
+   assert.deepEqual(autonomousSocialChoice(restrained,id),base);
+   b.needs.hunger=10;assert.equal(autonomousSocialChoice(s,id),null);b.needs.hunger=85;
    assert.ok(enqueueAction(s.actionQueues,peer,{type:'object',actionId:'bed'}));
-   assert.equal(trialStyleChoice(s,id),null);
+   assert.equal(autonomousSocialChoice(s,id),null);
    results.push({id,trait,paired});
  }
- console.log('LP-02D2 tone branch candidate '+JSON.stringify(results));
+ console.log('LP-02D3 native tone branch '+JSON.stringify(results));
 });
 
 /** Player-opened dialogue only. Test if actual existing authored alternatives

@@ -317,6 +317,17 @@ function workMotiveBias(actor,contract,def,o,energy,mood,history){
     }
   }
   if(pace?.includes(o.id)&&((has('pace.patient')&&o.id===pace[0])||(has('pace.impatient')&&o.id===pace[1])))return 3;
+  // D3: authored options already carry real energy and performance costs.
+  // Outside the C opportunity pairs, favor a successful, less draining
+  // alternative only when it is a genuine positive-result tradeoff.
+  // No bonus to delays/failures, no new effect, no increase above C's +3.
+  if(!options&&has('motivation.balanced')&&energy<=70){
+    const successful=def.options.filter(x=>x.performance>0)
+      .sort((a,b)=>b.performance-a.performance||a.id.localeCompare(b.id));
+    const high=successful[0],low=successful.slice(1)
+      .find(x=>x.energy>high.energy&&x.performance<high.performance);
+    if(low?.id===o.id)return 3;
+  }
   return 0;
 }
 export function chooseAutonomousWorkOption(root,id){

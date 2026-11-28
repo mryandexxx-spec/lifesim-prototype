@@ -343,3 +343,51 @@ test('LP-02D0 natural incident exposure and decision-window audit',()=>{
   mkdirSync('artifacts/lp02d0',{recursive:true});
   writeFileSync('artifacts/lp02d0/exposure.json',JSON.stringify({matrix,limitations:['natural extra resident schedule only','end forecast is detached and not guaranteed exact actual end state','counterfactual choices are not candidate settlements','legacy home routing absent']},null,2));
 });
+
+/** D3: candidate really plays the scheduled shifts, not just detached forecasts.
+ * Two extra residents only: actual headless routing/care exists for them.
+ * Same starting root, no injected incidents/history/needs; fixed 12-day horizon.
+ */
+test('LP-02D3 native balanced trait changes actual scheduled receipts without care or shift regression',()=>{
+ const anchors=['habits.neat','coordination.agile'],results=[];
+ for(const careers of [['city-services','kitchen-studio'],['business-center','art-studio'],['editorial','civic-service']]){
+   const runs=[];
+   for(const candidate of [false,true]){
+     let root=home(4),ids=residentIdsForSimulation(root);
+     const actors=['resident_3','resident_4'],steps=12*1440/10,start=root.minutes;
+     const critical={resident_3:0,resident_4:0},journal=new Map();
+     actors.forEach((id,i)=>{getActor(root,id).personality=createProfile([...anchors,...(candidate?['motivation.balanced']:[])]);hire(root,id,careers[i]);});
+     for(let i=1;i<=steps;i++){
+       const before=root.minutes;tickHousehold(root,10);assert.equal(root.minutes,before+10);
+       for(const id of actors){
+         const a=getActor(root,id);
+         if(Math.min(a.needs.energy,a.needs.hunger,a.needs.hygiene,a.needs.bladder)<25)critical[id]++;
+         for(const e of root.careerSystem.incidentHistory[id]||[])
+           journal.set(JSON.stringify([id,e.shiftStart,e.scenarioId]),{id,scene:e.scenarioId,choice:e.choiceId,energy:e.energyDelta,performance:e.performanceDelta});
+       }
+       if(i%144===0){
+         invariant(root,ids);const snapshot=copy(root);
+         root=loadHousehold(snapshot);
+         assert.deepEqual(root.careerSystem.incidentIds,snapshot.careerSystem.incidentIds);
+         for(const id of actors)assert.deepEqual(getActor(root,id).personality,createProfile([...anchors,...(candidate?['motivation.balanced']:[])]));
+       }
+     }
+     assert.equal(root.minutes,start+12*1440);invariant(root,ids);
+     const paid=Object.fromEntries(actors.map(id=>[id,root.financialHistory.entries.filter(e=>e.kind==='salary'&&e.actorId===id).length]));
+     assert.ok(actors.every(id=>paid[id]>0));
+     assert.equal(new Set(root.careerSystem.incidentIds).size,root.careerSystem.incidentIds.length);
+     runs.push({steps,critical,paid,journal});
+   }
+   const [base,next]=runs,matched=[...base.journal].filter(([key])=>next.journal.has(key));
+   const changed=matched.filter(([key,v])=>next.journal.get(key).choice!==v.choice)
+     .map(([key,v])=>({before:v,after:next.journal.get(key)}));
+   for(const id of Object.keys(base.paid)){
+     assert.ok(next.critical[id]-base.critical[id]<=base.steps*.05,'critical care regression '+id);
+     assert.ok(next.paid[id]>=base.paid[id],'lost paid shift '+id);
+   }
+   const report={careers,base:{critical:base.critical,paid:base.paid,count:base.journal.size},
+     candidate:{critical:next.critical,paid:next.paid,count:next.journal.size},matched:matched.length,changed};
+   console.log('LP-02D3 native matched schedule '+JSON.stringify(report));results.push(report);
+ }
+ assert.ok(results.reduce((sum,r)=>sum+r.changed.filter(x=>x.after.energy>x.before.energy&&x.after.performance>0).length,0)>0,'at least one actual successful energy-saving choice');
+});
