@@ -465,6 +465,9 @@ export function additionalCareCapability(root,id,actionId){
     return probeAdditionalCare(root,id,actionId);
   const blocked=additionalAutonomyBlock(root,id);
   if(blocked)return {status:'blocked',reason:blocked,plan:null};
+  const actor=savedAdditionalActor(root,id);
+  if(!actor||!Number.isFinite(root.minutes)||root.minutes<actor.autonomy.nextAt)
+    return {status:'blocked',reason:'cooldown',plan:null};
   return probeAdditionalCare(root,id,actionId);
 }
 
@@ -508,14 +511,20 @@ export function explainAdditionalResidentAutonomy(root,id){
 }
 
 /** Transient intent, not an accepted command, reservation or saved event. */
-function careProposal(id,minutes,plan){
-  return plan?Object.freeze({type:'additional-care',residentId:id,
-    at:minutes,actionId:plan.id,targetInstanceId:plan.targetInstanceId,
-    bedSlot:plan.bedSlot??null}):null;
+// Provenance is transient and weakly held; it cannot survive a saved-game
+// reload, bind another household, or become a reusable admission ticket.
+const careProposalOrigins=new WeakMap();
+function careProposal(root,id,plan){
+  if(!plan)return null;
+  const proposal=Object.freeze({type:'additional-care',residentId:id,
+    at:root.minutes,actionId:plan.id,targetInstanceId:plan.targetInstanceId,
+    bedSlot:plan.bedSlot??null});
+  careProposalOrigins.set(proposal,root);
+  return proposal;
 }
 export function proposeAdditionalCare(root,id){
   const explanation=explainAdditionalResidentAutonomy(root,id);
-  return careProposal(id,root?.minutes,explanation.plan);
+  return careProposal(root,id,explanation.plan);
 }
 /** Reuse the real care adapter at the current clock and exact target. The
  * returned result describes admission only; the existing tick owns effects.
@@ -526,6 +535,8 @@ export function admitAdditionalCareProposal(root,id,proposal){
     typeof proposal.targetInstanceId!=='string'||
     !ADDITIONAL_AUTONOMOUS_ACTIONS.includes(proposal.actionId))
     return rejected('invalid-proposal');
+  if(careProposalOrigins.get(proposal)!==root)return rejected('foreign-or-used-proposal');
+  careProposalOrigins.delete(proposal);
   if(!Number.isFinite(root?.minutes)||proposal.at!==root.minutes)
     return rejected('stale-clock');
   const blocked=additionalAutonomyBlock(root,id);
@@ -550,7 +561,7 @@ export function startAdditionalResidentAutonomy(root,id){
   const actor=savedAdditionalActor(root,id);
   actor.autonomy.enabled=root.autonomy.enabled;
   actor.minutes=root.minutes;
-  const proposal=careProposal(id,root.minutes,explanation.plan);
+  const proposal=careProposal(root,id,explanation.plan);
   if(proposal&&admitAdditionalCareProposal(root,id,proposal).status==='admitted')
     return true;
   // No eligible need: do not repeatedly postpone a future need merely

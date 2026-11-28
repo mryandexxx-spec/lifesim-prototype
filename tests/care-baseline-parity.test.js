@@ -13,7 +13,7 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 export async function collectCareTrace(path){
   const {sim,hh,extra,queue,nav,furniture}=await load(path);
   const traces=[];
-  for(const size of [2,4])for(const scenario of ['normal','night','memory','paused','disabled','fifo','occupied','active','cooldown']){
+  for(const size of [2,4])for(const scenario of ['normal','night','memory','paused','disabled','fifo','occupied','active','cooldown','parked','speed3']){
     let root=hh.newHousehold('2026-11-21');
     if(size===4){
       const ids=['resident_3','resident_4'];
@@ -43,9 +43,12 @@ export async function collectCareTrace(path){
       if(scenario==='memory')a.mind.memories.push({id:'fridge',at:root.minutes-1,fulfilled:true});
       if(scenario==='fifo')queue.enqueueAction(root.actionQueues,id,{type:'object',actionId:'fridge',targetInstanceId:fridge.instanceId});
       if(scenario==='active')a.action={id:'fridge',phase:'walking',elapsed:0,automatic:false,targetInstanceId:fridge.instanceId};
+      if(scenario==='parked')assert.ok(queue.parkInterruptedAction(root.actionQueues,id,
+        {type:'object',actionId:'fridge',targetInstanceId:fridge.instanceId},'resource-busy',root.minutes));
     }
     if(scenario==='occupied')root.action={id:'fridge',phase:'using',elapsed:0,automatic:false,targetInstanceId:fridge.instanceId};
     root.paused=scenario==='paused';root.autonomy.enabled=scenario!=='disabled';
+    root.speed=scenario==='speed3'?3:1;
     const observe=()=>{
       const rows=[];
       for(const id of ids){
@@ -71,10 +74,10 @@ export async function collectCareTrace(path){
 }
 test('care baseline trace covers two and four residents, and matches frozen base when supplied',async()=>{
   const candidate=await collectCareTrace(process.cwd());
-  assert.equal(candidate.length,18);
+  assert.equal(candidate.length,22);
   if(process.env.CARE_BASELINE_PATH){
     const baseline=await collectCareTrace(process.env.CARE_BASELINE_PATH);
     assert.deepEqual(candidate,baseline);
-    console.log('Exact baseline parity: 18 matched care traces');
+    console.log('Exact baseline parity: 22 matched care traces');
   }
 });

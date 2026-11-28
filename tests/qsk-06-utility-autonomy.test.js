@@ -152,6 +152,9 @@ test('care capability classifications do not imply execution or mutate the save'
   assert.equal(additionalCareCapability(root,'resident_3','fake').status,'unknown');
   assert.equal(additionalCareCapability(root,'resident_999','toilet').status,'blocked');
   assert.deepEqual(root,before);
+  a.autonomy.nextAt=root.minutes+1;
+  assert.equal(additionalCareCapability(root,'resident_3','toilet').reason,'cooldown');
+  a.autonomy.nextAt=root.minutes;
   root.paused=true;assert.equal(additionalCareCapability(root,'resident_3','toilet').status,'blocked');
 });
 test('care proposal uses actual adapter, rejects stale, foreign and occupied targets without rewards',()=>{
@@ -161,6 +164,10 @@ test('care proposal uses actual adapter, rejects stale, foreign and occupied tar
   assert.equal(proposal.actionId,'toilet');assert.equal(Object.isFrozen(proposal),true);
   assert.deepEqual(root,before);
   assert.equal(admitAdditionalCareProposal(root,'alex',proposal).status,'rejected');
+  assert.equal(admitAdditionalCareProposal(loadHousehold(copy(root)),'resident_3',proposal).reason,
+    'foreign-or-used-proposal');
+  assert.equal(admitAdditionalCareProposal(root,'resident_3',{...proposal}).reason,
+    'foreign-or-used-proposal');
   root.minutes+=.3;
   assert.equal(admitAdditionalCareProposal(root,'resident_3',proposal).reason,'stale-clock');
   const fresh=proposeAdditionalCare(root,'resident_3');
@@ -177,6 +184,7 @@ test('care proposal uses actual adapter, rejects stale, foreign and occupied tar
   const outcome=admitAdditionalCareProposal(restored,'resident_3',intent);
   assert.equal(outcome.status,'admitted');assert.equal(outcome.phase,'walking');
   assert.deepEqual(b.needs,needs);
-  assert.equal(admitAdditionalCareProposal(restored,'resident_3',intent).status,'rejected');
+  assert.equal(admitAdditionalCareProposal(restored,'resident_3',intent).reason,
+    'foreign-or-used-proposal');
   assert.equal(loadHousehold(copy(restored)).version,1);
 });
