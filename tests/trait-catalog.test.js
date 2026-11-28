@@ -130,3 +130,47 @@ test('completed activity receipts are safe typed immutable values',()=>{
   assert.equal(activityReceipt('sofa',NaN),null);
   assert.equal(isSimEvent({type:'gift.given',atGameMinute:-1}),false);
 });
+
+
+// Independently frozen old catalogue groups; do not derive expected conflicts
+// from the validator under test. Catalogue expansion must extend this fixture.
+const oldTraitGroups=[
+  ['temperament.cheerful','temperament.melancholic','temperament.calm','temperament.hotheaded'],
+  ['habits.neat','habits.untidy'],
+  ['coordination.clumsy','coordination.agile'],
+  ['social.outgoing','social.reserved'],
+  ['approach.creative','approach.pragmatic'],
+  ['values.empathetic','values.independent']
+];
+test('LP-02A: exhaustive old profile pair/triple compatibility in every order',()=>{
+  const ids=oldTraitGroups.flat();
+  assert.deepEqual([...Object.keys(TRAIT_CATALOG)].sort(),[...ids].sort());
+  const groupOf=id=>oldTraitGroups.findIndex(g=>g.includes(id));
+  const totals={2:{valid:0,invalid:0},3:{valid:0,invalid:0}};
+  const inspect=selection=>{
+    const valid=new Set(selection.map(groupOf)).size===selection.length;
+    totals[selection.length][valid?'valid':'invalid']++;
+    const [a,b,c]=selection;
+    const orders=selection.length===2?[[a,b],[b,a]]:
+      [[a,b,c],[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]];
+    for(const order of orders){
+      assert.equal(validateSelection(order).valid,valid,order.join(','));
+      if(valid){
+        const p=createProfile(order);
+        assert.deepEqual(restoreProfile(JSON.parse(JSON.stringify(p))),p);
+        assert.deepEqual(deriveAxes(p),deriveAxes(createProfile(selection)));
+      }else assert.throws(()=>createProfile(order),RangeError);
+    }
+  };
+  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+    inspect([ids[i],ids[j]]);
+    for(let k=j+1;k<ids.length;k++)inspect([ids[i],ids[j],ids[k]]);
+  }
+  assert.deepEqual(totals,{2:{valid:80,invalid:11},3:{valid:240,invalid:124}});
+  for(const id of ids){
+    assert.equal(validateSelection([id,id]).valid,false);
+    assert.equal(validateSelection([id]).valid,false);
+    assert.equal(validateSelection([id,'not.registered']).valid,false);
+  }
+  assert.equal(validateSelection([ids[0],ids[4],ids[6],ids[8]]).valid,false);
+});

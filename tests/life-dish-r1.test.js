@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newHousehold,loadHousehold,chooseResidentAction,tickHousehold,
-  residentAutonomousChoice,furnitureAvailable} from '../src/household.js';
+  residentAutonomousChoice,furnitureAvailable,getActor} from '../src/household.js';
 import {DISH_AUTO_WASH_THRESHOLD,newKitchen,recordDirtyDish,washKitchenDishes} from '../src/kitchen.js';
 import {dirtyDishVisualPlan,DISH_VISUAL_CAP} from '../src/dirty-dishes-visual.js';
 import {furnitureActionApproach} from '../src/furniture-catalog.js';
 import {arrive,ACTIONS,SAVE_KEY} from '../src/simulation.js';
 import {readFileSync} from 'node:fs';
+import {createProfile} from '../src/trait-catalog.js';
+import {enqueueAction} from '../src/action-queue.js';
 
 const sink={instanceId:'dish-sink',prefabId:'sink',itemDefinitionId:'sink.farm',
   location:'home',x:12.5,z:1.5,yaw:0};
@@ -117,4 +119,81 @@ test('DISH-R1: actual PlayCanvas UI contract, bounded 3D cache and one save key'
   assert.match(html,/id="dish-alert"/);
   assert.match(game,/select\('wash',sink\.instanceId\)/);
   assert.doesNotMatch(game,/dirtyDishes\s*[+\-]=/);
+});
+
+
+function personalityDishFixture(id,trait,count,fun=95){
+  const h=household(),a=getActor(h,id);
+  h.autonomy.enabled=true;h.otherSim.autonomy.enabled=true;
+  h.minutes=480;a.minutes=480;a.autonomy.nextAt=480;
+  Object.assign(a.needs,{hunger:95,energy:95,hygiene:95,fun,social:95,bladder:95});
+  a.personality=createProfile(['temperament.calm',trait],{likes:[],dislikes:[]});
+  h.kitchen.dirtyDishes=count;
+  return {h,a};
+}
+test('LP-02A: housekeeping timing differs by profile, not legacy actor identity',()=>{
+  for(const id of ['alex','mira'])for(const count of [0,2,3,5,6,8,9,32]){
+    for(const [trait,threshold] of [['habits.neat',3],['habits.untidy',6],['coordination.agile',6]]){
+      const {h}=personalityDishFixture(id,trait,count);
+      assert.equal(residentAutonomousChoice(h,id)==='wash',count>=threshold,
+        JSON.stringify({id,trait,count}));
+      assert.equal(h.kitchen.dirtyDishes,count,'selection does not settle dishes');
+    }
+  }
+});
+test('LP-02A: care choice outranks early tidy impulse; untidy may defer only before hard ceiling',()=>{
+  for(const id of ['alex','mira'])for(const count of [3,5,6,8,9,32]){
+    for(const trait of ['habits.neat','habits.untidy','coordination.agile']){
+      const {h}=personalityDishFixture(id,trait,count,30);
+      const shouldWash=count>=9||(count>=6&&trait!=='habits.untidy');
+      assert.equal(residentAutonomousChoice(h,id),shouldWash?'wash':'sofa',
+        JSON.stringify({id,trait,count}));
+      assert.equal(h.kitchen.dirtyDishes,count);
+    }
+  }
+});
+test('LP-02A: missing/occupied sink, active command, urgent hunger, pause and FIFO prevent early wash',()=>{
+  for(const id of ['alex','mira']){
+    const fixture=()=>personalityDishFixture(id,'habits.neat',3);
+    const missing=fixture();missing.h.world.furniture.instances.find(x=>x.instanceId==='dish-sink').location='storage';
+    assert.notEqual(residentAutonomousChoice(missing.h,id),'wash');
+    const occupied=fixture(),other=id==='alex'?'mira':'alex';
+    assert.ok(chooseResidentAction(occupied.h,'wash',false,other,'dish-sink'));
+    assert.notEqual(residentAutonomousChoice(occupied.h,id),'wash');
+    const active=fixture();
+    assert.ok(chooseResidentAction(active.h,'sofa',false,id));
+    assert.notEqual(residentAutonomousChoice(active.h,id),'wash');
+    const urgent=fixture();urgent.a.needs.hunger=10;
+    assert.equal(residentAutonomousChoice(urgent.h,id),'fridge');
+    const paused=fixture();paused.h.paused=true;
+    assert.equal(residentAutonomousChoice(paused.h,id),null);
+    const disabled=fixture();disabled.h.autonomy.enabled=false;
+    assert.equal(residentAutonomousChoice(disabled.h,id),null);
+    const queued=fixture();assert.ok(enqueueAction(queued.h.actionQueues,id,{type:'object',actionId:'sofa'}));
+    assert.equal(residentAutonomousChoice(queued.h,id),null);
+    for(const item of [missing,occupied,active,urgent,paused,disabled,queued])
+      assert.equal(item.h.kitchen.dirtyDishes,3);
+  }
+});
+test('LP-02A: early wash uses existing physical completion once and survives profile reload',()=>{
+  for(const id of ['alex','mira']){
+    const {h,a}=personalityDishFixture(id,'habits.neat',3);
+    const restored=loadHousehold(structuredClone(h));
+    assert.equal(restored.version,1);
+    assert.deepEqual(getActor(restored,id).personality,a.personality);
+    assert.equal(restored.kitchen.dirtyDishes,3);
+    assert.equal(residentAutonomousChoice(h,id),'wash');
+    assert.ok(chooseResidentAction(h,'wash',true,id,'dish-sink'));
+    assert.equal(h.kitchen.dirtyDishes,3);
+    a.position={...furnitureActionApproach(h.world,'wash','dish-sink')};
+    arrive(a);
+    h.autonomy.enabled=false;h.otherSim.autonomy.enabled=false;
+    h.paused=true;tickHousehold(h,ACTIONS.wash.duration);
+    assert.equal(h.kitchen.dirtyDishes,3);
+    h.paused=false;tickHousehold(h,ACTIONS.wash.duration);
+    assert.equal(h.kitchen.dirtyDishes,0);
+    assert.equal(a.action,null);
+    tickHousehold(h,ACTIONS.wash.duration);
+    assert.equal(h.kitchen.dirtyDishes,0);
+  }
 });
