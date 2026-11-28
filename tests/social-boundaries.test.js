@@ -256,3 +256,32 @@ test('mobile scene and Pages include optional personal cue UI, not numeric thres
  assert.ok(!/\b(alex|mira|document|localStorage|playcanvas)\b/i.test(core));
  assert.equal(CUE_LIMIT,5);
 });
+
+
+test('LP-02A: empathetic resident welcomes help, personal space wins for combined profile',()=>{
+  const empathetic=createProfile(['temperament.calm','values.empathetic']);
+  const reserved=createProfile(['social.reserved','values.empathetic']);
+  const neutral=createProfile(['temperament.calm','habits.neat']);
+  assert.equal(boundaryDisposition(empathetic,'support.help'),4);
+  assert.equal(boundaryDisposition(empathetic,'support.listen'),4);
+  assert.equal(boundaryDisposition(reserved,'support.help'),-5);
+  assert.equal(boundaryDisposition(reserved,'support.listen'),4);
+  assert.equal(boundaryDisposition(neutral,'support.help'),0);
+  const s=newHousehold();s.otherSim.personality=empathetic;
+  const before=evaluateResponse(s,'alex','support','support.help');
+  s.otherSim.personality=neutral;
+  const after=evaluateResponse(s,'alex','support','support.help');
+  assert.ok(before.confidence>after.confidence);
+});
+test('LP-02A: real learned support cue applies to help unless a space boundary is known',()=>{
+  const g=newSocialGraph(ids),a=actual(g,'nova','ember','conversation.talk',500);
+  learnSocialCue(g,a,'nova','ember','support.help',true);
+  assert.equal(socialCommunicationBias(g,'nova','ember','support.help'),2);
+  assert.equal(socialCommunicationBias(g,'nova','ember','support.listen'),2);
+  const b=actual(g,'nova','ember','conversation.talk',600);
+  learnSocialCue(g,b,'nova','ember','support.help',false);
+  assert.equal(socialCommunicationBias(g,'nova','ember','support.help'),-2);
+  assert.equal(socialCommunicationBias(g,'nova','ember','support.listen'),2);
+  const restored=restoreSocialGraph(clone(g),ids);
+  assert.equal(socialCommunicationBias(restored,'nova','ember','support.help'),-2);
+});

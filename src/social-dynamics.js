@@ -233,6 +233,18 @@ export function proposeAutonomousSocial({
     const distressed=!repair&&!severe&&directed.tension>=85&&
       mood<42&&self.needs.fun<35;
     if(distressed)score+=20;
+    // Discretionary company is distinct from a genuinely unmet social need.
+    // Preserve all existing eligibility, cooldown, repair and distress gates.
+    // A weak but safe acquaintance is interesting to an outgoing resident;
+    // reserved/independent residents are more selective about optional company.
+    if(!repair&&!distressed&&finite(self.needs.social)&&socialLevel>=45){
+      if(axes.sociability<=.36&&directed.trust<60)score-=4;
+      if(axes.independence>=.70)score-=4;
+      if(axes.sociability>=.70&&directed.friendship>=35&&directed.friendship<=55&&
+        directed.trust>=45&&directed.tension<20&&targetView.tension<20&&!boundary&&!recipientWound.unresolved)
+        score+=3;
+      if(axes.empathy>=.70&&boundary?.count>=1)score-=3;
+    }
     if(score<26)continue; // Having nothing to say is a valid autonomous choice.
     const candidate={actorId,targetId,
       kind:distressed?'argue':'talk',

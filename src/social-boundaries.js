@@ -100,7 +100,7 @@ export function boundaryDisposition(profile,actionId){
   if(!validRecord(profile)||!Array.isArray(profile.traitIds)||typeof actionId!=='string')return 0;
   const axes=deriveAxes(profile);
   if(sharp.has(actionId))return axes.emotionalReactivity>=.66?-6:axes.empathy>=.70?-4:0;
-  if(space.has(actionId))return axes.independence>=.70||axes.sociability<=.36?-5:0;
+  if(space.has(actionId)&&(axes.independence>=.70||axes.sociability<=.36))return -5;
   if(support.has(actionId))return axes.empathy>=.70?4:0;
   if(playful.has(actionId))return axes.optimism>=.70?4:0;
   if(clear.has(actionId))return axes.practicality>=.72?3:0;
@@ -114,7 +114,7 @@ export function cueConversationBias(pair,viewerId,actionId){
   const find=id=>cues.find(c=>c.id===id);
   const weight=c=>c?.count>=2?5:c?.count===1?2:0;
   if(sharp.has(actionId))return -weight(find('gentle'));
-  if(space.has(actionId))return -weight(find('space'));
+  if(space.has(actionId)&&find('space'))return -weight(find('space'));
   if(support.has(actionId))return weight(find('support'));
   if(playful.has(actionId))return weight(find('playful'));
   if(clear.has(actionId))return weight(find('clear'));

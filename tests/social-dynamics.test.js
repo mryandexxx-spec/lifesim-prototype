@@ -10,6 +10,7 @@ import {newActionQueues,enqueueAction,pendingActions} from '../src/action-queue.
 import {newHousehold,loadHousehold,chooseResidentAction} from '../src/household.js';
 import {autonomousSocialChoice,startSocial,arriveSocial,tickSocial,
   canStartSocial} from '../src/relationships.js';
+import {createProfile} from '../src/trait-catalog.js';
 import {ACTIONS,SAVE_KEY} from '../src/simulation.js';
 
 const DAY=1440,ids=['nova','ember','iris','riven','opal'],spot={x:-.2,z:1.85};
@@ -318,4 +319,40 @@ test('Pages, text-only UI and save contract include the read-only pair dynamics'
   assert.ok(!module.includes('Math.random('));
   assert.ok(!module.includes('enqueueAction('));
   assert.ok(!module.includes('root.version'));
+});
+
+
+test('LP-02A: optional company depends on disposition, but real social need still motivates',()=>{
+  const g=newSocialGraph(ids);markAcquainted(g,'nova','ember',480);
+  observePairViews(g,'nova','ember',{nova:{friendship:50,trust:45,tension:0},
+    ember:{friendship:50,trust:45,tension:0}});
+  const c=context(g),a=c.residents.nova;
+  a.needs.fun=40;a.needs.social=60;
+  const cases=[['habits.neat',true],['social.outgoing',true],
+    ['social.reserved',false],['values.independent',false]];
+  for(const [trait,expected] of cases){
+    a.personality=createProfile(['temperament.calm',trait]);
+    const snap=copy(c);assert.equal(Boolean(proposeAutonomousSocial(c)),expected,trait);
+    assert.deepEqual(c,snap);
+    a.needs.social=15;assert.ok(proposeAutonomousSocial(c),trait+' still seeks company');
+    a.needs.social=60;
+  }
+});
+test('LP-02A: outgoing residents may choose a safe acquaintance, not an unsafe or unwilling target',()=>{
+  const g=newSocialGraph(ids);markAcquainted(g,'nova','ember',480);markAcquainted(g,'nova','opal',480);
+  observePairViews(g,'nova','ember',{nova:{friendship:53,trust:50,tension:0},
+    ember:{friendship:53,trust:50,tension:0}});
+  observePairViews(g,'nova','opal',{nova:{friendship:60,trust:55,tension:0},
+    opal:{friendship:60,trust:55,tension:0}});
+  const c=context(g),a=c.residents.nova;a.needs.social=60;
+  a.personality=createProfile(['temperament.calm','habits.neat']);
+  assert.equal(proposeAutonomousSocial(c)?.targetId,'opal');
+  a.personality=createProfile(['temperament.calm','social.outgoing']);
+  assert.equal(proposeAutonomousSocial(c)?.targetId,'ember');
+  assert.ok(enqueueAction(c.queues,'ember',{type:'object',actionId:'bed'}));
+  assert.equal(proposeAutonomousSocial(c)?.targetId,'opal');
+  c.queues=newActionQueues(ids);c.residents.ember.needs.hunger=10;
+  assert.equal(proposeAutonomousSocial(c)?.targetId,'opal');
+  c.residents.ember.needs.hunger=83;
+  c.minutes=500;assert.equal(proposeAutonomousSocial(c),null);
 });
