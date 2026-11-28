@@ -284,6 +284,112 @@ export function startWorkIncident(root,id,at,plan=null){
     performanceDelta:0,energyDelta:0,funDelta:0};
   return true;
 }
+// Context-specific preferences affect only autonomous choice, never settlement.
+const motiveOpportunities=Object.freeze({
+  'city-services/city-route':['test','plan'],
+  'kitchen-studio/kitchen-special':['invent','pair'],
+  'business-center/business-idea':['pilot','review'],
+  'art-studio/art-young':['mentor','exhibit'],
+  'editorial/editorial-letter':['visit','interview'],
+  'civic-service/civic-neighbors':['mediate','survey']
+});
+const motivePace=Object.freeze({
+  'editorial/editorial-source':['rights','replace'],
+  'business-center/business-handoff':['rebuild','contact'],
+  'kitchen-studio/kitchen-supply':['inventory','substitute']
+});
+// D4: explicit semantic annotations of existing successful authored options.
+// These are preferences, not extra effects or a new decision system.
+const extendedPace=Object.freeze({
+  'editorial/pf09b-editorial-correction':['a','b'],
+  'editorial/pf09b-editorial-embargo':['a','b'],
+  'business-center/pf09b-business-center-version':['a','b'],
+  'city-services/pf09b-city-services-locker':['a','b'],
+  'kitchen-studio/pf09b-kitchen-studio-guest':['a','b'],
+  'art-studio/pf09b-art-studio-packing':['a','b'],
+  'civic-service/pf09b-civic-service-language':['a','b']
+});
+const explicitTrial=Object.freeze({
+  'city-services/pf09b-city-services-partner':'b',
+  'kitchen-studio/pf09b-kitchen-studio-texture':'a',
+  'art-studio/pf09b-art-studio-restudy':'b',
+  'business-center/pf09b-business-center-workshop':'b',
+  'civic-service/pf09b-civic-service-outreach':'b',
+  'editorial/pf09b-editorial-rotation':'b'
+});
+// Independently authored conciliatory and clear/direct approaches.
+// null means there is no corresponding authored option, not a negative bias.
+const workCommunication=Object.freeze({
+  'editorial/editorial-ethics':['council','defend'],
+  'art-studio/art-collection':['dialogue',null],
+  'civic-service/civic-hearing':['facilitate',null],
+  'civic-service/civic-courtyard':['workshop',null],
+  'business-center/business-forecast':[null,'verify'],
+  'civic-service/civic-accessibility':[null,'review'],
+  'civic-service/pf09b-civic-service-language':[null,'b']
+});
+function workMotiveBias(actor,contract,def,o,energy,mood,history){
+  const ids=actor?.personality?.traitIds;
+  if(!Array.isArray(ids)||energy<45||mood<45||
+    ['hunger','bladder','hygiene'].some(k=>(actor?.needs?.[k]??100)<25))return 0;
+  const key=contract.careerId+'/'+def.id,options=motiveOpportunities[key],pace=motivePace[key];
+  const has=id=>ids.includes(id);
+  if(options?.includes(o.id)&&def.tone==='opportunity'){
+    const [high,low]=options.map(x=>def.options.find(v=>v.id===x));
+    if(high&&low&&high.performance>low.performance&&high.energy<low.energy){
+      if(has('motivation.balanced')&&energy<=70&&o.id===low.id)return 3;
+      if(has('motivation.ambitious')&&!(has('motivation.balanced')&&energy<=70)&&energy>=65&&contract.performance<85&&o.id===high.id)return 3;
+    }
+    if(energy>=55&&(has('novelty.curious')||has('novelty.familiar'))){
+      const known=new Set(history.filter(h=>h.careerId===contract.careerId&&h.scenarioId===def.id&&h.performanceDelta>0).map(h=>h.choiceId));
+      if(options.some(x=>known.has(x))&&options.some(x=>!known.has(x))&&
+        ((has('novelty.curious')&&!known.has(o.id))||(has('novelty.familiar')&&known.has(o.id))))return 3;
+    }
+  }
+  if(pace?.includes(o.id)&&((has('pace.patient')&&o.id===pace[0])||(has('pace.impatient')&&o.id===pace[1])))return 3;
+  // D3: authored options already carry real energy and performance costs.
+  // Outside the C opportunity pairs, favor a successful, less draining
+  // alternative only when it is a genuine positive-result tradeoff.
+  // No bonus to delays/failures, no new effect, no increase above C's +3.
+  if(!options&&has('motivation.balanced')&&energy<=70){
+    const successful=def.options.filter(x=>x.performance>0)
+      .sort((a,b)=>b.performance-a.performance||a.id.localeCompare(b.id));
+    const high=successful[0],low=successful.slice(1)
+      .find(x=>x.energy>high.energy&&x.performance<high.performance);
+    if(low?.id===o.id)return 3;
+  }
+  // D4 preserves C/D3 priority and the per-option +3 ceiling. No
+  // new motive favors a failed/delayed outcome, or overrides the care gate.
+  if(o.performance<=0)return 0;
+  const fullId=id=>id&&def.id.startsWith('pf09b-')?def.id+'-'+id:id;
+  if(!options&&has('motivation.ambitious')&&energy>=65&&contract.performance<85&&
+    !(has('motivation.balanced')&&energy<=70)){
+    const successful=def.options.filter(x=>x.performance>0)
+      .sort((a,b)=>b.performance-a.performance||a.id.localeCompare(b.id));
+    const high=successful[0];
+    if(high?.id===o.id&&successful.some(x=>x.performance<high.performance&&x.energy>high.energy))return 3;
+  }
+  if(!options&&energy>=55&&(has('novelty.curious')||has('novelty.familiar'))){
+    const successful=def.options.filter(x=>x.performance>0);
+    const known=new Set(history.filter(h=>h.careerId===contract.careerId&&h.scenarioId===def.id&&h.performanceDelta>0).map(h=>h.choiceId));
+    const familiar=successful.filter(x=>known.has(x.id));
+    const unfamiliar=successful.filter(x=>!known.has(x.id));
+    if(familiar.length&&unfamiliar.length){
+      if((has('novelty.curious')&&!known.has(o.id))||(has('novelty.familiar')&&known.has(o.id)))return 3;
+    }else if(has('novelty.curious')&&unfamiliar.length>1&&o.id===fullId(explicitTrial[key]))return 3;
+  }
+  const expanded=extendedPace[key]?.map(fullId);
+  if(expanded&&((has('pace.patient')&&o.id===expanded[0])||(has('pace.impatient')&&o.id===expanded[1])))return 3;
+  const communication=workCommunication[key]?.map(fullId);
+  if(communication){
+    const diplomatic=has('communication.diplomatic'),direct=has('communication.direct');
+    // Both are legal together: when the same scene offers both different
+    // approaches, defer to the established score rather than stack them.
+    if(!(diplomatic&&direct&&communication[0]&&communication[1])&&
+      ((diplomatic&&o.id===communication[0])||(direct&&o.id===communication[1])))return 3;
+  }
+  return 0;
+}
 export function chooseAutonomousWorkOption(root,id){
   const contract=root?.careerSystem?.byResident?.[id],shift=contract?.currentShift;
   const def=workScenario(contract?.careerId,shift?.incident?.scenarioId);
@@ -296,7 +402,8 @@ export function chooseAutonomousWorkOption(root,id){
       const level=o.skill?currentSkillLevel(actor?.skills,HOBBY_SKILLS,o.skill):0;
       const familiarity=history.slice(-3).filter(h=>h.choiceId===o.id).length;
       return o.performance*.45+o.energy*(energy<45?.75:.22)+o.fun*(mood<45?.38:.2)+
-        (axes[o.axis]-.5)*16+Math.min(3,level)*1.1-familiarity*.65;
+        (axes[o.axis]-.5)*16+Math.min(3,level)*1.1-familiarity*.65+
+        workMotiveBias(actor,contract,def,o,energy,mood,history);
     };
     return score(b)-score(a)||a.id.localeCompare(b.id);
   })[0].id;

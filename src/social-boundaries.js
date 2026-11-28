@@ -19,6 +19,13 @@ const support=new Set(['support.listen','support.help']);
 const playful=new Set(['humor.joke','humor.story']);
 const clear=new Set(['conflict.explain']);
 const space=new Set(['plans.invite','support.help']);
+// Authored conversational content, not inferred from a topic, mood or taste.
+// A reflective temperament does not mean that someone enjoys sadness.
+const optimistic=new Set(['daily.news','daily.yes','daily.reframe','daily.tact']);
+const reflective=new Set(['philosophy.share','philosophy.reflect','memories.reflect','dreams.deep']);
+const composed=new Set(['conflict.extra','conflict.repair','conflict.yes']);
+const imaginative=new Set(['plans.idea','hobbies.extra','dreams.share','humor.extra']);
+const concrete=new Set(['money.ask','money.share','plans.extra','plans.yes','dreams.reflect']);
 const validRecord=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const validId=id=>typeof id==='string'&&/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -96,15 +103,34 @@ export function socialCueNotes(pair,viewerId,limit=3){
 /** Stable disposition affects the recipient whether or not the initiator
  * knows it. A transient bad day may still override this small coefficient.
  */
-export function boundaryDisposition(profile,actionId){
+function baselineDisposition(profile,actionId){
   if(!validRecord(profile)||!Array.isArray(profile.traitIds)||typeof actionId!=='string')return 0;
   const axes=deriveAxes(profile);
   if(sharp.has(actionId))return axes.emotionalReactivity>=.66?-6:axes.empathy>=.70?-4:0;
-  if(space.has(actionId))return axes.independence>=.70||axes.sociability<=.36?-5:0;
+  if(space.has(actionId)&&(axes.independence>=.70||axes.sociability<=.36))return -5;
   if(support.has(actionId))return axes.empathy>=.70?4:0;
   if(playful.has(actionId))return axes.optimism>=.70?4:0;
   if(clear.has(actionId))return axes.practicality>=.72?3:0;
+  // At most one modest content-specific response bias. Normal relationship,
+  // emotional state, taste and consent still decide the actual answer.
+  if(optimistic.has(actionId)&&axes.optimism>=.70)return 4;
+  if(reflective.has(actionId)&&axes.emotionalReactivity>=.65&&axes.optimism<=.45)return 4;
+  if(composed.has(actionId)&&axes.emotionalReactivity<=.36&&axes.resilience>=.62)return 4;
+  if(imaginative.has(actionId)&&axes.creativity>=.70)return 4;
+  if(concrete.has(actionId)&&axes.practicality>=.72)return 4;
   return 0;
+}
+const traitStyles=Object.freeze({
+  'communication.diplomatic':['conflict.apologize','family.share','money.reflect'],
+  'communication.direct':['conflict.explain','gossip.share','relationships.reflect'],
+  'tone.playful':['humor.joke','career.tact','family.tact'],
+  'tone.serious':['philosophy.share','money.deep']
+});
+export function boundaryDisposition(profile,actionId){
+  const old=baselineDisposition(profile,actionId);
+  if(old!==0)return old;
+  if(!Array.isArray(profile?.traitIds)||typeof actionId!=='string')return 0;
+  return profile.traitIds.some(id=>Object.hasOwn(traitStyles,id)&&traitStyles[id].includes(actionId))?3:0;
 }
 /** Learned expectations modify contextual conversation choices, not the
  * person's personality, friendship, guaranteed legacy acts or save scores.
@@ -114,7 +140,7 @@ export function cueConversationBias(pair,viewerId,actionId){
   const find=id=>cues.find(c=>c.id===id);
   const weight=c=>c?.count>=2?5:c?.count===1?2:0;
   if(sharp.has(actionId))return -weight(find('gentle'));
-  if(space.has(actionId))return -weight(find('space'));
+  if(space.has(actionId)&&find('space'))return -weight(find('space'));
   if(support.has(actionId))return weight(find('support'));
   if(playful.has(actionId))return weight(find('playful'));
   if(clear.has(actionId))return weight(find('clear'));

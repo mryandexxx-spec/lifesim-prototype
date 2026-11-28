@@ -1463,15 +1463,27 @@ export function residentAutonomousChoice(root,id='alex') {
   // Essential self-care always takes precedence over housekeeping.
   const urgent=Math.min(...['hunger','energy','bladder','hygiene'].map(
     key=>resident.needs?.[key]??100))<25;
-  // Dish care uses the same ordinary physical A*/FIFO wash action.
-  // No instant count mutation, alternate economy or additional save field.
-  if(!urgent&&root.kitchen?.dirtyDishes>=DISH_AUTO_WASH_THRESHOLD&&
-    furnitureAvailable(root,'wash',id))return 'wash';
-  // Bounded original-football fandom may suggest a normal real-TV action.
-  // Never preempt work, critical needs, a call or the owner's manual FIFO.
-  if(!urgent&&sportsAutoIntent(root,id)&&furnitureAvailable(root,'tv',id))return 'tv';
+  // Existing wash executor settles one batch of up to three real dishes.
+  // Personality changes optional timing only; no new action or saved state.
+  const dishes=root.kitchen?.dirtyDishes;
+  const traits=Array.isArray(resident.personality?.traitIds)?resident.personality.traitIds:[];
+  const idleLegacy=HOUSEHOLD_IDS.includes(id)&&!resident.action;
+  const neat=idleLegacy&&traits.includes('habits.neat')&&!traits.includes('habits.untidy');
+  const untidy=idleLegacy&&traits.includes('habits.untidy')&&!traits.includes('habits.neat');
+  const standardWash=!urgent&&dishes>=DISH_AUTO_WASH_THRESHOLD&&
+    furnitureAvailable(root,'wash',id);
+  // One extra batch is a hard ceiling on discretionary postponement.
+  const deferWash=standardWash&&untidy&&dishes<DISH_AUTO_WASH_THRESHOLD+3;
+  if(standardWash&&!deferWash)return 'wash';
+  // Keep the normal sports priority when standard washing was not due.
+  if(!standardWash&&!urgent&&sportsAutoIntent(root,id)&&furnitureAvailable(root,'tv',id))return 'tv';
   const proposal=autonomousChoice(createCareContext(resident,{
     residentId:id,minutes:root.minutes,paused:root.paused,enabled:root.autonomy.enabled
   }));
-  return proposal && furnitureAvailable(root,proposal,id) ? proposal : null;
+  if(proposal&&furnitureAvailable(root,proposal,id))return proposal;
+  if(standardWash)return 'wash';
+  // Early cleaning is spare-time initiative, not a new essential need.
+  if(neat&&!urgent&&!proposal&&Number.isInteger(dishes)&&dishes>=3&&
+    dishes<DISH_AUTO_WASH_THRESHOLD&&furnitureAvailable(root,'wash',id))return 'wash';
+  return null;
 }

@@ -5,6 +5,7 @@
  */
 import {createResidentMembership} from './resident-membership.js';
 import {validAdditionalAction} from './resident-activity-runtime.js';
+import {PROFILE_RULES,validateSelection,validatePreferences} from './trait-catalog.js';
 
 export const POPULATION_SCHEMA=1;
 const isRecord=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -52,6 +53,10 @@ function validName(x,{allowEmpty=false}={}){
   return typeof x==='string'&&(allowEmpty?x.length<=40:x.length>=1&&x.length<=40)&&
     x===x.trim()&&!/[\u0000-\u001f\u007f<>]/.test(x);
 }
+function validPersonality(profile){
+  return isRecord(profile)&&profile.schema===PROFILE_RULES.schema&&
+    validateSelection(profile.traitIds).valid&&validatePreferences(profile.preferences).valid;
+}
 function validateResident(id,entry){
   if(!EXTRA_ID.test(id)||!isRecord(entry)||entry.id!==id||!isRecord(entry.identity))
     invalid('invalid additional resident ID or identity');
@@ -66,6 +71,10 @@ function validateResident(id,entry){
     NEEDS.some(k=>!Number.isFinite(actor.needs[k])||actor.needs[k]<0||actor.needs[k]>100)||
     !isRecord(actor.autonomy)||typeof actor.autonomy.enabled!=='boolean'||
     !validAdditionalAction(actor.action))invalid('invalid additional resident actor snapshot');
+  // Historical extra snapshots could omit personality (or contain name-only metadata).
+  // Preserve those bytes; explicit profile data must be valid, never silently rewritten.
+  if(isRecord(actor.personality)&&['schema','traitIds','preferences'].some(k=>own(actor.personality,k))&&
+    !validPersonality(actor.personality))invalid('invalid explicit personality profile');
   if(FORBIDDEN_ACTOR_FIELDS.some(key=>own(actor,key)))
     invalid('additional resident cannot own household state');
 }
@@ -112,6 +121,13 @@ export function proposePopulationSave(root,population,restoreSnapshot){
     if(!base||base.length>8_000_000)return {ok:false,reason:'snapshot-too-large'};
     const next=JSON.parse(base);
     next.population=restorePopulation(population);
+    for(const [id,entry] of Object.entries(next.population.residentsById)){
+      const prior=root.population?.residentsById?.[id];
+      if(!prior&&!validPersonality(entry.actor.personality))return {ok:false,reason:'invalid-personality'};
+      // Membership transactions cannot rewrite an existing character's personality.
+      if(prior&&JSON.stringify(prior.actor.personality)!==JSON.stringify(entry.actor.personality))
+        return {ok:false,reason:'existing-personality-locked'};
+    }
     const serialized=JSON.stringify(next);
     if(serialized.length>8_000_000)return {ok:false,reason:'snapshot-too-large'};
     const restored=restoreSnapshot(JSON.parse(serialized));

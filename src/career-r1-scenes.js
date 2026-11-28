@@ -281,7 +281,7 @@ const CONTENT={
           6,
           -9,
           1,
-          "creativity",
+          "coordination",
           "work.pride",
           "painting"
         ],
@@ -292,7 +292,7 @@ const CONTENT={
           4,
           -5,
           4,
-          "coordination",
+          "creativity",
           "work.pride",
           "painting"
         ],

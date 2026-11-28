@@ -8,6 +8,11 @@ import {newHousehold,loadHousehold,tickHousehold,getActor,setHouseholdAutonomy} 
 import {residentIdsForSimulation} from '../src/resident-activity-runtime.js';
 import {acceptCareerOffer} from '../src/career-job-board.js';
 import {nextCareerShift} from '../src/career-scheduler.js';
+import {arriveCareerPortal,finishCareerReturn} from '../src/career-work.js';
+import {createProfile} from '../src/trait-catalog.js';
+import {chooseAutonomousWorkOption,pendingWorkIncident,workScenario} from '../src/career-incidents.js';
+import {progressWorkNeeds} from '../src/career-work-needs.js';
+import {candidateWorkAudit} from './lp02d-work-motive-probe.mjs';
 import {enqueueAction,pendingActions,MAX_ACTION_QUEUE} from '../src/action-queue.js';
 import {queueAddressedSocial} from '../src/resident-social-runtime.js';
 import {getPair} from '../src/social-graph.js';
@@ -193,4 +198,276 @@ test('CAS-01.8 concurrent FIFO and real addressed social survives mid-session sa
   assert.equal(getPair(root.socialGraph,'resident_3','resident_4').events.length,1,
     'next tick and resume cannot replay social reward');
   invariant(root,['alex','mira','resident_3','resident_4']);
+});
+
+/** Paired uninterrupted root-clock workloads. Legacy portal/return callbacks
+ * stand in for renderer arrivals, not for successful physical routing.
+ * Naturally scheduled incidents only; no injected scene, history or needs.
+ */
+test('LP-02C/3 matched eight-day 2/4 resident workloads retain care and shift invariants',()=>{
+  const report=[];
+  const anchors=[['habits.neat','coordination.agile'],['temperament.calm','values.independent'],['approach.creative','social.outgoing'],['habits.untidy','values.empathetic']];
+  const additions=['motivation.balanced','pace.patient','novelty.curious','novelty.familiar'];
+  const careers=['editorial','kitchen-studio','business-center','civic-service'];
+  for(const n of [2,4]){
+    const results=[];
+    for(const candidate of [false,true]){
+      let root=home(n),ids=residentIdsForSimulation(root);
+      ids.forEach((id,i)=>{getActor(root,id).personality=createProfile([...anchors[i],...(candidate?[additions[i]]:[])]);hire(root,id,careers[i]);});
+      const profiles=Object.fromEntries(ids.map(id=>[id,copy(getActor(root,id).personality)]));
+      const critical=Object.fromEntries(ids.map(id=>[id,0])),worst=Object.fromEntries(ids.map(id=>[id,100]));
+      const initial=root.minutes,steps=8*1440/20;
+      let portalCallbacks=0,returns=0;
+      for(let step=1;step<=steps;step++){
+        const before=root.minutes;tickHousehold(root,20);assert.equal(root.minutes,before+20);
+        for(const id of ['alex','mira']){
+          const s=root.careerSystem.byResident[id]?.currentShift;
+          if(s?.phase==='departing'&&root.minutes<s.end){assert.ok(arriveCareerPortal(root,id,root.minutes));portalCallbacks++;}
+          if(s?.phase==='returning'){assert.ok(finishCareerReturn(root,id));returns++;}
+        }
+        for(const id of ids){
+          const a=getActor(root,id),low=Math.min(...['hunger','energy','bladder','hygiene'].map(k=>a.needs[k]));
+          if(low<25)critical[id]++;worst[id]=Math.min(worst[id],low);
+        }
+        if(step%12===0)invariant(root,ids);
+        if(step%72===0){
+          const saved=copy(root),wallet=root.shop.credits,receipts=copy(root.careerSystem.incidentIds);
+          root=loadHousehold(saved);
+          assert.equal(root.shop.credits,wallet);assert.deepEqual(root.careerSystem.incidentIds,receipts);
+          for(const id of ids)assert.deepEqual(getActor(root,id).personality,profiles[id]);
+        }
+      }
+      assert.equal(root.minutes,initial+8*1440);invariant(root,ids);
+      const salaries=root.financialHistory.entries.filter(e=>e.kind==='salary');
+      const paid=Object.fromEntries(ids.map(id=>[id,salaries.filter(e=>e.actorId===id).length]));
+      const journal=Object.fromEntries(ids.map(id=>[id,root.careerSystem.incidentHistory[id].map(x=>({scenario:x.scenarioId,choice:x.choiceId,delta:x.performanceDelta}))]));
+      assert.equal(new Set(root.careerSystem.incidentIds).size,root.careerSystem.incidentIds.length);
+      assert.ok(ids.every(id=>paid[id]>0),'all employed residents complete shifts');
+      results.push({n,candidate,steps,critical,worst,paid,journal,portalCallbacks,returns,saveBytes:JSON.stringify(root).length});
+    }
+    const [base,next]=results;report.push(...results);
+    // Frozen engineering screen: <=5 percentage-point rise in sampled critical
+    // needs per actor and no loss of a completed paid shift in this workload.
+    console.log('LP-02C matched workload '+JSON.stringify(results));
+    for(const id of Object.keys(base.paid)){
+      assert.ok(next.critical[id]-base.critical[id]<=base.steps*.05,'critical care regression '+id);
+      assert.ok(next.paid[id]>=base.paid[id],'lost paid shift '+id);
+    }
+  }
+  mkdirSync('artifacts/lp02c-workload',{recursive:true});
+  writeFileSync('artifacts/lp02c-workload/report.json',JSON.stringify(report,null,2));
+});
+
+/** D0 discovery only: natural work schedule, no invented history/scene,
+ * paired counterfactual selectors at actual open and pre-settlement states.
+ * Extra actors have the real headless home executor. Legacy home care
+ * remains renderer-owned, so do not generalize their headless deprivation.
+ */
+test('LP-02D0 natural incident exposure and decision-window audit',()=>{
+  const motives=['novelty.curious','novelty.familiar','motivation.ambitious','motivation.balanced','pace.patient','pace.impatient'];
+  const anchors=['habits.neat','coordination.agile'];
+  const banks=[['city-services','kitchen-studio'],['business-center','art-studio'],['editorial','civic-service']];
+  const matrix=[];
+  function inspect(root,id){
+    const actor=getActor(root,id),c=root.careerSystem.byResident[id],incident=pendingWorkIncident(root,id);
+    assert.ok(incident);
+    const before=JSON.stringify(root),original=actor.personality,choices={};
+    const neutral=chooseAutonomousWorkOption(root,id);
+    for(const trait of motives){
+      try{actor.personality=createProfile([...anchors,trait]);choices[trait]=chooseAutonomousWorkOption(root,id);}
+      finally{actor.personality=original;}
+    }
+    assert.equal(JSON.stringify(root),before,'counterfactual read never changes live state');
+    const def=workScenario(c.careerId,incident.scenarioId);
+    assert.ok(def.options.some(o=>o.id===neutral));
+    for(const choice of Object.values(choices))assert.ok(def.options.some(o=>o.id===choice));
+    const {energy,hunger,bladder,hygiene}=actor.needs,mood=actor.mind.mood.value;
+    return {minute:root.minutes,energy,hunger,bladder,hygiene,mood,performance:c.performance,
+      gate:energy>=45&&mood>=45&&Math.min(hunger,bladder,hygiene)>=25,
+      neutral,choices,known:(root.careerSystem.incidentHistory[id]||[]).filter(h=>h.careerId===c.careerId&&h.scenarioId===incident.scenarioId&&h.performanceDelta>0).map(h=>h.choiceId)};
+  }
+  for(const [careerA,careerB] of banks){
+    let root=home(4),ids=residentIdsForSimulation(root);
+    for(const [id,career] of [['resident_3',careerA],['resident_4',careerB]]){
+      getActor(root,id).personality=createProfile(anchors);hire(root,id,career);
+    }
+    const rows=new Map(),initial=root.minutes,critical={resident_3:0,resident_4:0},steps=12*1440/10;
+    for(let i=1;i<=steps;i++){
+      const before=root.minutes;
+      for(const id of ['resident_3','resident_4']){
+        const incident=pendingWorkIncident(root,id),shift=root.careerSystem.byResident[id]?.currentShift;
+        if(!incident)continue;
+        if(!rows.has(incident.id))rows.set(incident.id,{id,career:shift.careerId,scene:incident.scenarioId,incidentId:incident.id,opened:inspect(root,id)});
+        // Mirror actual work-needs accrual on a detached snapshot immediately
+        // before the end tick. This is a forecast, NOT a committed receipt.
+        if(before+10>=shift.end){
+          const probe=copy(root);
+          progressWorkNeeds(probe,before,before+10);
+          rows.get(incident.id).endForecast=inspect(probe,id);
+          rows.get(incident.id).candidate=candidateWorkAudit(probe,id,anchors);
+        }
+      }
+      tickHousehold(root,10);assert.equal(root.minutes,before+10);
+      for(const id of ['resident_3','resident_4']){
+        const a=getActor(root,id);
+        if(Math.min(a.needs.energy,a.needs.hunger,a.needs.bladder,a.needs.hygiene)<25)critical[id]++;
+        for(const receipt of root.careerSystem.incidentHistory[id]||[]){
+          const row=rows.get(receipt.id);
+          if(row&&!row.actual)row.actual={choice:receipt.choiceId,performance:receipt.performanceDelta,energy:receipt.energyDelta,auto:receipt.auto};
+        }
+      }
+      if(i%144===0){
+        invariant(root,ids);const snapshot=copy(root);
+        root=loadHousehold(snapshot);
+        assert.deepEqual(root.careerSystem.incidentIds,snapshot.careerSystem.incidentIds);
+      }
+    }
+    assert.equal(root.minutes,initial+12*1440);
+    invariant(root,ids);
+    const completed=[...rows.values()].filter(x=>x.actual);
+    assert.ok(completed.length>0,careerA+'/'+careerB);
+    assert.ok(completed.every(x=>x.actual.auto));
+    const summary={careers:[careerA,careerB],steps,critical,opened:rows.size,completed:completed.length,
+      eligibleAtOpen:completed.filter(x=>x.opened.gate).length,
+      eligibleAtEndForecast:completed.filter(x=>x.endForecast?.gate).length,
+      forecastMatches:completed.filter(x=>x.endForecast?.neutral===x.actual.choice).length,
+      effects:Object.fromEntries(motives.map(t=>[t,{
+        open:completed.filter(x=>x.opened.choices[t]!==x.opened.neutral).length,
+        end:completed.filter(x=>x.endForecast&&x.endForecast.choices[t]!==x.endForecast.neutral).length
+      }]))};
+    const candidateSummary={scenes:completed.map(x=>({scene:x.scene,career:x.career,actual:x.actual.choice,gate:x.endForecast?.gate,known:x.endForecast?.known})),effects:Object.fromEntries(motives.map(t=>[t,{targeted:completed.filter(x=>x.candidate?.cases[t].targets.length).length,changed:completed.filter(x=>x.candidate?.cases[t].changed).length,receipts:completed.filter(x=>x.candidate?.cases[t].changed).map(x=>({scene:x.scene,comparison:x.candidate.cases[t].receipts}))}]))};
+    console.log('LP-02D1 candidate exposure '+JSON.stringify(candidateSummary));
+    matrix.push({summary,candidateSummary,rows:[...rows.values()]});
+    console.log('LP-02D0 natural exposure '+JSON.stringify(summary));
+  }
+  mkdirSync('artifacts/lp02d0',{recursive:true});
+  writeFileSync('artifacts/lp02d0/exposure.json',JSON.stringify({matrix,limitations:['natural extra resident schedule only','end forecast is detached and not guaranteed exact actual end state','counterfactual choices are not candidate settlements','legacy home routing absent']},null,2));
+});
+
+/** D3: candidate really plays the scheduled shifts, not just detached forecasts.
+ * Two extra residents only: actual headless routing/care exists for them.
+ * Same starting root, no injected incidents/history/needs; fixed 12-day horizon.
+ */
+test('LP-02D3 native balanced trait changes actual scheduled receipts without care or shift regression',()=>{
+ const anchors=['habits.neat','coordination.agile'],results=[];
+ for(const careers of [['city-services','kitchen-studio'],['business-center','art-studio'],['editorial','civic-service']]){
+   const runs=[];
+   for(const candidate of [false,true]){
+     let root=home(4),ids=residentIdsForSimulation(root);
+     const actors=['resident_3','resident_4'],steps=12*1440/10,start=root.minutes;
+     const critical={resident_3:0,resident_4:0},journal=new Map();
+     actors.forEach((id,i)=>{getActor(root,id).personality=createProfile([...anchors,...(candidate?['motivation.balanced']:[])]);hire(root,id,careers[i]);});
+     for(let i=1;i<=steps;i++){
+       const before=root.minutes;tickHousehold(root,10);assert.equal(root.minutes,before+10);
+       for(const id of actors){
+         const a=getActor(root,id);
+         if(Math.min(a.needs.energy,a.needs.hunger,a.needs.hygiene,a.needs.bladder)<25)critical[id]++;
+         for(const e of root.careerSystem.incidentHistory[id]||[])
+           journal.set(JSON.stringify([id,e.shiftStart,e.scenarioId]),{id,scene:e.scenarioId,choice:e.choiceId,energy:e.energyDelta,performance:e.performanceDelta});
+       }
+       if(i%144===0){
+         invariant(root,ids);const snapshot=copy(root);
+         root=loadHousehold(snapshot);
+         assert.deepEqual(root.careerSystem.incidentIds,snapshot.careerSystem.incidentIds);
+         for(const id of actors)assert.deepEqual(getActor(root,id).personality,createProfile([...anchors,...(candidate?['motivation.balanced']:[])]));
+       }
+     }
+     assert.equal(root.minutes,start+12*1440);invariant(root,ids);
+     const paid=Object.fromEntries(actors.map(id=>[id,root.financialHistory.entries.filter(e=>e.kind==='salary'&&e.actorId===id).length]));
+     assert.ok(actors.every(id=>paid[id]>0));
+     assert.equal(new Set(root.careerSystem.incidentIds).size,root.careerSystem.incidentIds.length);
+     runs.push({steps,critical,paid,journal});
+   }
+   const [base,next]=runs,matched=[...base.journal].filter(([key])=>next.journal.has(key));
+   const changed=matched.filter(([key,v])=>next.journal.get(key).choice!==v.choice)
+     .map(([key,v])=>({before:v,after:next.journal.get(key)}));
+   for(const id of Object.keys(base.paid)){
+     assert.ok(next.critical[id]-base.critical[id]<=base.steps*.05,'critical care regression '+id);
+     assert.ok(next.paid[id]>=base.paid[id],'lost paid shift '+id);
+   }
+   const report={careers,base:{critical:base.critical,paid:base.paid,count:base.journal.size},
+     candidate:{critical:next.critical,paid:next.paid,count:next.journal.size},matched:matched.length,changed};
+   console.log('LP-02D3 native matched schedule '+JSON.stringify(report));results.push(report);
+ }
+ assert.ok(results.reduce((sum,r)=>sum+r.changed.filter(x=>x.after.energy>x.before.energy&&x.after.performance>0).length,0)>0,'at least one actual successful energy-saving choice');
+});
+
+
+/** D5: real scheduled extra-resident workloads with single and combined traits.
+ * Work-neutral control is neat + serious; same old axes in every profile.
+ * No injection of incidents, history or needs, no renderer/legacy autonomy claim.
+ * Natural differentiation is measured, not forced on every authored encounter.
+ */
+test('LP-02D5 twelve-day matched workloads cover all new work motives and mixed profiles',()=>{
+  const actors=['resident_3','resident_4'],anchor='habits.neat',neutral=['tone.serious'];
+  const matrix=[
+    {careers:['city-services','kitchen-studio'],variants:[
+      [['novelty.curious'],['novelty.familiar']],
+      [['pace.patient'],['pace.impatient']],
+      [['novelty.curious','pace.patient'],['novelty.familiar','motivation.balanced']]]},
+    {careers:['business-center','art-studio'],variants:[
+      [['motivation.ambitious'],['novelty.curious']],
+      [['communication.direct'],['communication.diplomatic']],
+      [['motivation.ambitious','motivation.balanced'],['tone.serious','communication.diplomatic']]]},
+    {careers:['editorial','civic-service'],variants:[
+      [['pace.patient'],['communication.direct']],
+      [['pace.impatient'],['communication.diplomatic']],
+      [['communication.direct','communication.diplomatic'],['tone.playful','pace.impatient']]]}
+  ];
+  const reports=[];
+  function run(careers,traits){
+    let root=home(4);
+    const ids=residentIdsForSimulation(root),steps=12*1440/10,start=root.minutes;
+    const profiles=traits.map(xs=>createProfile([anchor,...xs]));
+    const critical=Object.fromEntries(actors.map(id=>[id,0])),journal=new Map();
+    actors.forEach((id,i)=>{getActor(root,id).personality=profiles[i];hire(root,id,careers[i]);});
+    for(let i=1;i<=steps;i++){
+      const before=root.minutes;tickHousehold(root,10);assert.equal(root.minutes,before+10);
+      for(const id of actors){
+        const a=getActor(root,id);
+        if(Math.min(a.needs.energy,a.needs.hunger,a.needs.hygiene,a.needs.bladder)<25)critical[id]++;
+        for(const e of root.careerSystem.incidentHistory[id]||[]){
+          assert.equal(e.auto,true);
+          journal.set(JSON.stringify([id,e.shiftStart,e.scenarioId]),{id,scene:e.scenarioId,choice:e.choiceId,energy:e.energyDelta,performance:e.performanceDelta});
+        }
+      }
+      if(i%144===0){
+        invariant(root,ids);const snapshot=copy(root),saved=JSON.stringify(snapshot);
+        root=loadHousehold(snapshot);
+        assert.equal(JSON.stringify(snapshot),saved);
+        assert.equal(root.shop.credits,snapshot.shop.credits);
+        assert.deepEqual(root.careerSystem.incidentIds,snapshot.careerSystem.incidentIds);
+        assert.deepEqual(root.careerSystem.settlementIds,snapshot.careerSystem.settlementIds);
+        actors.forEach((id,j)=>assert.deepEqual(getActor(root,id).personality,profiles[j]));
+      }
+    }
+    assert.equal(root.minutes,start+12*1440);invariant(root,ids);
+    assert.equal(new Set(root.careerSystem.incidentIds).size,root.careerSystem.incidentIds.length);
+    const paid=Object.fromEntries(actors.map(id=>[id,root.financialHistory.entries.filter(e=>e.kind==='salary'&&e.actorId===id).length]));
+    assert.ok(actors.every(id=>paid[id]>0));
+    return {steps,critical,paid,journal};
+  }
+  for(const {careers,variants} of matrix){
+    const base=run(careers,[neutral,neutral]);
+    for(const traits of variants){
+      const next=run(careers,traits);
+      const perActor=actors.map((id,i)=>{
+        const original=[...base.journal].filter(([,v])=>v.id===id);
+        const observed=[...next.journal].filter(([,v])=>v.id===id);
+        const matched=original.filter(([key])=>next.journal.has(key));
+        const changed=matched.filter(([key,v])=>next.journal.get(key).choice!==v.choice)
+          .map(([key,v])=>({before:v,after:next.journal.get(key)}));
+        assert.ok(next.critical[id]-base.critical[id]<=base.steps*.05,'critical care regression '+careers[i]+' '+traits[i]);
+        assert.ok(next.paid[id]>=base.paid[id],'lost paid shift '+careers[i]+' '+traits[i]);
+        assert.ok(original.length>0&&observed.length>0,'actual scheduled exposure '+careers[i]);
+        return {id,career:careers[i],traits:traits[i],baseCount:original.length,candidateCount:observed.length,matched:matched.length,changed,
+          critical:[base.critical[id],next.critical[id]],paid:[base.paid[id],next.paid[id]]};
+      });
+      console.log('LP-02D5 natural matched profiles '+JSON.stringify(perActor));
+      reports.push(...perActor);
+    }
+  }
+  assert.equal(reports.length,18);
+  mkdirSync('artifacts/lp02d5',{recursive:true});
+  writeFileSync('artifacts/lp02d5/workloads.json',JSON.stringify({reports,stepsPerRun:1728,limitations:['extra-resident headless schedule, not full legacy routing','work-neutral serious control, not a no-personality control','matched receipt changes only; unmatched encounters reported separately','no inference that every trait naturally crosses in 12 days','no device or human acceptance']},null,2));
 });

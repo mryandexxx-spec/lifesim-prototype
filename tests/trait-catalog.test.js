@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {TRAIT_CATALOG,DEMO_PROFILES,PROFILE_RULES,AXES,PREFERENCE_CATALOG,
-  getTrait,listTraits,validateSelection,validatePreferences,createProfile,
+  getTrait,listTraits,validateSelection,validatePreferences,createProfile,TRAIT_CONFLICTS,traitsConflict,
   restoreProfile,deriveAxes,preferenceAffinity,traitLabels,interestLabels} from '../src/trait-catalog.js';
 import {activityReceipt,isSimEvent} from '../src/sim-events.js';
 import {newGame,loadGame,SAVE_KEY,autonomousChoice} from '../src/simulation.js';
@@ -9,10 +9,10 @@ import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
 import {selectWish,calculateMood,psychologyScore} from '../src/psychology.js';
 const thinker=['temperament.melancholic','habits.neat'];
 const joyful=['temperament.cheerful','coordination.clumsy'];
-test('registry exposes 14 stable unique trait definitions over six facets',()=>{
-  assert.equal(listTraits().length,14);
-  assert.equal(new Set(listTraits().map(t=>t.id)).size,14);
-  assert.equal(new Set(listTraits().map(t=>t.facet)).size,6);
+test('registry exposes 24 stable unique trait definitions',()=>{
+  assert.equal(listTraits().length,24);
+  assert.equal(new Set(listTraits().map(t=>t.id)).size,24);
+  assert.equal(TRAIT_CONFLICTS.length,14);
   assert.ok(AXES.length>=10);assert.equal(PROFILE_RULES.schema,1);
   assert.equal(getTrait('coordination.clumsy').label,'Растяпа');
   assert.equal(getTrait('__proto__'),null);
@@ -129,4 +129,389 @@ test('completed activity receipts are safe typed immutable values',()=>{
   assert.equal(activityReceipt('unknown',600),null);
   assert.equal(activityReceipt('sofa',NaN),null);
   assert.equal(isSimEvent({type:'gift.given',atGameMinute:-1}),false);
+});
+
+
+// Independently frozen old catalogue groups; do not derive expected conflicts
+// from the validator under test. Catalogue expansion must extend this fixture.
+const oldTraitGroups=[
+  ['temperament.cheerful','temperament.melancholic','temperament.calm','temperament.hotheaded'],
+  ['habits.neat','habits.untidy'],
+  ['coordination.clumsy','coordination.agile'],
+  ['social.outgoing','social.reserved'],
+  ['approach.creative','approach.pragmatic'],
+  ['values.empathetic','values.independent']
+];
+test('LP-02A: exhaustive old profile pair/triple compatibility in every order',()=>{
+  const ids=oldTraitGroups.flat();
+  assert.ok(ids.every(id=>Object.hasOwn(TRAIT_CATALOG,id)));
+  const groupOf=id=>oldTraitGroups.findIndex(g=>g.includes(id));
+  const totals={2:{valid:0,invalid:0},3:{valid:0,invalid:0}};
+  const inspect=selection=>{
+    const valid=new Set(selection.map(groupOf)).size===selection.length;
+    totals[selection.length][valid?'valid':'invalid']++;
+    const [a,b,c]=selection;
+    const orders=selection.length===2?[[a,b],[b,a]]:
+      [[a,b,c],[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]];
+    for(const order of orders){
+      assert.equal(validateSelection(order).valid,valid,order.join(','));
+      if(valid){
+        const p=createProfile(order);
+        assert.deepEqual(restoreProfile(JSON.parse(JSON.stringify(p))),p);
+        assert.deepEqual(deriveAxes(p),deriveAxes(createProfile(selection)));
+      }else assert.throws(()=>createProfile(order),RangeError);
+    }
+  };
+  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+    inspect([ids[i],ids[j]]);
+    for(let k=j+1;k<ids.length;k++)inspect([ids[i],ids[j],ids[k]]);
+  }
+  assert.deepEqual(totals,{2:{valid:80,invalid:11},3:{valid:240,invalid:124}});
+  for(const id of ids){
+    assert.equal(validateSelection([id,id]).valid,false);
+    assert.equal(validateSelection([id]).valid,false);
+    assert.equal(validateSelection([id,'not.registered']).valid,false);
+  }
+  assert.equal(validateSelection([ids[0],ids[4],ids[6],ids[8]]).valid,false);
+});
+
+test('LP-02C: all ordered 24-trait pairs and triples against independent groups, old axes unchanged',()=>{
+  const groups=[...oldTraitGroups,['novelty.curious','novelty.familiar'],['pace.patient','pace.impatient'],['tone.playful','tone.serious'],['motivation.ambitious'],['motivation.balanced'],['communication.diplomatic'],['communication.direct']];
+  const ids=groups.flat(),old=oldTraitGroups.flat();
+  assert.deepEqual(Object.keys(TRAIT_CATALOG).sort(),[...ids].sort());
+  const group=id=>groups.findIndex(g=>g.includes(id));
+  let checked=0,restored=0;
+  function verify(xs){
+    const valid=new Set(xs.map(group)).size===xs.length;
+    const [a,b,c]=xs;
+    for(const order of c?[[a,b,c],[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]]:[[a,b],[b,a]]){
+      assert.equal(validateSelection(order).valid,valid,order.join(','));
+      checked++;
+      if(valid)assert.deepEqual(deriveAxes(createProfile(order)),deriveAxes({traitIds:order.filter(id=>old.includes(id))}));
+    }
+    if(valid){
+      const root=newHousehold();root.personality=createProfile(xs);root.otherSim.personality=createProfile([...xs].reverse());
+      const loaded=loadHousehold(JSON.parse(JSON.stringify(root)));
+      assert.deepEqual(loaded.personality,root.personality);assert.deepEqual(loaded.otherSim.personality,root.otherSim.personality);restored++;
+    }
+  }
+  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+    assert.equal(traitsConflict(ids[i],ids[j]),group(ids[i])===group(ids[j]));
+    assert.equal(traitsConflict(ids[i],ids[j]),traitsConflict(ids[j],ids[i]));
+    verify([ids[i],ids[j]]);
+    for(let k=j+1;k<ids.length;k++)verify([ids[i],ids[j],ids[k]]);
+  }
+  assert.equal(checked,12696);assert.equal(restored,1986);
+});
+
+import {getActor} from '../src/household.js';
+import {hireCareer} from '../src/career-state.js';
+import {plannedCareerShift} from '../src/career-scheduler.js';
+import {progressCareerWork,arriveCareerPortal} from '../src/career-work.js';
+import {startWorkIncident,chooseAutonomousWorkOption,automaticWorkIncident,decideWorkIncident,workScenario} from '../src/career-incidents.js';
+import {boundaryDisposition} from '../src/social-boundaries.js';
+import {evaluateResponse} from '../src/conversation-engine.js';
+import {startConversation,arriveSocial,chooseSocialLine,finishSocialConversation} from '../src/relationships.js';
+import {getPair} from '../src/social-graph.js';
+
+function mixedHousehold(){
+  const root=newHousehold('2026-11-16');
+  root.population={schema:1,nextResidentSerial:5,residentsById:{},linksByResident:{},kinship:[]};
+  for(const id of ['alex','mira','resident_3','resident_4']){
+    root.population.linksByResident[id]={familyId:'family_1',dwellingId:'dwelling_1'};
+    if(id.startsWith('resident_'))root.population.residentsById[id]={id,identity:{firstName:id==='resident_3'?'Вера':'Игорь',lastName:'Тест',lifeStage:'adult'},actor:newGame()};
+  }
+  return loadHousehold(structuredClone(root));
+}
+test('LP-02C mixed four-person v1 profiles survive reload without changing existing identities',()=>{
+  const root=mixedHousehold(),ids=['alex','mira','resident_3','resident_4'];
+  const profiles=[['habits.neat','novelty.curious','pace.patient'],['coordination.agile','motivation.balanced','motivation.ambitious'],['communication.direct','communication.diplomatic','tone.serious'],['values.independent','novelty.familiar','tone.playful']];
+  ids.forEach((id,i)=>getActor(root,id).personality=createProfile(profiles[i]));
+  const restored=loadHousehold(structuredClone(root));
+  ids.forEach((id,i)=>assert.deepEqual(getActor(restored,id).personality,createProfile(profiles[i])));
+  assert.equal(restored.version,1);assert.equal(SAVE_KEY,'lifesim.room01.v1');
+  restored.paused=true;const snapshot=JSON.stringify(restored);tickHousehold(restored,20);assert.equal(JSON.stringify(restored),snapshot);
+});
+const opportunityFixtures=[
+ ['city-services','city-route','test','plan'],['kitchen-studio','kitchen-special','invent','pair'],
+ ['business-center','business-idea','pilot','review'],['art-studio','art-young','mentor','exhibit'],
+ ['editorial','editorial-letter','visit','interview'],['civic-service','civic-neighbors','mediate','survey']
+];
+const paceFixtures=[['editorial','editorial-source','rights','replace'],['business-center','business-handoff','rebuild','contact'],['kitchen-studio','kitchen-supply','inventory','substitute']];
+const neutralTraits=['social.outgoing','values.independent'];
+function pendingFixture(id,career,scene,after=0){
+  const root=id.startsWith('resident_')?mixedHousehold():newHousehold('2026-11-16');
+  root.careerSystem=hireCareer(root.careerSystem,id,career,480);
+  const c=root.careerSystem.byResident[id];let shift=null;
+  for(let day=after;day<after+15&&!shift;day++)shift=plannedCareerShift(root.calendar,c,day);
+  assert.ok(shift);
+  root.minutes=root.otherSim.minutes=shift.start;
+  progressCareerWork(root,shift.start-.01,shift.start);
+  // Additional residents reach work inside progressCareerWork; legacy actors use the portal callback.
+  if(c.currentShift?.phase==='departing')assert.ok(arriveCareerPortal(root,id,shift.start));
+  assert.equal(c.currentShift?.phase,'working');
+  root.minutes=root.otherSim.minutes=shift.start+shift.duration/2+1;
+  if(id.startsWith('resident_'))getActor(root,id).minutes=root.minutes;
+  assert.ok(startWorkIncident(root,id,root.minutes));c.currentShift.incident.scenarioId=scene;
+  const a=getActor(root,id);a.personality=createProfile(neutralTraits);
+  Object.assign(a.needs,{hunger:80,bladder:80,hygiene:80,energy:80,fun:80,social:80});
+  a.mind.mood.value=65;c.performance=50;
+  return {root,shift};
+}
+test('LP-02C native work preferences cross actual decisions and settle once for all four actor IDs',()=>{
+  const old=oldTraitGroups.flat(),anchors=[...old.map(x=>[x]),...old.flatMap((a,i)=>old.slice(i+1).map(b=>[a,b]).filter(x=>validateSelection(x).valid))];
+  for(const trait of ['novelty.curious','novelty.familiar','motivation.ambitious','motivation.balanced','pace.patient','pace.impatient']){
+    for(const id of ['alex','mira','resident_3','resident_4']){
+      let witness=false;
+      for(const [career,scene,first,second] of trait.startsWith('pace.')?paceFixtures:opportunityFixtures){
+        for(const known of trait.startsWith('novelty.')?[first,second]:[null]){
+          let previous=null;
+          if(known){
+            previous=pendingFixture(id,career,scene);
+            assert.ok(decideWorkIncident(previous.root,id,known).ok);
+            assert.ok(previous.root.careerSystem.incidentHistory[id][0].performanceDelta>0);
+          }
+          const {root}=pendingFixture(id,career,scene,previous?previous.shift.dayIndex+1:0);
+          if(previous){
+            root.careerSystem.incidentHistory[id]=structuredClone(previous.root.careerSystem.incidentHistory[id]);
+            root.careerSystem.incidentIds=structuredClone(previous.root.careerSystem.incidentIds);
+          }
+          const a=getActor(root,id);
+          for(const anchor of anchors){
+            if(witness)break;
+            for(const energy of [55,65,75,95]){
+              a.needs.energy=energy;
+              // A one-old baseline is only an unsaved counterfactual.
+              a.personality={schema:1,traitIds:anchor,preferences:{likes:[],dislikes:[]}};
+              const before=chooseAutonomousWorkOption(root,id);
+              a.needs.hunger=10;const urgent=chooseAutonomousWorkOption(root,id);
+              a.personality=createProfile([...anchor,trait]);
+              assert.equal(chooseAutonomousWorkOption(root,id),urgent);
+              a.needs.hunger=80;const after=chooseAutonomousWorkOption(root,id);
+              if(before===after)continue;
+              assert.ok([first,second].includes(after));
+              const profile=structuredClone(a.personality),n=root.careerSystem.incidentIds.length,credits=root.shop.credits;
+              const receipt=automaticWorkIncident(root,id);assert.ok(receipt.ok);
+              assert.equal(receipt.option.id,after);assert.equal(root.shop.credits,credits);
+              assert.equal(root.careerSystem.incidentIds.length,n+1);
+              assert.equal(automaticWorkIncident(root,id).ok,false);
+              const restored=loadHousehold(structuredClone(root));
+              assert.deepEqual(getActor(restored,id).personality,profile);
+              assert.deepEqual(restored.careerSystem.incidentHistory[id],root.careerSystem.incidentHistory[id]);
+              witness=true;break;
+            }
+          }
+          if(witness)break;
+        }
+        if(witness)break;
+      }
+      assert.ok(witness,trait+' '+id+' must change at least one native work decision');
+    }
+  }
+});
+test('LP-02C all four communication styles cross actual legacy responses and complete canonical conversations',()=>{
+  for(const [trait,line] of [['communication.diplomatic','family.share'],['communication.direct','conflict.explain'],['tone.playful','humor.joke'],['tone.serious','philosophy.share']]){
+    const topic=line.split('.')[0];
+    for(const id of ['alex','mira']){
+      let found=false;const target=id==='alex'?'mira':'alex';
+      const fixture=extra=>{
+        const root=newHousehold(),a=getActor(root,id),b=getActor(root,target);
+        a.personality=createProfile(['habits.neat','coordination.agile']);
+        b.personality=createProfile(['habits.neat','coordination.agile',...extra]);
+        b.mind.mood.value=70;return root;
+      };
+      for(const trust of [10,30,50,70,90]){
+        for(let tension=0;tension<=100&&!found;tension+=2){
+          const a=fixture([]),b=fixture([trait]);
+          for(const root of [a,b])Object.assign(root.relationship.views[target],{trust,tension,friendship:50});
+          const before=evaluateResponse(a,id,topic,line),after=evaluateResponse(b,id,topic,line);
+          if(!before||!after||before.accepted===after.accepted)continue;
+          assert.equal(after.accepted,true);
+          for(const [root,expected] of [[a,before],[b,after]]){
+            const seq=root.socialGraph.nextSeq;
+            assert.ok(startConversation(root,id,{x:-.2,z:1.85},topic));assert.ok(arriveSocial(root));
+            assert.equal(chooseSocialLine(root,line).accepted,expected.accepted);
+            assert.equal(root.socialGraph.nextSeq,seq);
+            assert.ok(finishSocialConversation(root));assert.equal(root.socialGraph.nextSeq,seq+1);
+            const restored=loadHousehold(structuredClone(root));
+            assert.deepEqual(getActor(restored,target).personality,getActor(root,target).personality);
+            assert.deepEqual(getPair(restored.socialGraph,'alex','mira').events,getPair(root.socialGraph,'alex','mira').events);
+            assert.equal(finishSocialConversation(root),null);
+          }
+          found=true;
+        }
+        if(found)break;
+      }
+      assert.ok(found,trait+' '+id);
+    }
+  }
+  const old=createProfile(['temperament.cheerful','coordination.agile']);
+  const playful=createProfile([...old.traitIds,'tone.playful']);
+  assert.equal(boundaryDisposition(playful,'humor.joke'),boundaryDisposition(old,'humor.joke'));
+  assert.equal(boundaryDisposition(createProfile(['habits.neat','tone.serious']),'humor.joke'),0);
+  assert.equal(boundaryDisposition(createProfile(['habits.neat','communication.direct','communication.diplomatic']),'conflict.explain'),3);
+});
+
+
+// D4 new situations only: no reuse of the C opportunity/pace witnesses.
+// All choices use the native selector and settlement, not a test-only scorer.
+test('LP-02D4 extended traits reach native work decisions on held-out scenes and all four IDs',()=>{
+  const pf=(career,key)=>'pf09b-'+career+'-'+key;
+  const fixtures={
+    'novelty.curious':[['city-services',pf('city-services','partner')],['kitchen-studio',pf('kitchen-studio','texture')],['art-studio',pf('art-studio','restudy')],['business-center',pf('business-center','workshop')]],
+    'novelty.familiar':[['city-services',pf('city-services','map')],['kitchen-studio',pf('kitchen-studio','quiet')],['art-studio','art-frame'],['business-center',pf('business-center','workshop')]],
+    'motivation.ambitious':[['city-services',pf('city-services','map')],['kitchen-studio',pf('kitchen-studio','quiet')],['art-studio','art-frame'],['business-center',pf('business-center','workshop')]],
+    'pace.patient':[['editorial',pf('editorial','correction')],['business-center',pf('business-center','version')],['city-services',pf('city-services','locker')],['civic-service',pf('civic-service','language')]],
+    'pace.impatient':[['editorial',pf('editorial','correction')],['business-center',pf('business-center','version')],['city-services',pf('city-services','locker')],['civic-service',pf('civic-service','language')]],
+    'communication.diplomatic':[['editorial','editorial-ethics'],['art-studio','art-collection'],['civic-service','civic-hearing'],['civic-service','civic-courtyard']],
+    'communication.direct':[['editorial','editorial-ethics'],['business-center','business-forecast'],['civic-service','civic-accessibility'],['civic-service',pf('civic-service','language')]]
+  };
+  const old=oldTraitGroups.flat(),anchors=old.flatMap((a,i)=>old.slice(i+1).map(b=>[a,b]).filter(x=>validateSelection(x).valid));
+  const summary=[];
+  for(const [trait,scenes] of Object.entries(fixtures)){
+    for(const id of ['alex','mira','resident_3','resident_4']){
+      const witnesses=[];
+      for(const [career,scene] of scenes){
+        const def=workScenario(career,scene);
+        assert.ok(def,scene);
+        const successful=def.options.filter(o=>o.performance>0);
+        const previousOptions=trait.startsWith('novelty.')?successful.map(o=>o.id):[null];
+        let found=false;
+        for(const known of previousOptions){
+          let previous=null;
+          if(known){
+            previous=pendingFixture(id,career,scene);
+            assert.ok(decideWorkIncident(previous.root,id,known).ok);
+            assert.ok(previous.root.careerSystem.incidentHistory[id][0].performanceDelta>0);
+          }
+          const {root}=pendingFixture(id,career,scene,previous?previous.shift.dayIndex+1:0);
+          if(previous){
+            root.careerSystem.incidentHistory[id]=structuredClone(previous.root.careerSystem.incidentHistory[id]);
+            root.careerSystem.incidentIds=structuredClone(previous.root.careerSystem.incidentIds);
+          }
+          const a=getActor(root,id);
+          for(const anchor of anchors){
+            if(found)break;
+            for(const energy of [55,65,75,95]){
+              a.needs.energy=energy;
+              a.personality=createProfile(anchor);
+              const before=chooseAutonomousWorkOption(root,id);
+              a.needs.hunger=10;
+              const urgent=chooseAutonomousWorkOption(root,id);
+              a.personality=createProfile([...anchor,trait]);
+              assert.equal(chooseAutonomousWorkOption(root,id),urgent);
+              a.needs.hunger=80;
+              const after=chooseAutonomousWorkOption(root,id);
+              a.personality=createProfile([trait,...anchor].reverse());
+              assert.equal(chooseAutonomousWorkOption(root,id),after);
+              if(before===after)continue;
+              assert.ok(successful.some(o=>o.id===after),trait+' positive result');
+              if(trait==='novelty.familiar')assert.equal(after,known);
+              if(trait==='novelty.curious')assert.notEqual(after,known);
+              const n=root.careerSystem.incidentIds.length,credits=root.shop.credits,profile=structuredClone(a.personality);
+              const receipt=automaticWorkIncident(root,id);
+              assert.ok(receipt.ok);assert.equal(receipt.option.id,after);
+              assert.equal(root.shop.credits,credits);
+              assert.equal(root.careerSystem.incidentIds.length,n+1);
+              assert.equal(automaticWorkIncident(root,id).ok,false);
+              const restored=loadHousehold(structuredClone(root));
+              assert.deepEqual(getActor(restored,id).personality,profile);
+              assert.deepEqual(restored.careerSystem.incidentHistory[id],root.careerSystem.incidentHistory[id]);
+              witnesses.push({career,scene,before,after,known,energy,anchor});
+              found=true;break;
+            }
+          }
+          if(found)break;
+        }
+        if(witnesses.length===2)break;
+      }
+      summary.push({trait,id,witnesses});
+      assert.equal(witnesses.length,2,trait+' '+id+' distinct native scenes');
+    }
+  }
+  console.log('LP-02D4 native work witnesses '+JSON.stringify(summary));
+});
+test('LP-02D4 compatible communication traits and ambition/balance preserve contextual arbitration',()=>{
+  for(const id of ['alex','mira','resident_3','resident_4']){
+    const {root}=pendingFixture(id,'editorial','editorial-ethics');
+    const a=getActor(root,id);
+    a.personality=createProfile(['habits.neat','coordination.agile']);
+    const neutral=chooseAutonomousWorkOption(root,id);
+    // Compare identical one-old axes, not a different two-old profile.
+    a.personality={schema:1,traitIds:['habits.neat'],preferences:{likes:[],dislikes:[]}};
+    const single=chooseAutonomousWorkOption(root,id);
+    a.personality=createProfile(['habits.neat','communication.diplomatic','communication.direct']);
+    assert.equal(chooseAutonomousWorkOption(root,id),single);
+    assert.ok(neutral);
+    const work=pendingFixture(id,'city-services','pf09b-city-services-map').root,b=getActor(work,id);
+    b.needs.energy=65;
+    b.personality=createProfile(['habits.neat','motivation.balanced']);
+    const balanced=chooseAutonomousWorkOption(work,id);
+    b.personality=createProfile(['habits.neat','motivation.ambitious','motivation.balanced']);
+    assert.equal(chooseAutonomousWorkOption(work,id),balanced);
+  }
+});
+
+
+test('LP-02D5 every compatible pair of new traits composes without stacking or overriding urgent care',()=>{
+  const ids=['alex','mira','resident_3','resident_4'];
+  const fresh=['novelty.curious','novelty.familiar','motivation.ambitious','motivation.balanced','pace.patient','pace.impatient','communication.diplomatic','communication.direct','tone.playful','tone.serious'];
+  const pairs=fresh.flatMap((a,i)=>fresh.slice(i+1).map(b=>[a,b]).filter(xs=>validateSelection(xs).valid));
+  assert.equal(pairs.length,42);
+  const old='habits.neat',neutral=createProfile([old,'tone.serious']);
+  const scenes=[['city-services','pf09b-city-services-map'],['kitchen-studio','pf09b-kitchen-studio-texture'],
+    ['editorial','editorial-ethics'],['business-center','pf09b-business-center-version'],
+    ['art-studio','art-collection'],['civic-service','pf09b-civic-service-language']];
+  let choices=0,receipts=0;
+  for(const id of ids){
+    for(let i=0;i<scenes.length;i++){
+      const [career,scene]=scenes[i],{root}=pendingFixture(id,career,scene),a=getActor(root,id);
+      const def=workScenario(career,scene);
+      for(const [x,y] of pairs){
+        for(const energy of [35,55,65,85]){
+          a.needs.energy=energy;
+          const choose=profile=>{a.personality=profile;return chooseAutonomousWorkOption(root,id);};
+          const base=choose(neutral),singleX=choose(createProfile([old,x])),singleY=choose(createProfile([old,y]));
+          const combined=createProfile([old,x,y]),selected=choose(combined);
+          assert.equal(choose(createProfile([y,old,x])),selected);
+          assert.ok([base,singleX,singleY].includes(selected),'unexpected stacked result '+[id,scene,x,y,energy]);
+          assert.ok(def.options.some(o=>o.id===selected));
+          a.needs.hunger=10;
+          assert.equal(choose(combined),choose(neutral),'urgent veto '+[id,scene,x,y]);
+          a.needs.hunger=80;choices++;
+          // Settle and roundtrip one genuine native decision per pair and actor,
+          // without contaminating the reusable matched fixture.
+          if(i===0&&energy===65){
+            const candidate=structuredClone(root),actor=getActor(candidate,id);
+            actor.personality=combined;
+            const n=candidate.careerSystem.incidentIds.length,credits=candidate.shop.credits;
+            const receipt=automaticWorkIncident(candidate,id);
+            assert.ok(receipt.ok);assert.equal(receipt.option.id,selected);
+            assert.equal(candidate.shop.credits,credits);
+            assert.equal(candidate.careerSystem.incidentIds.length,n+1);
+            assert.equal(automaticWorkIncident(candidate,id).ok,false);
+            const restored=loadHousehold(structuredClone(candidate));
+            assert.deepEqual(getActor(restored,id).personality,combined);
+            assert.deepEqual(restored.careerSystem.incidentHistory[id],candidate.careerSystem.incidentHistory[id]);
+            receipts++;
+          }
+        }
+      }
+    }
+  }
+  assert.equal(choices,4032);assert.equal(receipts,168);
+  // All combinations preserve pre-existing nonzero disposition and the +3
+  // ceiling on the actual authored response function, including unrelated/sharp lines.
+  const lines=['daily.news','daily.critic','conflict.explain','conflict.apologize','conflict.blame','family.share','relationships.share','humor.joke','philosophy.share','money.ask','plans.idea','support.help'];
+  let responses=0;
+  for(const oldTrait of oldTraitGroups.flat())for(const [x,y] of pairs)for(const line of lines){
+    const base=boundaryDisposition({traitIds:[oldTrait]},line);
+    const a=boundaryDisposition(createProfile([oldTrait,x]),line);
+    const b=boundaryDisposition(createProfile([oldTrait,y]),line);
+    const both=boundaryDisposition(createProfile([oldTrait,x,y]),line);
+    assert.equal(both,base!==0?base:Math.max(a,b));
+    assert.equal(boundaryDisposition(createProfile([y,x,oldTrait]),line),both);
+    responses++;
+  }
+  console.log('LP-02D5 composition '+JSON.stringify({pairs:pairs.length,choices,receipts,responses}));
 });

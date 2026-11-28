@@ -8,7 +8,9 @@ import {restoreSkillProgress} from '../src/skills-engine.js';
 import {HOBBY_SKILLS} from '../src/hobby-reading.js';
 import {isWalkable,findPath,isClearLine} from '../src/navigation.js';
 import {queueAddressedConversation,finishAddressedConversation,cancelAddressedSocial,dispatchAddressedSocial,tickAddressedSocial} from '../src/resident-social-runtime.js';
-import {getPair} from '../src/social-graph.js';
+import {getPair,observePairViews} from '../src/social-graph.js';
+import {createProfile} from '../src/trait-catalog.js';
+import {evaluateResponse} from '../src/conversation-engine.js';
 import {startConversation,arriveSocial,finishSocialConversation} from '../src/relationships.js';
 import {enqueueAction,pendingActions} from '../src/action-queue.js';
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -163,4 +165,59 @@ test('PF-10/A later FIFO entries survive a conversation and cancellation has no 
   assert.equal(root.socialGraph.nextSeq,before);
   assert.equal(pendingActions(root.actionQueues,a)[0].type,'move');
   assert.equal(pendingActions(root.actionQueues,b)[0].type,'move');
+});
+
+test('LP-02C/3 all four new styles change actual addressed dialogue responses across every extra-directed pair',()=>{
+  const ids=['alex','mira','resident_3','resident_4'],witnesses=[];
+  const styles=[['communication.diplomatic','family.share'],['communication.direct','conflict.explain'],['tone.playful','humor.joke'],['tone.serious','philosophy.share']];
+  for(const a of ids)for(const b of ids){
+    if(a===b||(!a.startsWith('resident_')&&!b.startsWith('resident_')))continue;
+    for(const [trait,line] of styles){
+      const topic=line.split('.')[0];
+      const seed=household();placePair(seed,a,b);
+      const neutral=['habits.neat','coordination.agile'];
+      getActor(seed,a).personality=createProfile(neutral);
+      getActor(seed,b).personality=createProfile(neutral);
+      getActor(seed,b).mind.mood.value=70;
+      let found=null;
+      for(const trust of [10,30,50,70,90]){
+        for(let tension=0;tension<=100;tension+=2){
+          const view={trust,tension,friendship:50};
+          assert.ok(observePairViews(seed.socialGraph,a,b,{[a]:view,[b]:view}));
+          const base=evaluateResponse(seed,a,topic,line,b);
+          getActor(seed,b).personality=createProfile([...neutral,trait]);
+          const next=evaluateResponse(seed,a,topic,line,b);
+          getActor(seed,b).personality=createProfile(neutral);
+          if(base?.accepted===false&&next?.accepted===true){found={trust,tension};break;}
+        }
+        if(found)break;
+      }
+      assert.ok(found,trait+' '+a+' -> '+b);
+      for(const candidate of [false,true]){
+        const root=clone(seed);
+        if(candidate)getActor(root,b).personality=createProfile([...neutral,trait]);
+        const before=root.socialGraph.nextSeq,minute=root.minutes;
+        const expected=evaluateResponse(root,a,topic,line,b);
+        assert.equal(expected.accepted,candidate);
+        assert.ok(queueAddressedConversation(root,a,b,topic));
+        assert.ok(dispatchAddressedSocial(root));tickAddressedSocial(root,.1);
+        assert.equal(root.additionalSocial?.phase,'using');
+        assert.ok(dialogueNeedsDecision(root));
+        tickHousehold(root,20);assert.equal(root.minutes,minute);
+        assert.equal(chooseConversationTurn(root,line).accepted,candidate);
+        assert.equal(root.socialGraph.nextSeq,before);
+        const restored=loadHousehold(clone(root));
+        assert.deepEqual(restored.additionalSocial.conversation,root.additionalSocial.conversation);
+        assert.deepEqual(getActor(restored,b).personality,getActor(root,b).personality);
+        assert.ok(finishAddressedConversation(restored));assert.equal(restored.socialGraph.nextSeq,before+1);
+        const receipt=getPair(restored.socialGraph,a,b).events.at(-1);
+        assert.equal(receipt.actorId,a);assert.equal(receipt.targetId,b);
+        assert.equal(finishAddressedConversation(restored),null);assert.equal(restored.socialGraph.nextSeq,before+1);
+        assert.equal(restored.relationship.affinity,50);
+      }
+      witnesses.push({trait,a,b,...found});
+    }
+  }
+  assert.equal(witnesses.length,40);
+  console.log('LP-02C addressed matched response witnesses '+JSON.stringify(witnesses));
 });
