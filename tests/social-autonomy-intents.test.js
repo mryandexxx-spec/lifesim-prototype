@@ -2,16 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {newSocialGraph,markAcquainted,getPair,applySocialEvent,
-  observePairViews} from '../src/social-graph.js';
+  observePairViews,availableSocialActions,resolveBranchResponse} from '../src/social-graph.js';
 import {newActionQueues,enqueueAction,pendingActions} from '../src/action-queue.js';
 import {createProfile,DEMO_PROFILES} from '../src/trait-catalog.js';
 import {proposeAutonomousSocial,autonomousLeisureToken,
   AUTONOMOUS_LEISURE,AUTONOMOUS_FRIEND_BRANCHES,
-  AUTONOMOUS_PAIR_COOLDOWN} from '../src/social-dynamics.js';
+  AUTONOMOUS_PAIR_COOLDOWN,pairSocialHabits,pairDynamic} from '../src/social-dynamics.js';
 import {newHousehold,loadHousehold,tickHousehold,
   chooseResidentAction,setHouseholdAutonomy} from '../src/household.js';
 import {startSharedSocial,startBranchSocial,autonomousSocialChoice,
-  arriveSocial,cancelSocial,tickSocial,startSocial} from '../src/relationships.js';
+  arriveSocial,cancelSocial,tickSocial,startSocial,startConversation,finishSocialConversation} from '../src/relationships.js';
+import {conversationOptions,chooseConversationTurn} from '../src/conversation-engine.js';
+import {moodActionPolicy} from '../src/mood-action-policy.js';
 import {LEISURE_CATALOG,evaluateLeisure,sharedDuration} from '../src/gifts-leisure.js';
 import {SAVE_KEY} from '../src/simulation.js';
 
@@ -317,4 +319,114 @@ test('LP-02A: actual legacy adapter distinguishes optional company and settles a
     assert.equal(restored.socialGraph.nextSeq,before+1);
     assert.deepEqual(getPair(restored.socialGraph,'alex','mira').events,getPair(s.socialGraph,'alex','mira').events);
   }
+});
+
+/** D2 exploratory adapter qualification. Not a production autonomous policy.
+ * Only reconsider an already offered safe friend branch; no new target,
+ * invitation, conflict, private preference access or mandatory dialogue.
+ */
+function styleFixture(id,style){
+  const s=legacy(),peer=id==='alex'?'mira':'alex';
+  for(const a of [s,s.otherSim]){
+    a.personality=createProfile(['habits.neat','coordination.agile']);
+    Object.assign(a.needs,{energy:85,hunger:85,hygiene:85,bladder:85,fun:20,social:35});
+    a.mind.mood.value=75;
+  }
+  s.minutes=s.otherSim.minutes=2*1440+1000;
+  const g=s.socialGraph;
+  const views={alex:{friendship:85,trust:85,tension:0},mira:{friendship:85,trust:85,tension:0}};
+  observePairViews(g,id,peer,views);
+  for(const [type,at] of (style==='playful'?
+    [['friend.tease',560],['leisure.accepted',1440+560],['talk',2*1440+580]]:
+    [['conversation.talk',560],['gift.accepted',1440+560],['talk',2*1440+580]]))
+    assert.ok(evt(g,id,peer,type,at));
+  observePairViews(g,id,peer,views);
+  for(const who of ['alex','mira'])Object.assign(s.relationship.views[who],views[who]);
+  assert.equal(pairDynamic(getPair(g,id,peer),id,s.minutes).id,style);
+  assert.notEqual(getPair(g,id,peer).friendship,'none');
+  return s;
+}
+function trialStyleChoice(root,id){
+  const base=autonomousSocialChoice(root,id),peer=id==='alex'?'mira':'alex';
+  if(base?.type!=='branch'||!['friend.tease','friend.confide'].includes(base.actionId))return base;
+  const a=id==='alex'?root:root.otherSim,b=peer==='alex'?root:root.otherSim;
+  const trait=a.personality.traitIds;
+  const proposed=trait.includes('tone.playful')?'friend.tease':trait.includes('tone.serious')?'friend.confide':null;
+  if(!proposed||proposed===base.actionId)return base;
+  const pair=getPair(root.socialGraph,id,peer),view=pair.views[id],other=pair.views[peer];
+  const habits=pairSocialHabits(pair,id,root.minutes);
+  if(pair.events.at(-1)?.type===proposed||habits.recent.filter(x=>x==='branch.'+proposed).length>=2||
+    view.trust<65||other.trust<65||view.tension>=20||other.tension>=20||
+    a.mind.mood.value<55||b.mind.mood.value<55||
+    !availableSocialActions(root.socialGraph,id,peer,root.minutes).some(x=>x.id===proposed&&x.enabled)||
+    !moodActionPolicy(a,{type:'branch',actionId:proposed},{automatic:true}).willing)return base;
+  return {kind:'talk',type:'branch',actionId:proposed};
+}
+test('LP-02D2 exploratory tone choices: real voluntary friend branch admission, completion and vetoes',()=>{
+ const results=[];
+ for(const id of ['alex','mira'])for(const [style,trait,expected] of [
+   ['supportive','tone.playful','friend.tease'],['playful','tone.serious','friend.confide']]){
+   const s=styleFixture(id,style),peer=id==='alex'?'mira':'alex';
+   const a=id==='alex'?s:s.otherSim,b=peer==='alex'?s:s.otherSim;
+   const base=autonomousSocialChoice(s,id);
+   assert.equal(base?.actionId,style==='supportive'?'friend.confide':'friend.tease');
+   a.personality=createProfile(['habits.neat','coordination.agile',trait]);
+   const before=JSON.stringify(s),candidate=trialStyleChoice(s,id);
+   assert.equal(candidate?.actionId,expected);assert.equal(JSON.stringify(s),before);
+   const paired=[];
+   for(const plan of [base,candidate]){
+     let root=copy(s),seq=root.socialGraph.nextSeq;
+     const ok=startBranchSocial(root,id,place,plan.actionId,true);
+     if(!ok){paired.push({action:plan.actionId,admitted:false});continue;}
+     assert.equal(root.socialGraph.nextSeq,seq);
+     assert.ok(arriveSocial(root));
+     root=loadHousehold(copy(root));
+     assert.ok(root.socialAction?.branchAction);
+     tickHousehold(root,19);
+     assert.equal(root.socialAction,null);
+     assert.equal(root.socialGraph.nextSeq,seq+1);
+     const receipt=getPair(root.socialGraph,id,peer).events.at(-1);
+     assert.equal(receipt.actorId,id);assert.equal(receipt.targetId,peer);
+     tickSocial(root,30);assert.equal(root.socialGraph.nextSeq,seq+1);
+     paired.push({action:plan.actionId,admitted:true,receipt:receipt.type});
+   }
+   assert.ok(paired.every(x=>x.admitted&&x.receipt===x.action),JSON.stringify(paired));
+   const control=copy(s);control.paused=true;assert.equal(trialStyleChoice(control,id),null);
+   b.needs.hunger=10;assert.equal(trialStyleChoice(s,id),null);b.needs.hunger=85;
+   assert.ok(enqueueAction(s.actionQueues,peer,{type:'object',actionId:'bed'}));
+   assert.equal(trialStyleChoice(s,id),null);
+   results.push({id,trait,paired});
+ }
+ console.log('LP-02D2 tone branch candidate '+JSON.stringify(results));
+});
+
+/** Player-opened dialogue only. Test if actual existing authored alternatives
+ * could express initiator style in a later separately qualified mechanism.
+ * Do not compare to an imaginary current autonomous line selector.
+ */
+test('LP-02D2 communication affordances: actual explicit dialogue alternatives and canonical outcomes',()=>{
+ const results=[];
+ for(const id of ['alex','mira'])for(const [trait,topic,line,alternative] of [
+  ['communication.diplomatic','conflict','conflict.apologize','conflict.explain'],
+  ['communication.direct','conflict','conflict.explain','conflict.apologize'],
+  ['communication.diplomatic','family','family.share','family.ask'],
+  ['communication.direct','relationships','relationships.share','relationships.ask']
+ ]){
+   const initial=legacy(),a=id==='alex'?initial:initial.otherSim;
+   a.personality=createProfile(['habits.neat','coordination.agile',trait]);
+   const outcomes=[];
+   for(const selected of [alternative,line]){
+     let s=copy(initial),seq=s.socialGraph.nextSeq;
+     assert.ok(startConversation(s,id,place,topic));assert.ok(arriveSocial(s));
+     assert.ok(conversationOptions(s.socialAction.conversation,s).some(x=>x.id===selected&&!x.locked));
+     const response=chooseConversationTurn(s,selected);assert.ok(response);
+     assert.equal(s.socialGraph.nextSeq,seq);
+     s=loadHousehold(copy(s));assert.equal(s.socialAction.conversation.turns[0].id,selected);
+     assert.ok(finishSocialConversation(s));assert.equal(s.socialGraph.nextSeq,seq+1);
+     assert.equal(finishSocialConversation(s),null);
+     outcomes.push({line:selected,accepted:response.accepted,receipt:getPair(s.socialGraph,'alex','mira').events.at(-1).type});
+   }
+   results.push({id,trait,topic,outcomes});
+ }
+ console.log('LP-02D2 explicit line affordances '+JSON.stringify(results));
 });
