@@ -41,8 +41,9 @@ for(const [engine,launcher] of [['chromium',chromium],['webkit',webkit]]){
    assert.match(await choose('pace.impatient').innerText(),/Несовместимо/);assert.equal(await confirm.isDisabled(),true);
    await tap(choose('communication.direct'));assert.equal(await confirm.isEnabled(),true);
    await tap(choose('communication.diplomatic'));assert.equal(await choose('tone.serious').isDisabled(),true);
-   await tap(choose('pace.patient'));assert.equal(await choose('pace.impatient').isEnabled(),true);
+   await tap(page.locator('[data-remove-trait="pace.patient"]'));assert.equal(await choose('pace.impatient').isEnabled(),true);
    await tap(choose('tone.serious'));assert.equal(await choose('tone.playful').isDisabled(),true);
+   assert.deepEqual(await page.locator('.trait-selected button').evaluateAll(nodes=>nodes.map(x=>x.dataset.removeTrait)),['communication.direct','communication.diplomatic','tone.serious']);
    assert.equal(await page.evaluate(()=>window.__writes),0);
    const layout=await page.evaluate(()=>{const l=document.querySelector('.trait-list'),f=document.querySelector('.trait-confirm').getBoundingClientRect();return {w:innerWidth,h:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,scroll:l.scrollHeight>l.clientHeight,footer:f.bottom<=innerHeight+1};});
    assert.ok(layout.sw<=layout.w+1&&layout.sh<=layout.h+1&&layout.scroll&&layout.footer,JSON.stringify(layout));

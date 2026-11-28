@@ -8,6 +8,8 @@ import {newHousehold,loadHousehold,tickHousehold,getActor,setHouseholdAutonomy} 
 import {residentIdsForSimulation} from '../src/resident-activity-runtime.js';
 import {acceptCareerOffer} from '../src/career-job-board.js';
 import {nextCareerShift} from '../src/career-scheduler.js';
+import {arriveCareerPortal,finishCareerReturn} from '../src/career-work.js';
+import {createProfile} from '../src/trait-catalog.js';
 import {enqueueAction,pendingActions,MAX_ACTION_QUEUE} from '../src/action-queue.js';
 import {queueAddressedSocial} from '../src/resident-social-runtime.js';
 import {getPair} from '../src/social-graph.js';
@@ -193,4 +195,62 @@ test('CAS-01.8 concurrent FIFO and real addressed social survives mid-session sa
   assert.equal(getPair(root.socialGraph,'resident_3','resident_4').events.length,1,
     'next tick and resume cannot replay social reward');
   invariant(root,['alex','mira','resident_3','resident_4']);
+});
+
+/** Paired uninterrupted root-clock workloads. Legacy portal/return callbacks
+ * stand in for renderer arrivals, not for successful physical routing.
+ * Naturally scheduled incidents only; no injected scene, history or needs.
+ */
+test('LP-02C/3 matched eight-day 2/4 resident workloads retain care and shift invariants',()=>{
+  const report=[];
+  const anchors=[['habits.neat','coordination.agile'],['temperament.calm','values.independent'],['approach.creative','social.outgoing'],['habits.untidy','values.empathetic']];
+  const additions=['motivation.balanced','pace.patient','novelty.curious','novelty.familiar'];
+  const careers=['editorial','kitchen-studio','business-center','civic-service'];
+  for(const n of [2,4]){
+    const results=[];
+    for(const candidate of [false,true]){
+      let root=home(n),ids=residentIdsForSimulation(root);
+      ids.forEach((id,i)=>{getActor(root,id).personality=createProfile([...anchors[i],...(candidate?[additions[i]]:[])]);hire(root,id,careers[i]);});
+      const profiles=Object.fromEntries(ids.map(id=>[id,copy(getActor(root,id).personality)]));
+      const critical=Object.fromEntries(ids.map(id=>[id,0])),worst=Object.fromEntries(ids.map(id=>[id,100]));
+      const initial=root.minutes,steps=8*1440/20;
+      let portalCallbacks=0,returns=0;
+      for(let step=1;step<=steps;step++){
+        const before=root.minutes;tickHousehold(root,20);assert.equal(root.minutes,before+20);
+        for(const id of ['alex','mira']){
+          const s=root.careerSystem.byResident[id]?.currentShift;
+          if(s?.phase==='departing'&&root.minutes<s.end){assert.ok(arriveCareerPortal(root,id,root.minutes));portalCallbacks++;}
+          if(s?.phase==='returning'){assert.ok(finishCareerReturn(root,id));returns++;}
+        }
+        for(const id of ids){
+          const a=getActor(root,id),low=Math.min(...['hunger','energy','bladder','hygiene'].map(k=>a.needs[k]));
+          if(low<25)critical[id]++;worst[id]=Math.min(worst[id],low);
+        }
+        if(step%12===0)invariant(root,ids);
+        if(step%72===0){
+          const saved=copy(root),wallet=root.shop.credits,receipts=copy(root.careerSystem.incidentIds);
+          root=loadHousehold(saved);
+          assert.equal(root.shop.credits,wallet);assert.deepEqual(root.careerSystem.incidentIds,receipts);
+          for(const id of ids)assert.deepEqual(getActor(root,id).personality,profiles[id]);
+        }
+      }
+      assert.equal(root.minutes,initial+8*1440);invariant(root,ids);
+      const salaries=root.financialHistory.entries.filter(e=>e.kind==='salary');
+      const paid=Object.fromEntries(ids.map(id=>[id,salaries.filter(e=>e.actorId===id).length]));
+      const journal=Object.fromEntries(ids.map(id=>[id,root.careerSystem.incidentHistory[id].map(x=>({scenario:x.scenarioId,choice:x.choiceId,delta:x.performanceDelta}))]));
+      assert.equal(new Set(root.careerSystem.incidentIds).size,root.careerSystem.incidentIds.length);
+      assert.ok(ids.every(id=>paid[id]>0),'all employed residents complete shifts');
+      results.push({n,candidate,steps,critical,worst,paid,journal,portalCallbacks,returns,saveBytes:JSON.stringify(root).length});
+    }
+    const [base,next]=results;report.push(...results);
+    // Frozen engineering screen: <=5 percentage-point rise in sampled critical
+    // needs per actor and no loss of a completed paid shift in this workload.
+    console.log('LP-02C matched workload '+JSON.stringify(results));
+    for(const id of Object.keys(base.paid)){
+      assert.ok(next.critical[id]-base.critical[id]<=base.steps*.05,'critical care regression '+id);
+      assert.ok(next.paid[id]>=base.paid[id],'lost paid shift '+id);
+    }
+  }
+  mkdirSync('artifacts/lp02c-workload',{recursive:true});
+  writeFileSync('artifacts/lp02c-workload/report.json',JSON.stringify(report,null,2));
 });
