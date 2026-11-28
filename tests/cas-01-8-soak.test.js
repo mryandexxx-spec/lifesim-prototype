@@ -12,6 +12,7 @@ import {arriveCareerPortal,finishCareerReturn} from '../src/career-work.js';
 import {createProfile} from '../src/trait-catalog.js';
 import {chooseAutonomousWorkOption,pendingWorkIncident,workScenario} from '../src/career-incidents.js';
 import {progressWorkNeeds} from '../src/career-work-needs.js';
+import {candidateWorkAudit} from './lp02d-work-motive-probe.mjs';
 import {enqueueAction,pendingActions,MAX_ACTION_QUEUE} from '../src/action-queue.js';
 import {queueAddressedSocial} from '../src/resident-social-runtime.js';
 import {getPair} from '../src/social-graph.js';
@@ -303,6 +304,7 @@ test('LP-02D0 natural incident exposure and decision-window audit',()=>{
           const probe=copy(root);
           progressWorkNeeds(probe,before,before+10);
           rows.get(incident.id).endForecast=inspect(probe,id);
+          rows.get(incident.id).candidate=candidateWorkAudit(probe,id,anchors);
         }
       }
       tickHousehold(root,10);assert.equal(root.minutes,before+10);
@@ -333,7 +335,9 @@ test('LP-02D0 natural incident exposure and decision-window audit',()=>{
         open:completed.filter(x=>x.opened.choices[t]!==x.opened.neutral).length,
         end:completed.filter(x=>x.endForecast&&x.endForecast.choices[t]!==x.endForecast.neutral).length
       }]))};
-    matrix.push({summary,rows:[...rows.values()]});
+    const candidateSummary={scenes:completed.map(x=>({scene:x.scene,career:x.career,actual:x.actual.choice,gate:x.endForecast?.gate,known:x.endForecast?.known})),effects:Object.fromEntries(motives.map(t=>[t,{targeted:completed.filter(x=>x.candidate?.cases[t].targets.length).length,changed:completed.filter(x=>x.candidate?.cases[t].changed).length,receipts:completed.filter(x=>x.candidate?.cases[t].changed).map(x=>({scene:x.scene,comparison:x.candidate.cases[t].receipts}))}]))};
+    console.log('LP-02D1 candidate exposure '+JSON.stringify(candidateSummary));
+    matrix.push({summary,candidateSummary,rows:[...rows.values()]});
     console.log('LP-02D0 natural exposure '+JSON.stringify(summary));
   }
   mkdirSync('artifacts/lp02d0',{recursive:true});
