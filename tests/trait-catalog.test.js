@@ -208,7 +208,7 @@ import {getActor} from '../src/household.js';
 import {hireCareer} from '../src/career-state.js';
 import {plannedCareerShift} from '../src/career-scheduler.js';
 import {progressCareerWork,arriveCareerPortal} from '../src/career-work.js';
-import {startWorkIncident,chooseAutonomousWorkOption,automaticWorkIncident,decideWorkIncident} from '../src/career-incidents.js';
+import {startWorkIncident,chooseAutonomousWorkOption,automaticWorkIncident,decideWorkIncident,workScenario} from '../src/career-incidents.js';
 import {boundaryDisposition} from '../src/social-boundaries.js';
 import {evaluateResponse} from '../src/conversation-engine.js';
 import {startConversation,arriveSocial,chooseSocialLine,finishSocialConversation} from '../src/relationships.js';
@@ -350,4 +350,104 @@ test('LP-02C all four communication styles cross actual legacy responses and com
   assert.equal(boundaryDisposition(playful,'humor.joke'),boundaryDisposition(old,'humor.joke'));
   assert.equal(boundaryDisposition(createProfile(['habits.neat','tone.serious']),'humor.joke'),0);
   assert.equal(boundaryDisposition(createProfile(['habits.neat','communication.direct','communication.diplomatic']),'conflict.explain'),3);
+});
+
+
+// D4 new situations only: no reuse of the C opportunity/pace witnesses.
+// All choices use the native selector and settlement, not a test-only scorer.
+test('LP-02D4 extended traits reach native work decisions on held-out scenes and all four IDs',()=>{
+  const pf=(career,key)=>'pf09b-'+career+'-'+key;
+  const fixtures={
+    'novelty.curious':[['city-services',pf('city-services','partner')],['kitchen-studio',pf('kitchen-studio','texture')],['art-studio',pf('art-studio','restudy')],['business-center',pf('business-center','workshop')]],
+    'novelty.familiar':[['city-services',pf('city-services','map')],['kitchen-studio',pf('kitchen-studio','quiet')],['art-studio','art-frame'],['business-center',pf('business-center','workshop')]],
+    'motivation.ambitious':[['city-services',pf('city-services','map')],['kitchen-studio',pf('kitchen-studio','quiet')],['art-studio','art-frame'],['business-center',pf('business-center','workshop')]],
+    'pace.patient':[['editorial',pf('editorial','correction')],['business-center',pf('business-center','version')],['city-services',pf('city-services','locker')],['civic-service',pf('civic-service','language')]],
+    'pace.impatient':[['editorial',pf('editorial','correction')],['business-center',pf('business-center','version')],['city-services',pf('city-services','locker')],['civic-service',pf('civic-service','language')]],
+    'communication.diplomatic':[['editorial','editorial-ethics'],['art-studio','art-collection'],['civic-service','civic-hearing'],['civic-service','civic-courtyard']],
+    'communication.direct':[['editorial','editorial-ethics'],['business-center','business-forecast'],['civic-service','civic-accessibility'],['civic-service',pf('civic-service','language')]]
+  };
+  const old=oldTraitGroups.flat(),anchors=old.flatMap((a,i)=>old.slice(i+1).map(b=>[a,b]).filter(x=>validateSelection(x).valid));
+  const summary=[];
+  for(const [trait,scenes] of Object.entries(fixtures)){
+    for(const id of ['alex','mira','resident_3','resident_4']){
+      const witnesses=[];
+      for(const [career,scene] of scenes){
+        const def=workScenario(career,scene);
+        assert.ok(def,scene);
+        const successful=def.options.filter(o=>o.performance>0);
+        const previousOptions=trait.startsWith('novelty.')?successful.map(o=>o.id):[null];
+        let found=false;
+        for(const known of previousOptions){
+          let previous=null;
+          if(known){
+            previous=pendingFixture(id,career,scene);
+            assert.ok(decideWorkIncident(previous.root,id,known).ok);
+            assert.ok(previous.root.careerSystem.incidentHistory[id][0].performanceDelta>0);
+          }
+          const {root}=pendingFixture(id,career,scene,previous?previous.shift.dayIndex+1:0);
+          if(previous){
+            root.careerSystem.incidentHistory[id]=structuredClone(previous.root.careerSystem.incidentHistory[id]);
+            root.careerSystem.incidentIds=structuredClone(previous.root.careerSystem.incidentIds);
+          }
+          const a=getActor(root,id);
+          for(const anchor of anchors){
+            if(found)break;
+            for(const energy of [55,65,75,95]){
+              a.needs.energy=energy;
+              a.personality=createProfile(anchor);
+              const before=chooseAutonomousWorkOption(root,id);
+              a.needs.hunger=10;
+              const urgent=chooseAutonomousWorkOption(root,id);
+              a.personality=createProfile([...anchor,trait]);
+              assert.equal(chooseAutonomousWorkOption(root,id),urgent);
+              a.needs.hunger=80;
+              const after=chooseAutonomousWorkOption(root,id);
+              a.personality=createProfile([trait,...anchor].reverse());
+              assert.equal(chooseAutonomousWorkOption(root,id),after);
+              if(before===after)continue;
+              assert.ok(successful.some(o=>o.id===after),trait+' positive result');
+              if(trait==='novelty.familiar')assert.equal(after,known);
+              if(trait==='novelty.curious')assert.notEqual(after,known);
+              const n=root.careerSystem.incidentIds.length,credits=root.shop.credits,profile=structuredClone(a.personality);
+              const receipt=automaticWorkIncident(root,id);
+              assert.ok(receipt.ok);assert.equal(receipt.option.id,after);
+              assert.equal(root.shop.credits,credits);
+              assert.equal(root.careerSystem.incidentIds.length,n+1);
+              assert.equal(automaticWorkIncident(root,id).ok,false);
+              const restored=loadHousehold(structuredClone(root));
+              assert.deepEqual(getActor(restored,id).personality,profile);
+              assert.deepEqual(restored.careerSystem.incidentHistory[id],root.careerSystem.incidentHistory[id]);
+              witnesses.push({career,scene,before,after,known,energy,anchor});
+              found=true;break;
+            }
+          }
+          if(found)break;
+        }
+        if(witnesses.length===2)break;
+      }
+      summary.push({trait,id,witnesses});
+      assert.equal(witnesses.length,2,trait+' '+id+' distinct native scenes');
+    }
+  }
+  console.log('LP-02D4 native work witnesses '+JSON.stringify(summary));
+});
+test('LP-02D4 compatible communication traits and ambition/balance preserve contextual arbitration',()=>{
+  for(const id of ['alex','mira','resident_3','resident_4']){
+    const {root}=pendingFixture(id,'editorial','editorial-ethics');
+    const a=getActor(root,id);
+    a.personality=createProfile(['habits.neat','coordination.agile']);
+    const neutral=chooseAutonomousWorkOption(root,id);
+    // Compare identical one-old axes, not a different two-old profile.
+    a.personality={schema:1,traitIds:['habits.neat'],preferences:{likes:[],dislikes:[]}};
+    const single=chooseAutonomousWorkOption(root,id);
+    a.personality=createProfile(['habits.neat','communication.diplomatic','communication.direct']);
+    assert.equal(chooseAutonomousWorkOption(root,id),single);
+    assert.ok(neutral);
+    const work=pendingFixture(id,'city-services','pf09b-city-services-map').root,b=getActor(work,id);
+    b.needs.energy=65;
+    b.personality=createProfile(['habits.neat','motivation.balanced']);
+    const balanced=chooseAutonomousWorkOption(work,id);
+    b.personality=createProfile(['habits.neat','motivation.ambitious','motivation.balanced']);
+    assert.equal(chooseAutonomousWorkOption(work,id),balanced);
+  }
 });
