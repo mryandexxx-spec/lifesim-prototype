@@ -129,7 +129,10 @@ test('naturally different personalities respond differently to communication sty
   assert.equal(boundaryDisposition(independent,'support.help'),-5);
   assert.equal(boundaryDisposition(null,'plans.invite'),0);
   assert.equal(boundaryDisposition(cheerful,'unknown'),0);
-  assert.equal(boundaryDisposition(cheerful,'daily.news'),0);
+  // LP-02A: good news is an explicitly authored optimism response; neutral content stays neutral.
+  assert.equal(boundaryDisposition(cheerful,'daily.news'),4);
+  assert.equal(boundaryDisposition(sensitive,'daily.news'),0);
+  assert.equal(boundaryDisposition(cheerful,'money.ask'),0);
   assert.ok(boundaryDisposition(DEMO_PROFILES.second,'humor.joke')>0);
 });
 
