@@ -978,8 +978,29 @@ const SKILLS=[null,"cooking","literature","painting",null,null];
 const RARITIES=['ordinary','unusual','unusual','rare','rare','rare','unusual','rare'];
 const AXES=['organization','empathy','practicality','resilience','creativity','coordination'];
 const DELTAS=[[6,-9,-2,3,-4,3,-1,2,5],[5,-7,2,3,-3,5,0,2,2],[6,-10,3,4,-6,1,-2,1,5],[5,-8,4,4,-5,2,-1,2,3]];
+// Explicit semantic corrections for the old rotational coordination assignments.
+// IDs, option costs, skills, rewards and already settled receipts are unchanged.
+const COORDINATION_AXIS_CORRECTIONS=Object.freeze({
+  "pf09b-city-services-letter-c": "organization",
+  "pf09b-city-services-locker-a": "practicality",
+  "pf09b-city-services-locker-b": "practicality",
+  "pf09b-kitchen-studio-fruit-c": "practicality",
+  "pf09b-kitchen-studio-guest-b": "empathy",
+  "pf09b-editorial-voices-c": "organization",
+  "pf09b-editorial-map-b": "organization",
+  "pf09b-editorial-rotation-c": "organization",
+  "pf09b-art-studio-light-c": "practicality",
+  "pf09b-art-studio-sketch-b": "creativity",
+  "pf09b-art-studio-restudy-c": "organization",
+  "pf09b-art-studio-shared-b": "organization",
+  "pf09b-business-center-room-b": "practicality",
+  "pf09b-business-center-move-c": "organization",
+  "pf09b-business-center-sample-b": "practicality",
+  "pf09b-civic-service-language-c": "empathy",
+  "pf09b-civic-service-outreach-b": "practicality"
+});
 export const PF09B_SCENES=Object.freeze(Object.fromEntries(Object.entries(CONTENT).map(([career,rows],ci)=>[career,Object.freeze(rows.map(([key,title,text,focus,answers],i)=>{
  const id='pf09b-'+career+'-'+key,tone=[0,4,7].includes(i)?'pressure':'opportunity',d=DELTAS[(ci+i)%4];
- const options=answers.map(([text,feedback],j)=>Object.freeze({id:id+'-'+['a','b','c'][j],text,feedback,performance:d[j*3],energy:d[j*3+1],fun:d[j*3+2],axis:j===0?focus:AXES[(ci+i+j)%AXES.length],memory:j===0&&tone==='pressure'?'work.pressure':j===2?'work.relief':'work.pride',skill:j<2?SKILLS[ci]:null}));
- return Object.freeze({id,title,text,focus,tone,rarity:RARITIES[i],minRank:i>=5?5:0,maxRank:i===4?4:7,...(i>=6?{trackId:TRACKS[ci][i-6]}:{}),options:Object.freeze(options)});
+ const options=answers.map(([text,feedback],j)=>Object.freeze({id:id+'-'+['a','b','c'][j],text,feedback,performance:d[j*3],energy:d[j*3+1],fun:d[j*3+2],axis:COORDINATION_AXIS_CORRECTIONS[id+'-'+['a','b','c'][j]]??(j===0?focus:AXES[(ci+i+j)%AXES.length]),memory:j===0&&tone==='pressure'?'work.pressure':j===2?'work.relief':'work.pride',skill:j<2?SKILLS[ci]:null}));
+ return Object.freeze({id,title,text,focus:id==='pf09b-city-services-locker'?'practicality':focus,tone,rarity:RARITIES[i],minRank:i>=5?5:0,maxRank:i===4?4:7,...(i>=6?{trackId:TRACKS[ci][i-6]}:{}),options:Object.freeze(options)});
 }))])));

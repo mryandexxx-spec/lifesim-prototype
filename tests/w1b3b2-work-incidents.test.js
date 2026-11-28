@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newHousehold,loadHousehold,tickHousehold} from '../src/household.js';
+import {newHousehold,loadHousehold,tickHousehold,getActor} from '../src/household.js';
 import {hireCareer,restoreCareerSystem} from '../src/career-state.js';
 import {plannedCareerShift} from '../src/career-scheduler.js';
 import {progressCareerWork,arriveCareerPortal,finishCareerReturn} from '../src/career-work.js';
-import {WORK_INCIDENTS,startWorkIncident,pendingWorkIncident,
+import {WORK_INCIDENTS,WORK_INCIDENT_CATALOG,startWorkIncident,pendingWorkIncident,
   decideWorkIncident,automaticWorkIncident,chooseAutonomousWorkOption,
   restoreWorkIncident,workIncidentChoiceDescription,planWorkIncident,workScenario} from '../src/career-incidents.js';
+import {createProfile} from '../src/trait-catalog.js';
 import {CAREER_CATALOG} from '../src/career-catalog.js';
 
 const json=x=>JSON.parse(JSON.stringify(x));
@@ -216,4 +217,54 @@ test('overnight civic work event resolves with ordinary canonical payroll',()=>{
   tickHousehold(root,shift.end-root.minutes);
   assert.equal(root.careerSystem.byResident.mira.lastShift.salary,152);
   assert.equal(root.careerSystem.byResident.mira.lastShift.incident.auto,true);
+});
+
+
+test('LP-02A: manual dexterity maps only to authored physical approaches',()=>{
+  const keys=Object.entries(WORK_INCIDENT_CATALOG).flatMap(([career,scenes])=>
+    scenes.flatMap(s=>s.options.filter(o=>o.axis==='coordination')
+      .map(o=>career+'/'+s.id+'/'+o.id))).sort();
+  assert.deepEqual(keys,[
+    'art-studio/art-frame/repair',
+    'art-studio/art-pigments/mix',
+    'art-studio/legacy/rebuild',
+    'art-studio/pf09b-art-studio-light/pf09b-art-studio-light-a',
+    'art-studio/pf09b-art-studio-packing/pf09b-art-studio-packing-a'
+  ]);
+  assert.equal(workScenario('city-services','pf09b-city-services-locker').focus,'practicality');
+  assert.equal(workScenario('art-studio','art-pigments').options.find(o=>o.id==='change').axis,'creativity');
+});
+test('LP-02A: real work decision and once-only receipt differ by dexterity, not resident identity',()=>{
+  for(const id of ['alex','mira'])for(const trait of ['coordination.agile','coordination.clumsy']){
+    const {root,contract}=reached('art-studio',id),actor=getActor(root,id);
+    actor.personality=createProfile(['temperament.calm',trait]);
+    actor.needs.energy=75;actor.mind.mood.value=75;
+    contract.currentShift.incident.scenarioId='art-pigments';
+    const chosen=chooseAutonomousWorkOption(root,id),before=root.shop.credits;
+    assert.equal(chosen,trait==='coordination.agile'?'mix':'plain');
+    const result=automaticWorkIncident(root,id);
+    assert.ok(result.ok);
+    assert.equal(result.incident.choiceId,chosen);
+    assert.equal(root.careerSystem.incidentIds.length,1);
+    assert.equal(root.careerSystem.incidentHistory[id][0].choiceId,chosen);
+    assert.equal(root.shop.credits,before);
+    assert.equal(automaticWorkIncident(root,id).ok,false);
+    const restored=loadHousehold(json(root));
+    assert.deepEqual(restored.careerSystem.incidentHistory[id],root.careerSystem.incidentHistory[id]);
+    assert.deepEqual(restored.careerSystem.incidentIds,root.careerSystem.incidentIds);
+  }
+});
+test('LP-02A: dexterity alone no longer changes abstract editorial decisions or previews',()=>{
+  const {root,contract}=reached('editorial');
+  contract.currentShift.incident.scenarioId='pf09b-editorial-voices';
+  const options=workScenario('editorial','pf09b-editorial-voices').options;
+  for(const energy of [35,75])for(const mood of [35,75]){
+    root.needs.energy=energy;root.mind.mood.value=mood;
+    root.personality=createProfile(['temperament.calm','coordination.agile']);
+    const first=chooseAutonomousWorkOption(root,'alex');
+    const descriptions=options.map(o=>workIncidentChoiceDescription(root,'alex',o));
+    root.personality=createProfile(['temperament.calm','coordination.clumsy']);
+    assert.equal(chooseAutonomousWorkOption(root,'alex'),first);
+    assert.deepEqual(options.map(o=>workIncidentChoiceDescription(root,'alex',o)),descriptions);
+  }
 });
