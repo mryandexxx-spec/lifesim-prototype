@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newGame,evaluateAutonomy,autonomousChoice,SAVE_KEY} from '../src/simulation.js';
+import {newGame,evaluateAutonomy,autonomousChoice,createCareContext,SAVE_KEY} from '../src/simulation.js';
 import {createProfile} from '../src/trait-catalog.js';
 import {newHousehold,loadHousehold,tickHousehold,getActor} from '../src/household.js';
 import {resolveActionFurniture,furnitureActionApproach} from '../src/furniture-catalog.js';
 import {pendingActions,enqueueAction} from '../src/action-queue.js';
-import {explainAdditionalResidentAutonomy} from '../src/resident-activity-runtime.js';
+import {explainAdditionalResidentAutonomy,additionalCareCapability,proposeAdditionalCare,admitAdditionalCareProposal} from '../src/resident-activity-runtime.js';
 
 const copy=value=>JSON.parse(JSON.stringify(value));
 const healthy=state=>{
@@ -124,4 +124,67 @@ test('QSK-06 blocked manual queue still outranks ranked fallback after save/relo
   assert.equal(b.action,null,'AI cannot skip a blocked user command');
   assert.equal(pendingActions(restored.actionQueues,'resident_3').length,1);
   assert.equal(restored.version,1);
+});
+
+test('care context is detached, compact, frozen and exact for the current scoring kernel',()=>{
+  const root=oneExtra(),actor=getActor(root,'resident_3');
+  root.minutes=1380;healthy(actor);actor.needs.energy=35;
+  actor.mind.memories.push({id:'bed',at:1370,fulfilled:true});
+  const context=createCareContext(actor,{residentId:'resident_3',minutes:root.minutes,
+    paused:root.paused,enabled:root.autonomy.enabled});
+  const baseline={...actor,minutes:root.minutes,paused:root.paused,
+    autonomy:{...actor.autonomy,enabled:root.autonomy.enabled}};
+  assert.deepEqual(evaluateAutonomy(context),evaluateAutonomy(baseline));
+  assert.equal(context.residentId,'resident_3');
+  assert.equal(Object.hasOwn(context,'world'),false);
+  assert.notEqual(context.needs,actor.needs);
+  assert.notEqual(context.mind.memories,actor.mind.memories);
+  assert.throws(()=>{context.needs.energy=1;},TypeError);
+  actor.needs.energy=4;assert.equal(context.needs.energy,35);
+});
+test('care capability classifications do not imply execution or mutate the save',()=>{
+  const root=oneExtra();const a=getActor(root,'resident_3');
+  healthy(a);a.needs.bladder=7;
+  const before=copy(root);
+  assert.equal(additionalCareCapability(root,'resident_3','toilet').status,'supported');
+  assert.equal(additionalCareCapability(root,'resident_3','dresser').status,'forbidden');
+  assert.equal(additionalCareCapability(root,'resident_3','cook').status,'unsupported');
+  assert.equal(additionalCareCapability(root,'resident_3','fake').status,'unknown');
+  assert.equal(additionalCareCapability(root,'resident_999','toilet').status,'blocked');
+  assert.deepEqual(root,before);
+  a.autonomy.nextAt=root.minutes+1;
+  assert.equal(additionalCareCapability(root,'resident_3','toilet').reason,'cooldown');
+  a.autonomy.nextAt=root.minutes;
+  root.paused=true;assert.equal(additionalCareCapability(root,'resident_3','toilet').status,'blocked');
+});
+test('care proposal uses actual adapter, rejects stale, foreign and occupied targets without rewards',()=>{
+  const root=oneExtra(),a=getActor(root,'resident_3');
+  healthy(a);a.needs.bladder=7;
+  const before=copy(root),proposal=proposeAdditionalCare(root,'resident_3');
+  assert.equal(proposal.actionId,'toilet');assert.equal(Object.isFrozen(proposal),true);
+  assert.deepEqual(root,before);
+  assert.equal(admitAdditionalCareProposal(root,'alex',proposal).status,'rejected');
+  assert.equal(admitAdditionalCareProposal(loadHousehold(copy(root)),'resident_3',proposal).reason,
+    'foreign-or-used-proposal');
+  assert.equal(admitAdditionalCareProposal(root,'resident_3',{...proposal}).reason,
+    'foreign-or-used-proposal');
+  root.minutes+=.3;
+  assert.equal(admitAdditionalCareProposal(root,'resident_3',proposal).reason,'stale-clock');
+  const fresh=proposeAdditionalCare(root,'resident_3');
+  root.action={id:'toilet',phase:'using',elapsed:0,automatic:false,targetInstanceId:fresh.targetInstanceId};
+  const occupied=copy(root);
+  assert.equal(admitAdditionalCareProposal(root,'resident_3',fresh).status,'rejected');
+  assert.deepEqual(root,occupied);
+  root.action=null;
+  const pending=proposeAdditionalCare(root,'resident_3');
+  enqueueAction(root.actionQueues,'resident_3',{type:'object',actionId:'toilet',targetInstanceId:pending.targetInstanceId});
+  assert.equal(admitAdditionalCareProposal(root,'resident_3',pending).reason,'manual-fifo');
+  const restored=loadHousehold(copy(before)),b=getActor(restored,'resident_3');
+  const intent=proposeAdditionalCare(restored,'resident_3'),needs=copy(b.needs);
+  const outcome=admitAdditionalCareProposal(restored,'resident_3',intent);
+  assert.equal(outcome.status,'admitted');assert.equal(outcome.phase,'walking');
+  assert.deepEqual(b.needs,needs);
+  assert.equal(admitAdditionalCareProposal(restored,'resident_3',intent).reason,
+    'foreign-or-used-proposal');
+  assert.equal(loadHousehold(copy(restored)).version,1);
 });

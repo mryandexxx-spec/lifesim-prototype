@@ -541,6 +541,34 @@ export function tick(state, minutes,world=state?.world??null) {
   }
 }
 
+/** Detached, read-only care inputs. No world, queues, inventory, renderer or
+ * entire household clone. Adapters resolve the actual actor and supply the
+ * canonical clock. Do not persist this temporary evaluation record. */
+export function createCareContext(actor,{residentId,minutes,paused,enabled}){
+  if(!actor||typeof residentId!=='string')return null;
+  const freeze=Object.freeze;
+  const profile=actor.personality;
+  const prefs=profile?.preferences;
+  const copyList=list=>Array.isArray(list)?freeze([...list]):undefined;
+  const mind=actor.mind;
+  return freeze({
+    residentId,minutes,paused,
+    action:actor.action?freeze({id:actor.action.id}):actor.action,
+    autonomy:freeze({enabled,nextAt:actor.autonomy?.nextAt}),
+    needs:freeze(Object.fromEntries(NEEDS.map(key=>[key,actor.needs?.[key]]))),
+    personality:profile?freeze({traitIds:copyList(profile.traitIds),
+      preferences:prefs?freeze({likes:copyList(prefs.likes),
+        dislikes:copyList(prefs.dislikes)}):undefined}):profile,
+    mind:mind?freeze({
+      memories:Array.isArray(mind.memories)?freeze(mind.memories.map(m=>
+        freeze({id:m.id,at:m.at}))):undefined,
+      wish:mind.wish?freeze({id:mind.wish.id}):mind.wish,
+      mood:mind.mood?freeze({value:mind.mood.value}):mind.mood
+    }):mind,
+    workRecovery:actor.workRecovery?freeze({until:actor.workRecovery.until}):actor.workRecovery
+  });
+}
+
 /** QSK-06: explainable, pure utility scoring. Decisions contain no RNG,
  * wall clock, I/O or mutations; tie order follows the established action list.
  * Only an actual adapter can decide whether a ranked physical resource is free.

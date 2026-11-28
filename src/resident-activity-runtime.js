@@ -4,7 +4,7 @@
  * Alex/Mira keep their established visual/social pipelines; additional actors
  * use the same root clock, typed persistent FIFO and world A* geometry.
  */
-import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy,mirrorActionLabel} from './simulation.js';
+import {ACTIONS,chooseAction,arrive,tick,evaluateAutonomy,createCareContext,mirrorActionLabel} from './simulation.js';
 import {recordTaskOutcome,captureTaskLeisure,settleTaskLeisure} from './recurring-tasks.js';
 import {ACTOR_RADIUS,findPath,isWalkable,isClearLine,nearestWalkable} from './navigation.js';
 import {resolveActionFurniture,furnitureActionApproach} from './furniture-catalog.js';
@@ -443,6 +443,34 @@ function additionalAutonomyBlock(root,id){
   return null;
 }
 
+/** Capability of the existing additional-resident automatic care adapter.
+ * A supported action is not necessarily currently possible. No new action is
+ * admitted by this classification. Manual-only objects remain manual-only. */
+function probeAdditionalCare(root,id,actionId,targetInstanceId=null){
+  if(typeof actionId!=='string'||!Object.hasOwn(ACTIONS,actionId))
+    return {status:'unknown',reason:'unknown-action',plan:null};
+  if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(actionId))
+    return {status:ADDITIONAL_OBJECT_ACTIONS.includes(actionId)?'forbidden':'unsupported',
+      reason:ADDITIONAL_OBJECT_ACTIONS.includes(actionId)?'manual-only':'no-automatic-care-adapter',
+      plan:null};
+  const plan=prepareCommand(root,id,{type:'object',actionId,
+    ...(targetInstanceId!==null?{targetInstanceId}:{})},{automatic:true});
+  return plan?{status:'supported',reason:null,plan}:
+    {status:'blocked',reason:'unavailable-or-unreachable',plan:null};
+}
+export function additionalCareCapability(root,id,actionId){
+  // Classify unsupported action independently of temporary actor blockers.
+  if(typeof actionId!=='string'||!Object.hasOwn(ACTIONS,actionId)||
+    !ADDITIONAL_AUTONOMOUS_ACTIONS.includes(actionId))
+    return probeAdditionalCare(root,id,actionId);
+  const blocked=additionalAutonomyBlock(root,id);
+  if(blocked)return {status:'blocked',reason:blocked,plan:null};
+  const actor=savedAdditionalActor(root,id);
+  if(!actor||!Number.isFinite(root.minutes)||root.minutes<actor.autonomy.nextAt)
+    return {status:'blocked',reason:'cooldown',plan:null};
+  return probeAdditionalCare(root,id,actionId);
+}
+
 /** Read-only resource-aware explanation of a resident's *actual* feasible
  * next action. This is not serialized or shown as a reward. It uses precisely
  * the same exclusive furniture reservations and A* tests as action dispatch.
@@ -451,8 +479,9 @@ export function explainAdditionalResidentAutonomy(root,id){
   const blocked=additionalAutonomyBlock(root,id);
   if(blocked)return {blocked,selected:null,plan:null,attempts:[]};
   const actor=savedAdditionalActor(root,id);
-  const projected={...actor,minutes:root.minutes,paused:root.paused,
-    autonomy:{...actor.autonomy,enabled:root.autonomy.enabled}};
+  const projected=createCareContext(actor,{
+    residentId:id,minutes:root.minutes,paused:root.paused,enabled:root.autonomy.enabled
+  });
   const evaluation=evaluateAutonomy(projected);
   if(evaluation.blocked)return {
     blocked:evaluation.blocked,selected:null,plan:null,attempts:[]};
@@ -460,10 +489,10 @@ export function explainAdditionalResidentAutonomy(root,id){
   for(const candidate of evaluation.candidates){
     if(candidate.score<=0)continue;
     if(!ADDITIONAL_AUTONOMOUS_ACTIONS.includes(candidate.id))continue;
-    let plan=prepareCommand(root,id,{type:'object',actionId:candidate.id},{automatic:true});
+    let plan=probeAdditionalCare(root,id,candidate.id).plan;
     // Real TV is only an alternate reachable device for leisure.
     if(!plan&&candidate.id==='sofa')
-      plan=prepareCommand(root,id,{type:'object',actionId:'tv'},{automatic:true});
+      plan=probeAdditionalCare(root,id,'tv').plan;
     attempts.push({id:candidate.id,score:candidate.score,
       reason:candidate.reason,factors:candidate.factors,
       availability:plan?'free-and-reachable':'unavailable-or-unreachable',
@@ -472,7 +501,7 @@ export function explainAdditionalResidentAutonomy(root,id){
   }
   if(evaluation.selected===null&&Number.isFinite(actor.needs.social)&&
     actor.needs.social<35){
-    const mirror=prepareCommand(root,id,{type:'object',actionId:'mirror'},{automatic:true});
+    const mirror=probeAdditionalCare(root,id,'mirror').plan;
     attempts.push({id:'mirror',score:null,reason:'low-social-real-mirror',
       availability:mirror?'free-and-reachable':'unavailable-or-unreachable',
       plannedAction:mirror?.id||null});
@@ -481,13 +510,59 @@ export function explainAdditionalResidentAutonomy(root,id){
   return {blocked:null,selected:null,plan:null,attempts};
 }
 
+/** Transient intent, not an accepted command, reservation or saved event. */
+// Provenance is transient and weakly held; it cannot survive a saved-game
+// reload, bind another household, or become a reusable admission ticket.
+const careProposalOrigins=new WeakMap();
+function careProposal(root,id,plan){
+  if(!plan)return null;
+  const proposal=Object.freeze({type:'additional-care',residentId:id,
+    at:root.minutes,actionId:plan.id,targetInstanceId:plan.targetInstanceId,
+    bedSlot:plan.bedSlot??null});
+  careProposalOrigins.set(proposal,root);
+  return proposal;
+}
+export function proposeAdditionalCare(root,id){
+  const explanation=explainAdditionalResidentAutonomy(root,id);
+  return careProposal(root,id,explanation.plan);
+}
+/** Reuse the real care adapter at the current clock and exact target. The
+ * returned result describes admission only; the existing tick owns effects.
+ * No pending intent, result or reservation is serialized by this function. */
+export function admitAdditionalCareProposal(root,id,proposal){
+  const rejected=reason=>({status:'rejected',reason});
+  if(!proposal||proposal.type!=='additional-care'||proposal.residentId!==id||
+    typeof proposal.targetInstanceId!=='string'||
+    !ADDITIONAL_AUTONOMOUS_ACTIONS.includes(proposal.actionId))
+    return rejected('invalid-proposal');
+  if(careProposalOrigins.get(proposal)!==root)return rejected('foreign-or-used-proposal');
+  careProposalOrigins.delete(proposal);
+  if(!Number.isFinite(root?.minutes)||proposal.at!==root.minutes)
+    return rejected('stale-clock');
+  const blocked=additionalAutonomyBlock(root,id);
+  if(blocked)return rejected(blocked);
+  const actor=savedAdditionalActor(root,id);
+  if(!actor||root.minutes<actor.autonomy.nextAt)return rejected('cooldown');
+  const capability=probeAdditionalCare(root,id,proposal.actionId,proposal.targetInstanceId);
+  if(capability.status!=='supported')return rejected(capability.reason);
+  const plan=capability.plan;
+  if(plan.targetInstanceId!==proposal.targetInstanceId||
+    (plan.bedSlot??null)!==proposal.bedSlot)return rejected('changed-resource');
+  actor.autonomy.enabled=root.autonomy.enabled;
+  actor.minutes=root.minutes;
+  if(!startPlannedObject(root,id,plan,true))return rejected('admission-failed');
+  return {status:'admitted',residentId:id,actionId:actor.action.id,
+    targetInstanceId:actor.action.targetInstanceId,phase:actor.action.phase};
+}
+
 export function startAdditionalResidentAutonomy(root,id){
   const explanation=explainAdditionalResidentAutonomy(root,id);
   if(explanation.blocked)return false;
   const actor=savedAdditionalActor(root,id);
   actor.autonomy.enabled=root.autonomy.enabled;
   actor.minutes=root.minutes;
-  if(explanation.plan&&startPlannedObject(root,id,explanation.plan,true))
+  const proposal=careProposal(root,id,explanation.plan);
+  if(proposal&&admitAdditionalCareProposal(root,id,proposal).status==='admitted')
     return true;
   // No eligible need: do not repeatedly postpone a future need merely
   // because this resident is presently healthy and content.

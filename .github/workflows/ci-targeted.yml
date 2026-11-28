@@ -8,6 +8,70 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  care-seam-parity:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/lp-01h-care-seam' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: bbd752a22ae08df6ff2c538891c723eefc244d42
+          path: frozen-care-baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          test "$(git -C frozen-care-baseline rev-parse HEAD)" = bbd752a22ae08df6ff2c538891c723eefc244d42
+          CARE_BASELINE_PATH="$PWD/frozen-care-baseline" node --test tests/care-baseline-parity.test.js
+          node --test tests/qsk-06-utility-autonomy.test.js tests/cas-01-5-autonomy.test.js
+  care-runtime-browser:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/lp-01h-care-seam' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
+        width: [320, 390]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: bbd752a22ae08df6ff2c538891c723eefc244d42
+          path: frozen-care-baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          test "$(git -C frozen-care-baseline rev-parse HEAD)" = bbd752a22ae08df6ff2c538891c723eefc244d42
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps "$CARE_ENGINE"
+          mkdir -p vendor frozen-care-baseline/vendor
+          cp node_modules/playcanvas/build/playcanvas.mjs vendor/playcanvas.mjs
+          cp vendor/playcanvas.mjs frozen-care-baseline/vendor/playcanvas.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/care-candidate-http.log 2>&1 &
+          python3 -m http.server 8766 --bind 127.0.0.1 --directory frozen-care-baseline >/tmp/care-baseline-http.log 2>&1 &
+          sleep 3
+          node tests/care-runtime-browser.mjs
+        env:
+          CARE_ENGINE: ${{ matrix.engine }}
+          CARE_WIDTH: ${{ matrix.width }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: care-runtime-${{ matrix.engine }}-${{ matrix.width }}
+          path: artifacts/care-browser/
+          if-no-files-found: warn
   gc-08-life-biography:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/gc-08-biography' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
