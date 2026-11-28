@@ -356,3 +356,21 @@ test('LP-02A: outgoing residents may choose a safe acquaintance, not an unsafe o
   c.residents.ember.needs.hunger=83;
   c.minutes=500;assert.equal(proposeAutonomousSocial(c),null);
 });
+
+
+test('LP-02A: composed temperament refrains from discretionary conflict, not ordinary social care',()=>{
+  const g=newSocialGraph(ids);markAcquainted(g,'nova','ember',480);
+  const c=context(g),a=c.residents.nova,p=getPair(g,'nova','ember');
+  a.needs.fun=20;a.mind.mood.value=38;
+  p.views.nova.tension=90;
+  for(const trait of ['temperament.hotheaded','temperament.calm']){
+    a.personality=createProfile([trait,'social.outgoing']);
+    assert.equal(proposeAutonomousSocial(c)?.kind,trait==='temperament.calm'?undefined:'argue');
+    p.views.nova.tension=10;
+    assert.equal(proposeAutonomousSocial(c)?.kind,'talk');
+    p.views.nova.tension=90;
+  }
+  a.personality=createProfile(['temperament.hotheaded','social.outgoing']);
+  assert.ok(enqueueAction(c.queues,'ember',{type:'object',actionId:'bed'}));
+  assert.equal(proposeAutonomousSocial(c),null);
+});

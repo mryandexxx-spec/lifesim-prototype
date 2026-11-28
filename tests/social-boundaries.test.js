@@ -285,3 +285,71 @@ test('LP-02A: real learned support cue applies to help unless a space boundary i
   const restored=restoreSocialGraph(clone(g),ids);
   assert.equal(socialCommunicationBias(restored,'nova','ember','support.help'),-2);
 });
+
+
+test('LP-02A: temperament and approach respond to authored content rather than a whole topic',()=>{
+  const profile=trait=>createProfile(['habits.neat',trait]);
+  const neutral=profile('coordination.agile');
+  const cases=[
+    ['temperament.cheerful','daily.news','daily.critic'],
+    ['temperament.melancholic','philosophy.share','daily.news'],
+    ['temperament.calm','conflict.extra','plans.idea'],
+    ['approach.creative','plans.idea','money.ask'],
+    ['approach.pragmatic','money.ask','plans.idea']
+  ];
+  for(const [trait,meaningful,unrelated] of cases){
+    assert.equal(boundaryDisposition(profile(trait),meaningful),4,trait);
+    assert.equal(boundaryDisposition(neutral,meaningful),0);
+    assert.equal(boundaryDisposition(profile(trait),unrelated),0);
+  }
+  assert.equal(boundaryDisposition(profile('temperament.hotheaded'),'conflict.blame'),-6);
+  assert.equal(boundaryDisposition(profile('temperament.hotheaded'),'conflict.extra'),0);
+  assert.equal(boundaryDisposition(createProfile(['temperament.cheerful','approach.creative']),'plans.idea'),4);
+});
+test('LP-02A: actual authored answers can change by profile and settle once for either resident',()=>{
+  const cases=[
+    ['temperament.cheerful','daily','daily.news',true],
+    ['temperament.melancholic','philosophy','philosophy.share',true],
+    ['temperament.calm','conflict','conflict.extra',true],
+    ['temperament.hotheaded','daily','daily.critic',false],
+    ['approach.creative','plans','plans.idea',true],
+    ['approach.pragmatic','money','money.ask',true]
+  ];
+  const neutral=createProfile(['habits.neat','coordination.agile']);
+  for(const initiator of ['alex','mira'])for(const [trait,topic,line,preferred] of cases){
+    const partner=initiator==='alex'?'mira':'alex';
+    const candidate=createProfile(['habits.neat',trait]);
+    function fixture(profile,trust,tension){
+      const s=newHousehold(),a=initiator==='alex'?s:s.otherSim,b=partner==='alex'?s:s.otherSim;
+      a.personality=clone(neutral);b.personality=clone(profile);
+      b.mind.mood.value=70;
+      Object.assign(s.relationship.views[partner],{trust,tension,friendship:50});
+      return s;
+    }
+    let matched=null;
+    for(const trust of [10,30,50,70,90,100]){
+      for(let tension=0;tension<=100;tension++){
+        const a=fixture(neutral,trust,tension),b=fixture(candidate,trust,tension);
+        const first=evaluateResponse(a,initiator,topic,line),second=evaluateResponse(b,initiator,topic,line);
+        if(first?.accepted===!preferred&&second?.accepted===preferred){matched={a,b};break;}
+      }
+      if(matched)break;
+    }
+    assert.ok(matched,trait+' '+initiator+' has a genuine threshold crossing');
+    for(const [root,expected] of [[matched.a,!preferred],[matched.b,preferred]]){
+      const seq=root.socialGraph.nextSeq;
+      assert.ok(startConversation(root,initiator,spot,topic));
+      assert.ok(arriveSocial(root));
+      assert.equal(chooseSocialLine(root,line)?.accepted,expected);
+      assert.equal(root.socialGraph.nextSeq,seq,'reply is not yet a completed event');
+      assert.ok(finishSocialConversation(root));
+      const pair=getPair(root.socialGraph,'alex','mira');
+      assert.equal(pair.events.at(-1).type,expected?'conversation.talk':'conversation.argue');
+      assert.equal(root.socialGraph.nextSeq,seq+1);
+      assert.equal(finishSocialConversation(root),null);
+      const restored=loadHousehold(clone(root));
+      assert.equal(restored.version,1);
+      assert.deepEqual(getPair(restored.socialGraph,'alex','mira').events,pair.events);
+    }
+  }
+});

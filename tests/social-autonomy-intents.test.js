@@ -287,3 +287,34 @@ test('final player-facing and deploy wiring handles structured automation',()=>{
   assert.ok(workflow.includes('src/social-boundaries.js src/social-dynamics.js src/romance.js src/reaction-badges.js'));
   assert.ok(!/\b(alex|mira|document|localStorage|playcanvas)\b/i.test(core));
 });
+
+
+test('LP-02A: actual legacy adapter distinguishes optional company and settles a genuine talk once',()=>{
+  for(const id of ['alex','mira']){
+    const s=legacy(),a=id==='alex'?s:s.otherSim,other=id==='alex'?'mira':'alex';
+    const recipient=other==='alex'?s:s.otherSim;
+    a.needs.fun=40;a.needs.social=60;
+    a.mind.mood.value=65;recipient.mind.mood.value=65;
+    for(const actor of [a,recipient])Object.assign(actor.needs,{energy:85,hunger:85,hygiene:85,bladder:85});
+    for(const who of ['alex','mira']){
+      Object.assign(s.relationship.views[who],{friendship:50,trust:45,tension:0});
+      Object.assign(getPair(s.socialGraph,'alex','mira').views[who],{friendship:50,trust:45,tension:0});
+    }
+    recipient.personality=createProfile(['habits.neat','coordination.agile']);
+    a.personality=createProfile(['temperament.calm','social.reserved']);
+    assert.equal(autonomousSocialChoice(s,id),null);
+    a.personality=createProfile(['temperament.calm','social.outgoing']);
+    assert.equal(autonomousSocialChoice(s,id),'talk');
+    const before=s.socialGraph.nextSeq;
+    assert.ok(startSocial(s,'talk',id,place,true));
+    assert.equal(s.socialGraph.nextSeq,before);
+    assert.ok(arriveSocial(s));
+    tickHousehold(s,100);
+    assert.equal(s.socialAction,null);
+    assert.equal(s.socialGraph.nextSeq,before+1);
+    assert.equal(getPair(s.socialGraph,'alex','mira').events.at(-1).type,'talk');
+    const restored=loadHousehold(copy(s));
+    assert.equal(restored.socialGraph.nextSeq,before+1);
+    assert.deepEqual(getPair(restored.socialGraph,'alex','mira').events,getPair(s.socialGraph,'alex','mira').events);
+  }
+});

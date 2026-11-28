@@ -19,6 +19,13 @@ const support=new Set(['support.listen','support.help']);
 const playful=new Set(['humor.joke','humor.story']);
 const clear=new Set(['conflict.explain']);
 const space=new Set(['plans.invite','support.help']);
+// Authored conversational content, not inferred from a topic, mood or taste.
+// A reflective temperament does not mean that someone enjoys sadness.
+const optimistic=new Set(['daily.news','daily.yes','daily.reframe','daily.tact']);
+const reflective=new Set(['philosophy.share','philosophy.reflect','memories.reflect','dreams.deep']);
+const composed=new Set(['conflict.extra','conflict.repair','conflict.yes']);
+const imaginative=new Set(['plans.idea','hobbies.extra','dreams.share','humor.extra']);
+const concrete=new Set(['money.ask','money.share','plans.extra','plans.yes','dreams.reflect']);
 const validRecord=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const validId=id=>typeof id==='string'&&/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -104,6 +111,13 @@ export function boundaryDisposition(profile,actionId){
   if(support.has(actionId))return axes.empathy>=.70?4:0;
   if(playful.has(actionId))return axes.optimism>=.70?4:0;
   if(clear.has(actionId))return axes.practicality>=.72?3:0;
+  // At most one modest content-specific response bias. Normal relationship,
+  // emotional state, taste and consent still decide the actual answer.
+  if(optimistic.has(actionId)&&axes.optimism>=.70)return 4;
+  if(reflective.has(actionId)&&axes.emotionalReactivity>=.65&&axes.optimism<=.45)return 4;
+  if(composed.has(actionId)&&axes.emotionalReactivity<=.36&&axes.resilience>=.62)return 4;
+  if(imaginative.has(actionId)&&axes.creativity>=.70)return 4;
+  if(concrete.has(actionId)&&axes.practicality>=.72)return 4;
   return 0;
 }
 /** Learned expectations modify contextual conversation choices, not the

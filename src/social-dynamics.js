@@ -232,6 +232,10 @@ export function proposeAutonomousSocial({
     // AND bad mood AND low fun, but never immediately repeat a recent fight.
     const distressed=!repair&&!severe&&directed.tension>=85&&
       mood<42&&self.needs.fun<35;
+    // A composed temperament can decline the discretionary confrontation.
+    // Do not turn restraint into an imposed conversation or suppress repair.
+    // Other profiles retain the existing severe-tension conflict threshold.
+    if(distressed&&axes.emotionalReactivity<=.36&&axes.resilience>=.62)continue;
     if(distressed)score+=20;
     // Discretionary company is distinct from a genuinely unmet social need.
     // Preserve all existing eligibility, cooldown, repair and distress gates.
