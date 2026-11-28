@@ -322,6 +322,12 @@ test('LP-02A: actual authored answers can change by profile and settle once for 
     function fixture(profile,trust,tension){
       const s=newHousehold(),a=initiator==='alex'?s:s.otherSim,b=partner==='alex'?s:s.otherSim;
       a.personality=clone(neutral);b.personality=clone(profile);
+      // A sharp line is otherwise rejected even at trust=100. Both matched
+      // profiles have the same favorable interest; only temperament differs.
+      if(line==='daily.critic'){
+        a.personality.preferences.likes=['calm_leisure'];
+        b.personality.preferences.likes=['calm_leisure'];
+      }
       b.mind.mood.value=70;
       Object.assign(s.relationship.views[partner],{trust,tension,friendship:50});
       return s;
