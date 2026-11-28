@@ -8,6 +8,34 @@ concurrency:
   group: targeted-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  lp02c-trait-picker:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/lp-02a-housekeeping' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real mobile touch and canonical admission in both browser engines
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/lp02c-http.log 2>&1 &
+          sleep 3
+          node tests/lp02c-trait-picker-browser.mjs
+        env:
+          LP_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lp02c-trait-picker
+          path: artifacts/lp02c-picker/
+          if-no-files-found: warn
   care-seam-parity:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/lp-01h-care-seam' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
